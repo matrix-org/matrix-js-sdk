@@ -16,10 +16,10 @@ limitations under the License.
 
 import {
     Curve25519PublicKey,
-    EstablishedSecureChannel,
+    Ecies,
+    EstablishedEcies,
     QrCodeData,
     QrCodeMode,
-    SecureChannel,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
@@ -36,8 +36,8 @@ import { logger } from "../../logger";
  * Imports @matrix-org/matrix-sdk-crypto-wasm so should be async-imported to avoid bundling the WASM into the main bundle.
  */
 export class MSC4108SecureChannel {
-    private readonly secureChannel: SecureChannel;
-    private establishedChannel?: EstablishedSecureChannel;
+    private readonly secureChannel: Ecies;
+    private establishedChannel?: EstablishedEcies;
     private connected = false;
 
     public constructor(
@@ -45,7 +45,7 @@ export class MSC4108SecureChannel {
         private theirPublicKey?: Curve25519PublicKey,
         public onFailure?: RendezvousFailureListener,
     ) {
-        this.secureChannel = new SecureChannel();
+        this.secureChannel = new Ecies();
     }
 
     /**
@@ -93,7 +93,11 @@ export class MSC4108SecureChannel {
 
         if (this.theirPublicKey) {
             // We are the scanning device
-            this.establishedChannel = this.secureChannel.create_outbound_channel(this.theirPublicKey);
+            const result = this.secureChannel.establish_outbound_channel(
+                this.theirPublicKey,
+                "MATRIX_QR_CODE_LOGIN_INITIATE",
+            );
+            this.establishedChannel = result.channel;
 
             /*
              Secure Channel step 4. Device S sends the initial message
@@ -107,8 +111,7 @@ export class MSC4108SecureChannel {
              */
             {
                 logger.info("Sending LoginInitiateMessage");
-                const loginInitiateMessage = this.establishedChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE");
-                await this.rendezvousSession.send(loginInitiateMessage);
+                await this.rendezvousSession.send(result.initial_message);
             }
 
             /*
@@ -162,7 +165,7 @@ export class MSC4108SecureChannel {
             }
 
             const { channel, message: candidateLoginInitiateMessage } =
-                this.secureChannel.create_inbound_channel(loginInitiateMessage);
+                this.secureChannel.establish_inbound_channel(loginInitiateMessage);
             this.establishedChannel = channel;
 
             if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {

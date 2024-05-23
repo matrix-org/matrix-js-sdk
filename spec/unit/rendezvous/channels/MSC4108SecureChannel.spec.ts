@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EstablishedSecureChannel, QrCodeData, QrCodeMode, SecureChannel } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { EstablishedEcies, QrCodeData, QrCodeMode, Ecies } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked } from "jest-mock";
 
 import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
@@ -45,8 +45,11 @@ describe("MSC4108SecureChannel", () => {
         const channel = new MSC4108SecureChannel(mockSession);
 
         const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
-        const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
-        mocked(mockSession.receive).mockResolvedValue(opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE"));
+        const { initial_message: ciphertext } = new Ecies().establish_outbound_channel(
+            qrCodeData.public_key,
+            "MATRIX_QR_CODE_LOGIN_INITIATE",
+        );
+        mocked(mockSession.receive).mockResolvedValue(ciphertext);
         await channel.connect();
         await expect(channel.connect()).rejects.toThrow("Channel already connected");
     });
@@ -63,8 +66,10 @@ describe("MSC4108SecureChannel", () => {
         await expect(channel.connect()).rejects.toThrow("No response from other device");
 
         const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
-        const opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
-        const ciphertext = opponentChannel.encrypt("NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE");
+        const { initial_message: ciphertext } = new Ecies().establish_outbound_channel(
+            qrCodeData.public_key,
+            "NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE",
+        );
 
         mocked(mockSession.receive).mockResolvedValue(ciphertext);
         await expect(channel.connect()).rejects.toThrow("Invalid response from other device");
@@ -73,7 +78,7 @@ describe("MSC4108SecureChannel", () => {
     describe("should be able to connect as a reciprocating device", () => {
         let mockSession: MSC4108RendezvousSession;
         let channel: MSC4108SecureChannel;
-        let opponentChannel: EstablishedSecureChannel;
+        let opponentChannel: EstablishedEcies;
 
         beforeEach(async () => {
             mockSession = {
@@ -84,8 +89,11 @@ describe("MSC4108SecureChannel", () => {
             channel = new MSC4108SecureChannel(mockSession);
 
             const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
-            opponentChannel = new SecureChannel().create_outbound_channel(qrCodeData.public_key);
-            const ciphertext = opponentChannel.encrypt("MATRIX_QR_CODE_LOGIN_INITIATE");
+            const { channel: _opponentChannel, initial_message: ciphertext } = new Ecies().establish_outbound_channel(
+                qrCodeData.public_key,
+                "MATRIX_QR_CODE_LOGIN_INITIATE",
+            );
+            opponentChannel = _opponentChannel;
 
             mocked(mockSession.receive).mockResolvedValue(ciphertext);
             await channel.connect();
