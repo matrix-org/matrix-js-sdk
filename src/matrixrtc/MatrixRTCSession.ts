@@ -20,7 +20,13 @@ import { EventTimeline } from "../models/event-timeline";
 import { Room } from "../models/room";
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
-import { CallMembership, CallMembershipData, CallMembershipDataLegacy, SessionMembershipData } from "./CallMembership";
+import {
+    CallMembership,
+    CallMembershipData,
+    CallMembershipDataLegacy,
+    SessionMembershipData,
+    isLegacyCallMembershipData,
+} from "./CallMembership";
 import { RoomStateEvent } from "../models/room-state";
 import { Focus } from "./focus";
 import { randomString, secureRandomBase64Url } from "../randomstring";
@@ -269,7 +275,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      *                        or optionally other room members homeserver well known.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRoomSession(fociActive: Focus, fociPreferred: Focus[], joinConfig?: JoinSessionConfig): void {
+    public async joinRoomSession(
+        fociActive: Focus,
+        fociPreferred: Focus[],
+        joinConfig?: JoinSessionConfig,
+    ): Promise<void> {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
@@ -284,14 +294,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
         this.useLegacyMemberEvents = joinConfig?.useLegacyMemberEvents ?? this.useLegacyMemberEvents;
         this.membershipId = randomString(5);
-        this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
         if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
             this.requestKeyEventSend();
         }
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
-        this.triggerCallMembershipEventUpdate();
+        await this.triggerCallMembershipEventUpdate();
+        this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
     /**
@@ -820,38 +830,38 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
         const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
-        const content = myCallMemberEvent?.getContent<Record<any, unknown>>() ?? {};
-        // For MSC4134 style events we dont need to do any updating. We abort here.
-        if (!("memberships" in content)) return;
-        // We know its CallMembershipDataLegacy
-        const memberships: CallMembershipDataLegacy[] = Array.isArray(content["memberships"])
-            ? content["memberships"]
-            : [];
-
-        const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
-        let myPrevMembership;
-        try {
-            if (myCallMemberEvent && myPrevMembershipData && myPrevMembershipData.membershipID === this.membershipId) {
-                myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
-            }
-        } catch (e) {
-            // This would indicate a bug or something weird if our own call membership
-            // wasn't valid
-            logger.warn("Our previous call membership was invalid - this shouldn't happen.", e);
-        }
-
-        if (myPrevMembership) {
-            logger.debug(`${myPrevMembership.getMsUntilExpiry()} until our membership expires`);
-        }
-
-        if (!this.membershipEventNeedsUpdate(myPrevMembershipData, myPrevMembership)) {
-            // nothing to do - reschedule the check again
-            this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
-            return;
-        }
-
+        const content = myCallMemberEvent?.getContent<Record<string, unknown>>() ?? {};
+        const legacy = "memberships" in content || this.useLegacyMemberEvents;
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
-        if (this.useLegacyMemberEvents) {
+        if (legacy) {
+            let myPrevMembership;
+            // We know its CallMembershipDataLegacy
+            const memberships = Array.isArray(content["memberships"])
+                ? content["memberships"]
+                : ([] as CallMembershipDataLegacy[]);
+            const myPrevMembershipData = memberships.find((m) => m.device_id === localDeviceId);
+            try {
+                if (
+                    myCallMemberEvent &&
+                    myPrevMembershipData &&
+                    isLegacyCallMembershipData(myPrevMembershipData) &&
+                    myPrevMembershipData.membershipID === this.membershipId
+                ) {
+                    myPrevMembership = new CallMembership(myCallMemberEvent, myPrevMembershipData);
+                }
+            } catch (e) {
+                // This would indicate a bug or something weird if our own call membership
+                // wasn't valid
+                logger.warn("Our previous call membership was invalid - this shouldn't happen.", e);
+            }
+            if (myPrevMembership) {
+                logger.debug(`${myPrevMembership.getMsUntilExpiry()} until our membership expires`);
+            }
+            if (!this.membershipEventNeedsUpdate(myPrevMembershipData, myPrevMembership)) {
+                // nothing to do - reschedule the check again
+                this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
+                return;
+            }
             newContent = this.makeNewLegacyMemberships(memberships, myCallMemberEvent, myPrevMembership);
         } else {
             newContent = this.makeNewMembership();
@@ -867,7 +877,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Sent updated call member event.`);
 
             // check periodically to see if we need to refresh our member event
-            if (this.isJoined()) {
+            if (this.isJoined() && legacy) {
                 this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
             }
         } catch (e) {

@@ -36,7 +36,7 @@ export interface SessionMembershipData {
     // Application specific data
     scope?: CallScope;
 }
-const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
+export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
     "foci_active" in data &&
     "foci_preferred" in data &&
     "membership_id" in data &&
@@ -69,7 +69,7 @@ export interface CallMembershipDataLegacy {
     expires_ts?: number;
     foci_active?: Focus[];
 }
-const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
+export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
     "membershipID" in data && "foci_active" in data && Array.isArray(data.foci_active);
 const checkCallMembershipDataLegacy = (data: CallMembershipDataLegacy): void => {
     const prefix = "Malformed legacy rtc membership event: ";
