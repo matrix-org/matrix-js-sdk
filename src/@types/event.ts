@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { XOR } from "ts-xor";
+
 import { UnstableValue } from "../NamespacedValue";
 import {
     PolicyRuleEventContent,
@@ -42,7 +44,6 @@ import {
 } from "../webrtc/groupCall";
 import { MSC3089EventContent } from "../models/MSC3089Branch";
 import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon";
-import { XOR } from "./common";
 import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events";
 import {
     MCallAnswer,

@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { XOR } from "ts-xor";
+
 import { MsgType, RelationType } from "./event";
 import { FileInfo, ImageInfo, MediaEventContent } from "./media";
-import { XOR } from "./common";
 
 interface BaseTimelineEvent {
     "body": string;
