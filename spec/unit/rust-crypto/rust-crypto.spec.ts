@@ -1396,14 +1396,15 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
-                testData.SIGNED_BACKUP_DATA.version!,
+                backupVersion,
             );
 
             // we import two keys: one "from backup", and one "from export"
             const [backedUpRoomKey, exportedRoomKey] = testData.MEGOLM_SESSION_DATA_ARRAY;
-            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey]);
+            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey], backupVersion);
             await rustCrypto.importRoomKeys([exportedRoomKey]);
 
             // we ask for the keys that should be backed up
@@ -1438,16 +1439,17 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
-                testData.SIGNED_BACKUP_DATA.version!,
+                backupVersion,
             );
 
             const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
             // in addition to correct keys, we restore an invalid key
             backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
             const progressCallback = jest.fn();
-            await rustCrypto.importBackedUpRoomKeys(backup, { progressCallback });
+            await rustCrypto.importBackedUpRoomKeys(backup, backupVersion, { progressCallback });
             expect(progressCallback).toHaveBeenCalledWith({
                 total: 3,
                 successes: 0,
