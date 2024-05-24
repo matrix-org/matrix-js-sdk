@@ -406,12 +406,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private threads = new Map<string, Thread>();
 
     /**
-     * @deprecated This value is unreliable. It may not contain the last thread.
-     *             Use {@link Room.getLastThread} instead.
-     */
-    public lastThread?: Thread;
-
-    /**
      * A mapping of eventId to all visibility changes to apply
      * to the event, by chronological order, as per
      * https://github.com/matrix-org/matrix-doc/pull/3531
@@ -2457,15 +2451,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
         // and pass the event through this.
         thread.addEvents(events, false);
-
-        const isNewer =
-            this.lastThread?.rootEvent &&
-            rootEvent?.localTimestamp &&
-            this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
-
-        if (!this.lastThread || isNewer) {
-            this.lastThread = thread;
-        }
 
         // We need to update the thread root events, but the thread may not be ready yet.
         // If it isn't, it will fire ThreadEvent.Update when it is and we'll call updateThreadRootEvents then.
