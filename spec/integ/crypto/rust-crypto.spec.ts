@@ -85,6 +85,44 @@ describe("MatrixClient.initRustCrypto", () => {
         );
     });
 
+    it("should create the meta db if given a storageKey", async () => {
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        // No databases.
+        expect(await indexedDB.databases()).toHaveLength(0);
+
+        await matrixClient.initRustCrypto({ storageKey: new Uint8Array(32) });
+
+        // should have two indexed dbs now
+        const databaseNames = (await indexedDB.databases()).map((db) => db.name);
+        expect(databaseNames).toEqual(
+            expect.arrayContaining(["matrix-js-sdk::matrix-sdk-crypto", "matrix-js-sdk::matrix-sdk-crypto-meta"]),
+        );
+    });
+
+    it("should create the meta db if given a storagePassword", async () => {
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        // No databases.
+        expect(await indexedDB.databases()).toHaveLength(0);
+
+        await matrixClient.initRustCrypto({ storagePassword: "the cow is on the moon" });
+
+        // should have two indexed dbs now
+        const databaseNames = (await indexedDB.databases()).map((db) => db.name);
+        expect(databaseNames).toEqual(
+            expect.arrayContaining(["matrix-js-sdk::matrix-sdk-crypto", "matrix-js-sdk::matrix-sdk-crypto-meta"]),
+        );
+    });
+
     it("should ignore a second call", async () => {
         const matrixClient = createClient({
             baseUrl: "http://test.server",
