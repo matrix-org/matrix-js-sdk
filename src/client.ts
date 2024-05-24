@@ -1480,13 +1480,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.on(ClientEvent.Sync, this.startMatrixRTC);
 
-        // backwards compat for when 'opts' was 'historyLen'.
-        if (typeof opts === "number") {
-            opts = {
-                initialSyncLimit: opts,
-            };
-        }
-
         // Create our own user object artificially (instead of waiting for sync)
         // so it's always available, even if the user is not in any rooms etc.
         const userId = this.getUserId();
@@ -7888,16 +7881,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         password: string,
         sessionId: string | null,
         auth: { session?: string; type: string },
-        bindThreepids?: boolean | null | { email?: boolean; msisdn?: boolean },
+        bindThreepids?: { email?: boolean; msisdn?: boolean },
         guestAccessToken?: string,
         inhibitLogin?: boolean,
     ): Promise<RegisterResponse> {
-        // backwards compat
-        if (bindThreepids === true) {
-            bindThreepids = { email: true };
-        } else if (bindThreepids === null || bindThreepids === undefined || bindThreepids === false) {
-            bindThreepids = {};
-        }
         if (sessionId) {
             auth.session = sessionId;
         }
