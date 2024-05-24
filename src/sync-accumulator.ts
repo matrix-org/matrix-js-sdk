@@ -58,8 +58,6 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
-    /** @deprecated - legacy field */
-    age?: number;
 }
 
 export interface IStateEvent extends IRoomEvent {
@@ -498,7 +496,7 @@ export class SyncAccumulator {
                 if (transformedEvent.unsigned !== undefined) {
                     transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
                 }
-                const age = e.unsigned ? e.unsigned.age : e.age;
+                const age = e.unsigned?.age;
                 if (age !== undefined) transformedEvent._localTs = Date.now() - age;
             } else {
                 transformedEvent = e;

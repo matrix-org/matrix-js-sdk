@@ -3198,7 +3198,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                                 content: strippedEvent.content,
                                 event_id: "$fake" + Date.now(),
                                 room_id: this.roomId,
-                                user_id: this.myUserId, // technically a lie
+                                sender: this.myUserId, // technically a lie
                             }),
                         ]);
                     }

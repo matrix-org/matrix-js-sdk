@@ -1560,7 +1560,6 @@ describe("MatrixClient", function () {
                     },
                 },
                 event_id: "$ev1",
-                user_id: "@alice:matrix.org",
             });
 
             expect(rootEvent.isThreadRoot).toBe(true);

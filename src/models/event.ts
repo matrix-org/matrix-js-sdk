@@ -98,19 +98,6 @@ export interface IEvent {
     membership?: Membership;
     unsigned: IUnsigned;
     redacts?: string;
-
-    /**
-     * @deprecated in favour of `sender`
-     */
-    user_id?: string;
-    /**
-     * @deprecated in favour of `unsigned.prev_content`
-     */
-    prev_content?: IContent;
-    /**
-     * @deprecated in favour of `origin_server_ts`
-     */
-    age?: number;
 }
 
 export interface IAggregatedRelation {
@@ -495,7 +482,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns The user ID, e.g. `@alice:matrix.org`
      */
     public getSender(): string | undefined {
-        return this.event.sender || this.event.user_id; // v2 / v1
+        return this.event.sender; // v2 / v1
     }
 
     /**
@@ -669,7 +656,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getPrevContent(): IContent {
         // v2 then v1 then default
-        return this.getUnsigned().prev_content || this.event.prev_content || {};
+        return this.getUnsigned().prev_content || {};
     }
 
     /**
@@ -693,7 +680,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns The age of this event in milliseconds.
      */
     public getAge(): number | undefined {
-        return this.getUnsigned().age || this.event.age; // v2 / v1
+        return this.getUnsigned().age;
     }
 
     /**
