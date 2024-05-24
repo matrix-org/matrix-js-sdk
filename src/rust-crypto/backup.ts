@@ -263,6 +263,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 };
                 opts?.progressCallback?.(importOpt);
             },
+            backupVersion,
         );
     }
 
