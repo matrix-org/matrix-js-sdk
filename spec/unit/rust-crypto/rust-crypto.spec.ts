@@ -1391,8 +1391,7 @@ describe("RustCrypto", () => {
             expect(await keyBackupStatusPromise).toBe(true);
         });
 
-        // XXX: disabled until https://github.com/matrix-org/matrix-rust-sdk/issues/3447 is fixed
-        it.skip("does not back up keys that came from backup", async () => {
+        it("does not back up keys that came from backup", async () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
