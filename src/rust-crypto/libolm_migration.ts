@@ -83,6 +83,19 @@ export async function migrateFromLegacyCrypto(args: {
     }
 
     await legacyStore.startup();
+
+    let account;
+    await legacyStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+        legacyStore.getAccount(txn, (acct) => {
+            account = acct;
+        });
+    });
+    if (!account) {
+        // This store is not properly set up. Nothing to migrate.
+        logger.warn("Legacy crypto store is not set up (no account found). Not migrating.");
+        return;
+    }
+
     let migrationState = await legacyStore.getMigrationState();
 
     if (migrationState >= MigrationState.MEGOLM_SESSIONS_MIGRATED) {
