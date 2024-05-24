@@ -3863,12 +3863,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!backupInfo.version) {
             throw new Error("Backup version must be defined");
         }
+        const backupVersion = backupInfo.version!;
 
         let totalKeyCount = 0;
         let totalFailures = 0;
         let totalImported = 0;
 
-        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
+        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupVersion);
 
         const backupDecryptor = await this.cryptoBackend.getBackupDecryptor(backupInfo, privKey);
 
@@ -3882,7 +3883,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Cache the key, if possible.
             // This is async.
             this.cryptoBackend
-                .storeSessionBackupPrivateKey(privKey, backupInfo.version)
+                .storeSessionBackupPrivateKey(privKey, backupVersion)
                 .catch((e) => {
                     this.logger.warn("Error caching session backup key:", e);
                 })
@@ -3922,7 +3923,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     async (chunk) => {
                         // We have a chunk of decrypted keys: import them
                         try {
-                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
+                            const backupVersion = backupInfo.version!;
+                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, backupVersion, {
                                 untrusted,
                             });
                             totalImported += chunk.length;
@@ -3952,7 +3954,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
-                await this.cryptoBackend.importBackedUpRoomKeys(keys, {
+                await this.cryptoBackend.importBackedUpRoomKeys(keys, backupVersion, {
                     progressCallback,
                     untrusted,
                 });
@@ -3966,7 +3968,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     key.room_id = targetRoomId!;
                     key.session_id = targetSessionId!;
 
-                    await this.cryptoBackend.importBackedUpRoomKeys([key], {
+                    await this.cryptoBackend.importBackedUpRoomKeys([key], backupVersion, {
                         progressCallback,
                         untrusted,
                     });
