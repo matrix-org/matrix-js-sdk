@@ -104,7 +104,7 @@ describe("initRustCrypto", () => {
         } as unknown as Mocked<OlmMachine>;
     }
 
-    it("passes through the store params", async () => {
+    it("passes through the store params (passphrase)", async () => {
         const mockStore = { free: jest.fn() } as unknown as StoreHandle;
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
@@ -126,7 +126,30 @@ describe("initRustCrypto", () => {
         expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
-    it("suppresses the storePassphrase if storePrefix is unset", async () => {
+    it("passes through the store params (key)", async () => {
+        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+        jest.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
+
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+
+        const storeKey = new Uint8Array(32);
+        await initRustCrypto({
+            logger,
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storeKey: storeKey,
+        });
+
+        expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+    });
+
+    it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
         const mockStore = { free: jest.fn() } as unknown as StoreHandle;
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
@@ -141,10 +164,11 @@ describe("initRustCrypto", () => {
             secretStorage: {} as ServerSideSecretStorage,
             cryptoCallbacks: {} as CryptoCallbacks,
             storePrefix: null,
+            storeKey: new Uint8Array(),
             storePassphrase: "storePassphrase",
         });
 
-        expect(StoreHandle.open).toHaveBeenCalledWith(undefined, undefined);
+        expect(StoreHandle.open).toHaveBeenCalledWith();
         expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
