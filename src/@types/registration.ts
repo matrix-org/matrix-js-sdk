@@ -56,7 +56,7 @@ export interface RegisterRequest {
      * but specifying the additional POST parameter guest_access_token containing the guest’s access token.
      * They are also required to specify the username parameter to the value of the local part of their username,
      * which is otherwise optional.
-     * {@see https://spec.matrix.org/v1.10/client-server-api/#guest-access}
+     * @see https://spec.matrix.org/v1.10/client-server-api/#guest-access
      */
     guest_access_token?: string;
 }
