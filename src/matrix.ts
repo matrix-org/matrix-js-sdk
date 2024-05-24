@@ -114,20 +114,6 @@ export { LocationAssetType } from "./@types/location";
  */
 export * as Crypto from "./crypto-api";
 
-/**
- * Backwards compatibility re-export
- * @internal
- * @deprecated use {@link Crypto.CryptoApi}
- */
-export type { CryptoApi } from "./crypto-api";
-
-/**
- * Backwards compatibility re-export
- * @internal
- * @deprecated use {@link Crypto.DeviceVerificationStatus}
- */
-export { DeviceVerificationStatus } from "./crypto-api";
-
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 
 /**
