@@ -63,7 +63,7 @@ export interface BackupTrustInfo {
 }
 
 /**
- * The result of {@link CryptoApi.checkKeyBackupAndEnable}.
+ * The result of {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
  */
 export interface KeyBackupCheck {
     backupInfo: KeyBackupInfo;

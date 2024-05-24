@@ -643,7 +643,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#getVersion}.
+     * Implementation of {@link Crypto.CryptoApi#getVersion}.
      */
     public getVersion(): string {
         const olmVersionTuple = Crypto.getOlmVersion();
@@ -803,7 +803,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     * Implementation of {@link Crypto.CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
         const publicKeysOnDevice = Boolean(this.crossSigningInfo.getId());
@@ -1167,7 +1167,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     * Implementation of {@link Crypto.CryptoApi#resetKeyBackup}.
      */
     public async resetKeyBackup(): Promise<void> {
         // Delete existing ones
@@ -1203,7 +1203,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     * Implementation of {@link Crypto.CryptoApi#deleteKeyBackupVersion}.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         await this.backupManager.deleteKeyBackupVersion(version);
@@ -1350,7 +1350,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the current status of key backup.
      *
-     * Implementation of {@link CryptoApi.getActiveSessionBackupVersion}.
+     * Implementation of {@link Crypto.CryptoApi.getActiveSessionBackupVersion}.
      */
     public async getActiveSessionBackupVersion(): Promise<string | null> {
         if (this.backupManager.getKeyBackupEnabled()) {
@@ -1372,7 +1372,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
      *
-     * Implementation of {@link CryptoApi.checkKeyBackupAndEnable}.
+     * Implementation of {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
         const checkResult = await this.backupManager.checkKeyBackup();
@@ -1589,7 +1589,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi.getUserVerificationStatus}.
+     * Implementation of {@link Crypto.CryptoApi.getUserVerificationStatus}.
      */
     public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
         return this.checkUserTrust(userId);
@@ -1986,7 +1986,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns base64-encoded ed25519 key.
      *
-     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}.
+     * @deprecated Use {@link Crypto.CryptoApi#getOwnDeviceKeys}.
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
@@ -1997,14 +1997,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns base64-encoded curve25519 key.
      *
-     * @deprecated Use {@link CryptoApi#getOwnDeviceKeys}
+     * @deprecated Use {@link Crypto.CryptoApi#getOwnDeviceKeys}
      */
     public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;
     }
 
     /**
-     * Implementation of {@link CryptoApi#getOwnDeviceKeys}.
+     * Implementation of {@link Crypto.CryptoApi#getOwnDeviceKeys}.
      */
     public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
         if (!this.olmDevice.deviceCurve25519Key) {
@@ -2340,7 +2340,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Mark the given device as locally verified.
      *
-     * Implementation of {@link CryptoApi#setDeviceVerified}.
+     * Implementation of {@link Crypto.CryptoApi#setDeviceVerified}.
      */
     public async setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         await this.setDeviceVerification(userId, deviceId, verified);
@@ -2349,7 +2349,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Blindly cross-sign one of our other devices.
      *
-     * Implementation of {@link CryptoApi#crossSignDevice}.
+     * Implementation of {@link Crypto.CryptoApi#crossSignDevice}.
      */
     public async crossSignDevice(deviceId: string): Promise<void> {
         await this.setDeviceVerified(this.userId, deviceId, true);
@@ -2785,7 +2785,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     * Implementation of {@link Crypto.CryptoApi.getEncryptionInfoForEvent}.
      */
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
         const encryptionInfo = this.getEventEncryptionInfo(event);
@@ -4268,7 +4268,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
+     * Implementation of {@link Crypto.CryptoApi#isEncryptionEnabledInRoom}.
      */
     public async isEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
         return this.isRoomEncrypted(roomId);

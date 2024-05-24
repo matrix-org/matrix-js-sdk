@@ -2895,7 +2895,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param event - event to be checked
      * @returns The event information.
-     * @deprecated Prefer {@link CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
+     * @deprecated Prefer {@link Crypto.CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         if (!this.cryptoBackend) {
@@ -3313,7 +3313,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      *
-     * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
+     * @deprecated Prefer {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public checkKeyBackup(): Promise<IKeyBackupCheck | null> {
         if (!this.crypto) {
@@ -3370,7 +3370,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     the server, otherwise false. If we haven't completed a successful check
      *     of key backup status yet, returns null.
      *
-     * @deprecated Prefer direct access to {@link CryptoApi.getActiveSessionBackupVersion}:
+     * @deprecated Prefer direct access to {@link Crypto.CryptoApi.getActiveSessionBackupVersion}:
      *
      * ```javascript
      * let enabled = (await client.getCrypto().getActiveSessionBackupVersion()) !== null;
@@ -3390,7 +3390,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param info - Backup information object as returned by getKeyBackupVersion
      * @returns Promise which resolves when complete.
      *
-     * @deprecated Do not call this directly. Instead call {@link CryptoApi.checkKeyBackupAndEnable}.
+     * @deprecated Do not call this directly. Instead call {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         if (!this.crypto) {
