@@ -7912,26 +7912,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (password !== undefined && password !== null) {
             params.password = password;
         }
-        if (bindThreepids.email) {
-            params.bind_email = true;
-        }
-        if (bindThreepids.msisdn) {
-            params.bind_msisdn = true;
-        }
         if (guestAccessToken !== undefined && guestAccessToken !== null) {
             params.guest_access_token = guestAccessToken;
         }
         if (inhibitLogin !== undefined && inhibitLogin !== null) {
             params.inhibit_login = inhibitLogin;
-        }
-        // Temporary parameter added to make the register endpoint advertise
-        // msisdn flows. This exists because there are clients that break
-        // when given stages they don't recognise. This parameter will cease
-        // to be necessary once these old clients are gone.
-        // Only send it if we send any params at all (the password param is
-        // mandatory, so if we send any params, we'll send the password param)
-        if (password !== undefined && password !== null) {
-            params.x_show_msisdn = true;
         }
 
         return this.registerRequest(params);
