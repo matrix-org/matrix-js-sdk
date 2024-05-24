@@ -84,13 +84,13 @@ export async function migrateFromLegacyCrypto(args: {
 
     await legacyStore.startup();
 
-    let account;
+    let accountPickle: string | null = null;
     await legacyStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        legacyStore.getAccount(txn, (acct) => {
-            account = acct;
+        legacyStore.getAccount(txn, (acctPickle) => {
+            accountPickle = acctPickle;
         });
     });
-    if (!account) {
+    if (!accountPickle) {
         // This store is not properly set up. Nothing to migrate.
         logger.warn("Legacy crypto store is not set up (no account found). Not migrating.");
         return;
