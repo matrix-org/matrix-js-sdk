@@ -1377,32 +1377,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Returns whether there are any devices in the room that are unverified
-     *
-     * Note: Callers should first check if crypto is enabled on this device. If it is
-     * disabled, then we aren't tracking room devices at all, so we can't answer this, and an
-     * error will be thrown.
-     *
-     * @returns the result
-     *
-     * @deprecated Not supported under rust crypto. Instead, call {@link Room.getEncryptionTargetMembers},
-     * {@link CryptoApi.getUserDeviceInfo}, and {@link CryptoApi.getDeviceVerificationStatus}.
-     */
-    public async hasUnverifiedDevices(): Promise<boolean> {
-        if (!this.hasEncryptionStateEvent()) {
-            return false;
-        }
-        const e2eMembers = await this.getEncryptionTargetMembers();
-        for (const member of e2eMembers) {
-            const devices = this.client.getStoredDevicesForUser(member.userId);
-            if (devices.some((device) => device.isUnverified())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Return the timeline sets for this room.
      * @returns array of timeline sets for this room
      */
