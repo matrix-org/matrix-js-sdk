@@ -24,6 +24,7 @@ type CallScope = "m.room" | "m.user";
 // There are two different data interfaces. One for the Legacy types and one complient with MSC4143
 
 // MSC4143 (MatrixRTC) session membership data
+
 export interface SessionMembershipData {
     application: string;
     call_id: string;
@@ -36,6 +37,7 @@ export interface SessionMembershipData {
     // Application specific data
     scope?: CallScope;
 }
+
 export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
     "foci_active" in data &&
     "foci_preferred" in data &&
@@ -58,6 +60,7 @@ const checkSessionsMembershipData = (data: SessionMembershipData): void => {
 };
 
 // Legacy session membership data
+
 export interface CallMembershipDataLegacy {
     application: string;
     call_id: string;
@@ -69,8 +72,10 @@ export interface CallMembershipDataLegacy {
     expires_ts?: number;
     foci_active?: Focus[];
 }
+
 export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
     "membershipID" in data && "foci_active" in data && Array.isArray(data.foci_active);
+
 const checkCallMembershipDataLegacy = (data: CallMembershipDataLegacy): void => {
     const prefix = "Malformed legacy rtc membership event: ";
     if (!(data.expires || data.expires_ts)) {

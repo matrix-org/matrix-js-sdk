@@ -358,8 +358,8 @@ export interface StateEvents {
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
     [EventType.GroupCallMemberPrefix]: XOR<
-        IGroupCallRoomMemberState,
-        ExperimentalGroupCallRoomMemberState | {} | SessionMembershipData
+        XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>,
+        XOR<SessionMembershipData, {}>
     >;
 
     // MSC3089
