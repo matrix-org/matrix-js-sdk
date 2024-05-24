@@ -2896,39 +2896,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param addLiveEventOptions - addLiveEvent options
      * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
      */
-    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void>;
-    /**
-     * @deprecated In favor of the overload with `IAddLiveEventOptions`
-     */
-    public async addLiveEvents(
-        events: MatrixEvent[],
-        duplicateStrategy?: DuplicateStrategy,
-        fromCache?: boolean,
-    ): Promise<void>;
-    public async addLiveEvents(
-        events: MatrixEvent[],
-        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
-        fromCache = false,
-    ): Promise<void> {
-        let duplicateStrategy: DuplicateStrategy | undefined = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean | undefined = false;
-        if (typeof duplicateStrategyOrOpts === "object") {
-            ({
-                duplicateStrategy,
-                fromCache = false,
-                /* roomState, (not used here) */
-                timelineWasEmpty,
-            } = duplicateStrategyOrOpts);
-        } else if (duplicateStrategyOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` " +
-                    "is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`",
-            );
-        }
-
+    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void> {
+        const { duplicateStrategy, fromCache, timelineWasEmpty } = addLiveEventOptions ?? {};
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }

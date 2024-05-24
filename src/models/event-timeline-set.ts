@@ -592,43 +592,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      */
     public addLiveEvent(
         event: MatrixEvent,
-        { duplicateStrategy, fromCache, roomState, timelineWasEmpty }: IAddLiveEventOptions,
-    ): void;
-    /**
-     * @deprecated In favor of the overload with `IAddLiveEventOptions`
-     */
-    public addLiveEvent(
-        event: MatrixEvent,
-        duplicateStrategy?: DuplicateStrategy,
-        fromCache?: boolean,
-        roomState?: RoomState,
-    ): void;
-    public addLiveEvent(
-        event: MatrixEvent,
-        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
-        fromCache = false,
-        roomState?: RoomState,
+        { duplicateStrategy, fromCache, roomState, timelineWasEmpty }: IAddLiveEventOptions = {},
     ): void {
-        let duplicateStrategy = (duplicateStrategyOrOpts as DuplicateStrategy) || DuplicateStrategy.Ignore;
-        let timelineWasEmpty: boolean | undefined;
-        if (typeof duplicateStrategyOrOpts === "object") {
-            ({
-                duplicateStrategy = DuplicateStrategy.Ignore,
-                fromCache = false,
-                roomState,
-                timelineWasEmpty,
-            } = duplicateStrategyOrOpts);
-        } else if (duplicateStrategyOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimelineSet.addLiveEvent(event, duplicateStrategy?, fromCache?, roomState?)` " +
-                    "is deprecated in favor of the overload with " +
-                    "`EventTimelineSet.addLiveEvent(event, IAddLiveEventOptions)`",
-            );
-        }
-
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
             if (!events.length) {
