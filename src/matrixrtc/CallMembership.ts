@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EitherAnd } from "matrix-events-sdk/lib/types";
+
 import { MatrixEvent } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
@@ -61,32 +63,30 @@ const checkSessionsMembershipData = (data: SessionMembershipData): void => {
 
 // Legacy session membership data
 
-export interface CallMembershipDataLegacy {
+export type CallMembershipDataLegacy = {
     application: string;
     call_id: string;
     scope: CallScope;
     device_id: string;
     membershipID: string;
     created_ts?: number;
-    expires?: number;
-    expires_ts?: number;
     foci_active?: Focus[];
-}
+} & EitherAnd<{ expires: number }, { expires_ts: number }>;
 
 export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
-    "membershipID" in data && "foci_active" in data && Array.isArray(data.foci_active);
+    "membershipID" in data;
 
 const checkCallMembershipDataLegacy = (data: CallMembershipDataLegacy): void => {
     const prefix = "Malformed legacy rtc membership event: ";
-    if (!(data.expires || data.expires_ts)) {
+    if (!("expires" in data || "expires_ts" in data)) {
         throw new Error(prefix + "expires_ts or expires must be present");
     }
-    if (data.expires) {
+    if ("expires" in data) {
         if (typeof data.expires !== "number") {
             throw new Error(prefix + "expires must be numeric");
         }
     }
-    if (data.expires_ts) {
+    if ("expires_ts" in data) {
         if (typeof data.expires_ts !== "number") {
             throw new Error(prefix + "expires_ts must be numeric");
         }
