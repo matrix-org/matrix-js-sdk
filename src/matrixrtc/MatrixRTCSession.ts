@@ -301,7 +301,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
-        await this.triggerCallMembershipEventUpdate();
+        this.triggerCallMembershipEventUpdate();
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
