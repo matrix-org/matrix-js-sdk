@@ -684,7 +684,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (this.membershipId === undefined) {
             throw new Error("Tried to create our own membership event when we have no membership ID!");
         }
-        const created_ts = prevMembership?.createdTs();
+        const createdTs = prevMembership?.createdTs();
         return {
             call_id: "",
             scope: "m.room",
@@ -692,11 +692,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
             // TODO: Date.now() should be the origin_server_ts (now).
-            expires_ts: this.relativeExpiry + (created_ts ?? Date.now()),
+            expires_ts: this.relativeExpiry + (createdTs ?? Date.now()),
             // we use the fociPreferred since this is the list of foci.
             // it is named wrong in the Legacy events.
             foci_active: this.ownFociPreferred,
             membershipID: this.membershipId,
+            ...(createdTs ? { created_ts: createdTs } : {}),
         };
     }
     /**

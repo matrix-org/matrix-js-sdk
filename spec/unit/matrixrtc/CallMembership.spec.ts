@@ -93,7 +93,7 @@ describe("CallMembership", () => {
     it("computes absolute expiry time based on expires_ts", () => {
         const membership = new CallMembership(
             makeMockEvent(1000),
-            Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: 6000 }),
+            Object.assign({}, membershipTemplate, { expires_ts: 6000 }),
         );
         expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
     });
