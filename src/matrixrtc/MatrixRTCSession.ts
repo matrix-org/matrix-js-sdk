@@ -35,7 +35,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
 import { KnownMembership } from "../@types/membership";
 import { MatrixError } from "../http-api/errors";
 import { MatrixEvent } from "../models/event";
-import { LivekitFocusActive, isLivekitFocusActive } from "./LivekitFocus";
+import { isLivekitFocusActive } from "./LivekitFocus";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
@@ -160,7 +160,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
             const content = memberEvent.getContent();
-            let membershipContents: CallMembershipData[] = [];
+            let membershipContents: any[] = [];
             // We first decide if its a MSC4143 event (per device state key)
             if ("memberships" in content) {
                 // we have a legacy (one event for all devices) event
@@ -173,7 +173,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 // We have a MSC4143 event membership event
                 if (Object.keys(content).length !== 0) {
                     // We checked for empty content to not try to construct CallMembership's with {}.
-                    membershipContents.push(content as CallMembershipData);
+                    membershipContents.push(content);
                 }
             }
             if (membershipContents.length === 0) {
@@ -277,8 +277,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param joinConfig - Additional configuration for the joined session.
      */
     public async joinRoomSession(
-        fociActive: Focus,
         fociPreferred: Focus[],
+        fociActive?: Focus,
         joinConfig?: JoinSessionConfig,
     ): Promise<void> {
         if (this.isJoined()) {
@@ -709,7 +709,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             scope: "m.room",
             application: "m.call",
             device_id: this.client.getDeviceId()!,
-            foci_active: { type: "livekit", focus_selection: "oldest_membership" } as LivekitFocusActive as Focus,
+            foci_active: { type: "livekit", focus_selection: "oldest_membership" },
             foci_preferred: this.ownFociPreferred ?? [],
         };
     }

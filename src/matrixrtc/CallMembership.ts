@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EitherAnd } from "matrix-events-sdk/lib/types";
 
-import { IContent, MatrixEvent } from "../matrix";
+import { MatrixEvent } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
 
@@ -27,7 +27,7 @@ type CallScope = "m.room" | "m.user";
 
 // MSC4143 (MatrixRTC) session membership data
 
-export interface SessionMembershipData {
+export type SessionMembershipData = {
     application: string;
     call_id: string;
     device_id: string;
@@ -38,7 +38,7 @@ export interface SessionMembershipData {
 
     // Application specific data
     scope?: CallScope;
-}
+};
 
 export const isSessionMembershipData = (data: any): data is SessionMembershipData =>
     "foci_active" in data &&
@@ -109,7 +109,7 @@ export class CallMembership {
 
     public constructor(
         private parentEvent: MatrixEvent,
-        private data: IContent,
+        private data: any,
     ) {
         if (isLegacyCallMembershipData(data)) checkCallMembershipDataLegacy(data);
         else if (isSessionMembershipData(data)) checkSessionsMembershipData(data);
