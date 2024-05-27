@@ -43,7 +43,6 @@ export interface SessionMembershipData {
 export const isSessionMembershipData = (data: any): data is SessionMembershipData =>
     "foci_active" in data &&
     "foci_preferred" in data &&
-    "membership_id" in data &&
     !Array.isArray(data.foci_active) &&
     Array.isArray(data.foci_preferred);
 
@@ -53,7 +52,7 @@ const checkSessionsMembershipData = (data: SessionMembershipData): void => {
     if (typeof data.call_id !== "string") throw new Error(prefix + "call_id must be string");
     if (typeof data.application !== "string") throw new Error(prefix + "application must be a string");
     if (typeof data.foci_active?.type !== "string") throw new Error(prefix + "foci_active.type must be a string");
-    if (Array.isArray(data.foci_preferred)) throw new Error(prefix + "foci_preferred must be an array");
+    if (!Array.isArray(data.foci_preferred)) throw new Error(prefix + "foci_preferred must be an array");
     // optional elements
     if (data.created_ts && typeof data.created_ts !== "number") throw new Error(prefix + "created_ts must be number");
 

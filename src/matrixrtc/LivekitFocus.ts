@@ -21,19 +21,19 @@ export interface LivekitFocusConfig extends Focus {
     livekit_service_url: string;
 }
 
-export const isLivekitFocusConfig = (object: Focus): object is LivekitFocusConfig =>
+export const isLivekitFocusConfig = (object: any): object is LivekitFocusConfig =>
     object.type === "livekit" && "livekit_service_url" in object;
 
 export interface LivekitFocus extends LivekitFocusConfig {
     livekit_alias: string;
 }
 
-export const isLivekitFocus = (object: Focus): object is LivekitFocus =>
+export const isLivekitFocus = (object: any): object is LivekitFocus =>
     isLivekitFocusConfig(object) && "livekit_alias" in object;
 
 export interface LivekitFocusActive extends Focus {
     type: "livekit";
     focus_selection: "oldest_membership";
 }
-export const isLivekitFocusActive = (object: Focus): object is LivekitFocusActive =>
+export const isLivekitFocusActive = (object: any): object is LivekitFocusActive =>
     object.type === "livekit" && "focus_selection" in object;
