@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EitherAnd } from "matrix-events-sdk/lib/types";
 
-import { MatrixEvent } from "../matrix";
+import { IContent, MatrixEvent } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
 
@@ -40,7 +40,7 @@ export interface SessionMembershipData {
     scope?: CallScope;
 }
 
-export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
+export const isSessionMembershipData = (data: any): data is SessionMembershipData =>
     "foci_active" in data &&
     "foci_preferred" in data &&
     "membership_id" in data &&
@@ -73,8 +73,7 @@ export type CallMembershipDataLegacy = {
     foci_active?: Focus[];
 } & EitherAnd<{ expires: number }, { expires_ts: number }>;
 
-export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
-    "membershipID" in data;
+export const isLegacyCallMembershipData = (data: any): data is CallMembershipDataLegacy => "membershipID" in data;
 
 const checkCallMembershipDataLegacy = (data: CallMembershipDataLegacy): void => {
     const prefix = "Malformed legacy rtc membership event: ";
@@ -111,7 +110,7 @@ export class CallMembership {
 
     public constructor(
         private parentEvent: MatrixEvent,
-        private data: CallMembershipData,
+        private data: IContent,
     ) {
         if (isLegacyCallMembershipData(data)) checkCallMembershipDataLegacy(data);
         else if (isSessionMembershipData(data)) checkSessionsMembershipData(data);
@@ -157,21 +156,21 @@ export class CallMembership {
 
     public getAbsoluteExpiry(): number | undefined {
         if (!isLegacyCallMembershipData(this.data)) return undefined;
-        if (this.data.expires) {
+        if ("expires" in this.data) {
             // we know createdTs exists since we already do the isLegacyCallMembershipData check
-            return this.createdTs()! + this.data.expires;
+            return this.createdTs() + this.data.expires;
         } else {
             // We know it exists because we checked for this in the constructor.
-            return this.data.expires_ts!;
+            return this.data.expires_ts;
         }
     }
 
     // gets the expiry time of the event, converted into the device's local time
     public getLocalExpiry(): number | undefined {
         if (!isLegacyCallMembershipData(this.data)) return undefined;
-        if (this.data.expires) {
+        if ("expires" in this.data) {
             // we know createdTs exists since we already do the isLegacyCallMembershipData check
-            const relativeCreationTime = this.parentEvent.getTs() - this.createdTs()!;
+            const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
 
             const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
 
@@ -179,7 +178,7 @@ export class CallMembership {
         } else {
             // With expires_ts we cannot convert to local time.
             // TODO: Check the server timestamp and compute a diff to local time.
-            return this.data.expires_ts!;
+            return this.data.expires_ts;
         }
     }
 

@@ -124,9 +124,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private setNewKeyTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
     // This is a Focus with the specifid fields for an ActiveFocus (e.g. LivekitFocusActive for type="livekit")
-    private ownFocusActive: Focus | undefined;
+    private ownFocusActive?: Focus;
     // This is a Foci array that contains the Focus objects this user is aware of and proposes to use.
-    private ownFociPreferred: Focus[] | undefined;
+    private ownFociPreferred?: Focus[];
 
     private updateCallMembershipRunning = false;
     private needCallMembershipUpdate = false;
@@ -170,8 +170,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     continue;
                 }
             } else {
-                // we have a MSC4143 event membership event
+                // We have a MSC4143 event membership event
                 if (Object.keys(content).length !== 0) {
+                    // We checked for empty content to not try to construct CallMembership's with {}.
                     membershipContents.push(content as CallMembershipData);
                 }
             }
@@ -683,29 +684,23 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (this.membershipId === undefined) {
             throw new Error("Tried to create our own membership event when we have no membership ID!");
         }
-
-        const m: CallMembershipDataLegacy = {
+        const created_ts = prevMembership?.createdTs();
+        return {
             call_id: "",
             scope: "m.room",
             application: "m.call",
             device_id: this.client.getDeviceId()!,
             expires: this.relativeExpiry,
+            // TODO: Date.now() should be the origin_server_ts (now).
+            expires_ts: this.relativeExpiry + (created_ts ?? Date.now()),
             // we use the fociPreferred since this is the list of foci.
             // it is named wrong in the Legacy events.
             foci_active: this.ownFociPreferred,
             membershipID: this.membershipId,
         };
-
-        if (prevMembership) m.created_ts = prevMembership.createdTs();
-        if (m.created_ts) m.expires_ts = m.created_ts + (m.expires ?? 0);
-        // TODO: Date.now() should be the origin_server_ts (now).
-        else m.expires_ts = Date.now() + (m.expires ?? 0);
-
-        return m;
     }
     /**
      * Constructs our own membership
-     * @param prevMembership - The previous value of our call membership, if any
      */
     private makeMyMembership(): SessionMembershipData {
         return {

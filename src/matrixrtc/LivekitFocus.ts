@@ -25,7 +25,6 @@ export const isLivekitFocusConfig = (object: Focus): object is LivekitFocusConfi
     object.type === "livekit" && "livekit_service_url" in object;
 
 export interface LivekitFocus extends LivekitFocusConfig {
-    type: "livekit";
     livekit_alias: string;
 }
 
