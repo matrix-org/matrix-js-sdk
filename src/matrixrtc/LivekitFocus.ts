@@ -16,20 +16,21 @@ limitations under the License.
 
 import { Focus } from "./focus";
 
-export interface LivekitFocus extends Focus {
-    type: "livekit";
-    livekit_service_url: string;
-    livekit_alias: string;
-}
-export const isLivekitFocus = (object: Focus): object is LivekitFocus =>
-    object.type === "livekit" && "livekit_service_url" in object && "livekit_alias" in object;
-
 export interface LivekitFocusConfig extends Focus {
     type: "livekit";
     livekit_service_url: string;
 }
+
 export const isLivekitFocusConfig = (object: Focus): object is LivekitFocusConfig =>
     object.type === "livekit" && "livekit_service_url" in object;
+
+export interface LivekitFocus extends LivekitFocusConfig {
+    type: "livekit";
+    livekit_alias: string;
+}
+
+export const isLivekitFocus = (object: Focus): object is LivekitFocus =>
+    isLivekitFocusConfig(object) && "livekit_alias" in object;
 
 export interface LivekitFocusActive extends Focus {
     type: "livekit";
