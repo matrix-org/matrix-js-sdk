@@ -705,7 +705,7 @@ describe("MatrixRTCSession", () => {
                         device_id: "OTHERDEVICE",
                         expires: 3600000,
                         created_ts: 1000,
-                        foci_active: [{ type: "livekit" }],
+                        foci_active: [{ type: "livekit", livekit_service_url: "https://lk.url" }],
                         membershipID: expect.stringMatching(".*"),
                     },
                     {
