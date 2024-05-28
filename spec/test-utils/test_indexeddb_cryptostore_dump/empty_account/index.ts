@@ -20,12 +20,7 @@ import { DumpDataSetInfo } from "../index";
  * A key query response containing the current keys of the tested user.
  * To be used during tests with fetchmock.
  */
-const KEYS_QUERY_RESPONSE: any = {
-    device_keys: {},
-    master_keys: {},
-    self_signing_keys: {},
-    user_signing_keys: {},
-};
+const KEYS_QUERY_RESPONSE = { device_keys: { "@emptyuser:example.com": {} } };
 
 /**
  * A dataset containing the information for the tested user.
