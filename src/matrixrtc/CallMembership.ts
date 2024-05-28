@@ -40,24 +40,25 @@ export type SessionMembershipData = {
     scope?: CallScope;
 };
 
-export const isSessionMembershipData = (data: any): data is SessionMembershipData =>
+export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
     "foci_active" in data &&
     "foci_preferred" in data &&
     !Array.isArray(data.foci_active) &&
     Array.isArray(data.foci_preferred);
 
-const checkSessionsMembershipData = (data: SessionMembershipData): void => {
+const checkSessionsMembershipData = (data: any): data is SessionMembershipData => {
     const prefix = "Malformed session membership event: ";
     if (typeof data.device_id !== "string") throw new Error(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") throw new Error(prefix + "call_id must be string");
     if (typeof data.application !== "string") throw new Error(prefix + "application must be a string");
     if (typeof data.foci_active?.type !== "string") throw new Error(prefix + "foci_active.type must be a string");
     if (!Array.isArray(data.foci_preferred)) throw new Error(prefix + "foci_preferred must be an array");
-    // optional elements
+    // optional parameters
     if (data.created_ts && typeof data.created_ts !== "number") throw new Error(prefix + "created_ts must be number");
 
     // application specific data (we first need to check if they exist)
     if (data.scope && typeof data.scope !== "string") throw new Error(prefix + "scope must be string");
+    return true;
 };
 
 // Legacy session membership data
@@ -72,9 +73,10 @@ export type CallMembershipDataLegacy = {
     foci_active?: Focus[];
 } & EitherAnd<{ expires: number }, { expires_ts: number }>;
 
-export const isLegacyCallMembershipData = (data: any): data is CallMembershipDataLegacy => "membershipID" in data;
+export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
+    "membershipID" in data;
 
-const checkCallMembershipDataLegacy = (data: CallMembershipDataLegacy): void => {
+const checkCallMembershipDataLegacy = (data: any): data is CallMembershipDataLegacy => {
     const prefix = "Malformed legacy rtc membership event: ";
     if (!("expires" in data || "expires_ts" in data)) {
         throw new Error(prefix + "expires_ts or expires must be present");
@@ -98,27 +100,40 @@ const checkCallMembershipDataLegacy = (data: CallMembershipDataLegacy): void => 
     if (data.created_ts && typeof data.created_ts !== "number") throw new Error(prefix + "created_ts must be number");
     // application specific data (we first need to check if they exist)
     if (data.scope && typeof data.scope !== "string") throw new Error(prefix + "scope must be string");
+    return true;
 };
 
 export type CallMembershipData = CallMembershipDataLegacy | SessionMembershipData;
 
 export class CallMembership {
     public static equal(a: CallMembership, b: CallMembership): boolean {
-        return deepCompare(a.data, b.data);
+        return deepCompare(a.membershipData, b.membershipData);
     }
+    private membershipData: CallMembershipData;
 
     public constructor(
         private parentEvent: MatrixEvent,
-        private data: any,
+        data: any,
     ) {
-        if (isLegacyCallMembershipData(data)) checkCallMembershipDataLegacy(data);
-        else if (isSessionMembershipData(data)) checkSessionsMembershipData(data);
-        else throw Error("unknown CallMembership data. Does not match legacy call.member events nor MSC4143");
         if (!parentEvent.getSender()) throw new Error("Invalid parent event: sender is null");
+        try {
+            // The throw will not be called since checkSessionsMembershipData will throw earlier with a descriptive type
+            if (!checkSessionsMembershipData(data)) throw Error("no SessionsMembershipData");
+        } catch (sessionError) {
+            try {
+                // The throw will not be called since checkCallMembershipDataLegacy will throw earlier with a descriptive type
+                if (!checkCallMembershipDataLegacy(data)) throw Error("no CallMembershipDataLegacy");
+            } catch (legacyError) {
+                throw Error(
+                    `unknown CallMembership data. Does not match legacy call.member (${legacyError}) events nor MSC4143 (${sessionError})`,
+                );
+            }
+        }
+        this.membershipData = data;
     }
 
     public get isLegacy(): boolean {
-        return isLegacyCallMembershipData(this.data);
+        return isLegacyCallMembershipData(this.membershipData);
     }
 
     public get sender(): string | undefined {
@@ -126,23 +141,23 @@ export class CallMembership {
     }
 
     public get callId(): string {
-        return this.data.call_id;
+        return this.membershipData.call_id;
     }
 
     public get deviceId(): string {
-        return this.data.device_id;
+        return this.membershipData.device_id;
     }
 
     public get application(): string | undefined {
-        return this.data.application;
+        return this.membershipData.application;
     }
 
     public get scope(): CallScope | undefined {
-        return this.data.scope;
+        return this.membershipData.scope;
     }
 
     public get membershipID(): string {
-        if (isLegacyCallMembershipData(this.data)) return this.data.membershipID;
+        if (isLegacyCallMembershipData(this.membershipData)) return this.membershipData.membershipID;
         // the createdTs behaves equivalent to the membershipID.
         // we only need the field for the legacy member envents where we needed to update them
         // synapse ignores sending state events if they have the same content.
@@ -150,43 +165,43 @@ export class CallMembership {
     }
 
     public createdTs(): number {
-        return this.data.created_ts ?? this.parentEvent.getTs();
+        return this.membershipData.created_ts ?? this.parentEvent.getTs();
     }
 
     public getAbsoluteExpiry(): number | undefined {
-        if (!isLegacyCallMembershipData(this.data)) return undefined;
-        if ("expires" in this.data) {
+        if (!isLegacyCallMembershipData(this.membershipData)) return undefined;
+        if ("expires" in this.membershipData) {
             // we know createdTs exists since we already do the isLegacyCallMembershipData check
-            return this.createdTs() + this.data.expires;
+            return this.createdTs() + this.membershipData.expires;
         } else {
             // We know it exists because we checked for this in the constructor.
-            return this.data.expires_ts;
+            return this.membershipData.expires_ts;
         }
     }
 
     // gets the expiry time of the event, converted into the device's local time
     public getLocalExpiry(): number | undefined {
-        if (!isLegacyCallMembershipData(this.data)) return undefined;
-        if ("expires" in this.data) {
+        if (!isLegacyCallMembershipData(this.membershipData)) return undefined;
+        if ("expires" in this.membershipData) {
             // we know createdTs exists since we already do the isLegacyCallMembershipData check
             const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
 
             const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
 
-            return localCreationTs + this.data.expires;
+            return localCreationTs + this.membershipData.expires;
         } else {
             // With expires_ts we cannot convert to local time.
             // TODO: Check the server timestamp and compute a diff to local time.
-            return this.data.expires_ts;
+            return this.membershipData.expires_ts;
         }
     }
 
     public getMsUntilExpiry(): number | undefined {
-        if (isLegacyCallMembershipData(this.data)) return this.getLocalExpiry()! - Date.now();
+        if (isLegacyCallMembershipData(this.membershipData)) return this.getLocalExpiry()! - Date.now();
     }
 
     public isExpired(): boolean {
-        if (isLegacyCallMembershipData(this.data)) return this.getMsUntilExpiry()! <= 0;
+        if (isLegacyCallMembershipData(this.membershipData)) return this.getMsUntilExpiry()! <= 0;
 
         // MSC4143 events expire by being updated. So if the event exists, its not expired.
         return false;
@@ -195,9 +210,9 @@ export class CallMembership {
     public getPreferredFoci(): Focus[] {
         // To support both, the new and the old MatrixRTC memberships have two cases based
         // on the availablitiy of `foci_preferred`
-        if (isLegacyCallMembershipData(this.data)) return this.data.foci_active ?? [];
+        if (isLegacyCallMembershipData(this.membershipData)) return this.membershipData.foci_active ?? [];
 
         // MSC4143 style membership
-        return this.data.foci_preferred;
+        return this.membershipData.foci_preferred;
     }
 }
