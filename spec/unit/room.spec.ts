@@ -22,7 +22,7 @@ import { mocked } from "jest-mock";
 import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, Optional, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
-import { emitPromise } from "../test-utils/test-utils";
+import { emitPromise, IMessageOpts } from "../test-utils/test-utils";
 import {
     Direction,
     DuplicateStrategy,
@@ -54,7 +54,6 @@ import { Crypto } from "../../src/crypto";
 import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
-import { IMessageOpts } from "../test-utils/test-utils";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -339,24 +338,6 @@ describe("Room", function () {
             }),
         ];
 
-        it("Make sure legacy overload passing options directly as parameters still works", async () => {
-            await expect(room.addLiveEvents(events, DuplicateStrategy.Replace, false)).resolves.not.toThrow();
-            await expect(room.addLiveEvents(events, DuplicateStrategy.Ignore, true)).resolves.not.toThrow();
-            await expect(
-                // @ts-ignore
-                room.addLiveEvents(events, "shouldfailbecauseinvalidduplicatestrategy", false),
-            ).rejects.toThrow();
-        });
-
-        it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", async function () {
-            return expect(
-                // @ts-ignore
-                room.addLiveEvents(events, {
-                    duplicateStrategy: "foo",
-                }),
-            ).rejects.toThrow();
-        });
-
         it("should replace a timeline event if dupe strategy is 'replace'", async function () {
             // make a duplicate
             const dupe = utils.mkMessage({
@@ -387,7 +368,7 @@ describe("Room", function () {
             expect(room.timeline[0]).toEqual(events[0]);
             // @ts-ignore
             await room.addLiveEvents([dupe], {
-                duplicateStrategy: "ignore",
+                duplicateStrategy: DuplicateStrategy.Ignore,
             });
             expect(room.timeline[0]).toEqual(events[0]);
         });

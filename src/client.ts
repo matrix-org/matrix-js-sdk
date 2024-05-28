@@ -1480,13 +1480,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.on(ClientEvent.Sync, this.startMatrixRTC);
 
-        // backwards compat for when 'opts' was 'historyLen'.
-        if (typeof opts === "number") {
-            opts = {
-                initialSyncLimit: opts,
-            };
-        }
-
         // Create our own user object artificially (instead of waiting for sync)
         // so it's always available, even if the user is not in any rooms etc.
         const userId = this.getUserId();
@@ -2906,7 +2899,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param event - event to be checked
      * @returns The event information.
-     * @deprecated Prefer {@link CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
+     * @deprecated Prefer {@link Crypto.CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         if (!this.cryptoBackend) {
@@ -3324,7 +3317,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      *
-     * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
+     * @deprecated Prefer {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public checkKeyBackup(): Promise<IKeyBackupCheck | null> {
         if (!this.crypto) {
@@ -3381,7 +3374,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     the server, otherwise false. If we haven't completed a successful check
      *     of key backup status yet, returns null.
      *
-     * @deprecated Prefer direct access to {@link CryptoApi.getActiveSessionBackupVersion}:
+     * @deprecated Prefer direct access to {@link Crypto.CryptoApi.getActiveSessionBackupVersion}:
      *
      * ```javascript
      * let enabled = (await client.getCrypto().getActiveSessionBackupVersion()) !== null;
@@ -3401,7 +3394,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param info - Backup information object as returned by getKeyBackupVersion
      * @returns Promise which resolves when complete.
      *
-     * @deprecated Do not call this directly. Instead call {@link CryptoApi.checkKeyBackupAndEnable}.
+     * @deprecated Do not call this directly. Instead call {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         if (!this.crypto) {
@@ -7901,16 +7894,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         password: string,
         sessionId: string | null,
         auth: { session?: string; type: string },
-        bindThreepids?: boolean | null | { email?: boolean; msisdn?: boolean },
+        bindThreepids?: { email?: boolean; msisdn?: boolean },
         guestAccessToken?: string,
         inhibitLogin?: boolean,
     ): Promise<RegisterResponse> {
-        // backwards compat
-        if (bindThreepids === true) {
-            bindThreepids = { email: true };
-        } else if (bindThreepids === null || bindThreepids === undefined || bindThreepids === false) {
-            bindThreepids = {};
-        }
         if (sessionId) {
             auth.session = sessionId;
         }
@@ -7925,26 +7912,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (password !== undefined && password !== null) {
             params.password = password;
         }
-        if (bindThreepids.email) {
-            params.bind_email = true;
-        }
-        if (bindThreepids.msisdn) {
-            params.bind_msisdn = true;
-        }
         if (guestAccessToken !== undefined && guestAccessToken !== null) {
             params.guest_access_token = guestAccessToken;
         }
         if (inhibitLogin !== undefined && inhibitLogin !== null) {
             params.inhibit_login = inhibitLogin;
-        }
-        // Temporary parameter added to make the register endpoint advertise
-        // msisdn flows. This exists because there are clients that break
-        // when given stages they don't recognise. This parameter will cease
-        // to be necessary once these old clients are gone.
-        // Only send it if we send any params at all (the password param is
-        // mandatory, so if we send any params, we'll send the password param)
-        if (password !== undefined && password !== null) {
-            params.x_show_msisdn = true;
         }
 
         return this.registerRequest(params);

@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
 import { IMarkerFoundOptions, RoomState } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
@@ -361,30 +360,10 @@ export class EventTimeline {
      * @param event - new event
      * @param options - addEvent options
      */
-    public addEvent(event: MatrixEvent, { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions): void;
-    /**
-     * @deprecated In favor of the overload with `IAddEventOptions`
-     */
-    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, roomState?: RoomState): void;
     public addEvent(
         event: MatrixEvent,
-        toStartOfTimelineOrOpts: boolean | IAddEventOptions,
-        roomState?: RoomState,
+        { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions = { toStartOfTimeline: false },
     ): void {
-        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean | undefined;
-        if (typeof toStartOfTimelineOrOpts === "object") {
-            ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
-        } else if (toStartOfTimelineOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` " +
-                    "is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`",
-            );
-        }
-
         if (!roomState) {
             roomState = toStartOfTimeline ? this.startState : this.endState;
         }
