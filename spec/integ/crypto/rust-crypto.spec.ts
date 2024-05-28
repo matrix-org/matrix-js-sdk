@@ -309,8 +309,10 @@ describe("MatrixClient.initRustCrypto", () => {
             // See https://github.com/element-hq/element-web/issues/27447
 
             // Given we have an almost-empty legacy account in the database
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", EMPTY_ACCOUNT_DATASET.backupResponse);
-
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: { errcode: "M_NOT_FOUND", error: "No backup found" },
+            });
             fetchMock.post("path:/_matrix/client/v3/keys/query", EMPTY_ACCOUNT_DATASET.keyQueryResponse);
 
             const testStoreName = "test-store";
