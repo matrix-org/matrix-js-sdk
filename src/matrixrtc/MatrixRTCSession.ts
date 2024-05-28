@@ -276,11 +276,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      *                        or optionally other room members homeserver well known.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public async joinRoomSession(
-        fociPreferred: Focus[],
-        fociActive?: Focus,
-        joinConfig?: JoinSessionConfig,
-    ): Promise<void> {
+    public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
