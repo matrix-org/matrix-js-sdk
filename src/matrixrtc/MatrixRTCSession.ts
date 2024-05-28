@@ -716,7 +716,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         myPrevMembershipData?: CallMembershipData,
         myPrevMembership?: CallMembership,
     ): boolean {
-        if (myPrevMembership?.getMsUntilExpiry() === undefined) return false;
+        if (myPrevMembership && myPrevMembership.getMsUntilExpiry() === undefined) return false;
 
         // Need to update if there's a membership for us but we're not joined (valid or otherwise)
         if (!this.isJoined()) return !!myPrevMembershipData;
