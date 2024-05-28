@@ -92,7 +92,7 @@ export async function migrateFromLegacyCrypto(args: {
     });
     if (!accountPickle) {
         // This store is not properly set up. Nothing to migrate.
-        logger.warn("Legacy crypto store is not set up (no account found). Not migrating.");
+        logger.debug("Legacy crypto store is not set up (no account found). Not migrating.");
         return;
     }
 
