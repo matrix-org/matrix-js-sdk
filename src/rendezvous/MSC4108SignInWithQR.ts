@@ -25,6 +25,11 @@ import { MatrixError } from "../http-api";
 import { sleep } from "../utils";
 import { DEVICE_CODE_SCOPE, discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig } from "../oidc";
 
+/**
+ * Enum representing the payload types transmissible over [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * secure channels.
+ * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
+ */
 export enum PayloadType {
     Protocols = "m.login.protocols",
     Protocol = "m.login.protocol",
@@ -35,6 +40,11 @@ export enum PayloadType {
     Declined = "m.login.declined",
 }
 
+/**
+ * Type representing the base payload format for [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * messages sent over the secure channel.
+ * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
+ */
 export interface MSC4108Payload {
     type: PayloadType;
 }

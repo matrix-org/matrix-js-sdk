@@ -33,6 +33,9 @@ import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession
 import { logger } from "../../logger";
 
 /**
+ * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * secure rendezvous session protocol.
+ * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  * Imports @matrix-org/matrix-sdk-crypto-wasm so should be async-imported to avoid bundling the WASM into the main bundle.
  */
 export class MSC4108SecureChannel {
