@@ -104,7 +104,7 @@ describe("initRustCrypto", () => {
         } as unknown as Mocked<OlmMachine>;
     }
 
-    it("passes through the store params", async () => {
+    it("passes through the store params (passphrase)", async () => {
         const mockStore = { free: jest.fn() } as unknown as StoreHandle;
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
@@ -126,7 +126,30 @@ describe("initRustCrypto", () => {
         expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
-    it("suppresses the storePassphrase if storePrefix is unset", async () => {
+    it("passes through the store params (key)", async () => {
+        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+        jest.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
+
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+
+        const storeKey = new Uint8Array(32);
+        await initRustCrypto({
+            logger,
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storeKey: storeKey,
+        });
+
+        expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+    });
+
+    it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
         const mockStore = { free: jest.fn() } as unknown as StoreHandle;
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
@@ -141,10 +164,11 @@ describe("initRustCrypto", () => {
             secretStorage: {} as ServerSideSecretStorage,
             cryptoCallbacks: {} as CryptoCallbacks,
             storePrefix: null,
+            storeKey: new Uint8Array(),
             storePassphrase: "storePassphrase",
         });
 
-        expect(StoreHandle.open).toHaveBeenCalledWith(undefined, undefined);
+        expect(StoreHandle.open).toHaveBeenCalledWith();
         expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
@@ -1395,14 +1419,15 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
-                testData.SIGNED_BACKUP_DATA.version!,
+                backupVersion,
             );
 
             // we import two keys: one "from backup", and one "from export"
             const [backedUpRoomKey, exportedRoomKey] = testData.MEGOLM_SESSION_DATA_ARRAY;
-            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey]);
+            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey], backupVersion);
             await rustCrypto.importRoomKeys([exportedRoomKey]);
 
             // we ask for the keys that should be backed up
@@ -1437,16 +1462,17 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
-                testData.SIGNED_BACKUP_DATA.version!,
+                backupVersion,
             );
 
             const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
             // in addition to correct keys, we restore an invalid key
             backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
             const progressCallback = jest.fn();
-            await rustCrypto.importBackedUpRoomKeys(backup, { progressCallback });
+            await rustCrypto.importBackedUpRoomKeys(backup, backupVersion, { progressCallback });
             expect(progressCallback).toHaveBeenCalledWith({
                 total: 3,
                 successes: 0,

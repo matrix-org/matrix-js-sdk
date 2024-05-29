@@ -21,7 +21,7 @@ import { Mocked } from "jest-mock";
 
 import {
     createClient,
-    CryptoApi,
+    Crypto,
     CryptoEvent,
     ICreateClientOpts,
     IEvent,
@@ -310,7 +310,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     });
 
     describe("recover from backup", () => {
-        let aliceCrypto: CryptoApi;
+        let aliceCrypto: Crypto.CryptoApi;
 
         beforeEach(async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);

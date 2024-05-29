@@ -57,10 +57,14 @@ class KeyDownloadRateLimitError extends Error {
 /** Details of a megolm session whose key we are trying to fetch. */
 type SessionInfo = { roomId: string; megolmSessionId: string };
 
-/** Holds the current backup decryptor and version that should be used. */
+/** Holds the current backup decryptor and version that should be used.
+ *
+ * This is intended to be used as an immutable object (a new instance should be created if the configuration changes),
+ * and some of the logic relies on that, so the properties are marked as `readonly`.
+ */
 type Configuration = {
-    backupVersion: string;
-    decryptor: BackupDecryptor;
+    readonly backupVersion: string;
+    readonly decryptor: BackupDecryptor;
 };
 
 /**
@@ -392,7 +396,7 @@ export class PerSessionKeyBackupDownloader {
         for (const k of keys) {
             k.room_id = sessionInfo.roomId;
         }
-        await this.backupManager.importBackedUpRoomKeys(keys);
+        await this.backupManager.importBackedUpRoomKeys(keys, configuration.backupVersion);
     }
 
     /**

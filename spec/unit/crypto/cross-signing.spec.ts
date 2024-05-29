@@ -23,12 +23,12 @@ import HttpBackend from "matrix-mock-request";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixError } from "../../../src/http-api";
 import { logger } from "../../../src/logger";
-import { ICrossSigningKey, ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
+import { ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
 import { CryptoEvent } from "../../../src/crypto";
 import { IDevice } from "../../../src/crypto/deviceinfo";
 import { TestClient } from "../../TestClient";
 import { resetCrossSigningKeys } from "./crypto-utils";
-import { BootstrapCrossSigningOpts } from "../../../src/crypto-api";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../../../src/crypto-api";
 
 const PUSH_RULES_RESPONSE: Response = {
     method: "GET",
@@ -377,7 +377,7 @@ describe("Cross Signing", function () {
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK: ICrossSigningKey = {
+        const bobSSK: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -515,7 +515,7 @@ describe("Cross Signing", function () {
         };
         olmlib.pkSign(bobDevice, selfSigningKey as unknown as PkSigning, "@bob:example.com", "");
 
-        const bobMaster: ICrossSigningKey = {
+        const bobMaster: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["master"],
             keys: {
@@ -630,7 +630,7 @@ describe("Cross Signing", function () {
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK: ICrossSigningKey = {
+        const bobSSK: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -696,7 +696,7 @@ describe("Cross Signing", function () {
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK: ICrossSigningKey = {
+        const bobSSK: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -763,7 +763,7 @@ describe("Cross Signing", function () {
         const bobSigning2 = new global.Olm.PkSigning();
         const bobPrivkey2 = bobSigning2.generate_seed();
         const bobPubkey2 = bobSigning2.init_with_seed(bobPrivkey2);
-        const bobSSK2: ICrossSigningKey = {
+        const bobSSK2: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -913,7 +913,7 @@ describe("Cross Signing", function () {
         const aliceSigning = new global.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK: ICrossSigningKey = {
+        const aliceSSK: CrossSigningKeyInfo = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {
@@ -988,7 +988,7 @@ describe("Cross Signing", function () {
         const aliceSigning = new global.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK: ICrossSigningKey = {
+        const aliceSSK: CrossSigningKeyInfo = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {
@@ -1048,7 +1048,7 @@ describe("Cross Signing", function () {
         const aliceSigning = new global.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK: ICrossSigningKey = {
+        const aliceSSK: CrossSigningKeyInfo = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {

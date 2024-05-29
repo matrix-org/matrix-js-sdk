@@ -16,11 +16,12 @@ limitations under the License.
 
 import { IContent, MatrixClient, MatrixEvent } from "../../../src";
 import { Room } from "../../../src/models/room";
-import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../../../src/@types/event";
+import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../../../src/@types/event";
 import { EventTimelineSet } from "../../../src/models/event-timeline-set";
 import { EventTimeline } from "../../../src/models/event-timeline";
 import { MSC3089Branch } from "../../../src/models/MSC3089Branch";
 import { MSC3089TreeSpace } from "../../../src/models/MSC3089TreeSpace";
+import { EncryptedFile } from "../../../src/@types/media";
 
 describe("MSC3089Branch", () => {
     let client: MatrixClient;
@@ -254,7 +255,7 @@ describe("MSC3089Branch", () => {
     it("should create new versions of itself", async () => {
         const canaryName = "canary";
         const canaryContents = "contents go here";
-        const canaryFile = {} as IEncryptedFile;
+        const canaryFile = {} as EncryptedFile;
         const canaryAddl = { canary: true };
         indexEvent.getContent = () => ({ active: true, retained: true });
         const stateKeyOrder = [fileEventId2, fileEventId];
@@ -287,23 +288,21 @@ describe("MSC3089Branch", () => {
 
         const createFn = jest
             .fn()
-            .mockImplementation(
-                (name: string, contents: ArrayBuffer, info: Partial<IEncryptedFile>, addl: IContent) => {
-                    expect(name).toEqual(canaryName);
-                    expect(contents).toBe(canaryContents);
-                    expect(info).toBe(canaryFile);
-                    expect(addl).toMatchObject({
-                        ...canaryAddl,
-                        "m.new_content": true,
-                        "m.relates_to": {
-                            rel_type: RelationType.Replace,
-                            event_id: fileEventId,
-                        },
-                    });
+            .mockImplementation((name: string, contents: ArrayBuffer, info: Partial<EncryptedFile>, addl: IContent) => {
+                expect(name).toEqual(canaryName);
+                expect(contents).toBe(canaryContents);
+                expect(info).toBe(canaryFile);
+                expect(addl).toMatchObject({
+                    ...canaryAddl,
+                    "m.new_content": true,
+                    "m.relates_to": {
+                        rel_type: RelationType.Replace,
+                        event_id: fileEventId,
+                    },
+                });
 
-                    return Promise.resolve({ event_id: fileEventId2 });
-                },
-            );
+                return Promise.resolve({ event_id: fileEventId2 });
+            });
         directory.createFile = createFn;
 
         await branch.createNewVersion(canaryName, canaryContents, canaryFile, canaryAddl);

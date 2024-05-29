@@ -6,6 +6,6 @@ on:
 
 jobs:
     call-triage-labelled:
-        uses: vector-im/element-web/.github/workflows/triage-labelled.yml@develop
+        uses: element-hq/element-web/.github/workflows/triage-labelled.yml@develop
         secrets:
             ELEMENT_BOT_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}

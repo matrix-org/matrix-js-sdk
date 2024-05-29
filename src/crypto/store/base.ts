@@ -16,7 +16,6 @@ limitations under the License.
 
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { TrackingStatus } from "../DeviceList";
 import { IRoomEncryption } from "../RoomList";
@@ -27,6 +26,7 @@ import { InboundGroupSessionData } from "../OlmDevice";
 import { MatrixEvent } from "../../models/event";
 import { DehydrationManager } from "../dehydration";
 import { IEncryptedPayload } from "../aes";
+import { CrossSigningKeyInfo } from "../../crypto-api";
 
 /**
  * Internal module. Definitions for storage for the crypto module
@@ -100,13 +100,13 @@ export interface CryptoStore {
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
     storeAccount(txn: unknown, accountPickle: string): void;
-    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
+    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void;
-    storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void;
+    storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void;
     storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         type: K,

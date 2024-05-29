@@ -357,14 +357,14 @@ export interface ICreateClientOpts {
     deviceToImport?: IExportedDevice;
 
     /**
-     * Encryption key used for encrypting sensitive data (such as e2ee keys) in storage.
+     * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link ICreateClientOpts#cryptoStore}.
      *
      * This must be set to the same value every time the client is initialised for the same device.
      *
-     * If unset, either a hardcoded key or no encryption at all is used, depending on the Crypto implementation.
-     *
-     * No particular requirement is placed on the key data (it is fed into an HKDF to generate the actual encryption
-     * keys).
+     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initCrypto}),
+     * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
+     * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
+     * data can be migrated from the legacy store.
      */
     pickleKey?: string;
 
@@ -560,16 +560,13 @@ export interface Capabilities {
     "org.matrix.msc3882.get_login_token"?: IGetLoginTokenCapability;
 }
 
-/** @deprecated prefer {@link CrossSigningKeyInfo}. */
-export type ICrossSigningKey = CrossSigningKeyInfo;
-
 enum CrossSigningKeyType {
     MasterKey = "master_key",
     SelfSigningKey = "self_signing_key",
     UserSigningKey = "user_signing_key",
 }
 
-export type CrossSigningKeys = Record<CrossSigningKeyType, ICrossSigningKey>;
+export type CrossSigningKeys = Record<CrossSigningKeyType, CrossSigningKeyInfo>;
 
 export type SendToDeviceContentMap = Map<string, Map<string, Record<string, any>>>;
 
@@ -581,7 +578,7 @@ export interface ISignedKey {
     device_id: string;
 }
 
-export type KeySignatures = Record<string, Record<string, ICrossSigningKey | ISignedKey>>;
+export type KeySignatures = Record<string, Record<string, CrossSigningKeyInfo | ISignedKey>>;
 export interface IUploadKeySignaturesResponse {
     failures: Record<
         string,
@@ -1483,13 +1480,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.on(ClientEvent.Sync, this.startMatrixRTC);
 
-        // backwards compat for when 'opts' was 'historyLen'.
-        if (typeof opts === "number") {
-            opts = {
-                initialSyncLimit: opts,
-            };
-        }
-
         // Create our own user object artificially (instead of waiting for sync)
         // so it's always available, even if the user is not in any rooms etc.
         const userId = this.getUserId();
@@ -2232,17 +2222,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * An alternative to {@link initCrypto}.
      *
-     * *WARNING*: this API is very experimental, should not be used in production, and may change without notice!
-     *    Eventually it will be deprecated and `initCrypto` will do the same thing.
-     *
-     * @experimental
-     *
-     * @param useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
+     * @param args.useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
+     * @param args.storageKey - A key with which to encrypt the indexeddb store. If provided, it must be exactly
+     *    32 bytes of data, and must be the same each time the client is initialised for a given device.
+     *    If both this and `storagePassword` are unspecified, the store will be unencrypted.
+     * @param args.storagePassword - An alternative to `storageKey`. A password which will be used to derive a key to
+     *    encrypt the store with. Deriving a key from a password is (deliberately) a slow operation, so prefer
+     *    to pass a `storageKey` directly where possible.
      *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
      */
-    public async initRustCrypto({ useIndexedDB = true }: { useIndexedDB?: boolean } = {}): Promise<void> {
+    public async initRustCrypto(
+        args: {
+            useIndexedDB?: boolean;
+            storageKey?: Uint8Array;
+            storagePassword?: string;
+        } = {},
+    ): Promise<void> {
         if (this.cryptoBackend) {
             this.logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
             return;
@@ -2275,11 +2272,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             deviceId: deviceId,
             secretStorage: this.secretStorage,
             cryptoCallbacks: this.cryptoCallbacks,
-            storePrefix: useIndexedDB ? RUST_SDK_STORE_PREFIX : null,
-            storePassphrase: this.pickleKey,
+            storePrefix: args.useIndexedDB === false ? null : RUST_SDK_STORE_PREFIX,
+            storeKey: args.storageKey,
+
+            // temporary compatibility hack: if there is no storageKey nor storagePassword, fall back to the pickleKey
+            storePassphrase: args.storagePassword ?? this.pickleKey,
+
             legacyCryptoStore: this.cryptoStore,
             legacyPickleKey: this.pickleKey ?? "DEFAULT_KEY",
-            legacyMigrationProgressListener: (progress, total) => {
+            legacyMigrationProgressListener: (progress: number, total: number): void => {
                 this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
             },
         });
@@ -2898,7 +2899,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param event - event to be checked
      * @returns The event information.
-     * @deprecated Prefer {@link CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
+     * @deprecated Prefer {@link Crypto.CryptoApi.getEncryptionInfoForEvent | `CryptoApi.getEncryptionInfoForEvent`}.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         if (!this.cryptoBackend) {
@@ -3316,7 +3317,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      *
-     * @deprecated Prefer {@link CryptoApi.checkKeyBackupAndEnable}.
+     * @deprecated Prefer {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public checkKeyBackup(): Promise<IKeyBackupCheck | null> {
         if (!this.crypto) {
@@ -3373,7 +3374,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     the server, otherwise false. If we haven't completed a successful check
      *     of key backup status yet, returns null.
      *
-     * @deprecated Prefer direct access to {@link CryptoApi.getActiveSessionBackupVersion}:
+     * @deprecated Prefer direct access to {@link Crypto.CryptoApi.getActiveSessionBackupVersion}:
      *
      * ```javascript
      * let enabled = (await client.getCrypto().getActiveSessionBackupVersion()) !== null;
@@ -3393,7 +3394,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param info - Backup information object as returned by getKeyBackupVersion
      * @returns Promise which resolves when complete.
      *
-     * @deprecated Do not call this directly. Instead call {@link CryptoApi.checkKeyBackupAndEnable}.
+     * @deprecated Do not call this directly. Instead call {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public enableKeyBackup(info: IKeyBackupInfo): Promise<void> {
         if (!this.crypto) {
@@ -3855,12 +3856,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!backupInfo.version) {
             throw new Error("Backup version must be defined");
         }
+        const backupVersion = backupInfo.version!;
 
         let totalKeyCount = 0;
         let totalFailures = 0;
         let totalImported = 0;
 
-        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
+        const path = this.makeKeyBackupPath(targetRoomId, targetSessionId, backupVersion);
 
         const backupDecryptor = await this.cryptoBackend.getBackupDecryptor(backupInfo, privKey);
 
@@ -3874,7 +3876,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Cache the key, if possible.
             // This is async.
             this.cryptoBackend
-                .storeSessionBackupPrivateKey(privKey, backupInfo.version)
+                .storeSessionBackupPrivateKey(privKey, backupVersion)
                 .catch((e) => {
                     this.logger.warn("Error caching session backup key:", e);
                 })
@@ -3914,7 +3916,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     async (chunk) => {
                         // We have a chunk of decrypted keys: import them
                         try {
-                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
+                            const backupVersion = backupInfo.version!;
+                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, backupVersion, {
                                 untrusted,
                             });
                             totalImported += chunk.length;
@@ -3944,7 +3947,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 for (const k of keys) {
                     k.room_id = targetRoomId!;
                 }
-                await this.cryptoBackend.importBackedUpRoomKeys(keys, {
+                await this.cryptoBackend.importBackedUpRoomKeys(keys, backupVersion, {
                     progressCallback,
                     untrusted,
                 });
@@ -3958,7 +3961,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     key.room_id = targetRoomId!;
                     key.session_id = targetSessionId!;
 
-                    await this.cryptoBackend.importBackedUpRoomKeys([key], {
+                    await this.cryptoBackend.importBackedUpRoomKeys([key], backupVersion, {
                         progressCallback,
                         untrusted,
                     });
@@ -4876,10 +4879,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
             path = utils.encodeUri(pathTemplate, pathParams);
-        } else if (event.isRedaction()) {
+        } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
             path = utils.encodeUri(pathTemplate, {
-                $redactsEventId: event.event.redacts!,
+                $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
@@ -7891,16 +7894,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         password: string,
         sessionId: string | null,
         auth: { session?: string; type: string },
-        bindThreepids?: boolean | null | { email?: boolean; msisdn?: boolean },
+        bindThreepids?: { email?: boolean; msisdn?: boolean },
         guestAccessToken?: string,
         inhibitLogin?: boolean,
     ): Promise<RegisterResponse> {
-        // backwards compat
-        if (bindThreepids === true) {
-            bindThreepids = { email: true };
-        } else if (bindThreepids === null || bindThreepids === undefined || bindThreepids === false) {
-            bindThreepids = {};
-        }
         if (sessionId) {
             auth.session = sessionId;
         }
@@ -7915,26 +7912,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (password !== undefined && password !== null) {
             params.password = password;
         }
-        if (bindThreepids.email) {
-            params.bind_email = true;
-        }
-        if (bindThreepids.msisdn) {
-            params.bind_msisdn = true;
-        }
         if (guestAccessToken !== undefined && guestAccessToken !== null) {
             params.guest_access_token = guestAccessToken;
         }
         if (inhibitLogin !== undefined && inhibitLogin !== null) {
             params.inhibit_login = inhibitLogin;
-        }
-        // Temporary parameter added to make the register endpoint advertise
-        // msisdn flows. This exists because there are clients that break
-        // when given stages they don't recognise. This parameter will cease
-        // to be necessary once these old clients are gone.
-        // Only send it if we send any params at all (the password param is
-        // mandatory, so if we send any params, we'll send the password param)
-        if (password !== undefined && password !== null) {
-            params.x_show_msisdn = true;
         }
 
         return this.registerRequest(params);
