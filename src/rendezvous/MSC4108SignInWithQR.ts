@@ -87,6 +87,11 @@ interface SecretsPayload extends MSC4108Payload, QRSecretsBundle {
     type: PayloadType.Secrets;
 }
 
+/**
+ * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * sign in with QR + OIDC flow.
+ * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
+ */
 export class MSC4108SignInWithQR {
     private readonly ourIntent: QrCodeMode;
     private _code?: Uint8Array;

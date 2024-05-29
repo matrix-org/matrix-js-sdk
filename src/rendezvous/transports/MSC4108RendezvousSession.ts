@@ -21,7 +21,7 @@ import { MatrixClient, Method } from "../../matrix";
 import { ClientPrefix } from "../../http-api";
 
 /**
- * Prototype of the unstable [4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
  * insecure rendezvous session protocol.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
