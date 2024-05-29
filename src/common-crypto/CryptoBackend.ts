@@ -113,10 +113,11 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * Import a list of room keys restored from backup
      *
      * @param keys - a list of session export objects
+     * @param backupVersion - the version of the backup these keys came from.
      * @param opts - options object
      * @returns a promise which resolves once the keys have been imported
      */
-    importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
+    importBackedUpRoomKeys(keys: IMegolmSessionData[], backupVersion: string, opts?: ImportRoomKeysOpts): Promise<void>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
