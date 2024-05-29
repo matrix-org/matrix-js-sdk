@@ -88,6 +88,9 @@ describe("MSC4108SignInWithQR", () => {
     });
 
     const url = "https://fallbackserver/rz/123";
+    const deviceId = "DEADB33F";
+    const verificationUri = "https://example.com/verify";
+    const verificationUriComplete = "https://example.com/verify/complete";
 
     it("should generate qr code data as expected", async () => {
         const session = new MSC4108RendezvousSession({
@@ -174,17 +177,13 @@ describe("MSC4108SignInWithQR", () => {
         it("should be able to connect with opponent and share verificationUri", async () => {
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
-            // We don't have the new device side of this flow implemented at this time so mock it
-            const deviceId = "DEADB33F";
-            const verificationUri = "https://example.com/verify";
-            const verificationUriComplete = "https://example.com/verify/complete";
-
             mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
 
             await Promise.all([
                 expect(ourLogin.deviceAuthorizationGrant()).resolves.toEqual({
                     verificationUri: verificationUriComplete,
                 }),
+                // We don't have the new device side of this flow implemented at this time so mock it
                 // @ts-ignore
                 opponentLogin.send({
                     type: PayloadType.Protocol,
@@ -201,14 +200,11 @@ describe("MSC4108SignInWithQR", () => {
         it("should abort if device already exists", async () => {
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
-            // We don't have the new device side of this flow implemented at this time so mock it
-            const deviceId = "DEADB33F";
-            const verificationUri = "https://example.com/verify";
-
             mocked(client.getDevice).mockResolvedValue({} as IMyDevice);
 
             await Promise.all([
                 expect(ourLogin.deviceAuthorizationGrant()).rejects.toThrow("Specified device ID already exists"),
+                // We don't have the new device side of this flow implemented at this time so mock it
                 // @ts-ignore
                 opponentLogin.send({
                     type: PayloadType.Protocol,
@@ -224,14 +220,11 @@ describe("MSC4108SignInWithQR", () => {
         it("should abort on unsupported protocol", async () => {
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
-            // We don't have the new device side of this flow implemented at this time so mock it
-            const deviceId = "DEADB33F";
-            const verificationUri = "https://example.com/verify";
-
             await Promise.all([
                 expect(ourLogin.deviceAuthorizationGrant()).rejects.toThrow(
                     "Received a request for an unsupported protocol",
                 ),
+                // We don't have the new device side of this flow implemented at this time so mock it
                 // @ts-ignore
                 opponentLogin.send({
                     type: PayloadType.Protocol,
