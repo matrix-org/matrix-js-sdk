@@ -347,11 +347,14 @@ export class MSC4108SignInWithQR {
             });
 
             logger.info("Waiting for outcome message");
-            const payload = await this.receive<SuccessPayload>();
+            const payload = await this.receive<SuccessPayload | DeclinedPayload>();
 
             if (payload?.type === PayloadType.Failure) {
-                const { reason } = payload;
-                throw new RendezvousError("Failed", reason);
+                throw new RendezvousError("Failed", payload.reason);
+            }
+
+            if (payload?.type === PayloadType.Declined) {
+                throw new RendezvousError("User declined", ClientRendezvousFailureReason.UserDeclined);
             }
 
             if (payload?.type !== PayloadType.Success) {
@@ -415,8 +418,9 @@ export class MSC4108SignInWithQR {
         if (!this.isExistingDevice) {
             throw new Error("Can only decline login on existing device");
         }
-        await this.send<DeclinedPayload>({
-            type: PayloadType.Declined,
+        await this.send<FailurePayload>({
+            type: PayloadType.Failure,
+            reason: MSC4108FailureReason.UserCancelled,
         });
     }
 
