@@ -24,6 +24,7 @@ import {
     MSC4108SecureChannel,
     MSC4108SignInWithQR,
     PayloadType,
+    RendezvousError,
 } from "../../../src/rendezvous";
 import { defer } from "../../../src/utils";
 import {
@@ -313,7 +314,9 @@ describe("MSC4108SignInWithQR", () => {
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
             await ourLogin.declineLoginOnExistingDevice();
-            await expect(opponentLogin.shareSecrets()).rejects.toThrow("Unexpected message received");
+            await expect(opponentLogin.shareSecrets()).rejects.toThrow(
+                new RendezvousError("Failed", MSC4108FailureReason.UserCancelled),
+            );
         });
 
         it("should not send secrets if user cancels", async () => {

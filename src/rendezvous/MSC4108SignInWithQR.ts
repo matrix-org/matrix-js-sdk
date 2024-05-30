@@ -213,8 +213,7 @@ export class MSC4108SignInWithQR {
             const payload = await this.receive<ProtocolsPayload>();
 
             if (payload?.type === PayloadType.Failure) {
-                const { reason } = payload;
-                throw new RendezvousError("Failed", reason);
+                throw new RendezvousError("Failed", payload.reason);
             }
 
             if (payload?.type !== PayloadType.Protocols) {
@@ -254,8 +253,7 @@ export class MSC4108SignInWithQR {
             const payload = await this.receive<ProtocolPayload | DeviceAuthorizationGrantProtocolPayload>();
 
             if (payload?.type === PayloadType.Failure) {
-                const { reason } = payload;
-                throw new RendezvousError("Failed", reason);
+                throw new RendezvousError("Failed", payload.reason);
             }
 
             if (payload?.type !== PayloadType.Protocol) {
@@ -322,8 +320,7 @@ export class MSC4108SignInWithQR {
             logger.info("Waiting for secrets message");
             const payload = await this.receive<SecretsPayload>();
             if (payload?.type === PayloadType.Failure) {
-                const { reason } = payload;
-                throw new RendezvousError("Failed", reason);
+                throw new RendezvousError("Failed", payload.reason);
             }
 
             if (payload?.type !== PayloadType.Secrets) {
