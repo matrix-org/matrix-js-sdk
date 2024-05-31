@@ -590,6 +590,46 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result.imported).toStrictEqual(20);
         });
 
+        it("Should report failures when decryption works but import fails - per room variant", async function () {
+            // @ts-ignore - mock a private method for testing purpose
+            aliceCrypto.importBackedUpRoomKeys = jest
+                .fn()
+                .mockImplementationOnce((keys: IMegolmSessionData[], version: String, opts?: ImportRoomKeysOpts) => {
+                    // report 10 failures to import
+                    opts!.progressCallback!({
+                        stage: "load_keys",
+                        successes: 20,
+                        failures: 10,
+                        total: 30,
+                    });
+                    return Promise.resolve();
+                })
+                // Ok for other chunks
+                .mockResolvedValue(importMockImpl);
+
+            const { response, expectedTotal } = createBackupDownloadResponse([30]);
+            const roomId = Object.keys(response.rooms)[0];
+
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/${roomId}`, response.rooms[roomId]);
+
+            const check = await aliceCrypto.checkKeyBackupAndEnable();
+
+            const progressCallback = jest.fn();
+            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
+                testData.BACKUP_DECRYPTION_KEY_BASE58,
+                roomId,
+                undefined,
+                check!.backupInfo!,
+                {
+                    progressCallback,
+                },
+            );
+
+            expect(result.total).toStrictEqual(expectedTotal);
+            // A chunk failed to import
+            expect(result.imported).toStrictEqual(20);
+        });
+
         it("recover specific session from backup", async function () {
             fetchMock.get(
                 "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
