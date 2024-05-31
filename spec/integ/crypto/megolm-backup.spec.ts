@@ -325,17 +325,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             await waitForDeviceList();
             await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 
-            importMockImpl = jest.fn().mockImplementation((keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts) => {
-                // need to report progress
-                if (opts?.progressCallback) {
-                    opts.progressCallback({
-                        stage: "load_keys",
-                        successes: keys.length,
-                        failures: 0,
-                        total: keys.length,
-                    });
-                }
-            });
+            importMockImpl = jest
+                .fn()
+                .mockImplementation((keys: IMegolmSessionData[], version: String, opts?: ImportRoomKeysOpts) => {
+                    // need to report progress
+                    if (opts?.progressCallback) {
+                        opts.progressCallback({
+                            stage: "load_keys",
+                            successes: keys.length,
+                            failures: 0,
+                            total: keys.length,
+                        });
+                    }
+                });
             // @ts-ignore - mock a private method for testing purpose
             aliceCrypto.importBackedUpRoomKeys = importMockImpl;
         });
@@ -553,7 +555,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             // @ts-ignore - mock a private method for testing purpose
             aliceCrypto.importBackedUpRoomKeys = jest
                 .fn()
-                .mockImplementationOnce((keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts) => {
+                .mockImplementationOnce((keys: IMegolmSessionData[], version: String, opts?: ImportRoomKeysOpts) => {
                     // report 10 failures to import
                     opts!.progressCallback!({
                         stage: "load_keys",

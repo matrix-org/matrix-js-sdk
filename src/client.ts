@@ -3928,7 +3928,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                                 success = stage.successes ?? 0;
                                 failures = stage.failures ?? 0;
                             };
-                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, {
+                            await this.cryptoBackend!.importBackedUpRoomKeys(chunk, backupVersion, {
                                 untrusted,
                                 progressCallback: partialProgress,
                             });
@@ -3967,7 +3967,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         success = stage.successes ?? 0;
                         failures = stage.failures ?? 0;
                     };
-                    await this.cryptoBackend!.importBackedUpRoomKeys(keys, {
+                    await this.cryptoBackend!.importBackedUpRoomKeys(keys, backupVersion, {
                         untrusted,
                         progressCallback: partialProgress,
                     });
