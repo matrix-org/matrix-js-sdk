@@ -687,4 +687,23 @@ describe("Secrets", function () {
             alice.stopClient();
         });
     });
+
+    it("should return false for supportsSecretsForQrLogin", async () => {
+        const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        expect(alice.getCrypto()?.supportsSecretsForQrLogin()).toBe(false);
+    });
+
+    it("should throw Not Implemented for importSecretsForQRLogin", async () => {
+        const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        await expect(
+            alice.getCrypto()?.importSecretsForQrLogin({
+                cross_signing: { master_key: "", self_signing_key: "", user_signing_key: "" },
+            }),
+        ).rejects.toThrow("Method not implemented.");
+    });
+
+    it("should throw Not Implemented for exportSecretsForQRLogin", async () => {
+        const alice = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        await expect(alice.getCrypto()?.exportSecretsForQrLogin()).rejects.toThrow("Method not implemented.");
+    });
 });
