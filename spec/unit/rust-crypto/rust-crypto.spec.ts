@@ -1555,6 +1555,15 @@ describe("RustCrypto", () => {
             };
             await rustCrypto.importSecretsForQrLogin(bundle);
             await expect(rustCrypto.exportSecretsForQrLogin()).resolves.toEqual(expect.objectContaining(bundle));
+            await expect(rustCrypto.getCrossSigningStatus()).resolves.toEqual({
+                privateKeysCachedLocally: {
+                    masterKey: true,
+                    selfSigningKey: true,
+                    userSigningKey: true,
+                },
+                privateKeysInSecretStorage: false,
+                publicKeysOnDevice: true,
+            });
         });
     });
 });
@@ -1576,7 +1585,10 @@ async function makeTestRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }> = {} as MatrixClient["http"],
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
-    secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
+    secretStorage = {
+        isStored: jest.fn().mockResolvedValue(null),
+        getDefaultKeyId: jest.fn().mockResolvedValue("key"),
+    } as unknown as ServerSideSecretStorage,
     cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
 ): Promise<RustCrypto> {
     return await initRustCrypto({
