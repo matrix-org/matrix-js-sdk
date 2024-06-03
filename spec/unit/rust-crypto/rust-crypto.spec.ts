@@ -1530,12 +1530,8 @@ describe("RustCrypto", () => {
             );
         });
 
-        it("should return true for supportsSecretsForQrLogin", async () => {
-            expect(rustCrypto.supportsSecretsForQrLogin()).toBe(true);
-        });
-
         it("should throw an error if there is nothing to export", async () => {
-            await expect(rustCrypto.exportSecretsForQrLogin()).rejects.toThrow(
+            await expect(rustCrypto.exportsSecretsBundle()).rejects.toThrow(
                 "The store doesn't contain any cross-signing keys",
             );
         });
@@ -1553,8 +1549,8 @@ describe("RustCrypto", () => {
                     backup_version: "9",
                 },
             };
-            await rustCrypto.importSecretsForQrLogin(bundle);
-            await expect(rustCrypto.exportSecretsForQrLogin()).resolves.toEqual(expect.objectContaining(bundle));
+            await rustCrypto.importSecretsBundle(bundle);
+            await expect(rustCrypto.exportsSecretsBundle()).resolves.toEqual(expect.objectContaining(bundle));
         });
     });
 });

@@ -25,33 +25,12 @@ import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/key
 import { ISignatures } from "./@types/signed";
 import { MatrixEvent } from "./models/event";
 
-export type QRSecretsBundle = Awaited<ReturnType<SecretsBundle["to_json"]>>;
-
 /**
  * Public interface to the cryptography parts of the js-sdk
  *
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
-    /**
-     * Boolean check to indicate whether `exportSecretsForQrLogin` and `importSecretsForQrLogin` are supported.
-     * @experimental - part of MSC4108
-     */
-    supportsSecretsForQrLogin(): boolean;
-
-    /**
-     * Export secrets bundle for transmitting to another device as part of OIDC QR login
-     * @experimental - part of MSC4108
-     */
-    exportSecretsForQrLogin(): Promise<QRSecretsBundle>;
-
-    /**
-     * Import secrets bundle transmitted from another device as part of OIDC QR login
-     * @param secrets the secrets bundle received from the other device
-     * @experimental - part of MSC4108
-     */
-    importSecretsForQrLogin(secrets: QRSecretsBundle): Promise<void>;
-
     /**
      * Global override for whether the client should ever send encrypted
      * messages to unverified devices. This provides the default for rooms which
@@ -554,6 +533,23 @@ export interface CryptoApi {
      *   to false.
      */
     startDehydration(createNewKey?: boolean): Promise<void>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Import/export of secret keys
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Export secrets bundle for transmitting to another device as part of OIDC QR login
+     */
+    exportSecretsBundle?(): Promise<Awaited<ReturnType<SecretsBundle["to_json"]>>>;
+
+    /**
+     * Import secrets bundle transmitted from another device.
+     * @param secrets - The secrets bundle received from the other device
+     */
+    importSecretsBundle?(secrets: Awaited<ReturnType<SecretsBundle["to_json"]>>): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */

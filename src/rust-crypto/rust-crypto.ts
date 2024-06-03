@@ -38,6 +38,7 @@ import {
     CrossSigningKey,
     CrossSigningKeyInfo,
     CrossSigningStatus,
+    CryptoApi,
     CryptoCallbacks,
     Curve25519AuthData,
     DecryptionFailureCode,
@@ -50,7 +51,6 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     OwnDeviceKeys,
-    QRSecretsBundle,
     UserVerificationStatus,
     VerificationRequest,
 } from "../crypto-api";
@@ -176,22 +176,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
-    }
-
-    public supportsSecretsForQrLogin(): boolean {
-        return true;
-    }
-
-    public async exportSecretsForQrLogin(): Promise<QRSecretsBundle> {
-        const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
-        const secrets = secretsBundle.to_json();
-        secretsBundle.free();
-        return secrets;
-    }
-
-    public async importSecretsForQrLogin(secrets: QRSecretsBundle): Promise<void> {
-        const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
-        await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
     }
 
     /**
@@ -1180,6 +1164,26 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // we can check and start async
         this.checkKeyBackupAndEnable();
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#importSecretsBundle}.
+     */
+    public async importSecretsBundle(
+        secrets: Parameters<NonNullable<CryptoApi["importSecretsBundle"]>>[0],
+    ): Promise<void> {
+        const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
+        await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#exportSecretsBundle}.
+     */
+    public async exportsSecretsBundle(): ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>> {
+        const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
+        const secrets = secretsBundle.to_json();
+        secretsBundle.free();
+        return secrets;
     }
 
     /**
