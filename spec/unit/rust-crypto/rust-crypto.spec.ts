@@ -1516,7 +1516,7 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("exportSecretsForQrLogin", () => {
+    describe("import & export secrets bundle", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
