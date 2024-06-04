@@ -1536,7 +1536,7 @@ describe("RustCrypto", () => {
             );
         });
 
-        it("should return a JSON secrets bundle if there is something to export", async () => {
+        it("should correctly import & export a secrets bundle", async () => {
             const bundle = {
                 cross_signing: {
                     master_key: "bMnVpkHI4S2wXRxy+IpaKM5PIAUUkl6DE+n0YLIW/qs",
