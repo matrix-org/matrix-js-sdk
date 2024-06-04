@@ -545,7 +545,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         let soonestExpiry;
         for (const membership of this.memberships) {
             const thisExpiry = membership.getMsUntilExpiry();
-            // If getMsUntilExpiry is undefined we have a MSC3143 compliant event - it never expires
+            // If getMsUntilExpiry is undefined we have a MSC4143 (MatrixRTC) compliant event - it never expires
             // but will be reliably resent on disconnect.
             if (thisExpiry !== undefined && (soonestExpiry === undefined || thisExpiry < soonestExpiry)) {
                 soonestExpiry = thisExpiry;
