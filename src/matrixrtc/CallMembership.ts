@@ -41,24 +41,20 @@ export type SessionMembershipData = {
 };
 
 export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
-    "foci_active" in data &&
-    "foci_preferred" in data &&
-    !Array.isArray(data.foci_active) &&
-    Array.isArray(data.foci_preferred);
-
-const checkSessionsMembershipData = (data: any): data is SessionMembershipData => {
+    "foci_active" in data;
+const checkSessionsMembershipData = (data: any, errors: string[]): data is SessionMembershipData => {
     const prefix = "Malformed session membership event: ";
-    if (typeof data.device_id !== "string") throw new Error(prefix + "device_id must be string");
-    if (typeof data.call_id !== "string") throw new Error(prefix + "call_id must be string");
-    if (typeof data.application !== "string") throw new Error(prefix + "application must be a string");
-    if (typeof data.foci_active?.type !== "string") throw new Error(prefix + "foci_active.type must be a string");
-    if (!Array.isArray(data.foci_preferred)) throw new Error(prefix + "foci_preferred must be an array");
+    if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
+    if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
+    if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
+    if (typeof data.foci_active?.type !== "string") errors.push(prefix + "foci_active.type must be a string");
+    if (!Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
     // optional parameters
-    if (data.created_ts && typeof data.created_ts !== "number") throw new Error(prefix + "created_ts must be number");
+    if (data.created_ts && typeof data.created_ts !== "number") errors.push(prefix + "created_ts must be number");
 
     // application specific data (we first need to check if they exist)
-    if (data.scope && typeof data.scope !== "string") throw new Error(prefix + "scope must be string");
-    return true;
+    if (data.scope && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
+    return errors.length === 0;
 };
 
 // Legacy session membership data
@@ -76,31 +72,31 @@ export type CallMembershipDataLegacy = {
 export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
     "membershipID" in data;
 
-const checkCallMembershipDataLegacy = (data: any): data is CallMembershipDataLegacy => {
+const checkCallMembershipDataLegacy = (data: any, errors: string[]): data is CallMembershipDataLegacy => {
     const prefix = "Malformed legacy rtc membership event: ";
     if (!("expires" in data || "expires_ts" in data)) {
-        throw new Error(prefix + "expires_ts or expires must be present");
+        errors.push(prefix + "expires_ts or expires must be present");
     }
     if ("expires" in data) {
         if (typeof data.expires !== "number") {
-            throw new Error(prefix + "expires must be numeric");
+            errors.push(prefix + "expires must be numeric");
         }
     }
     if ("expires_ts" in data) {
         if (typeof data.expires_ts !== "number") {
-            throw new Error(prefix + "expires_ts must be numeric");
+            errors.push(prefix + "expires_ts must be numeric");
         }
     }
 
-    if (typeof data.device_id !== "string") throw new Error(prefix + "device_id must be string");
-    if (typeof data.call_id !== "string") throw new Error(prefix + "call_id must be string");
-    if (typeof data.application !== "string") throw new Error(prefix + "application must be a string");
-    if (typeof data.membershipID !== "string") throw new Error(prefix + "membershipID must be a string");
+    if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
+    if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
+    if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
+    if (typeof data.membershipID !== "string") errors.push(prefix + "membershipID must be a string");
     // optional elements
-    if (data.created_ts && typeof data.created_ts !== "number") throw new Error(prefix + "created_ts must be number");
+    if (data.created_ts && typeof data.created_ts !== "number") errors.push(prefix + "created_ts must be number");
     // application specific data (we first need to check if they exist)
-    if (data.scope && typeof data.scope !== "string") throw new Error(prefix + "scope must be string");
-    return true;
+    if (data.scope && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
+    return errors.length === 0;
 };
 
 export type CallMembershipData = CallMembershipDataLegacy | SessionMembershipData;
@@ -115,25 +111,15 @@ export class CallMembership {
         private parentEvent: MatrixEvent,
         data: any,
     ) {
-        if (!parentEvent.getSender()) throw new Error("Invalid parent event: sender is null");
-        try {
-            // The throw will not be called since checkSessionsMembershipData will throw earlier with a descriptive type
-            if (!checkSessionsMembershipData(data)) throw Error("no SessionsMembershipData");
-        } catch (sessionError) {
-            try {
-                // The throw will not be called since checkCallMembershipDataLegacy will throw earlier with a descriptive type
-                if (!checkCallMembershipDataLegacy(data)) throw Error("no CallMembershipDataLegacy");
-            } catch (legacyError) {
-                throw Error(
-                    `unknown CallMembership data. Does not match legacy call.member (${legacyError}) events nor MSC4143 (${sessionError})`,
-                );
-            }
+        const sessionErrors: string[] = [];
+        const legacyErrors: string[] = [];
+        if (!checkSessionsMembershipData(data, sessionErrors) && !checkCallMembershipDataLegacy(data, legacyErrors)) {
+            throw Error(
+                `unknown CallMembership data. Does not match legacy call.member (${legacyErrors.join(" & ")}) events nor MSC4143 (${sessionErrors.join(" & ")})`,
+            );
+        } else {
+            this.membershipData = data;
         }
-        this.membershipData = data;
-    }
-
-    public get isLegacy(): boolean {
-        return isLegacyCallMembershipData(this.membershipData);
     }
 
     public get sender(): string | undefined {

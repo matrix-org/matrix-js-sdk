@@ -65,7 +65,7 @@ export enum MatrixRTCSessionEvent {
     MembershipsChanged = "memberships_changed",
     // We joined or left the session: our own local idea of whether we are joined,
     // separate from MembershipsChanged, ie. independent of whether our member event
-    // has succesfully gone through.
+    // has successfully gone through.
     JoinStateChanged = "join_state_changed",
     // The key used to encrypt media has changed
     EncryptionKeyChanged = "encryption_key_changed",
@@ -123,7 +123,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private makeNewKeyTimeout?: ReturnType<typeof setTimeout>;
     private setNewKeyTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    // This is a Focus with the specifid fields for an ActiveFocus (e.g. LivekitFocusActive for type="livekit")
+    // This is a Focus with the specified fields for an ActiveFocus (e.g. LivekitFocusActive for type="livekit")
     private ownFocusActive?: Focus;
     // This is a Foci array that contains the Focus objects this user is aware of and proposes to use.
     private ownFociPreferred?: Focus[];
@@ -401,7 +401,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param userId - The user ID of the participant
      * @param deviceId - Device ID of the participant
      * @param encryptionKeyIndex - The index of the key to set
-     * @param encryptionKeyString - The string represenation of the key to set in base64
+     * @param encryptionKeyString - The string representation of the key to set in base64
      * @param delayBeforeuse - If true, delay before emitting a key changed event. Useful when setting
      *                         encryption keys for the local participant to allow time for the key to
      *                         be distributed.
@@ -436,7 +436,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /**
      * Generate a new sender key and add it at the next available index
-     * @param delayBeforeUse - If true, wait for a short period before settign the key for the
+     * @param delayBeforeUse - If true, wait for a short period before setting the key for the
      *                         media encryptor to use. If false, set the key immediately.
      */
     private makeNewSenderKey(delayBeforeUse = false): void {
@@ -545,7 +545,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         let soonestExpiry;
         for (const membership of this.memberships) {
             const thisExpiry = membership.getMsUntilExpiry();
-            // If getMsUntilExpiry is undefined we have a MSC3143 complient event - it never expires
+            // If getMsUntilExpiry is undefined we have a MSC3143 compliant event - it never expires
             // but will be reliably resent on disconnect.
             if (thisExpiry !== undefined && (soonestExpiry === undefined || thisExpiry < soonestExpiry)) {
                 soonestExpiry = thisExpiry;
@@ -672,7 +672,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * Constructs our own membership
      * @param prevMembership - The previous value of our call membership, if any
      */
-    private makeMyMembershipLegacy(prevMembership?: CallMembership): CallMembershipDataLegacy {
+    private makeMyMembershipLegacy(deviceId: string, prevMembership?: CallMembership): CallMembershipDataLegacy {
         if (this.relativeExpiry === undefined) {
             throw new Error("Tried to create our own membership event when we're not joined!");
         }
@@ -684,7 +684,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             call_id: "",
             scope: "m.room",
             application: "m.call",
-            device_id: this.client.getDeviceId()!,
+            device_id: deviceId,
             expires: this.relativeExpiry,
             // TODO: Date.now() should be the origin_server_ts (now).
             expires_ts: this.relativeExpiry + (createdTs ?? Date.now()),
@@ -779,7 +779,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         // If we're joined, add our own
         if (this.isJoined()) {
-            newMemberships.push(this.makeMyMembershipLegacy(myPrevMembership));
+            newMemberships.push(this.makeMyMembershipLegacy(localDeviceId, myPrevMembership));
         }
 
         return { memberships: newMemberships };
