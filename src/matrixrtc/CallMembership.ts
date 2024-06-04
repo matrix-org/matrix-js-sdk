@@ -19,6 +19,7 @@ import { EitherAnd } from "matrix-events-sdk/lib/types";
 import { MatrixEvent } from "../matrix";
 import { deepCompare } from "../utils";
 import { Focus } from "./focus";
+import { isLivekitFocusActive } from "./LivekitFocus";
 
 type CallScope = "m.room" | "m.user";
 // Represents an entry in the memberships section of an m.call.member event as it is on the wire
@@ -32,7 +33,7 @@ export type SessionMembershipData = {
     call_id: string;
     device_id: string;
 
-    foci_active: Focus;
+    focus_active: Focus;
     foci_preferred: Focus[];
     created_ts?: number;
 
@@ -41,13 +42,14 @@ export type SessionMembershipData = {
 };
 
 export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
-    "foci_active" in data;
+    "focus_active" in data;
+
 const checkSessionsMembershipData = (data: any, errors: string[]): data is SessionMembershipData => {
     const prefix = "Malformed session membership event: ";
     if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
-    if (typeof data.foci_active?.type !== "string") errors.push(prefix + "foci_active.type must be a string");
+    if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
     if (!Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
     // optional parameters
     if (data.created_ts && typeof data.created_ts !== "number") errors.push(prefix + "created_ts must be number");
@@ -200,5 +202,16 @@ export class CallMembership {
 
         // MSC4143 style membership
         return this.membershipData.foci_preferred;
+    }
+
+    public getFocusSelection(): string | undefined {
+        if (isLegacyCallMembershipData(this.membershipData)) {
+            return "oldest_membership";
+        } else {
+            const focusActive = this.membershipData.focus_active;
+            if (isLivekitFocusActive(focusActive)) {
+                return focusActive.focus_selection;
+            }
+        }
     }
 }

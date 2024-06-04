@@ -561,6 +561,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.memberships[0];
     }
 
+    public getFocusInUse(): Focus | undefined {
+        const oldestMembership = this.getOldestMembership();
+        if (oldestMembership?.getFocusSelection() === "oldest_membership") {
+            return oldestMembership.getPreferredFoci()[0];
+        }
+    }
+
     public onCallEncryption = (event: MatrixEvent): void => {
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
@@ -704,7 +711,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             scope: "m.room",
             application: "m.call",
             device_id: deviceId,
-            foci_active: { type: "livekit", focus_selection: "oldest_membership" },
+            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
             foci_preferred: this.ownFociPreferred ?? [],
         };
     }

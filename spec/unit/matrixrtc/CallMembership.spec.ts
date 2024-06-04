@@ -129,7 +129,7 @@ describe("CallMembership", () => {
             scope: "m.room",
             application: "m.call",
             device_id: "AAAAAAA",
-            foci_active: { type: "livekit" },
+            focus_active: { type: "livekit" },
             foci_preferred: [{ type: "livekit" }],
         };
 
