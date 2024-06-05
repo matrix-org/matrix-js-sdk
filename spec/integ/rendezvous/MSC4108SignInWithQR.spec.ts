@@ -256,7 +256,7 @@ describe("MSC4108SignInWithQR", () => {
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
             };
-            mocked(client.getCrypto()!.exportSecretsForQrLogin).mockResolvedValue(secrets);
+            mocked(client.getCrypto()!.exportSecretsBundle!).mockResolvedValue(secrets);
 
             const payload = {
                 secrets: expect.objectContaining(secrets),
@@ -347,7 +347,7 @@ describe("MSC4108SignInWithQR", () => {
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
             };
-            mocked(client.getCrypto()!.exportSecretsForQrLogin).mockResolvedValue(secrets);
+            mocked(client.getCrypto()!.exportSecretsBundle!).mockResolvedValue(secrets);
 
             await Promise.all([
                 expect(ourProm).rejects.toThrow("User cancelled"),

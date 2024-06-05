@@ -34,25 +34,6 @@ export type QRSecretsBundle = Awaited<ReturnType<SecretsBundle["to_json"]>>;
  */
 export interface CryptoApi {
     /**
-     * Boolean check to indicate whether `exportSecretsForQrLogin` and `importSecretsForQrLogin` are supported.
-     * @experimental - part of MSC4108
-     */
-    supportsSecretsForQrLogin(): boolean;
-
-    /**
-     * Export secrets bundle for transmitting to another device as part of OIDC QR login
-     * @experimental - part of MSC4108
-     */
-    exportSecretsForQrLogin(): Promise<QRSecretsBundle>;
-
-    /**
-     * Import secrets bundle transmitted from another device as part of OIDC QR login
-     * @param secrets the secrets bundle received from the other device
-     * @experimental - part of MSC4108
-     */
-    importSecretsForQrLogin(secrets: QRSecretsBundle): Promise<void>;
-
-    /**
      * Global override for whether the client should ever send encrypted
      * messages to unverified devices. This provides the default for rooms which
      * do not specify a value.

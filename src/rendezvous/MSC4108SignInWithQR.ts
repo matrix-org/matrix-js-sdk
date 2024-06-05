@@ -370,7 +370,7 @@ export class MSC4108SignInWithQR {
 
                     if (device) {
                         // if so, return the secrets
-                        const secretsBundle = await this.client!.getCrypto()!.exportSecretsForQrLogin();
+                        const secretsBundle = await this.client!.getCrypto()!.exportSecretsBundle!();
                         if (this.channel.cancelled) {
                             throw new RendezvousError("User cancelled", MSC4108FailureReason.UserCancelled);
                         }
