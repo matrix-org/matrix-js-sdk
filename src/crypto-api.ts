@@ -25,8 +25,6 @@ import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/key
 import { ISignatures } from "./@types/signed";
 import { MatrixEvent } from "./models/event";
 
-export type QRSecretsBundle = Awaited<ReturnType<SecretsBundle["to_json"]>>;
-
 /**
  * Public interface to the cryptography parts of the js-sdk
  *

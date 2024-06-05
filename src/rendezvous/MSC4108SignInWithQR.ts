@@ -20,10 +20,10 @@ import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, R
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
-import { QRSecretsBundle } from "../crypto-api";
 import { MatrixError } from "../http-api";
 import { sleep } from "../utils";
 import { DEVICE_CODE_SCOPE, discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig } from "../oidc";
+import { CryptoApi } from "../crypto-api";
 
 /**
  * Enum representing the payload types transmissible over [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
@@ -93,7 +93,7 @@ interface AcceptedPayload extends MSC4108Payload {
     type: PayloadType.ProtocolAccepted;
 }
 
-interface SecretsPayload extends MSC4108Payload, QRSecretsBundle {
+interface SecretsPayload extends MSC4108Payload, Awaited<ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>>> {
     type: PayloadType.Secrets;
 }
 
@@ -311,7 +311,7 @@ export class MSC4108SignInWithQR {
      * The fifth (and final) step in the OIDC QR login process.
      * To be called after the new device has completed authentication.
      */
-    public async shareSecrets(): Promise<{ secrets?: QRSecretsBundle }> {
+    public async shareSecrets(): Promise<{ secrets?: Omit<SecretsPayload, "type"> }> {
         if (this.isNewDevice) {
             await this.send<SuccessPayload>({
                 type: PayloadType.Success,
