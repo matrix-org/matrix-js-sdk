@@ -43,8 +43,6 @@ export enum AutoDiscoveryError {
     InvalidJson = "Invalid JSON",
     UnsupportedHomeserverSpecVersion = "The homeserver does not meet the version requirements",
 
-    /** @deprecated Replaced by `UnsupportedHomeserverSpecVersion` */
-    HomeserverTooOld = UnsupportedHomeserverSpecVersion,
     // TODO: Implement when Sydent supports the `/versions` endpoint - https://github.com/matrix-org/sydent/issues/424
     //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
@@ -90,9 +88,6 @@ export class AutoDiscovery {
 
     public static readonly ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION =
         AutoDiscoveryError.UnsupportedHomeserverSpecVersion;
-
-    /** @deprecated Replaced by ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION */
-    public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION;
 
     public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError) as AutoDiscoveryError[];
 

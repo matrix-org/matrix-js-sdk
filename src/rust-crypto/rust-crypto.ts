@@ -38,6 +38,7 @@ import {
     CrossSigningKey,
     CrossSigningKeyInfo,
     CrossSigningStatus,
+    CryptoApi,
     CryptoCallbacks,
     Curve25519AuthData,
     DecryptionFailureCode,
@@ -882,7 +883,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     * Implementation of {@link Crypto.CryptoApi.getEncryptionInfoForEvent}.
      */
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
         return this.eventDecryptor.getEncryptionInfoForEvent(event);
@@ -1180,6 +1181,26 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
 
         // we can check and start async
         this.checkKeyBackupAndEnable();
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#importSecretsBundle}.
+     */
+    public async importSecretsBundle(
+        secrets: Parameters<NonNullable<CryptoApi["importSecretsBundle"]>>[0],
+    ): Promise<void> {
+        const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
+        await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#exportSecretsBundle}.
+     */
+    public async exportsSecretsBundle(): ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>> {
+        const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
+        const secrets = secretsBundle.to_json();
+        secretsBundle.free();
+        return secrets;
     }
 
     /**

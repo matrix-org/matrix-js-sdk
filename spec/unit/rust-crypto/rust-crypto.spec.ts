@@ -1516,7 +1516,7 @@ describe("RustCrypto", () => {
         });
     });
 
-    describe("exportSecretsForQrLogin", () => {
+    describe("import & export secrets bundle", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
@@ -1530,17 +1530,13 @@ describe("RustCrypto", () => {
             );
         });
 
-        it("should return true for supportsSecretsForQrLogin", async () => {
-            expect(rustCrypto.supportsSecretsForQrLogin()).toBe(true);
-        });
-
         it("should throw an error if there is nothing to export", async () => {
-            await expect(rustCrypto.exportSecretsForQrLogin()).rejects.toThrow(
+            await expect(rustCrypto.exportsSecretsBundle()).rejects.toThrow(
                 "The store doesn't contain any cross-signing keys",
             );
         });
 
-        it("should return a JSON secrets bundle if there is something to export", async () => {
+        it("should correctly import & export a secrets bundle", async () => {
             const bundle = {
                 cross_signing: {
                     master_key: "bMnVpkHI4S2wXRxy+IpaKM5PIAUUkl6DE+n0YLIW/qs",
@@ -1553,8 +1549,8 @@ describe("RustCrypto", () => {
                     backup_version: "9",
                 },
             };
-            await rustCrypto.importSecretsForQrLogin(bundle);
-            await expect(rustCrypto.exportSecretsForQrLogin()).resolves.toEqual(expect.objectContaining(bundle));
+            await rustCrypto.importSecretsBundle(bundle);
+            await expect(rustCrypto.exportsSecretsBundle()).resolves.toEqual(expect.objectContaining(bundle));
         });
     });
 });

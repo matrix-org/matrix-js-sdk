@@ -554,6 +554,23 @@ export interface CryptoApi {
      *   to false.
      */
     startDehydration(createNewKey?: boolean): Promise<void>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Import/export of secret keys
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Export secrets bundle for transmitting to another device as part of OIDC QR login
+     */
+    exportSecretsBundle?(): Promise<Awaited<ReturnType<SecretsBundle["to_json"]>>>;
+
+    /**
+     * Import secrets bundle transmitted from another device.
+     * @param secrets - The secrets bundle received from the other device
+     */
+    importSecretsBundle?(secrets: Awaited<ReturnType<SecretsBundle["to_json"]>>): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */

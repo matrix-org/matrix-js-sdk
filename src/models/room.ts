@@ -406,12 +406,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private threads = new Map<string, Thread>();
 
     /**
-     * @deprecated This value is unreliable. It may not contain the last thread.
-     *             Use {@link Room.getLastThread} instead.
-     */
-    public lastThread?: Thread;
-
-    /**
      * A mapping of eventId to all visibility changes to apply
      * to the event, by chronological order, as per
      * https://github.com/matrix-org/matrix-doc/pull/3531
@@ -1380,32 +1374,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 this.setThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight, highlightCount);
             }
         }
-    }
-
-    /**
-     * Returns whether there are any devices in the room that are unverified
-     *
-     * Note: Callers should first check if crypto is enabled on this device. If it is
-     * disabled, then we aren't tracking room devices at all, so we can't answer this, and an
-     * error will be thrown.
-     *
-     * @returns the result
-     *
-     * @deprecated Not supported under rust crypto. Instead, call {@link Room.getEncryptionTargetMembers},
-     * {@link CryptoApi.getUserDeviceInfo}, and {@link CryptoApi.getDeviceVerificationStatus}.
-     */
-    public async hasUnverifiedDevices(): Promise<boolean> {
-        if (!this.hasEncryptionStateEvent()) {
-            return false;
-        }
-        const e2eMembers = await this.getEncryptionTargetMembers();
-        for (const member of e2eMembers) {
-            const devices = this.client.getStoredDevicesForUser(member.userId);
-            if (devices.some((device) => device.isUnverified())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -2458,15 +2426,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // and pass the event through this.
         thread.addEvents(events, false);
 
-        const isNewer =
-            this.lastThread?.rootEvent &&
-            rootEvent?.localTimestamp &&
-            this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
-
-        if (!this.lastThread || isNewer) {
-            this.lastThread = thread;
-        }
-
         // We need to update the thread root events, but the thread may not be ready yet.
         // If it isn't, it will fire ThreadEvent.Update when it is and we'll call updateThreadRootEvents then.
         if (this.threadsReady && thread.initialEventsFetched) {
@@ -2896,39 +2855,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param addLiveEventOptions - addLiveEvent options
      * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
      */
-    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void>;
-    /**
-     * @deprecated In favor of the overload with `IAddLiveEventOptions`
-     */
-    public async addLiveEvents(
-        events: MatrixEvent[],
-        duplicateStrategy?: DuplicateStrategy,
-        fromCache?: boolean,
-    ): Promise<void>;
-    public async addLiveEvents(
-        events: MatrixEvent[],
-        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
-        fromCache = false,
-    ): Promise<void> {
-        let duplicateStrategy: DuplicateStrategy | undefined = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean | undefined = false;
-        if (typeof duplicateStrategyOrOpts === "object") {
-            ({
-                duplicateStrategy,
-                fromCache = false,
-                /* roomState, (not used here) */
-                timelineWasEmpty,
-            } = duplicateStrategyOrOpts);
-        } else if (duplicateStrategyOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` " +
-                    "is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`",
-            );
-        }
-
+    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void> {
+        const { duplicateStrategy, fromCache, timelineWasEmpty = false } = addLiveEventOptions ?? {};
         if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
@@ -3229,7 +3157,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                                 content: strippedEvent.content,
                                 event_id: "$fake" + Date.now(),
                                 room_id: this.roomId,
-                                user_id: this.myUserId, // technically a lie
+                                sender: this.myUserId, // technically a lie
                             }),
                         ]);
                     }

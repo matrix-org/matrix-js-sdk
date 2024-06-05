@@ -748,12 +748,7 @@ export function safeSet<O extends Record<any, any>, K extends keyof O>(obj: O, p
 }
 
 export function noUnsafeEventProps(event: Partial<IEvent>): boolean {
-    return !(
-        unsafeProp(event.room_id) ||
-        unsafeProp(event.sender) ||
-        unsafeProp(event.user_id) ||
-        unsafeProp(event.event_id)
-    );
+    return !(unsafeProp(event.room_id) || unsafeProp(event.sender) || unsafeProp(event.event_id));
 }
 
 export class MapWithDefault<K, V> extends Map<K, V> {

@@ -52,21 +52,13 @@ export interface RegisterRequest {
      */
     initial_device_display_name?: string;
     /**
-     * @deprecated missing in the spec
+     * Guest users can also upgrade their account by going through the ordinary register flow,
+     * but specifying the additional POST parameter guest_access_token containing the guest’s access token.
+     * They are also required to specify the username parameter to the value of the local part of their username,
+     * which is otherwise optional.
+     * @see https://spec.matrix.org/v1.10/client-server-api/#guest-access
      */
     guest_access_token?: string;
-    /**
-     * @deprecated missing in the spec
-     */
-    x_show_msisdn?: boolean;
-    /**
-     * @deprecated missing in the spec
-     */
-    bind_msisdn?: boolean;
-    /**
-     * @deprecated missing in the spec
-     */
-    bind_email?: boolean;
 }
 
 /**
