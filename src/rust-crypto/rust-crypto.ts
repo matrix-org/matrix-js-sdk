@@ -1247,14 +1247,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoBackend#isDehydrationSupported}.
+     * Implementation of {@link CryptoApi#isDehydrationSupported}.
      */
     public async isDehydrationSupported(): Promise<boolean> {
         return await this.dehydratedDeviceManager.isSupported();
     }
 
     /**
-     * Implementation of {@link CryptoBackend#startDehydration}.
+     * Implementation of {@link CryptoApi#startDehydration}.
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
         if (!(await this.isCrossSigningReady()) || !(await this.isSecretStorageReady())) {
