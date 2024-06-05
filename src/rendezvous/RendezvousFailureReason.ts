@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export type RendezvousFailureListener = (reason: RendezvousFailureReason) => void;
+export type RendezvousFailureListener = (reason: LegacyRendezvousFailureReason) => void;
 
-export enum RendezvousFailureReason {
+export enum LegacyRendezvousFailureReason {
     UserDeclined = "user_declined",
     OtherDeviceNotSignedIn = "other_device_not_signed_in",
     OtherDeviceAlreadySignedIn = "other_device_already_signed_in",
@@ -29,3 +29,8 @@ export enum RendezvousFailureReason {
     UnsupportedTransport = "unsupported_transport",
     HomeserverLacksSupport = "homeserver_lacks_support",
 }
+
+/**
+ * @deprecated legacy re-export
+ */
+export { LegacyRendezvousFailureReason as RendezvousFailureReason };
