@@ -640,7 +640,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 const ev = await sendEventAndAwaitDecryption({
                     unsigned: {
-                        [UNSIGNED_MEMBERSHIP_FIELD.altName]: "leave",
+                        [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "leave",
                     },
                 });
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
@@ -687,7 +687,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                     const ev = await sendEventAndAwaitDecryption({
                         unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.altName]: "invite",
+                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "invite",
                         },
                     });
                     expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
@@ -733,7 +733,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                     const ev = await sendEventAndAwaitDecryption({
                         unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.altName]: "join",
+                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "join",
                         },
                     });
                     expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);

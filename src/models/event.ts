@@ -77,8 +77,6 @@ export interface IUnsigned {
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
-    [UNSIGNED_MEMBERSHIP_FIELD.name]?: Membership | string;
-    [UNSIGNED_MEMBERSHIP_FIELD.altName]?: Membership | string;
 }
 
 export interface IThreadBundledRelationship {
@@ -715,19 +713,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the user's room membership at the time the event was sent, as reported
      * by the server.  This uses MSC4115.
      *
-     * @returns The user's room membership, or `undefined` if the server does
+     * @returns The user's room membership, or `null` if the server does
      *   not report it.
      */
-    public getMembershipAtEvent(): Membership | string | undefined {
+    public getMembershipAtEvent(): Optional<Membership | string> {
         const unsigned = this.getUnsigned();
-        // check the stable name first, then check the unstable name
-        if (typeof unsigned[UNSIGNED_MEMBERSHIP_FIELD.name] === "string") {
-            return unsigned[UNSIGNED_MEMBERSHIP_FIELD.name];
-        } else if (typeof unsigned[UNSIGNED_MEMBERSHIP_FIELD.altName] === "string") {
-            return unsigned[UNSIGNED_MEMBERSHIP_FIELD.altName];
-        } else {
-            return undefined;
-        }
+        return UNSIGNED_MEMBERSHIP_FIELD.findIn<Membership | string>(unsigned);
     }
 
     /**
