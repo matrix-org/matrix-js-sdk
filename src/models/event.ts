@@ -713,7 +713,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the user's room membership at the time the event was sent, as reported
      * by the server.  This uses MSC4115.
      *
-     * @returns The user's room membership, or `null` if the server does
+     * @returns The user's room membership, or `undefined` if the server does
      *   not report it.
      */
     public getMembershipAtEvent(): Optional<Membership | string> {
