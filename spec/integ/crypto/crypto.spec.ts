@@ -630,21 +630,26 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
             });
 
-            newBackendOnly("fails with NOT_JOINED if user is not member of room (MSC4115 unstable prefix)", async () => {
-                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                    status: 404,
-                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
-                });
-                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-                await startClientAndAwaitFirstSync();
+            newBackendOnly(
+                "fails with NOT_JOINED if user is not member of room (MSC4115 unstable prefix)",
+                async () => {
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
 
-                const ev = await sendEventAndAwaitDecryption({
-                    unsigned: {
-                        [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "leave",
-                    },
-                });
-                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
-            });
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "leave",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(
+                        DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED,
+                    );
+                },
+            );
 
             newBackendOnly(
                 "fails with another error when the server reports user was a member of the room",
