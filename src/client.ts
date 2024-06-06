@@ -7109,7 +7109,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // append the new results to our existing results
         const resultsLength = roomEvents.results?.length ?? 0;
         for (let i = 0; i < resultsLength; i++) {
-            const sr = SearchResult.fromJson(roomEvents.results[i], mapper);
+            const sr = SearchResult.fromJson(roomEvents.results![i], mapper);
             const room = this.getRoom(sr.context.getEvent().getRoomId());
             if (room) {
                 // Copy over a known event sender if we can
