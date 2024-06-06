@@ -1258,7 +1258,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     /**
      * Implementation of {@link CryptoApi#exportSecretsBundle}.
      */
-    public async exportsSecretsBundle(): ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>> {
+    public async exportSecretsBundle(): ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>> {
         const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
         const secrets = secretsBundle.to_json();
         secretsBundle.free();

@@ -1531,7 +1531,7 @@ describe("RustCrypto", () => {
         });
 
         it("should throw an error if there is nothing to export", async () => {
-            await expect(rustCrypto.exportsSecretsBundle()).rejects.toThrow(
+            await expect(rustCrypto.exportSecretsBundle()).rejects.toThrow(
                 "The store doesn't contain any cross-signing keys",
             );
         });
@@ -1550,7 +1550,7 @@ describe("RustCrypto", () => {
                 },
             };
             await rustCrypto.importSecretsBundle(bundle);
-            await expect(rustCrypto.exportsSecretsBundle()).resolves.toEqual(expect.objectContaining(bundle));
+            await expect(rustCrypto.exportSecretsBundle()).resolves.toEqual(expect.objectContaining(bundle));
         });
     });
 });
