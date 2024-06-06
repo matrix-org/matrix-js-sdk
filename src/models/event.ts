@@ -78,6 +78,7 @@ export interface IUnsigned {
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
     [UNSIGNED_MEMBERSHIP_FIELD.name]?: Membership | string;
+    [UNSIGNED_MEMBERSHIP_FIELD.altName]?: Membership | string;
 }
 
 export interface IThreadBundledRelationship {
@@ -719,8 +720,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getMembershipAtEvent(): Membership | string | undefined {
         const unsigned = this.getUnsigned();
+        // check the stable name first, then check the unstable name
         if (typeof unsigned[UNSIGNED_MEMBERSHIP_FIELD.name] === "string") {
             return unsigned[UNSIGNED_MEMBERSHIP_FIELD.name];
+        } else if (typeof unsigned[UNSIGNED_MEMBERSHIP_FIELD.altName] === "string") {
+            return unsigned[UNSIGNED_MEMBERSHIP_FIELD.altName];
         } else {
             return undefined;
         }
