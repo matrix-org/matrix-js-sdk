@@ -16,7 +16,12 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { RendezvousChannel, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
+import {
+    RendezvousChannel,
+    RendezvousFailureListener,
+    LegacyRendezvousFailureReason as RendezvousFailureReason,
+    RendezvousIntent,
+} from ".";
 import { IGetLoginTokenCapability, MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";

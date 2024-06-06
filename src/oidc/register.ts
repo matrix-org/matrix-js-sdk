@@ -49,6 +49,8 @@ interface OidcRegistrationRequestBody {
     application_type: "web" | "native";
 }
 
+export const DEVICE_CODE_SCOPE = "urn:ietf:params:oauth:grant-type:device_code";
+
 /**
  * Attempts dynamic registration against the configured registration endpoint
  * @param delegatedAuthConfig - Auth config from {@link discoverAndValidateOIDCIssuerWellKnown}

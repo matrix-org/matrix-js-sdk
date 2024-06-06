@@ -14,4 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * @deprecated in favour of MSC4108-based implementation
+ */
 export * from "./MSC3903ECDHv2RendezvousChannel";
+export * from "./MSC4108SecureChannel";
