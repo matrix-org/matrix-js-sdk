@@ -145,7 +145,7 @@ export class MSC4108SignInWithQR {
         }
 
         if (this.ourIntent === QrCodeMode.Reciprocate && this.client) {
-            this._code = await this.channel.generateCode(this.ourIntent, this.client.getHomeserverUrl());
+            this._code = await this.channel.generateCode(this.ourIntent, this.client.getDomain()!);
         } else if (this.ourIntent === QrCodeMode.Login) {
             this._code = await this.channel.generateCode(this.ourIntent);
         }
@@ -194,7 +194,7 @@ export class MSC4108SignInWithQR {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],
-                        homeserver: this.client?.getHomeserverUrl() ?? "",
+                        homeserver: this.client?.getDomain() ?? "",
                     });
                 } else {
                     await this.send<FailurePayload>({
