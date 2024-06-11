@@ -65,7 +65,7 @@
         "p-retry": "4",
         "sdp-transform": "^2.14.1",
         "unhomoglyph": "^1.0.6",
-        "uuid": "9"
+        "uuid": "10"
     },
     "devDependencies": {
         "@action-validator/cli": "^0.6.0",
