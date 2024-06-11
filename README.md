@@ -95,7 +95,7 @@ Object.keys(client.store.rooms).forEach((roomId) => {
 
 ## Authenticated media
 
-Servers supporting [MSC3916](https://github.com/matrix-org/matrix-spec-proposals/pull/3916) will require clients, like
+Servers supporting [MSC3916](https://github.com/matrix-org/matrix-spec-proposals/pull/3916) (Matrix 1.11) will require clients, like
 yours, to include an `Authorization` header when `/download`ing or `/thumbnail`ing media. For NodeJS environments this
 may be as easy as the following code snippet, though web browsers may need to use [Service Workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)
 to append the header when using the endpoints in `<img />` elements and similar.
