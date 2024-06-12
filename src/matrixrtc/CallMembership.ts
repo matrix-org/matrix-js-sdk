@@ -24,7 +24,7 @@ import { isLivekitFocusActive } from "./LivekitFocus";
 type CallScope = "m.room" | "m.user";
 // Represents an entry in the memberships section of an m.call.member event as it is on the wire
 
-// There are two different data interfaces. One for the Legacy types and one complient with MSC4143
+// There are two different data interfaces. One for the Legacy types and one compliant with MSC4143
 
 // MSC4143 (MatrixRTC) session membership data
 
