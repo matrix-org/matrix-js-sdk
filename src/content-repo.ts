@@ -62,7 +62,7 @@ export function getHttpUriForMxc(
     if (useAuthentication) {
         allowRedirects = true; // per docs (MSC3916 always expects redirects)
 
-        // Dev note: MSC3916 (as of writing) removes `allow_redirect` entirely, but
+        // Dev note: MSC3916 removes `allow_redirect` entirely, but
         // for explicitness we set it here. This makes it slightly more obvious to
         // callers, hopefully.
     }
@@ -70,8 +70,7 @@ export function getHttpUriForMxc(
     let serverAndMediaId = mxc.slice(6); // strips mxc://
     let prefix: string;
     if (useAuthentication) {
-        // TODO: Use stable once available (requires FCP on MSC3916).
-        prefix = "/_matrix/client/unstable/org.matrix.msc3916/media/download/";
+        prefix = "/_matrix/client/v1/media/download/";
     } else {
         prefix = "/_matrix/media/v3/download/";
     }
@@ -90,8 +89,7 @@ export function getHttpUriForMxc(
         // these are thumbnailing params so they probably want the
         // thumbnailing API...
         if (useAuthentication) {
-            // TODO: Use stable once available (requires FCP on MSC3916).
-            prefix = "/_matrix/client/unstable/org.matrix.msc3916/media/thumbnail/";
+            prefix = "/_matrix/client/v1/media/thumbnail/";
         } else {
             prefix = "/_matrix/media/v3/thumbnail/";
         }
