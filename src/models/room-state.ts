@@ -420,6 +420,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
 
             const lastStateEvent = this.getStateEventMatching(event);
+            // Safety measurs to not update the room (and emit the update) with older state.
+            // The sync loop really should not send old events but it does very regularly.
+            // Logging on return in those two conditions results in a large amount of logging. (on startup and when running element)
+            if ((lastStateEvent?.event.origin_server_ts ?? 0) > (event.event.origin_server_ts ?? 1)) return;
+            if (lastStateEvent?.event.unsigned?.replaces_state === event.event.event_id) return;
+
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
                 this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
