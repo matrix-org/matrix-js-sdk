@@ -406,7 +406,9 @@ export async function logDuration<T>(logger: BaseLogger, name: string, block: ()
 }
 
 /**
- * Promise/async version of {@link setImmediate} based on setTimeout 0 for wider compatibility.
+ * Promise/async version of {@link setImmediate}.
+ *
+ * Implementation is based on `setTimeout` for wider compatibility.
  * @deprecated Use {@link sleep} instead.
  */
 export function immediate(): Promise<void> {
