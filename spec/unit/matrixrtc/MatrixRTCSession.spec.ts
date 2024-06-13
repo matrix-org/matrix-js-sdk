@@ -489,7 +489,7 @@ describe("MatrixRTCSession", () => {
         });
 
         it("Doesn't re-send key immediately", async () => {
-            const realSetImmediate = setImmediate;
+            const realSetTimeout = setTimeout;
             jest.useFakeTimers();
             try {
                 const mockRoom = makeMockRoom([membershipTemplate]);
@@ -517,7 +517,7 @@ describe("MatrixRTCSession", () => {
                 sess.onMembershipUpdate();
 
                 await new Promise((resolve) => {
-                    realSetImmediate(resolve);
+                    realSetTimeout(resolve);
                 });
 
                 expect(sendEventMock).not.toHaveBeenCalled();
