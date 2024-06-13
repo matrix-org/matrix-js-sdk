@@ -2381,22 +2381,40 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF before v113
         if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
 
-        const recvCodecs = RTCRtpReceiver.getCapabilities("video")!.codecs;
-        const sendCodecs = RTCRtpSender.getCapabilities("video")!.codecs;
-        const codecs = [...sendCodecs, ...recvCodecs];
-
-        for (const codec of codecs) {
-            if (codec.mimeType === "video/rtx") {
-                const rtxCodecIndex = codecs.indexOf(codec);
-                codecs.splice(rtxCodecIndex, 1);
-            }
-        }
-
         const screenshareVideoTransceiver = this.transceivers.get(
             getTransceiverKey(SDPStreamMetadataPurpose.Screenshare, "video"),
         );
+
         // setCodecPreferences isn't supported on FF (as of v113)
-        screenshareVideoTransceiver?.setCodecPreferences?.(codecs);
+        if (!screenshareVideoTransceiver || !screenshareVideoTransceiver.setCodecPreferences) return;
+
+        const recvCodecs = RTCRtpReceiver.getCapabilities("video")!.codecs;
+        const sendCodecs = RTCRtpSender.getCapabilities("video")!.codecs;
+        const codecs = [];
+
+        for (const codec of [...recvCodecs, ...sendCodecs]) {
+            if (codec.mimeType !== "video/rtx") {
+                codecs.push(codec);
+                try {
+                    screenshareVideoTransceiver.setCodecPreferences(codecs);
+                } catch (e) {
+                    // Specifically, Chrome around version 125 and Electron 30 (which is Chromium 124) return an H.264 codec in
+                    // the sender's capabilities but throw when you try to set it. Hence... this mess.
+                    // Specifically, that codec is:
+                    // {
+                    //   clockRate: 90000,
+                    //   mimeType: "video/H264",
+                    //   sdpFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640034",
+                    // }
+                    logger.info(
+                        "Working around buggy WebRTC impl: claimed to support codec but threw when setting codec preferences",
+                        codec,
+                        e,
+                    );
+                    codecs.pop();
+                }
+            }
+        }
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
