@@ -2415,8 +2415,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
             }
         }
-
-        //screenshareVideoTransceiver.setCodecPreferences(codecs);
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
