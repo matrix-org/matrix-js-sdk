@@ -43,7 +43,16 @@ export interface IMarkerFoundOptions {
      */
     timelineWasEmpty?: boolean;
 }
-
+export interface ISetStateEventsOptions {
+    /** Whether the event is inserted at the start of the timeline
+     * or at the end. This is relevant for doing a sanity check:
+     * "Is the event id of the added event the same as the replaces_state id of the current event"
+     * We need to do this because sync sometimes feeds previous state events.
+     * If set to true the sanity check is inverted
+     * "Is the event id of the current event the same as the replaces_state id of the added event"
+     */
+    toStartOfTimeline?: boolean;
+}
 // possible statuses for out-of-band member loading
 enum OobStatus {
     NotStarted,
@@ -408,7 +417,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Fires {@link RoomStateEvent.Events}
      * Fires {@link RoomStateEvent.Marker}
      */
-    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
+    public setStateEvents(stateEvents: MatrixEvent[], options?: IMarkerFoundOptions & ISetStateEventsOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -420,11 +429,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
 
             const lastStateEvent = this.getStateEventMatching(event);
-            // Safety measurs to not update the room (and emit the update) with older state.
+            // Safety measure to not update the room (and emit the update) with older state.
             // The sync loop really should not send old events but it does very regularly.
             // Logging on return in those two conditions results in a large amount of logging. (on startup and when running element)
-            if ((lastStateEvent?.event.origin_server_ts ?? 0) > (event.event.origin_server_ts ?? 1)) return;
-            if (lastStateEvent?.event.unsigned?.replaces_state === event.event.event_id) return;
+            if (options?.toStartOfTimeline) {
+                if (event.event.unsigned?.replaces_state === lastStateEvent?.event.event_id) return;
+            } else {
+                if (lastStateEvent?.event.unsigned?.replaces_state === event.event.event_id) return;
+            }
 
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
@@ -482,7 +494,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
             } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
-                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
+                this.emit(RoomStateEvent.Marker, event, options);
             }
         });
 

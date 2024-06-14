@@ -151,7 +151,7 @@ export class EventTimeline {
             throw new Error("Cannot initialise state after events are added");
         }
 
-        this.startState?.setStateEvents(stateEvents, { timelineWasEmpty });
+        this.startState?.setStateEvents(stateEvents, { timelineWasEmpty, toStartOfTimeline: true });
         this.endState?.setStateEvents(stateEvents, { timelineWasEmpty });
     }
 
@@ -267,7 +267,7 @@ export class EventTimeline {
     /**
      * Get a pagination token
      *
-     * @param direction -   EventTimeline.BACKWARDS to get the pagination
+     * @param direction - EventTimeline.BACKWARDS to get the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to get the
      *   pagination token for going forwards in time.
      *
@@ -375,7 +375,7 @@ export class EventTimeline {
 
             // modify state but only on unfiltered timelineSets
             if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
-                roomState?.setStateEvents([event], { timelineWasEmpty });
+                roomState?.setStateEvents([event], { timelineWasEmpty, toStartOfTimeline });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
                 // it again if the prop wasn't previously set. It may also mean that
