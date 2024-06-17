@@ -22,12 +22,12 @@ import {
     LegacyRendezvousFailureReason as RendezvousFailureReason,
     RendezvousIntent,
 } from ".";
-import { IGetLoginTokenCapability, MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client";
+import { MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
 import { sleep } from "../utils";
 import { CrossSigningKey } from "../crypto-api";
-import { Device } from "../matrix";
+import { Device, IGetLoginTokenCapability } from "../matrix";
 
 enum PayloadType {
     Start = "m.login.start",
@@ -109,7 +109,7 @@ export class MSC3906Rendezvous {
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
         // in stable and unstable r1 the availability is exposed as a capability
-        const capabilities = await this.client.getCapabilities();
+        const capabilities = this.client.getCachedCapabilities();
         // in r0 of MSC3882 the availability is exposed as a feature flag
         const features = await buildFeatureSupportMap(await this.client.getVersions());
         const capability = GET_LOGIN_TOKEN_CAPABILITY.findIn<IGetLoginTokenCapability>(capabilities);

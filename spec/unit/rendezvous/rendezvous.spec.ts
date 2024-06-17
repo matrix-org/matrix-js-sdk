@@ -116,7 +116,7 @@ function makeMockClient(opts: {
                     },
                 };
             },
-            getCapabilities() {
+            getCachedCapabilities() {
                 return opts.msc3882r0Only
                     ? {}
                     : {

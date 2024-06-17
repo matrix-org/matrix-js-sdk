@@ -24,6 +24,7 @@ import { RoomWidgetClient, ICapabilities } from "./embedded";
 import { CryptoStore } from "./crypto/store/base";
 
 export * from "./client";
+export * from "./serverCapabilities";
 export * from "./embedded";
 export * from "./http-api";
 export * from "./autodiscovery";
