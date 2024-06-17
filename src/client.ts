@@ -4319,9 +4319,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             signPromise = this.http.requestOtherUrl<IThirdPartySigned>(Method.Post, url);
         }
 
-        const queryString: Record<string, string | string[]> = {};
+        const queryParams: QueryDict = {};
         if (opts.viaServers) {
-            queryString["server_name"] = opts.viaServers;
+            queryParams.server_name = opts.viaServers;
+            switch (this.canSupport.get(Feature.MigrateServerNameToVia)) {
+                case ServerSupport.Stable:
+                    queryParams.via = opts.viaServers;
+                    break;
+                case ServerSupport.Unstable:
+                    queryParams["org.matrix.msc4156.via"] = opts.viaServers;
+                    break;
+            }
         }
 
         const data: IJoinRequestBody = {};
@@ -4331,7 +4339,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
-        const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
+        const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryParams, data);
 
         const roomId = res.room_id;
         // In case we were originally given an alias, check the room cache again
@@ -4364,9 +4372,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const path = utils.encodeUri("/knock/$roomIdOrAlias", { $roomIdOrAlias: roomIdOrAlias });
 
-        const queryParams: Record<string, string | string[]> = {};
+        const queryParams: QueryDict = {};
         if (opts.viaServers) {
             queryParams.server_name = opts.viaServers;
+            switch (this.canSupport.get(Feature.MigrateServerNameToVia)) {
+                case ServerSupport.Stable:
+                    queryParams.via = opts.viaServers;
+                    break;
+                case ServerSupport.Unstable:
+                    queryParams["org.matrix.msc4156.via"] = opts.viaServers;
+                    break;
+            }
         }
 
         const body: Record<string, string> = {};
