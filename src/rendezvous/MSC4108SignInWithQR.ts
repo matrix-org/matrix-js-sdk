@@ -171,7 +171,7 @@ export class MSC4108SignInWithQR {
      * The scanning device has to discover the homeserver details, if they scanned the code then they already have it.
      * If the new device is the one rendering the QR code then it has to wait be sent the homeserver details via the rendezvous channel.
      */
-    public async negotiateProtocols(): Promise<{ homeserverBaseUrl?: string }> {
+    public async negotiateProtocols(): Promise<{ serverName?: string }> {
         logger.info(`negotiateProtocols(isNewDevice=${this.isNewDevice} didScanCode=${this.didScanCode})`);
         await this.channel.connect();
 
@@ -227,7 +227,7 @@ export class MSC4108SignInWithQR {
                 );
             }
 
-            return { homeserverBaseUrl: payload.homeserver };
+            return { serverName: payload.homeserver };
         } else {
             // MSC4108-Flow: NewScanned - nothing to do
         }

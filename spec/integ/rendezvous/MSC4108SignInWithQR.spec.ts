@@ -167,7 +167,7 @@ describe("MSC4108SignInWithQR", () => {
         it("should be able to connect with opponent and share server name & check code", async () => {
             await Promise.all([
                 expect(ourLogin.negotiateProtocols()).resolves.toEqual({}),
-                expect(opponentLogin.negotiateProtocols()).resolves.toEqual({ homeserverBaseUrl: client.getDomain() }),
+                expect(opponentLogin.negotiateProtocols()).resolves.toEqual({ serverName: client.getDomain() }),
             ]);
 
             expect(ourLogin.checkCode).toBe(opponentLogin.checkCode);
