@@ -69,6 +69,7 @@ describe("EventTimeline", function () {
             const timelineStartState = timeline.startState!;
             expect(mocked(timelineStartState).setStateEvents).toHaveBeenCalledWith(events, {
                 timelineWasEmpty: undefined,
+                toStartOfTimeline: true,
             });
             // @ts-ignore private prop
             const timelineEndState = timeline.endState!;
@@ -313,9 +314,11 @@ describe("EventTimeline", function () {
 
                 expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
                     timelineWasEmpty: undefined,
+                    toStartOfTimeline: false,
                 });
                 expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[1]], {
                     timelineWasEmpty: undefined,
+                    toStartOfTimeline: false,
                 });
 
                 expect(events[0].forwardLooking).toBe(true);
@@ -352,9 +355,11 @@ describe("EventTimeline", function () {
 
                 expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
                     timelineWasEmpty: undefined,
+                    toStartOfTimeline: true,
                 });
                 expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[1]], {
                     timelineWasEmpty: undefined,
+                    toStartOfTimeline: true,
                 });
 
                 expect(events[0].forwardLooking).toBe(false);
