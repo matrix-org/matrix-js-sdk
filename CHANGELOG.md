@@ -1,3 +1,28 @@
+Changes in [33.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v33.0.0) (2024-06-04)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Remove more deprecated methods, fields, and exports ([#4217](https://github.com/matrix-org/matrix-js-sdk/pull/4217)). Contributed by @t3chguy.
+* Remove deprecated methods and fields ([#4201](https://github.com/matrix-org/matrix-js-sdk/pull/4201)). Contributed by @t3chguy.
+
+## 🦖 Deprecations
+
+* Remove more deprecated methods, fields, and exports ([#4217](https://github.com/matrix-org/matrix-js-sdk/pull/4217)). Contributed by @t3chguy.
+* Remove deprecated methods and fields ([#4201](https://github.com/matrix-org/matrix-js-sdk/pull/4201)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* `initRustCrypto`: allow app to pass in the store key directly ([#4210](https://github.com/matrix-org/matrix-js-sdk/pull/4210)). Contributed by @richvdh.
+* Preserve ESM for async imports to work correctly ([#4187](https://github.com/matrix-org/matrix-js-sdk/pull/4187)). Contributed by @ms-dosx86.
+
+## 🐛 Bug Fixes
+
+* Don't run migration for Rust crypto if the legacy store is empty ([#4218](https://github.com/matrix-org/matrix-js-sdk/pull/4218)). Contributed by @andybalaam.
+* Bump matrix-sdk-crypto-wasm to 5.0.0 ([#4216](https://github.com/matrix-org/matrix-js-sdk/pull/4216)). Contributed by @richvdh.
+* Wire up verification cancel \& mismatch for rust crypto ([#4202](https://github.com/matrix-org/matrix-js-sdk/pull/4202)). Contributed by @t3chguy.
+* Only pass id\_server if we had one to begin with ([#4200](https://github.com/matrix-org/matrix-js-sdk/pull/4200)). Contributed by @t3chguy.
+
+
 Changes in [32.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v32.4.0) (2024-05-22)
 ==================================================================================================
 * No changes

@@ -17,7 +17,7 @@ limitations under the License.
 import MockHttpBackend from "matrix-mock-request";
 
 import type { MatrixClient } from "../../../src";
-import { RendezvousFailureReason } from "../../../src/rendezvous";
+import { LegacyRendezvousFailureReason as RendezvousFailureReason } from "../../../src/rendezvous";
 import { MSC3886SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc3886Enabled: boolean }): MatrixClient {

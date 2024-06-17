@@ -38,6 +38,7 @@ import {
     CrossSigningKey,
     CrossSigningKeyInfo,
     CrossSigningStatus,
+    CryptoApi,
     CryptoCallbacks,
     Curve25519AuthData,
     DecryptionFailureCode,
@@ -306,6 +307,40 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async checkOwnCrossSigningTrust(): Promise<void> {
         return;
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#getBackupDecryptor}.
+     */
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+        if (backupInfo.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
+            throw new Error(`getBackupDecryptor Unsupported algorithm ${backupInfo.algorithm}`);
+        }
+
+        const authData = <Curve25519AuthData>backupInfo.auth_data;
+
+        if (!(privKey instanceof Uint8Array)) {
+            throw new Error(`getBackupDecryptor expects Uint8Array`);
+        }
+
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
+
+        if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
+            throw new Error(`getBackupDecryptor key mismatch error`);
+        }
+
+        return this.backupManager.createBackupDecryptor(backupDecryptionKey);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public async importBackedUpRoomKeys(
+        keys: IMegolmSessionData[],
+        backupVersion: string,
+        opts?: ImportRoomKeysOpts,
+    ): Promise<void> {
+        return await this.backupManager.importBackedUpRoomKeys(keys, backupVersion, opts);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1169,6 +1204,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Signs the given object with the current device and current identity (if available).
      * As defined in {@link https://spec.matrix.org/v1.8/appendices/#signing-json | Signing JSON}.
      *
+     * Helper for {@link RustCrypto#resetKeyBackup}.
+     *
      * @param obj - The object to sign
      */
     private async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
@@ -1192,54 +1229,40 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link CryptoBackend#getBackupDecryptor}.
-     */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
-        if (backupInfo.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
-            throw new Error(`getBackupDecryptor Unsupported algorithm ${backupInfo.algorithm}`);
-        }
-
-        const authData = <Curve25519AuthData>backupInfo.auth_data;
-
-        if (!(privKey instanceof Uint8Array)) {
-            throw new Error(`getBackupDecryptor expects Uint8Array`);
-        }
-
-        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
-
-        if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
-            throw new Error(`getBackupDecryptor key mismatch error`);
-        }
-
-        return this.backupManager.createBackupDecryptor(backupDecryptionKey);
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
-     */
-    public async importBackedUpRoomKeys(
-        keys: IMegolmSessionData[],
-        backupVersion: string,
-        opts?: ImportRoomKeysOpts,
-    ): Promise<void> {
-        return await this.backupManager.importBackedUpRoomKeys(keys, backupVersion, opts);
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#isDehydrationSupported}.
+     * Implementation of {@link CryptoApi#isDehydrationSupported}.
      */
     public async isDehydrationSupported(): Promise<boolean> {
         return await this.dehydratedDeviceManager.isSupported();
     }
 
     /**
-     * Implementation of {@link CryptoBackend#startDehydration}.
+     * Implementation of {@link CryptoApi#startDehydration}.
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
         if (!(await this.isCrossSigningReady()) || !(await this.isSecretStorageReady())) {
             throw new Error("Device dehydration requires cross-signing and secret storage to be set up");
         }
         return await this.dehydratedDeviceManager.start(createNewKey);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#importSecretsBundle}.
+     */
+    public async importSecretsBundle(
+        secrets: Parameters<NonNullable<CryptoApi["importSecretsBundle"]>>[0],
+    ): Promise<void> {
+        const secretsBundle = RustSdkCryptoJs.SecretsBundle.from_json(secrets);
+        await this.getOlmMachineOrThrow().importSecretsBundle(secretsBundle); // this method frees the SecretsBundle
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#exportSecretsBundle}.
+     */
+    public async exportSecretsBundle(): ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>> {
+        const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
+        const secrets = secretsBundle.to_json();
+        secretsBundle.free();
+        return secrets;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -95,7 +95,9 @@ export interface RoomTopicEventContent {
 
 export interface RoomAvatarEventContent {
     url?: string;
-    info?: ImageInfo;
+    // The spec says that an encrypted file can be used for the thumbnail but this isn't true
+    // https://github.com/matrix-org/matrix-spec/issues/562 so omit those fields
+    info?: Omit<ImageInfo, "thumbnail_file">;
 }
 
 export interface RoomPinnedEventsEventContent {

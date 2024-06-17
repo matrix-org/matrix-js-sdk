@@ -14,10 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * @deprecated in favour of MSC4108-based implementation
+ */
 export * from "./MSC3906Rendezvous";
+export * from "./MSC4108SignInWithQR";
 export * from "./RendezvousChannel";
 export * from "./RendezvousCode";
 export * from "./RendezvousError";
 export * from "./RendezvousFailureReason";
 export * from "./RendezvousIntent";
 export * from "./RendezvousTransport";
+export * from "./transports";
+export * from "./channels";

@@ -54,9 +54,9 @@ enum GroupKey {
 }
 
 export interface IResultRoomEvents {
-    count: number;
-    highlights: string[];
-    results: ISearchResult[];
+    count?: number;
+    highlights?: string[];
+    results?: ISearchResult[];
     state?: { [roomId: string]: IStateEventWithRoomId[] };
     groups?: {
         [groupKey in GroupKey]: {

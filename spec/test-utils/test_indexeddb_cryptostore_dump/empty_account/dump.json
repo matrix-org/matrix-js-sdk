@@ -1,0 +1,14 @@
+{
+    "account": [],
+    "device_data": [],
+    "inbound_group_sessions": [],
+    "inbound_group_sessions_withheld": [],
+    "notified_error_devices": [],
+    "outgoingRoomKeyRequests": [],
+    "parked_shared_history": [],
+    "rooms": [],
+    "session_problems": [],
+    "sessions": [],
+    "sessions_needing_backup": [],
+    "shared_history_inbound_group_sessions": []
+}

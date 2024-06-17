@@ -23,7 +23,7 @@ import {
     RendezvousChannel,
     RendezvousTransportDetails,
     RendezvousTransport,
-    RendezvousFailureReason,
+    LegacyRendezvousFailureReason as RendezvousFailureReason,
 } from "..";
 import { encodeUnpaddedBase64, decodeBase64 } from "../../base64";
 import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
@@ -69,6 +69,9 @@ async function importKey(key: Uint8Array): Promise<CryptoKey> {
  * Implementation of the unstable [MSC3903](https://github.com/matrix-org/matrix-spec-proposals/pull/3903)
  * X25519/ECDH key agreement based secure rendezvous channel.
  * Note that this is UNSTABLE and may have breaking changes without notice.
+ * MSC3886/MSC3903/MSC3906 are now closed and so this functionality will be removed in future.
+ * However, we want to keep this implementation around for some time.
+ * TODO: define an end-of-life date for this implementation.
  */
 export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
     private olmSAS?: SAS;

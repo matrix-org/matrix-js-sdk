@@ -80,24 +80,22 @@ describe("ContentRepo", function () {
         it("should return an authenticated URL when requested", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, undefined, undefined, undefined, undefined, true, true)).toEqual(
-                baseUrl +
-                    "/_matrix/client/unstable/org.matrix.msc3916/media/download/server.name/resourceid?allow_redirect=true",
+                baseUrl + "/_matrix/client/v1/media/download/server.name/resourceid?allow_redirect=true",
             );
             expect(getHttpUriForMxc(baseUrl, mxcUri, 64, 64, "scale", undefined, true, true)).toEqual(
                 baseUrl +
-                    "/_matrix/client/unstable/org.matrix.msc3916/media/thumbnail/server.name/resourceid?width=64&height=64&method=scale&allow_redirect=true",
+                    "/_matrix/client/v1/media/thumbnail/server.name/resourceid?width=64&height=64&method=scale&allow_redirect=true",
             );
         });
 
         it("should force-enable allow_redirects when useAuthentication is set true", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, undefined, undefined, undefined, undefined, false, true)).toEqual(
-                baseUrl +
-                    "/_matrix/client/unstable/org.matrix.msc3916/media/download/server.name/resourceid?allow_redirect=true",
+                baseUrl + "/_matrix/client/v1/media/download/server.name/resourceid?allow_redirect=true",
             );
             expect(getHttpUriForMxc(baseUrl, mxcUri, 64, 64, "scale", undefined, false, true)).toEqual(
                 baseUrl +
-                    "/_matrix/client/unstable/org.matrix.msc3916/media/thumbnail/server.name/resourceid?width=64&height=64&method=scale&allow_redirect=true",
+                    "/_matrix/client/v1/media/thumbnail/server.name/resourceid?width=64&height=64&method=scale&allow_redirect=true",
             );
         });
     });

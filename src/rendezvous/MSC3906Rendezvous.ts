@@ -16,7 +16,12 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { RendezvousChannel, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
+import {
+    RendezvousChannel,
+    RendezvousFailureListener,
+    LegacyRendezvousFailureReason as RendezvousFailureReason,
+    RendezvousIntent,
+} from ".";
 import { IGetLoginTokenCapability, MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
@@ -59,6 +64,9 @@ const LOGIN_TOKEN_PROTOCOL = new UnstableValue("login_token", "org.matrix.msc390
  * Implements MSC3906 to allow a user to sign in on a new device using QR code.
  * This implementation only supports generating a QR code on a device that is already signed in.
  * Note that this is UNSTABLE and may have breaking changes without notice.
+ * MSC3886/MSC3903/MSC3906 are now closed and so this functionality will be removed in future.
+ * However, we want to keep this implementation around for some time.
+ * TODO: define an end-of-life date for this implementation.
  */
 export class MSC3906Rendezvous {
     private newDeviceId?: string;
