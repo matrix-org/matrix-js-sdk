@@ -194,7 +194,7 @@ export class MSC4108SignInWithQR {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],
-                        homeserver: this.client?.getDomain() ?? "",
+                        homeserver: this.client!.getDomain()!,
                     });
                 } else {
                     await this.send<FailurePayload>({
