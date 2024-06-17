@@ -69,7 +69,7 @@ export class MSC4108SecureChannel {
             this.secureChannel.public_key(),
             url,
             mode === QrCodeMode.Reciprocate ? serverName : undefined,
-        ).to_bytes();
+        ).toBytes();
     }
 
     /**

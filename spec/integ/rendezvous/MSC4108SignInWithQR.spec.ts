@@ -155,10 +155,10 @@ describe("MSC4108SignInWithQR", () => {
             client = makeMockClient({ userId: "@alice:example.com", deviceId: "alice", msc4108Enabled: true });
 
             const ourChannel = new MSC4108SecureChannel(ourMockSession);
-            const qrCodeData = QrCodeData.from_bytes(
+            const qrCodeData = QrCodeData.fromBytes(
                 await ourChannel.generateCode(QrCodeMode.Reciprocate, client.getDomain()!),
             );
-            const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.public_key);
+            const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.publicKey);
 
             ourLogin = new MSC4108SignInWithQR(ourChannel, true, client);
             opponentLogin = new MSC4108SignInWithQR(opponentChannel, false);

@@ -1100,10 +1100,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         }
 
         try {
-            const [request, outgoingRequest]: [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest] =
-                await device.requestVerification(
-                    this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
-                );
+            const [request, outgoingRequest] = device.requestVerification(
+                this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
+            );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
             return new RustVerificationRequest(
                 this.olmMachine,

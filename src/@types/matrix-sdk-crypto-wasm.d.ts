@@ -37,4 +37,8 @@ declare module "@matrix-org/matrix-sdk-crypto-wasm" {
             };
         }>;
     }
+
+    interface Device {
+        requestVerification(methods?: any[]): [RustSdkCryptoJs.VerificationRequest, RustSdkCryptoJs.ToDeviceRequest];
+    }
 }
