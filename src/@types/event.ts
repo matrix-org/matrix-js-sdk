@@ -57,6 +57,7 @@ import {
 } from "../webrtc/callEventTypes";
 import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types";
 import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls";
+import { SessionMembershipData } from "../matrixrtc/CallMembership";
 
 export enum EventType {
     // Room state events
@@ -356,7 +357,10 @@ export interface StateEvents {
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>;
+    [EventType.GroupCallMemberPrefix]: XOR<
+        XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>,
+        XOR<SessionMembershipData, {}>
+    >;
 
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;

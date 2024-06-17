@@ -73,9 +73,9 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
         this.roomSessions.clear();
 
-        this.client.removeListener(ClientEvent.Room, this.onRoom);
-        this.client.removeListener(RoomEvent.Timeline, this.onTimeline);
-        this.client.removeListener(RoomStateEvent.Events, this.onRoomState);
+        this.client.off(ClientEvent.Room, this.onRoom);
+        this.client.off(RoomEvent.Timeline, this.onTimeline);
+        this.client.off(RoomStateEvent.Events, this.onRoomState);
     }
 
     /**

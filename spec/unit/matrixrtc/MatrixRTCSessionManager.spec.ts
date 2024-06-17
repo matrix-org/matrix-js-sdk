@@ -35,6 +35,7 @@ const membershipTemplate: CallMembershipData = {
     device_id: "AAAAAAA",
     expires: 60 * 60 * 1000,
     membershipID: "bloop",
+    foci_active: [{ type: "test" }],
 };
 
 describe("MatrixRTCSessionManager", () => {

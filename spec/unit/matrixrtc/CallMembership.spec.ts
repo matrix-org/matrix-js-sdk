@@ -15,16 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../../../src";
-import { CallMembership, CallMembershipData } from "../../../src/matrixrtc/CallMembership";
-
-const membershipTemplate: CallMembershipData = {
-    call_id: "",
-    scope: "m.room",
-    application: "m.call",
-    device_id: "AAAAAAA",
-    expires: 5000,
-    membershipID: "bloop",
-};
+import { CallMembership, CallMembershipDataLegacy, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
@@ -34,96 +25,175 @@ function makeMockEvent(originTs = 0): MatrixEvent {
 }
 
 describe("CallMembership", () => {
-    it("rejects membership with no expiry and no expires_ts", () => {
-        expect(() => {
-            new CallMembership(
-                makeMockEvent(),
-                Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: undefined }),
+    describe("CallMembershipDataLegacy", () => {
+        const membershipTemplate: CallMembershipDataLegacy = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA",
+            expires: 5000,
+            membershipID: "bloop",
+            foci_active: [{ type: "livekit" }],
+        };
+        it("rejects membership with no expiry and no expires_ts", () => {
+            expect(() => {
+                new CallMembership(
+                    makeMockEvent(),
+                    Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: undefined }),
+                );
+            }).toThrow();
+        });
+
+        it("rejects membership with no device_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { device_id: undefined }));
+            }).toThrow();
+        });
+
+        it("rejects membership with no call_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { call_id: undefined }));
+            }).toThrow();
+        });
+
+        it("allow membership with no scope", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
+            }).not.toThrow();
+        });
+        it("rejects with malformatted expires_ts", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires_ts: "string" }));
+            }).toThrow();
+        });
+        it("rejects with malformatted expires", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires: "string" }));
+            }).toThrow();
+        });
+
+        it("uses event timestamp if no created_ts", () => {
+            const membership = new CallMembership(makeMockEvent(12345), membershipTemplate);
+            expect(membership.createdTs()).toEqual(12345);
+        });
+
+        it("uses created_ts if present", () => {
+            const membership = new CallMembership(
+                makeMockEvent(12345),
+                Object.assign({}, membershipTemplate, { created_ts: 67890 }),
             );
-        }).toThrow();
+            expect(membership.createdTs()).toEqual(67890);
+        });
+
+        it("computes absolute expiry time based on expires", () => {
+            const membership = new CallMembership(makeMockEvent(1000), membershipTemplate);
+            expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
+        });
+
+        it("computes absolute expiry time based on expires_ts", () => {
+            const membership = new CallMembership(
+                makeMockEvent(1000),
+                Object.assign({}, membershipTemplate, { expires_ts: 6000 }),
+            );
+            expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
+        });
+
+        it("considers memberships unexpired if local age low enough", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.getLocalAge = jest.fn().mockReturnValue(3000);
+            const membership = new CallMembership(fakeEvent, membershipTemplate);
+            expect(membership.isExpired()).toEqual(false);
+        });
+
+        it("considers memberships expired when local age large", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.localTimestamp = Date.now() - 6000;
+            const membership = new CallMembership(fakeEvent, membershipTemplate);
+            expect(membership.isExpired()).toEqual(true);
+        });
+
+        it("returns preferred foci", () => {
+            const fakeEvent = makeMockEvent();
+            const mockFocus = { type: "this_is_a_mock_focus" };
+            const membership = new CallMembership(
+                fakeEvent,
+                Object.assign({}, membershipTemplate, { foci_active: [mockFocus] }),
+            );
+            expect(membership.getPreferredFoci()).toEqual([mockFocus]);
+        });
     });
 
-    it("rejects membership with no device_id", () => {
-        expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { device_id: undefined }));
-        }).toThrow();
-    });
+    describe("SessionMembershipData", () => {
+        const membershipTemplate: SessionMembershipData = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA",
+            focus_active: { type: "livekit" },
+            foci_preferred: [{ type: "livekit" }],
+        };
 
-    it("rejects membership with no call_id", () => {
-        expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { call_id: undefined }));
-        }).toThrow();
-    });
+        it("rejects membership with no device_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { device_id: undefined }));
+            }).toThrow();
+        });
 
-    it("rejects membership with no scope", () => {
-        expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
-        }).toThrow();
-    });
-    it("rejects with malformatted expires_ts", () => {
-        expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires_ts: "string" }));
-        }).toThrow();
-    });
-    it("rejects with malformatted expires", () => {
-        expect(() => {
-            new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { expires: "string" }));
-        }).toThrow();
-    });
+        it("rejects membership with no call_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { call_id: undefined }));
+            }).toThrow();
+        });
 
-    it("uses event timestamp if no created_ts", () => {
-        const membership = new CallMembership(makeMockEvent(12345), membershipTemplate);
-        expect(membership.createdTs()).toEqual(12345);
-    });
+        it("allow membership with no scope", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
+            }).not.toThrow();
+        });
 
-    it("uses created_ts if present", () => {
-        const membership = new CallMembership(
-            makeMockEvent(12345),
-            Object.assign({}, membershipTemplate, { created_ts: 67890 }),
-        );
-        expect(membership.createdTs()).toEqual(67890);
-    });
+        it("uses event timestamp if no created_ts", () => {
+            const membership = new CallMembership(makeMockEvent(12345), membershipTemplate);
+            expect(membership.createdTs()).toEqual(12345);
+        });
 
-    it("computes absolute expiry time based on expires", () => {
-        const membership = new CallMembership(makeMockEvent(1000), membershipTemplate);
-        expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
-    });
+        it("uses created_ts if present", () => {
+            const membership = new CallMembership(
+                makeMockEvent(12345),
+                Object.assign({}, membershipTemplate, { created_ts: 67890 }),
+            );
+            expect(membership.createdTs()).toEqual(67890);
+        });
 
-    it("computes absolute expiry time based on expires_ts", () => {
-        const membership = new CallMembership(
-            makeMockEvent(1000),
-            Object.assign({}, membershipTemplate, { expires: undefined, expires_ts: 6000 }),
-        );
-        expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
-    });
+        it("considers memberships unexpired if local age low enough", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.getLocalAge = jest.fn().mockReturnValue(3000);
+            const membership = new CallMembership(fakeEvent, membershipTemplate);
+            expect(membership.isExpired()).toEqual(false);
+        });
 
-    it("considers memberships unexpired if local age low enough", () => {
-        const fakeEvent = makeMockEvent(1000);
-        fakeEvent.getLocalAge = jest.fn().mockReturnValue(3000);
-        const membership = new CallMembership(fakeEvent, membershipTemplate);
-        expect(membership.isExpired()).toEqual(false);
-    });
-
-    it("considers memberships expired when local age large", () => {
-        const fakeEvent = makeMockEvent(1000);
-        fakeEvent.localTimestamp = Date.now() - 6000;
-        const membership = new CallMembership(fakeEvent, membershipTemplate);
-        expect(membership.isExpired()).toEqual(true);
-    });
-
-    it("returns active foci", () => {
-        const fakeEvent = makeMockEvent();
-        const mockFocus = { type: "this_is_a_mock_focus" };
-        const membership = new CallMembership(
-            fakeEvent,
-            Object.assign({}, membershipTemplate, { foci_active: [mockFocus] }),
-        );
-        expect(membership.getActiveFoci()).toEqual([mockFocus]);
+        it("returns preferred foci", () => {
+            const fakeEvent = makeMockEvent();
+            const mockFocus = { type: "this_is_a_mock_focus" };
+            const membership = new CallMembership(
+                fakeEvent,
+                Object.assign({}, membershipTemplate, { foci_preferred: [mockFocus] }),
+            );
+            expect(membership.getPreferredFoci()).toEqual([mockFocus]);
+        });
     });
 
     describe("expiry calculation", () => {
         let fakeEvent: MatrixEvent;
         let membership: CallMembership;
+        const membershipTemplate: CallMembershipDataLegacy = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA",
+            expires: 5000,
+            membershipID: "bloop",
+            foci_active: [{ type: "livekit" }],
+        };
 
         beforeEach(() => {
             // server origin timestamp for this event is 1000
