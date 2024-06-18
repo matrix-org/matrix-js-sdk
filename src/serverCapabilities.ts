@@ -18,7 +18,7 @@ import { IHttpOpts, MatrixHttpApi, Method } from "./http-api";
 import { logger } from "./logger";
 
 // How often we update the server capabilities.
-// // 6 hours - an arbitrary value, but they should change very infrequently.
+// 6 hours - an arbitrary value, but they should change very infrequently.
 const CAPABILITIES_CACHE_MS = 6 * 60 * 60 * 1000;
 
 // How long we want before rtetrying if we couldn't fetch
