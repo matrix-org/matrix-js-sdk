@@ -111,7 +111,7 @@ export class ServerCapabilities {
 
     private poll = async (): Promise<void> => {
         try {
-            this.fetchCapabilities();
+            await this.fetchCapabilities();
             this.clearTimeouts();
             this.refreshTimeout = setTimeout(this.poll, CAPABILITIES_CACHE_MS);
             logger.debug("Fetched new server capabilities");
