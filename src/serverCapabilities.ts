@@ -21,7 +21,7 @@ import { logger } from "./logger";
 // 6 hours - an arbitrary value, but they should change very infrequently.
 const CAPABILITIES_CACHE_MS = 6 * 60 * 60 * 1000;
 
-// How long we want before rtetrying if we couldn't fetch
+// How long we want before retrying if we couldn't fetch
 const CAPABILITIES_RETRY_MS = 30 * 1000;
 
 export interface ICapability {
