@@ -117,7 +117,7 @@ export class ServerCapabilities {
             logger.debug("Fetched new server capabilities");
         } catch (e) {
             this.clearTimeouts();
-            const howLong = CAPABILITIES_RETRY_MS + Math.random() * 5000;
+            const howLong = Math.floor(CAPABILITIES_RETRY_MS + Math.random() * 5000);
             this.retryTimeout = setTimeout(this.poll, howLong);
             logger.warn(`Failed to refresh capabilities: retrying in ${howLong}ms`, e);
         }
