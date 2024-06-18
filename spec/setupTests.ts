@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import DOMException from "domexception";
-
-global.DOMException = DOMException as typeof global.DOMException;
-
 jest.mock("../src/http-api/utils", () => ({
     ...jest.requireActual("../src/http-api/utils"),
     // We mock timeoutSignal otherwise it causes tests to leave timers running
