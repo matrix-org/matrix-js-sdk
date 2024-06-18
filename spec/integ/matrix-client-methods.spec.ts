@@ -1292,6 +1292,41 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("getCapabilities", () => {
+        it("should return cached capabilities if present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(await client.getCapabilities()).toEqual(capsObject);
+        });
+
+        it("should fetch capabilities if cache not present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            const capsPromise = client.getCapabilities();
+            await httpBackend!.flushAllExpected();
+
+            expect(await capsPromise).toEqual(capsObject);
+        });
+    });
+
     describe("getCachedCapabilities", () => {
         it("should return cached capabilities or undefined", async () => {
             const capsObject = {
