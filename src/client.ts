@@ -4319,16 +4319,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             signPromise = this.http.requestOtherUrl<IThirdPartySigned>(Method.Post, url);
         }
 
-        const queryParams: QueryDict = {};
+        let queryParams: QueryDict = {};
         if (opts.viaServers) {
             queryParams.server_name = opts.viaServers;
-            switch (this.canSupport.get(Feature.MigrateServerNameToVia)) {
-                case ServerSupport.Stable:
-                    queryParams.via = opts.viaServers;
-                    break;
-                case ServerSupport.Unstable:
-                    queryParams["org.matrix.msc4156.via"] = opts.viaServers;
-                    break;
+            queryParams.via = opts.viaServers;
+            if (this.canSupport.get(Feature.MigrateServerNameToVia) === ServerSupport.Unstable) {
+                queryParams = replaceParam("via", "org.matrix.msc4156.via", queryParams);
             }
         }
 
@@ -4372,16 +4368,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const path = utils.encodeUri("/knock/$roomIdOrAlias", { $roomIdOrAlias: roomIdOrAlias });
 
-        const queryParams: QueryDict = {};
+        let queryParams: QueryDict = {};
         if (opts.viaServers) {
             queryParams.server_name = opts.viaServers;
-            switch (this.canSupport.get(Feature.MigrateServerNameToVia)) {
-                case ServerSupport.Stable:
-                    queryParams.via = opts.viaServers;
-                    break;
-                case ServerSupport.Unstable:
-                    queryParams["org.matrix.msc4156.via"] = opts.viaServers;
-                    break;
+            queryParams.via = opts.viaServers;
+            if (this.canSupport.get(Feature.MigrateServerNameToVia) === ServerSupport.Unstable) {
+                queryParams = replaceParam("via", "org.matrix.msc4156.via", queryParams);
             }
         }
 
