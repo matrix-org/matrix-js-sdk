@@ -257,7 +257,7 @@ describe("MatrixClient", function () {
                 .when("POST", "/knock/" + encodeURIComponent(roomId))
                 .check((request) => {
                     expect(request.data).toEqual({ reason: opts.reason });
-                    expect(request.queryParams).toEqual({ server_name: opts.viaServers });
+                    expect(request.queryParams).toEqual({ server_name: opts.viaServers, via: opts.viaServers });
                 })
                 .respond(200, { room_id: roomId });
 
