@@ -54,9 +54,7 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
             return opts.deviceId;
         },
         baseUrl,
-        getHomeserverUrl() {
-            return baseUrl;
-        },
+        getDomain: () => "example.com",
         getDevice: jest.fn(),
         getCrypto: jest.fn(() => crypto),
         getAuthIssuer: jest.fn().mockResolvedValue({ issuer: "https://issuer/" }),
@@ -157,19 +155,19 @@ describe("MSC4108SignInWithQR", () => {
             client = makeMockClient({ userId: "@alice:example.com", deviceId: "alice", msc4108Enabled: true });
 
             const ourChannel = new MSC4108SecureChannel(ourMockSession);
-            const qrCodeData = QrCodeData.from_bytes(
-                await ourChannel.generateCode(QrCodeMode.Reciprocate, client.getHomeserverUrl()),
+            const qrCodeData = QrCodeData.fromBytes(
+                await ourChannel.generateCode(QrCodeMode.Reciprocate, client.getDomain()!),
             );
-            const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.public_key);
+            const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.publicKey);
 
             ourLogin = new MSC4108SignInWithQR(ourChannel, true, client);
             opponentLogin = new MSC4108SignInWithQR(opponentChannel, false);
         });
 
-        it("should be able to connect with opponent and share homeserver url & check code", async () => {
+        it("should be able to connect with opponent and share server name & check code", async () => {
             await Promise.all([
                 expect(ourLogin.negotiateProtocols()).resolves.toEqual({}),
-                expect(opponentLogin.negotiateProtocols()).resolves.toEqual({ homeserverBaseUrl: client.baseUrl }),
+                expect(opponentLogin.negotiateProtocols()).resolves.toEqual({ serverName: client.getDomain() }),
             ]);
 
             expect(ourLogin.checkCode).toBe(opponentLogin.checkCode);

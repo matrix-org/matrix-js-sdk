@@ -145,7 +145,7 @@ export class MSC4108SignInWithQR {
         }
 
         if (this.ourIntent === QrCodeMode.Reciprocate && this.client) {
-            this._code = await this.channel.generateCode(this.ourIntent, this.client.getHomeserverUrl());
+            this._code = await this.channel.generateCode(this.ourIntent, this.client.getDomain()!);
         } else if (this.ourIntent === QrCodeMode.Login) {
             this._code = await this.channel.generateCode(this.ourIntent);
         }
@@ -171,7 +171,7 @@ export class MSC4108SignInWithQR {
      * The scanning device has to discover the homeserver details, if they scanned the code then they already have it.
      * If the new device is the one rendering the QR code then it has to wait be sent the homeserver details via the rendezvous channel.
      */
-    public async negotiateProtocols(): Promise<{ homeserverBaseUrl?: string }> {
+    public async negotiateProtocols(): Promise<{ serverName?: string }> {
         logger.info(`negotiateProtocols(isNewDevice=${this.isNewDevice} didScanCode=${this.didScanCode})`);
         await this.channel.connect();
 
@@ -194,7 +194,7 @@ export class MSC4108SignInWithQR {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],
-                        homeserver: this.client?.getHomeserverUrl() ?? "",
+                        homeserver: this.client!.getDomain()!,
                     });
                 } else {
                     await this.send<FailurePayload>({
@@ -227,7 +227,7 @@ export class MSC4108SignInWithQR {
                 );
             }
 
-            return { homeserverBaseUrl: payload.homeserver };
+            return { serverName: payload.homeserver };
         } else {
             // MSC4108-Flow: NewScanned - nothing to do
         }

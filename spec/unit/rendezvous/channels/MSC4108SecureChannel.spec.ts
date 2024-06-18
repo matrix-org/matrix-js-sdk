@@ -44,9 +44,9 @@ describe("MSC4108SecureChannel", () => {
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
 
-        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
+        const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
         const { initial_message: ciphertext } = new Ecies().establish_outbound_channel(
-            qrCodeData.public_key,
+            qrCodeData.publicKey,
             "MATRIX_QR_CODE_LOGIN_INITIATE",
         );
         mocked(mockSession.receive).mockResolvedValue(ciphertext);
@@ -65,9 +65,9 @@ describe("MSC4108SecureChannel", () => {
         mocked(mockSession.receive).mockResolvedValue("");
         await expect(channel.connect()).rejects.toThrow("No response from other device");
 
-        const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
+        const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
         const { initial_message: ciphertext } = new Ecies().establish_outbound_channel(
-            qrCodeData.public_key,
+            qrCodeData.publicKey,
             "NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE",
         );
 
@@ -88,9 +88,9 @@ describe("MSC4108SecureChannel", () => {
             } as unknown as MSC4108RendezvousSession;
             channel = new MSC4108SecureChannel(mockSession);
 
-            const qrCodeData = QrCodeData.from_bytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
+            const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
             const { channel: _opponentChannel, initial_message: ciphertext } = new Ecies().establish_outbound_channel(
-                qrCodeData.public_key,
+                qrCodeData.publicKey,
                 "MATRIX_QR_CODE_LOGIN_INITIATE",
             );
             opponentChannel = _opponentChannel;
