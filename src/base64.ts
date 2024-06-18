@@ -59,7 +59,7 @@ export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): stri
  * @returns The unpadded base64.
  */
 export function encodeUnpaddedBase64Url(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeUnpaddedBase64(uint8Array).replace("+", "-").replace("/", "_");
+    return encodeUnpaddedBase64(uint8Array).replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 /**
@@ -75,7 +75,7 @@ export function decodeBase64(base64: string): Uint8Array {
         const itFunc = function* (): Generator<number> {
             const decoded = atob(
                 // built-in atob doesn't support base64url: convert so we support either
-                base64.replace("-", "+").replace("_", "/"),
+                base64.replace(/-/g, "+").replace(/_/g, "/"),
             );
             for (let i = 0; i < decoded.length; ++i) {
                 yield decoded.charCodeAt(i);
