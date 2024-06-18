@@ -2065,13 +2065,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Gets the cached capabilities of the homeserver, returning cached ones if available.
+     * If there are no cached capabilities and none can be fetched, throw an exception.
+     *
+     * @returns Promise resolving with The capabilities of the homeserver
+     */
+    public async getCapabilities(): Promise<Capabilities> {
+        const caps = this.serverCapabilitiesService.getCachedCapabilities();
+        if (caps) return caps;
+        return this.serverCapabilitiesService.fetchCapabilities();
+    }
+
+    /**
      * Gets the cached capabilities of the homeserver. If none have been fetched yet,
      * return undefined.
      *
      * @returns The capabilities of the homeserver
      */
     public getCachedCapabilities(): Capabilities | undefined {
-        return this.serverCapabilitiesService.getCapabilities();
+        return this.serverCapabilitiesService.getCachedCapabilities();
     }
 
     /**

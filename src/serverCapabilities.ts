@@ -95,7 +95,7 @@ export class ServerCapabilities {
      * Returns the cached capabilities, or undefined if none are cached.
      * @returns the current capabilities, if any.
      */
-    public getCapabilities(): Capabilities | undefined {
+    public getCachedCapabilities(): Capabilities | undefined {
         return this.capabilities;
     }
 

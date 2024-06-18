@@ -70,7 +70,7 @@ import { RoomReceipts } from "./room-receipts";
 import { compareEventOrdering } from "./compare-event-ordering";
 import * as utils from "../utils";
 import { KnownMembership, Membership } from "../@types/membership";
-import { IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities";
+import { Capabilities, IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -612,8 +612,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Resolves to the version the room should be upgraded to.
      */
     public async getRecommendedVersion(): Promise<IRecommendedVersion> {
-        const capabilities = this.client.getCachedCapabilities();
-        let versionCap = (capabilities ?? {})["m.room_versions"];
+        let capabilities: Capabilities = {};
+        try {
+            capabilities = await this.client.getCapabilities();
+        } catch (e) {}
+        let versionCap = capabilities["m.room_versions"];
         if (!versionCap) {
             versionCap = {
                 default: KNOWN_SAFE_ROOM_VERSION,
