@@ -640,8 +640,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     "to be supporting a newer room version we don't know about.",
             );
 
-            const caps = await this.client.fetchCapabilities();
-            versionCap = caps["m.room_versions"];
+            try {
+                capabilities = await this.client.fetchCapabilities();
+            } catch (e) {
+                logger.warn("Failed to refresh room version capabilities", e);
+            }
+            versionCap = capabilities["m.room_versions"];
             if (!versionCap) {
                 logger.warn("No room version capability - assuming upgrade required.");
                 return result;
