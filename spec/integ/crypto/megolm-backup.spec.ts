@@ -796,7 +796,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
             expect(result).toBeTruthy();
-            jest.runAllTimers();
+            jest.advanceTimersByTime(10 * 60 * 1000);
             await failurePromise;
 
             // Fix the endpoint to do successful uploads
@@ -829,7 +829,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
 
             // run the timers, which will make the backup loop redo the request
-            await jest.runAllTimersAsync();
+            await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
             await successPromise;
             await allKeysUploadedPromise;
         });

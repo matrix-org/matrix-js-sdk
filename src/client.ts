@@ -226,6 +226,7 @@ import { getRelationsThreadFilter } from "./thread-utils";
 import { KnownMembership, Membership } from "./@types/membership";
 import { RoomMessageEventContent, StickerEventContent } from "./@types/events";
 import { ImageInfo } from "./@types/media";
+import { Capabilities, ServerCapabilities } from "./serverCapabilities";
 
 export type Store = IStore;
 
@@ -233,7 +234,6 @@ export type ResetTimelineCallback = (roomId: string) => boolean;
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
-const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
 export const UNSTABLE_MSC3852_LAST_SEEN_UA = new UnstableValue(
@@ -518,26 +518,6 @@ export interface IStartClientOpts {
 
 export interface IStoredClientOpts extends IStartClientOpts {}
 
-export enum RoomVersionStability {
-    Stable = "stable",
-    Unstable = "unstable",
-}
-
-export interface IRoomVersionsCapability {
-    default: string;
-    available: Record<string, RoomVersionStability>;
-}
-
-export interface ICapability {
-    enabled: boolean;
-}
-
-export interface IChangePasswordCapability extends ICapability {}
-
-export interface IThreadsCapability extends ICapability {}
-
-export interface IGetLoginTokenCapability extends ICapability {}
-
 export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
     "m.get_login_token",
     "org.matrix.msc3882.get_login_token",
@@ -546,19 +526,6 @@ export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
-
-/**
- * A representation of the capabilities advertised by a homeserver as defined by
- * [Capabilities negotiation](https://spec.matrix.org/v1.6/client-server-api/#get_matrixclientv3capabilities).
- */
-export interface Capabilities {
-    [key: string]: any;
-    "m.change_password"?: IChangePasswordCapability;
-    "m.room_versions"?: IRoomVersionsCapability;
-    "io.element.thread"?: IThreadsCapability;
-    "m.get_login_token"?: IGetLoginTokenCapability;
-    "org.matrix.msc3882.get_login_token"?: IGetLoginTokenCapability;
-}
 
 enum CrossSigningKeyType {
     MasterKey = "master_key",
@@ -1293,10 +1260,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
     protected serverVersionsPromise?: Promise<IServerVersions>;
 
-    public cachedCapabilities?: {
-        capabilities: Capabilities;
-        expiration: number;
-    };
     protected clientWellKnown?: IClientWellKnown;
     protected clientWellKnownPromise?: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
@@ -1324,6 +1287,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly ignoredInvites: IgnoredInvites;
 
     public readonly matrixRTC: MatrixRTCSessionManager;
+
+    private serverCapabilitiesService: ServerCapabilities;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1417,6 +1382,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // NB. We initialise MatrixRTC whether we have call support or not: this is just
         // the underlying session management and doesn't use any actual media capabilities
         this.matrixRTC = new MatrixRTCSessionManager(this);
+
+        this.serverCapabilitiesService = new ServerCapabilities(this.http);
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1540,6 +1507,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.start();
+        this.serverCapabilitiesService.start();
     }
 
     /**
@@ -1593,6 +1561,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.toDeviceMessageQueue.stop();
 
         this.matrixRTC.stop();
+
+        this.serverCapabilitiesService.stop();
     }
 
     /**
@@ -2095,47 +2065,35 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets the capabilities of the homeserver. Always returns an object of
-     * capability keys and their options, which may be empty.
-     * @param fresh - True to ignore any cached values.
-     * @returns Promise which resolves to the capabilities of the homeserver
-     * @returns Rejects: with an error response.
+     * Gets the cached capabilities of the homeserver, returning cached ones if available.
+     * If there are no cached capabilities and none can be fetched, throw an exception.
+     *
+     * @returns Promise resolving with The capabilities of the homeserver
      */
-    public getCapabilities(fresh = false): Promise<Capabilities> {
-        const now = new Date().getTime();
+    public async getCapabilities(): Promise<Capabilities> {
+        const caps = this.serverCapabilitiesService.getCachedCapabilities();
+        if (caps) return caps;
+        return this.serverCapabilitiesService.fetchCapabilities();
+    }
 
-        if (this.cachedCapabilities && !fresh) {
-            if (now < this.cachedCapabilities.expiration) {
-                this.logger.debug("Returning cached capabilities");
-                return Promise.resolve(this.cachedCapabilities.capabilities);
-            }
-        }
+    /**
+     * Gets the cached capabilities of the homeserver. If none have been fetched yet,
+     * return undefined.
+     *
+     * @returns The capabilities of the homeserver
+     */
+    public getCachedCapabilities(): Capabilities | undefined {
+        return this.serverCapabilitiesService.getCachedCapabilities();
+    }
 
-        type Response = {
-            capabilities?: Capabilities;
-        };
-        return this.http
-            .authedRequest<Response>(Method.Get, "/capabilities")
-            .catch((e: Error): Response => {
-                // We swallow errors because we need a default object anyhow
-                this.logger.error(e);
-                return {};
-            })
-            .then((r = {}) => {
-                const capabilities = r["capabilities"] || {};
-
-                // If the capabilities missed the cache, cache it for a shorter amount
-                // of time to try and refresh them later.
-                const cacheMs = Object.keys(capabilities).length ? CAPABILITIES_CACHE_MS : 60000 + Math.random() * 5000;
-
-                this.cachedCapabilities = {
-                    capabilities,
-                    expiration: now + cacheMs,
-                };
-
-                this.logger.debug("Caching capabilities: ", capabilities);
-                return capabilities;
-            });
+    /**
+     * Fetches the latest capabilities from the homeserver, ignoring any cached
+     * versions. The newly returned version is cached.
+     *
+     * @returns A promise which resolves to the capabilities of the homeserver
+     */
+    public fetchCapabilities(): Promise<Capabilities> {
+        return this.serverCapabilitiesService.fetchCapabilities();
     }
 
     /**

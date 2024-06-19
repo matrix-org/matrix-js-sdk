@@ -1293,18 +1293,109 @@ describe("MatrixClient", function () {
     });
 
     describe("getCapabilities", () => {
-        it("should cache by default", async () => {
+        it("should return cached capabilities if present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
             httpBackend.when("GET", "/capabilities").respond(200, {
-                capabilities: {
-                    "m.change_password": false,
-                },
+                capabilities: capsObject,
             });
-            const prom = httpBackend.flushAllExpected();
-            const capabilities1 = await client.getCapabilities();
-            const capabilities2 = await client.getCapabilities();
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(await client.getCapabilities()).toEqual(capsObject);
+        });
+
+        it("should fetch capabilities if cache not present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            const capsPromise = client.getCapabilities();
+            await httpBackend!.flushAllExpected();
+
+            expect(await capsPromise).toEqual(capsObject);
+        });
+    });
+
+    describe("getCachedCapabilities", () => {
+        it("should return cached capabilities or undefined", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            expect(client.getCachedCapabilities()).toBeUndefined();
+
+            client.startClient();
+
+            await httpBackend!.flushAllExpected();
+
+            expect(client.getCachedCapabilities()).toEqual(capsObject);
+        });
+    });
+
+    describe("fetchCapabilities", () => {
+        const capsObject = {
+            "m.change_password": false,
+        };
+
+        beforeEach(() => {
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("should always fetch capabilities and then cache", async () => {
+            const prom = client.fetchCapabilities();
+            await httpBackend.flushAllExpected();
+            const caps = await prom;
+
+            expect(caps).toEqual(capsObject);
+        });
+
+        it("should write-through the cache", async () => {
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(client.getCachedCapabilities()).toEqual(capsObject);
+
+            const newCapsObject = {
+                "m.change_password": true,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: newCapsObject,
+            });
+
+            const prom = client.fetchCapabilities();
+            await httpBackend.flushAllExpected();
             await prom;
 
-            expect(capabilities1).toStrictEqual(capabilities2);
+            expect(client.getCachedCapabilities()).toEqual(newCapsObject);
         });
     });
 

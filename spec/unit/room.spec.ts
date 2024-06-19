@@ -4034,4 +4034,47 @@ describe("Room", function () {
             expect(room.getLastThread()).toBe(thread2);
         });
     });
+
+    describe("getRecommendedVersion", () => {
+        it("returns the server's recommended version from capabilities", async () => {
+            const client = new TestClient(userA).client;
+            client.getCapabilities = jest.fn().mockReturnValue({
+                ["m.room_versions"]: {
+                    default: "1",
+                    available: ["1", "2"],
+                },
+            });
+            const room = new Room(roomId, client, userA);
+            expect(await room.getRecommendedVersion()).toEqual({
+                version: "1",
+                needsUpgrade: false,
+                urgent: false,
+            });
+        });
+
+        it("force-refreshes versions to make sure an upgrade is necessary", async () => {
+            const client = new TestClient(userA).client;
+            client.getCapabilities = jest.fn().mockReturnValue({
+                ["m.room_versions"]: {
+                    default: "5",
+                    available: ["5"],
+                },
+            });
+
+            client.fetchCapabilities = jest.fn().mockResolvedValue({
+                ["m.room_versions"]: {
+                    default: "1",
+                    available: ["1"],
+                },
+            });
+
+            const room = new Room(roomId, client, userA);
+            expect(await room.getRecommendedVersion()).toEqual({
+                version: "1",
+                needsUpgrade: false,
+                urgent: false,
+            });
+            expect(client.fetchCapabilities).toHaveBeenCalled();
+        });
+    });
 });
