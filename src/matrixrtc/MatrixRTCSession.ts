@@ -823,11 +823,21 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const localDeviceId = this.client.getDeviceId();
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
-        const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
-        const content = myCallMemberEvent?.getContent() ?? {};
-        const legacy = "memberships" in content || this.useLegacyMemberEvents;
+        const callMemberEvents = roomState.events.get(EventType.GroupCallMemberPrefix);
+        let legacy = this.useLegacyMemberEvents;
+        if (!legacy && callMemberEvents?.size) {
+            for (const callMemberEvent of callMemberEvents.values()) {
+                const content = callMemberEvent.getContent();
+                if (Array.isArray(content["memberships"]) && content["memberships"].length > 0) {
+                    legacy = true;
+                    break;
+                }
+            }
+        }
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
         if (legacy) {
+            const myCallMemberEvent = callMemberEvents?.get(localUserId);
+            const content = myCallMemberEvent?.getContent() ?? {};
             let myPrevMembership: CallMembership | undefined;
             // We know its CallMembershipDataLegacy
             const memberships: CallMembershipDataLegacy[] = Array.isArray(content["memberships"])
