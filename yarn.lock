@@ -6635,19 +6635,19 @@ typed-array-length@^1.0.4:
     is-typed-array "^1.1.9"
 
 typedoc-plugin-coverage@^3.0.0:
-  version "3.1.1"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-3.1.1.tgz#dda6f4d12a870ffd231b24d53be859e2e44d9c31"
-  integrity sha512-PAMYQ4fX7wJo6Y8mMzrISDNRurl5+xSNWEojrt6Yxofb/m7vWrgiP3bid2KXloMlPcSfCoBiJA6F2g3rmu8XTQ==
+  version "3.2.0"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-3.2.0.tgz#c3d09fd5f42fb8fa3de0ed72344c406afe7e994b"
+  integrity sha512-jY6bEl/zNezRTAg0V4+FkJAtPlzSszK3QzcXSyGYcKjzzT8C6qw0xdh2KIJkxAtzYtgxT/4idiAYqZ1WRAieTA==
 
 typedoc-plugin-mdn-links@^3.0.3:
-  version "3.1.29"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.1.29.tgz#e740f3d1e4ec345a2fceaaf81227d816b2e610cf"
-  integrity sha512-dFKri2eYa+Owq+/3h3z/GvRQF5yM5kzbPqQWLo0LTIv5s78tFGq+yl8vNGf6CkJGakPBfdnHdfeo4bSsVZH0WQ==
+  version "3.1.30"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-3.1.30.tgz#bea289518cb393b07ee65fabc8ced393810dce9a"
+  integrity sha512-aB3UqyRGdxYziOHKzE7AQPh+9xpqqHHrp23F+T6yshHeuSiauCL+zzgTRhi4Ad1x30/7rTkCtyQ5dfO/+1FDKA==
 
 typedoc-plugin-missing-exports@^2.0.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-missing-exports/-/typedoc-plugin-missing-exports-2.2.0.tgz#e39a04bab5b0d7f7b28507d64c07a4c40b788648"
-  integrity sha512-2+XR1IcyQ5UwXZVJe9NE6HrLmNufT9i5OwoIuuj79VxuA3eYq+Y6itS9rnNV1D7UeQnUSH8kISYD73gHE5zw+w==
+  version "2.3.0"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-missing-exports/-/typedoc-plugin-missing-exports-2.3.0.tgz#ae0858bf383a08345cc09a99d428234cf6b85ecf"
+  integrity sha512-iI9ITNNLlbsLCBBeYDyu0Qqp3GN/9AGyWNKg8bctRXuZEPT7G1L+0+MNWG9MsHcf/BFmNbXL0nQ8mC/tXRicog==
 
 typedoc@^0.25.10:
   version "0.25.13"
