@@ -825,8 +825,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
         const content = myCallMemberEvent?.getContent() ?? {};
-        const legacy =
-            (("memberships" in content && content.memberships?.length) ?? 0 > 0) || this.useLegacyMemberEvents;
+        const legacy = "memberships" in content || this.useLegacyMemberEvents;
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
         if (legacy) {
             let myPrevMembership: CallMembership | undefined;
@@ -867,7 +866,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
                 newContent,
-                legacy ? localUserId : `_${localUserId}_${localDeviceId}`,
+                this.useLegacyMemberEvents ? localUserId : `${localUserId}_${localDeviceId}`,
             );
             logger.info(`Sent updated call member event.`);
 
