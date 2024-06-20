@@ -824,16 +824,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
         const callMemberEvents = roomState.events.get(EventType.GroupCallMemberPrefix);
-        let legacy = !!this.useLegacyMemberEvents;
-        if (!legacy && callMemberEvents?.size) {
-            for (const callMemberEvent of callMemberEvents.values()) {
-                const content = callMemberEvent.getContent();
-                if (Array.isArray(content["memberships"]) && content["memberships"].length > 0) {
-                    legacy = true;
-                    break;
-                }
-            }
-        }
+        const legacy =
+            !!this.useLegacyMemberEvents ||
+            (callMemberEvents?.size && this.stateEventsContainOngoingLegacySession(callMemberEvents));
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
         if (legacy) {
             const myCallMemberEvent = callMemberEvents?.get(localUserId);
@@ -890,6 +883,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             await new Promise((resolve) => setTimeout(resolve, resendDelay));
             await this.triggerCallMembershipEventUpdate();
         }
+    }
+
+    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>) {
+        for (const callMemberEvent of callMemberEvents.values()) {
+            const content = callMemberEvent.getContent();
+            if (Array.isArray(content["memberships"])) {
+                for (const membership of content.memberships) {
+                    if (!(new CallMembership(callMemberEvent, membership).isExpired())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private onRotateKeyTimeout = (): void => {
