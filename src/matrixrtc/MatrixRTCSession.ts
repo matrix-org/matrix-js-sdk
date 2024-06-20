@@ -885,7 +885,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
-    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>) {
+    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>): boolean {
         for (const callMemberEvent of callMemberEvents.values()) {
             const content = callMemberEvent.getContent();
             if (Array.isArray(content["memberships"])) {
