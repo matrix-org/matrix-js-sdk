@@ -876,7 +876,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
                 newContent,
-                this.useLegacyMemberEvents ? localUserId : `${localUserId}_${localDeviceId}`,
+                legacy ? localUserId : `${localUserId}_${localDeviceId}`,
             );
             logger.info(`Sent updated call member event.`);
 
