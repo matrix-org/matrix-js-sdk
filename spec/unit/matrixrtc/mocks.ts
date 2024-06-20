@@ -40,6 +40,17 @@ export function makeMockRoomState(memberships: CallMembershipData[], roomId: str
             if (stateKey !== undefined) return event;
             return [event];
         },
+        events: new Map([
+            [
+                event.getType(),
+                {
+                    size: () => true,
+                    has: (_stateKey: string) => true,
+                    get: (_stateKey: string) => event,
+                    values: () => [event],
+                }
+            ]
+        ]),
     };
 }
 
