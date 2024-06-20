@@ -123,8 +123,8 @@ describe("MatrixRTCSession", () => {
                                 has: (_stateKey: string) => true,
                                 get: (_stateKey: string) => event,
                                 values: () => [event],
-                            }
-                        ]
+                            },
+                        ],
                     ]),
                 }),
             }),
@@ -158,8 +158,8 @@ describe("MatrixRTCSession", () => {
                                 has: (_stateKey: string) => true,
                                 get: (_stateKey: string) => event,
                                 values: () => [event],
-                            }
-                        ]
+                            },
+                        ],
                     ]),
                 }),
             }),
@@ -364,9 +364,7 @@ describe("MatrixRTCSession", () => {
                 const timeElapsed = 60 * 60 * 1000 - 1000;
                 const event = mockRTCEvent(eventContent.memberships, mockRoom.roomId, timeElapsed);
                 const getState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-                getState.getStateEvents = jest
-                    .fn()
-                    .mockReturnValue(event);
+                getState.getStateEvents = jest.fn().mockReturnValue(event);
                 getState.events = new Map([
                     [
                         event.getType(),
@@ -376,7 +374,7 @@ describe("MatrixRTCSession", () => {
                             get: (_stateKey: string) => event,
                             values: () => [event],
                         } as unknown as Map<string, MatrixEvent>,
-                    ]
+                    ],
                 ]);
 
                 const eventReSentPromise = new Promise<Record<string, any>>((r) => {

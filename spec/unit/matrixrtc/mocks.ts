@@ -48,8 +48,8 @@ export function makeMockRoomState(memberships: CallMembershipData[], roomId: str
                     has: (_stateKey: string) => true,
                     get: (_stateKey: string) => event,
                     values: () => [event],
-                }
-            ]
+                },
+            ],
         ]),
     };
 }
