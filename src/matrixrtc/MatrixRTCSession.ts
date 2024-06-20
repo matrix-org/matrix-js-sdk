@@ -890,7 +890,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const content = callMemberEvent.getContent();
             if (Array.isArray(content["memberships"])) {
                 for (const membership of content.memberships) {
-                    if (!(new CallMembership(callMemberEvent, membership).isExpired())) {
+                    if (!new CallMembership(callMemberEvent, membership).isExpired()) {
                         return true;
                     }
                 }
