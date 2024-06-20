@@ -824,7 +824,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
         const callMemberEvents = roomState.events.get(EventType.GroupCallMemberPrefix);
-        let legacy = this.useLegacyMemberEvents;
+        let legacy = !!this.useLegacyMemberEvents;
         if (!legacy && callMemberEvents?.size) {
             for (const callMemberEvent of callMemberEvents.values()) {
                 const content = callMemberEvent.getContent();
