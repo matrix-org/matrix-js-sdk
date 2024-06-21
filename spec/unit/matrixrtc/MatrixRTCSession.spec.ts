@@ -16,7 +16,11 @@ limitations under the License.
 
 import { EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
+import {
+    CallMembershipData,
+    CallMembershipDataLegacy,
+    SessionMembershipData,
+} from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
@@ -99,22 +103,33 @@ describe("MatrixRTCSession", () => {
     });
 
     it("safely ignores events with no memberships section", () => {
+        const roomId = randomString(8);
+        const event = {
+            getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+            getContent: jest.fn().mockReturnValue({}),
+            getSender: jest.fn().mockReturnValue("@mock:user.example"),
+            getTs: jest.fn().mockReturnValue(1000),
+            getLocalAge: jest.fn().mockReturnValue(0),
+        };
         const mockRoom = {
             ...makeMockRoom([]),
-            roomId: randomString(8),
+            roomId,
             getLiveTimeline: jest.fn().mockReturnValue({
                 getState: jest.fn().mockReturnValue({
                     on: jest.fn(),
                     off: jest.fn(),
-                    getStateEvents: (_type: string, _stateKey: string) => [
-                        {
-                            getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-                            getContent: jest.fn().mockReturnValue({}),
-                            getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                            getTs: jest.fn().mockReturnValue(1000),
-                            getLocalAge: jest.fn().mockReturnValue(0),
-                        },
-                    ],
+                    getStateEvents: (_type: string, _stateKey: string) => [event],
+                    events: new Map([
+                        [
+                            EventType.GroupCallMemberPrefix,
+                            {
+                                size: () => true,
+                                has: (_stateKey: string) => true,
+                                get: (_stateKey: string) => event,
+                                values: () => [event],
+                            },
+                        ],
+                    ]),
                 }),
             }),
         };
@@ -123,22 +138,33 @@ describe("MatrixRTCSession", () => {
     });
 
     it("safely ignores events with junk memberships section", () => {
+        const roomId = randomString(8);
+        const event = {
+            getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+            getContent: jest.fn().mockReturnValue({ memberships: ["i am a fish"] }),
+            getSender: jest.fn().mockReturnValue("@mock:user.example"),
+            getTs: jest.fn().mockReturnValue(1000),
+            getLocalAge: jest.fn().mockReturnValue(0),
+        };
         const mockRoom = {
             ...makeMockRoom([]),
-            roomId: randomString(8),
+            roomId,
             getLiveTimeline: jest.fn().mockReturnValue({
                 getState: jest.fn().mockReturnValue({
                     on: jest.fn(),
                     off: jest.fn(),
-                    getStateEvents: (_type: string, _stateKey: string) => [
-                        {
-                            getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-                            getContent: jest.fn().mockReturnValue({ memberships: "i am a fish" }),
-                            getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                            getTs: jest.fn().mockReturnValue(1000),
-                            getLocalAge: jest.fn().mockReturnValue(0),
-                        },
-                    ],
+                    getStateEvents: (_type: string, _stateKey: string) => [event],
+                    events: new Map([
+                        [
+                            EventType.GroupCallMemberPrefix,
+                            {
+                                size: () => true,
+                                has: (_stateKey: string) => true,
+                                get: (_stateKey: string) => event,
+                                values: () => [event],
+                            },
+                        ],
+                    ]),
                 }),
             }),
         };
@@ -184,6 +210,67 @@ describe("MatrixRTCSession", () => {
         const mockRoom = makeMockRoom([testMembership]);
         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
+    });
+
+    describe("updateCallMembershipEvent", () => {
+        const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
+        const joinSessionConfig = { useLegacyMemberEvents: false };
+
+        const legacyMembershipData: CallMembershipDataLegacy = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA_legacy",
+            expires: 60 * 60 * 1000,
+            membershipID: "bloop",
+            foci_active: [mockFocus],
+        };
+
+        const expiredLegacyMembershipData: CallMembershipDataLegacy = {
+            ...legacyMembershipData,
+            device_id: "AAAAAAA_legacy_expired",
+            expires: 0,
+        };
+
+        const sessionMembershipData: SessionMembershipData = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA_session",
+            focus_active: mockFocus,
+            foci_preferred: [mockFocus],
+        };
+
+        function testSession(
+            membershipData: CallMembershipData[] | SessionMembershipData,
+            shouldUseLegacy: boolean,
+        ): void {
+            sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
+
+            const makeNewLegacyMembershipsMock = jest.spyOn(sess as any, "makeNewLegacyMemberships");
+            const makeNewMembershipMock = jest.spyOn(sess as any, "makeNewMembership");
+
+            sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
+
+            expect(makeNewLegacyMembershipsMock).toHaveBeenCalledTimes(shouldUseLegacy ? 1 : 0);
+            expect(makeNewMembershipMock).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+        }
+
+        it("uses legacy events if there are any active legacy calls", () => {
+            testSession([expiredLegacyMembershipData, legacyMembershipData, sessionMembershipData], true);
+        });
+
+        it('uses legacy events if a non-legacy call is in a "memberships" array', () => {
+            testSession([sessionMembershipData], true);
+        });
+
+        it("uses non-legacy events if all legacy calls are expired", () => {
+            testSession([expiredLegacyMembershipData], false);
+        });
+
+        it("uses non-legacy events if there are only non-legacy calls", () => {
+            testSession(sessionMembershipData, false);
+        });
     });
 
     describe("getOldestMembership", () => {
@@ -340,9 +427,20 @@ describe("MatrixRTCSession", () => {
 
                 // definitely should have renewed by 1 second before the expiry!
                 const timeElapsed = 60 * 60 * 1000 - 1000;
-                mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!.getStateEvents = jest
-                    .fn()
-                    .mockReturnValue(mockRTCEvent(eventContent.memberships, mockRoom.roomId, timeElapsed));
+                const event = mockRTCEvent(eventContent.memberships, mockRoom.roomId, timeElapsed);
+                const getState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+                getState.getStateEvents = jest.fn().mockReturnValue(event);
+                getState.events = new Map([
+                    [
+                        event.getType(),
+                        {
+                            size: () => true,
+                            has: (_stateKey: string) => true,
+                            get: (_stateKey: string) => event,
+                            values: () => [event],
+                        } as unknown as Map<string, MatrixEvent>,
+                    ],
+                ]);
 
                 const eventReSentPromise = new Promise<Record<string, any>>((r) => {
                     resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {

@@ -823,11 +823,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const localDeviceId = this.client.getDeviceId();
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
-        const myCallMemberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix, localUserId) ?? undefined;
-        const content = myCallMemberEvent?.getContent() ?? {};
-        const legacy = "memberships" in content || this.useLegacyMemberEvents;
+        const callMemberEvents = roomState.events.get(EventType.GroupCallMemberPrefix);
+        const legacy =
+            !!this.useLegacyMemberEvents ||
+            (callMemberEvents?.size && this.stateEventsContainOngoingLegacySession(callMemberEvents));
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
         if (legacy) {
+            const myCallMemberEvent = callMemberEvents?.get(localUserId);
+            const content = myCallMemberEvent?.getContent() ?? {};
             let myPrevMembership: CallMembership | undefined;
             // We know its CallMembershipDataLegacy
             const memberships: CallMembershipDataLegacy[] = Array.isArray(content["memberships"])
@@ -866,7 +869,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
                 newContent,
-                this.useLegacyMemberEvents ? localUserId : `${localUserId}_${localDeviceId}`,
+                legacy ? localUserId : `${localUserId}_${localDeviceId}`,
             );
             logger.info(`Sent updated call member event.`);
 
@@ -880,6 +883,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             await new Promise((resolve) => setTimeout(resolve, resendDelay));
             await this.triggerCallMembershipEventUpdate();
         }
+    }
+
+    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>): boolean {
+        for (const callMemberEvent of callMemberEvents.values()) {
+            const content = callMemberEvent.getContent();
+            if (Array.isArray(content["memberships"])) {
+                for (const membership of content.memberships) {
+                    if (!new CallMembership(callMemberEvent, membership).isExpired()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private onRotateKeyTimeout = (): void => {
