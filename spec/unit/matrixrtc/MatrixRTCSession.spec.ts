@@ -399,6 +399,42 @@ describe("MatrixRTCSession", () => {
             jest.useRealTimers();
         });
 
+        describe("non-legacy calls", () => {
+            const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
+            const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
+
+            function testJoin(useOwnedStateEvents: boolean): void {
+                if (useOwnedStateEvents) {
+                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3779.default");
+                }
+
+                jest.useFakeTimers();
+                sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom!.roomId,
+                    EventType.GroupCallMemberPrefix,
+                    {
+                        application: "m.call",
+                        scope: "m.room",
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        foci_preferred: [activeFocusConfig],
+                        focus_active: activeFocus,
+                    } satisfies SessionMembershipData,
+                    `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`,
+                );
+                jest.useRealTimers();
+            }
+
+            it("sends a membership event with session payload when joining a non-legacy call", () => {
+                testJoin(false);
+            });
+
+            it("does not prefix the state key with _ for rooms that support user-owned state events", () => {
+                testJoin(true);
+            });
+        });
+
         it("does nothing if join called when already joined", () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
 
