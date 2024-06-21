@@ -428,12 +428,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 this.setBeacon(event);
             }
 
-            const lastStateEv = this.getStateEventMatching(event);
+            const lastStateEvent = this.getStateEventMatching(event);
+
             // Safety measure to not update the room (and emit the update) with older state.
             // The sync loop really should not send old events but it does very regularly.
             // Logging on return in those two conditions results in a large amount of logging. (on startup and when running element)
-            const [lastReplaceId, lastId] = [lastStateEv?.event.unsigned?.replaces_state, lastStateEv?.event.event_id];
-            const [newReplaceId, newId] = [event.event.unsigned?.replaces_state, event.event.event_id];
+            const lastReplaceId = lastStateEvent?.event.unsigned?.replaces_state;
+            const lastId = lastStateEvent?.event.event_id;
+            const newReplaceId = event.event.unsigned?.replaces_state;
+            const newId = event.event.event_id;
             if (options?.toStartOfTimeline) {
                 // Add an event to the start of the timeline. Its replace id not be the same as the one of the current/last start state event.
                 if (newReplaceId && newId && newReplaceId === lastId) return;
@@ -447,7 +450,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
                 this.updateThirdPartyTokenCache(event);
             }
-            this.emit(RoomStateEvent.Events, event, this, lastStateEv);
+            this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
         });
 
         this.onBeaconLivenessChange();
