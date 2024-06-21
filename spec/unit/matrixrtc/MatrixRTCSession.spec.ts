@@ -16,7 +16,11 @@ limitations under the License.
 
 import { EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
+import {
+    CallMembershipData,
+    CallMembershipDataLegacy,
+    SessionMembershipData,
+} from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
@@ -206,6 +210,67 @@ describe("MatrixRTCSession", () => {
         const mockRoom = makeMockRoom([testMembership]);
         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         expect(sess.memberships).toHaveLength(0);
+    });
+
+    describe("updateCallMembershipEvent", () => {
+        const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
+        const joinSessionConfig = { useLegacyMemberEvents: false };
+
+        const legacyMembershipData: CallMembershipDataLegacy = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA_legacy",
+            expires: 60 * 60 * 1000,
+            membershipID: "bloop",
+            foci_active: [mockFocus],
+        };
+
+        const expiredLegacyMembershipData: CallMembershipDataLegacy = {
+            ...legacyMembershipData,
+            device_id: "AAAAAAA_legacy_expired",
+            expires: 0,
+        };
+
+        const sessionMembershipData: SessionMembershipData = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA_session",
+            focus_active: mockFocus,
+            foci_preferred: [mockFocus],
+        };
+
+        function testSession(
+            membershipData: CallMembershipData[] | SessionMembershipData,
+            shouldUseLegacy: boolean,
+        ): void {
+            sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
+
+            const makeNewLegacyMembershipsMock = jest.spyOn(sess as any, "makeNewLegacyMemberships");
+            const makeNewMembershipMock = jest.spyOn(sess as any, "makeNewMembership");
+
+            sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
+
+            expect(makeNewLegacyMembershipsMock).toHaveBeenCalledTimes(shouldUseLegacy ? 1 : 0);
+            expect(makeNewMembershipMock).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+        }
+
+        it("uses legacy events if there are any active legacy calls", () => {
+            testSession([expiredLegacyMembershipData, legacyMembershipData, sessionMembershipData], true);
+        });
+
+        it('uses legacy events if a non-legacy call is in a "memberships" array', () => {
+            testSession([sessionMembershipData], true);
+        });
+
+        it("uses non-legacy events if all legacy calls are expired", () => {
+            testSession([expiredLegacyMembershipData], false);
+        });
+
+        it("uses non-legacy events if there are only non-legacy calls", () => {
+            testSession(sessionMembershipData, false);
+        });
     });
 
     describe("getOldestMembership", () => {

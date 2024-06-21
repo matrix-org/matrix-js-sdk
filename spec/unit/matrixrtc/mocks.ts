@@ -15,13 +15,15 @@ limitations under the License.
 */
 
 import { EventType, MatrixEvent, Room } from "../../../src";
-import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { CallMembershipData, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
-export function makeMockRoom(memberships: CallMembershipData[], localAge: number | null = null): Room {
+type MembershipData = CallMembershipData[] | SessionMembershipData;
+
+export function makeMockRoom(membershipData: MembershipData, localAge: number | null = null): Room {
     const roomId = randomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
-    const roomState = makeMockRoomState(memberships, roomId, localAge);
+    const roomState = makeMockRoomState(membershipData, roomId, localAge);
     return {
         roomId: roomId,
         hasMembershipState: jest.fn().mockReturnValue(true),
@@ -31,8 +33,8 @@ export function makeMockRoom(memberships: CallMembershipData[], localAge: number
     } as unknown as Room;
 }
 
-export function makeMockRoomState(memberships: CallMembershipData[], roomId: string, localAge: number | null = null) {
-    const event = mockRTCEvent(memberships, roomId, localAge);
+export function makeMockRoomState(membershipData: MembershipData, roomId: string, localAge: number | null = null) {
+    const event = mockRTCEvent(membershipData, roomId, localAge);
     return {
         on: jest.fn(),
         off: jest.fn(),
@@ -54,12 +56,16 @@ export function makeMockRoomState(memberships: CallMembershipData[], roomId: str
     };
 }
 
-export function mockRTCEvent(memberships: CallMembershipData[], roomId: string, localAge: number | null): MatrixEvent {
+export function mockRTCEvent(membershipData: MembershipData, roomId: string, localAge: number | null): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-        getContent: jest.fn().mockReturnValue({
-            memberships: memberships,
-        }),
+        getContent: jest.fn().mockReturnValue(
+            !Array.isArray(membershipData)
+                ? membershipData
+                : {
+                      memberships: membershipData,
+                  },
+        ),
         getSender: jest.fn().mockReturnValue("@mock:user.example"),
         getTs: jest.fn().mockReturnValue(1000),
         localTimestamp: Date.now() - (localAge ?? 10),
