@@ -127,7 +127,7 @@ export class EventTimeline {
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
-            this.startState = new RoomState(this.roomId);
+            this.startState = new RoomState(this.roomId, undefined, true);
             this.endState = new RoomState(this.roomId);
         }
 
@@ -151,7 +151,7 @@ export class EventTimeline {
             throw new Error("Cannot initialise state after events are added");
         }
 
-        this.startState?.setStateEvents(stateEvents, { timelineWasEmpty, toStartOfTimeline: true });
+        this.startState?.setStateEvents(stateEvents, { timelineWasEmpty });
         this.endState?.setStateEvents(stateEvents, { timelineWasEmpty });
     }
 
@@ -375,7 +375,7 @@ export class EventTimeline {
 
             // modify state but only on unfiltered timelineSets
             if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
-                roomState?.setStateEvents([event], { timelineWasEmpty, toStartOfTimeline });
+                roomState?.setStateEvents([event], { timelineWasEmpty });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
                 // it again if the prop wasn't previously set. It may also mean that

@@ -43,16 +43,7 @@ export interface IMarkerFoundOptions {
      */
     timelineWasEmpty?: boolean;
 }
-export interface ISetStateEventsOptions {
-    /** Whether the event is inserted at the start of the timeline
-     * or at the end. This is relevant for doing a sanity check:
-     * "Is the event id of the added event the same as the replaces_state id of the current event"
-     * We need to do this because sync sometimes feeds previous state events.
-     * If set to true the sanity check is inverted
-     * "Is the event id of the current event the same as the replaces_state id of the added event"
-     */
-    toStartOfTimeline?: boolean;
-}
+
 // possible statuses for out-of-band member loading
 enum OobStatus {
     NotStarted,
@@ -175,6 +166,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
     private _liveBeaconIds: BeaconIdentifier[] = [];
+    private _isStartTimelineState = false;
 
     /**
      * Construct room state.
@@ -207,8 +199,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public constructor(
         public readonly roomId: string,
         private oobMemberFlags = { status: OobStatus.NotStarted },
+        isStartTimelineState: boolean = false,
     ) {
         super();
+        this._isStartTimelineState = isStartTimelineState;
         this.updateModifiedTime();
     }
 
@@ -346,6 +340,21 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
+     * This state is marked as a start state. This is used to skip state insertions that are
+     * in the wrong order. The order is determined by the `replaces_state` id.
+     *
+     * Example:
+     * A current state events `replaces_state` value is `1`.
+     * Trying to insert a state event with `event_id` `1` in its place would fail if isStartTimelineState = false.
+     *
+     * A current state events `event_id` is `2`.
+     * Trying to insert a state event where its `replaces_state` value is `2` would fail if isStartTimelineState = true.
+     */
+    public get isStartTimelineState(): boolean {
+        return this._isStartTimelineState;
+    }
+
+    /**
      * Creates a copy of this room state so that mutations to either won't affect the other.
      * @returns the copy of the room state
      */
@@ -417,7 +426,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Fires {@link RoomStateEvent.Events}
      * Fires {@link RoomStateEvent.Marker}
      */
-    public setStateEvents(stateEvents: MatrixEvent[], options?: IMarkerFoundOptions & ISetStateEventsOptions): void {
+    public setStateEvents(stateEvents: MatrixEvent[], options?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -437,7 +446,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const lastId = lastStateEvent?.event.event_id;
             const newReplaceId = event.event.unsigned?.replaces_state;
             const newId = event.event.event_id;
-            if (options?.toStartOfTimeline) {
+            if (this._isStartTimelineState) {
                 // Add an event to the start of the timeline. Its replace id not be the same as the one of the current/last start state event.
                 if (newReplaceId && newId && newReplaceId === lastId) return;
             } else {

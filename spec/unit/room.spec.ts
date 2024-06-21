@@ -406,14 +406,8 @@ describe("Room", function () {
                 }),
             ];
             await room.addLiveEvents(events);
-            expect(room.currentState.setStateEvents).toHaveBeenCalledWith([events[0]], {
-                timelineWasEmpty: false,
-                toStartOfTimeline: false,
-            });
-            expect(room.currentState.setStateEvents).toHaveBeenCalledWith([events[1]], {
-                timelineWasEmpty: false,
-                toStartOfTimeline: false,
-            });
+            expect(room.currentState.setStateEvents).toHaveBeenCalledWith([events[0]], { timelineWasEmpty: false });
+            expect(room.currentState.setStateEvents).toHaveBeenCalledWith([events[1]], { timelineWasEmpty: false });
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
             expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
@@ -732,14 +726,8 @@ describe("Room", function () {
                 ];
 
                 room.addEventsToTimeline(events, true, room.getLiveTimeline());
-                expect(room.oldState.setStateEvents).toHaveBeenCalledWith([events[0]], {
-                    timelineWasEmpty: undefined,
-                    toStartOfTimeline: true,
-                });
-                expect(room.oldState.setStateEvents).toHaveBeenCalledWith([events[1]], {
-                    timelineWasEmpty: undefined,
-                    toStartOfTimeline: true,
-                });
+                expect(room.oldState.setStateEvents).toHaveBeenCalledWith([events[0]], { timelineWasEmpty: undefined });
+                expect(room.oldState.setStateEvents).toHaveBeenCalledWith([events[1]], { timelineWasEmpty: undefined });
                 expect(events[0].forwardLooking).toBe(false);
                 expect(events[1].forwardLooking).toBe(false);
                 expect(room.currentState.setStateEvents).not.toHaveBeenCalled();

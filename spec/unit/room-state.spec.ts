@@ -1125,6 +1125,9 @@ describe("RoomState", function () {
     describe("skipWrongOrderRoomStateInserts", () => {
         const idNow = "now";
         const idBefore = "before";
+        const endState = new RoomState(roomId);
+        const startState = new RoomState(roomId, undefined, true);
+
         let onRoomStateEvent: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
         const evNow = new MatrixEvent({
             type: "m.call.member",
@@ -1154,20 +1157,22 @@ describe("RoomState", function () {
                     updatedStateWithBefore();
                 }
             };
-            state.on(RoomStateEvent.Events, onRoomStateEvent);
+            endState.on(RoomStateEvent.Events, onRoomStateEvent);
+            startState.on(RoomStateEvent.Events, onRoomStateEvent);
         });
         afterEach(() => {
-            state.off(RoomStateEvent.Events, onRoomStateEvent);
+            endState.off(RoomStateEvent.Events, onRoomStateEvent);
+            startState.off(RoomStateEvent.Events, onRoomStateEvent);
             updatedStateWithNow.mockReset();
             updatedStateWithBefore.mockReset();
         });
         it("should skip inserting state to the end of the timeline if the current endState events replaces_state id is the same as the inserted events id", () => {
-            state.setStateEvents([evNow, evBefore], { toStartOfTimeline: false });
+            endState.setStateEvents([evNow, evBefore]);
             expect(updatedStateWithBefore).not.toHaveBeenCalled();
             expect(updatedStateWithNow).toHaveBeenCalled();
         });
         it("should skip inserting state at the beginning of the timeline if the inserted events replaces_state is the event id of the current startState", () => {
-            state.setStateEvents([evBefore, evNow], { toStartOfTimeline: true });
+            startState.setStateEvents([evBefore, evNow]);
             expect(updatedStateWithBefore).toHaveBeenCalled();
             expect(updatedStateWithNow).not.toHaveBeenCalled();
         });
