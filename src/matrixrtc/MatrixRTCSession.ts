@@ -869,9 +869,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
                 newContent,
-                legacy
-                    ? localUserId
-                    : `${!/^org\.matrix\.msc3779\b/.exec(this.room.getVersion()) ? "_" : "" + localUserId}_${localDeviceId}`,
+                legacy ? localUserId : this.makeMembershipStateKey(localUserId, localDeviceId),
             );
             logger.info(`Sent updated call member event.`);
 
@@ -899,6 +897,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
         return false;
+    }
+
+    private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
+        const stateKey = `${localUserId}_${localDeviceId}`;
+        if (/^org\.matrix\.msc3779\b/.exec(this.room.getVersion())) {
+            return stateKey;
+        } else {
+            return `_${stateKey}`;
+        }
     }
 
     private onRotateKeyTimeout = (): void => {
