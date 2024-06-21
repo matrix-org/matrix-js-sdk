@@ -74,7 +74,14 @@ export class RustVerificationRequest
         super();
         this.reEmitter = new TypedReEmitter(this);
 
-        inner.registerChangesCallback(async () => this.onChange());
+        // Obviously, the Rust object maintains a reference to the callback function. If the callback function maintains
+        // a reference to the Rust object, then we have a reference cycle which means that `RustVerificationRequest`
+        // will never be garbage-collected, and hence the underlying rust object will never be freed.
+        //
+        // To avoid this reference cycle, use a weak reference in the callback function. If the `RustVerificationRequest`
+        // gets garbage-collected, then there is nothing to update!
+        const weakThis = new WeakRef(this);
+        inner.registerChangesCallback(async () => weakThis.deref()?.onChange());
     }
 
     /**
@@ -476,9 +483,12 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
         super();
 
         this.completionDeferred = defer();
-        inner.registerChangesCallback(async () => {
-            this.onChange();
-        });
+
+        // As with RustVerificationRequest, we need to avoid a reference cycle.
+        // See the comments in RustVerificationRequest.
+        const weakThis = new WeakRef(this);
+        inner.registerChangesCallback(async () => weakThis.deref()?.onChange());
+
         // stop the runtime complaining if nobody catches a failure
         this.completionDeferred.promise.catch(() => null);
     }
@@ -755,9 +765,12 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
     public replaceInner(inner: RustSdkCryptoJs.Sas): void {
         if (this.inner != inner) {
             this.inner = inner;
-            inner.registerChangesCallback(async () => {
-                this.onChange();
-            });
+
+            // As with RustVerificationRequest, we need to avoid a reference cycle.
+            // See the comments in RustVerificationRequest.
+            const weakThis = new WeakRef(this);
+            inner.registerChangesCallback(async () => weakThis.deref()?.onChange());
+
             // replaceInner will only get called if we started the verification at the same time as the other side, and we lost
             // the tie breaker.  So we need to re-accept their verification.
             this.sendAccept();
