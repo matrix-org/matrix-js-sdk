@@ -398,7 +398,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
      */
     public currentState!: RoomState;
-    public readonly relations = new RelationsContainer(this.client, this);
+
+    public readonly relations;
 
     /**
      * A collection of events known by the client
@@ -460,6 +461,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         private readonly opts: IOpts = {},
     ) {
         super();
+
         // In some cases, we add listeners for every displayed Matrix event, so it's
         // common to have quite a few more than the default limit.
         this.setMaxListeners(100);
@@ -469,6 +471,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.name = roomId;
         this.normalizedName = roomId;
+
+        this.relations = new RelationsContainer(this.client, this);
 
         // Listen to our own receipt event as a more modular way of processing our own
         // receipts. No need to remove the listener: it's on ourself anyway.
