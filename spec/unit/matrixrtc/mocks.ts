@@ -30,6 +30,7 @@ export function makeMockRoom(membershipData: MembershipData, localAge: number | 
         getLiveTimeline: jest.fn().mockReturnValue({
             getState: jest.fn().mockReturnValue(roomState),
         }),
+        getVersion: jest.fn().mockReturnValue("default"),
     } as unknown as Room;
 }
 
