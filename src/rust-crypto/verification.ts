@@ -72,30 +72,33 @@ export class RustVerificationRequest
         private readonly supportedVerificationMethods: string[],
     ) {
         super();
-
         this.reEmitter = new TypedReEmitter(this);
 
-        const onChange = async (): Promise<void> => {
-            const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
+        inner.registerChangesCallback(async () => this.onChange());
+    }
 
-            // Set the _verifier object (wrapping the rust `Verification` as a js-sdk Verifier) if:
-            // - we now have a `Verification` where we lacked one before
-            // - we have transitioned from QR to SAS
-            // - we are verifying with SAS, but we need to replace our verifier with a new one because both parties
-            //   tried to start verification at the same time, and we lost the tie breaking
-            if (verification instanceof RustSdkCryptoJs.Sas) {
-                if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
-                    this.setVerifier(new RustSASVerifier(verification, this, outgoingRequestProcessor));
-                } else if (this._verifier instanceof RustSASVerifier) {
-                    this._verifier.replaceInner(verification);
-                }
-            } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
-                this.setVerifier(new RustQrCodeVerifier(verification, outgoingRequestProcessor));
+    /**
+     * Hook which is called when the underlying rust class notifies us that there has been a change.
+     */
+    private onChange(): void {
+        const verification: RustSdkCryptoJs.Qr | RustSdkCryptoJs.Sas | undefined = this.inner.getVerification();
+
+        // Set the _verifier object (wrapping the rust `Verification` as a js-sdk Verifier) if:
+        // - we now have a `Verification` where we lacked one before
+        // - we have transitioned from QR to SAS
+        // - we are verifying with SAS, but we need to replace our verifier with a new one because both parties
+        //   tried to start verification at the same time, and we lost the tie breaking
+        if (verification instanceof RustSdkCryptoJs.Sas) {
+            if (this._verifier === undefined || this._verifier instanceof RustQrCodeVerifier) {
+                this.setVerifier(new RustSASVerifier(verification, this, this.outgoingRequestProcessor));
+            } else if (this._verifier instanceof RustSASVerifier) {
+                this._verifier.replaceInner(verification);
             }
+        } else if (verification instanceof RustSdkCryptoJs.Qr && this._verifier === undefined) {
+            this.setVerifier(new RustQrCodeVerifier(verification, this.outgoingRequestProcessor));
+        }
 
-            this.emit(VerificationRequestEvent.Change);
-        };
-        inner.registerChangesCallback(onChange);
+        this.emit(VerificationRequestEvent.Change);
     }
 
     private setVerifier(verifier: RustSASVerifier | RustQrCodeVerifier): void {
