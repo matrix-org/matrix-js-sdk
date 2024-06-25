@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
-import { MockResponse } from "fetch-mock";
+import FetchMock from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
@@ -1511,7 +1511,7 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     return new Promise((resolve) => {
         fetchMock.putOnce(
             new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp(msgtype)}`),
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 resolve(JSON.parse(opts.body as string));
                 return {};
             },
@@ -1535,7 +1535,7 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
 
     fetchMock.put(
         new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
-        (url: string, opts: RequestInit): MockResponse => {
+        (url: string, opts: RequestInit): FetchMock.MockResponse => {
             const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
             // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
             const content = Object.values(messages)[0] as any;
