@@ -19,7 +19,7 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { MockResponse, MockResponseFunction } from "fetch-mock";
+import FetchMock from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
@@ -157,7 +157,7 @@ async function expectSendRoomKey(
     return await new Promise<Olm.InboundGroupSession>((resolve) => {
         fetchMock.putOnce(
             new RegExp("/sendToDevice/m.room.encrypted/"),
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 const content = JSON.parse(opts.body as string);
                 resolve(onSendRoomKey(content));
                 return {};
@@ -291,7 +291,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
      * @param response - the response to return from the request. Normally an {@link IClaimOTKsResult}
      *   (or a function that returns one).
      */
-    function expectAliceKeyClaim(response: MockResponse | MockResponseFunction) {
+    function expectAliceKeyClaim(response: FetchMock.MockResponse | FetchMock.MockResponseFunction) {
         const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
         fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/claim"), response);
     }
@@ -1419,7 +1419,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         fetchMock.putOnce(
             { url: new RegExp("/send/"), name: "send-event" },
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 const content = JSON.parse(opts.body as string);
                 logger.log("/send:", content);
                 // make sure that a new session is used
@@ -1484,7 +1484,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // mark the device as known, and resend.
         aliceClient.setDeviceKnown(aliceClient.getUserId()!, "DEVICE_ID");
-        expectAliceKeyClaim((url: string, opts: RequestInit): MockResponse => {
+        expectAliceKeyClaim((url: string, opts: RequestInit): FetchMock.MockResponse => {
             const content = JSON.parse(opts.body as string);
             expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
             return getTestKeysClaimResponse(aliceClient.getUserId()!);
@@ -2180,11 +2180,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
 
             // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
-            const sendRoomMessageDefer = defer<MockResponse>();
+            const sendRoomMessageDefer = defer<FetchMock.MockResponse>();
             const reqProm = new Promise<IContent>((resolve) => {
                 fetchMock.putOnce(
                     new RegExp("/send/m.room.encrypted/"),
-                    async (url: string, opts: RequestInit): Promise<MockResponse> => {
+                    async (url: string, opts: RequestInit): Promise<FetchMock.MockResponse> => {
                         resolve(JSON.parse(opts.body as string));
                         return await sendRoomMessageDefer.promise;
                     },
