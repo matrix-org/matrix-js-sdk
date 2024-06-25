@@ -118,7 +118,7 @@ export type EventTimelineSetHandlerMap = {
      */
     [RoomEvent.TimelineReset]: (
         room: Room | undefined,
-        eventTimelineSet: EventTimelineSet,
+        timelineSet: EventTimelineSet,
         resetAllTimelines: boolean,
     ) => void;
 };

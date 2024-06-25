@@ -276,7 +276,7 @@ export type CryptoEventHandlerMap = {
      * @param deviceId - the id of the verified device
      * @param deviceInfo - updated device information
      */
-    [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
+    [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, deviceInfo: DeviceInfo) => void;
     /**
      * Fires when the trust status of a user changes
      * If userId is the userId of the logged-in user, this indicated a change
@@ -292,7 +292,7 @@ export type CryptoEventHandlerMap = {
     /**
      * Fires when we receive a room key request
      *
-     * @param req - request details
+     * @param request - request details
      */
     [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
     /**

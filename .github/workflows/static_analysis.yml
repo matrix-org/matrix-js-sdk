@@ -81,7 +81,7 @@ jobs:
               run: "yarn install"
 
             - name: Generate Docs
-              run: "yarn run gendoc --treatWarningsAsErrors"
+              run: "yarn run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
 
             - name: Upload Artifact
               uses: actions/upload-artifact@v4

@@ -95,7 +95,7 @@ export type RoomStateEventHandlerMap = {
      * });
      * ```
      */
-    [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
+    [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null) => void;
     /**
      * Fires whenever a member in the members dictionary is updated in any way.
      * @param event - The matrix event which caused this event to fire.
