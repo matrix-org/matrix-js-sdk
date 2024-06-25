@@ -1,0 +1,23 @@
+{
+	"name": "example-app",
+	"type": "module",
+	"version": "0.0.0",
+	"description": "",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"preinstall": "npm install ../..",
+		"build": "tsc -b"
+	},
+	"author": "",
+	"license": "Apache 2.0",
+	"dependencies": {
+		"@matrix-org/olm": "^3.2.15",
+		"matrix-js-sdk": "file:../..",
+		"node-localstorage": "^2.2.1"
+	},
+	"devDependencies": {
+		"@types/node-localstorage": "^1.3.0",
+		"typescript": "^5.0.4"
+	}
+}
