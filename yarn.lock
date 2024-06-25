@@ -6534,9 +6534,9 @@ typed-array-length@^1.0.4:
     is-typed-array "^1.1.9"
 
 typedoc-plugin-coverage@^3.0.0:
-  version "3.2.0"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-3.2.0.tgz#c3d09fd5f42fb8fa3de0ed72344c406afe7e994b"
-  integrity sha512-jY6bEl/zNezRTAg0V4+FkJAtPlzSszK3QzcXSyGYcKjzzT8C6qw0xdh2KIJkxAtzYtgxT/4idiAYqZ1WRAieTA==
+  version "3.3.0"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-3.3.0.tgz#2b00830f32129e7433708f6893729d6770b96276"
+  integrity sha512-wpywQ95tqGSD6IbYUPMXSKiwnSWboSKdx2y9X6SJQKzQvBqZoz5iiUyDJFixtW8v7+xmrqXFR/B6Wy37FNhVqA==
 
 typedoc-plugin-mdn-links@^3.0.3:
   version "3.2.1"
