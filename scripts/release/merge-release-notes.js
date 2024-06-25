@@ -112,19 +112,20 @@ const main = async ({ github, releaseId, dependencies }) => {
     const { GITHUB_REPOSITORY } = process.env;
     const [owner, repo] = GITHUB_REPOSITORY.split("/");
 
+    const { data: release } = await github.rest.repos.getRelease({
+        owner,
+        repo,
+        release_id: releaseId,
+    });
+
     const sections = Object.fromEntries(categories.map((cat) => [cat, []]));
+    parseReleaseNotes(release.body, sections);
     for (const dependency of dependencies) {
         const releases = await getReleases(github, dependency);
         for (const release of releases) {
             parseReleaseNotes(release.body, sections);
         }
     }
-
-    const { data: release } = await github.rest.repos.getRelease({
-        owner,
-        repo,
-        release_id: releaseId,
-    });
 
     const intro = release.body.split(HEADING_PREFIX, 2)[0].trim();
 

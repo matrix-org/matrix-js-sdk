@@ -24,10 +24,6 @@ on:
                 description: List of github projects (owner/repo) which should have their dependency bumped to the newly released version (in JSON string array string syntax)
                 type: string
                 required: false
-            include-changes:
-                description: Project to include changelog entries from in this release.
-                type: string
-                required: false
             gpg-fingerprint:
                 description: Fingerprint of the GPG key to use for signing the git tag and assets, if any.
                 type: string
