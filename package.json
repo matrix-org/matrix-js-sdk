@@ -123,7 +123,7 @@
         "typedoc": "^0.26.0",
         "typedoc-plugin-coverage": "^3.0.0",
         "typedoc-plugin-mdn-links": "^3.0.3",
-        "typedoc-plugin-missing-exports": "^2.0.0",
+        "typedoc-plugin-missing-exports": "^3.0.0",
         "typescript": "^5.3.3"
     },
     "@casualbot/jest-sonar-reporter": {

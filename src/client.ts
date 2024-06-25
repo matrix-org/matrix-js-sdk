@@ -1075,7 +1075,7 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.Sync]: (state: SyncState, lastState: SyncState | null, data?: ISyncStateData) => void;
+    [ClientEvent.Sync]: (state: SyncState, prevState: SyncState | null, data?: ISyncStateData) => void;
     /**
      * Fires whenever the SDK receives a new event.
      * <p>

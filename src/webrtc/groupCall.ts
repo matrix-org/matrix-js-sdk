@@ -91,7 +91,7 @@ export type GroupCallEventHandlerMap = {
      * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
      * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
      * to their audio/video hardware.
-     * @param err - The error raised by MatrixCall.
+     * @param error - The error raised by MatrixCall.
      * @example
      * ```
      * matrixCall.on("error", function(err){
