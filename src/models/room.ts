@@ -209,7 +209,7 @@ export type RoomEventHandlerMap = {
      * });
      * ```
      */
-    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
+    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, prevEvent?: MatrixEvent) => void;
     /**
      * Fires whenever a receipt is received for a room
      * @param event - The receipt event

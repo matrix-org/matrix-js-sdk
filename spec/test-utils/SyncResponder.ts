@@ -17,7 +17,7 @@ limitations under the License.
 import debugFunc from "debug";
 import { Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
-import { MockResponse } from "fetch-mock";
+import FetchMock from "fetch-mock";
 
 /** Interface implemented by classes that intercept `/sync` requests from test clients
  *
@@ -80,7 +80,7 @@ export class SyncResponder implements ISyncResponder {
         );
     }
 
-    private async onSyncRequest(): Promise<MockResponse> {
+    private async onSyncRequest(): Promise<FetchMock.MockResponse> {
         switch (this.state) {
             case SyncResponderState.IDLE: {
                 this.debug("Got /sync request: waiting for response to be ready");
