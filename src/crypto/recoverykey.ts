@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as bs58 from "bs58";
+import bs58 from "bs58";
 
 // picked arbitrarily but to try & avoid clashing with any bitcoin ones
 // (which are also base58 encoded, but bitcoin's involve a lot more hashing)
