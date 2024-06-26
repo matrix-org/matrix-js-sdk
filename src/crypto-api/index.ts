@@ -15,15 +15,15 @@ limitations under the License.
 */
 
 import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
-import type { IMegolmSessionData } from "./@types/crypto";
-import { Room } from "./models/room";
-import { DeviceMap } from "./models/device";
-import { UIAuthCallback } from "./interactive-auth";
-import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "./secret-storage";
-import { VerificationRequest } from "./crypto-api/verification";
-import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./crypto-api/keybackup";
-import { ISignatures } from "./@types/signed";
-import { MatrixEvent } from "./models/event";
+import type { IMegolmSessionData } from "../@types/crypto";
+import { Room } from "../models/room";
+import { DeviceMap } from "../models/device";
+import { UIAuthCallback } from "../interactive-auth";
+import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage";
+import { VerificationRequest } from "./verification";
+import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup";
+import { ISignatures } from "../@types/signed";
+import { MatrixEvent } from "../models/event";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -949,5 +949,5 @@ export interface OwnDeviceKeys {
     curve25519: string;
 }
 
-export * from "./crypto-api/verification";
-export * from "./crypto-api/keybackup";
+export * from "./verification";
+export * from "./keybackup";
