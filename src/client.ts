@@ -2232,9 +2232,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             cryptoCallbacks: this.cryptoCallbacks,
             storePrefix: args.useIndexedDB === false ? null : RUST_SDK_STORE_PREFIX,
             storeKey: args.storageKey,
-
-            // temporary compatibility hack: if there is no storageKey nor storagePassword, fall back to the pickleKey
-            storePassphrase: args.storagePassword ?? this.pickleKey,
+            storePassphrase: args.storagePassword,
 
             legacyCryptoStore: this.cryptoStore,
             legacyPickleKey: this.pickleKey ?? "DEFAULT_KEY",
