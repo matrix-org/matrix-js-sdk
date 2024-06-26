@@ -11,6 +11,11 @@ async function main() {
             pkgJson[field] = pkgJson["matrix_lib_" + field];
         }
     }
+
+    // matrix-js-sdk is built into ECMAScript modules. Make sure we declare it as such.
+    // See https://nodejs.org/api/packages.html#type.
+    pkgJson["type"] = "module";
+
     await fsProm.writeFile(PKGJSON, JSON.stringify(pkgJson, null, 2));
 }
 
