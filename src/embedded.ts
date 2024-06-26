@@ -218,6 +218,14 @@ export class RoomWidgetClient extends MatrixClient {
                 });
             }) ?? [],
         );
+
+        if (opts.clientWellKnownPollPeriod !== undefined) {
+            this.clientWellKnownIntervalID = setInterval(() => {
+                this.fetchClientWellKnown();
+            }, 1000 * opts.clientWellKnownPollPeriod);
+            this.fetchClientWellKnown();
+        }
+
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished backfilling events");
 
