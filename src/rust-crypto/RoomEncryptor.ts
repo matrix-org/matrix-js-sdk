@@ -105,10 +105,8 @@ export class RoomEncryptor {
             (member.membership == KnownMembership.Invite && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
-            logDuration(this.prefixedLogger, "updateTrackedUsers", async () => {
-                this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
-                    this.prefixedLogger.error("Unable to update tracked users", e);
-                });
+            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
+                this.prefixedLogger.error("Unable to update tracked users", e);
             });
         }
 
