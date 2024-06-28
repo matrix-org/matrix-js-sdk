@@ -17,7 +17,6 @@ limitations under the License.
 import { logger } from "../logger";
 
 export let crypto = globalThis.crypto;
-export let subtleCrypto = crypto?.subtle ?? crypto?.webkitSubtle; // TODO: Stop using webkitSubtle fallback
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 if (!crypto) {
@@ -27,12 +26,7 @@ if (!crypto) {
         logger.error("Failed to load webcrypto", e);
     }
 }
-if (!subtleCrypto) {
-    subtleCrypto = crypto?.subtle;
-}
-/* eslint-enable @typescript-eslint/no-var-requires */
 
 export function setCrypto(_crypto: Crypto): void {
     crypto = _crypto;
-    subtleCrypto = _crypto.subtle ?? _crypto.webkitSubtle;
 }

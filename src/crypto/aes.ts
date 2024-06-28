@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { decodeBase64, encodeBase64 } from "../base64";
-import { subtleCrypto, crypto } from "./crypto";
+import { crypto } from "./crypto";
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
@@ -60,7 +60,7 @@ export async function encryptAES(
     const [aesKey, hmacKey] = await deriveKeys(key, name);
     const encodedData = new TextEncoder().encode(data);
 
-    const ciphertext = await subtleCrypto.encrypt(
+    const ciphertext = await crypto.subtle.encrypt(
         {
             name: "AES-CTR",
             counter: iv,
@@ -70,7 +70,7 @@ export async function encryptAES(
         encodedData,
     );
 
-    const hmac = await subtleCrypto.sign({ name: "HMAC" }, hmacKey, ciphertext);
+    const hmac = await crypto.subtle.sign({ name: "HMAC" }, hmacKey, ciphertext);
 
     return {
         iv: encodeBase64(iv),
@@ -91,11 +91,11 @@ export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name:
 
     const ciphertext = decodeBase64(data.ciphertext);
 
-    if (!(await subtleCrypto.verify({ name: "HMAC" }, hmacKey, decodeBase64(data.mac), ciphertext))) {
+    if (!(await crypto.subtle.verify({ name: "HMAC" }, hmacKey, decodeBase64(data.mac), ciphertext))) {
         throw new Error(`Error decrypting secret ${name}: bad MAC`);
     }
 
-    const plaintext = await subtleCrypto.decrypt(
+    const plaintext = await crypto.subtle.decrypt(
         {
             name: "AES-CTR",
             counter: decodeBase64(data.iv),
@@ -109,8 +109,8 @@ export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name:
 }
 
 async function deriveKeys(key: Uint8Array, name: string): Promise<[CryptoKey, CryptoKey]> {
-    const hkdfkey = await subtleCrypto.importKey("raw", key, { name: "HKDF" }, false, ["deriveBits"]);
-    const keybits = await subtleCrypto.deriveBits(
+    const hkdfkey = await crypto.subtle.importKey("raw", key, { name: "HKDF" }, false, ["deriveBits"]);
+    const keybits = await crypto.subtle.deriveBits(
         {
             name: "HKDF",
             salt: zeroSalt,
@@ -126,9 +126,9 @@ async function deriveKeys(key: Uint8Array, name: string): Promise<[CryptoKey, Cr
     const aesKey = keybits.slice(0, 32);
     const hmacKey = keybits.slice(32);
 
-    const aesProm = subtleCrypto.importKey("raw", aesKey, { name: "AES-CTR" }, false, ["encrypt", "decrypt"]);
+    const aesProm = crypto.subtle.importKey("raw", aesKey, { name: "AES-CTR" }, false, ["encrypt", "decrypt"]);
 
-    const hmacProm = subtleCrypto.importKey(
+    const hmacProm = crypto.subtle.importKey(
         "raw",
         hmacKey,
         {

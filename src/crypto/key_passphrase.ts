@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { randomString } from "../randomstring";
-import { subtleCrypto } from "./crypto";
+import { crypto } from "./crypto";
 
 const DEFAULT_ITERATIONS = 500000;
 
@@ -70,15 +70,15 @@ export async function deriveKey(
     iterations: number,
     numBits = DEFAULT_BITSIZE,
 ): Promise<Uint8Array> {
-    if (!subtleCrypto || !TextEncoder) {
+    if (!crypto.subtle || !TextEncoder) {
         throw new Error("Password-based backup is not available on this platform");
     }
 
-    const key = await subtleCrypto.importKey("raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, [
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, [
         "deriveBits",
     ]);
 
-    const keybits = await subtleCrypto.deriveBits(
+    const keybits = await crypto.subtle.deriveBits(
         {
             name: "PBKDF2",
             salt: new TextEncoder().encode(salt),
