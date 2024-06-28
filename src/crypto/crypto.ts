@@ -14,8 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export let crypto = globalThis.crypto;
-
-export function setCrypto(_crypto: Crypto): void {
-    crypto = _crypto;
-}
+/** @deprecated this is a no-op and should no longer be called. */
+export function setCrypto(_crypto: Crypto): void {}

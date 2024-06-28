@@ -26,7 +26,6 @@ import {
     RendezvousTransportDetails,
 } from "..";
 import { decodeBase64, encodeUnpaddedBase64 } from "../../base64";
-import { crypto } from "../../crypto/crypto";
 import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
 import { UnstableValue } from "../../NamespacedValue";
 
@@ -56,11 +55,11 @@ export interface EncryptedPayload {
 }
 
 async function importKey(key: Uint8Array): Promise<CryptoKey> {
-    if (!crypto.subtle) {
+    if (!globalThis.crypto.subtle) {
         throw new Error("Web Crypto is not available");
     }
 
-    const imported = crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    const imported = globalThis.crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 
     return imported;
 }
@@ -164,16 +163,16 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
     }
 
     private async encrypt(data: T): Promise<MSC3903ECDHPayload> {
-        if (!crypto.subtle) {
+        if (!globalThis.crypto.subtle) {
             throw new Error("Web Crypto is not available");
         }
 
         const iv = new Uint8Array(32);
-        crypto.getRandomValues(iv);
+        globalThis.crypto.getRandomValues(iv);
 
         const encodedData = new TextEncoder().encode(JSON.stringify(data));
 
-        const ciphertext = await crypto.subtle.encrypt(
+        const ciphertext = await globalThis.crypto.subtle.encrypt(
             {
                 name: "AES-GCM",
                 iv,
@@ -208,11 +207,11 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
 
         const ciphertextBytes = decodeBase64(ciphertext);
 
-        if (!crypto.subtle) {
+        if (!globalThis.crypto.subtle) {
             throw new Error("Web Crypto is not available");
         }
 
-        const plaintext = await crypto.subtle.decrypt(
+        const plaintext = await globalThis.crypto.subtle.decrypt(
             {
                 name: "AES-GCM",
                 iv: decodeBase64(iv),
