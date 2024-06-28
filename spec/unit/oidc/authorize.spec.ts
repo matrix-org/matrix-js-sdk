@@ -26,7 +26,6 @@ import { getRandomValues } from "node:crypto";
 import { TextEncoder } from "node:util";
 
 import { Method } from "../../../src";
-import { crypto } from "../../../src/crypto/crypto";
 import { logger } from "../../../src/logger";
 import {
     completeAuthorizationCodeGrant,
@@ -92,7 +91,7 @@ describe("oidc authorization", () => {
         it("should generate url with correct parameters", async () => {
             // test the no crypto case here
             // @ts-ignore mocking
-            crypto.subtle = undefined;
+            globalThis.crypto.subtle = undefined;
 
             const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
             const authUrl = new URL(

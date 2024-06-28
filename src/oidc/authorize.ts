@@ -16,7 +16,6 @@ limitations under the License.
 
 import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
-import { crypto } from "../crypto/crypto";
 import { logger } from "../logger";
 import { randomString } from "../randomstring";
 import { OidcError } from "./error";
@@ -57,14 +56,14 @@ export const generateScope = (deviceId?: string): string => {
 
 // https://www.rfc-editor.org/rfc/rfc7636
 const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
-    if (!crypto.subtle) {
+    if (!globalThis.crypto.subtle) {
         // @TODO(kerrya) should this be allowed? configurable?
         logger.warn("A secure context is required to generate code challenge. Using plain text code challenge");
         return codeVerifier;
     }
     const utf8 = new TextEncoder().encode(codeVerifier);
 
-    const digest = await crypto.subtle.digest("SHA-256", utf8);
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", utf8);
 
     return btoa(String.fromCharCode(...new Uint8Array(digest)))
         .replace(/=/g, "")
