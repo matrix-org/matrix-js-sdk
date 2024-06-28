@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { randomString } from "../randomstring";
-import { subtleCrypto, TextEncoder } from "./crypto";
+import { subtleCrypto } from "./crypto";
 
 const DEFAULT_ITERATIONS = 500000;
 

@@ -18,7 +18,6 @@ import { logger } from "../logger";
 
 export let crypto = globalThis.crypto;
 export let subtleCrypto = crypto?.subtle ?? crypto?.webkitSubtle; // TODO: Stop using webkitSubtle fallback
-export let TextEncoder = globalThis.TextEncoder;
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 if (!crypto) {
@@ -31,20 +30,9 @@ if (!crypto) {
 if (!subtleCrypto) {
     subtleCrypto = crypto?.subtle;
 }
-if (!TextEncoder) {
-    try {
-        TextEncoder = require("util").TextEncoder;
-    } catch (e) {
-        logger.error("Failed to load TextEncoder util", e);
-    }
-}
 /* eslint-enable @typescript-eslint/no-var-requires */
 
 export function setCrypto(_crypto: Crypto): void {
     crypto = _crypto;
     subtleCrypto = _crypto.subtle ?? _crypto.webkitSubtle;
-}
-
-export function setTextEncoder(_TextEncoder: typeof TextEncoder): void {
-    TextEncoder = _TextEncoder;
 }
