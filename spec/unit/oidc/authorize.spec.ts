@@ -26,7 +26,6 @@ import { getRandomValues } from "node:crypto";
 import { TextEncoder } from "node:util";
 
 import { Method } from "../../../src";
-import * as crypto from "../../../src/crypto/crypto";
 import { logger } from "../../../src/logger";
 import {
     completeAuthorizationCodeGrant,
@@ -38,11 +37,6 @@ import { OidcError } from "../../../src/oidc/error";
 import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
 
 jest.mock("jwt-decode");
-
-const webCrypto = new Crypto();
-
-// save for resetting mocks
-const realSubtleCrypto = crypto.subtleCrypto;
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
@@ -62,7 +56,11 @@ describe("oidc authorization", () => {
             delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
             mockOpenIdConfiguration(),
         );
+        global.TextEncoder = TextEncoder;
+    });
 
+    beforeEach(() => {
+        const webCrypto = new Crypto();
         Object.defineProperty(window, "crypto", {
             value: {
                 getRandomValues,
@@ -70,12 +68,6 @@ describe("oidc authorization", () => {
                 subtle: webCrypto.subtle,
             },
         });
-        global.TextEncoder = TextEncoder;
-    });
-
-    afterEach(() => {
-        // @ts-ignore reset any ugly mocking we did
-        crypto.subtleCrypto = realSubtleCrypto;
     });
 
     it("should generate authorization params", () => {
@@ -99,7 +91,7 @@ describe("oidc authorization", () => {
         it("should generate url with correct parameters", async () => {
             // test the no crypto case here
             // @ts-ignore mocking
-            crypto.subtleCrypto = undefined;
+            globalThis.crypto.subtle = undefined;
 
             const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
             const authUrl = new URL(
