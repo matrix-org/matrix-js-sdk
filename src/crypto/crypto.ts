@@ -14,18 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-
 export let crypto = globalThis.crypto;
-
-/* eslint-disable @typescript-eslint/no-var-requires */
-if (!crypto) {
-    try {
-        crypto = require("crypto").webcrypto;
-    } catch (e) {
-        logger.error("Failed to load webcrypto", e);
-    }
-}
 
 export function setCrypto(_crypto: Crypto): void {
     crypto = _crypto;
