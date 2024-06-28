@@ -39,11 +39,6 @@ import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-uti
 
 jest.mock("jwt-decode");
 
-const webCrypto = new Crypto();
-
-// save for resetting mocks
-const realSubtleCrypto = crypto.subtle;
-
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
     const authorizationEndpoint = delegatedAuthConfig.authorizationEndpoint;
@@ -62,7 +57,11 @@ describe("oidc authorization", () => {
             delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
             mockOpenIdConfiguration(),
         );
+        global.TextEncoder = TextEncoder;
+    });
 
+    beforeEach(() => {
+        const webCrypto = new Crypto();
         Object.defineProperty(window, "crypto", {
             value: {
                 getRandomValues,
@@ -70,12 +69,6 @@ describe("oidc authorization", () => {
                 subtle: webCrypto.subtle,
             },
         });
-        global.TextEncoder = TextEncoder;
-    });
-
-    afterEach(() => {
-        // @ts-ignore reset any ugly mocking we did
-        crypto.subtle = realSubtleCrypto;
     });
 
     it("should generate authorization params", () => {
