@@ -17,16 +17,16 @@ limitations under the License.
 import { SAS } from "@matrix-org/olm";
 
 import {
-    RendezvousError,
-    RendezvousCode,
-    RendezvousIntent,
-    RendezvousChannel,
-    RendezvousTransportDetails,
-    RendezvousTransport,
     LegacyRendezvousFailureReason as RendezvousFailureReason,
+    RendezvousChannel,
+    RendezvousCode,
+    RendezvousError,
+    RendezvousIntent,
+    RendezvousTransport,
+    RendezvousTransportDetails,
 } from "..";
-import { encodeUnpaddedBase64, decodeBase64 } from "../../base64";
-import { crypto, subtleCrypto } from "../../crypto/crypto";
+import { decodeBase64, encodeUnpaddedBase64 } from "../../base64";
+import { crypto } from "../../crypto/crypto";
 import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
 import { UnstableValue } from "../../NamespacedValue";
 
@@ -56,11 +56,11 @@ export interface EncryptedPayload {
 }
 
 async function importKey(key: Uint8Array): Promise<CryptoKey> {
-    if (!subtleCrypto) {
+    if (!crypto.subtle) {
         throw new Error("Web Crypto is not available");
     }
 
-    const imported = subtleCrypto.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    const imported = crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 
     return imported;
 }
@@ -164,7 +164,7 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
     }
 
     private async encrypt(data: T): Promise<MSC3903ECDHPayload> {
-        if (!subtleCrypto) {
+        if (!crypto.subtle) {
             throw new Error("Web Crypto is not available");
         }
 
@@ -173,7 +173,7 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
 
         const encodedData = new TextEncoder().encode(JSON.stringify(data));
 
-        const ciphertext = await subtleCrypto.encrypt(
+        const ciphertext = await crypto.subtle.encrypt(
             {
                 name: "AES-GCM",
                 iv,
@@ -208,11 +208,11 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
 
         const ciphertextBytes = decodeBase64(ciphertext);
 
-        if (!subtleCrypto) {
+        if (!crypto.subtle) {
             throw new Error("Web Crypto is not available");
         }
 
-        const plaintext = await subtleCrypto.decrypt(
+        const plaintext = await crypto.subtle.decrypt(
             {
                 name: "AES-GCM",
                 iv: decodeBase64(iv),

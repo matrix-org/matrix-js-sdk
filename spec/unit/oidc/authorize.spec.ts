@@ -26,7 +26,7 @@ import { getRandomValues } from "node:crypto";
 import { TextEncoder } from "node:util";
 
 import { Method } from "../../../src";
-import * as crypto from "../../../src/crypto/crypto";
+import { crypto } from "../../../src/crypto/crypto";
 import { logger } from "../../../src/logger";
 import {
     completeAuthorizationCodeGrant,
@@ -42,7 +42,7 @@ jest.mock("jwt-decode");
 const webCrypto = new Crypto();
 
 // save for resetting mocks
-const realSubtleCrypto = crypto.subtleCrypto;
+const realSubtleCrypto = crypto.subtle;
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
@@ -75,7 +75,7 @@ describe("oidc authorization", () => {
 
     afterEach(() => {
         // @ts-ignore reset any ugly mocking we did
-        crypto.subtleCrypto = realSubtleCrypto;
+        crypto.subtle = realSubtleCrypto;
     });
 
     it("should generate authorization params", () => {
@@ -99,7 +99,7 @@ describe("oidc authorization", () => {
         it("should generate url with correct parameters", async () => {
             // test the no crypto case here
             // @ts-ignore mocking
-            crypto.subtleCrypto = undefined;
+            crypto.subtle = undefined;
 
             const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
             const authUrl = new URL(
