@@ -1018,6 +1018,16 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
+     * Gets the clear event. If the event is not encrypted,
+     * or encryption has not been completed, this will return null.
+     *
+     * @returns {Object} The clear event of the encrypted event.
+     */
+    public getClearEvent(): IClearEvent | null {
+        return this.clearEvent || null;
+    }
+
+    /**
      * Check if the event is encrypted.
      * @returns True if this event is encrypted.
      */
