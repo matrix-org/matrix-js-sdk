@@ -166,6 +166,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
     private _liveBeaconIds: BeaconIdentifier[] = [];
+    private _isStartTimelineState = false;
 
     /**
      * Construct room state.
@@ -198,8 +199,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public constructor(
         public readonly roomId: string,
         private oobMemberFlags = { status: OobStatus.NotStarted },
+        isStartTimelineState: boolean = false,
     ) {
         super();
+        this._isStartTimelineState = isStartTimelineState;
         this.updateModifiedTime();
     }
 
@@ -337,6 +340,21 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
+     * This state is marked as a start state. This is used to skip state insertions that are
+     * in the wrong order. The order is determined by the `replaces_state` id.
+     *
+     * Example:
+     * A current state events `replaces_state` value is `1`.
+     * Trying to insert a state event with `event_id` `1` in its place would fail if isStartTimelineState = false.
+     *
+     * A current state events `event_id` is `2`.
+     * Trying to insert a state event where its `replaces_state` value is `2` would fail if isStartTimelineState = true.
+     */
+    public get isStartTimelineState(): boolean {
+        return this._isStartTimelineState;
+    }
+
+    /**
      * Creates a copy of this room state so that mutations to either won't affect the other.
      * @returns the copy of the room state
      */
@@ -408,7 +426,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Fires {@link RoomStateEvent.Events}
      * Fires {@link RoomStateEvent.Marker}
      */
-    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
+    public setStateEvents(stateEvents: MatrixEvent[], options?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -420,6 +438,22 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
 
             const lastStateEvent = this.getStateEventMatching(event);
+
+            // Safety measure to not update the room (and emit the update) with older state.
+            // The sync loop really should not send old events but it does very regularly.
+            // Logging on return in those two conditions results in a large amount of logging. (on startup and when running element)
+            const lastReplaceId = lastStateEvent?.event.unsigned?.replaces_state;
+            const lastId = lastStateEvent?.event.event_id;
+            const newReplaceId = event.event.unsigned?.replaces_state;
+            const newId = event.event.event_id;
+            if (this._isStartTimelineState) {
+                // Add an event to the start of the timeline. Its replace id not be the same as the one of the current/last start state event.
+                if (newReplaceId && newId && newReplaceId === lastId) return;
+            } else {
+                // Add an event to the end of the timeline. It should not be the same as the one replaced but the current/last end state event.
+                if (lastReplaceId && newId && lastReplaceId === newId) return;
+            }
+
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
                 this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
@@ -476,7 +510,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
             } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
-                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
+                this.emit(RoomStateEvent.Marker, event, options);
             }
         });
 
