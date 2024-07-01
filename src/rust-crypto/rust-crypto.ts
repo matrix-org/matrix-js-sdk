@@ -21,7 +21,7 @@ import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypt
 import { KnownMembership } from "../@types/membership";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
-import { IContent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { MatrixEvent, MatrixEventEvent } from "../models/event";
 import { Room } from "../models/room";
 import { RoomMember } from "../models/room-member";
 import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
@@ -1315,7 +1315,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         // look for interesting to-device messages
         for (const message of processed) {
             if (message.type === EventType.KeyVerificationRequest) {
-                this.onIncomingKeyVerificationRequest(message.sender, message.content);
+                const sender = message.sender;
+                const transactionId = message.content.transaction_id;
+                if (transactionId && sender) {
+                    this.onIncomingKeyVerificationRequest(sender, transactionId);
+                }
             }
         }
         return processed;
@@ -1411,18 +1415,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Handle an incoming m.key.verification request event
+     * Handle an incoming m.key.verification.request event, received either in-room or in a to-device message.
      *
      * @param sender - the sender of the event
-     * @param content - the content of the event
+     * @param transactionId - the transaction ID for the verification. For to-device messages, this comes from the
+     *    content of the message; for in-room messages it is the event ID.
      */
-    private onIncomingKeyVerificationRequest(sender: string, content: IContent): void {
-        const transactionId = content.transaction_id;
-        if (!transactionId || !sender) {
-            // not a valid request: ignore
-            return;
-        }
-
+    private onIncomingKeyVerificationRequest(sender: string, transactionId: string): void {
         const request: RustSdkCryptoJs.VerificationRequest | undefined = this.olmMachine.getVerificationRequest(
             new RustSdkCryptoJs.UserId(sender),
             transactionId,
@@ -1437,6 +1436,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
                     this.outgoingRequestProcessor,
                     this._supportedVerificationMethods,
                 ),
+            );
+        } else {
+            // There are multiple reasons this can happen; probably the most likely is that the event is an
+            // in-room event which is too old.
+            this.logger.info(
+                `Ignoring just-received verification request ${transactionId} which did not start a rust-side verification`,
             );
         }
     }
@@ -1597,7 +1602,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const processEvent = async (evt: MatrixEvent): Promise<void> => {
             // Process only verification event
             if (isVerificationEvent(event)) {
-                await this.onKeyVerificationRequest(evt);
+                await this.onKeyVerificationEvent(evt);
             }
         };
 
@@ -1624,11 +1629,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Handle key verification request.
+     * Handle an in-room key verification event.
      *
      * @param event - a key validation request event.
      */
-    private async onKeyVerificationRequest(event: MatrixEvent): Promise<void> {
+    private async onKeyVerificationEvent(event: MatrixEvent): Promise<void> {
         const roomId = event.getRoomId();
 
         if (!roomId) {
@@ -1655,27 +1660,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             event.getType() === EventType.RoomMessage &&
             event.getContent().msgtype === MsgType.KeyVerificationRequest
         ) {
-            const request: RustSdkCryptoJs.VerificationRequest | undefined = this.olmMachine.getVerificationRequest(
-                new RustSdkCryptoJs.UserId(event.getSender()!),
-                event.getId()!,
-            );
-
-            if (!request) {
-                // There are multiple reasons this can happen; probably the most likely is that the event is too old.
-                this.logger.info(
-                    `Ignoring just-received verification request ${event.getId()} which did not start a rust-side verification`,
-                );
-            } else {
-                this.emit(
-                    CryptoEvent.VerificationRequestReceived,
-                    new RustVerificationRequest(
-                        this.olmMachine,
-                        request,
-                        this.outgoingRequestProcessor,
-                        this._supportedVerificationMethods,
-                    ),
-                );
-            }
+            this.onIncomingKeyVerificationRequest(event.getSender()!, event.getId()!);
         }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
