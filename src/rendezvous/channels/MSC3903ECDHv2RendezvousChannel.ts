@@ -26,7 +26,7 @@ import {
     LegacyRendezvousFailureReason as RendezvousFailureReason,
 } from "..";
 import { encodeUnpaddedBase64, decodeBase64 } from "../../base64";
-import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
+import { crypto, subtleCrypto } from "../../crypto/crypto";
 import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
 import { UnstableValue } from "../../NamespacedValue";
 

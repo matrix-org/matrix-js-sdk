@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { decodeBase64, encodeBase64 } from "../base64";
-import { subtleCrypto, crypto, TextEncoder } from "./crypto";
+import { subtleCrypto, crypto } from "./crypto";
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
