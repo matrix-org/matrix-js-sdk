@@ -26,8 +26,14 @@ import {
 } from "matrix-widget-api";
 
 import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event";
-import { ISendEventResponse } from "./@types/requests";
-import { EventType } from "./@types/event";
+import {
+    ISendActionFutureResponse,
+    ISendEventResponse,
+    ISendFutureRequestOpts,
+    ISendFutureResponse,
+    ISendTimeoutFutureResponse,
+} from "./@types/requests";
+import { EventType, StateEvents } from "./@types/event";
 import { logger } from "./logger";
 import {
     MatrixClient,
@@ -248,7 +254,33 @@ export class RoomWidgetClient extends MatrixClient {
         throw new Error(`Unknown room: ${roomIdOrAlias}`);
     }
 
-    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse> {
+    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse>;
+    protected async encryptAndSendEvent<F extends ISendFutureRequestOpts>(
+        room: Room,
+        event: MatrixEvent,
+        futureOpts: F,
+    ): Promise<ISendFutureResponse<F>>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        futureOpts?: ISendFutureRequestOpts,
+    ): Promise<ISendEventResponse | ISendTimeoutFutureResponse | ISendActionFutureResponse> {
+        if (futureOpts) {
+            // TODO: updatePendingEvent for futures?
+            const response = await this.widgetApi.sendRoomFuture(
+                futureOpts,
+                event.getType(),
+                event.getContent(),
+                room.roomId,
+            );
+            return {
+                future_group_id: response.future_group_id,
+                send_token: response.send_token,
+                cancel_token: response.cancel_token,
+                ...(response.refresh_token && { refresh_token: response.refresh_token }),
+            };
+        }
+
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi.sendRoomEvent(event.getType(), event.getContent(), room.roomId);
@@ -268,6 +300,27 @@ export class RoomWidgetClient extends MatrixClient {
         stateKey = "",
     ): Promise<ISendEventResponse> {
         return await this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId);
+    }
+
+    /**
+     * @experimental This currently relies on an unstable MSC (MSC4140).
+     */
+    // eslint-disable-next-line
+    public async _unstable_sendStateFuture<K extends keyof StateEvents, F extends ISendFutureRequestOpts>(
+        roomId: string,
+        futureOpts: F,
+        eventType: K,
+        content: StateEvents[K],
+        stateKey = "",
+    ): Promise<ISendFutureResponse<F>> {
+        // TODO: better type checking
+        return (await this.widgetApi.sendStateFuture(
+            futureOpts,
+            eventType,
+            stateKey,
+            content,
+            roomId,
+        )) as unknown as ISendFutureResponse<F>;
     }
 
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<{}> {

@@ -120,6 +120,7 @@ import {
     ICreateRoomOpts,
     IEventSearchOpts,
     IFilterResponse,
+    IFutureInfo,
     IGuestAccessOpts,
     IJoinRoomOpts,
     INotificationsResponse,
@@ -130,7 +131,12 @@ import {
     IRelationsResponse,
     IRoomDirectoryOptions,
     ISearchOpts,
+    ISendActionFutureResponse,
     ISendEventResponse,
+    ISendFutureGroupResponse,
+    ISendFutureRequestOpts,
+    ISendFutureResponse,
+    ISendTimeoutFutureResponse,
     IStatusResponse,
     ITagsResponse,
     KnockRoomOpts,
@@ -526,6 +532,8 @@ export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
+
+const UNSTABLE_MSC4140_FUTURES = "org.matrix.msc4140";
 
 enum CrossSigningKeyType {
     MasterKey = "master_key",
@@ -4554,6 +4562,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         contentOrTxnId?: IContent | string,
         txnIdOrVoid?: string,
     ): Promise<ISendEventResponse> {
+        const { threadId, eventType, content, txnId } = this.processEventArgs(
+            roomId,
+            threadIdOrEventType,
+            eventTypeOrContent,
+            contentOrTxnId,
+            txnIdOrVoid,
+        );
+
+        return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, txnId);
+    }
+
+    private processEventArgs(
+        roomId: string,
+        threadIdOrEventType: string | null,
+        eventTypeOrContent: string | IContent,
+        contentOrTxnId?: IContent | string,
+        txnIdOrVoid?: string,
+    ): {
+        threadId: string | null;
+        eventType: string;
+        content: IContent;
+        txnId: string | undefined;
+    } {
         let threadId: string | null;
         let eventType: string;
         let content: IContent;
@@ -4594,10 +4625,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
 
-        return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, txnId);
+        return {
+            threadId,
+            eventType,
+            content,
+            txnId,
+        };
     }
 
     /**
+     * TODO: update docstring for overloads
      * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
      * @param txnId - Optional.
      * @returns Promise which resolves: to an empty object `{}`
@@ -4608,7 +4645,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         threadId: string | null,
         eventObject: Partial<IEvent>,
         txnId?: string,
-    ): Promise<ISendEventResponse> {
+    ): Promise<ISendEventResponse>;
+    private sendCompleteEvent<F extends ISendFutureRequestOpts>(
+        roomId: string,
+        threadId: string | null,
+        eventObject: Partial<IEvent>,
+        futureOpts: F,
+        txnId?: string,
+    ): Promise<ISendFutureResponse<F>>;
+    private sendCompleteEvent(
+        roomId: string,
+        threadId: string | null,
+        eventObject: Partial<IEvent>,
+        futureOptsOrTxnId?: ISendFutureRequestOpts | string,
+        txnIdOrVoid?: string,
+    ): Promise<ISendEventResponse | ISendTimeoutFutureResponse | ISendActionFutureResponse> {
+        let futureOpts: ISendFutureRequestOpts | undefined;
+        let txnId: string | undefined;
+        if (typeof futureOptsOrTxnId === "string") {
+            txnId = futureOptsOrTxnId;
+        } else {
+            futureOpts = futureOptsOrTxnId;
+            txnId = txnIdOrVoid;
+        }
+
         if (!txnId) {
             txnId = this.makeTxnId();
         }
@@ -4632,6 +4692,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // set up re-emitter for this new event - this is normally the job of EventMapper but we don't use it here
+        // TODO: skip for futures?
         this.reEmitter.reEmit(localEvent, [MatrixEventEvent.Replaced, MatrixEventEvent.VisibilityChange]);
         room?.reEmitter.reEmit(localEvent, [MatrixEventEvent.BeforeRedaction]);
 
@@ -4648,29 +4709,50 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const type = localEvent.getType();
-        this.logger.debug(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
+        this.logger.debug(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}${futureOpts ? " (future)" : ""}`);
 
         localEvent.setTxnId(txnId);
         localEvent.setStatus(EventStatus.SENDING);
 
-        // add this event immediately to the local store as 'sending'.
-        room?.addPendingEvent(localEvent, txnId);
+        // TODO: separate store for futures?
+        if (!futureOpts) {
+            // add this event immediately to the local store as 'sending'.
+            room?.addPendingEvent(localEvent, txnId);
 
-        // addPendingEvent can change the state to NOT_SENT if it believes
-        // that there's other events that have failed. We won't bother to
-        // try sending the event if the state has changed as such.
-        if (localEvent.status === EventStatus.NOT_SENT) {
-            return Promise.reject(new Error("Event blocked by other events not yet sent"));
+            // addPendingEvent can change the state to NOT_SENT if it believes
+            // that there's other events that have failed. We won't bother to
+            // try sending the event if the state has changed as such.
+            if (localEvent.status === EventStatus.NOT_SENT) {
+                return Promise.reject(new Error("Event blocked by other events not yet sent"));
+            }
+
+            return this.encryptAndSendEvent(room, localEvent);
+        } else {
+            return this.encryptAndSendEvent(room, localEvent, futureOpts);
         }
-
-        return this.encryptAndSendEvent(room, localEvent);
     }
 
     /**
+     * TODO: update docstring for overloads
      * encrypts the event if necessary; adds the event to the queue, or sends it; marks the event as sent/unsent
      * @returns returns a promise which resolves with the result of the send request
      */
-    protected async encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
+    protected async encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse>;
+    protected async encryptAndSendEvent<F extends ISendFutureRequestOpts>(
+        room: Room | null,
+        event: MatrixEvent,
+        futureOpts: F,
+    ): Promise<ISendFutureResponse<F>>;
+    protected async encryptAndSendEvent(
+        room: Room | null,
+        event: MatrixEvent,
+        futureOpts?: ISendFutureRequestOpts,
+    ): Promise<ISendEventResponse | ISendTimeoutFutureResponse | ISendActionFutureResponse> {
+        // TODO: Allow encrypted futures, and encrypt them properly
+        if (futureOpts) {
+            return this.sendEventHttpRequest(event, futureOpts);
+        }
+
         try {
             let cancelled: boolean;
             this.eventsBeingEncrypted.add(event.getId()!);
@@ -4821,7 +4903,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private sendEventHttpRequest(event: MatrixEvent): Promise<ISendEventResponse> {
+    private sendEventHttpRequest(event: MatrixEvent): Promise<ISendEventResponse>;
+    private sendEventHttpRequest<F extends ISendFutureRequestOpts>(
+        event: MatrixEvent,
+        futureOpts: F,
+    ): Promise<ISendFutureResponse<F>>;
+    private sendEventHttpRequest(
+        event: MatrixEvent,
+        futureOpts?: ISendFutureRequestOpts,
+    ): Promise<ISendEventResponse | ISendTimeoutFutureResponse | ISendActionFutureResponse> {
         let txnId = event.getTxnId();
         if (!txnId) {
             txnId = this.makeTxnId();
@@ -4835,30 +4925,37 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $txnId: txnId,
         };
 
+        const futurePathPart = futureOpts ? "_future" : "";
         let path: string;
 
         if (event.isState()) {
-            let pathTemplate = "/rooms/$roomId/state/$eventType";
+            let pathTemplate = `/rooms/$roomId/state${futurePathPart}/$eventType`;
             if (event.getStateKey() && event.getStateKey()!.length > 0) {
-                pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
+                pathTemplate = `/rooms/$roomId/state${futurePathPart}/$eventType/$stateKey`;
             }
             path = utils.encodeUri(pathTemplate, pathParams);
         } else if (event.isRedaction() && event.event.redacts) {
-            const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
+            // TODO: support future redactions?
+            const pathTemplate = `/rooms/$roomId/redact${futurePathPart}/$redactsEventId/$txnId`;
             path = utils.encodeUri(pathTemplate, {
                 $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
-            path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
+            path = utils.encodeUri(`/rooms/$roomId/send${futurePathPart}/$eventType/$txnId`, pathParams);
         }
 
-        return this.http
-            .authedRequest<ISendEventResponse>(Method.Put, path, undefined, event.getWireContent())
-            .then((res) => {
+        const content = event.getWireContent();
+        if (!futureOpts) {
+            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, undefined, content).then((res) => {
                 this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
                 return res;
             });
+        } else {
+            return this.http.authedRequest(Method.Put, path, { ...futureOpts }, content, {
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_FUTURES}`,
+            });
+        }
     }
 
     /**
@@ -5186,6 +5283,164 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         const content = ContentHelpers.makeHtmlEmote(body, htmlBody!);
         return this.sendMessage(roomId, threadId, content);
+    }
+
+    /**
+     * Send a future for a timeline event.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    // eslint-disable-next-line
+    public _unstable_sendFuture<K extends keyof TimelineEvents, F extends ISendFutureRequestOpts>(
+        roomId: string,
+        futureOpts: F,
+        eventType: K,
+        content: TimelineEvents[K],
+        txnId?: string,
+    ): Promise<ISendFutureResponse<F>>;
+    // eslint-disable-next-line
+    public _unstable_sendFuture<K extends keyof TimelineEvents, F extends ISendFutureRequestOpts>(
+        roomId: string,
+        futureOpts: F,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K],
+        txnId?: string,
+    ): Promise<ISendFutureResponse<F>>;
+    // eslint-disable-next-line
+    public async _unstable_sendFuture(
+        roomId: string,
+        futureOpts: ISendFutureRequestOpts,
+        threadIdOrEventType: string | null,
+        eventTypeOrContent: string | IContent,
+        contentOrTxnId?: IContent | string,
+        txnIdOrVoid?: string,
+    ): Promise<ISendTimeoutFutureResponse | ISendActionFutureResponse> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_FUTURES))) {
+            throw Error("Server does not support the Futures API");
+        }
+
+        const { threadId, eventType, content, txnId } = this.processEventArgs(
+            roomId,
+            threadIdOrEventType,
+            eventTypeOrContent,
+            contentOrTxnId,
+            txnIdOrVoid,
+        );
+
+        return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, futureOpts, txnId);
+    }
+
+    /**
+     * Send a future for a state event.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    // eslint-disable-next-line
+    public async _unstable_sendStateFuture<K extends keyof StateEvents, F extends ISendFutureRequestOpts>(
+        roomId: string,
+        futureOpts: F,
+        eventType: K,
+        content: StateEvents[K],
+        stateKey = "",
+        opts: IRequestOpts = {},
+    ): Promise<ISendFutureResponse<F>> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_FUTURES))) {
+            throw Error("Server does not support the Futures API");
+        }
+
+        const pathParams = {
+            $roomId: roomId,
+            $eventType: eventType,
+            $stateKey: stateKey,
+        };
+        let path = utils.encodeUri("/rooms/$roomId/state_future/$eventType", pathParams);
+        if (stateKey !== undefined) {
+            path = utils.encodeUri(path + "/$stateKey", pathParams);
+        }
+        return this.http.authedRequest(Method.Put, path, { ...futureOpts }, content as Body, {
+            prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_FUTURES}`,
+            ...opts,
+        });
+    }
+
+    /**
+     * Send a group of future events.
+     * TODO: type safety & threads...or remove altogether
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    // eslint-disable-next-line
+    public async _unstable_sendFutureGroup(
+        roomId: string,
+        timeout: number,
+        sendOnTimeout: MatrixEvent,
+        sendOnAction?: Record<string, MatrixEvent>,
+        sendNow?: MatrixEvent,
+    ): Promise<ISendFutureGroupResponse> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_FUTURES))) {
+            throw Error("Server does not support the Futures API");
+        }
+
+        return await this.http.authedRequest<ISendFutureGroupResponse>(
+            Method.Put,
+            // NOTE: Difference from MSC = remove /send part of path, to avoid ambiguity with regular event sending
+            utils.encodeUri("/rooms/$roomId/future/$txnId", {
+                $roomId: roomId,
+                $txnId: this.makeTxnId(),
+            }),
+            undefined,
+            {
+                timeout,
+                send_on_timeout: sendOnTimeout,
+                ...(sendOnAction ?? { send_on_action: sendOnAction }),
+                ...(sendNow ?? { send_now: sendNow }),
+            },
+            { prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_FUTURES}` },
+        );
+    }
+
+    /**
+     * Get all pending futures for the calling user.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    // eslint-disable-next-line
+    public async _unstable_getFutures(): Promise<IFutureInfo[]> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_FUTURES))) {
+            throw Error("Server does not support the Futures API");
+        }
+
+        return await this.http.authedRequest(Method.Get, "/future", undefined, undefined, {
+            prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_FUTURES}`,
+        });
+    }
+
+    /**
+     * Use a future token, taking the appropriate action given what the token is for.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    // eslint-disable-next-line
+    public async _unstable_useFutureToken(futureToken: string): Promise<{}> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_FUTURES))) {
+            throw Error("Server does not support the Futures API");
+        }
+
+        return await this.http.request(
+            Method.Post,
+            utils.encodeUri("/future/$futureToken", {
+                $futureToken: futureToken,
+            }),
+            undefined,
+            undefined,
+            { prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_FUTURES}` },
+        );
     }
 
     /**

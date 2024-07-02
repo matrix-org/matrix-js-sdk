@@ -137,6 +137,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
+    private cancelFutureToken: string | undefined;
+
     /**
      * The callId (sessionId) of the call.
      *
@@ -864,18 +866,35 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             newContent = this.makeNewMembership(localDeviceId);
         }
 
+        const stateKey = legacy ? localUserId : this.makeMembershipStateKey(localUserId, localDeviceId);
         try {
-            await this.client.sendStateEvent(
-                this.room.roomId,
-                EventType.GroupCallMemberPrefix,
-                newContent,
-                legacy ? localUserId : this.makeMembershipStateKey(localUserId, localDeviceId),
-            );
+            await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, newContent, stateKey);
             logger.info(`Sent updated call member event.`);
 
             // check periodically to see if we need to refresh our member event
-            if (this.isJoined() && legacy) {
-                this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
+            if (this.isJoined()) {
+                if (legacy) {
+                    this.memberEventTimeout = setTimeout(
+                        this.triggerCallMembershipEventUpdate,
+                        MEMBER_EVENT_CHECK_PERIOD,
+                    );
+                } else {
+                    const res = await this.client._unstable_sendStateFuture(
+                        this.room.roomId,
+                        {
+                            // TODO: choose a reasonable timeout
+                            future_timeout: 10000,
+                        },
+                        EventType.GroupCallMemberPrefix,
+                        {}, // leave event
+                        stateKey,
+                    );
+                    this.cancelFutureToken = res.cancel_token;
+                    this.scheduleRefreshFuture(res.refresh_token);
+                }
+            } else if (!legacy && this.cancelFutureToken !== undefined) {
+                // TODO: remove this once the Synapse MSC4140 implementation cancels timeout futures on state change
+                await this.client._unstable_useFutureToken(this.cancelFutureToken);
             }
         } catch (e) {
             const resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
@@ -883,6 +902,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             await new Promise((resolve) => setTimeout(resolve, resendDelay));
             await this.triggerCallMembershipEventUpdate();
         }
+    }
+
+    private scheduleRefreshFuture(refreshToken: string): void {
+        // TODO: choose a reasonable timeout
+        this.memberEventTimeout = setTimeout(() => this.refreshFuture(refreshToken), 3000);
+    }
+
+    private refreshFuture(refreshToken: string): void {
+        this.client
+            ._unstable_useFutureToken(refreshToken)
+            .then(() => this.scheduleRefreshFuture(refreshToken))
+            .catch((err) => logger.error("Failed to refresh future", err));
     }
 
     private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>): boolean {

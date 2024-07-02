@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EitherAnd } from "matrix-events-sdk/lib/types";
+
 import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { IEventWithRoomId, SearchKey } from "./search";
@@ -75,6 +77,52 @@ export interface IRedactOpts {
 export interface ISendEventResponse {
     event_id: string;
 }
+
+export interface IFutureGroupId {
+    future_group_id: string;
+}
+
+export interface IFutureTimeout {
+    future_timeout: number;
+}
+
+export type ISendFutureRequestOpts = EitherAnd<IFutureGroupId, IFutureTimeout>;
+
+export interface IFutureTokens {
+    send_token: string;
+    cancel_token: string;
+}
+
+export interface ITimeoutFutureTokens extends IFutureTokens {
+    refresh_token: string;
+}
+
+export type ISendActionFutureResponse = IFutureGroupId & IFutureTokens;
+export type ISendTimeoutFutureResponse = IFutureGroupId & ITimeoutFutureTokens;
+
+export type ISendFutureResponse<F extends ISendFutureRequestOpts> = F extends IFutureTimeout
+    ? ISendTimeoutFutureResponse
+    : ISendActionFutureResponse;
+
+export interface ISendFutureGroupResponse {
+    send_on_timeout: ITimeoutFutureTokens;
+    send_on_action?: {
+        [action_name: string]: IFutureTokens;
+    };
+    send_now?: ISendEventResponse;
+}
+
+interface IFuturePartialEvent {
+    room_id: string;
+    type: string;
+    state_key?: string;
+    content: IContent;
+}
+
+export type IActionFutureInfo = IFutureGroupId & IFuturePartialEvent & IFutureTokens;
+export type ITimeoutFutureInfo = IFutureGroupId & IFutureTimeout & IFuturePartialEvent & ITimeoutFutureTokens;
+
+export type IFutureInfo = IActionFutureInfo | ITimeoutFutureInfo;
 
 export interface IPresenceOpts {
     // One of "online", "offline" or "unavailable"
