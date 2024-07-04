@@ -2281,7 +2281,7 @@ describe("MatrixClient syncing", () => {
             httpBackend!.expectedRequests = [];
         });
 
-        it("should return a room based on the room initialSync API", async () => {
+        it.each([undefined, 100])("should return a room based on the room initialSync API with limit %s", async (limit) => {
             httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomOne)}/initialSync`).respond(200, {
                 room_id: roomOne,
                 membership: KnownMembership.Leave,
@@ -2328,7 +2328,7 @@ describe("MatrixClient syncing", () => {
             });
             httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
 
-            const prom = client!.peekInRoom(roomOne);
+            const prom = client!.peekInRoom(roomOne, limit);
             await httpBackend!.flushAllExpected();
             const room = await prom;
 
