@@ -36,10 +36,6 @@ interface IKey {
 }
 
 export function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
-    if (!global.Olm) {
-        throw new Error("Olm is not available");
-    }
-
     if (!authData.private_key_salt || !authData.private_key_iterations) {
         throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
     }
@@ -53,10 +49,6 @@ export function keyFromAuthData(authData: IAuthData, password: string): Promise<
 }
 
 export async function keyFromPassphrase(password: string): Promise<IKey> {
-    if (!global.Olm) {
-        throw new Error("Olm is not available");
-    }
-
     const salt = randomString(32);
 
     const key = await deriveKey(password, salt, DEFAULT_ITERATIONS, DEFAULT_BITSIZE);
