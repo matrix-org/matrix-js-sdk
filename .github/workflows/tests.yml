@@ -18,7 +18,7 @@ jobs:
         strategy:
             matrix:
                 specs: [integ, unit]
-                node: [18, "lts/*", 21]
+                node: ["lts/*", 21, 22]
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
