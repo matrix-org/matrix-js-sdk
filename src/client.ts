@@ -6603,13 +6603,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Peek into a room and receive updates about the room. This only works if the
      * history visibility for the room is world_readable.
      * @param roomId - The room to attempt to peek into.
+     * @param limit - The number of timeline events to initially retrieve.
      * @returns Promise which resolves: Room object
      * @returns Rejects: with an error response.
      */
-    public peekInRoom(roomId: string): Promise<Room> {
+    public peekInRoom(roomId: string, limit: number = 20): Promise<Room> {
         this.peekSync?.stopPeeking();
         this.peekSync = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-        return this.peekSync.peek(roomId);
+        return this.peekSync.peek(roomId, limit);
     }
 
     /**

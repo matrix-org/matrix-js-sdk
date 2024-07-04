@@ -2281,67 +2281,70 @@ describe("MatrixClient syncing", () => {
             httpBackend!.expectedRequests = [];
         });
 
-        it("should return a room based on the room initialSync API", async () => {
-            httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomOne)}/initialSync`).respond(200, {
-                room_id: roomOne,
-                membership: KnownMembership.Leave,
-                messages: {
-                    start: "start",
-                    end: "end",
-                    chunk: [
+        it.each([undefined, 100])(
+            "should return a room based on the room initialSync API with limit %s",
+            async (limit) => {
+                httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomOne)}/initialSync`).respond(200, {
+                    room_id: roomOne,
+                    membership: KnownMembership.Leave,
+                    messages: {
+                        start: "start",
+                        end: "end",
+                        chunk: [
+                            {
+                                content: { body: "Message 1" },
+                                type: "m.room.message",
+                                event_id: "$eventId1",
+                                sender: userA,
+                                origin_server_ts: 12313525,
+                                room_id: roomOne,
+                            },
+                            {
+                                content: { body: "Message 2" },
+                                type: "m.room.message",
+                                event_id: "$eventId2",
+                                sender: userB,
+                                origin_server_ts: 12315625,
+                                room_id: roomOne,
+                            },
+                        ],
+                    },
+                    state: [
                         {
-                            content: { body: "Message 1" },
-                            type: "m.room.message",
-                            event_id: "$eventId1",
+                            content: { name: "Room Name" },
+                            type: "m.room.name",
+                            event_id: "$eventId",
                             sender: userA,
-                            origin_server_ts: 12313525,
-                            room_id: roomOne,
-                        },
-                        {
-                            content: { body: "Message 2" },
-                            type: "m.room.message",
-                            event_id: "$eventId2",
-                            sender: userB,
-                            origin_server_ts: 12315625,
+                            origin_server_ts: 12314525,
+                            state_key: "",
                             room_id: roomOne,
                         },
                     ],
-                },
-                state: [
-                    {
-                        content: { name: "Room Name" },
-                        type: "m.room.name",
-                        event_id: "$eventId",
-                        sender: userA,
-                        origin_server_ts: 12314525,
-                        state_key: "",
-                        room_id: roomOne,
-                    },
-                ],
-                presence: [
-                    {
-                        content: {},
-                        type: "m.presence",
-                        sender: userA,
-                    },
-                ],
-            });
-            httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
+                    presence: [
+                        {
+                            content: {},
+                            type: "m.presence",
+                            sender: userA,
+                        },
+                    ],
+                });
+                httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
 
-            const prom = client!.peekInRoom(roomOne);
-            await httpBackend!.flushAllExpected();
-            const room = await prom;
+                const prom = client!.peekInRoom(roomOne, limit);
+                await httpBackend!.flushAllExpected();
+                const room = await prom;
 
-            expect(room.roomId).toBe(roomOne);
-            expect(room.getMyMembership()).toBe(KnownMembership.Leave);
-            expect(room.name).toBe("Room Name");
-            expect(room.currentState.getStateEvents("m.room.name", "")?.getId()).toBe("$eventId");
-            expect(room.timeline[0].getContent().body).toBe("Message 1");
-            expect(room.timeline[1].getContent().body).toBe("Message 2");
-            client?.stopPeeking();
-            httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
-            await httpBackend!.flushAllExpected();
-        });
+                expect(room.roomId).toBe(roomOne);
+                expect(room.getMyMembership()).toBe(KnownMembership.Leave);
+                expect(room.name).toBe("Room Name");
+                expect(room.currentState.getStateEvents("m.room.name", "")?.getId()).toBe("$eventId");
+                expect(room.timeline[0].getContent().body).toBe("Message 1");
+                expect(room.timeline[1].getContent().body).toBe("Message 2");
+                client?.stopPeeking();
+                httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
+                await httpBackend!.flushAllExpected();
+            },
+        );
     });
 
     describe("user account data", () => {
