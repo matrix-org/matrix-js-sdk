@@ -1789,6 +1789,13 @@ class EventDecryptor {
 
         switch (err.code) {
             case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey:
+                if (err.maybe_withheld) {
+                    throw new DecryptionError(
+                        DecryptionFailureCode.MEGOLM_KEY_WITHHELD,
+                        err.maybe_withheld,
+                        errorDetails,
+                    );
+                }
                 throw new DecryptionError(
                     DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                     "The sender's device has not sent us the keys for this message.",
