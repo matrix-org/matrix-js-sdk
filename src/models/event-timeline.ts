@@ -127,7 +127,7 @@ export class EventTimeline {
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
-            this.startState = new RoomState(this.roomId);
+            this.startState = new RoomState(this.roomId, undefined, true);
             this.endState = new RoomState(this.roomId);
         }
 
@@ -267,7 +267,7 @@ export class EventTimeline {
     /**
      * Get a pagination token
      *
-     * @param direction -   EventTimeline.BACKWARDS to get the pagination
+     * @param direction - EventTimeline.BACKWARDS to get the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to get the
      *   pagination token for going forwards in time.
      *
