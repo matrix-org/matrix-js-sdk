@@ -18,7 +18,6 @@ limitations under the License.
  * QR code key verification.
  */
 
-import { crypto } from "../crypto";
 import { VerificationBase as Base } from "./Base";
 import { newKeyMismatchError, newUserCancelledError } from "./Error";
 import { decodeBase64, encodeUnpaddedBase64 } from "../../base64";
@@ -202,7 +201,7 @@ export class QRCodeData {
 
     private static generateSharedSecret(): string {
         const secretBytes = new Uint8Array(11);
-        crypto.getRandomValues(secretBytes);
+        globalThis.crypto.getRandomValues(secretBytes);
         return encodeUnpaddedBase64(secretBytes);
     }
 

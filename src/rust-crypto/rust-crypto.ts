@@ -62,7 +62,6 @@ import { CrossSigningIdentity } from "./CrossSigningIdentity";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage";
 import { keyFromPassphrase } from "../crypto/key_passphrase";
 import { encodeRecoveryKey } from "../crypto/recoverykey";
-import { crypto } from "../crypto/crypto";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
 import { EventType, MsgType } from "../@types/event";
 import { CryptoEvent } from "../crypto";
@@ -891,7 +890,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         } else {
             // Using the navigator crypto API to generate the private key
             const key = new Uint8Array(32);
-            crypto.getRandomValues(key);
+            globalThis.crypto.getRandomValues(key);
             return {
                 privateKey: key,
                 encodedPrivateKey: encodeRecoveryKey(key),
