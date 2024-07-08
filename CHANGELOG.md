@@ -1,3 +1,29 @@
+Changes in [34.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.0.0) (2024-07-08)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Fetch capabilities in the background ([#4246](https://github.com/matrix-org/matrix-js-sdk/pull/4246)). Contributed by @dbkr.
+
+## ✨ Features
+
+* Prefix the user+device state key if needed ([#4262](https://github.com/matrix-org/matrix-js-sdk/pull/4262)). Contributed by @AndrewFerr.
+* Use legacy call membership if anyone else is ([#4260](https://github.com/matrix-org/matrix-js-sdk/pull/4260)). Contributed by @AndrewFerr.
+* Fetch capabilities in the background ([#4246](https://github.com/matrix-org/matrix-js-sdk/pull/4246)). Contributed by @dbkr.
+* Use server name instead of homeserver url to allow well-known lookups during QR OIDC reciprocation ([#4233](https://github.com/matrix-org/matrix-js-sdk/pull/4233)). Contributed by @t3chguy.
+* Add via parameter for MSC4156 ([#4247](https://github.com/matrix-org/matrix-js-sdk/pull/4247)). Contributed by @Johennes.
+* Make the js-sdk compatible with MSC preferred foci and active focus. ([#4195](https://github.com/matrix-org/matrix-js-sdk/pull/4195)). Contributed by @toger5.
+* Replace usages of setImmediate with setTimeout for wider compatibility ([#4240](https://github.com/matrix-org/matrix-js-sdk/pull/4240)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] Fix "Unable to restore session" error ([#4299](https://github.com/matrix-org/matrix-js-sdk/pull/4299)). Contributed by @RiotRobot.
+* [Backport staging] Fix error when sending encrypted messages in large rooms ([#4297](https://github.com/matrix-org/matrix-js-sdk/pull/4297)). Contributed by @RiotRobot.
+* Element-R: Fix resource leaks in verification logic ([#4263](https://github.com/matrix-org/matrix-js-sdk/pull/4263)). Contributed by @richvdh.
+* Upgrade Rust Crypto SDK to 6.1.0 ([#4261](https://github.com/matrix-org/matrix-js-sdk/pull/4261)). Contributed by @richvdh.
+* Correctly transform base64 with multiple instances of + or / ([#4252](https://github.com/matrix-org/matrix-js-sdk/pull/4252)). Contributed by @robintown.
+* Work around spec bug for m.room.avatar state event content type ([#4245](https://github.com/matrix-org/matrix-js-sdk/pull/4245)). Contributed by @t3chguy.
+
+
 Changes in [33.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v33.1.0) (2024-06-18)
 ==================================================================================================
 ## ✨ Features
