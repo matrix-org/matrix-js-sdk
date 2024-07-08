@@ -2404,6 +2404,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                             ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD
                             : DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                     );
+
+                    // `isEncryptedDisabledForUnverifiedDevices` should be true for `m.unverified` and false for other errors.
+                    expect(ev.isEncryptedDisabledForUnverifiedDevices).toEqual(withheldCode === "m.unverified");
                 });
             },
         );
