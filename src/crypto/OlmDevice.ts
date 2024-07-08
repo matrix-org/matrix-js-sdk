@@ -1222,7 +1222,9 @@ export class OlmDevice {
                     if (session === null || sessionData === null) {
                         if (withheld) {
                             error = new DecryptionError(
-                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
+                                withheld.code === "m.unverified"
+                                    ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
+                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,
@@ -1238,7 +1240,9 @@ export class OlmDevice {
                     } catch (e) {
                         if ((<Error>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
                             error = new DecryptionError(
-                                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
+                                withheld.code === "m.unverified"
+                                    ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
+                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD,
                                 calculateWithheldMessage(withheld),
                                 {
                                     session: senderKey + "|" + sessionId,

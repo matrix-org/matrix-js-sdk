@@ -2334,11 +2334,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("m.room_key.withheld handling", () => {
         describe.each([
-            ["m.blacklisted", "The sender has blocked you."],
-            ["m.unverified", "The sender has disabled encrypting to unverified devices."],
+            ["m.blacklisted", "The sender has blocked you.", DecryptionFailureCode.MEGOLM_KEY_WITHHELD],
+            [
+                "m.unverified",
+                "The sender has disabled encrypting to unverified devices.",
+                DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+            ],
         ])(
             "Decryption fails with withheld error if a withheld notice with code '%s' is received",
-            (withheldCode, expectedMessage) => {
+            (withheldCode, expectedMessage, expectedErrorCode) => {
                 // TODO: test arrival after the event too.
                 it.each(["before"])("%s the event", async (when) => {
                     expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -2398,12 +2402,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                         msgtype: "m.bad.encrypted",
                     });
 
-                    // Legacy crypto backend uses a different error code
-                    expect(ev.decryptionFailureReason).toEqual(
-                        backend === "rust-sdk"
-                            ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD
-                            : DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
-                    );
+                    expect(ev.decryptionFailureReason).toEqual(expectedErrorCode);
 
                     // `isEncryptedDisabledForUnverifiedDevices` should be true for `m.unverified` and false for other errors.
                     expect(ev.isEncryptedDisabledForUnverifiedDevices).toEqual(withheldCode === "m.unverified");

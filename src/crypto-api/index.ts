@@ -557,8 +557,11 @@ export enum DecryptionFailureCode {
     /** Message was encrypted with a Megolm session whose keys have not been shared with us. */
     MEGOLM_UNKNOWN_INBOUND_SESSION_ID = "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
 
-    /** A special case of `MEGOLM_UNKNOWN_INBOUND_SESSION_ID`: the sender has told us it is withholding the key. */
+    /** A special case of {@link MEGOLM_UNKNOWN_INBOUND_SESSION_ID}: the sender has told us it is withholding the key. */
     MEGOLM_KEY_WITHHELD = "MEGOLM_KEY_WITHHELD",
+
+    /** A special case of {@link MEGOLM_KEY_WITHHELD}: the sender has told us it is withholding the key, because the current device is unverified. */
+    MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE = "MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE",
 
     /** Message was encrypted with a Megolm session which has been shared with us, but in a later ratchet state. */
     OLM_UNKNOWN_MESSAGE_INDEX = "OLM_UNKNOWN_MESSAGE_INDEX",

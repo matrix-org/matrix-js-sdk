@@ -1787,15 +1787,19 @@ class EventDecryptor {
             }
         }
 
+        // If we got a withheld code, expose that.
+        if (err.maybe_withheld) {
+            // Unfortunately the Rust SDK API doesn't let us distinguish between different withheld cases, other than
+            // by string-matching.
+            const failureCode =
+                err.maybe_withheld === "The sender has disabled encrypting to unverified devices."
+                    ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
+                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD;
+            throw new DecryptionError(failureCode, err.maybe_withheld, errorDetails);
+        }
+
         switch (err.code) {
             case RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey:
-                if (err.maybe_withheld) {
-                    throw new DecryptionError(
-                        DecryptionFailureCode.MEGOLM_KEY_WITHHELD,
-                        err.maybe_withheld,
-                        errorDetails,
-                    );
-                }
                 throw new DecryptionError(
                     DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                     "The sender's device has not sent us the keys for this message.",
