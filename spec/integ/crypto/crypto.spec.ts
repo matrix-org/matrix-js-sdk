@@ -2333,7 +2333,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("m.room_key.withheld handling", () => {
-        describe.each([["m.blacklisted", "The sender has blocked you."]])(
+        describe.each([
+            ["m.blacklisted", "The sender has blocked you."],
+            ["m.unverified", "The sender has disabled encrypting to unverified devices."],
+        ])(
             "Decryption fails with withheld error if a withheld notice with code '%s' is received",
             (withheldCode, expectedMessage) => {
                 // TODO: test arrival after the event too.
