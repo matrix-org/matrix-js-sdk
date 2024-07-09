@@ -1221,15 +1221,13 @@ export class OlmDevice {
                 this.getInboundGroupSession(roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null || sessionData === null) {
                         if (withheld) {
-                            error = new DecryptionError(
+                            const failureCode =
                                 withheld.code === "m.unverified"
                                     ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
-                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD,
-                                calculateWithheldMessage(withheld),
-                                {
-                                    session: senderKey + "|" + sessionId,
-                                },
-                            );
+                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD;
+                            error = new DecryptionError(failureCode, calculateWithheldMessage(withheld), {
+                                session: senderKey + "|" + sessionId,
+                            });
                         }
                         result = null;
                         return;
@@ -1239,15 +1237,13 @@ export class OlmDevice {
                         res = session.decrypt(body);
                     } catch (e) {
                         if ((<Error>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
-                            error = new DecryptionError(
+                            const failureCode =
                                 withheld.code === "m.unverified"
                                     ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
-                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD,
-                                calculateWithheldMessage(withheld),
-                                {
-                                    session: senderKey + "|" + sessionId,
-                                },
-                            );
+                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD;
+                            error = new DecryptionError(failureCode, calculateWithheldMessage(withheld), {
+                                session: senderKey + "|" + sessionId,
+                            });
                         } else {
                             error = <Error>e;
                         }
