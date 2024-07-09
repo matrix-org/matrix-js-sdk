@@ -2333,8 +2333,82 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("m.room_key.withheld handling", () => {
-        // TODO: there are a bunch more tests for this sort of thing in spec/unit/crypto/algorithms/megolm.spec.ts.
-        //   They should be converted to integ tests and moved.
+        describe.each([
+            ["m.blacklisted", "The sender has blocked you.", DecryptionFailureCode.MEGOLM_KEY_WITHHELD],
+            [
+                "m.unverified",
+                "The sender has disabled encrypting to unverified devices.",
+                DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+            ],
+        ])(
+            "Decryption fails with withheld error if a withheld notice with code '%s' is received",
+            (withheldCode, expectedMessage, expectedErrorCode) => {
+                // TODO: test arrival after the event too.
+                it.each(["before"])("%s the event", async (when) => {
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+                    const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
+
+                    // Send Alice an encrypted room event which looks like it was encrypted with a megolm session
+                    async function sendEncryptedEvent() {
+                        const event = {
+                            ...testData.ENCRYPTED_EVENT,
+                            origin_server_ts: Date.now(),
+                        };
+                        const syncResponse = {
+                            next_batch: 1,
+                            rooms: { join: { [ROOM_ID]: { timeline: { events: [event] } } } },
+                        };
+
+                        syncResponder.sendOrQueueSyncResponse(syncResponse);
+                        await syncPromise(aliceClient);
+                    }
+
+                    // Send Alice a withheld notice
+                    async function sendWithheldMessage() {
+                        const withheldMessage = {
+                            type: "m.room_key.withheld",
+                            sender: "@bob:example.com",
+                            content: {
+                                algorithm: "m.megolm.v1.aes-sha2",
+                                room_id: ROOM_ID,
+                                sender_key: testData.ENCRYPTED_EVENT.content!.sender_key,
+                                session_id: testData.ENCRYPTED_EVENT.content!.session_id,
+                                code: withheldCode,
+                                reason: "zzz",
+                            },
+                        };
+
+                        syncResponder.sendOrQueueSyncResponse({
+                            next_batch: 1,
+                            to_device: { events: [withheldMessage] },
+                        });
+                        await syncPromise(aliceClient);
+                    }
+
+                    if (when === "before") {
+                        await sendWithheldMessage();
+                        await sendEncryptedEvent();
+                    } else {
+                        await sendEncryptedEvent();
+                        await sendWithheldMessage();
+                    }
+
+                    const ev = await awaitDecryption;
+                    expect(ev.getContent()).toEqual({
+                        body: `** Unable to decrypt: DecryptionError: ${expectedMessage} **`,
+                        msgtype: "m.bad.encrypted",
+                    });
+
+                    expect(ev.decryptionFailureReason).toEqual(expectedErrorCode);
+
+                    // `isEncryptedDisabledForUnverifiedDevices` should be true for `m.unverified` and false for other errors.
+                    expect(ev.isEncryptedDisabledForUnverifiedDevices).toEqual(withheldCode === "m.unverified");
+                });
+            },
+        );
 
         oldBackendOnly("does not block decryption on an 'm.unavailable' report", async function () {
             // there may be a key downloads for alice

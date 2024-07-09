@@ -412,7 +412,12 @@ describe("MatrixEvent", () => {
             const crypto = {
                 decryptEvent: jest
                     .fn()
-                    .mockRejectedValue("DecryptionError: The sender has disabled encrypting to unverified devices."),
+                    .mockRejectedValue(
+                        new DecryptionError(
+                            DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+                            "The sender has disabled encrypting to unverified devices.",
+                        ),
+                    ),
             } as unknown as Crypto;
 
             await encryptedEvent.attemptDecryption(crypto);
