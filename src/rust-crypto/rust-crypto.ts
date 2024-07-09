@@ -1486,7 +1486,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         this.logger.debug(
             `Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`,
         );
-        const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key);
+        const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key.roomId.toString(), key.sessionId);
         if (pendingList.length === 0) return;
 
         this.logger.debug(
@@ -1683,7 +1683,7 @@ class EventDecryptor {
     /**
      * Events which we couldn't decrypt due to unknown sessions / indexes.
      *
-     * Map from senderKey to sessionId to Set of MatrixEvents
+     * Map from roomId to sessionId to Set of MatrixEvents
      */
     private eventsPendingKey = new MapWithDefault<string, MapWithDefault<string, Set<MatrixEvent>>>(
         () => new MapWithDefault<string, Set<MatrixEvent>>(() => new Set()),
@@ -1843,30 +1843,27 @@ class EventDecryptor {
      * Look for events which are waiting for a given megolm session
      *
      * Returns a list of events which were encrypted by `session` and could not be decrypted
-     *
-     * @param session -
      */
-    public getEventsPendingRoomKey(session: RustSdkCryptoJs.RoomKeyInfo): MatrixEvent[] {
-        const senderPendingEvents = this.eventsPendingKey.get(session.senderKey.toBase64());
-        if (!senderPendingEvents) return [];
+    public getEventsPendingRoomKey(roomId: string, sessionId: string): MatrixEvent[] {
+        const roomPendingEvents = this.eventsPendingKey.get(roomId);
+        if (!roomPendingEvents) return [];
 
-        const sessionPendingEvents = senderPendingEvents.get(session.sessionId);
+        const sessionPendingEvents = roomPendingEvents.get(sessionId);
         if (!sessionPendingEvents) return [];
 
-        const roomId = session.roomId.toString();
-        return [...sessionPendingEvents].filter((ev) => ev.getRoomId() === roomId);
+        return [...sessionPendingEvents];
     }
 
     /**
      * Add an event to the list of those awaiting their session keys.
      */
     private addEventToPendingList(event: MatrixEvent): void {
-        const content = event.getWireContent();
-        const senderKey = content.sender_key;
-        const sessionId = content.session_id;
+        const roomId = event.getRoomId();
+        // We shouldn't have events without a room id here.
+        if (!roomId) return;
 
-        const senderPendingEvents = this.eventsPendingKey.getOrCreate(senderKey);
-        const sessionPendingEvents = senderPendingEvents.getOrCreate(sessionId);
+        const roomPendingEvents = this.eventsPendingKey.getOrCreate(roomId);
+        const sessionPendingEvents = roomPendingEvents.getOrCreate(event.getWireContent().session_id);
         sessionPendingEvents.add(event);
     }
 
@@ -1874,23 +1871,22 @@ class EventDecryptor {
      * Remove an event from the list of those awaiting their session keys.
      */
     private removeEventFromPendingList(event: MatrixEvent): void {
-        const content = event.getWireContent();
-        const senderKey = content.sender_key;
-        const sessionId = content.session_id;
+        const roomId = event.getRoomId();
+        if (!roomId) return;
 
-        const senderPendingEvents = this.eventsPendingKey.get(senderKey);
-        if (!senderPendingEvents) return;
+        const roomPendingEvents = this.eventsPendingKey.getOrCreate(roomId);
+        if (!roomPendingEvents) return;
 
-        const sessionPendingEvents = senderPendingEvents.get(sessionId);
+        const sessionPendingEvents = roomPendingEvents.get(event.getWireContent().session_id);
         if (!sessionPendingEvents) return;
 
         sessionPendingEvents.delete(event);
 
         // also clean up the higher-level maps if they are now empty
         if (sessionPendingEvents.size === 0) {
-            senderPendingEvents.delete(sessionId);
-            if (senderPendingEvents.size === 0) {
-                this.eventsPendingKey.delete(senderKey);
+            roomPendingEvents.delete(event.getWireContent().session_id);
+            if (roomPendingEvents.size === 0) {
+                this.eventsPendingKey.delete(roomId);
             }
         }
     }
