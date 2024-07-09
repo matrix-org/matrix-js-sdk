@@ -1508,6 +1508,37 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
+     * Callback for `OlmMachine.registerRoomKeyWithheldCallback`.
+     *
+     * Called by the rust sdk whenever we are told that a key has been withheld. We see if we had any events that
+     * failed to decrypt for the given session, and update their status if so.
+     *
+     * @param withheld - Details of the withheld sessions.
+     */
+    public async onRoomKeysWithheld(withheld: RustSdkCryptoJs.RoomKeyWithheldInfo[]): Promise<void> {
+        for (const session of withheld) {
+            this.logger.debug(`Got withheld message for session ${session.sessionId} in ${session.roomId.toString()}`);
+            const pendingList = this.eventDecryptor.getEventsPendingRoomKey(
+                session.roomId.toString(),
+                session.sessionId,
+            );
+            if (pendingList.length === 0) return;
+
+            // The easiest way to update the status of the event is to have another go at decrypting it.
+            this.logger.debug(
+                "Retrying decryption on events:",
+                pendingList.map((e) => `${e.getId()}`),
+            );
+
+            for (const ev of pendingList) {
+                ev.attemptDecryption(this, { isRetry: true }).catch((_e) => {
+                    // It's somewhat expected that we still can't decrypt here.
+                });
+            }
+        }
+    }
+
+    /**
      * Callback for `OlmMachine.registerUserIdentityUpdatedCallback`
      *
      * Called by the rust-sdk whenever there is an update to any user's cross-signing status. We re-check their trust
