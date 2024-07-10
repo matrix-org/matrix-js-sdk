@@ -2343,13 +2343,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         ])(
             "Decryption fails with withheld error if a withheld notice with code '%s' is received",
             (withheldCode, expectedMessage, expectedErrorCode) => {
-                // TODO: test arrival after the event too.
-                it.each(["before"])("%s the event", async (when) => {
+                it.each(["before", "after"])("%s the event", async (when) => {
                     expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
                     await startClientAndAwaitFirstSync();
 
                     // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
-                    const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
+                    let awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
 
                     // Send Alice an encrypted room event which looks like it was encrypted with a megolm session
                     async function sendEncryptedEvent() {
@@ -2393,6 +2392,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                         await sendEncryptedEvent();
                     } else {
                         await sendEncryptedEvent();
+                        // Make sure that the first attempt to decrypt has happened before the withheld arrives
+                        await awaitDecryption;
+                        awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
                         await sendWithheldMessage();
                     }
 
