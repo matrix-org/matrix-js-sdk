@@ -854,9 +854,14 @@ export interface CreateSecretStorageOpts {
     setupNewSecretStorage?: boolean;
 
     /**
-     * Function called to get the user's
-     * current key backup passphrase. Should return a promise that resolves with a Uint8Array
+     * Function called to get the user's current key backup passphrase.
+     *
+     * Should return a promise that resolves with a Uint8Array
      * containing the key, or rejects if the key cannot be obtained.
+     *
+     * Only used when the client has existing key backup, but no secret storage.
+     *
+     * @deprecated Not used by the Rust crypto stack.
      */
     getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
