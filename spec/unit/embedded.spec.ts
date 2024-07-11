@@ -32,7 +32,7 @@ import {
     IOpenIDCredentials,
 } from "matrix-widget-api";
 
-import { createRoomWidgetClient, MsgType } from "../../src/matrix";
+import { createRoomWidgetClient, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
 import { ICapabilities } from "../../src/embedded";
@@ -59,8 +59,26 @@ class MockWidgetApi extends EventEmitter {
     public requestCapabilityToReceiveState = jest.fn();
     public requestCapabilityToSendToDevice = jest.fn();
     public requestCapabilityToReceiveToDevice = jest.fn();
-    public sendRoomEvent = jest.fn(() => ({ event_id: `$${Math.random()}` }));
-    public sendStateEvent = jest.fn();
+    public sendRoomEvent = jest.fn(
+        (eventType: string, content: unknown, roomId?: string, delay?: number, parentDelayId?: string) =>
+            delay === undefined && parentDelayId === undefined
+                ? { event_id: `$${Math.random()}` }
+                : { delay_id: `id-${Math.random()}` },
+    );
+    public sendStateEvent = jest.fn(
+        (
+            eventType: string,
+            stateKey: string,
+            content: unknown,
+            roomId?: string,
+            delay?: number,
+            parentDelayId?: string,
+        ) =>
+            delay === undefined && parentDelayId === undefined
+                ? { event_id: `$${Math.random()}` }
+                : { delay_id: `id-${Math.random()}` },
+    );
+    public updateDelayedEvent = jest.fn();
     public sendToDevice = jest.fn();
     public requestOpenIDConnectToken = jest.fn(() => {
         return testOIDCToken;
@@ -125,6 +143,17 @@ describe("RoomWidgetClient", () => {
             );
         });
 
+        it("send handles wrong field in response", async () => {
+            await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
+            widgetApi.sendRoomEvent.mockResolvedValueOnce({
+                room_id: "!1:example.org",
+                delay_id: `id-${Math.random}`,
+            });
+            await expect(
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
+            ).rejects.toThrow();
+        });
+
         it("receives", async () => {
             const event = new MatrixEvent({
                 type: "org.matrix.rageshake_request",
@@ -157,6 +186,199 @@ describe("RoomWidgetClient", () => {
                     .getEvents()
                     .map((e) => e.getEffectiveEvent()),
             ).toEqual([event]);
+        });
+    });
+
+    describe("delayed events", () => {
+        describe("when supported", () => {
+            const doesServerSupportUnstableFeatureMock = jest.fn((feature) =>
+                Promise.resolve(feature === "org.matrix.msc4140"),
+            );
+
+            beforeAll(() => {
+                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
+            });
+
+            afterAll(() => {
+                doesServerSupportUnstableFeatureMock.mockReset();
+            });
+
+            it("sends delayed message events", async () => {
+                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
+                await client._unstable_sendDelayedEvent(
+                    "!1:example.org",
+                    { delay: 2000 },
+                    null,
+                    "org.matrix.rageshake_request",
+                    { request_id: 123 },
+                );
+                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
+                    "org.matrix.rageshake_request",
+                    { request_id: 123 },
+                    "!1:example.org",
+                    2000,
+                    undefined,
+                );
+            });
+
+            it("sends child action delayed message events", async () => {
+                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
+                const parentDelayId = `id-${Math.random()}`;
+                await client._unstable_sendDelayedEvent(
+                    "!1:example.org",
+                    { parent_delay_id: parentDelayId },
+                    null,
+                    "org.matrix.rageshake_request",
+                    { request_id: 123 },
+                );
+                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
+                    "org.matrix.rageshake_request",
+                    { request_id: 123 },
+                    "!1:example.org",
+                    undefined,
+                    parentDelayId,
+                );
+            });
+
+            it("sends delayed state events", async () => {
+                await makeClient({
+                    sendDelayedEvents: true,
+                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
+                });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
+                await client._unstable_sendDelayedStateEvent(
+                    "!1:example.org",
+                    { delay: 2000 },
+                    "org.example.foo",
+                    { hello: "world" },
+                    "bar",
+                );
+                expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
+                    "org.example.foo",
+                    "bar",
+                    { hello: "world" },
+                    "!1:example.org",
+                    2000,
+                    undefined,
+                );
+            });
+
+            it("sends child action delayed state events", async () => {
+                await makeClient({
+                    sendDelayedEvents: true,
+                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
+                });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
+                const parentDelayId = `fg-${Math.random()}`;
+                await client._unstable_sendDelayedStateEvent(
+                    "!1:example.org",
+                    { parent_delay_id: parentDelayId },
+                    "org.example.foo",
+                    { hello: "world" },
+                    "bar",
+                );
+                expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
+                    "org.example.foo",
+                    "bar",
+                    { hello: "world" },
+                    "!1:example.org",
+                    undefined,
+                    parentDelayId,
+                );
+            });
+
+            it("send delayed message events handles wrong field in response", async () => {
+                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                widgetApi.sendRoomEvent.mockResolvedValueOnce({
+                    room_id: "!1:example.org",
+                    event_id: `$${Math.random()}`,
+                });
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        "!1:example.org",
+                        { delay: 2000 },
+                        null,
+                        "org.matrix.rageshake_request",
+                        { request_id: 123 },
+                    ),
+                ).rejects.toThrow();
+            });
+
+            it("send delayed state events handles wrong field in response", async () => {
+                await makeClient({
+                    sendDelayedEvents: true,
+                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
+                });
+                widgetApi.sendStateEvent.mockResolvedValueOnce({
+                    room_id: "!1:example.org",
+                    event_id: `$${Math.random()}`,
+                });
+                await expect(
+                    client._unstable_sendDelayedStateEvent(
+                        "!1:example.org",
+                        { delay: 2000 },
+                        "org.example.foo",
+                        { hello: "world" },
+                        "bar",
+                    ),
+                ).rejects.toThrow();
+            });
+
+            it("updates delayed events", async () => {
+                await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                for (const action of [
+                    UpdateDelayedEventAction.Cancel,
+                    UpdateDelayedEventAction.Restart,
+                    UpdateDelayedEventAction.Send,
+                ]) {
+                    await client._unstable_updateDelayedEvent("id", action);
+                    expect(widgetApi.updateDelayedEvent).toHaveBeenCalledWith("id", action);
+                }
+            });
+        });
+
+        describe("when unsupported", () => {
+            it("fails to send delayed message events", async () => {
+                await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        "!1:example.org",
+                        { delay: 2000 },
+                        null,
+                        "org.matrix.rageshake_request",
+                        { request_id: 123 },
+                    ),
+                ).rejects.toThrow("Server does not support");
+            });
+
+            it("fails to send delayed state events", async () => {
+                await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                await expect(
+                    client._unstable_sendDelayedStateEvent(
+                        "!1:example.org",
+                        { delay: 2000 },
+                        "org.example.foo",
+                        { hello: "world" },
+                        "bar",
+                    ),
+                ).rejects.toThrow("Server does not support");
+            });
+
+            it("fails to update delayed state events", async () => {
+                await makeClient({});
+                for (const action of [
+                    UpdateDelayedEventAction.Cancel,
+                    UpdateDelayedEventAction.Restart,
+                    UpdateDelayedEventAction.Send,
+                ]) {
+                    await expect(client._unstable_updateDelayedEvent("id", action)).rejects.toThrow(
+                        "Server does not support",
+                    );
+                }
+            });
         });
     });
 
@@ -209,6 +431,17 @@ describe("RoomWidgetClient", () => {
                 { hello: "world" },
                 "!1:example.org",
             );
+        });
+
+        it("send handles incorrect response", async () => {
+            await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+            widgetApi.sendStateEvent.mockResolvedValueOnce({
+                room_id: "!1:example.org",
+                delay_id: `id-${Math.random}`,
+            });
+            await expect(
+                client.sendStateEvent("!1:example.org", "org.example.foo", { hello: "world" }, "bar"),
+            ).rejects.toThrow();
         });
 
         it("receives", async () => {
