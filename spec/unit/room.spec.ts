@@ -1396,7 +1396,7 @@ describe("Room", function () {
         });
 
         it("recalculates in acceptable time without heroes", function () {
-            for (let i = 0; i < 10000; i++) {
+            for (let i = 0; i < 5000; i++) {
                 addMember(`@person${i}:bar`, KnownMembership.Join, { name: `Person ${i % 20} ${i % 10} ${i % 3}` });
             }
 
@@ -1408,7 +1408,7 @@ describe("Room", function () {
                 room.recalculate();
             }
             const duration = performance.now() - start;
-            expect(duration).toBeLessThan(500);
+            expect(duration).toBeLessThan(200);
         });
     });
 
