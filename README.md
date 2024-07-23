@@ -39,7 +39,7 @@ client.publicRooms(function (err, data) {
 ```
 
 See below for how to include libolm to enable end-to-end-encryption. Please check
-[the Node.js terminal app](examples/node) for a more complex example.
+[the Node.js terminal app](examples/node/README.md) for a more complex example.
 
 To start the client:
 
