@@ -504,7 +504,7 @@ export class SyncAccumulator {
 
             currentData._timeline.push({
                 event: transformedEvent,
-                token: index === 0 ? data.timeline.prev_batch ?? null : null,
+                token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
         });
 

@@ -434,7 +434,7 @@ describe("TimelineWindow", function () {
     });
 
     function idsOf(events: Array<MatrixEvent>): Array<string> {
-        return events.map((e) => (e ? e.getId() ?? "MISSING_ID" : "MISSING_EVENT"));
+        return events.map((e) => (e ? (e.getId() ?? "MISSING_ID") : "MISSING_EVENT"));
     }
 
     describe("removing events", () => {
