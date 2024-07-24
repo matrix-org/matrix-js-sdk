@@ -169,7 +169,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     continue;
                 }
                 membershipContents = content["memberships"];
-            } else {
+            } else if ("focus_active" in content) {
                 // We have a MSC4143 event membership event
                 if (Object.keys(content).length !== 0) {
                     // We checked for empty content to not try to construct CallMembership's with {}.
