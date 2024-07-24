@@ -1403,7 +1403,9 @@ export class SyncApi {
                 if (limited) {
                     room.resetLiveTimeline(
                         joinObj.timeline.prev_batch,
-                        this.syncOpts.canResetEntireTimeline!(room.roomId) ? null : syncEventData.oldSyncToken ?? null,
+                        this.syncOpts.canResetEntireTimeline!(room.roomId)
+                            ? null
+                            : (syncEventData.oldSyncToken ?? null),
                     );
 
                     // We have to assume any gap in any timeline is

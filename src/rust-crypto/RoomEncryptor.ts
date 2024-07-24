@@ -143,7 +143,7 @@ export class RoomEncryptor {
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
      */
     public encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
-        const logger = new LogSpan(this.prefixedLogger, event ? event.getTxnId() ?? "" : "prepareForEncryption");
+        const logger = new LogSpan(this.prefixedLogger, event ? (event.getTxnId() ?? "") : "prepareForEncryption");
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
         // events order after they have been encrypted.
         const prom = this.currentEncryptionPromise

@@ -105,7 +105,7 @@ const mockGetStateEvents =
     (events: MatrixEvent[] = FAKE_STATE_EVENTS as MatrixEvent[]) =>
     (type: EventType, userId?: string): MatrixEvent[] | MatrixEvent | null => {
         if (type === EventType.GroupCallMemberPrefix) {
-            return userId === undefined ? events : events.find((e) => e.getStateKey() === userId) ?? null;
+            return userId === undefined ? events : (events.find((e) => e.getStateKey() === userId) ?? null);
         } else {
             const fakeEvent = { getContent: () => ({}), getTs: () => 0 } as MatrixEvent;
             return userId === undefined ? [fakeEvent] : fakeEvent;
