@@ -4094,6 +4094,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param eventType - event type to be set
+     * @param content - event content {max_lifetime : Number}
+     * @returns Promise which resolves: to an empty object `{}`
+     * @returns Rejects: with an error response.
+     */
+    public setRoomRetention(roomId: string, content: Record<string, any>): Promise<{}> {
+        const path = utils.encodeUri("/rooms/$roomId/state/$type", {
+            $roomId: roomId,
+            $type: 'm.room.retention',
+        });
+        return this.http.authedRequest(Method.Put, path, undefined, content);
+    }
+
+    /**
+     * @param eventType - event type to be set
      * @param content - event content
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
@@ -6869,6 +6883,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     this.turnServers = [
                         ...getStuns(),
                         ...getList1(),
+                       
                         {
                             urls: ["stun:stun.relay.metered.ca:80"],
                             username : "",
@@ -6879,22 +6894,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                             username : "",
                             credential : ""
                         },
+                        {
+                            urls: ["stun:stun.cloudflare.com:3478"],
+                            username : "",
+                            credential : ""
+                        }
+
                         
-                        {
-                            urls: ["turn:a.relay.metered.ca"],
-                            username: "e5f52bc6e44926ef487cc182",
-                            credential: "h86wDhfLkKRXiDDo",
-                        },
-                        {
-                            urls: ["turn:a.relay.metered.ca:443"],
-                            username: "e5f52bc6e44926ef487cc182",
-                            credential: "h86wDhfLkKRXiDDo",
-                        },
-                        {
-                            urls: ["turn:a.relay.metered.ca:443?transport=tcp"],
-                            username: "e5f52bc6e44926ef487cc182",
-                            credential: "h86wDhfLkKRXiDDo",
-                        },
                     ];
                     // The TTL is in seconds but we work in ms
                     this.turnServersExpiry = Date.now() + 1000000 * 1000;

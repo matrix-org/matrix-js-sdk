@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk-bastyon",
-    "version": "23.1.8",
+    "version": "23.1.11",
     "description": "Matrix Client-Server SDK for Javascript (Bastyon)",
     "engines": {
         "node": ">=16.0.0"
