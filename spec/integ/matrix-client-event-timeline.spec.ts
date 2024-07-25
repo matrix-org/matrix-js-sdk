@@ -40,6 +40,7 @@ import { KnownMembership } from "../../src/@types/membership";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
+const altName = "meow";
 const accessToken = "aseukfgwef";
 const roomId = "!foo:bar";
 const otherUserId = "@bob:localhost";
@@ -747,7 +748,9 @@ describe("MatrixClient event timelines", function () {
                 };
             });
             req.check((request) => {
-                expect(request.queryParams?.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER));
+                expect(request.queryParams?.filter).toEqual(
+                    JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER),
+                );
             });
 
             await Promise.all([
@@ -1072,6 +1075,150 @@ describe("MatrixClient event timelines", function () {
                         expect(room.getThreads().map((it) => it.id)).toEqual([THREAD_ROOT.event_id!]);
                         expect(tl!.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("start_token1");
                         expect(tl!.getPaginationToken(EventTimeline.FORWARDS)).toEqual("end_token0");
+                    }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+        it("event will have a sender profile if /context and /messages returns state", async () => {
+            // @ts-ignore
+            client.clientOpts.lazyLoadMembers = false;
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id!))
+                .respond(200, function () {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: EVENTS[0],
+                        events_after: [],
+                        end: "end_token0",
+                        state: [
+                            utils.mkMembership({
+                                mship: KnownMembership.Join,
+                                room: roomId,
+                                user: userId,
+                                name: altName,
+                                event: true,
+                            }),
+                            utils.mkMembership({
+                                mship: KnownMembership.Join,
+                                room: roomId,
+                                user: otherUserId,
+                                event: true,
+                            }),
+                        ],
+                    };
+                });
+
+            // Server thinks the client has cached the member event
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/messages")
+                .check(function (req) {
+                    const params = req.queryParams!;
+                    expect(params.filter).toBeNull();
+                })
+                .respond(200, function () {
+                    return {
+                        chunk: [EVENTS[1], EVENTS[2]],
+                        end: "start_token1",
+                        state: [
+                            utils.mkMembership({
+                                mship: KnownMembership.Join,
+                                room: roomId,
+                                user: userId,
+                                name: altName,
+                                event: true,
+                            }),
+                            utils.mkMembership({
+                                mship: KnownMembership.Join,
+                                room: roomId,
+                                user: otherUserId,
+                                event: true,
+                            }),
+                        ],
+                    };
+                });
+
+            let tl: EventTimeline;
+            return Promise.all([
+                client
+                    .getEventTimeline(timelineSet, EVENTS[0].event_id!)
+                    .then(function (tl0) {
+                        tl = tl0!;
+                        return client.paginateEventTimeline(tl, { backwards: true });
+                    })
+                    .then(function (success) {
+                        expect(success).toBeTruthy();
+                        expect(tl!.getEvents()[0].sender?.name).toEqual(altName);
+                        expect(tl!.getEvents()[1].sender?.name).toEqual(altName);
+                        expect(tl!.getEvents()[2].sender?.name).toEqual(altName);
+                    }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("event will sometimes have no sender profile if /context but not /messages doesn't return state", async () => {
+            // @ts-ignore
+            client.clientOpts.lazyLoadMembers = true;
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id!))
+                .respond(200, function () {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: EVENTS[0],
+                        events_after: [],
+                        end: "end_token0",
+                        state: [
+                            utils.mkMembership({
+                                mship: KnownMembership.Join,
+                                room: roomId,
+                                user: userId,
+                                name: altName,
+                                event: true,
+                            }),
+                        ],
+                    };
+                });
+
+            // Lazy loaded members with redundant members removed since the server just sent it above
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/messages")
+                .check(function (req) {
+                    const params = req.queryParams!;
+                    expect(params.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER));
+                })
+                .respond(200, function () {
+                    return {
+                        chunk: [EVENTS[1], EVENTS[2]],
+                        end: "start_token1",
+                    };
+                });
+
+            logger.log("hello world");
+            let tl: EventTimeline;
+            return Promise.all([
+                client
+                    .getEventTimeline(timelineSet, EVENTS[0].event_id!)
+                    .then(function (tl0) {
+                        tl = tl0!;
+                        return client.paginateEventTimeline(tl, { backwards: true });
+                    })
+                    .then(function (success) {
+                        logger.log("abcd, ", tl!.getEvents()[0].sender);
+                        expect(success).toBeTruthy();
+                        expect(tl!.getEvents().length).toEqual(3);
+                        expect(tl!.getEvents()[0].sender?.name).toEqual(altName);
+                        expect(tl!.getEvents()[1].sender?.name).toEqual(altName);
+
+                        // Lost track of the member state?
+                        expect(tl!.getEvents()[2].sender).toBeNull();
                     }),
                 httpBackend.flushAllExpected(),
             ]);
