@@ -160,6 +160,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
             const content = memberEvent.getContent();
+
+            // Dont even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
+            if (Object.keys(content).length === 0) continue;
+
             let membershipContents: any[] = [];
             // We first decide if its a MSC4143 event (per device state key)
             if ("memberships" in content) {
@@ -173,9 +177,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 // We have a MSC4143 event membership event
                 membershipContents.push(content);
             }
-            if (membershipContents.length === 0) {
-                continue;
-            }
+
+            if (membershipContents.length === 0) continue;
 
             for (const membershipData of membershipContents) {
                 try {
