@@ -76,7 +76,7 @@ export class Filter {
 
     public static LAZY_LOADING_MESSAGES_REDUNDANT_FILTER = {
         lazy_load_members: true,
-        include_redundant_members: true
+        include_redundant_members: true,
     };
 
     /**
