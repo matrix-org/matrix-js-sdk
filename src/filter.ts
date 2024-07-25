@@ -74,6 +74,11 @@ export class Filter {
         lazy_load_members: true,
     };
 
+    public static LAZY_LOADING_MESSAGES_REDUNDANT_FILTER = {
+        lazy_load_members: true,
+        include_redundant_members: true
+    };
+
     /**
      * Create a filter from existing data.
      */

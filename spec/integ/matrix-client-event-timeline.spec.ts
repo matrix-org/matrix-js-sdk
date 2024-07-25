@@ -747,7 +747,7 @@ describe("MatrixClient event timelines", function () {
                 };
             });
             req.check((request) => {
-                expect(request.queryParams?.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
+                expect(request.queryParams?.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER));
             });
 
             await Promise.all([
@@ -1781,6 +1781,7 @@ describe("MatrixClient event timelines", function () {
                 expect(request.queryParams?.filter).toEqual(
                     JSON.stringify({
                         lazy_load_members: true,
+                        include_redundant_members: true,
                     }),
                 );
             });
