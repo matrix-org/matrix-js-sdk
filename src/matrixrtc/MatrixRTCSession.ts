@@ -160,17 +160,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
             const content = memberEvent.getContent();
-
+            const eventKeysCount = Object.keys(content).length;
             // Dont even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-            if (Object.keys(content).length === 0) continue;
+            if (eventKeysCount === 0) continue;
 
             let membershipContents: any[] = [];
 
             // We first decide if its a MSC4143 event (per device state key)
-            if ("focus_active" in content) {
+            if (eventKeysCount > 1 && "focus_active" in content) {
                 // We have a MSC4143 event membership event
                 membershipContents.push(content);
-            } else if ("memberships" in content) {
+            } else if (eventKeysCount === 1 && "memberships" in content) {
                 // we have a legacy (one event for all devices) event
                 if (!Array.isArray(content["memberships"])) {
                     logger.warn(`Malformed member event from ${memberEvent.getSender()}: memberships is not an array`);
