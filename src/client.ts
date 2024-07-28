@@ -324,10 +324,13 @@ export interface ICreateClientOpts {
     localTimeoutMs?: number;
 
     /**
-     * Set to true to use
-     * Authorization header instead of query param to send the access token to the server.
+     * Set to false to send the access token to the server via a query parameter rather
+     * than the Authorization HTTP header.
      *
-     * Default false.
+     * Note that as of v1.11 of the Matrix spec, sending the access token via a query
+     * is deprecated.
+     *
+     * Default true.
      */
     useAuthorizationHeader?: boolean;
 
