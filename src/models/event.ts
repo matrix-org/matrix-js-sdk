@@ -404,7 +404,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // The fallback in these cases will be to use the origin_server_ts.
         // For EDUs, the origin_server_ts also is not defined so we use Date.now().
         const age = this.getAge();
-        this.localTimestamp = age !== undefined ? Date.now() - age : this.getTs() ?? Date.now();
+        this.localTimestamp = age !== undefined ? Date.now() - age : (this.getTs() ?? Date.now());
         this.reEmitter = new TypedReEmitter(this);
     }
 

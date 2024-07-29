@@ -1394,6 +1394,22 @@ describe("Room", function () {
                 expect(name).toEqual(userB);
             });
         });
+
+        it("recalculates in acceptable time without heroes", function () {
+            for (let i = 0; i < 5000; i++) {
+                addMember(`@person${i}:bar`, KnownMembership.Join, { name: `Person ${i % 20} ${i % 10} ${i % 3}` });
+            }
+
+            // This isn't a real performance test and has plenty of headroom because github
+            // runners don't offer any kind of speed consistency guarantee, but this should at
+            // least assert that the perf doesn't suddenly become n^2.
+            const start = performance.now();
+            for (let i = 0; i < 50; i++) {
+                room.recalculate();
+            }
+            const duration = performance.now() - start;
+            expect(duration).toBeLessThan(200);
+        });
     });
 
     describe("receipts", function () {

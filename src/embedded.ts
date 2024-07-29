@@ -258,7 +258,7 @@ export class RoomWidgetClient extends MatrixClient {
         }
 
         room.updatePendingEvent(event, EventStatus.SENT, response.event_id);
-        return { event_id: response.event_id };
+        return { event_id: response.event_id! };
     }
 
     public async sendStateEvent(
@@ -267,7 +267,7 @@ export class RoomWidgetClient extends MatrixClient {
         content: any,
         stateKey = "",
     ): Promise<ISendEventResponse> {
-        return await this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId);
+        return (await this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId)) as ISendEventResponse;
     }
 
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<{}> {
