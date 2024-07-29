@@ -5407,7 +5407,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
         while (predecessorRoomId !== null) {
             if (predecessorRoomId) {
-                if (seenRoomIDs.has(predecessorRoomId)) return ret;
+                if (seenRoomIDs.has(predecessorRoomId)) break;
                 seenRoomIDs.add(predecessorRoomId);
             }
             const predecessorRoom = this.getRoom(predecessorRoomId);
