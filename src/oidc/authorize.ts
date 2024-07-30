@@ -27,6 +27,7 @@ import {
     validateIdToken,
     validateStoredUserState,
 } from "./validate";
+import { sha256Base64UrlUnpadded } from "../crypto/digest";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
@@ -61,14 +62,8 @@ const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
         logger.warn("A secure context is required to generate code challenge. Using plain text code challenge");
         return codeVerifier;
     }
-    const utf8 = new TextEncoder().encode(codeVerifier);
 
-    const digest = await globalThis.crypto.subtle.digest("SHA-256", utf8);
-
-    return btoa(String.fromCharCode(...new Uint8Array(digest)))
-        .replace(/=/g, "")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
+    return sha256Base64UrlUnpadded(codeVerifier);
 };
 
 /**

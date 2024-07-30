@@ -298,7 +298,9 @@ describe("MatrixClient", function () {
             ...(opts || {}),
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = (["authedRequest", "getContentUri", "request", "uploadContent"] as const).reduce((r, k) => {
+        client.http = (
+            ["authedRequest", "getContentUri", "request", "uploadContent", "idServerRequest"] as const
+        ).reduce((r, k) => {
             r[k] = jest.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
@@ -3033,6 +3035,47 @@ describe("MatrixClient", function () {
 
             await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
             expect(httpLookups.length).toEqual(0);
+        });
+    });
+
+    describe("identityHashedLookup", () => {
+        it("should return hashed lookup results", async () => {
+            const ID_ACCESS_TOKEN = "hello_id_server_please_let_me_make_a_request";
+
+            client.http.idServerRequest = jest.fn().mockImplementation((method, path, params) => {
+                if (method === "GET" && path === "/hash_details") {
+                    return { algorithms: ["sha256"], lookup_pepper: "carrot" };
+                } else if (method === "POST" && path === "/lookup") {
+                    return {
+                        mappings: {
+                            "WHA-MgrrsZACDI9F8OaVagpiyiV2sjZylGHJteT4OMU": "@bob:homeserver.dummy",
+                        },
+                    };
+                }
+
+                throw new Error("Test impl doesn't know about this request");
+            });
+
+            const lookupResult = await client.identityHashedLookup([["bob@email.dummy", "email"]], ID_ACCESS_TOKEN);
+
+            expect(client.http.idServerRequest).toHaveBeenCalledWith(
+                "GET",
+                "/hash_details",
+                undefined,
+                "/_matrix/identity/v2",
+                ID_ACCESS_TOKEN,
+            );
+
+            expect(client.http.idServerRequest).toHaveBeenCalledWith(
+                "POST",
+                "/lookup",
+                { pepper: "carrot", algorithm: "sha256", addresses: ["WHA-MgrrsZACDI9F8OaVagpiyiV2sjZylGHJteT4OMU"] },
+                "/_matrix/identity/v2",
+                ID_ACCESS_TOKEN,
+            );
+
+            expect(lookupResult).toHaveLength(1);
+            expect(lookupResult[0]).toEqual({ address: "bob@email.dummy", mxid: "@bob:homeserver.dummy" });
         });
     });
 });
