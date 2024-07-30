@@ -89,11 +89,8 @@ describe("oidc authorization", () => {
 
     describe("generateAuthorizationUrl()", () => {
         it("should generate url with correct parameters", async () => {
-            // test the no crypto case here
-            // @ts-ignore mocking
-            globalThis.crypto.subtle = undefined;
-
             const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
+            authorizationParams.codeVerifier = "test-code-verifier";
             const authUrl = new URL(
                 await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
             );
@@ -105,6 +102,18 @@ describe("oidc authorization", () => {
             expect(authUrl.searchParams.get("scope")).toEqual(authorizationParams.scope);
             expect(authUrl.searchParams.get("state")).toEqual(authorizationParams.state);
             expect(authUrl.searchParams.get("nonce")).toEqual(authorizationParams.nonce);
+            expect(authUrl.searchParams.get("code_challenge")).toEqual("0FLIKahrX7kqxncwhV5WD82lu_wi5GA8FsRSLubaOpU");
+        });
+
+        it("should log a warning if crypto is not available", async () => {
+            // test the no crypto case here
+            // @ts-ignore mocking
+            globalThis.crypto.subtle = undefined;
+
+            const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
+            const authUrl = new URL(
+                await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
+            );
 
             // crypto not available, plain text code_challenge is used
             expect(authUrl.searchParams.get("code_challenge")).toEqual(authorizationParams.codeVerifier);
