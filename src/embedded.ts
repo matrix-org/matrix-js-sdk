@@ -26,7 +26,7 @@ import {
 } from "matrix-widget-api";
 
 import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event";
-import { ISendEventResponse } from "./@types/requests";
+import { ISendEventResponse, SendDelayedEventRequestOpts, SendDelayedEventResponse } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { logger } from "./logger";
 import {
@@ -248,7 +248,20 @@ export class RoomWidgetClient extends MatrixClient {
         throw new Error(`Unknown room: ${roomIdOrAlias}`);
     }
 
-    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse> {
+    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        delayOpts: SendDelayedEventRequestOpts,
+    ): Promise<SendDelayedEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        delayOpts?: SendDelayedEventRequestOpts,
+    ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        if (delayOpts) {
+            throw new Error("Delayed event sending via widgets is not implemented");
+        }
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi.sendRoomEvent(event.getType(), event.getContent(), room.roomId);

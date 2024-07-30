@@ -46,6 +46,9 @@ describe("MatrixRTCSession", () => {
         client = new MatrixClient({ baseUrl: "base_url" });
         client.getUserId = jest.fn().mockReturnValue("@alice:example.org");
         client.getDeviceId = jest.fn().mockReturnValue("AAAAAAA");
+        client.doesServerSupportUnstableFeature = jest.fn((feature) =>
+            Promise.resolve(feature === "org.matrix.msc4140"),
+        );
     });
 
     afterEach(() => {
@@ -241,35 +244,61 @@ describe("MatrixRTCSession", () => {
             foci_preferred: [mockFocus],
         };
 
-        function testSession(
+        let sendStateEventMock: jest.Mock;
+        let sendDelayedStateMock: jest.Mock;
+
+        let sentStateEvent: Promise<void>;
+        let sentDelayedState: Promise<void>;
+
+        beforeEach(() => {
+            sentStateEvent = new Promise((resolve) => {
+                sendStateEventMock = jest.fn(resolve);
+            });
+            sentDelayedState = new Promise((resolve) => {
+                sendDelayedStateMock = jest.fn(() => {
+                    resolve();
+                    return {
+                        delay_id: "id",
+                    };
+                });
+            });
+            client.sendStateEvent = sendStateEventMock;
+            client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
+        });
+
+        async function testSession(
             membershipData: CallMembershipData[] | SessionMembershipData,
             shouldUseLegacy: boolean,
-        ): void {
+        ): Promise<void> {
             sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
 
             const makeNewLegacyMembershipsMock = jest.spyOn(sess as any, "makeNewLegacyMemberships");
             const makeNewMembershipMock = jest.spyOn(sess as any, "makeNewMembership");
 
             sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
 
             expect(makeNewLegacyMembershipsMock).toHaveBeenCalledTimes(shouldUseLegacy ? 1 : 0);
             expect(makeNewMembershipMock).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+
+            await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
         }
 
-        it("uses legacy events if there are any active legacy calls", () => {
-            testSession([expiredLegacyMembershipData, legacyMembershipData, sessionMembershipData], true);
+        it("uses legacy events if there are any active legacy calls", async () => {
+            await testSession([expiredLegacyMembershipData, legacyMembershipData, sessionMembershipData], true);
         });
 
-        it('uses legacy events if a non-legacy call is in a "memberships" array', () => {
-            testSession([sessionMembershipData], true);
+        it('uses legacy events if a non-legacy call is in a "memberships" array', async () => {
+            await testSession([sessionMembershipData], true);
         });
 
-        it("uses non-legacy events if all legacy calls are expired", () => {
-            testSession([expiredLegacyMembershipData], false);
+        it("uses non-legacy events if all legacy calls are expired", async () => {
+            await testSession([expiredLegacyMembershipData], false);
         });
 
-        it("uses non-legacy events if there are only non-legacy calls", () => {
-            testSession(sessionMembershipData, false);
+        it("uses non-legacy events if there are only non-legacy calls", async () => {
+            await testSession(sessionMembershipData, false);
         });
     });
 
@@ -347,12 +376,27 @@ describe("MatrixRTCSession", () => {
     describe("joining", () => {
         let mockRoom: Room;
         let sendStateEventMock: jest.Mock;
+        let sendDelayedStateMock: jest.Mock;
         let sendEventMock: jest.Mock;
 
+        let sentStateEvent: Promise<void>;
+        let sentDelayedState: Promise<void>;
+
         beforeEach(() => {
-            sendStateEventMock = jest.fn();
+            sentStateEvent = new Promise((resolve) => {
+                sendStateEventMock = jest.fn(resolve);
+            });
+            sentDelayedState = new Promise((resolve) => {
+                sendDelayedStateMock = jest.fn(() => {
+                    resolve();
+                    return {
+                        delay_id: "id",
+                    };
+                });
+            });
             sendEventMock = jest.fn();
             client.sendStateEvent = sendStateEventMock;
+            client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
             client.sendEvent = sendEventMock;
 
             mockRoom = makeMockRoom([]);
@@ -373,9 +417,11 @@ describe("MatrixRTCSession", () => {
             expect(sess!.isJoined()).toEqual(true);
         });
 
-        it("sends a membership event when joining a call", () => {
+        it("sends a membership event when joining a call", async () => {
+            const realSetTimeout = setTimeout;
             jest.useFakeTimers();
             sess!.joinRoomSession([mockFocus], mockFocus);
+            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
             expect(client.sendStateEvent).toHaveBeenCalledWith(
                 mockRoom!.roomId,
                 EventType.GroupCallMemberPrefix,
@@ -396,6 +442,8 @@ describe("MatrixRTCSession", () => {
                 },
                 "@alice:example.org",
             );
+            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(0);
             jest.useRealTimers();
         });
 
@@ -403,13 +451,15 @@ describe("MatrixRTCSession", () => {
             const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
 
-            function testJoin(useOwnedStateEvents: boolean): void {
+            async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
+                const realSetTimeout = setTimeout;
                 if (useOwnedStateEvents) {
                     mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3779.default");
                 }
 
                 jest.useFakeTimers();
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
+                await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     mockRoom!.roomId,
                     EventType.GroupCallMemberPrefix,
@@ -423,15 +473,17 @@ describe("MatrixRTCSession", () => {
                     } satisfies SessionMembershipData,
                     `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`,
                 );
+                await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                 jest.useRealTimers();
             }
 
-            it("sends a membership event with session payload when joining a non-legacy call", () => {
-                testJoin(false);
+            it("sends a membership event with session payload when joining a non-legacy call", async () => {
+                await testJoin(false);
             });
 
-            it("does not prefix the state key with _ for rooms that support user-owned state events", () => {
-                testJoin(true);
+            it("does not prefix the state key with _ for rooms that support user-owned state events", async () => {
+                await testJoin(true);
             });
         });
 
