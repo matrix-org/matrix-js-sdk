@@ -76,6 +76,56 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
+export type TimeoutDelay = {
+    delay: number;
+};
+
+export type ParentDelayId = {
+    parent_delay_id: string;
+};
+
+export type SendTimeoutDelayedEventRequestOpts = TimeoutDelay & Partial<ParentDelayId>;
+export type SendActionDelayedEventRequestOpts = ParentDelayId;
+
+export type SendDelayedEventRequestOpts = SendTimeoutDelayedEventRequestOpts | SendActionDelayedEventRequestOpts;
+
+export type SendDelayedEventResponse = {
+    delay_id: string;
+};
+
+export enum UpdateDelayedEventAction {
+    Cancel = "cancel",
+    Restart = "restart",
+    Send = "send",
+}
+
+export type UpdateDelayedEventRequestOpts = SendDelayedEventResponse & {
+    action: UpdateDelayedEventAction;
+};
+
+type DelayedPartialTimelineEvent = {
+    room_id: string;
+    type: string;
+    content: IContent;
+};
+
+type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
+    state_key: string;
+    transaction_id: string;
+};
+
+type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
+
+export type DelayedEventInfo = {
+    delayed_events: DelayedPartialEvent &
+        SendDelayedEventResponse &
+        SendDelayedEventRequestOpts &
+        {
+            running_since: number;
+        }[];
+    next_batch?: string;
+};
+
 export interface IPresenceOpts {
     // One of "online", "offline" or "unavailable"
     presence: "online" | "offline" | "unavailable";
