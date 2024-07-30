@@ -1,3 +1,10 @@
+Changes in [34.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.2.0) (2024-07-30)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Element-R: detect "withheld key" UTD errors, and mark them as such ([#4302](https://github.com/matrix-org/matrix-js-sdk/pull/4302)). Contributed by @richvdh.
+
+
 Changes in [34.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.1.0) (2024-07-16)
 ==================================================================================================
 ## ✨ Features
