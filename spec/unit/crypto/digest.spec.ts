@@ -26,4 +26,14 @@ describe("sha256Base64UrlUnpadded", () => {
         const hash = await sha256Base64UrlUnpadded("test 🍱");
         expect(hash).toBe("X2aDNrrwfq3nCTOl90R9qg9ynxhHnSzsMqtrdYX-SGw");
     });
+
+    it("throws if webcrypto is not available", async () => {
+        const oldCrypto = global.crypto;
+        try {
+            global.crypto = {} as any;
+            await expect(sha256Base64UrlUnpadded("test")).rejects.toThrow();
+        } finally {
+            global.crypto = oldCrypto;
+        }
+    });
 });
