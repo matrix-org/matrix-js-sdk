@@ -227,7 +227,7 @@ import { KnownMembership, Membership } from "./@types/membership";
 import { RoomMessageEventContent, StickerEventContent } from "./@types/events";
 import { ImageInfo } from "./@types/media";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities";
-import { sha256Base64UrlUnpadded } from "./crypto/digest";
+import { sha256Base64UrlUnpadded } from "./digest";
 
 export type Store = IStore;
 

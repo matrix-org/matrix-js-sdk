@@ -27,7 +27,7 @@ import {
     validateIdToken,
     validateStoredUserState,
 } from "./validate";
-import { sha256Base64UrlUnpadded } from "../crypto/digest";
+import { sha256Base64UrlUnpadded } from "../digest";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
