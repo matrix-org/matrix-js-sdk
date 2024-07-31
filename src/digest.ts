@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeUnpaddedBase64Url } from "../base64";
+import { encodeUnpaddedBase64Url } from "./base64";
 
 /**
  * @param plaintext The string to hash
