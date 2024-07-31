@@ -20,6 +20,7 @@ import { EventTimeline } from "../models/event-timeline";
 import { Room } from "../models/room";
 import { MatrixClient } from "../client";
 import { EventType } from "../@types/event";
+import { UpdateDelayedEventAction } from "../@types/requests";
 import {
     CallMembership,
     CallMembershipData,
@@ -865,24 +866,54 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             newContent = this.makeNewMembership(localDeviceId);
         }
 
+        const stateKey = legacy ? localUserId : this.makeMembershipStateKey(localUserId, localDeviceId);
         try {
-            await this.client.sendStateEvent(
-                this.room.roomId,
-                EventType.GroupCallMemberPrefix,
-                newContent,
-                legacy ? localUserId : this.makeMembershipStateKey(localUserId, localDeviceId),
-            );
+            await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, newContent, stateKey);
             logger.info(`Sent updated call member event.`);
 
             // check periodically to see if we need to refresh our member event
-            if (this.isJoined() && legacy) {
-                this.memberEventTimeout = setTimeout(this.triggerCallMembershipEventUpdate, MEMBER_EVENT_CHECK_PERIOD);
+            if (this.isJoined()) {
+                if (legacy) {
+                    this.memberEventTimeout = setTimeout(
+                        this.triggerCallMembershipEventUpdate,
+                        MEMBER_EVENT_CHECK_PERIOD,
+                    );
+                } else {
+                    try {
+                        // TODO: If delayed event times out, re-join!
+                        const res = await this.client._unstable_sendDelayedStateEvent(
+                            this.room.roomId,
+                            {
+                                delay: 8000,
+                            },
+                            EventType.GroupCallMemberPrefix,
+                            {}, // leave event
+                            stateKey,
+                        );
+                        this.scheduleDelayDisconnection(res.delay_id);
+                    } catch (e) {
+                        logger.error("Failed to send delayed event:", e);
+                    }
+                }
             }
         } catch (e) {
             const resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
-            logger.warn(`Failed to send call member event: retrying in ${resendDelay}`);
+            logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
             await new Promise((resolve) => setTimeout(resolve, resendDelay));
             await this.triggerCallMembershipEventUpdate();
+        }
+    }
+
+    private scheduleDelayDisconnection(delayId: string): void {
+        this.memberEventTimeout = setTimeout(() => this.delayDisconnection(delayId), 5000);
+    }
+
+    private async delayDisconnection(delayId: string): Promise<void> {
+        try {
+            await this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart);
+            this.scheduleDelayDisconnection(delayId);
+        } catch (e) {
+            logger.error("Failed to delay our disconnection event", e);
         }
     }
 
