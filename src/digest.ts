@@ -19,7 +19,7 @@ import { encodeUnpaddedBase64Url } from "./base64";
 /**
  * @param plaintext The string to hash
  * @returns Unpadded base64-url string representing the sha256 hash of the input
- * @throws If the WebCrypto API is not available, for example if the code is running
+ * @throws If the subtle crypto API is not available, for example if the code is running
  *         in a web page with an insecure context (eg. served over plain HTTP).
  */
 export async function sha256Base64UrlUnpadded(plaintext: string): Promise<string> {
