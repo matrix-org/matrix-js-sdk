@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 /**
+ * Computes a SHA-256 hash of a string (after utf-8 encoding) and returns it as an ArrayBuffer.
+ *
  * @param plaintext The string to hash
  * @returns An ArrayBuffer containing the SHA-256 hash of the input string
  * @throws If the subtle crypto API is not available, for example if the code is running
