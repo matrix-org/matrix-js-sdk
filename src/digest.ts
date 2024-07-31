@@ -14,15 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeUnpaddedBase64Url } from "./base64";
-
 /**
  * @param plaintext The string to hash
- * @returns Unpadded base64-url string representing the sha256 hash of the input
+ * @returns An ArrayBuffer containing the SHA-256 hash of the input string
  * @throws If the subtle crypto API is not available, for example if the code is running
  *         in a web page with an insecure context (eg. served over plain HTTP).
  */
-export async function sha256Base64UrlUnpadded(plaintext: string): Promise<string> {
+export async function sha256(plaintext: string): Promise<ArrayBuffer> {
     if (!globalThis.crypto.subtle) {
         throw new Error("Crypto.subtle is not available: insecure context?");
     }
@@ -30,5 +28,5 @@ export async function sha256Base64UrlUnpadded(plaintext: string): Promise<string
 
     const digest = await globalThis.crypto.subtle.digest("SHA-256", utf8);
 
-    return encodeUnpaddedBase64Url(digest);
+    return digest;
 }

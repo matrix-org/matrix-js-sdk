@@ -27,7 +27,8 @@ import {
     validateIdToken,
     validateStoredUserState,
 } from "./validate";
-import { sha256Base64UrlUnpadded } from "../digest";
+import { sha256 } from "../digest";
+import { encodeUnpaddedBase64Url } from "../base64";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
@@ -63,7 +64,8 @@ const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
         return codeVerifier;
     }
 
-    return sha256Base64UrlUnpadded(codeVerifier);
+    const hashBuffer = await sha256(codeVerifier);
+    return encodeUnpaddedBase64Url(hashBuffer);
 };
 
 /**
