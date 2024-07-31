@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeUnpaddedBase64Url } from "../../../src";
-import { sha256 } from "../../../src/digest";
+import { encodeUnpaddedBase64Url } from "../../src";
+import { sha256 } from "../../src/digest";
 
 describe("sha256", () => {
     it("should hash a string", async () => {
