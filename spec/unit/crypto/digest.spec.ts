@@ -14,24 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { sha256Base64UrlUnpadded } from "../../../src/digest";
+import { encodeUnpaddedBase64Url } from "../../../src";
+import { sha256 } from "../../../src/digest";
 
-describe("sha256Base64UrlUnpadded", () => {
+describe("sha256", () => {
     it("should hash a string", async () => {
-        const hash = await sha256Base64UrlUnpadded("test");
-        expect(hash).toBe("n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg");
+        const hash = await sha256("test");
+        expect(encodeUnpaddedBase64Url(hash)).toBe("n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg");
     });
 
     it("should hash a string with emoji", async () => {
-        const hash = await sha256Base64UrlUnpadded("test 🍱");
-        expect(hash).toBe("X2aDNrrwfq3nCTOl90R9qg9ynxhHnSzsMqtrdYX-SGw");
+        const hash = await sha256("test 🍱");
+        expect(encodeUnpaddedBase64Url(hash)).toBe("X2aDNrrwfq3nCTOl90R9qg9ynxhHnSzsMqtrdYX-SGw");
     });
 
     it("throws if webcrypto is not available", async () => {
         const oldCrypto = global.crypto;
         try {
             global.crypto = {} as any;
-            await expect(sha256Base64UrlUnpadded("test")).rejects.toThrow();
+            await expect(sha256("test")).rejects.toThrow();
         } finally {
             global.crypto = oldCrypto;
         }
