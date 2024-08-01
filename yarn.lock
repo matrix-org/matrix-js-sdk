@@ -4722,10 +4722,10 @@ matrix-mock-request@^2.5.0:
   dependencies:
     expect "^28.1.0"
 
-matrix-widget-api@^1.6.0:
-  version "1.7.0"
-  resolved "https://registry.yarnpkg.com/matrix-widget-api/-/matrix-widget-api-1.7.0.tgz#ae3b44380f11bb03519d0bf0373dfc3341634667"
-  integrity sha512-dzSnA5Va6CeIkyWs89xZty/uv38HLyfjOrHGbbEikCa2ZV0HTkUNtrBMKlrn4CRYyDJ6yoO/3ssRwiR0jJvOkQ==
+matrix-widget-api@^1.8.1:
+  version "1.8.1"
+  resolved "https://registry.yarnpkg.com/matrix-widget-api/-/matrix-widget-api-1.8.1.tgz#90fe4814956a27d6c6cff55c2aa67da516722eb1"
+  integrity sha512-oISJ9rmkfxNonrrWKUB2HCwj0i+J0b7zNGqwNudOjXj9Jsv7r8UWqowE7AEWyAsPp4IwW/hEvNeLbNo2wUsXwg==
   dependencies:
     "@types/events" "^3.0.0"
     events "^3.2.0"

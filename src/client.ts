@@ -535,7 +535,7 @@ export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
 
-const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
+export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 
 enum CrossSigningKeyType {
     MasterKey = "master_key",
