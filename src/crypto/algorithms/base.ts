@@ -66,18 +66,16 @@ export abstract class EncryptionAlgorithm {
     protected readonly crypto: Crypto;
     protected readonly olmDevice: OlmDevice;
     protected readonly baseApis: MatrixClient;
-    protected readonly roomId?: string;
 
     /**
      * @param params - parameters
      */
-    public constructor(params: IParams) {
+    public constructor(params: Omit<IParams, "roomId">) {
         this.userId = params.userId;
         this.deviceId = params.deviceId;
         this.crypto = params.crypto;
         this.olmDevice = params.olmDevice;
         this.baseApis = params.baseApis;
-        this.roomId = params.roomId;
     }
 
     /**
@@ -127,14 +125,12 @@ export abstract class DecryptionAlgorithm {
     protected readonly crypto: Crypto;
     protected readonly olmDevice: OlmDevice;
     protected readonly baseApis: MatrixClient;
-    protected readonly roomId?: string;
 
-    public constructor(params: DecryptionClassParams) {
+    public constructor(params: Omit<DecryptionClassParams, "roomId">) {
         this.userId = params.userId;
         this.crypto = params.crypto;
         this.olmDevice = params.olmDevice;
         this.baseApis = params.baseApis;
-        this.roomId = params.roomId;
     }
 
     /**
