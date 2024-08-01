@@ -70,7 +70,7 @@ export abstract class EncryptionAlgorithm {
     /**
      * @param params - parameters
      */
-    public constructor(params: Omit<IParams, "roomId">) {
+    public constructor(params: IParams) {
         this.userId = params.userId;
         this.deviceId = params.deviceId;
         this.crypto = params.crypto;
@@ -126,7 +126,7 @@ export abstract class DecryptionAlgorithm {
     protected readonly olmDevice: OlmDevice;
     protected readonly baseApis: MatrixClient;
 
-    public constructor(params: Omit<DecryptionClassParams, "roomId">) {
+    public constructor(params: DecryptionClassParams) {
         this.userId = params.userId;
         this.crypto = params.crypto;
         this.olmDevice = params.olmDevice;
