@@ -47,7 +47,7 @@ import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
 import * as olmlib from "./crypto/olmlib";
-import { decodeBase64, encodeBase64 } from "./base64";
+import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 import { TypedReEmitter } from "./ReEmitter";
@@ -231,6 +231,7 @@ import { KnownMembership, Membership } from "./@types/membership";
 import { RoomMessageEventContent, StickerEventContent } from "./@types/events";
 import { ImageInfo } from "./@types/media";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities";
+import { sha256 } from "./digest";
 
 export type Store = IStore;
 
@@ -9484,20 +9485,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // When picking an algorithm, we pick the hashed over no hashes
         if (hashes["algorithms"].includes("sha256")) {
-            // Abuse the olm hashing
-            const olmutil = new global.Olm.Utility();
-            params["addresses"] = addressPairs.map((p) => {
-                const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
-                const med = p[1].toLowerCase();
-                const hashed = olmutil
-                    .sha256(`${addr} ${med} ${params["pepper"]}`)
-                    .replace(/\+/g, "-")
-                    .replace(/\//g, "_"); // URL-safe base64
-                // Map the hash to a known (case-sensitive) address. We use the case
-                // sensitive version because the caller might be expecting that.
-                localMapping[hashed] = p[0];
-                return hashed;
-            });
+            params["addresses"] = await Promise.all(
+                addressPairs.map(async (p) => {
+                    const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+                    const med = p[1].toLowerCase();
+                    const hashBuffer = await sha256(`${addr} ${med} ${params["pepper"]}`);
+                    const hashed = encodeUnpaddedBase64Url(hashBuffer);
+
+                    // Map the hash to a known (case-sensitive) address. We use the case
+                    // sensitive version because the caller might be expecting that.
+                    localMapping[hashed] = p[0];
+                    return hashed;
+                }),
+            );
             params["algorithm"] = "sha256";
         } else if (hashes["algorithms"].includes("none")) {
             params["addresses"] = addressPairs.map((p) => {
