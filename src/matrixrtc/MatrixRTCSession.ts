@@ -933,7 +933,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
         const stateKey = `${localUserId}_${localDeviceId}`;
-        if (/^org\.matrix\.msc3779\b/.exec(this.room.getVersion())) {
+        if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
             return stateKey;
         } else {
             return `_${stateKey}`;
