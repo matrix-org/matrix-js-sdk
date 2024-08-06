@@ -33,14 +33,17 @@ export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     // the browser impl works but predates Uint8Array and so only uses strings.
     // Right now, switching between native (or polyfilled) impls like this feels
     // like the least bad option, but... *shrugs*.
-    if (typeof Buffer === "function") { // node
+    if (typeof Buffer === "function") {
+        // node
         return Buffer.from(uint8Array).toString("base64");
-    } else if (typeof btoa === "function" && uint8Array instanceof Uint8Array) { // browsers
+    } else if (typeof btoa === "function" && uint8Array instanceof Uint8Array) {
+        // browsers
         // We accept an ArrayBuffer (a node concept), but it should be filtered out by
         // the Buffer check above. ArrayBuffers don't have `reduce`, so it's important
         // that they be checked first.
         return btoa(uint8Array.reduce((acc, current) => acc + String.fromCharCode(current), ""));
-    } else { // "should never happen"
+    } else {
+        // "should never happen"
         throw new Error("No base64 impl found!");
     }
 }
