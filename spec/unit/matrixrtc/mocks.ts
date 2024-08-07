@@ -20,10 +20,10 @@ import { randomString } from "../../../src/randomstring";
 
 type MembershipData = CallMembershipData[] | SessionMembershipData;
 
-export function makeMockRoom(membershipData: MembershipData, localAge: number | null = null): Room {
+export function makeMockRoom(membershipData: MembershipData): Room {
     const roomId = randomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
-    const roomState = makeMockRoomState(membershipData, roomId, localAge);
+    const roomState = makeMockRoomState(membershipData, roomId);
     return {
         roomId: roomId,
         hasMembershipState: jest.fn().mockReturnValue(true),
@@ -34,8 +34,8 @@ export function makeMockRoom(membershipData: MembershipData, localAge: number | 
     } as unknown as Room;
 }
 
-export function makeMockRoomState(membershipData: MembershipData, roomId: string, localAge: number | null = null) {
-    const event = mockRTCEvent(membershipData, roomId, localAge);
+export function makeMockRoomState(membershipData: MembershipData, roomId: string) {
+    const event = mockRTCEvent(membershipData, roomId);
     return {
         on: jest.fn(),
         off: jest.fn(),
@@ -57,7 +57,7 @@ export function makeMockRoomState(membershipData: MembershipData, roomId: string
     };
 }
 
-export function mockRTCEvent(membershipData: MembershipData, roomId: string, localAge: number | null): MatrixEvent {
+export function mockRTCEvent(membershipData: MembershipData, roomId: string): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
         getContent: jest.fn().mockReturnValue(
@@ -68,8 +68,7 @@ export function mockRTCEvent(membershipData: MembershipData, roomId: string, loc
                   },
         ),
         getSender: jest.fn().mockReturnValue("@mock:user.example"),
-        getTs: jest.fn().mockReturnValue(1000),
-        localTimestamp: Date.now() - (localAge ?? 10),
+        getTs: jest.fn().mockReturnValue(Date.now()),
         getRoomId: jest.fn().mockReturnValue(roomId),
         sender: {
             userId: "@mock:user.example",
