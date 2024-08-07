@@ -98,20 +98,6 @@ describe("CallMembership", () => {
             expect(membership.getAbsoluteExpiry()).toEqual(5000 + 1000);
         });
 
-        it("considers memberships unexpired if local age low enough", () => {
-            const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getLocalAge = jest.fn().mockReturnValue(3000);
-            const membership = new CallMembership(fakeEvent, membershipTemplate);
-            expect(membership.isExpired()).toEqual(false);
-        });
-
-        it("considers memberships expired when local age large", () => {
-            const fakeEvent = makeMockEvent(1000);
-            fakeEvent.localTimestamp = Date.now() - 6000;
-            const membership = new CallMembership(fakeEvent, membershipTemplate);
-            expect(membership.isExpired()).toEqual(true);
-        });
-
         it("returns preferred foci", () => {
             const fakeEvent = makeMockEvent();
             const mockFocus = { type: "this_is_a_mock_focus" };
@@ -198,13 +184,6 @@ describe("CallMembership", () => {
         beforeEach(() => {
             // server origin timestamp for this event is 1000
             fakeEvent = makeMockEvent(1000);
-            // our clock would have been at 2000 at the creation time (our clock at event receive time - age)
-            // (ie. the local clock is 1 second ahead of the servers' clocks)
-            fakeEvent.localTimestamp = 2000;
-
-            // for simplicity's sake, we say that the event's age is zero
-            fakeEvent.getLocalAge = jest.fn().mockReturnValue(0);
-
             membership = new CallMembership(fakeEvent!, membershipTemplate);
 
             jest.useFakeTimers();
@@ -215,6 +194,13 @@ describe("CallMembership", () => {
         });
 
         it("converts expiry time into local clock", () => {
+            // our clock would have been at 2000 at the creation time (our clock at event receive time - age)
+            // (ie. the local clock is 1 second ahead of the servers' clocks)
+            fakeEvent.localTimestamp = 2000;
+
+            // for simplicity's sake, we say that the event's age is zero
+            fakeEvent.getLocalAge = jest.fn().mockReturnValue(0);
+
             // for sanity's sake, make sure the server-relative expiry time is what we expect
             expect(membership.getAbsoluteExpiry()).toEqual(6000);
             // therefore the expiry time converted to our clock should be 1 second later
@@ -223,7 +209,8 @@ describe("CallMembership", () => {
 
         it("calculates time until expiry", () => {
             jest.setSystemTime(2000);
-            expect(membership.getMsUntilExpiry()).toEqual(5000);
+            // should be using absolute expiry time
+            expect(membership.getMsUntilExpiry()).toEqual(4000);
         });
     });
 });

@@ -167,7 +167,10 @@ export class CallMembership {
         }
     }
 
-    // gets the expiry time of the event, converted into the device's local time
+    /**
+     * Gets the expiry time of the event, converted into the device's local time.
+     * @deprecated This function has been observed returning bad data and is no longer used by MatrixRTC.
+     */
     public getLocalExpiry(): number | undefined {
         if (!isLegacyCallMembershipData(this.membershipData)) return undefined;
         if ("expires" in this.membershipData) {
@@ -185,7 +188,10 @@ export class CallMembership {
     }
 
     public getMsUntilExpiry(): number | undefined {
-        if (isLegacyCallMembershipData(this.membershipData)) return this.getLocalExpiry()! - Date.now();
+        // Assume that local clock is sufficiently in sync with origin homeserver server clock.
+        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
+        // The current implementation allows for the local clock to be -infinity to +MatrixRTC.MEMBERSHIP_EXPIRY_TIME/2 (i.e. +30mins).
+        if (isLegacyCallMembershipData(this.membershipData)) return this.getAbsoluteExpiry()! - Date.now();
     }
 
     public isExpired(): boolean {
