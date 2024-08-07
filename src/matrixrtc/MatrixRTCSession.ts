@@ -826,9 +826,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
         const callMemberEvents = roomState.events.get(EventType.GroupCallMemberPrefix);
-        const legacy =
-            !!this.useLegacyMemberEvents ||
-            (callMemberEvents?.size && this.stateEventsContainOngoingLegacySession(callMemberEvents));
+        const legacy = this.stateEventsContainOngoingLegacySession(callMemberEvents);
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
         if (legacy) {
             const myCallMemberEvent = callMemberEvents?.get(localUserId);
@@ -917,7 +915,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
-    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>): boolean {
+    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent> | undefined): boolean {
+        if (!callMemberEvents?.size) {
+            return this.useLegacyMemberEvents;
+        }
+
+        let containsAnyOngoingSession = false;
+        let containsUnknownOngoingSession = false;
         for (const callMemberEvent of callMemberEvents.values()) {
             const content = callMemberEvent.getContent();
             if (Array.isArray(content["memberships"])) {
@@ -926,9 +930,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                         return true;
                     }
                 }
+            } else if (Object.keys(content).length > 0) {
+                containsAnyOngoingSession ||= true;
+                containsUnknownOngoingSession ||= !("focus_active" in content);
             }
         }
-        return false;
+        return containsAnyOngoingSession && !containsUnknownOngoingSession ? false : this.useLegacyMemberEvents;
     }
 
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
