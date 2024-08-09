@@ -161,10 +161,9 @@ export class CallMembership {
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
     public getAbsoluteExpiry(): number | undefined {
-        if (!isLegacyCallMembershipData(this.membershipData)) {
-            // Assumed to be MSC4143
-            return undefined;
-        }
+        // if the membership is not a legacy membership, we assume it is MSC4143
+        if (!isLegacyCallMembershipData(this.membershipData)) return undefined;
+
         if ("expires" in this.membershipData) {
             // we know createdTs exists since we already do the isLegacyCallMembershipData check
             return this.createdTs() + this.membershipData.expires;
@@ -180,10 +179,9 @@ export class CallMembership {
      * @returns The local expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
     public getLocalExpiry(): number | undefined {
-        if (!isLegacyCallMembershipData(this.membershipData)) {
-            // Assumed to be MSC4143
-            return undefined;
-        }
+        // if the membership is not a legacy membership, we assume it is MSC4143
+        if (!isLegacyCallMembershipData(this.membershipData)) return undefined;
+
         if ("expires" in this.membershipData) {
             // we know createdTs exists since we already do the isLegacyCallMembershipData check
             const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
