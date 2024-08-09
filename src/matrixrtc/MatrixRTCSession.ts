@@ -432,6 +432,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         timestamp: number,
         delayBeforeuse = false,
     ): void {
+        logger.info(
+            `Setting key at index ${encryptionKeyIndex} for ${userId}:${deviceId} with timestamp ${timestamp}: ${encryptionKeyString}`,
+        );
         const keyBin = decodeBase64(encryptionKeyString);
 
         const participantId = getParticipantId(userId, deviceId);
@@ -555,8 +558,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             } as EncryptionKeysEventContent);
 
             logger.debug(
-                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
-                this.encryptionKeys,
+                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}: ${myKeys.map((key) => encodeUnpaddedBase64(key))}`,
             );
         } catch (error) {
             const matrixError = error as MatrixError;
@@ -675,7 +677,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 );
             } else {
                 logger.debug(
-                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex}`,
+                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} from ${event.getId()}: ${encryptionKey}`,
                     this.encryptionKeys,
                 );
                 this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, event.getTs());
