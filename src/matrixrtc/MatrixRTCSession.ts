@@ -56,9 +56,9 @@ const USE_KEY_DELAY = 5000;
 const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
 const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
 
-function keysEqual(a: Uint8Array, b: Uint8Array): boolean {
+function keysEqual(a: Uint8Array | undefined, b: Uint8Array | undefined): boolean {
     if (a === b) return true;
-    return a && b && a.length === b.length && a.every((x, i) => x === b[i]);
+    return !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 }
 
 export enum MatrixRTCSessionEvent {
@@ -134,8 +134,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private manageMediaKeys = false;
     private useLegacyMemberEvents = true;
-    // userId:deviceId => array of keys
-    private encryptionKeys = new Map<string, Array<Uint8Array>>();
+    // userId:deviceId => array of (key, timestamp)
+    private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
     /**
@@ -374,8 +374,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
+    /**
+     * Get the known encryption keys for a given participant device.
+     *
+     * @param userId the user ID of the participant
+     * @param deviceId the device ID of the participant
+     * @returns The encryption keys for the given participant, or undefined if they are not known.
+     */
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
-        return this.encryptionKeys.get(getParticipantId(userId, deviceId));
+        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map(({ key }) => key);
     }
 
     /**
@@ -383,7 +390,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * cipher) given participant's media. This also includes our own key
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
-        return this.encryptionKeys.entries();
+        // the returned array doesn't contain the timestamps
+        return Array.from(this.encryptionKeys.entries())
+            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k): Uint8Array => k.key)])
+            .values();
     }
 
     private getNewEncryptionKeyIndex(): number {
@@ -398,12 +408,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /**
      * Sets an encryption key at a specified index for a participant.
-     * The encryption keys for the local participanmt are also stored here under the
+     * The encryption keys for the local participant are also stored here under the
      * user and device ID of the local participant.
+     * If the key is older than the existing key at the index, it will be ignored.
      * @param userId - The user ID of the participant
      * @param deviceId - Device ID of the participant
      * @param encryptionKeyIndex - The index of the key to set
      * @param encryptionKeyString - The string representation of the key to set in base64
+     * @param timestamp - The timestamp of the key. We assume that these are monotonic for each participant device.
      * @param delayBeforeUse - If true, delay before emitting a key changed event. Useful when setting
      *                         encryption keys for the local participant to allow time for the key to
      *                         be distributed.
@@ -413,17 +425,41 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         deviceId: string,
         encryptionKeyIndex: number,
         encryptionKeyString: string,
+        timestamp: number,
         delayBeforeUse = false,
     ): void {
         const keyBin = decodeBase64(encryptionKeyString);
 
         const participantId = getParticipantId(userId, deviceId);
-        const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
+        if (!this.encryptionKeys.has(participantId)) {
+            this.encryptionKeys.set(participantId, []);
+        }
+        const participantKeys = this.encryptionKeys.get(participantId)!;
 
-        if (keysEqual(encryptionKeys[encryptionKeyIndex], keyBin)) return;
+        const existingKeyAtIndex = participantKeys[encryptionKeyIndex];
 
-        encryptionKeys[encryptionKeyIndex] = keyBin;
-        this.encryptionKeys.set(participantId, encryptionKeys);
+        if (existingKeyAtIndex && existingKeyAtIndex.timestamp > timestamp) {
+            logger.info(
+                `Ignoring new key at index ${encryptionKeyIndex} for ${participantId} as it is older than existing known key`,
+            );
+            return;
+        }
+
+        if (existingKeyAtIndex && keysEqual(existingKeyAtIndex.key, keyBin)) {
+            // key values are the same
+
+            // update the timestamp if more recent that the one we received before
+            if (timestamp > existingKeyAtIndex.timestamp) {
+                existingKeyAtIndex.timestamp = timestamp;
+            }
+            return;
+        }
+
+        participantKeys[encryptionKeyIndex] = {
+            key: keyBin,
+            timestamp,
+        };
+
         if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
@@ -451,7 +487,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const encryptionKey = secureRandomBase64Url(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         logger.info("Generated new key at index " + encryptionKeyIndex);
-        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, delayBeforeUse);
+        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, Date.now(), delayBeforeUse);
     }
 
     /**
@@ -570,6 +606,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
+    /**
+     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
+     * This should be called each time the relevant event is received from a room timeline.
+     * If the event is malformed then it will be logged and ignored.
+     *
+     * @param event the event to process
+     */
     public onCallEncryption = (event: MatrixEvent): void => {
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
@@ -631,7 +674,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex}`,
                     this.encryptionKeys,
                 );
-                this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
+                this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, event.getTs());
             }
         }
     };
