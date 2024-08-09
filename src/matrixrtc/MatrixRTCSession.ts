@@ -404,7 +404,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param deviceId - Device ID of the participant
      * @param encryptionKeyIndex - The index of the key to set
      * @param encryptionKeyString - The string representation of the key to set in base64
-     * @param delayBeforeuse - If true, delay before emitting a key changed event. Useful when setting
+     * @param delayBeforeUse - If true, delay before emitting a key changed event. Useful when setting
      *                         encryption keys for the local participant to allow time for the key to
      *                         be distributed.
      */
@@ -413,7 +413,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         deviceId: string,
         encryptionKeyIndex: number,
         encryptionKeyString: string,
-        delayBeforeuse = false,
+        delayBeforeUse = false,
     ): void {
         const keyBin = decodeBase64(encryptionKeyString);
 
@@ -424,7 +424,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         encryptionKeys[encryptionKeyIndex] = keyBin;
         this.encryptionKeys.set(participantId, encryptionKeys);
-        if (delayBeforeuse) {
+        if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
                 logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
