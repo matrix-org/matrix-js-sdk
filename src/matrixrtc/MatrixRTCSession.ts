@@ -650,6 +650,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     public onMembershipUpdate = (): void => {
         const oldMemberships = this.memberships;
+        const oldFingerprints = this.lastMembershipFingerprints;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
         this._callId = this._callId ?? this.memberships[0]?.callId;
@@ -676,17 +677,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const anyLeft = Array.from(oldMembershipIds).some((x) => !newMembershipIds.has(x));
             const anyJoined = Array.from(newMembershipIds).some((x) => !oldMembershipIds.has(x));
 
+            // always store the fingerprints of these latest memberships
+            this.storeLastMembershipFingerprints();
+
             if (anyLeft) {
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
                 this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (anyJoined) {
                 logger.debug(`New member(s) have joined: re-sending keys`);
                 this.requestKeyEventSend();
-            } else if (this.lastMembershipFingerprints) {
+            } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
-                const oldFingerprints = this.lastMembershipFingerprints;
-                this.storeLastMembershipFingerprints();
-                const newFingerprints = this.lastMembershipFingerprints;
+                const newFingerprints = this.lastMembershipFingerprints!;
 
                 // We can use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/symmetricDifference
                 // for this once available
@@ -697,9 +699,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     logger.debug(`Member(s) have updated/reconnected: re-sending keys`);
                     this.requestKeyEventSend();
                 }
-            } else {
-                // store the fingerprints of these latest memberships
-                this.storeLastMembershipFingerprints();
             }
         }
 
