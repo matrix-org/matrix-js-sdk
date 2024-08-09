@@ -644,6 +644,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
     }
 
+    /**
+     * Examines the latest call memberships and handles any encryption key sending or rotation that is needed.
+     *
+     * This function should be called when the room members or call memberships might have changed.
+     */
     public onMembershipUpdate = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
