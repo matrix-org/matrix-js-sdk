@@ -138,6 +138,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptionKeys = new Map<string, Array<Uint8Array>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
+    // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
+    // if it looks like a membership has been updated.
+    private lastMembershipFingerprints: Set<string> | undefined;
+
     /**
      * The callId (sessionId) of the call.
      *
@@ -636,6 +640,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     };
 
+    private isMyMembership(m: CallMembership): boolean {
+        return m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
+    }
+
     public onMembershipUpdate = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
@@ -651,19 +659,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
         }
 
-        const isMyMembership = (m: CallMembership): boolean =>
-            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
-
         if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
-            const oldMebershipIds = new Set(
-                oldMemberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+            const oldMembershipIds = new Set(
+                oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
-            const newMebershipIds = new Set(
-                this.memberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+            const newMembershipIds = new Set(
+                this.memberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
 
-            const anyLeft = Array.from(oldMebershipIds).some((x) => !newMebershipIds.has(x));
-            const anyJoined = Array.from(newMebershipIds).some((x) => !oldMebershipIds.has(x));
+            const anyLeft = Array.from(oldMembershipIds).some((x) => !newMembershipIds.has(x));
+            const anyJoined = Array.from(newMembershipIds).some((x) => !oldMembershipIds.has(x));
 
             if (anyLeft) {
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
@@ -671,11 +676,35 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             } else if (anyJoined) {
                 logger.debug(`New member(s) have joined: re-sending keys`);
                 this.requestKeyEventSend();
+            } else if (this.lastMembershipFingerprints) {
+                // does it look like any of the members have updated their memberships?
+                const oldFingerprints = this.lastMembershipFingerprints;
+                this.storeLastMembershipFingerprints();
+                const newFingerprints = this.lastMembershipFingerprints;
+
+                const candidateUpdates =
+                    Array.from(oldFingerprints).some((x) => !newFingerprints.has(x)) ||
+                    Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
+                if (candidateUpdates) {
+                    logger.debug(`Member(s) have updated/reconnected: re-sending keys`);
+                    this.requestKeyEventSend();
+                }
+            } else {
+                // store the fingerprints of these latest memberships
+                this.storeLastMembershipFingerprints();
             }
         }
 
         this.setExpiryTimer();
     };
+
+    private storeLastMembershipFingerprints(): void {
+        this.lastMembershipFingerprints = new Set(
+            this.memberships
+                .filter((m) => !this.isMyMembership(m))
+                .map((m) => `${getParticipantIdFromMembership(m)}:${m.membershipID}:${m.createdTs()}`),
+        );
+    }
 
     /**
      * Constructs our own membership
