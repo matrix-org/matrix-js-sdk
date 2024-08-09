@@ -640,9 +640,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     };
 
-    private isMyMembership(m: CallMembership): boolean {
-        return m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
-    }
+    private isMyMembership = (m: CallMembership): boolean =>
+        m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
     /**
      * Examines the latest call memberships and handles any encryption key sending or rotation that is needed.
