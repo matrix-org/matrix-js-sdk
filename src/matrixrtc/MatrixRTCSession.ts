@@ -671,6 +671,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.memberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
 
+            // We can use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/symmetricDifference
+            // for this once available
             const anyLeft = Array.from(oldMembershipIds).some((x) => !newMembershipIds.has(x));
             const anyJoined = Array.from(newMembershipIds).some((x) => !oldMembershipIds.has(x));
 
@@ -686,6 +688,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.storeLastMembershipFingerprints();
                 const newFingerprints = this.lastMembershipFingerprints;
 
+                // We can use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/symmetricDifference
+                // for this once available
                 const candidateUpdates =
                     Array.from(oldFingerprints).some((x) => !newFingerprints.has(x)) ||
                     Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
