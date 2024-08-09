@@ -650,7 +650,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     public onMembershipUpdate = (): void => {
         const oldMemberships = this.memberships;
-        const oldFingerprints = this.lastMembershipFingerprints;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
         this._callId = this._callId ?? this.memberships[0]?.callId;
@@ -677,6 +676,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const anyLeft = Array.from(oldMembershipIds).some((x) => !newMembershipIds.has(x));
             const anyJoined = Array.from(newMembershipIds).some((x) => !oldMembershipIds.has(x));
 
+            const oldFingerprints = this.lastMembershipFingerprints;
             // always store the fingerprints of these latest memberships
             this.storeLastMembershipFingerprints();
 
