@@ -1,3 +1,20 @@
+Changes in [34.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.3.0) (2024-08-13)
+==================================================================================================
+## ✨ Features
+
+* Bump matrix-widget-api ([#4336](https://github.com/matrix-org/matrix-js-sdk/pull/4336)). Contributed by @AndrewFerr.
+* Also check for MSC3757 for session state keys ([#4334](https://github.com/matrix-org/matrix-js-sdk/pull/4334)). Contributed by @AndrewFerr.
+* Support Futures via widgets ([#4311](https://github.com/matrix-org/matrix-js-sdk/pull/4311)). Contributed by @AndrewFerr.
+* Support MSC4140: Delayed events (Futures) ([#4294](https://github.com/matrix-org/matrix-js-sdk/pull/4294)). Contributed by @AndrewFerr.
+* Handle late-arriving `m.room_key.withheld` messages ([#4310](https://github.com/matrix-org/matrix-js-sdk/pull/4310)). Contributed by @richvdh.
+* Be specific about what is considered a MSC4143 call member event. ([#4328](https://github.com/matrix-org/matrix-js-sdk/pull/4328)). Contributed by @toger5.
+* Add index.ts for matrixrtc module ([#4314](https://github.com/matrix-org/matrix-js-sdk/pull/4314)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Fix hashed ID server lookups with no Olm ([#4333](https://github.com/matrix-org/matrix-js-sdk/pull/4333)). Contributed by @dbkr.
+
+
 Changes in [34.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.2.0) (2024-07-30)
 ==================================================================================================
 ## 🐛 Bug Fixes
