@@ -649,17 +649,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (changed) {
             logger.info(`Memberships for call in room ${this.room.roomId} have changed: emitting`);
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
-        }
 
-        const isMyMembership = (m: CallMembership): boolean =>
-            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
+            if (this.isJoined() && !this.memberships.some(this.isMyMembership)) {
+                logger.warn("Missing own membership: force re-join");
+                // TODO: Should this be awaited? And is there anything to tell the focus?
+                this.triggerCallMembershipEventUpdate();
+                // TODO: Is this needed?
+                this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
+            }
+        }
 
         if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
             const oldMebershipIds = new Set(
-                oldMemberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+                oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
             const newMebershipIds = new Set(
-                this.memberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+                this.memberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
 
             const anyLeft = Array.from(oldMebershipIds).some((x) => !newMebershipIds.has(x));
@@ -676,6 +681,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         this.setExpiryTimer();
     };
+
+    private isMyMembership = (m: CallMembership): boolean =>
+        m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
     /**
      * Constructs our own membership
@@ -795,6 +803,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private triggerCallMembershipEventUpdate = async (): Promise<void> => {
+        // TODO: Should this await on a shared promise?
         if (this.updateCallMembershipRunning) {
             this.needCallMembershipUpdate = true;
             return;
@@ -878,7 +887,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     );
                 } else {
                     try {
-                        // TODO: If delayed event times out, re-join!
                         const res = await this.client._unstable_sendDelayedStateEvent(
                             this.room.roomId,
                             {
