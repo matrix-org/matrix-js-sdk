@@ -727,7 +727,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([member1, member2]);
                 mockRoom.getLiveTimeline().getState = jest
                     .fn()
-                    .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId, undefined));
+                    .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId));
 
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -776,7 +776,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([member1, member2]);
                 mockRoom.getLiveTimeline().getState = jest
                     .fn()
-                    .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId, undefined));
+                    .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId));
 
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -856,7 +856,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([member1, member2]);
                 mockRoom.getLiveTimeline().getState = jest
                     .fn()
-                    .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId, undefined));
+                    .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId));
 
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
