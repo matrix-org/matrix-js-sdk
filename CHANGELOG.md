@@ -1,3 +1,43 @@
+Changes in [34.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.3.0) (2024-08-13)
+==================================================================================================
+## ✨ Features
+
+* Bump matrix-widget-api ([#4336](https://github.com/matrix-org/matrix-js-sdk/pull/4336)). Contributed by @AndrewFerr.
+* Also check for MSC3757 for session state keys ([#4334](https://github.com/matrix-org/matrix-js-sdk/pull/4334)). Contributed by @AndrewFerr.
+* Support Futures via widgets ([#4311](https://github.com/matrix-org/matrix-js-sdk/pull/4311)). Contributed by @AndrewFerr.
+* Support MSC4140: Delayed events (Futures) ([#4294](https://github.com/matrix-org/matrix-js-sdk/pull/4294)). Contributed by @AndrewFerr.
+* Handle late-arriving `m.room_key.withheld` messages ([#4310](https://github.com/matrix-org/matrix-js-sdk/pull/4310)). Contributed by @richvdh.
+* Be specific about what is considered a MSC4143 call member event. ([#4328](https://github.com/matrix-org/matrix-js-sdk/pull/4328)). Contributed by @toger5.
+* Add index.ts for matrixrtc module ([#4314](https://github.com/matrix-org/matrix-js-sdk/pull/4314)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Fix hashed ID server lookups with no Olm ([#4333](https://github.com/matrix-org/matrix-js-sdk/pull/4333)). Contributed by @dbkr.
+
+
+Changes in [34.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.2.0) (2024-07-30)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Element-R: detect "withheld key" UTD errors, and mark them as such ([#4302](https://github.com/matrix-org/matrix-js-sdk/pull/4302)). Contributed by @richvdh.
+
+
+Changes in [34.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.1.0) (2024-07-16)
+==================================================================================================
+## ✨ Features
+
+* Add ability to choose how many timeline events to sync when peeking ([#4300](https://github.com/matrix-org/matrix-js-sdk/pull/4300)). Contributed by @jgarplind.
+* Remove redundant hack for using the old pickle key in rust crypto ([#4282](https://github.com/matrix-org/matrix-js-sdk/pull/4282)). Contributed by @richvdh.
+* Add fetching the well known in embedded mode. ([#4259](https://github.com/matrix-org/matrix-js-sdk/pull/4259)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Fix room state being updated with old (now overwritten) state and emitting for those updates. ([#4242](https://github.com/matrix-org/matrix-js-sdk/pull/4242)). Contributed by @toger5.
+* Fix incorrect "Olm is not available" errors ([#4301](https://github.com/matrix-org/matrix-js-sdk/pull/4301)). Contributed by @richvdh.
+* Fix build for example script ([#4286](https://github.com/matrix-org/matrix-js-sdk/pull/4286)). Contributed by @richvdh.
+* Declare matrix-js-sdk as an ES module ([#4285](https://github.com/matrix-org/matrix-js-sdk/pull/4285)). Contributed by @richvdh.
+
+
 Changes in [34.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.0.0) (2024-07-08)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES

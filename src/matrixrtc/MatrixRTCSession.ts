@@ -56,9 +56,9 @@ const USE_KEY_DELAY = 5000;
 const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
 const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
 
-function keysEqual(a: Uint8Array, b: Uint8Array): boolean {
+function keysEqual(a: Uint8Array | undefined, b: Uint8Array | undefined): boolean {
     if (a === b) return true;
-    return a && b && a.length === b.length && a.every((x, i) => x === b[i]);
+    return !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 }
 
 export enum MatrixRTCSessionEvent {
@@ -134,9 +134,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private manageMediaKeys = false;
     private useLegacyMemberEvents = true;
-    // userId:deviceId => array of keys
-    private encryptionKeys = new Map<string, Array<Uint8Array>>();
+    // userId:deviceId => array of (key, timestamp)
+    private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
     private lastEncryptionKeyUpdateRequest?: number;
+
+    // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
+    // if it looks like a membership has been updated.
+    private lastMembershipFingerprints: Set<string> | undefined;
 
     /**
      * The callId (sessionId) of the call.
@@ -374,8 +378,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
+    /**
+     * Get the known encryption keys for a given participant device.
+     *
+     * @param userId the user ID of the participant
+     * @param deviceId the device ID of the participant
+     * @returns The encryption keys for the given participant, or undefined if they are not known.
+     */
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
-        return this.encryptionKeys.get(getParticipantId(userId, deviceId));
+        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
     }
 
     /**
@@ -383,7 +394,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * cipher) given participant's media. This also includes our own key
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
-        return this.encryptionKeys.entries();
+        // the returned array doesn't contain the timestamps
+        return Array.from(this.encryptionKeys.entries())
+            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
+            .values();
     }
 
     private getNewEncryptionKeyIndex(): number {
@@ -398,13 +412,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /**
      * Sets an encryption key at a specified index for a participant.
-     * The encryption keys for the local participanmt are also stored here under the
+     * The encryption keys for the local participant are also stored here under the
      * user and device ID of the local participant.
+     * If the key is older than the existing key at the index, it will be ignored.
      * @param userId - The user ID of the participant
      * @param deviceId - Device ID of the participant
      * @param encryptionKeyIndex - The index of the key to set
      * @param encryptionKeyString - The string representation of the key to set in base64
-     * @param delayBeforeuse - If true, delay before emitting a key changed event. Useful when setting
+     * @param timestamp - The timestamp of the key. We assume that these are monotonic for each participant device.
+     * @param delayBeforeUse - If true, delay before emitting a key changed event. Useful when setting
      *                         encryption keys for the local participant to allow time for the key to
      *                         be distributed.
      */
@@ -413,18 +429,39 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         deviceId: string,
         encryptionKeyIndex: number,
         encryptionKeyString: string,
-        delayBeforeuse = false,
+        timestamp: number,
+        delayBeforeUse = false,
     ): void {
         const keyBin = decodeBase64(encryptionKeyString);
 
         const participantId = getParticipantId(userId, deviceId);
-        const encryptionKeys = this.encryptionKeys.get(participantId) ?? [];
+        if (!this.encryptionKeys.has(participantId)) {
+            this.encryptionKeys.set(participantId, []);
+        }
+        const participantKeys = this.encryptionKeys.get(participantId)!;
 
-        if (keysEqual(encryptionKeys[encryptionKeyIndex], keyBin)) return;
+        const existingKeyAtIndex = participantKeys[encryptionKeyIndex];
 
-        encryptionKeys[encryptionKeyIndex] = keyBin;
-        this.encryptionKeys.set(participantId, encryptionKeys);
-        if (delayBeforeuse) {
+        if (existingKeyAtIndex) {
+            if (existingKeyAtIndex.timestamp > timestamp) {
+                logger.info(
+                    `Ignoring new key at index ${encryptionKeyIndex} for ${participantId} as it is older than existing known key`,
+                );
+                return;
+            }
+
+            if (keysEqual(existingKeyAtIndex.key, keyBin)) {
+                existingKeyAtIndex.timestamp = timestamp;
+                return;
+            }
+        }
+
+        participantKeys[encryptionKeyIndex] = {
+            key: keyBin,
+            timestamp,
+        };
+
+        if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
                 logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
@@ -451,7 +488,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const encryptionKey = secureRandomBase64Url(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         logger.info("Generated new key at index " + encryptionKeyIndex);
-        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, delayBeforeUse);
+        this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, Date.now(), delayBeforeUse);
     }
 
     /**
@@ -570,6 +607,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
+    /**
+     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
+     * This should be called each time the relevant event is received from a room timeline.
+     * If the event is malformed then it will be logged and ignored.
+     *
+     * @param event the event to process
+     */
     public onCallEncryption = (event: MatrixEvent): void => {
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
@@ -631,11 +675,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex}`,
                     this.encryptionKeys,
                 );
-                this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey);
+                this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, event.getTs());
             }
         }
     };
 
+    private isMyMembership = (m: CallMembership): boolean =>
+        m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
+
+    /**
+     * Examines the latest call memberships and handles any encryption key sending or rotation that is needed.
+     *
+     * This function should be called when the room members or call memberships might have changed.
+     */
     public onMembershipUpdate = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
@@ -651,19 +703,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
         }
 
-        const isMyMembership = (m: CallMembership): boolean =>
-            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
-
         if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
-            const oldMebershipIds = new Set(
-                oldMemberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+            const oldMembershipIds = new Set(
+                oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
-            const newMebershipIds = new Set(
-                this.memberships.filter((m) => !isMyMembership(m)).map(getParticipantIdFromMembership),
+            const newMembershipIds = new Set(
+                this.memberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
 
-            const anyLeft = Array.from(oldMebershipIds).some((x) => !newMebershipIds.has(x));
-            const anyJoined = Array.from(newMebershipIds).some((x) => !oldMebershipIds.has(x));
+            // We can use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/symmetricDifference
+            // for this once available
+            const anyLeft = Array.from(oldMembershipIds).some((x) => !newMembershipIds.has(x));
+            const anyJoined = Array.from(newMembershipIds).some((x) => !oldMembershipIds.has(x));
+
+            const oldFingerprints = this.lastMembershipFingerprints;
+            // always store the fingerprints of these latest memberships
+            this.storeLastMembershipFingerprints();
 
             if (anyLeft) {
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
@@ -671,11 +726,32 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             } else if (anyJoined) {
                 logger.debug(`New member(s) have joined: re-sending keys`);
                 this.requestKeyEventSend();
+            } else if (oldFingerprints) {
+                // does it look like any of the members have updated their memberships?
+                const newFingerprints = this.lastMembershipFingerprints!;
+
+                // We can use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/symmetricDifference
+                // for this once available
+                const candidateUpdates =
+                    Array.from(oldFingerprints).some((x) => !newFingerprints.has(x)) ||
+                    Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
+                if (candidateUpdates) {
+                    logger.debug(`Member(s) have updated/reconnected: re-sending keys`);
+                    this.requestKeyEventSend();
+                }
             }
         }
 
         this.setExpiryTimer();
     };
+
+    private storeLastMembershipFingerprints(): void {
+        this.lastMembershipFingerprints = new Set(
+            this.memberships
+                .filter((m) => !this.isMyMembership(m))
+                .map((m) => `${getParticipantIdFromMembership(m)}:${m.membershipID}:${m.createdTs()}`),
+        );
+    }
 
     /**
      * Constructs our own membership
@@ -826,9 +902,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
         const callMemberEvents = roomState.events.get(EventType.GroupCallMemberPrefix);
-        const legacy =
-            !!this.useLegacyMemberEvents ||
-            (callMemberEvents?.size && this.stateEventsContainOngoingLegacySession(callMemberEvents));
+        const legacy = this.stateEventsContainOngoingLegacySession(callMemberEvents);
         let newContent: {} | ExperimentalGroupCallRoomMemberState | SessionMembershipData = {};
         if (legacy) {
             const myCallMemberEvent = callMemberEvents?.get(localUserId);
@@ -917,7 +991,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
-    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent>): boolean {
+    private stateEventsContainOngoingLegacySession(callMemberEvents: Map<string, MatrixEvent> | undefined): boolean {
+        if (!callMemberEvents?.size) {
+            return this.useLegacyMemberEvents;
+        }
+
+        let containsAnyOngoingSession = false;
+        let containsUnknownOngoingSession = false;
         for (const callMemberEvent of callMemberEvents.values()) {
             const content = callMemberEvent.getContent();
             if (Array.isArray(content["memberships"])) {
@@ -926,9 +1006,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                         return true;
                     }
                 }
+            } else if (Object.keys(content).length > 0) {
+                containsAnyOngoingSession ||= true;
+                containsUnknownOngoingSession ||= !("focus_active" in content);
             }
         }
-        return false;
+        return containsAnyOngoingSession && !containsUnknownOngoingSession ? false : this.useLegacyMemberEvents;
     }
 
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
