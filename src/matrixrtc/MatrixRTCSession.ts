@@ -438,16 +438,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const existingKeyAtIndex = participantKeys[encryptionKeyIndex];
 
-        if (existingKeyAtIndex && existingKeyAtIndex.timestamp > timestamp) {
-            logger.info(
-                `Ignoring new key at index ${encryptionKeyIndex} for ${participantId} as it is older than existing known key`,
-            );
-            return;
-        }
+        if (existingKeyAtIndex) {
+            if (existingKeyAtIndex.timestamp > timestamp) {
+                logger.info(
+                    `Ignoring new key at index ${encryptionKeyIndex} for ${participantId} as it is older than existing known key`,
+                );
+                return;
+            }
 
-        if (existingKeyAtIndex && keysEqual(existingKeyAtIndex.key, keyBin)) {
-            existingKeyAtIndex.timestamp = timestamp;
-            return;
+            if (keysEqual(existingKeyAtIndex.key, keyBin)) {
+                existingKeyAtIndex.timestamp = timestamp;
+                return;
+            }
         }
 
         participantKeys[encryptionKeyIndex] = {
