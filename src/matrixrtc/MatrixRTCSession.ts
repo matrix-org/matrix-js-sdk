@@ -382,7 +382,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @returns The encryption keys for the given participant, or undefined if they are not known.
      */
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
-        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map(({ key }) => key);
+        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
     }
 
     /**
@@ -392,7 +392,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         // the returned array doesn't contain the timestamps
         return Array.from(this.encryptionKeys.entries())
-            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k): Uint8Array => k.key)])
+            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
             .values();
     }
 
@@ -446,12 +446,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         if (existingKeyAtIndex && keysEqual(existingKeyAtIndex.key, keyBin)) {
-            // key values are the same
-
-            // update the timestamp if more recent that the one we received before
-            if (timestamp > existingKeyAtIndex.timestamp) {
-                existingKeyAtIndex.timestamp = timestamp;
-            }
+            existingKeyAtIndex.timestamp = timestamp;
             return;
         }
 
