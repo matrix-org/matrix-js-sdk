@@ -841,6 +841,7 @@ describe("MatrixRTCSession", () => {
 
         it("Re-sends key if a member changes created_ts", async () => {
             jest.useFakeTimers();
+            jest.setSystemTime(1000);
             try {
                 const keysSentPromise1 = new Promise((resolve) => {
                     sendEventMock.mockImplementation(resolve);
