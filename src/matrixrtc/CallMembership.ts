@@ -203,7 +203,7 @@ export class CallMembership {
         if (isLegacyCallMembershipData(this.membershipData)) {
             // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
             // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-            // The current implementation allows for the local clock to be -infinity to +MatrixRTC.MEMBERSHIP_EXPIRY_TIME/2 (i.e. +30mins).
+            // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
             return this.getAbsoluteExpiry()! - Date.now();
         }
 
