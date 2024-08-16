@@ -19,7 +19,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { Room } from "../models/room.ts";
 import { MatrixClient } from "../client.ts";
-import { EventType } from "../@types/event.ts";
+import { EventType, ToDeviceMessageId } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import {
     CallMembership,
@@ -31,14 +31,15 @@ import {
 import { RoomStateEvent } from "../models/room-state.ts";
 import { Focus } from "./focus.ts";
 import { randomString, secureRandomBase64Url } from "../randomstring.ts";
-import { EncryptionKeysEventContent } from "./types.ts";
+import { EncryptionKeysEventContent, EncryptionKeysToDeviceContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MatrixError } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
-import { ToDeviceMessage } from "../models/ToDeviceMessage.ts";
+import { DeviceInfo } from "../crypto/deviceinfo.ts";
+import { IOlmDevice } from "../crypto/algorithms/megolm.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -603,7 +604,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        const payload: EncryptionKeysEventContent = {
+        const content: EncryptionKeysToDeviceContent = {
             keys: myKeys.map((key, index) => {
                 return {
                     index,
@@ -615,21 +616,36 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             room_id: this.room.roomId,
         };
 
-        const toDeviceBatch: ToDeviceMessage[] = membershipsRequiringToDevice.map(({ deviceId, sender }) => ({
-            deviceId,
-            userId: sender!,
-            payload,
-        }));
+        const payload = {
+            type: EventType.CallEncryptionKeysPrefix,
+            [ToDeviceMessageId]: randomString(32),
+            content,
+        };
 
         logger.info(
-            `Sending encryption keys to-device batch for: ${toDeviceBatch.map(({ userId, deviceId }) => `${userId}:${deviceId}`).join(", ")}`,
+            `Sending encryption keys to-device batch for: ${membershipsRequiringToDevice.map(({ sender, deviceId }) => `${sender}:${deviceId}`).join(", ")}`,
         );
 
-        // TODO: encrypt the events
-        await this.client.queueToDevice({
-            eventType: EventType.CallEncryptionKeysPrefix,
-            batch: toDeviceBatch,
-        });
+        const userIds = new Set(membershipsRequiringToDevice.map((m) => m.sender!));
+        const deviceInfoMap = await this.client.crypto!.deviceList.downloadKeys(Array.from(userIds), false);
+
+        const deviceTargets: IOlmDevice<DeviceInfo>[] = [];
+
+        membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
+            const devices = deviceInfoMap.get(sender!);
+            if (!devices) {
+                logger.warn(`No devices found for user ${sender}`);
+                return;
+            }
+
+            if (devices.has(deviceId)) {
+                // Send the message to a specific device
+                deviceTargets.push({ userId: sender!, deviceInfo: devices.get(deviceId)! });
+            } else {
+                logger.warn(`No device found for user ${sender} with id ${deviceId}`);
+            }
+        }),
+            await this.client.encryptAndSendToDevices(deviceTargets, payload);
     }
 
     /**

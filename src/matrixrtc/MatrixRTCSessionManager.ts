@@ -22,6 +22,7 @@ import { RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import { EncryptionKeysToDeviceContent } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSessionManager");
 
@@ -167,8 +168,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
             }
 
             if (event.getType() !== EventType.CallEncryptionKeysPrefix) return;
-
-            const roomId = event.getContent().room_id;
+            const roomId = event.getContent<EncryptionKeysToDeviceContent>().room_id;
             if (!roomId) {
                 logger.error("Got to-device event with no room_id!");
                 return;

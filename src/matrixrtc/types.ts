@@ -23,6 +23,9 @@ export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];
     device_id: string;
     call_id: string;
+}
+
+export interface EncryptionKeysToDeviceContent extends EncryptionKeysEventContent {
     room_id?: string;
 }
 
