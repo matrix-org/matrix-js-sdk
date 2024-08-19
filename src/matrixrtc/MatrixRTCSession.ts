@@ -626,26 +626,48 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             `Sending encryption keys to-device batch for: ${membershipsRequiringToDevice.map(({ sender, deviceId }) => `${sender}:${deviceId}`).join(", ")}`,
         );
 
-        const userIds = new Set(membershipsRequiringToDevice.map((m) => m.sender!));
-        const deviceInfoMap = await this.client.crypto!.deviceList.downloadKeys(Array.from(userIds), false);
+        if ("widgetApi" in this.client) {
+            logger.info("Sending keys via widgetApi");
+            // embedded mode, getCrypto() returns null and so we make some assumptions about the underlying implementation
+            // See: RoomWidgetClient.encryptAndSendToDevices()
+            const inputToSend: {
+                userId: string;
+                deviceInfo: {
+                    deviceId: string;
+                };
+            }[] = membershipsRequiringToDevice.map(({ sender, deviceId }) => ({
+                userId: sender!,
+                deviceInfo: { deviceId },
+            }));
 
-        const deviceTargets: IOlmDevice<DeviceInfo>[] = [];
-
-        membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
-            const devices = deviceInfoMap.get(sender!);
-            if (!devices) {
-                logger.warn(`No devices found for user ${sender}`);
+            await this.client.encryptAndSendToDevices(inputToSend as any as IOlmDevice<DeviceInfo>[], payload);
+        } else {
+            if (!this.client.crypto) {
+                logger.error("No crypto instance available to send keys via to-device event");
                 return;
             }
 
-            if (devices.has(deviceId)) {
-                // Send the message to a specific device
-                deviceTargets.push({ userId: sender!, deviceInfo: devices.get(deviceId)! });
-            } else {
-                logger.warn(`No device found for user ${sender} with id ${deviceId}`);
-            }
-        }),
+            const userIds = new Set(membershipsRequiringToDevice.map((m) => m.sender!));
+            const deviceInfoMap = await this.client.crypto.downloadKeys(Array.from(userIds), false);
+
+            const deviceTargets: IOlmDevice<DeviceInfo>[] = [];
+
+            membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
+                const devices = deviceInfoMap.get(sender!);
+                if (!devices) {
+                    logger.warn(`No devices found for user ${sender}`);
+                    return;
+                }
+
+                if (devices.has(deviceId)) {
+                    // Send the message to a specific device
+                    deviceTargets.push({ userId: sender!, deviceInfo: devices.get(deviceId)! });
+                } else {
+                    logger.warn(`No device found for user ${sender} with id ${deviceId}`);
+                }
+            });
             await this.client.encryptAndSendToDevices(deviceTargets, payload);
+        }
     }
 
     /**
