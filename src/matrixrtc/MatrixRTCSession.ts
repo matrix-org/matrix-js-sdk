@@ -642,6 +642,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
             await this.client.encryptAndSendToDevices(inputToSend as any as IOlmDevice<DeviceInfo>[], payload);
         } else {
+            // TODO: This method doesn't work with the Rust Crypto implementation
+            // See https://github.com/matrix-org/matrix-rust-sdk-crypto-wasm/pull/101
+            // and https://github.com/matrix-org/matrix-js-sdk/issues/3304
             if (!this.client.crypto) {
                 logger.error("No crypto instance available to send keys via to-device event");
                 return;
