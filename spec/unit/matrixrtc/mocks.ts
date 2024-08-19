@@ -73,5 +73,6 @@ export function mockRTCEvent(membershipData: MembershipData, roomId: string): Ma
         sender: {
             userId: "@mock:user.example",
         },
+        isDecryptionFailure: jest.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
 }

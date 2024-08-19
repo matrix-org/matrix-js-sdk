@@ -98,8 +98,23 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
-    private async consumeCallEncryptionEvent(event: MatrixEvent): Promise<void> {
+    private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
         await this.client.decryptEventIfNeeded(event);
+        if (event.isDecryptionFailure()) {
+            if (!isRetry) {
+                logger.warn(
+                    `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
+                );
+                // retry after 1 second. After this we give up.
+                setTimeout(() => this.consumeCallEncryptionEvent(event, true), 1000);
+            } else {
+                logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
+            }
+            return;
+        } else if (isRetry) {
+            logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
+        }
+
         if (event.getType() !== EventType.CallEncryptionKeysPrefix) return Promise.resolve();
 
         const room = this.client.getRoom(event.getRoomId());
