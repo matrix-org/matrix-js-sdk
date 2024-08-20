@@ -1,3 +1,8 @@
+Changes in [34.3.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.3.1) (2024-08-20)
+==================================================================================================
+# Security
+- Fixes for [CVE-2024-42369](https://nvd.nist.gov/vuln/detail/CVE-2024-42369) / [GHSA-vhr5-g3pm-49fm](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-vhr5-g3pm-49fm).
+
 Changes in [34.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.3.0) (2024-08-13)
 ==================================================================================================
 ## ✨ Features
