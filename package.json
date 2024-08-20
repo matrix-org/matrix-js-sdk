@@ -31,6 +31,7 @@
     "keywords": [
         "matrix-org"
     ],
+    "type": "module",
     "main": "./src/index.ts",
     "browser": "./src/browser-index.ts",
     "matrix_src_main": "./src/index.ts",
