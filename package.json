@@ -31,8 +31,9 @@
     "keywords": [
         "matrix-org"
     ],
-    "main": "./lib/index.js",
-    "browser": "./lib/browser-index.js",
+    "type": "module",
+    "main": "./src/index.js",
+    "browser": "./src/browser-index.js",
     "matrix_src_main": "./src/index.ts",
     "matrix_src_browser": "./src/browser-index.ts",
     "matrix_lib_main": "./lib/index.js",

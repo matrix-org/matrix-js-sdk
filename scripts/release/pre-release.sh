@@ -12,6 +12,3 @@ do
         jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
     fi
 done
-
-# Ensure that "type": "module" is present
-jq '.type = "module"' package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
