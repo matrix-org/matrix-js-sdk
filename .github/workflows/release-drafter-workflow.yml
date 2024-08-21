@@ -56,7 +56,7 @@ jobs:
                   script: |
                       const { RELEASE_ID: releaseId, DEPENDENCY, VERSION } = process.env;
                       const { owner, repo } = context.repo;
-                      const script = require("./.action-repo/scripts/release/merge-release-notes.js");
+                      const script = require("./.action-repo/scripts/release/merge-release-notes.cjs");
 
                       let deps = [];
                       if (DEPENDENCY.includes("/")) {
