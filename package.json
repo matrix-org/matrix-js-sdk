@@ -98,7 +98,7 @@
         "eslint-import-resolver-typescript": "^3.5.1",
         "eslint-plugin-import": "^2.26.0",
         "eslint-plugin-jest": "^28.0.0",
-        "eslint-plugin-jsdoc": "^48.0.0",
+        "eslint-plugin-jsdoc": "^50.0.0",
         "eslint-plugin-matrix-org": "^1.0.0",
         "eslint-plugin-tsdoc": "^0.3.0",
         "eslint-plugin-unicorn": "^54.0.0",
