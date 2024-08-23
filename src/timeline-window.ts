@@ -16,12 +16,12 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { Direction, EventTimeline } from "./models/event-timeline";
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { EventTimelineSet } from "./models/event-timeline-set";
-import { MatrixEvent } from "./models/event";
-import { Room, RoomEvent } from "./models/room";
+import { Direction, EventTimeline } from "./models/event-timeline.ts";
+import { logger } from "./logger.ts";
+import { MatrixClient } from "./client.ts";
+import { EventTimelineSet } from "./models/event-timeline-set.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { Room, RoomEvent } from "./models/room.ts";
 
 /**
  * @internal

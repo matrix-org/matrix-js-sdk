@@ -8,7 +8,8 @@
         "noUnusedLocals": true,
         "noEmit": true,
         "declaration": true,
-        "strict": true
+        "strict": true,
+        "allowImportingTsExtensions": true
     },
     "include": ["./src/**/*.ts", "./spec/**/*.ts"]
 }

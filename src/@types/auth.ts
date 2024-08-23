@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "../NamespacedValue";
-import { IClientWellKnown } from "../client";
+import { UnstableValue } from "../NamespacedValue.ts";
+import { IClientWellKnown } from "../client.ts";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */

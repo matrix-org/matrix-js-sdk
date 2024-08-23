@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../../logger";
-import { errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError } from "../Error";
-import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode";
-import { IVerificationChannel } from "./Channel";
-import { MatrixClient } from "../../../client";
-import { MatrixEvent } from "../../../models/event";
-import { EventType } from "../../../@types/event";
-import { VerificationBase } from "../Base";
-import { VerificationMethod } from "../../index";
-import { TypedEventEmitter } from "../../../models/typed-event-emitter";
+import { logger } from "../../../logger.ts";
+import { errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError } from "../Error.ts";
+import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode.ts";
+import { IVerificationChannel } from "./Channel.ts";
+import { MatrixClient } from "../../../client.ts";
+import { MatrixEvent } from "../../../models/event.ts";
+import { EventType } from "../../../@types/event.ts";
+import { VerificationBase } from "../Base.ts";
+import { VerificationMethod } from "../../index.ts";
+import { TypedEventEmitter } from "../../../models/typed-event-emitter.ts";
 import {
     canAcceptVerificationRequest,
     VerificationPhase as Phase,
@@ -31,10 +31,10 @@ import {
     VerificationRequestEvent,
     VerificationRequestEventHandlerMap,
     Verifier,
-} from "../../../crypto-api/verification";
+} from "../../../crypto-api/verification.ts";
 
 // backwards-compatibility exports
-export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification";
+export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification.ts";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes

@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { EventTimeline } from "../models/event-timeline";
-import { Room } from "../models/room";
-import { MatrixClient } from "../client";
-import { EventType } from "../@types/event";
-import { UpdateDelayedEventAction } from "../@types/requests";
+import { logger } from "../logger.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { EventTimeline } from "../models/event-timeline.ts";
+import { Room } from "../models/room.ts";
+import { MatrixClient } from "../client.ts";
+import { EventType } from "../@types/event.ts";
+import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import {
     CallMembership,
     CallMembershipData,
     CallMembershipDataLegacy,
     SessionMembershipData,
     isLegacyCallMembershipData,
-} from "./CallMembership";
-import { RoomStateEvent } from "../models/room-state";
-import { Focus } from "./focus";
-import { randomString, secureRandomBase64Url } from "../randomstring";
-import { EncryptionKeysEventContent } from "./types";
-import { decodeBase64, encodeUnpaddedBase64 } from "../base64";
-import { KnownMembership } from "../@types/membership";
-import { MatrixError } from "../http-api/errors";
-import { MatrixEvent } from "../models/event";
-import { isLivekitFocusActive } from "./LivekitFocus";
-import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall";
+} from "./CallMembership.ts";
+import { RoomStateEvent } from "../models/room-state.ts";
+import { Focus } from "./focus.ts";
+import { randomString, secureRandomBase64Url } from "../randomstring.ts";
+import { EncryptionKeysEventContent } from "./types.ts";
+import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { MatrixError } from "../http-api/errors.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { isLivekitFocusActive } from "./LivekitFocus.ts";
+import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
 
 const MEMBERSHIP_EXPIRY_TIME = 60 * 60 * 1000;
 const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if we need to re-send our member event

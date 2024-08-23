@@ -18,29 +18,29 @@ limitations under the License.
  * Classes for dealing with key backup.
  */
 
-import type { IMegolmSessionData } from "../@types/crypto";
-import { MatrixClient } from "../client";
-import { logger } from "../logger";
-import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
-import { DeviceInfo } from "./deviceinfo";
-import { DeviceTrustLevel } from "./CrossSigning";
-import { keyFromPassphrase } from "./key_passphrase";
-import { encodeUri, safeSet, sleep } from "../utils";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { encodeRecoveryKey } from "./recoverykey";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
+import type { IMegolmSessionData } from "../@types/crypto.ts";
+import { MatrixClient } from "../client.ts";
+import { logger } from "../logger.ts";
+import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib.ts";
+import { DeviceInfo } from "./deviceinfo.ts";
+import { DeviceTrustLevel } from "./CrossSigning.ts";
+import { keyFromPassphrase } from "./key_passphrase.ts";
+import { encodeUri, safeSet, sleep } from "../utils.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
+import { encodeRecoveryKey } from "./recoverykey.ts";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.ts";
 import {
     Curve25519SessionData,
     IAes256AuthData,
     ICurve25519AuthData,
     IKeyBackupInfo,
     IKeyBackupSession,
-} from "./keybackup";
-import { UnstableValue } from "../NamespacedValue";
-import { CryptoEvent } from "./index";
-import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api";
-import { BackupTrustInfo } from "../crypto-api/keybackup";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend";
+} from "./keybackup.ts";
+import { UnstableValue } from "../NamespacedValue.ts";
+import { CryptoEvent } from "./index.ts";
+import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.ts";
+import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms

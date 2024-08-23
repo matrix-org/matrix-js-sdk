@@ -16,9 +16,9 @@ limitations under the License.
 
 import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
-import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate";
-import { Method, timeoutSignal } from "../http-api";
-import { OidcClientConfig } from "./index";
+import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate.ts";
+import { Method, timeoutSignal } from "../http-api/index.ts";
+import { OidcClientConfig } from "./index.ts";
 
 /**
  * @experimental

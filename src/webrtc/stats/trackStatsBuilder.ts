@@ -1,6 +1,6 @@
-import { MediaTrackStats } from "./media/mediaTrackStats";
-import { ValueFormatter } from "./valueFormatter";
-import { TrackSummary } from "./callStatsReportSummary";
+import { MediaTrackStats } from "./media/mediaTrackStats.ts";
+import { ValueFormatter } from "./valueFormatter.ts";
+import { TrackSummary } from "./callStatsReportSummary.ts";
 
 export class TrackStatsBuilder {
     public static buildFramerateResolution(trackStats: MediaTrackStats, now: any): void {

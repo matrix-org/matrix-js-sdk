@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ISigned } from "../@types/signed";
-import { IEncryptedPayload } from "../crypto/aes";
+import { ISigned } from "../@types/signed.ts";
+import { IEncryptedPayload } from "../crypto/aes.ts";
 
 export interface Curve25519AuthData {
     public_key: string;

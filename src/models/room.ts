@@ -21,17 +21,17 @@ import {
     DuplicateStrategy,
     IAddLiveEventOptions,
     EventTimelineSetHandlerMap,
-} from "./event-timeline-set";
-import { Direction, EventTimeline } from "./event-timeline";
-import { getHttpUriForMxc } from "../content-repo";
-import { removeElement } from "../utils";
-import { normalize, noUnsafeEventProps } from "../utils";
-import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
-import { EventStatus } from "./event-status";
-import { RoomMember } from "./room-member";
-import { IRoomSummary, RoomSummary } from "./room-summary";
-import { logger } from "../logger";
-import { TypedReEmitter } from "../ReEmitter";
+} from "./event-timeline-set.ts";
+import { Direction, EventTimeline } from "./event-timeline.ts";
+import { getHttpUriForMxc } from "../content-repo.ts";
+import { removeElement } from "../utils.ts";
+import { normalize, noUnsafeEventProps } from "../utils.ts";
+import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event.ts";
+import { EventStatus } from "./event-status.ts";
+import { RoomMember } from "./room-member.ts";
+import { IRoomSummary, RoomSummary } from "./room-summary.ts";
+import { logger } from "../logger.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
 import {
     EventType,
     RoomCreateTypeField,
@@ -40,12 +40,12 @@ import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
     UNSIGNED_THREAD_ID_FIELD,
-} from "../@types/event";
-import { MatrixClient, PendingEventOrdering } from "../client";
-import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
-import { Filter, IFilterDefinition } from "../filter";
-import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
-import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
+} from "../@types/event.ts";
+import { MatrixClient, PendingEventOrdering } from "../client.ts";
+import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials.ts";
+import { Filter, IFilterDefinition } from "../filter.ts";
+import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state.ts";
+import { BeaconEvent, BeaconEventHandlerMap } from "./beacon.ts";
 import {
     Thread,
     ThreadEvent,
@@ -54,23 +54,23 @@ import {
     THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
-} from "./thread";
+} from "./thread.ts";
 import {
     CachedReceiptStructure,
     MAIN_ROOM_TIMELINE,
     Receipt,
     ReceiptContent,
     ReceiptType,
-} from "../@types/read_receipts";
-import { IStateEventWithRoomId } from "../@types/search";
-import { RelationsContainer } from "./relations-container";
-import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
-import { isPollEvent, Poll, PollEvent } from "./poll";
-import { RoomReceipts } from "./room-receipts";
-import { compareEventOrdering } from "./compare-event-ordering";
-import * as utils from "../utils";
-import { KnownMembership, Membership } from "../@types/membership";
-import { Capabilities, IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities";
+} from "../@types/read_receipts.ts";
+import { IStateEventWithRoomId } from "../@types/search.ts";
+import { RelationsContainer } from "./relations-container.ts";
+import { ReadReceipt, synthesizeReceipt } from "./read-receipt.ts";
+import { isPollEvent, Poll, PollEvent } from "./poll.ts";
+import { RoomReceipts } from "./room-receipts.ts";
+import { compareEventOrdering } from "./compare-event-ordering.ts";
+import * as utils from "../utils.ts";
+import { KnownMembership, Membership } from "../@types/membership.ts";
+import { Capabilities, IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be

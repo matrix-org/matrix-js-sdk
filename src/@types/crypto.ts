@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { ISignatures } from "./signed";
+import type { ISignatures } from "./signed.ts";
 
 export type OlmGroupSessionExtraData = {
     untrusted?: boolean;
@@ -22,7 +22,7 @@ export type OlmGroupSessionExtraData = {
 };
 
 // Backwards compatible re-export
-export type { EventDecryptionResult as IEventDecryptionResult } from "../common-crypto/CryptoBackend";
+export type { EventDecryptionResult as IEventDecryptionResult } from "../common-crypto/CryptoBackend.ts";
 
 interface Extensible {
     [key: string]: any;

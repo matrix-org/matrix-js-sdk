@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { MatrixClient, ClientEvent } from "../client";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Room, RoomEvent } from "../models/room";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { MatrixEvent } from "../models/event";
-import { MatrixRTCSession } from "./MatrixRTCSession";
-import { EventType } from "../@types/event";
+import { logger } from "../logger.ts";
+import { MatrixClient, ClientEvent } from "../client.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { Room, RoomEvent } from "../models/room.ts";
+import { RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { MatrixRTCSession } from "./MatrixRTCSession.ts";
+import { EventType } from "../@types/event.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously

@@ -25,15 +25,15 @@ import {
     ISendEventFromWidgetResponseData,
 } from "matrix-widget-api";
 
-import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event";
+import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event.ts";
 import {
     ISendEventResponse,
     SendDelayedEventRequestOpts,
     SendDelayedEventResponse,
     UpdateDelayedEventAction,
-} from "./@types/requests";
-import { EventType, StateEvents } from "./@types/event";
-import { logger } from "./logger";
+} from "./@types/requests.ts";
+import { EventType, StateEvents } from "./@types/event.ts";
+import { logger } from "./logger.ts";
 import {
     MatrixClient,
     ClientEvent,
@@ -42,15 +42,15 @@ import {
     SendToDeviceContentMap,
     IOpenIDToken,
     UNSTABLE_MSC4140_DELAYED_EVENTS,
-} from "./client";
-import { SyncApi, SyncState } from "./sync";
-import { SlidingSyncSdk } from "./sliding-sync-sdk";
-import { User } from "./models/user";
-import { Room } from "./models/room";
-import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage";
-import { DeviceInfo } from "./crypto/deviceinfo";
-import { IOlmDevice } from "./crypto/algorithms/megolm";
-import { MapWithDefault, recursiveMapToObject } from "./utils";
+} from "./client.ts";
+import { SyncApi, SyncState } from "./sync.ts";
+import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
+import { User } from "./models/user.ts";
+import { Room } from "./models/room.ts";
+import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage.ts";
+import { DeviceInfo } from "./crypto/deviceinfo.ts";
+import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
+import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
 
 interface IStateEventRequest {
     eventType: string;

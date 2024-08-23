@@ -18,16 +18,16 @@ limitations under the License.
  * QR code key verification.
  */
 
-import { VerificationBase as Base } from "./Base";
-import { newKeyMismatchError, newUserCancelledError } from "./Error";
-import { decodeBase64, encodeUnpaddedBase64 } from "../../base64";
-import { logger } from "../../logger";
-import { VerificationRequest } from "./request/VerificationRequest";
-import { MatrixClient } from "../../client";
-import { IVerificationChannel } from "./request/Channel";
-import { MatrixEvent } from "../../models/event";
-import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification";
-import { VerificationMethod } from "../../types";
+import { VerificationBase as Base } from "./Base.ts";
+import { newKeyMismatchError, newUserCancelledError } from "./Error.ts";
+import { decodeBase64, encodeUnpaddedBase64 } from "../../base64.ts";
+import { logger } from "../../logger.ts";
+import { VerificationRequest } from "./request/VerificationRequest.ts";
+import { MatrixClient } from "../../client.ts";
+import { IVerificationChannel } from "./request/Channel.ts";
+import { MatrixEvent } from "../../models/event.ts";
+import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
+import { VerificationMethod } from "../../types.ts";
 
 export const SHOW_QR_CODE_METHOD = VerificationMethod.ShowQrCode;
 export const SCAN_QR_CODE_METHOD = VerificationMethod.ScanQrCode;

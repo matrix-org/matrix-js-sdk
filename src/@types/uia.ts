@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AuthDict, IAuthData } from "../interactive-auth";
+import { AuthDict, IAuthData } from "../interactive-auth.ts";
 
 /**
  * Helper type to represent HTTP request body for a UIA enabled endpoint

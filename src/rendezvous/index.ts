@@ -17,13 +17,13 @@ limitations under the License.
 /**
  * @deprecated in favour of MSC4108-based implementation
  */
-export * from "./MSC3906Rendezvous";
-export * from "./MSC4108SignInWithQR";
-export * from "./RendezvousChannel";
-export * from "./RendezvousCode";
-export * from "./RendezvousError";
-export * from "./RendezvousFailureReason";
-export * from "./RendezvousIntent";
-export * from "./RendezvousTransport";
-export * from "./transports";
-export * from "./channels";
+export * from "./MSC3906Rendezvous.ts";
+export * from "./MSC4108SignInWithQR.ts";
+export * from "./RendezvousChannel.ts";
+export * from "./RendezvousCode.ts";
+export * from "./RendezvousError.ts";
+export * from "./RendezvousFailureReason.ts";
+export * from "./RendezvousIntent.ts";
+export * from "./RendezvousTransport.ts";
+export * from "./transports/index.ts";
+export * from "./channels/index.ts";

@@ -15,10 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IClientWellKnown, IWellKnownConfig, IServerVersions } from "./client";
-import { logger } from "./logger";
-import { MatrixError, Method, timeoutSignal } from "./http-api";
-import { SUPPORTED_MATRIX_VERSIONS } from "./version-support";
+import { IClientWellKnown, IWellKnownConfig, IServerVersions } from "./client.ts";
+import { logger } from "./logger.ts";
+import { MatrixError, Method, timeoutSignal } from "./http-api/index.ts";
+import { SUPPORTED_MATRIX_VERSIONS } from "./version-support.ts";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery

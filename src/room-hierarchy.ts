@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Room } from "./models/room";
-import { IHierarchyRoom, IHierarchyRelation } from "./@types/spaces";
-import { MatrixClient } from "./client";
-import { EventType } from "./@types/event";
-import { MatrixError } from "./http-api";
+import { Room } from "./models/room.ts";
+import { IHierarchyRoom, IHierarchyRelation } from "./@types/spaces.ts";
+import { MatrixClient } from "./client.ts";
+import { EventType } from "./@types/event.ts";
+import { MatrixError } from "./http-api/index.ts";
 
 export class RoomHierarchy {
     // Map from room id to list of servers which are listed as a via somewhere in the loaded hierarchy

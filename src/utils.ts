@@ -22,10 +22,10 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 import { Optional } from "matrix-events-sdk";
 
-import { IEvent, MatrixEvent } from "./models/event";
-import { M_TIMESTAMP } from "./@types/location";
-import { ReceiptType } from "./@types/read_receipts";
-import { BaseLogger } from "./logger";
+import { IEvent, MatrixEvent } from "./models/event.ts";
+import { M_TIMESTAMP } from "./@types/location.ts";
+import { ReceiptType } from "./@types/read_receipts.ts";
+import { BaseLogger } from "./logger.ts";
 
 const interns = new Map<string, string>();
 

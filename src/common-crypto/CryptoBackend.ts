@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import { IClearEvent, MatrixEvent } from "../models/event";
-import { Room } from "../models/room";
-import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api";
-import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
-import { IEncryptedEventInfo } from "../crypto/api";
-import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
-import { IMegolmSessionData } from "../@types/crypto";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
+import { IClearEvent, MatrixEvent } from "../models/event.ts";
+import { Room } from "../models/room.ts";
+import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning.ts";
+import { IEncryptedEventInfo } from "../crypto/api.ts";
+import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { IMegolmSessionData } from "../@types/crypto.ts";
 
 /**
  * Common interface for the crypto implementations

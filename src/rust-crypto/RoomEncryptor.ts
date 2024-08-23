@@ -26,16 +26,16 @@ import {
     UserId,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { EventType } from "../@types/event";
-import { IContent, MatrixEvent } from "../models/event";
-import { Room } from "../models/room";
-import { Logger, logger, LogSpan } from "../logger";
-import { KeyClaimManager } from "./KeyClaimManager";
-import { RoomMember } from "../models/room-member";
-import { HistoryVisibility } from "../@types/partials";
-import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
-import { logDuration } from "../utils";
-import { KnownMembership } from "../@types/membership";
+import { EventType } from "../@types/event.ts";
+import { IContent, MatrixEvent } from "../models/event.ts";
+import { Room } from "../models/room.ts";
+import { Logger, logger, LogSpan } from "../logger.ts";
+import { KeyClaimManager } from "./KeyClaimManager.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { HistoryVisibility } from "../@types/partials.ts";
+import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
+import { logDuration } from "../utils.ts";
+import { KnownMembership } from "../@types/membership.ts";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room

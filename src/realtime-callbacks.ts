@@ -24,7 +24,7 @@ limitations under the License.
  * it will instead fire as soon as possible after resume.
  */
 
-import { logger } from "./logger";
+import { logger } from "./logger.ts";
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.

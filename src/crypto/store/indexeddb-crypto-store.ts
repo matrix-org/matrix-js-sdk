@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, Logger } from "../../logger";
-import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
-import { MemoryCryptoStore } from "./memory-crypto-store";
-import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
-import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors";
-import * as IndexedDBHelpers from "../../indexeddb-helpers";
+import { logger, Logger } from "../../logger.ts";
+import { LocalStorageCryptoStore } from "./localStorage-crypto-store.ts";
+import { MemoryCryptoStore } from "./memory-crypto-store.ts";
+import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend.ts";
+import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors.ts";
+import * as IndexedDBHelpers from "../../indexeddb-helpers.ts";
 import {
     CryptoStore,
     IDeviceData,
@@ -34,12 +34,12 @@ import {
     ParkedSharedHistory,
     SecretStorePrivateKeys,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
-} from "./base";
-import { IRoomKeyRequestBody } from "../index";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { CrossSigningKeyInfo } from "../../crypto-api";
+} from "./base.ts";
+import { IRoomKeyRequestBody } from "../index.ts";
+import { IOlmDevice } from "../algorithms/megolm.ts";
+import { IRoomEncryption } from "../RoomList.ts";
+import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /*
  * Internal module. indexeddb storage for e2e.

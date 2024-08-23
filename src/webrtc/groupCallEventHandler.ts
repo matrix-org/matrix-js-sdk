@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event";
-import { MatrixClient, ClientEvent } from "../client";
-import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall";
-import { Room } from "../models/room";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { RoomMember } from "../models/room-member";
-import { logger } from "../logger";
-import { EventType } from "../@types/event";
-import { SyncState } from "../sync";
+import { MatrixEvent } from "../models/event.ts";
+import { MatrixClient, ClientEvent } from "../client.ts";
+import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall.ts";
+import { Room } from "../models/room.ts";
+import { RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { logger } from "../logger.ts";
+import { EventType } from "../@types/event.ts";
+import { SyncState } from "../sync.ts";
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",

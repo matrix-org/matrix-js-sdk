@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { IRoomEvent, IStateEvent } from "./sync-accumulator";
-import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { sleep, IDeferred, defer } from "./utils";
-import { HTTPError } from "./http-api";
+import { logger } from "./logger.ts";
+import { MatrixClient } from "./client.ts";
+import { IRoomEvent, IStateEvent } from "./sync-accumulator.ts";
+import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { sleep, IDeferred, defer } from "./utils.ts";
+import { HTTPError } from "./http-api/index.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing

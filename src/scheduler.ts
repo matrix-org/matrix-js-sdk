@@ -18,12 +18,12 @@ limitations under the License.
  * This is an internal module which manages queuing, scheduling and retrying
  * of requests.
  */
-import { logger } from "./logger";
-import { MatrixEvent } from "./models/event";
-import { EventType } from "./@types/event";
-import { defer, IDeferred, removeElement } from "./utils";
-import { calculateRetryBackoff, MatrixError } from "./http-api";
-import { ISendEventResponse } from "./@types/requests";
+import { logger } from "./logger.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { EventType } from "./@types/event.ts";
+import { defer, IDeferred, removeElement } from "./utils.ts";
+import { calculateRetryBackoff, MatrixError } from "./http-api/index.ts";
+import { ISendEventResponse } from "./@types/requests.ts";
 
 const DEBUG = false; // set true to enable console logging.
 

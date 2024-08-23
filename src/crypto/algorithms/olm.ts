@@ -18,17 +18,17 @@ limitations under the License.
  * Defines m.olm encryption/decryption
  */
 
-import type { IEventDecryptionResult } from "../../@types/crypto";
-import { logger } from "../../logger";
-import * as olmlib from "../olmlib";
-import { DeviceInfo } from "../deviceinfo";
-import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base";
-import { Room } from "../../models/room";
-import { IContent, MatrixEvent } from "../../models/event";
-import { IEncryptedContent, IOlmEncryptedContent } from "../index";
-import { IInboundSession } from "../OlmDevice";
-import { DecryptionFailureCode } from "../../crypto-api";
-import { DecryptionError } from "../../common-crypto/CryptoBackend";
+import type { IEventDecryptionResult } from "../../@types/crypto.ts";
+import { logger } from "../../logger.ts";
+import * as olmlib from "../olmlib.ts";
+import { DeviceInfo } from "../deviceinfo.ts";
+import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base.ts";
+import { Room } from "../../models/room.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { IEncryptedContent, IOlmEncryptedContent } from "../index.ts";
+import { IInboundSession } from "../OlmDevice.ts";
+import { DecryptionFailureCode } from "../../crypto-api/index.ts";
+import { DecryptionError } from "../../common-crypto/CryptoBackend.ts";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 

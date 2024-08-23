@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IUsageLimit } from "../@types/partials";
-import { MatrixEvent } from "../models/event";
+import { IUsageLimit } from "../@types/partials.ts";
+import { MatrixEvent } from "../models/event.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible

@@ -18,13 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { checkObjectHasKeys, encodeParams } from "../utils";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Method } from "./method";
-import { ConnectionError, MatrixError } from "./errors";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface";
-import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
-import { QueryDict } from "../utils";
+import { checkObjectHasKeys, encodeParams } from "../utils.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { Method } from "./method.ts";
+import { ConnectionError, MatrixError } from "./errors.ts";
+import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface.ts";
+import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
+import { QueryDict } from "../utils.ts";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
