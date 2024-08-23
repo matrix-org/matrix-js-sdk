@@ -66,7 +66,12 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { IMessage } from "./algorithms/olm.ts";
-import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend.ts";
+import {
+    BackupDecryptor,
+    CryptoBackend,
+    DecryptionError,
+    OnSyncCompletedData,
+} from "../common-crypto/CryptoBackend.ts";
 import { RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { MapWithDefault, recursiveMapToObject } from "../utils.ts";
 import {

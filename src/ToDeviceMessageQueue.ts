@@ -18,7 +18,12 @@ import { ToDeviceMessageId } from "./@types/event.ts";
 import { logger } from "./logger.ts";
 import { MatrixClient, ClientEvent } from "./client.ts";
 import { MatrixError } from "./http-api/index.ts";
-import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage.ts";
+import {
+    IndexedToDeviceBatch,
+    ToDeviceBatch,
+    ToDeviceBatchWithTxnId,
+    ToDevicePayload,
+} from "./models/ToDeviceMessage.ts";
 import { MatrixScheduler } from "./scheduler.ts";
 import { SyncState } from "./sync.ts";
 import { MapWithDefault } from "./utils.ts";

@@ -15,7 +15,12 @@ limitations under the License.
 */
 
 import { MBeaconEventContent } from "../@types/beacon.ts";
-import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers.ts";
+import {
+    BeaconInfoState,
+    BeaconLocationState,
+    parseBeaconContent,
+    parseBeaconInfoContent,
+} from "../content-helpers.ts";
 import { MatrixEvent } from "./event.ts";
 import { sortEventsByLatestContentTimestamp } from "../utils.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";

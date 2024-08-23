@@ -24,7 +24,12 @@ import type { IEncryptedEventInfo } from "../crypto/api.ts";
 import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { Room } from "../models/room.ts";
 import { RoomMember } from "../models/room-member.ts";
-import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend.ts";
+import {
+    BackupDecryptor,
+    CryptoBackend,
+    DecryptionError,
+    OnSyncCompletedData,
+} from "../common-crypto/CryptoBackend.ts";
 import { logger, Logger } from "../logger.ts";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RoomEncryptor } from "./RoomEncryptor.ts";

@@ -16,7 +16,12 @@ limitations under the License.
 
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener } from "./index.ts";
+import {
+    ClientRendezvousFailureReason,
+    MSC4108FailureReason,
+    RendezvousError,
+    RendezvousFailureListener,
+} from "./index.ts";
 import { MatrixClient } from "../client.ts";
 import { logger } from "../logger.ts";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";

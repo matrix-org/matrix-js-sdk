@@ -154,7 +154,14 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event.ts";
-import { GuestAccess, HistoryVisibility, IdServerUnbindResult, JoinRule, Preset, Visibility } from "./@types/partials.ts";
+import {
+    GuestAccess,
+    HistoryVisibility,
+    IdServerUnbindResult,
+    JoinRule,
+    Preset,
+    Visibility,
+} from "./@types/partials.ts";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
 import { randomString } from "./randomstring.ts";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup.ts";

@@ -30,7 +30,11 @@ import { ICryptoCallbacks } from "./index.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base.ts";
 import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage.ts";
-import { CrossSigningKeyInfo, DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api/index.ts";
+import {
+    CrossSigningKeyInfo,
+    DeviceVerificationStatus,
+    UserVerificationStatus as UserTrustLevel,
+} from "../crypto-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 
 // backwards-compatibility re-exports
