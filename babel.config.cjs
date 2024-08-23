@@ -17,6 +17,8 @@ module.exports = {
         [
             "@babel/preset-typescript",
             {
+                // Node.js requires .js extensions on ESM imports. Our tests, however, still
+                // run in CommonJS (see above).
                 rewriteImportExtensions: process.env.NODE_ENV !== "test",
             },
         ],
