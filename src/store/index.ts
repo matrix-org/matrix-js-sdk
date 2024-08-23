@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType } from "../@types/event";
-import { Room } from "../models/room";
-import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
-import { Filter } from "../filter";
-import { RoomSummary } from "../models/room-summary";
-import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
-import { IStartClientOpts } from "../client";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
-import { EventEmitterEvents } from "../models/typed-event-emitter";
+import { EventType } from "../@types/event.js";
+import { Room } from "../models/room.js";
+import { User } from "../models/user.js";
+import { IEvent, MatrixEvent } from "../models/event.js";
+import { Filter } from "../filter.js";
+import { RoomSummary } from "../models/room-summary.js";
+import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator.js";
+import { IStartClientOpts } from "../client.js";
+import { IStateEventWithRoomId } from "../@types/search.js";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.js";
+import { EventEmitterEvents } from "../models/typed-event-emitter.js";
 
 export interface ISavedSync {
     nextBatch: string;

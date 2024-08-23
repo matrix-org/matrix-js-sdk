@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ISignatures } from "../@types/signed";
-import { DeviceVerification } from "../models/device";
+import { ISignatures } from "../@types/signed.js";
+import { DeviceVerification } from "../models/device.js";
 
 export interface IDevice {
     keys: Record<string, string>;

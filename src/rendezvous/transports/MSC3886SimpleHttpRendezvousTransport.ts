@@ -16,16 +16,16 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { logger } from "../../logger";
-import { sleep } from "../../utils";
+import { logger } from "../../logger.js";
+import { sleep } from "../../utils.js";
 import {
     RendezvousFailureListener,
     LegacyRendezvousFailureReason as RendezvousFailureReason,
     RendezvousTransport,
     RendezvousTransportDetails,
-} from "..";
-import { MatrixClient } from "../../matrix";
-import { ClientPrefix } from "../../http-api";
+} from "../index.js";
+import { MatrixClient } from "../../matrix.js";
+import { ClientPrefix } from "../../http-api/index.js";
 
 const TYPE = new UnstableValue("http.v1", "org.matrix.msc3886.http.v1");
 

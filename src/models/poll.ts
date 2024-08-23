@@ -16,13 +16,13 @@ limitations under the License.
 
 import { M_POLL_START } from "matrix-events-sdk";
 
-import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls";
-import { MatrixClient } from "../client";
-import { PollStartEvent } from "../extensible_events_v1/PollStartEvent";
-import { MatrixEvent } from "./event";
-import { Relations } from "./relations";
-import { Room } from "./room";
-import { TypedEventEmitter } from "./typed-event-emitter";
+import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls.js";
+import { MatrixClient } from "../client.js";
+import { PollStartEvent } from "../extensible_events_v1/PollStartEvent.js";
+import { MatrixEvent } from "./event.js";
+import { Relations } from "./relations.js";
+import { Room } from "./room.js";
+import { TypedEventEmitter } from "./typed-event-emitter.js";
 
 export enum PollEvent {
     New = "Poll.new",

@@ -18,16 +18,16 @@ import {
     ReceiptCache,
     ReceiptType,
     WrappedReceipt,
-} from "../@types/read_receipts";
-import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter";
-import { isSupportedReceiptType } from "../utils";
-import { MatrixEvent } from "./event";
-import { EventType } from "../@types/event";
-import { EventTimelineSet } from "./event-timeline-set";
-import { MapWithDefault } from "../utils";
-import { NotificationCountType } from "./room";
-import { logger } from "../logger";
-import { inMainTimelineForReceipt, threadIdForReceipt } from "../client";
+} from "../@types/read_receipts.js";
+import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter.js";
+import { isSupportedReceiptType } from "../utils.js";
+import { MatrixEvent } from "./event.js";
+import { EventType } from "../@types/event.js";
+import { EventTimelineSet } from "./event-timeline-set.js";
+import { MapWithDefault } from "../utils.js";
+import { NotificationCountType } from "./room.js";
+import { logger } from "../logger.js";
+import { inMainTimelineForReceipt, threadIdForReceipt } from "../client.js";
 
 /**
  * Create a synthetic receipt for the given event

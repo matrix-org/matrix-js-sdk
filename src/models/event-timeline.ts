@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMarkerFoundOptions, RoomState } from "./room-state";
-import { EventTimelineSet } from "./event-timeline-set";
-import { MatrixEvent } from "./event";
-import { Filter } from "../filter";
-import { EventType } from "../@types/event";
+import { IMarkerFoundOptions, RoomState } from "./room-state.js";
+import { EventTimelineSet } from "./event-timeline-set.js";
+import { MatrixEvent } from "./event.js";
+import { Filter } from "../filter.js";
+import { EventType } from "../@types/event.js";
 
 export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, "timelineWasEmpty"> {
     // This is a separate interface without any extra stuff currently added on

@@ -16,10 +16,10 @@ limitations under the License.
 
 import { IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
-import { AccessTokens } from "../http-api";
-import { generateScope } from "./authorize";
-import { discoverAndValidateOIDCIssuerWellKnown } from "./discovery";
-import { logger } from "../logger";
+import { AccessTokens } from "../http-api/index.js";
+import { generateScope } from "./authorize.js";
+import { discoverAndValidateOIDCIssuerWellKnown } from "./discovery.js";
+import { logger } from "../logger.js";
 
 /**
  * @experimental

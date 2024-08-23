@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_receipts";
-import { threadIdForReceipt } from "../client";
-import { Room, RoomEvent } from "./room";
-import { MatrixEvent } from "./event";
-import { logger } from "../logger";
+import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_receipts.js";
+import { threadIdForReceipt } from "../client.js";
+import { Room, RoomEvent } from "./room.js";
+import { MatrixEvent } from "./event.js";
+import { logger } from "../logger.js";
 
 /**
  * The latest receipts we have for a room.

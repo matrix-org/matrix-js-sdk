@@ -16,9 +16,9 @@ limitations under the License.
 
 import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { Logger } from "../logger";
-import { defer, IDeferred, logDuration } from "../utils";
+import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor.js";
+import { Logger } from "../logger.js";
+import { defer, IDeferred, logDuration } from "../utils.js";
 
 /**
  * OutgoingRequestsManager: responsible for processing outgoing requests from the OlmMachine.

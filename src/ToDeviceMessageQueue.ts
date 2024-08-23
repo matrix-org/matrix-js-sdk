@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ToDeviceMessageId } from "./@types/event";
-import { logger } from "./logger";
-import { MatrixClient, ClientEvent } from "./client";
-import { MatrixError } from "./http-api";
-import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
-import { MatrixScheduler } from "./scheduler";
-import { SyncState } from "./sync";
-import { MapWithDefault } from "./utils";
+import { ToDeviceMessageId } from "./@types/event.js";
+import { logger } from "./logger.js";
+import { MatrixClient, ClientEvent } from "./client.js";
+import { MatrixError } from "./http-api/index.js";
+import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage.js";
+import { MatrixScheduler } from "./scheduler.js";
+import { SyncState } from "./sync.js";
+import { MapWithDefault } from "./utils.js";
 
 const MAX_BATCH_SIZE = 20;
 

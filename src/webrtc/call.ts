@@ -24,12 +24,12 @@ limitations under the License.
 import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
-import { logger } from "../logger";
-import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils";
-import { MatrixEvent } from "../models/event";
-import { EventType, TimelineEvents, ToDeviceMessageId } from "../@types/event";
-import { RoomMember } from "../models/room-member";
-import { randomString } from "../randomstring";
+import { logger } from "../logger.js";
+import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils.js";
+import { MatrixEvent } from "../models/event.js";
+import { EventType, TimelineEvents, ToDeviceMessageId } from "../@types/event.js";
+import { RoomMember } from "../models/room-member.js";
+import { randomString } from "../randomstring.js";
 import {
     MCallReplacesEvent,
     MCallAnswer,
@@ -44,15 +44,15 @@ import {
     MCallCandidates,
     MCallBase,
     MCallHangupReject,
-} from "./callEventTypes";
-import { CallFeed } from "./callFeed";
-import { MatrixClient } from "../client";
-import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
-import { DeviceInfo } from "../crypto/deviceinfo";
-import { GroupCallUnknownDeviceError } from "./groupCall";
-import { IScreensharingOpts } from "./mediaHandler";
-import { MatrixError } from "../http-api";
-import { GroupCallStats } from "./stats/groupCallStats";
+} from "./callEventTypes.js";
+import { CallFeed } from "./callFeed.js";
+import { MatrixClient } from "../client.js";
+import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.js";
+import { DeviceInfo } from "../crypto/deviceinfo.js";
+import { GroupCallUnknownDeviceError } from "./groupCall.js";
+import { IScreensharingOpts } from "./mediaHandler.js";
+import { MatrixError } from "../http-api/index.js";
+import { GroupCallStats } from "./stats/groupCallStats.js";
 
 interface CallOpts {
     // The room ID for this call.

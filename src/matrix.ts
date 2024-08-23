@@ -16,74 +16,74 @@ limitations under the License.
 
 import { WidgetApi } from "matrix-widget-api";
 
-import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
-import { MemoryStore } from "./store/memory";
-import { MatrixScheduler } from "./scheduler";
-import { MatrixClient, ICreateClientOpts } from "./client";
-import { RoomWidgetClient, ICapabilities } from "./embedded";
-import { CryptoStore } from "./crypto/store/base";
+import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store.js";
+import { MemoryStore } from "./store/memory.js";
+import { MatrixScheduler } from "./scheduler.js";
+import { MatrixClient, ICreateClientOpts } from "./client.js";
+import { RoomWidgetClient, ICapabilities } from "./embedded.js";
+import { CryptoStore } from "./crypto/store/base.js";
 
-export * from "./client";
-export * from "./serverCapabilities";
-export * from "./embedded";
-export * from "./http-api";
-export * from "./autodiscovery";
-export * from "./sync-accumulator";
-export * from "./errors";
-export * from "./base64";
-export * from "./models/beacon";
-export * from "./models/event";
-export * from "./models/room";
-export * from "./models/event-timeline";
-export * from "./models/event-timeline-set";
-export * from "./models/poll";
-export * from "./models/room-member";
-export * from "./models/room-state";
-export * from "./models/thread";
-export * from "./models/typed-event-emitter";
-export * from "./models/user";
-export * from "./models/device";
-export * from "./models/search-result";
-export * from "./oidc";
-export * from "./scheduler";
-export * from "./filter";
-export * from "./timeline-window";
-export * from "./interactive-auth";
-export * from "./service-types";
-export * from "./store/memory";
-export * from "./store/indexeddb";
-export * from "./crypto/store/memory-crypto-store";
-export * from "./crypto/store/localStorage-crypto-store";
-export * from "./crypto/store/indexeddb-crypto-store";
-export type { OutgoingRoomKeyRequest } from "./crypto/store/base";
-export * from "./content-repo";
-export * from "./@types/common";
-export * from "./@types/uia";
-export * from "./@types/event";
-export * from "./@types/PushRules";
-export * from "./@types/partials";
-export * from "./@types/requests";
-export * from "./@types/search";
-export * from "./@types/beacon";
-export * from "./@types/topic";
-export * from "./@types/location";
-export * from "./@types/threepids";
-export * from "./@types/auth";
-export * from "./@types/polls";
-export * from "./@types/local_notifications";
-export * from "./@types/registration";
-export * from "./@types/read_receipts";
-export * from "./@types/crypto";
-export * from "./@types/extensible_events";
-export * from "./@types/IIdentityServerProvider";
-export * from "./models/room-summary";
-export * from "./models/event-status";
-export type { RoomSummary } from "./client";
-export * as ContentHelpers from "./content-helpers";
-export * as SecretStorage from "./secret-storage";
-export type { ICryptoCallbacks } from "./crypto"; // used to be located here
-export { createNewMatrixCall, CallEvent } from "./webrtc/call";
-export type { MatrixCall } from "./webrtc/call";
+export * from "./client.js";
+export * from "./serverCapabilities.js";
+export * from "./embedded.js";
+export * from "./http-api/index.js";
+export * from "./autodiscovery.js";
+export * from "./sync-accumulator.js";
+export * from "./errors.js";
+export * from "./base64.js";
+export * from "./models/beacon.js";
+export * from "./models/event.js";
+export * from "./models/room.js";
+export * from "./models/event-timeline.js";
+export * from "./models/event-timeline-set.js";
+export * from "./models/poll.js";
+export * from "./models/room-member.js";
+export * from "./models/room-state.js";
+export * from "./models/thread.js";
+export * from "./models/typed-event-emitter.js";
+export * from "./models/user.js";
+export * from "./models/device.js";
+export * from "./models/search-result.js";
+export * from "./oidc/index.js";
+export * from "./scheduler.js";
+export * from "./filter.js";
+export * from "./timeline-window.js";
+export * from "./interactive-auth.js";
+export * from "./service-types.js";
+export * from "./store/memory.js";
+export * from "./store/indexeddb.js";
+export * from "./crypto/store/memory-crypto-store.js";
+export * from "./crypto/store/localStorage-crypto-store.js";
+export * from "./crypto/store/indexeddb-crypto-store.js";
+export type { OutgoingRoomKeyRequest } from "./crypto/store/base.js";
+export * from "./content-repo.js";
+export * from "./@types/common.js";
+export * from "./@types/uia.js";
+export * from "./@types/event.js";
+export * from "./@types/PushRules.js";
+export * from "./@types/partials.js";
+export * from "./@types/requests.js";
+export * from "./@types/search.js";
+export * from "./@types/beacon.js";
+export * from "./@types/topic.js";
+export * from "./@types/location.js";
+export * from "./@types/threepids.js";
+export * from "./@types/auth.js";
+export * from "./@types/polls.js";
+export * from "./@types/local_notifications.js";
+export * from "./@types/registration.js";
+export * from "./@types/read_receipts.js";
+export * from "./@types/crypto.js";
+export * from "./@types/extensible_events.js";
+export * from "./@types/IIdentityServerProvider.js";
+export * from "./models/room-summary.js";
+export * from "./models/event-status.js";
+export type { RoomSummary } from "./client.js";
+export * as ContentHelpers from "./content-helpers.js";
+export * as SecretStorage from "./secret-storage.js";
+export type { ICryptoCallbacks } from "./crypto/index.js"; // used to be located here
+export { createNewMatrixCall, CallEvent } from "./webrtc/call.js";
+export type { MatrixCall } from "./webrtc/call.js";
 export {
     GroupCall,
     GroupCallEvent,
@@ -91,21 +91,21 @@ export {
     GroupCallState,
     GroupCallType,
     GroupCallStatsReportEvent,
-} from "./webrtc/groupCall";
-export { CryptoEvent } from "./crypto";
-export { SyncState, SetPresence } from "./sync";
-export type { ISyncStateData as SyncStateData } from "./sync";
-export { SlidingSyncEvent } from "./sliding-sync";
-export { MediaHandlerEvent } from "./webrtc/mediaHandler";
-export { CallFeedEvent } from "./webrtc/callFeed";
-export { StatsReport } from "./webrtc/stats/statsReport";
-export { Relations, RelationsEvent } from "./models/relations";
-export { TypedEventEmitter } from "./models/typed-event-emitter";
-export { LocalStorageErrors } from "./store/local-storage-events-emitter";
-export { IdentityProviderBrand, SSOAction } from "./@types/auth";
-export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth";
-export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces";
-export { LocationAssetType } from "./@types/location";
+} from "./webrtc/groupCall.js";
+export { CryptoEvent } from "./crypto/index.js";
+export { SyncState, SetPresence } from "./sync.js";
+export type { ISyncStateData as SyncStateData } from "./sync.js";
+export { SlidingSyncEvent } from "./sliding-sync.js";
+export { MediaHandlerEvent } from "./webrtc/mediaHandler.js";
+export { CallFeedEvent } from "./webrtc/callFeed.js";
+export { StatsReport } from "./webrtc/stats/statsReport.js";
+export { Relations, RelationsEvent } from "./models/relations.js";
+export { TypedEventEmitter } from "./models/typed-event-emitter.js";
+export { LocalStorageErrors } from "./store/local-storage-events-emitter.js";
+export { IdentityProviderBrand, SSOAction } from "./@types/auth.js";
+export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth.js";
+export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces.js";
+export { LocationAssetType } from "./@types/location.js";
 
 /**
  * Types supporting cryptography.
@@ -113,7 +113,7 @@ export { LocationAssetType } from "./@types/location";
  * The most important is {@link Crypto.CryptoApi}, an instance of which can be retrieved via
  * {@link MatrixClient.getCrypto}.
  */
-export * as Crypto from "./crypto-api";
+export * as Crypto from "./crypto-api/index.js";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 

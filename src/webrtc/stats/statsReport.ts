@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ConnectionStatsBandwidth, ConnectionStatsBitrate, PacketLoss } from "./connectionStats";
-import { TransportStats } from "./transportStats";
-import { Resolution } from "./media/mediaTrackStats";
+import { ConnectionStatsBandwidth, ConnectionStatsBitrate, PacketLoss } from "./connectionStats.js";
+import { TransportStats } from "./transportStats.js";
+import { Resolution } from "./media/mediaTrackStats.js";
 
 export enum StatsReport {
     CONNECTION_STATS = "StatsReport.connection_stats",

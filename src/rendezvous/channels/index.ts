@@ -17,5 +17,5 @@ limitations under the License.
 /**
  * @deprecated in favour of MSC4108-based implementation
  */
-export * from "./MSC3903ECDHv2RendezvousChannel";
-export * from "./MSC4108SecureChannel";
+export * from "./MSC3903ECDHv2RendezvousChannel.js";
+export * from "./MSC4108SecureChannel.js";

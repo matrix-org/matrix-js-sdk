@@ -16,18 +16,18 @@ limitations under the License.
 
 /* eslint-disable @babel/no-invalid-this */
 
-import { MemoryStore, IOpts as IBaseOpts } from "./memory";
-import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
-import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
-import { IEvent, MatrixEvent } from "../models/event";
-import { logger } from "../logger";
-import { ISavedSync } from "./index";
-import { IIndexedDBBackend } from "./indexeddb-backend";
-import { ISyncResponse } from "../sync-accumulator";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
-import { IStoredClientOpts } from "../client";
+import { MemoryStore, IOpts as IBaseOpts } from "./memory.js";
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
+import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.js";
+import { IEvent, MatrixEvent } from "../models/event.js";
+import { logger } from "../logger.js";
+import { ISavedSync } from "./index.js";
+import { IIndexedDBBackend } from "./indexeddb-backend.js";
+import { ISyncResponse } from "../sync-accumulator.js";
+import { TypedEventEmitter } from "../models/typed-event-emitter.js";
+import { IStateEventWithRoomId } from "../@types/search.js";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.js";
+import { IStoredClientOpts } from "../client.js";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.

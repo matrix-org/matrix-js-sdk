@@ -21,7 +21,7 @@ import {
     REFERENCE_RELATION,
     RelatesToRelationship,
     TSNamespace,
-} from "./extensible_events";
+} from "./extensible_events.js";
 
 /**
  * Identifier for a disclosed poll.

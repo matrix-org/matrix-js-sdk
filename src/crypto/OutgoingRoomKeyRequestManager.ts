@@ -16,12 +16,12 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import { logger } from "../logger";
-import { MatrixClient } from "../client";
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
-import { CryptoStore, OutgoingRoomKeyRequest } from "./store/base";
-import { EventType, ToDeviceMessageId } from "../@types/event";
-import { MapWithDefault } from "../utils";
+import { logger } from "../logger.js";
+import { MatrixClient } from "../client.js";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index.js";
+import { CryptoStore, OutgoingRoomKeyRequest } from "./store/base.js";
+import { EventType, ToDeviceMessageId } from "../@types/event.js";
+import { MapWithDefault } from "../utils.js";
 
 /**
  * Internal module. Management of outgoing room key requests.

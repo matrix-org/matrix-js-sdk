@@ -20,11 +20,11 @@ import {
     isEventTypeSame,
     M_TEXT,
     REFERENCE_RELATION,
-} from "../@types/extensible_events";
-import { M_POLL_END, PollEndEventContent } from "../@types/polls";
-import { ExtensibleEvent } from "./ExtensibleEvent";
-import { InvalidEventError } from "./InvalidEventError";
-import { MessageEvent } from "./MessageEvent";
+} from "../@types/extensible_events.js";
+import { M_POLL_END, PollEndEventContent } from "../@types/polls.js";
+import { ExtensibleEvent } from "./ExtensibleEvent.js";
+import { InvalidEventError } from "./InvalidEventError.js";
+import { MessageEvent } from "./MessageEvent.js";
 
 /**
  * Represents a poll end/closure event.

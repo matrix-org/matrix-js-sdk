@@ -1,4 +1,4 @@
-import { TransportStats } from "./transportStats";
+import { TransportStats } from "./transportStats.js";
 
 export class TransportStatsBuilder {
     public static buildReport(

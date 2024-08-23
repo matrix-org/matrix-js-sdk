@@ -15,13 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { VerificationRequest, REQUEST_TYPE, READY_TYPE, START_TYPE } from "./VerificationRequest";
-import { logger } from "../../../logger";
-import { IVerificationChannel } from "./Channel";
-import { EventType, TimelineEvents } from "../../../@types/event";
-import { MatrixClient } from "../../../client";
-import { MatrixEvent } from "../../../models/event";
-import { IRequestsMap } from "../..";
+import { VerificationRequest, REQUEST_TYPE, READY_TYPE, START_TYPE } from "./VerificationRequest.js";
+import { logger } from "../../../logger.js";
+import { IVerificationChannel } from "./Channel.js";
+import { EventType, TimelineEvents } from "../../../@types/event.js";
+import { MatrixClient } from "../../../client.js";
+import { MatrixEvent } from "../../../models/event.js";
+import { IRequestsMap } from "../../index.js";
 
 const MESSAGE_TYPE = EventType.RoomMessage;
 const M_REFERENCE = "m.reference";

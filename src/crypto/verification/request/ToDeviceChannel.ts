@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from "../../../randomstring";
-import { logger } from "../../../logger";
+import { randomString } from "../../../randomstring.js";
+import { logger } from "../../../logger.js";
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -25,12 +25,12 @@ import {
     READY_TYPE,
     START_TYPE,
     VerificationRequest,
-} from "./VerificationRequest";
-import { errorFromEvent, newUnexpectedMessageError } from "../Error";
-import { MatrixEvent } from "../../../models/event";
-import { IVerificationChannel } from "./Channel";
-import { MatrixClient } from "../../../client";
-import { IRequestsMap } from "../..";
+} from "./VerificationRequest.js";
+import { errorFromEvent, newUnexpectedMessageError } from "../Error.js";
+import { MatrixEvent } from "../../../models/event.js";
+import { IVerificationChannel } from "./Channel.js";
+import { MatrixClient } from "../../../client.js";
+import { IRequestsMap } from "../../index.js";
 
 export type Request = VerificationRequest<ToDeviceChannel>;
 

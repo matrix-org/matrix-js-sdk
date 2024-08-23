@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ExtensibleEvent } from "./ExtensibleEvent";
-import { M_POLL_RESPONSE, PollResponseEventContent, PollResponseSubtype } from "../@types/polls";
-import { ExtensibleEventType, IPartialEvent, isEventTypeSame, REFERENCE_RELATION } from "../@types/extensible_events";
-import { InvalidEventError } from "./InvalidEventError";
-import { PollStartEvent } from "./PollStartEvent";
+import { ExtensibleEvent } from "./ExtensibleEvent.js";
+import { M_POLL_RESPONSE, PollResponseEventContent, PollResponseSubtype } from "../@types/polls.js";
+import { ExtensibleEventType, IPartialEvent, isEventTypeSame, REFERENCE_RELATION } from "../@types/extensible_events.js";
+import { InvalidEventError } from "./InvalidEventError.js";
+import { PollStartEvent } from "./PollStartEvent.js";
 
 /**
  * Represents a poll response event.

@@ -27,13 +27,13 @@ import {
     UploadSigningKeysRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { logger } from "../logger";
-import { calculateRetryBackoff, IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { logDuration, QueryDict, sleep } from "../utils";
-import { AuthDict, UIAuthCallback } from "../interactive-auth";
-import { UIAResponse } from "../@types/uia";
-import { ToDeviceMessageId } from "../@types/event";
-import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager";
+import { logger } from "../logger.js";
+import { calculateRetryBackoff, IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.js";
+import { logDuration, QueryDict, sleep } from "../utils.js";
+import { AuthDict, UIAuthCallback } from "../interactive-auth.js";
+import { UIAResponse } from "../@types/uia.js";
+import { ToDeviceMessageId } from "../@types/event.js";
+import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager.js";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.

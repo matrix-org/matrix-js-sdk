@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from "./event";
-import { logger } from "../logger";
-import { RelationType } from "../@types/event";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { MatrixClient } from "../client";
-import { Room } from "./room";
+import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from "./event.js";
+import { logger } from "../logger.js";
+import { RelationType } from "../@types/event.js";
+import { TypedEventEmitter } from "./typed-event-emitter.js";
+import { MatrixClient } from "../client.js";
+import { Room } from "./room.js";
 
 export enum RelationsEvent {
     Add = "Relations.add",

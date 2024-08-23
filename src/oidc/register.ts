@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClientConfig } from ".";
-import { OidcError } from "./error";
-import { Method } from "../http-api";
-import { logger } from "../logger";
-import { NonEmptyArray } from "../@types/common";
+import { OidcClientConfig } from "./index.js";
+import { OidcError } from "./error.js";
+import { Method } from "../http-api/index.js";
+import { logger } from "../logger.js";
+import { NonEmptyArray } from "../@types/common.js";
 
 /**
  * Client metadata passed to registration endpoint

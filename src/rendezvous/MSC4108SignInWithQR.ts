@@ -16,14 +16,14 @@ limitations under the License.
 
 import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener } from ".";
-import { MatrixClient } from "../client";
-import { logger } from "../logger";
-import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel";
-import { MatrixError } from "../http-api";
-import { sleep } from "../utils";
-import { DEVICE_CODE_SCOPE, discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig } from "../oidc";
-import { CryptoApi } from "../crypto-api";
+import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousError, RendezvousFailureListener } from "./index.js";
+import { MatrixClient } from "../client.js";
+import { logger } from "../logger.js";
+import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.js";
+import { MatrixError } from "../http-api/index.js";
+import { sleep } from "../utils.js";
+import { DEVICE_CODE_SCOPE, discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig } from "../oidc/index.js";
+import { CryptoApi } from "../crypto-api/index.js";
 
 /**
  * Enum representing the payload types transmissible over [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)

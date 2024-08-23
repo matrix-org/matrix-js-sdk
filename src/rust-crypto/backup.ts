@@ -24,19 +24,19 @@ import {
     KeyBackupInfo,
     KeyBackupSession,
     Curve25519SessionData,
-} from "../crypto-api/keybackup";
-import { logger } from "../logger";
-import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
-import { CryptoEvent, IMegolmSessionData } from "../crypto";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri, logDuration } from "../utils";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { sleep } from "../utils";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend";
-import { IEncryptedPayload } from "../crypto/aes";
-import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api";
-import { IKeyBackupInfo } from "../crypto/keybackup";
-import { IKeyBackup } from "../crypto/backup";
+} from "../crypto-api/keybackup.js";
+import { logger } from "../logger.js";
+import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.js";
+import { CryptoEvent, IMegolmSessionData } from "../crypto/index.js";
+import { TypedEventEmitter } from "../models/typed-event-emitter.js";
+import { encodeUri, logDuration } from "../utils.js";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.js";
+import { sleep } from "../utils.js";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend.js";
+import { IEncryptedPayload } from "../crypto/aes.js";
+import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api/index.js";
+import { IKeyBackupInfo } from "../crypto/keybackup.js";
+import { IKeyBackup } from "../crypto/backup.js";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];

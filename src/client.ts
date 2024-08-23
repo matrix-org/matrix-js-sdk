@@ -20,8 +20,8 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto";
-import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync";
+import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto.js";
+import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync.js";
 import {
     EventStatus,
     IContent,
@@ -31,29 +31,29 @@ import {
     MatrixEventEvent,
     MatrixEventHandlerMap,
     PushDetails,
-} from "./models/event";
-import { StubStore } from "./store/stub";
-import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
-import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
-import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler";
+} from "./models/event.js";
+import { StubStore } from "./store/stub.js";
+import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call.js";
+import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter.js";
+import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler.js";
 import {
     GroupCallEventHandler,
     GroupCallEventHandlerEvent,
     GroupCallEventHandlerEventHandlerMap,
-} from "./webrtc/groupCallEventHandler";
-import * as utils from "./utils";
-import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils";
-import { Direction, EventTimeline } from "./models/event-timeline";
-import { IActionsObject, PushProcessor } from "./pushprocessor";
-import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
-import * as olmlib from "./crypto/olmlib";
-import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64";
-import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
-import { IOlmDevice } from "./crypto/algorithms/megolm";
-import { TypedReEmitter } from "./ReEmitter";
-import { IRoomEncryption } from "./crypto/RoomList";
-import { logger, Logger } from "./logger";
-import { SERVICE_TYPES } from "./service-types";
+} from "./webrtc/groupCallEventHandler.js";
+import * as utils from "./utils.js";
+import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils.js";
+import { Direction, EventTimeline } from "./models/event-timeline.js";
+import { IActionsObject, PushProcessor } from "./pushprocessor.js";
+import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.js";
+import * as olmlib from "./crypto/olmlib.js";
+import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.js";
+import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.js";
+import { IOlmDevice } from "./crypto/algorithms/megolm.js";
+import { TypedReEmitter } from "./ReEmitter.js";
+import { IRoomEncryption } from "./crypto/RoomList.js";
+import { logger, Logger } from "./logger.js";
+import { SERVICE_TYPES } from "./service-types.js";
 import {
     Body,
     ClientPrefix,
@@ -73,7 +73,7 @@ import {
     Upload,
     UploadOpts,
     UploadResponse,
-} from "./http-api";
+} from "./http-api/index.js";
 import {
     Crypto,
     CryptoEvent,
@@ -83,14 +83,14 @@ import {
     ICryptoCallbacks,
     IRoomKeyRequestBody,
     isCryptoAvailable,
-} from "./crypto";
-import { DeviceInfo } from "./crypto/deviceinfo";
-import { decodeRecoveryKey } from "./crypto/recoverykey";
-import { keyFromAuthData } from "./crypto/key_passphrase";
-import { User, UserEvent, UserEventHandlerMap } from "./models/user";
-import { getHttpUriForMxc } from "./content-repo";
-import { SearchResult } from "./models/search-result";
-import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration";
+} from "./crypto/index.js";
+import { DeviceInfo } from "./crypto/deviceinfo.js";
+import { decodeRecoveryKey } from "./crypto/recoverykey.js";
+import { keyFromAuthData } from "./crypto/key_passphrase.js";
+import { User, UserEvent, UserEventHandlerMap } from "./models/user.js";
+import { getHttpUriForMxc } from "./content-repo.js";
+import { SearchResult } from "./models/search-result.js";
+import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration.js";
 import {
     IKeyBackupInfo,
     IKeyBackupPrepareOpts,
@@ -98,21 +98,21 @@ import {
     IKeyBackupRestoreResult,
     IKeyBackupRoomSessions,
     IKeyBackupSession,
-} from "./crypto/keybackup";
-import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
-import { MatrixScheduler } from "./scheduler";
-import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon";
-import { AuthDict } from "./interactive-auth";
-import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
-import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api";
-import { EventTimelineSet } from "./models/event-timeline-set";
-import { VerificationRequest } from "./crypto/verification/request/VerificationRequest";
-import { VerificationBase as Verification } from "./crypto/verification/Base";
-import * as ContentHelpers from "./content-helpers";
-import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { NotificationCountType, Room, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
-import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
-import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
+} from "./crypto/keybackup.js";
+import { IIdentityServerProvider } from "./@types/IIdentityServerProvider.js";
+import { MatrixScheduler } from "./scheduler.js";
+import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon.js";
+import { AuthDict } from "./interactive-auth.js";
+import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator.js";
+import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api.js";
+import { EventTimelineSet } from "./models/event-timeline-set.js";
+import { VerificationRequest } from "./crypto/verification/request/VerificationRequest.js";
+import { VerificationBase as Verification } from "./crypto/verification/Base.js";
+import * as ContentHelpers from "./content-helpers.js";
+import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning.js";
+import { NotificationCountType, Room, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room.js";
+import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member.js";
+import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state.js";
 import {
     DelayedEventInfo,
     IAddThreePidOnlyBody,
@@ -138,7 +138,7 @@ import {
     SendDelayedEventRequestOpts,
     SendDelayedEventResponse,
     UpdateDelayedEventAction,
-} from "./@types/requests";
+} from "./@types/requests.js";
 import {
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
@@ -153,15 +153,15 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
-} from "./@types/event";
-import { GuestAccess, HistoryVisibility, IdServerUnbindResult, JoinRule, Preset, Visibility } from "./@types/partials";
-import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
-import { randomString } from "./randomstring";
-import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
-import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace";
-import { ISignatures } from "./@types/signed";
-import { IStore } from "./store";
-import { ISecretRequest } from "./crypto/SecretStorage";
+} from "./@types/event.js";
+import { GuestAccess, HistoryVisibility, IdServerUnbindResult, JoinRule, Preset, Visibility } from "./@types/partials.js";
+import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.js";
+import { randomString } from "./randomstring.js";
+import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup.js";
+import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.js";
+import { ISignatures } from "./@types/signed.js";
+import { IStore } from "./store/index.js";
+import { ISecretRequest } from "./crypto/SecretStorage.js";
 import {
     IEventWithRoomId,
     ISearchRequestBody,
@@ -169,9 +169,9 @@ import {
     ISearchResults,
     IStateEventWithRoomId,
     SearchOrderBy,
-} from "./@types/search";
-import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
-import { IHierarchyRoom } from "./@types/spaces";
+} from "./@types/search.js";
+import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse.js";
+import { IHierarchyRoom } from "./@types/spaces.js";
 import {
     IPusher,
     IPusherRequest,
@@ -181,11 +181,11 @@ import {
     PushRuleActionName,
     PushRuleKind,
     RuleId,
-} from "./@types/PushRules";
-import { IThreepid } from "./@types/threepids";
-import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
-import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./webrtc/groupCall";
-import { MediaHandler } from "./webrtc/mediaHandler";
+} from "./@types/PushRules.js";
+import { IThreepid } from "./@types/threepids.js";
+import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base.js";
+import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./webrtc/groupCall.js";
+import { MediaHandler } from "./webrtc/mediaHandler.js";
 import {
     ILoginFlowsResponse,
     IRefreshTokenResponse,
@@ -193,11 +193,11 @@ import {
     LoginResponse,
     LoginTokenPostResponse,
     SSOAction,
-} from "./@types/auth";
-import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
-import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
-import { SlidingSyncSdk } from "./sliding-sync-sdk";
+} from "./@types/auth.js";
+import { TypedEventEmitter } from "./models/typed-event-emitter.js";
+import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts.js";
+import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync.js";
+import { SlidingSyncSdk } from "./sliding-sync-sdk.js";
 import {
     determineFeatureSupport,
     FeatureSupport,
@@ -205,33 +205,33 @@ import {
     THREAD_RELATION_TYPE,
     ThreadFilterType,
     threadFilterTypeToFilter,
-} from "./models/thread";
-import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon";
-import { NamespacedValue, UnstableValue } from "./NamespacedValue";
-import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
-import { ToDeviceBatch } from "./models/ToDeviceMessage";
-import { IgnoredInvites } from "./models/invites-ignorer";
-import { UIARequest, UIAResponse } from "./@types/uia";
-import { LocalNotificationSettings } from "./@types/local_notifications";
-import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
-import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend";
-import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
-import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api";
-import { DeviceInfoMap } from "./crypto/DeviceList";
+} from "./models/thread.js";
+import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon.js";
+import { NamespacedValue, UnstableValue } from "./NamespacedValue.js";
+import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.js";
+import { ToDeviceBatch } from "./models/ToDeviceMessage.js";
+import { IgnoredInvites } from "./models/invites-ignorer.js";
+import { UIARequest, UIAResponse } from "./@types/uia.js";
+import { LocalNotificationSettings } from "./@types/local_notifications.js";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature.js";
+import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend.js";
+import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.js";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo, CryptoApi, ImportRoomKeysOpts } from "./crypto-api/index.js";
+import { DeviceInfoMap } from "./crypto/DeviceList.js";
 import {
     AddSecretStorageKeyOpts,
     SecretStorageKeyDescription,
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
-} from "./secret-storage";
-import { RegisterRequest, RegisterResponse } from "./@types/registration";
-import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager";
-import { getRelationsThreadFilter } from "./thread-utils";
-import { KnownMembership, Membership } from "./@types/membership";
-import { RoomMessageEventContent, StickerEventContent } from "./@types/events";
-import { ImageInfo } from "./@types/media";
-import { Capabilities, ServerCapabilities } from "./serverCapabilities";
-import { sha256 } from "./digest";
+} from "./secret-storage.js";
+import { RegisterRequest, RegisterResponse } from "./@types/registration.js";
+import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager.js";
+import { getRelationsThreadFilter } from "./thread-utils.js";
+import { KnownMembership, Membership } from "./@types/membership.js";
+import { RoomMessageEventContent, StickerEventContent } from "./@types/events.js";
+import { ImageInfo } from "./@types/media.js";
+import { Capabilities, ServerCapabilities } from "./serverCapabilities.js";
+import { sha256 } from "./digest.js";
 
 export type Store = IStore;
 

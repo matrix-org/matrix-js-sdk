@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../logger";
-import { sleep } from "../../utils";
-import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousFailureListener } from "..";
-import { MatrixClient, Method } from "../../matrix";
-import { ClientPrefix } from "../../http-api";
+import { logger } from "../../logger.js";
+import { sleep } from "../../utils.js";
+import { ClientRendezvousFailureReason, MSC4108FailureReason, RendezvousFailureListener } from "../index.js";
+import { MatrixClient, Method } from "../../matrix.js";
+import { ClientPrefix } from "../../http-api/index.js";
 
 /**
  * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)

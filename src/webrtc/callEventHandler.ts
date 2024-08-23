@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event";
-import { logger } from "../logger";
-import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call";
-import { EventType } from "../@types/event";
-import { ClientEvent, MatrixClient } from "../client";
-import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
-import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from "./groupCall";
-import { RoomEvent } from "../models/room";
+import { MatrixEvent } from "../models/event.js";
+import { logger } from "../logger.js";
+import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call.js";
+import { EventType } from "../@types/event.js";
+import { ClientEvent, MatrixClient } from "../client.js";
+import { MCallAnswer, MCallHangupReject } from "./callEventTypes.js";
+import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from "./groupCall.js";
+import { RoomEvent } from "../models/room.js";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button

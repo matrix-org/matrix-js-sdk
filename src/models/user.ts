@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../matrix";
-import { MatrixEvent } from "./event";
-import { TypedEventEmitter } from "./typed-event-emitter";
+import { MatrixClient } from "../matrix.js";
+import { MatrixEvent } from "./event.js";
+import { TypedEventEmitter } from "./typed-event-emitter.js";
 
 export enum UserEvent {
     DisplayName = "User.displayName",

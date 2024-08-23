@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "./event";
-import { Room } from "./room";
-import { inMainTimelineForReceipt, threadIdForReceipt } from "../client";
+import { MatrixEvent } from "./event.js";
+import { Room } from "./room.js";
+import { inMainTimelineForReceipt, threadIdForReceipt } from "../client.js";
 
 /**
  * Determine the order of two events in a room.

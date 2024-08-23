@@ -21,27 +21,27 @@ limitations under the License.
 import anotherjson from "another-json";
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
-import { VerificationBase as Base, SwitchStartEventError } from "./Base";
+import { VerificationBase as Base, SwitchStartEventError } from "./Base.js";
 import {
     errorFactory,
     newInvalidMessageError,
     newKeyMismatchError,
     newUnknownMethodError,
     newUserCancelledError,
-} from "./Error";
-import { logger } from "../../logger";
-import { IContent, MatrixEvent } from "../../models/event";
-import { generateDecimalSas } from "./SASDecimal";
-import { EventType } from "../../@types/event";
-import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification";
-import { VerificationMethod } from "../../types";
+} from "./Error.js";
+import { logger } from "../../logger.js";
+import { IContent, MatrixEvent } from "../../models/event.js";
+import { generateDecimalSas } from "./SASDecimal.js";
+import { EventType } from "../../@types/event.js";
+import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification.js";
+import { VerificationMethod } from "../../types.js";
 
 // backwards-compatibility exports
 export type {
     ShowSasCallbacks as ISasEvent,
     GeneratedSas as IGeneratedSas,
     EmojiMapping,
-} from "../../crypto-api/verification";
+} from "../../crypto-api/verification.js";
 
 const START_TYPE = EventType.KeyVerificationStart;
 

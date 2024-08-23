@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Relations, RelationsEvent, EventHandlerMap } from "./relations";
-import { MatrixEvent } from "./event";
-import { Listener } from "./typed-event-emitter";
+import { Relations, RelationsEvent, EventHandlerMap } from "./relations.js";
+import { MatrixEvent } from "./event.js";
+import { Listener } from "./typed-event-emitter.js";
 
 export class RelatedRelations {
     private relations: Relations[];

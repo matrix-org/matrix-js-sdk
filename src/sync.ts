@@ -25,14 +25,14 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
-import { User } from "./models/user";
-import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils";
-import { Filter } from "./filter";
-import { EventTimeline } from "./models/event-timeline";
-import { logger } from "./logger";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.js";
+import { User } from "./models/user.js";
+import { NotificationCountType, Room, RoomEvent } from "./models/room.js";
+import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.js";
+import { Filter } from "./filter.js";
+import { EventTimeline } from "./models/event-timeline.js";
+import { logger } from "./logger.js";
+import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client.js";
 import {
     IEphemeral,
     IInvitedRoom,
@@ -47,20 +47,20 @@ import {
     ISyncResponse,
     ITimeline,
     IToDeviceEvent,
-} from "./sync-accumulator";
-import { MatrixEvent } from "./models/event";
-import { MatrixError, Method } from "./http-api";
-import { ISavedSync } from "./store";
-import { EventType } from "./@types/event";
-import { IPushRules } from "./@types/PushRules";
-import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
-import { RoomMemberEvent } from "./models/room-member";
-import { BeaconEvent } from "./models/beacon";
-import { IEventsResponse } from "./@types/requests";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
-import { Feature, ServerSupport } from "./feature";
-import { Crypto } from "./crypto";
-import { KnownMembership } from "./@types/membership";
+} from "./sync-accumulator.js";
+import { MatrixEvent } from "./models/event.js";
+import { MatrixError, Method } from "./http-api/index.js";
+import { ISavedSync } from "./store/index.js";
+import { EventType } from "./@types/event.js";
+import { IPushRules } from "./@types/PushRules.js";
+import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state.js";
+import { RoomMemberEvent } from "./models/room-member.js";
+import { BeaconEvent } from "./models/beacon.js";
+import { IEventsResponse } from "./@types/requests.js";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.js";
+import { Feature, ServerSupport } from "./feature.js";
+import { Crypto } from "./crypto/index.js";
+import { KnownMembership } from "./@types/membership.js";
 
 const DEBUG = true;
 

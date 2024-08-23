@@ -1,6 +1,6 @@
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient, IMyDevice } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.js";
+import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed.js";
+import { MatrixClient, IMyDevice } from "../client.js";
 import {
     CallErrorCode,
     CallEvent,
@@ -11,31 +11,31 @@ import {
     setTracksEnabled,
     createNewMatrixCall,
     CallError,
-} from "./call";
-import { RoomMember } from "../models/room-member";
-import { Room } from "../models/room";
-import { RoomStateEvent } from "../models/room-state";
-import { logger } from "../logger";
-import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { CallEventHandlerEvent } from "./callEventHandler";
-import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
-import { IScreensharingOpts } from "./mediaHandler";
-import { mapsEqual } from "../utils";
-import { GroupCallStats } from "./stats/groupCallStats";
+} from "./call.js";
+import { RoomMember } from "../models/room-member.js";
+import { Room } from "../models/room.js";
+import { RoomStateEvent } from "../models/room-state.js";
+import { logger } from "../logger.js";
+import { ReEmitter } from "../ReEmitter.js";
+import { SDPStreamMetadataPurpose } from "./callEventTypes.js";
+import { MatrixEvent } from "../models/event.js";
+import { EventType } from "../@types/event.js";
+import { CallEventHandlerEvent } from "./callEventHandler.js";
+import { GroupCallEventHandlerEvent } from "./groupCallEventHandler.js";
+import { IScreensharingOpts } from "./mediaHandler.js";
+import { mapsEqual } from "../utils.js";
+import { GroupCallStats } from "./stats/groupCallStats.js";
 import {
     ByteSentStatsReport,
     CallFeedReport,
     ConnectionStatsReport,
     StatsReport,
     SummaryStatsReport,
-} from "./stats/statsReport";
-import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
-import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
-import { KnownMembership } from "../@types/membership";
-import { CallMembershipData } from "../matrixrtc/CallMembership";
+} from "./stats/statsReport.js";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.js";
+import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.js";
+import { KnownMembership } from "../@types/membership.js";
+import { CallMembershipData } from "../matrixrtc/CallMembership.js";
 
 export enum GroupCallIntent {
     Ring = "m.ring",

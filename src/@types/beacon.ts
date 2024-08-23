@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RelatesToRelationship, REFERENCE_RELATION } from "./extensible_events";
-import { UnstableValue } from "../NamespacedValue";
-import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
+import { RelatesToRelationship, REFERENCE_RELATION } from "./extensible_events.js";
+import { UnstableValue } from "../NamespacedValue.js";
+import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location.js";
 
 /**
  * Beacon info and beacon event types as described in MSC3672

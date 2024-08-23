@@ -16,8 +16,8 @@ limitations under the License.
 
 import { NamespacedValue } from "matrix-events-sdk";
 
-import { MessageEvent } from "./MessageEvent";
-import { ExtensibleEventType, IPartialEvent, isEventTypeSame, M_TEXT } from "../@types/extensible_events";
+import { MessageEvent } from "./MessageEvent.js";
+import { ExtensibleEventType, IPartialEvent, isEventTypeSame, M_TEXT } from "../@types/extensible_events.js";
 import {
     KnownPollKind,
     M_POLL_KIND_DISCLOSED,
@@ -26,9 +26,9 @@ import {
     PollStartEventContent,
     PollStartSubtype,
     PollAnswer,
-} from "../@types/polls";
-import { InvalidEventError } from "./InvalidEventError";
-import { ExtensibleEvent } from "./ExtensibleEvent";
+} from "../@types/polls.js";
+import { InvalidEventError } from "./InvalidEventError.js";
+import { ExtensibleEvent } from "./ExtensibleEvent.js";
 
 /**
  * Represents a poll answer. Note that this is represented as a subtype and is

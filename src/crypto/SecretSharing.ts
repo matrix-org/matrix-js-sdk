@@ -15,13 +15,13 @@ limitations under the License.
 */
 import { v4 as uuidv4 } from "uuid";
 
-import { MatrixClient } from "../client";
-import { ICryptoCallbacks, IEncryptedContent } from "./index";
-import { defer, IDeferred } from "../utils";
-import { ToDeviceMessageId } from "../@types/event";
-import { logger } from "../logger";
-import { MatrixEvent } from "../models/event";
-import * as olmlib from "./olmlib";
+import { MatrixClient } from "../client.js";
+import { ICryptoCallbacks, IEncryptedContent } from "./index.js";
+import { defer, IDeferred } from "../utils.js";
+import { ToDeviceMessageId } from "../@types/event.js";
+import { logger } from "../logger.js";
+import { MatrixEvent } from "../models/event.js";
+import * as olmlib from "./olmlib.js";
 
 export interface ISecretRequest {
     requestId: string;

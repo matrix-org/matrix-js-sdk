@@ -17,10 +17,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
-import { logger } from "../logger";
-import { MatrixClient } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.js";
+import { GroupCallType, GroupCallState } from "../webrtc/groupCall.js";
+import { logger } from "../logger.js";
+import { MatrixClient } from "../client.js";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed",

@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError } from "./errors";
-import { Logger } from "../logger";
+import { MatrixError } from "./errors.js";
+import { Logger } from "../logger.js";
 
 export type Body = Record<string, any> | BodyInit;
 

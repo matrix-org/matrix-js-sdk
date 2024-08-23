@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "./event";
-import { Direction } from "./event-timeline";
+import { MatrixEvent } from "./event.js";
+import { Direction } from "./event-timeline.js";
 
 export class EventContext {
     private timeline: MatrixEvent[];

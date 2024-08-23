@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../logger";
-import { deepCompare, promiseTry, safeSet } from "../../utils";
+import { logger } from "../../logger.js";
+import { deepCompare, promiseTry, safeSet } from "../../utils.js";
 import {
     CryptoStore,
     IDeviceData,
@@ -30,12 +30,12 @@ import {
     ParkedSharedHistory,
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
-} from "./base";
-import { IRoomKeyRequestBody } from "../index";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { CrossSigningKeyInfo } from "../../crypto-api";
+} from "./base.js";
+import { IRoomKeyRequestBody } from "../index.js";
+import { IOlmDevice } from "../algorithms/megolm.js";
+import { IRoomEncryption } from "../RoomList.js";
+import { InboundGroupSessionData } from "../OlmDevice.js";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.js";
 
 function encodeSessionKey(senderCurve25519Key: string, sessionId: string): string {
     return encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);

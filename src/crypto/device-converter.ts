@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Device } from "../models/device";
-import { DeviceInfo } from "./deviceinfo";
+import { Device } from "../models/device.js";
+import { DeviceInfo } from "./deviceinfo.js";
 
 /**
  * Convert a {@link DeviceInfo} to a {@link Device}.

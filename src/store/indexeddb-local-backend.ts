@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
-import { deepCopy, promiseTry } from "../utils";
-import { exists as idbExists } from "../indexeddb-helpers";
-import { logger } from "../logger";
-import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix";
-import { ISavedSync } from "./index";
-import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator.js";
+import { deepCopy, promiseTry } from "../utils.js";
+import { exists as idbExists } from "../indexeddb-helpers.js";
+import { logger } from "../logger.js";
+import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix.js";
+import { ISavedSync } from "./index.js";
+import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend.js";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.js";
 
 type DbMigration = (db: IDBDatabase) => void;
 const DB_MIGRATIONS: DbMigration[] = [

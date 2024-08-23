@@ -16,12 +16,12 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { Direction, EventTimeline } from "./models/event-timeline";
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { EventTimelineSet } from "./models/event-timeline-set";
-import { MatrixEvent } from "./models/event";
-import { Room, RoomEvent } from "./models/room";
+import { Direction, EventTimeline } from "./models/event-timeline.js";
+import { logger } from "./logger.js";
+import { MatrixClient } from "./client.js";
+import { EventTimelineSet } from "./models/event-timeline-set.js";
+import { MatrixEvent } from "./models/event.js";
+import { Room, RoomEvent } from "./models/room.js";
 
 /**
  * @internal

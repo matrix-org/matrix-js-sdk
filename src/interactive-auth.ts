@@ -16,12 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { defer, IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
-import { UIAResponse } from "./@types/uia";
-import { UserIdentifier } from "./@types/auth";
+import { logger } from "./logger.js";
+import { MatrixClient } from "./client.js";
+import { defer, IDeferred } from "./utils.js";
+import { MatrixError } from "./http-api/index.js";
+import { UIAResponse } from "./@types/uia.js";
+import { UserIdentifier } from "./@types/auth.js";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";

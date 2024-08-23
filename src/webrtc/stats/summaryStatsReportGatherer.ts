@@ -10,11 +10,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { StatsReportEmitter } from "./statsReportEmitter";
-import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { SummaryStatsReport } from "./statsReport";
-import { ParticipantState } from "../groupCall";
-import { RoomMember } from "../../matrix";
+import { StatsReportEmitter } from "./statsReportEmitter.js";
+import { CallStatsReportSummary } from "./callStatsReportSummary.js";
+import { SummaryStatsReport } from "./statsReport.js";
+import { ParticipantState } from "../groupCall.js";
+import { RoomMember } from "../../matrix.js";
 
 interface CallStatsReportSummaryCounter {
     receivedAudio: number;

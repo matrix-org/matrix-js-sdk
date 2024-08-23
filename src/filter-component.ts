@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RelationType } from "./@types/event";
-import { MatrixEvent } from "./models/event";
-import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread";
+import { RelationType } from "./@types/event.js";
+import { MatrixEvent } from "./models/event.js";
+import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread.js";
 
 /**
  * Checks if a value matches a given field value, which may be a * terminated

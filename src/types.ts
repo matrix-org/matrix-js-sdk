@@ -21,11 +21,11 @@ limitations under the License.
  * Remember to only export *public* types from this file.
  */
 
-export type * from "./@types/media";
-export * from "./@types/membership";
-export type * from "./@types/event";
-export type * from "./@types/events";
-export type * from "./@types/state_events";
+export type * from "./@types/media.js";
+export * from "./@types/membership.js";
+export type * from "./@types/event.js";
+export type * from "./@types/events.js";
+export type * from "./@types/state_events.js";
 
 /** The different methods for device and user verification */
 export enum VerificationMethod {

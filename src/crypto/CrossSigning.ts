@@ -19,19 +19,19 @@ limitations under the License.
  */
 
 import type { PkSigning } from "@matrix-org/olm";
-import { IObject, pkSign, pkVerify } from "./olmlib";
-import { logger } from "../logger";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, encryptAES } from "./aes";
-import { DeviceInfo } from "./deviceinfo";
-import { ISignedKey, MatrixClient } from "../client";
-import { OlmDevice } from "./OlmDevice";
-import { ICryptoCallbacks } from ".";
-import { ISignatures } from "../@types/signed";
-import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
-import { CrossSigningKeyInfo, DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api";
-import { decodeBase64, encodeBase64 } from "../base64";
+import { IObject, pkSign, pkVerify } from "./olmlib.js";
+import { logger } from "../logger.js";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.js";
+import { decryptAES, encryptAES } from "./aes.js";
+import { DeviceInfo } from "./deviceinfo.js";
+import { ISignedKey, MatrixClient } from "../client.js";
+import { OlmDevice } from "./OlmDevice.js";
+import { ICryptoCallbacks } from "./index.js";
+import { ISignatures } from "../@types/signed.js";
+import { CryptoStore, SecretStorePrivateKeys } from "./store/base.js";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage.js";
+import { CrossSigningKeyInfo, DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api/index.js";
+import { decodeBase64, encodeBase64 } from "../base64.js";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };

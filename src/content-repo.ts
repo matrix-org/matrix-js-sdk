@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeParams } from "./utils";
+import { encodeParams } from "./utils.js";
 
 /**
  * Get the HTTP URL for an MXC URI.

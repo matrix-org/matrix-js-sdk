@@ -18,17 +18,17 @@ limitations under the License.
  * This is an internal module.
  */
 
-import { EventType } from "../@types/event";
-import { Room } from "../models/room";
-import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
-import { Filter } from "../filter";
-import { ISavedSync, IStore, UserCreator } from "./index";
-import { RoomSummary } from "../models/room-summary";
-import { ISyncResponse } from "../sync-accumulator";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage";
-import { IStoredClientOpts } from "../client";
+import { EventType } from "../@types/event.js";
+import { Room } from "../models/room.js";
+import { User } from "../models/user.js";
+import { IEvent, MatrixEvent } from "../models/event.js";
+import { Filter } from "../filter.js";
+import { ISavedSync, IStore, UserCreator } from "./index.js";
+import { RoomSummary } from "../models/room-summary.js";
+import { ISyncResponse } from "../sync-accumulator.js";
+import { IStateEventWithRoomId } from "../@types/search.js";
+import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage.js";
+import { IStoredClientOpts } from "../client.js";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.

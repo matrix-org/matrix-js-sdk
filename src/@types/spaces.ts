@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IPublicRoomsChunkRoom } from "../client";
-import { RoomType } from "./event";
-import { IStrippedState } from "../sync-accumulator";
+import { IPublicRoomsChunkRoom } from "../client.js";
+import { RoomType } from "./event.js";
+import { IStrippedState } from "../sync-accumulator.js";
 
 // Types relating to Rooms of type `m.space` and related APIs
 

@@ -17,13 +17,13 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
-import { Logger } from "../logger";
-import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
-import { RustBackupManager } from "./backup";
-import { CryptoEvent } from "../matrix";
-import { encodeUri, sleep } from "../utils";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend";
+import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.js";
+import { Logger } from "../logger.js";
+import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.js";
+import { RustBackupManager } from "./backup.js";
+import { CryptoEvent } from "../matrix.js";
+import { encodeUri, sleep } from "../utils.js";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend.js";
 
 // The minimum time to wait between two retries in case of errors. To avoid hammering the server.
 const KEY_BACKUP_BACKOFF = 5000; // ms

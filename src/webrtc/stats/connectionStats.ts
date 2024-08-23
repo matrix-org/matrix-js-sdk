@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TransportStats } from "./transportStats";
-import { Bitrate } from "./media/mediaTrackStats";
+import { TransportStats } from "./transportStats.js";
+import { Bitrate } from "./media/mediaTrackStats.js";
 
 export interface ConnectionStatsBandwidth {
     /**

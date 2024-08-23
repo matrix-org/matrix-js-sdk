@@ -16,18 +16,18 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Logger } from "../logger";
-import { CryptoStore, MigrationState, SecretStorePrivateKeys } from "../crypto/store/base";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, IEncryptedPayload } from "../crypto/aes";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
-import { requestKeyBackupVersion } from "./backup";
-import { IRoomEncryption } from "../crypto/RoomList";
-import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api";
-import { RustCrypto } from "./rust-crypto";
-import { KeyBackupInfo } from "../crypto-api/keybackup";
-import { sleep } from "../utils";
-import { encodeBase64 } from "../base64";
+import { Logger } from "../logger.js";
+import { CryptoStore, MigrationState, SecretStorePrivateKeys } from "../crypto/store/base.js";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.js";
+import { decryptAES, IEncryptedPayload } from "../crypto/aes.js";
+import { IHttpOpts, MatrixHttpApi } from "../http-api/index.js";
+import { requestKeyBackupVersion } from "./backup.js";
+import { IRoomEncryption } from "../crypto/RoomList.js";
+import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api/index.js";
+import { RustCrypto } from "./rust-crypto.js";
+import { KeyBackupInfo } from "../crypto-api/keybackup.js";
+import { sleep } from "../utils.js";
+import { encodeBase64 } from "../base64.js";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.

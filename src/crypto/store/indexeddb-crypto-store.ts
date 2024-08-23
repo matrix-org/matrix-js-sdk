@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, Logger } from "../../logger";
-import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
-import { MemoryCryptoStore } from "./memory-crypto-store";
-import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
-import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors";
-import * as IndexedDBHelpers from "../../indexeddb-helpers";
+import { logger, Logger } from "../../logger.js";
+import { LocalStorageCryptoStore } from "./localStorage-crypto-store.js";
+import { MemoryCryptoStore } from "./memory-crypto-store.js";
+import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend.js";
+import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors.js";
+import * as IndexedDBHelpers from "../../indexeddb-helpers.js";
 import {
     CryptoStore,
     IDeviceData,
@@ -34,12 +34,12 @@ import {
     ParkedSharedHistory,
     SecretStorePrivateKeys,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
-} from "./base";
-import { IRoomKeyRequestBody } from "../index";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { CrossSigningKeyInfo } from "../../crypto-api";
+} from "./base.js";
+import { IRoomKeyRequestBody } from "../index.js";
+import { IOlmDevice } from "../algorithms/megolm.js";
+import { IRoomEncryption } from "../RoomList.js";
+import { InboundGroupSessionData } from "../OlmDevice.js";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.js";
 
 /*
  * Internal module. indexeddb storage for e2e.

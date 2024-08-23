@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Logger, logger } from "../../logger";
-import { deepCompare } from "../../utils";
+import { Logger, logger } from "../../logger.js";
+import { deepCompare } from "../../utils.js";
 import {
     CryptoStore,
     IDeviceData,
@@ -31,13 +31,13 @@ import {
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
-} from "./base";
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { IndexedDBCryptoStore } from "./indexeddb-crypto-store";
-import { CrossSigningKeyInfo } from "../../crypto-api";
+} from "./base.js";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.js";
+import { IOlmDevice } from "../algorithms/megolm.js";
+import { IRoomEncryption } from "../RoomList.js";
+import { InboundGroupSessionData } from "../OlmDevice.js";
+import { IndexedDBCryptoStore } from "./indexeddb-crypto-store.js";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.js";
 
 const PROFILE_TRANSACTIONS = false;
 

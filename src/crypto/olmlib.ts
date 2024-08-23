@@ -21,16 +21,16 @@ limitations under the License.
 import anotherjson from "another-json";
 
 import type { PkSigning } from "@matrix-org/olm";
-import type { IOneTimeKey } from "../@types/crypto";
-import { OlmDevice } from "./OlmDevice";
-import { DeviceInfo } from "./deviceinfo";
-import { Logger, logger } from "../logger";
-import { IClaimOTKsResult, MatrixClient } from "../client";
-import { ISignatures } from "../@types/signed";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { IMessage } from "./algorithms/olm";
-import { MapWithDefault } from "../utils";
+import type { IOneTimeKey } from "../@types/crypto.js";
+import { OlmDevice } from "./OlmDevice.js";
+import { DeviceInfo } from "./deviceinfo.js";
+import { Logger, logger } from "../logger.js";
+import { IClaimOTKsResult, MatrixClient } from "../client.js";
+import { ISignatures } from "../@types/signed.js";
+import { MatrixEvent } from "../models/event.js";
+import { EventType } from "../@types/event.js";
+import { IMessage } from "./algorithms/olm.js";
+import { MapWithDefault } from "../utils.js";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",

@@ -18,8 +18,8 @@ limitations under the License.
  * Error messages.
  */
 
-import { MatrixEvent } from "../../models/event";
-import { EventType } from "../../@types/event";
+import { MatrixEvent } from "../../models/event.js";
+import { EventType } from "../../@types/event.js";
 
 export function newVerificationError(code: string, reason: string, extraData?: Record<string, any>): MatrixEvent {
     const content = Object.assign({}, { code, reason }, extraData);

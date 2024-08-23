@@ -16,13 +16,13 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { MatrixClient } from "../client";
-import { IContent, MatrixEvent } from "./event";
-import { EventTimeline } from "./event-timeline";
-import { Preset } from "../@types/partials";
-import { globToRegexp } from "../utils";
-import { Room } from "./room";
-import { EventType, StateEvents } from "../@types/event";
+import { MatrixClient } from "../client.js";
+import { IContent, MatrixEvent } from "./event.js";
+import { EventTimeline } from "./event-timeline.js";
+import { Preset } from "../@types/partials.js";
+import { globToRegexp } from "../utils.js";
+import { Room } from "./room.js";
+import { EventType, StateEvents } from "../@types/event.js";
 
 /// The event type storing the user's individual policies.
 ///

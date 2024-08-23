@@ -18,15 +18,15 @@ limitations under the License.
  * Internal module. Defines the base classes of the encryption implementations
  */
 
-import type { IMegolmSessionData } from "../../@types/crypto";
-import { MatrixClient } from "../../client";
-import { Room } from "../../models/room";
-import { OlmDevice } from "../OlmDevice";
-import { IContent, MatrixEvent, RoomMember } from "../../matrix";
-import { Crypto, IEncryptedContent, IEventDecryptionResult, IncomingRoomKeyRequest } from "..";
-import { DeviceInfo } from "../deviceinfo";
-import { IRoomEncryption } from "../RoomList";
-import { DeviceInfoMap } from "../DeviceList";
+import type { IMegolmSessionData } from "../../@types/crypto.js";
+import { MatrixClient } from "../../client.js";
+import { Room } from "../../models/room.js";
+import { OlmDevice } from "../OlmDevice.js";
+import { IContent, MatrixEvent, RoomMember } from "../../matrix.js";
+import { Crypto, IEncryptedContent, IEventDecryptionResult, IncomingRoomKeyRequest } from "../index.js";
+import { DeviceInfo } from "../deviceinfo.js";
+import { IRoomEncryption } from "../RoomList.js";
+import { DeviceInfoMap } from "../DeviceList.js";
 
 /**
  * Map of registered encryption algorithm classes. A map from string to {@link EncryptionAlgorithm} class
@@ -233,4 +233,4 @@ export function registerAlgorithm<P extends IParams = IParams>(
 }
 
 /* Re-export for backwards compatibility. Deprecated: this is an internal class. */
-export { DecryptionError } from "../../common-crypto/CryptoBackend";
+export { DecryptionError } from "../../common-crypto/CryptoBackend.js";

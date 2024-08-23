@@ -16,19 +16,19 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient, PendingEventOrdering } from "../client";
-import { TypedReEmitter } from "../ReEmitter";
-import { RelationType } from "../@types/event";
-import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
-import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
-import { NotificationCountType, Room, RoomEvent } from "./room";
-import { RoomState } from "./room-state";
-import { ServerControlledNamespacedValue } from "../NamespacedValue";
-import { logger } from "../logger";
-import { ReadReceipt } from "./read-receipt";
-import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
-import { Feature, ServerSupport } from "../feature";
+import { MatrixClient, PendingEventOrdering } from "../client.js";
+import { TypedReEmitter } from "../ReEmitter.js";
+import { RelationType } from "../@types/event.js";
+import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event.js";
+import { Direction, EventTimeline } from "./event-timeline.js";
+import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set.js";
+import { NotificationCountType, Room, RoomEvent } from "./room.js";
+import { RoomState } from "./room-state.js";
+import { ServerControlledNamespacedValue } from "../NamespacedValue.js";
+import { logger } from "../logger.js";
+import { ReadReceipt } from "./read-receipt.js";
+import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts.js";
+import { Feature, ServerSupport } from "../feature.js";
 
 export enum ThreadEvent {
     New = "Thread.new",

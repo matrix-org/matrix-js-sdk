@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RoomType } from "./event";
-import { GuestAccess, HistoryVisibility, JoinRule, RestrictedAllowType } from "./partials";
-import { ImageInfo } from "./media";
-import { PolicyRecommendation } from "../models/invites-ignorer";
+import { RoomType } from "./event.js";
+import { GuestAccess, HistoryVisibility, JoinRule, RestrictedAllowType } from "./partials.js";
+import { ImageInfo } from "./media.js";
+import { PolicyRecommendation } from "../models/invites-ignorer.js";
 
 export interface RoomCanonicalAliasEventContent {
     alias?: string;

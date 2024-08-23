@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../../logger";
-import { errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError } from "../Error";
-import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode";
-import { IVerificationChannel } from "./Channel";
-import { MatrixClient } from "../../../client";
-import { MatrixEvent } from "../../../models/event";
-import { EventType } from "../../../@types/event";
-import { VerificationBase } from "../Base";
-import { VerificationMethod } from "../../index";
-import { TypedEventEmitter } from "../../../models/typed-event-emitter";
+import { logger } from "../../../logger.js";
+import { errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError } from "../Error.js";
+import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode.js";
+import { IVerificationChannel } from "./Channel.js";
+import { MatrixClient } from "../../../client.js";
+import { MatrixEvent } from "../../../models/event.js";
+import { EventType } from "../../../@types/event.js";
+import { VerificationBase } from "../Base.js";
+import { VerificationMethod } from "../../index.js";
+import { TypedEventEmitter } from "../../../models/typed-event-emitter.js";
 import {
     canAcceptVerificationRequest,
     VerificationPhase as Phase,
@@ -31,10 +31,10 @@ import {
     VerificationRequestEvent,
     VerificationRequestEventHandlerMap,
     Verifier,
-} from "../../../crypto-api/verification";
+} from "../../../crypto-api/verification.js";
 
 // backwards-compatibility exports
-export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification";
+export { VerificationPhase as Phase, VerificationRequestEvent } from "../../../crypto-api/verification.js";
 
 // How long after the event's timestamp that the request times out
 const TIMEOUT_FROM_EVENT_TS = 10 * 60 * 1000; // 10 minutes

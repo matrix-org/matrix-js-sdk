@@ -15,14 +15,14 @@ limitations under the License.
 */
 
 import type { SigningKey } from "oidc-client-ts";
-import { ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate";
+import { ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate.js";
 
-export * from "./authorize";
-export * from "./discovery";
-export * from "./error";
-export * from "./register";
-export * from "./tokenRefresher";
-export * from "./validate";
+export * from "./authorize.js";
+export * from "./discovery.js";
+export * from "./error.js";
+export * from "./register.js";
+export * from "./tokenRefresher.js";
+export * from "./validate.js";
 
 /**
  * Validated config for native OIDC authentication, as returned by {@link discoverAndValidateOIDCIssuerWellKnown}.

@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
-import { MsgType } from "./@types/event";
-import { M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events";
-import { isProvided } from "./extensible_events_v1/utilities";
+import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon.js";
+import { MsgType } from "./@types/event.js";
+import { M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events.js";
+import { isProvided } from "./extensible_events_v1/utilities.js";
 import {
     M_ASSET,
     LocationAssetType,
@@ -28,9 +28,9 @@ import {
     MLocationContent,
     MAssetContent,
     LegacyLocationEventContent,
-} from "./@types/location";
-import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic";
-import { RoomMessageEventContent } from "./@types/events";
+} from "./@types/location.js";
+import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic.js";
+import { RoomMessageEventContent } from "./@types/events.js";
 
 /**
  * Generates the content for a HTML Message event

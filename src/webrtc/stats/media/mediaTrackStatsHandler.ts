@@ -13,10 +13,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { TrackID } from "../statsReport";
-import { MediaTrackStats } from "./mediaTrackStats";
-import { MediaTrackHandler, TrackId } from "./mediaTrackHandler";
-import { MediaSsrcHandler } from "./mediaSsrcHandler";
+import { TrackID } from "../statsReport.js";
+import { MediaTrackStats } from "./mediaTrackStats.js";
+import { MediaTrackHandler, TrackId } from "./mediaTrackHandler.js";
+import { MediaSsrcHandler } from "./mediaSsrcHandler.js";
 
 export class MediaTrackStatsHandler {
     private readonly track2stats = new Map<TrackID, MediaTrackStats>();

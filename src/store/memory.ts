@@ -18,21 +18,21 @@ limitations under the License.
  * This is an internal module. See {@link MemoryStore} for the public class.
  */
 
-import { EventType } from "../@types/event";
-import { Room } from "../models/room";
-import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { RoomMember } from "../models/room-member";
-import { Filter } from "../filter";
-import { ISavedSync, IStore, UserCreator } from "./index";
-import { RoomSummary } from "../models/room-summary";
-import { ISyncResponse } from "../sync-accumulator";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
-import { IStoredClientOpts } from "../client";
-import { MapWithDefault } from "../utils";
-import { KnownMembership } from "../@types/membership";
+import { EventType } from "../@types/event.js";
+import { Room } from "../models/room.js";
+import { User } from "../models/user.js";
+import { IEvent, MatrixEvent } from "../models/event.js";
+import { RoomState, RoomStateEvent } from "../models/room-state.js";
+import { RoomMember } from "../models/room-member.js";
+import { Filter } from "../filter.js";
+import { ISavedSync, IStore, UserCreator } from "./index.js";
+import { RoomSummary } from "../models/room-summary.js";
+import { ISyncResponse } from "../sync-accumulator.js";
+import { IStateEventWithRoomId } from "../@types/search.js";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.js";
+import { IStoredClientOpts } from "../client.js";
+import { MapWithDefault } from "../utils.js";
+import { KnownMembership } from "../@types/membership.js";
 
 function isValidFilterId(filterId?: string | number | null): boolean {
     const isValidStr =

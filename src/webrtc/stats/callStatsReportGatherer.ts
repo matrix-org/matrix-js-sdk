@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ConnectionStats } from "./connectionStats";
-import { StatsReportEmitter } from "./statsReportEmitter";
-import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
-import { ConnectionStatsBuilder } from "./connectionStatsBuilder";
-import { TransportStatsBuilder } from "./transportStatsBuilder";
-import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
-import { MediaTrackHandler } from "./media/mediaTrackHandler";
-import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
-import { TrackStatsBuilder } from "./trackStatsBuilder";
-import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder";
-import { ValueFormatter } from "./valueFormatter";
-import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { logger } from "../../logger";
-import { CallFeedStatsReporter } from "./callFeedStatsReporter";
+import { ConnectionStats } from "./connectionStats.js";
+import { StatsReportEmitter } from "./statsReportEmitter.js";
+import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport.js";
+import { ConnectionStatsBuilder } from "./connectionStatsBuilder.js";
+import { TransportStatsBuilder } from "./transportStatsBuilder.js";
+import { MediaSsrcHandler } from "./media/mediaSsrcHandler.js";
+import { MediaTrackHandler } from "./media/mediaTrackHandler.js";
+import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler.js";
+import { TrackStatsBuilder } from "./trackStatsBuilder.js";
+import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder.js";
+import { ValueFormatter } from "./valueFormatter.js";
+import { CallStatsReportSummary } from "./callStatsReportSummary.js";
+import { logger } from "../../logger.js";
+import { CallFeedStatsReporter } from "./callFeedStatsReporter.js";
 
 export class CallStatsReportGatherer {
     private isActive = true;

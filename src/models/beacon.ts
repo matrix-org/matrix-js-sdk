@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MBeaconEventContent } from "../@types/beacon";
-import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers";
-import { MatrixEvent } from "./event";
-import { sortEventsByLatestContentTimestamp } from "../utils";
-import { TypedEventEmitter } from "./typed-event-emitter";
+import { MBeaconEventContent } from "../@types/beacon.js";
+import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers.js";
+import { MatrixEvent } from "./event.js";
+import { sortEventsByLatestContentTimestamp } from "../utils.js";
+import { TypedEventEmitter } from "./typed-event-emitter.js";
 
 export enum BeaconEvent {
     New = "Beacon.new",

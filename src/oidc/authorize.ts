@@ -16,9 +16,9 @@ limitations under the License.
 
 import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
-import { logger } from "../logger";
-import { randomString } from "../randomstring";
-import { OidcError } from "./error";
+import { logger } from "../logger.js";
+import { randomString } from "../randomstring.js";
+import { OidcError } from "./error.js";
 import {
     BearerTokenResponse,
     UserState,
@@ -26,9 +26,9 @@ import {
     ValidatedIssuerMetadata,
     validateIdToken,
     validateStoredUserState,
-} from "./validate";
-import { sha256 } from "../digest";
-import { encodeUnpaddedBase64Url } from "../base64";
+} from "./validate.js";
+import { sha256 } from "../digest.js";
+import { encodeUnpaddedBase64Url } from "../base64.js";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };

@@ -19,23 +19,23 @@ limitations under the License.
  * Base class for verification methods.
  */
 
-import { MatrixEvent } from "../../models/event";
-import { EventType } from "../../@types/event";
-import { logger } from "../../logger";
-import { DeviceInfo } from "../deviceinfo";
-import { newTimeoutError } from "./Error";
-import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossSigning";
-import { IVerificationChannel } from "./request/Channel";
-import { MatrixClient } from "../../client";
-import { VerificationRequest } from "./request/VerificationRequest";
-import { TypedEventEmitter } from "../../models/typed-event-emitter";
+import { MatrixEvent } from "../../models/event.js";
+import { EventType } from "../../@types/event.js";
+import { logger } from "../../logger.js";
+import { DeviceInfo } from "../deviceinfo.js";
+import { newTimeoutError } from "./Error.js";
+import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossSigning.js";
+import { IVerificationChannel } from "./request/Channel.js";
+import { MatrixClient } from "../../client.js";
+import { VerificationRequest } from "./request/VerificationRequest.js";
+import { TypedEventEmitter } from "../../models/typed-event-emitter.js";
 import {
     ShowQrCodeCallbacks,
     ShowSasCallbacks,
     Verifier,
     VerifierEvent,
     VerifierEventHandlerMap,
-} from "../../crypto-api/verification";
+} from "../../crypto-api/verification.js";
 
 const timeoutException = new Error("Verification timed out");
 

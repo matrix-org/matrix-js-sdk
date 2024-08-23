@@ -24,10 +24,10 @@ import {
     RendezvousIntent,
     RendezvousTransport,
     RendezvousTransportDetails,
-} from "..";
-import { decodeBase64, encodeUnpaddedBase64 } from "../../base64";
-import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
-import { UnstableValue } from "../../NamespacedValue";
+} from "../index.js";
+import { decodeBase64, encodeUnpaddedBase64 } from "../../base64.js";
+import { generateDecimalSas } from "../../crypto/verification/SASDecimal.js";
+import { UnstableValue } from "../../NamespacedValue.js";
 
 const ECDH_V2 = new UnstableValue(
     "m.rendezvous.v2.curve25519-aes-sha256",

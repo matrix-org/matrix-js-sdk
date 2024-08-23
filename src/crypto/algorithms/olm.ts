@@ -18,17 +18,17 @@ limitations under the License.
  * Defines m.olm encryption/decryption
  */
 
-import type { IEventDecryptionResult } from "../../@types/crypto";
-import { logger } from "../../logger";
-import * as olmlib from "../olmlib";
-import { DeviceInfo } from "../deviceinfo";
-import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base";
-import { Room } from "../../models/room";
-import { IContent, MatrixEvent } from "../../models/event";
-import { IEncryptedContent, IOlmEncryptedContent } from "../index";
-import { IInboundSession } from "../OlmDevice";
-import { DecryptionFailureCode } from "../../crypto-api";
-import { DecryptionError } from "../../common-crypto/CryptoBackend";
+import type { IEventDecryptionResult } from "../../@types/crypto.js";
+import { logger } from "../../logger.js";
+import * as olmlib from "../olmlib.js";
+import { DeviceInfo } from "../deviceinfo.js";
+import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base.js";
+import { Room } from "../../models/room.js";
+import { IContent, MatrixEvent } from "../../models/event.js";
+import { IEncryptedContent, IOlmEncryptedContent } from "../index.js";
+import { IInboundSession } from "../OlmDevice.js";
+import { DecryptionFailureCode } from "../../crypto-api/index.js";
+import { DecryptionError } from "../../common-crypto/CryptoBackend.js";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 

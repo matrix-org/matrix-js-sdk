@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RoomMember } from "./room-member";
-import { logger } from "../logger";
-import { isNumber, removeHiddenChars } from "../utils";
-import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
-import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
-import { MatrixClient } from "../client";
-import { GuestAccess, HistoryVisibility, JoinRule } from "../@types/partials";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
-import { TypedReEmitter } from "../ReEmitter";
-import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
-import { KnownMembership } from "../@types/membership";
-import { RoomJoinRulesEventContent } from "../@types/state_events";
+import { RoomMember } from "./room-member.js";
+import { logger } from "../logger.js";
+import { isNumber, removeHiddenChars } from "../utils.js";
+import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event.js";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./event.js";
+import { MatrixClient } from "../client.js";
+import { GuestAccess, HistoryVisibility, JoinRule } from "../@types/partials.js";
+import { TypedEventEmitter } from "./typed-event-emitter.js";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon.js";
+import { TypedReEmitter } from "../ReEmitter.js";
+import { M_BEACON, M_BEACON_INFO } from "../@types/beacon.js";
+import { KnownMembership } from "../@types/membership.js";
+import { RoomJoinRulesEventContent } from "../@types/state_events.js";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the

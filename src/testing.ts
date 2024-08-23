@@ -22,12 +22,12 @@ limitations under the License.
  * @packageDocumentation
  */
 
-import { IContent, IEvent, IUnsigned, MatrixEvent } from "./models/event";
-import { RoomMember } from "./models/room-member";
-import { EventType } from "./@types/event";
-import { DecryptionError } from "./crypto/algorithms";
-import { DecryptionFailureCode } from "./crypto-api";
-import { EventDecryptionResult } from "./common-crypto/CryptoBackend";
+import { IContent, IEvent, IUnsigned, MatrixEvent } from "./models/event.js";
+import { RoomMember } from "./models/room-member.js";
+import { EventType } from "./@types/event.js";
+import { DecryptionError } from "./crypto/algorithms/index.js";
+import { DecryptionFailureCode } from "./crypto-api/index.js";
+import { EventDecryptionResult } from "./common-crypto/CryptoBackend.js";
 
 /**
  * Create a {@link MatrixEvent}.

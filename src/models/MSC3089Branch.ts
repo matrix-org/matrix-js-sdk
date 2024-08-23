@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../client";
-import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
-import { IContent, MatrixEvent } from "./event";
-import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
-import { EventTimeline } from "./event-timeline";
-import { FileType } from "../http-api";
-import type { ISendEventResponse } from "../@types/requests";
-import { EncryptedFile } from "../@types/media";
+import { MatrixClient } from "../client.js";
+import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event.js";
+import { IContent, MatrixEvent } from "./event.js";
+import { MSC3089TreeSpace } from "./MSC3089TreeSpace.js";
+import { EventTimeline } from "./event-timeline.js";
+import { FileType } from "../http-api/index.js";
+import type { ISendEventResponse } from "../@types/requests.js";
+import { EncryptedFile } from "../@types/media.js";
 
 export interface MSC3089EventContent {
     active?: boolean;

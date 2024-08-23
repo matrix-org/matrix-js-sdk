@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { IRoomEvent, IStateEvent } from "./sync-accumulator";
-import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { sleep, IDeferred, defer } from "./utils";
-import { HTTPError } from "./http-api";
+import { logger } from "./logger.js";
+import { MatrixClient } from "./client.js";
+import { IRoomEvent, IStateEvent } from "./sync-accumulator.js";
+import { TypedEventEmitter } from "./models/typed-event-emitter.js";
+import { sleep, IDeferred, defer } from "./utils.js";
+import { HTTPError } from "./http-api/index.js";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing

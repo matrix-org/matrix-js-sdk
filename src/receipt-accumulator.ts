@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMinimalEvent } from "./sync-accumulator";
-import { EventType } from "./@types/event";
-import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
-import { IContent } from "./models/event";
-import { ReceiptContent, ReceiptType } from "./@types/read_receipts";
+import { IMinimalEvent } from "./sync-accumulator.js";
+import { EventType } from "./@types/event.js";
+import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils.js";
+import { IContent } from "./models/event.js";
+import { ReceiptContent, ReceiptType } from "./@types/read_receipts.js";
 
 interface AccumulatedReceipt {
     data: IMinimalEvent;

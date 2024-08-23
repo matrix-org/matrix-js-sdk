@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../logger";
-import { MemoryCryptoStore } from "./memory-crypto-store";
+import { logger } from "../../logger.js";
+import { MemoryCryptoStore } from "./memory-crypto-store.js";
 import {
     CryptoStore,
     IDeviceData,
@@ -28,12 +28,12 @@ import {
     Mode,
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
-} from "./base";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { safeSet } from "../../utils";
-import { CrossSigningKeyInfo } from "../../crypto-api";
+} from "./base.js";
+import { IOlmDevice } from "../algorithms/megolm.js";
+import { IRoomEncryption } from "../RoomList.js";
+import { InboundGroupSessionData } from "../OlmDevice.js";
+import { safeSet } from "../../utils.js";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.js";
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.

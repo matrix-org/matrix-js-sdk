@@ -28,9 +28,9 @@ import {
     MSC4108Payload,
     RendezvousError,
     RendezvousFailureListener,
-} from "..";
-import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession";
-import { logger } from "../../logger";
+} from "../index.js";
+import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession.js";
+import { logger } from "../../logger.js";
 
 /**
  * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "./client";
-import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
-import { RelationType } from "./@types/event";
+import { MatrixClient } from "./client.js";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event.js";
+import { RelationType } from "./@types/event.js";
 
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 

@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { FetchHttpApi } from "./fetch";
-import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface";
-import { MediaPrefix } from "./prefix";
-import { defer, QueryDict, removeElement } from "../utils";
-import * as callbacks from "../realtime-callbacks";
-import { Method } from "./method";
-import { ConnectionError } from "./errors";
-import { parseErrorResponse } from "./utils";
+import { FetchHttpApi } from "./fetch.js";
+import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface.js";
+import { MediaPrefix } from "./prefix.js";
+import { defer, QueryDict, removeElement } from "../utils.js";
+import * as callbacks from "../realtime-callbacks.js";
+import { Method } from "./method.js";
+import { ConnectionError } from "./errors.js";
+import { parseErrorResponse } from "./utils.js";
 
-export * from "./interface";
-export * from "./prefix";
-export * from "./errors";
-export * from "./method";
-export * from "./utils";
+export * from "./interface.js";
+export * from "./prefix.js";
+export * from "./errors.js";
+export * from "./method.js";
+export * from "./utils.js";
 
 export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     private uploads: Upload[] = [];

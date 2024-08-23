@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { getHttpUriForMxc } from "../content-repo";
-import { removeDirectionOverrideChars, removeHiddenChars } from "../utils";
-import { User } from "./user";
-import { MatrixEvent } from "./event";
-import { RoomState } from "./room-state";
-import { logger } from "../logger";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { EventType } from "../@types/event";
-import { KnownMembership, Membership } from "../@types/membership";
+import { getHttpUriForMxc } from "../content-repo.js";
+import { removeDirectionOverrideChars, removeHiddenChars } from "../utils.js";
+import { User } from "./user.js";
+import { MatrixEvent } from "./event.js";
+import { RoomState } from "./room-state.js";
+import { logger } from "../logger.js";
+import { TypedEventEmitter } from "./typed-event-emitter.js";
+import { EventType } from "../@types/event.js";
+import { KnownMembership, Membership } from "../@types/membership.js";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",

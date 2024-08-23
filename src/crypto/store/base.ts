@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { IOlmDevice } from "../algorithms/megolm";
-import { TrackingStatus } from "../DeviceList";
-import { IRoomEncryption } from "../RoomList";
-import { IDevice } from "../deviceinfo";
-import { ICrossSigningInfo } from "../CrossSigning";
-import { Logger } from "../../logger";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { MatrixEvent } from "../../models/event";
-import { DehydrationManager } from "../dehydration";
-import { IEncryptedPayload } from "../aes";
-import { CrossSigningKeyInfo } from "../../crypto-api";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.js";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.js";
+import { IOlmDevice } from "../algorithms/megolm.js";
+import { TrackingStatus } from "../DeviceList.js";
+import { IRoomEncryption } from "../RoomList.js";
+import { IDevice } from "../deviceinfo.js";
+import { ICrossSigningInfo } from "../CrossSigning.js";
+import { Logger } from "../../logger.js";
+import { InboundGroupSessionData } from "../OlmDevice.js";
+import { MatrixEvent } from "../../models/event.js";
+import { DehydrationManager } from "../dehydration.js";
+import { IEncryptedPayload } from "../aes.js";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.js";
 
 /**
  * Internal module. Definitions for storage for the crypto module

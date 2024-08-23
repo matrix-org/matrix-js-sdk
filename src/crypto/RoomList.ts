@@ -18,8 +18,8 @@ limitations under the License.
  * Manages the list of encrypted rooms
  */
 
-import { CryptoStore } from "./store/base";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
+import { CryptoStore } from "./store/base.js";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.js";
 
 /* eslint-disable camelcase */
 export interface IRoomEncryption {

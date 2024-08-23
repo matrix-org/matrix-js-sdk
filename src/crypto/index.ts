@@ -20,55 +20,55 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
+import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto.js";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
-import { EventType, ToDeviceMessageId } from "../@types/event";
-import { TypedReEmitter } from "../ReEmitter";
-import { logger } from "../logger";
-import { IExportedDevice, OlmDevice } from "./OlmDevice";
-import { IOlmDevice } from "./algorithms/megolm";
-import * as olmlib from "./olmlib";
-import { DeviceInfoMap, DeviceList } from "./DeviceList";
-import { DeviceInfo, IDevice } from "./deviceinfo";
-import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
-import * as algorithms from "./algorithms";
-import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
-import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
-import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./api";
-import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { VerificationBase } from "./verification/Base";
-import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode";
-import { SAS as SASVerification } from "./verification/SAS";
-import { keyFromPassphrase } from "./key_passphrase";
-import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey";
-import { VerificationRequest } from "./verification/request/VerificationRequest";
-import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
-import { IllegalMethod } from "./verification/IllegalMethod";
-import { KeySignatureUploadError } from "../errors";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
-import { DehydrationManager } from "./dehydration";
-import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup";
-import { IStore } from "../store";
-import { Room, RoomEvent } from "../models/room";
-import { RoomMember, RoomMemberEvent } from "../models/room-member";
-import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
-import { ToDeviceBatch } from "../models/ToDeviceMessage";
-import { ClientEvent, IKeysUploadResponse, ISignedKey, IUploadKeySignaturesResponse, MatrixClient } from "../client";
-import { IRoomEncryption, RoomList } from "./RoomList";
-import { IKeyBackupInfo } from "./keybackup";
-import { ISyncStateData } from "../sync";
-import { CryptoStore } from "./store/base";
-import { IVerificationChannel } from "./verification/request/Channel";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
-import { ISignatures } from "../@types/signed";
-import { IMessage } from "./algorithms/olm";
-import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { MapWithDefault, recursiveMapToObject } from "../utils";
+import { EventType, ToDeviceMessageId } from "../@types/event.js";
+import { TypedReEmitter } from "../ReEmitter.js";
+import { logger } from "../logger.js";
+import { IExportedDevice, OlmDevice } from "./OlmDevice.js";
+import { IOlmDevice } from "./algorithms/megolm.js";
+import * as olmlib from "./olmlib.js";
+import { DeviceInfoMap, DeviceList } from "./DeviceList.js";
+import { DeviceInfo, IDevice } from "./deviceinfo.js";
+import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms/index.js";
+import * as algorithms from "./algorithms/index.js";
+import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning.js";
+import { EncryptionSetupBuilder } from "./EncryptionSetup.js";
+import { SecretStorage as LegacySecretStorage } from "./SecretStorage.js";
+import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./api.js";
+import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager.js";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.js";
+import { VerificationBase } from "./verification/Base.js";
+import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode.js";
+import { SAS as SASVerification } from "./verification/SAS.js";
+import { keyFromPassphrase } from "./key_passphrase.js";
+import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey.js";
+import { VerificationRequest } from "./verification/request/VerificationRequest.js";
+import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel.js";
+import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel.js";
+import { IllegalMethod } from "./verification/IllegalMethod.js";
+import { KeySignatureUploadError } from "../errors.js";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.js";
+import { DehydrationManager } from "./dehydration.js";
+import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup.js";
+import { IStore } from "../store/index.js";
+import { Room, RoomEvent } from "../models/room.js";
+import { RoomMember, RoomMemberEvent } from "../models/room-member.js";
+import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event.js";
+import { ToDeviceBatch } from "../models/ToDeviceMessage.js";
+import { ClientEvent, IKeysUploadResponse, ISignedKey, IUploadKeySignaturesResponse, MatrixClient } from "../client.js";
+import { IRoomEncryption, RoomList } from "./RoomList.js";
+import { IKeyBackupInfo } from "./keybackup.js";
+import { ISyncStateData } from "../sync.js";
+import { CryptoStore } from "./store/base.js";
+import { IVerificationChannel } from "./verification/request/Channel.js";
+import { TypedEventEmitter } from "../models/typed-event-emitter.js";
+import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator.js";
+import { ISignatures } from "../@types/signed.js";
+import { IMessage } from "./algorithms/olm.js";
+import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend.js";
+import { RoomState, RoomStateEvent } from "../models/room-state.js";
+import { MapWithDefault, recursiveMapToObject } from "../utils.js";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
@@ -77,8 +77,8 @@ import {
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
     ServerSideSecretStorageImpl,
-} from "../secret-storage";
-import { ISecretRequest } from "./SecretSharing";
+} from "../secret-storage.js";
+import { ISecretRequest } from "./SecretSharing.js";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -94,18 +94,18 @@ import {
     KeyBackupInfo,
     OwnDeviceKeys,
     VerificationRequest as CryptoApiVerificationRequest,
-} from "../crypto-api";
-import { Device, DeviceMap } from "../models/device";
-import { deviceInfoToDevice } from "./device-converter";
-import { ClientPrefix, MatrixError, Method } from "../http-api";
-import { decodeBase64, encodeBase64 } from "../base64";
-import { KnownMembership } from "../@types/membership";
+} from "../crypto-api/index.js";
+import { Device, DeviceMap } from "../models/device.js";
+import { deviceInfoToDevice } from "./device-converter.js";
+import { ClientPrefix, MatrixError, Method } from "../http-api/index.js";
+import { decodeBase64, encodeBase64 } from "../base64.js";
+import { KnownMembership } from "../@types/membership.js";
 
 /* re-exports for backwards compatibility */
 export type {
     BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts,
     CryptoCallbacks as ICryptoCallbacks,
-} from "../crypto-api";
+} from "../crypto-api/index.js";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -4374,4 +4374,4 @@ class IncomingRoomKeyRequestCancellation {
 }
 
 // a number of types are re-exported for backwards compatibility, in case any applications are referencing it.
-export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.js";

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from "./CallMembership";
-export * from "./focus";
-export * from "./LivekitFocus";
-export * from "./MatrixRTCSession";
-export * from "./MatrixRTCSessionManager";
-export * from "./types";
+export * from "./CallMembership.js";
+export * from "./focus.js";
+export * from "./LivekitFocus.js";
+export * from "./MatrixRTCSession.js";
+export * from "./MatrixRTCSessionManager.js";
+export * from "./types.js";

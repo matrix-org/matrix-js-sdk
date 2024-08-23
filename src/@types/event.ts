@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { NamespacedValue, UnstableValue } from "../NamespacedValue";
+import { NamespacedValue, UnstableValue } from "../NamespacedValue.js";
 import {
     PolicyRuleEventContent,
     RoomAvatarEventContent,
@@ -34,16 +34,16 @@ import {
     RoomTopicEventContent,
     SpaceChildEventContent,
     SpaceParentEventContent,
-} from "./state_events";
+} from "./state_events.js";
 import {
     ExperimentalGroupCallRoomMemberState,
     IGroupCallRoomMemberState,
     IGroupCallRoomState,
-} from "../webrtc/groupCall";
-import { MSC3089EventContent } from "../models/MSC3089Branch";
-import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon";
-import { XOR } from "./common";
-import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events";
+} from "../webrtc/groupCall.js";
+import { MSC3089EventContent } from "../models/MSC3089Branch.js";
+import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon.js";
+import { XOR } from "./common.js";
+import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events.js";
 import {
     MCallAnswer,
     MCallBase,
@@ -54,10 +54,10 @@ import {
     MCallSelectAnswer,
     SDPStreamMetadata,
     SDPStreamMetadataKey,
-} from "../webrtc/callEventTypes";
-import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types";
-import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls";
-import { SessionMembershipData } from "../matrixrtc/CallMembership";
+} from "../webrtc/callEventTypes.js";
+import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types.js";
+import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls.js";
+import { SessionMembershipData } from "../matrixrtc/CallMembership.js";
 
 export enum EventType {
     // Room state events

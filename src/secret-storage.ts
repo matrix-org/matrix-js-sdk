@@ -20,12 +20,12 @@ limitations under the License.
  * @see https://spec.matrix.org/v1.6/client-server-api/#storage
  */
 
-import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { ClientEvent, ClientEventHandlerMap } from "./client";
-import { MatrixEvent } from "./models/event";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./crypto/aes";
-import { randomString } from "./randomstring";
-import { logger } from "./logger";
+import { TypedEventEmitter } from "./models/typed-event-emitter.js";
+import { ClientEvent, ClientEventHandlerMap } from "./client.js";
+import { MatrixEvent } from "./models/event.js";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./crypto/aes.js";
+import { randomString } from "./randomstring.js";
+import { logger } from "./logger.js";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 

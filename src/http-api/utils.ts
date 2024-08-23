@@ -16,9 +16,9 @@ limitations under the License.
 
 import { parse as parseContentType, ParsedMediaType } from "content-type";
 
-import { logger } from "../logger";
-import { sleep } from "../utils";
-import { ConnectionError, HTTPError, MatrixError } from "./errors";
+import { logger } from "../logger.js";
+import { sleep } from "../utils.js";
+import { ConnectionError, HTTPError, MatrixError } from "./errors.js";
 
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {

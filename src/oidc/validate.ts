@@ -17,8 +17,8 @@ limitations under the License.
 import { jwtDecode } from "jwt-decode";
 import { IdTokenClaims, OidcMetadata, SigninResponse } from "oidc-client-ts";
 
-import { logger } from "../logger";
-import { OidcError } from "./error";
+import { logger } from "../logger.js";
+import { OidcError } from "./error.js";
 
 export type ValidatedIssuerConfig = {
     authorizationEndpoint: string;

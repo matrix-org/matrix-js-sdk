@@ -16,10 +16,10 @@ limitations under the License.
 
 import { EitherAnd } from "matrix-events-sdk/lib/types";
 
-import { MatrixEvent } from "../matrix";
-import { deepCompare } from "../utils";
-import { Focus } from "./focus";
-import { isLivekitFocusActive } from "./LivekitFocus";
+import { MatrixEvent } from "../matrix.js";
+import { deepCompare } from "../utils.js";
+import { Focus } from "./focus.js";
+import { isLivekitFocusActive } from "./LivekitFocus.js";
 
 type CallScope = "m.room" | "m.user";
 // Represents an entry in the memberships section of an m.call.member event as it is on the wire

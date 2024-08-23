@@ -18,12 +18,12 @@ limitations under the License.
  * This is an internal module which manages queuing, scheduling and retrying
  * of requests.
  */
-import { logger } from "./logger";
-import { MatrixEvent } from "./models/event";
-import { EventType } from "./@types/event";
-import { defer, IDeferred, removeElement } from "./utils";
-import { calculateRetryBackoff, MatrixError } from "./http-api";
-import { ISendEventResponse } from "./@types/requests";
+import { logger } from "./logger.js";
+import { MatrixEvent } from "./models/event.js";
+import { EventType } from "./@types/event.js";
+import { defer, IDeferred, removeElement } from "./utils.js";
+import { calculateRetryBackoff, MatrixError } from "./http-api/index.js";
+import { ISendEventResponse } from "./@types/requests.js";
 
 const DEBUG = false; // set true to enable console logging.
 

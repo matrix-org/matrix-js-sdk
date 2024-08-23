@@ -16,11 +16,11 @@ limitations under the License.
 
 import promiseRetry from "p-retry";
 
-import { MatrixClient } from "../client";
-import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
-import { Room } from "./room";
-import { logger } from "../logger";
-import { IContent, MatrixEvent } from "./event";
+import { MatrixClient } from "../client.js";
+import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event.js";
+import { Room } from "./room.js";
+import { logger } from "../logger.js";
+import { IContent, MatrixEvent } from "./event.js";
 import {
     averageBetweenStrings,
     DEFAULT_ALPHABET,
@@ -28,14 +28,14 @@ import {
     nextString,
     prevString,
     simpleRetryOperation,
-} from "../utils";
-import { MSC3089Branch } from "./MSC3089Branch";
-import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
-import { ISendEventResponse } from "../@types/requests";
-import { FileType } from "../http-api";
-import { KnownMembership } from "../@types/membership";
-import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events";
-import type { EncryptedFile, FileContent } from "../@types/media";
+} from "../utils.js";
+import { MSC3089Branch } from "./MSC3089Branch.js";
+import { isRoomSharedHistory } from "../crypto/algorithms/megolm.js";
+import { ISendEventResponse } from "../@types/requests.js";
+import { FileType } from "../http-api/index.js";
+import { KnownMembership } from "../@types/membership.js";
+import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events.js";
+import type { EncryptedFile, FileContent } from "../@types/media.js";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
