@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
+import { logger as rootLogger } from "../logger";
 import { MatrixClient, ClientEvent } from "../client";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Room, RoomEvent } from "../models/room";
@@ -22,6 +22,8 @@ import { RoomState, RoomStateEvent } from "../models/room-state";
 import { MatrixEvent } from "../models/event";
 import { MatrixRTCSession } from "./MatrixRTCSession";
 import { EventType } from "../@types/event";
+
+const logger = rootLogger.getChild("MatrixRTCSessionManager");
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
