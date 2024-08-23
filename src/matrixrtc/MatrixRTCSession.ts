@@ -146,6 +146,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
+    public statistics = {
+        counters: {
+            toDeviceEncryptionKeysSent: 0,
+            toDeviceEncryptionKeysReceived: 0,
+            roomEventEncryptionKeysSent: 0,
+            roomEventEncryptionKeysReceived: 0,
+        },
+        totals: {
+            toDeviceEncryptionKeysReceivedTotalAge: 0,
+            roomEventEncryptionKeysReceivedTotalAge: 0,
+        },
+    };
+
     /**
      * The callId (sessionId) of the call.
      *
@@ -582,6 +595,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             `Sending encryption keys event for: ${membersRequiringRoomEvent.map((m) => `${m.sender}:${m.deviceId}`).join(", ")}`,
         );
 
+        this.statistics.counters.roomEventEncryptionKeysSent += 1;
+
         await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, {
             keys: myKeys.map((key, index) => {
                 return {
@@ -614,6 +629,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             device_id: deviceId,
             call_id: "",
             room_id: this.room.roomId,
+            sent_ts: Date.now(),
         };
 
         const payload = {
@@ -625,6 +641,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(
             `Sending encryption keys to-device batch for: ${membershipsRequiringToDevice.map(({ sender, deviceId }) => `${sender}:${deviceId}`).join(", ")}`,
         );
+
+        this.statistics.counters.toDeviceEncryptionKeysSent += membershipsRequiringToDevice.length;
 
         if ("widgetApi" in this.client) {
             logger.info("Sending keys via widgetApi");
@@ -746,6 +764,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // the fact that we don't need it anyway because we already know our own keys).
             logger.info("Ignoring our own keys event");
             return;
+        }
+
+        if (event.getRoomId()) {
+            this.statistics.counters.roomEventEncryptionKeysReceived += 1;
+            this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += Date.now() - event.getTs();
+        } else {
+            this.statistics.counters.toDeviceEncryptionKeysReceived += 1;
+            this.statistics.totals.toDeviceEncryptionKeysReceivedTotalAge +=
+                Date.now() - (content as EncryptionKeysToDeviceContent).sent_ts;
         }
 
         for (const key of content.keys) {
