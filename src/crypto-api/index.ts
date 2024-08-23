@@ -809,6 +809,8 @@ export interface CryptoCallbacks extends SecretStorageCallbacks {
      * @param key - private key to store
      */
     cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+
+    /** @deprecated: unused with the Rust crypto stack. */
     onSecretRequested?: (
         userId: string,
         deviceId: string,
@@ -816,10 +818,13 @@ export interface CryptoCallbacks extends SecretStorageCallbacks {
         secretName: string,
         deviceTrust: DeviceVerificationStatus,
     ) => Promise<string | undefined>;
+
+    /** @deprecated: unused with the Rust crypto stack. */
     getDehydrationKey?: (
         keyInfo: SecretStorageKeyDescription,
         checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
+
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
