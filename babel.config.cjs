@@ -17,9 +17,9 @@ module.exports = {
         [
             "@babel/preset-typescript",
             {
-                "rewriteImportExtensions": process.env.NODE_ENV !== "test"
-            }
-        ]
+                rewriteImportExtensions: process.env.NODE_ENV !== "test",
+            },
+        ],
     ],
     plugins: [
         "@babel/plugin-transform-numeric-separator",
