@@ -1,3 +1,17 @@
+Changes in [34.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.4.0) (2024-08-27)
+==================================================================================================
+## ✨ Features
+
+* Use non-legacy calls if any are found ([#4337](https://github.com/matrix-org/matrix-js-sdk/pull/4337)). Contributed by @AndrewFerr.
+
+## 🐛 Bug Fixes
+
+* Retry event decryption failures on first failure ([#4346](https://github.com/matrix-org/matrix-js-sdk/pull/4346)). Contributed by @hughns.
+* Ensure "type" = "module" ES declaration in pre-release.sh ([#4350](https://github.com/matrix-org/matrix-js-sdk/pull/4350)). Contributed by @BLCK-B.
+* Handle MatrixRTC encryption keys arriving out of order ([#4345](https://github.com/matrix-org/matrix-js-sdk/pull/4345)). Contributed by @hughns.
+* Resend MatrixRTC encryption keys if a membership has changed ([#4343](https://github.com/matrix-org/matrix-js-sdk/pull/4343)). Contributed by @hughns.
+
+
 Changes in [34.3.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.3.1) (2024-08-20)
 ==================================================================================================
 # Security
