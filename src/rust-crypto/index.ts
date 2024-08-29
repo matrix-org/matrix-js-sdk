@@ -17,17 +17,17 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RustCrypto } from "./rust-crypto";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
-import { ServerSideSecretStorage } from "../secret-storage";
-import { ICryptoCallbacks } from "../crypto";
-import { Logger } from "../logger";
-import { CryptoStore, MigrationState } from "../crypto/store/base";
+import { RustCrypto } from "./rust-crypto.ts";
+import { IHttpOpts, MatrixHttpApi } from "../http-api/index.ts";
+import { ServerSideSecretStorage } from "../secret-storage.ts";
+import { ICryptoCallbacks } from "../crypto/index.ts";
+import { Logger } from "../logger.ts";
+import { CryptoStore, MigrationState } from "../crypto/store/base.ts";
 import {
     migrateFromLegacyCrypto,
     migrateLegacyLocalTrustIfNeeded,
     migrateRoomSettingsFromLegacyCrypto,
-} from "./libolm_migration";
+} from "./libolm_migration.ts";
 
 /**
  * Create a new `RustCrypto` implementation

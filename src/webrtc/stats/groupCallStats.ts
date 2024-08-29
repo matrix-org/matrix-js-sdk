@@ -13,11 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { CallStatsReportGatherer } from "./callStatsReportGatherer";
-import { StatsReportEmitter } from "./statsReportEmitter";
-import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer";
-import { logger } from "../../logger";
+import { CallStatsReportGatherer } from "./callStatsReportGatherer.ts";
+import { StatsReportEmitter } from "./statsReportEmitter.ts";
+import { CallStatsReportSummary } from "./callStatsReportSummary.ts";
+import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer.ts";
+import { logger } from "../../logger.ts";
 
 export class GroupCallStats {
     private timer: undefined | ReturnType<typeof setTimeout>;

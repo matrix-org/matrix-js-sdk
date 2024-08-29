@@ -20,9 +20,9 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto";
-import { logger, Logger } from "../../logger";
-import * as olmlib from "../olmlib";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto.ts";
+import { logger, Logger } from "../../logger.ts";
+import * as olmlib from "../olmlib.ts";
 import {
     DecryptionAlgorithm,
     DecryptionClassParams,
@@ -30,22 +30,22 @@ import {
     IParams,
     registerAlgorithm,
     UnknownDeviceError,
-} from "./base";
-import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice";
-import { Room } from "../../models/room";
-import { DeviceInfo } from "../deviceinfo";
-import { IOlmSessionResult } from "../olmlib";
-import { DeviceInfoMap } from "../DeviceList";
-import { IContent, MatrixEvent } from "../../models/event";
-import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event";
-import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { OlmGroupSessionExtraData } from "../../@types/crypto";
-import { MatrixError } from "../../http-api";
-import { immediate, MapWithDefault } from "../../utils";
-import { KnownMembership } from "../../@types/membership";
-import { DecryptionFailureCode } from "../../crypto-api";
-import { DecryptionError } from "../../common-crypto/CryptoBackend";
+} from "./base.ts";
+import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice.ts";
+import { Room } from "../../models/room.ts";
+import { DeviceInfo } from "../deviceinfo.ts";
+import { IOlmSessionResult } from "../olmlib.ts";
+import { DeviceInfoMap } from "../DeviceList.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event.ts";
+import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index.ts";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
+import { OlmGroupSessionExtraData } from "../../@types/crypto.ts";
+import { MatrixError } from "../../http-api/index.ts";
+import { immediate, MapWithDefault } from "../../utils.ts";
+import { KnownMembership } from "../../@types/membership.ts";
+import { DecryptionFailureCode } from "../../crypto-api/index.ts";
+import { DecryptionError } from "../../common-crypto/CryptoBackend.ts";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {

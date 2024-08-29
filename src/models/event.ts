@@ -21,9 +21,9 @@ limitations under the License.
 
 import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
-import type { IEventDecryptionResult } from "../@types/crypto";
-import { logger } from "../logger";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
+import type { IEventDecryptionResult } from "../@types/crypto.ts";
+import { logger } from "../logger.ts";
+import { VerificationRequest } from "../crypto/verification/request/VerificationRequest.ts";
 import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     EventType,
@@ -32,24 +32,24 @@ import {
     ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
     UNSIGNED_MEMBERSHIP_FIELD,
-} from "../@types/event";
-import { Crypto } from "../crypto";
-import { deepSortedObjectEntries, internaliseString } from "../utils";
-import { RoomMember } from "./room-member";
-import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread";
-import { IActionsObject } from "../pushprocessor";
-import { TypedReEmitter } from "../ReEmitter";
-import { MatrixError } from "../http-api";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { EventStatus } from "./event-status";
-import { CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend";
-import { IAnnotatedPushRule } from "../@types/PushRules";
-import { Room } from "./room";
-import { EventTimeline } from "./event-timeline";
-import { Membership } from "../@types/membership";
-import { DecryptionFailureCode } from "../crypto-api";
+} from "../@types/event.ts";
+import { Crypto } from "../crypto/index.ts";
+import { deepSortedObjectEntries, internaliseString } from "../utils.ts";
+import { RoomMember } from "./room-member.ts";
+import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread.ts";
+import { IActionsObject } from "../pushprocessor.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
+import { MatrixError } from "../http-api/index.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
+import { EventStatus } from "./event-status.ts";
+import { CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend.ts";
+import { IAnnotatedPushRule } from "../@types/PushRules.ts";
+import { Room } from "./room.ts";
+import { EventTimeline } from "./event-timeline.ts";
+import { Membership } from "../@types/membership.ts";
+import { DecryptionFailureCode } from "../crypto-api/index.ts";
 
-export { EventStatus } from "./event-status";
+export { EventStatus } from "./event-status.ts";
 
 /* eslint-disable camelcase */
 export interface IContent {

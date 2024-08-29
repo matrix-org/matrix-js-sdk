@@ -19,19 +19,23 @@ limitations under the License.
  */
 
 import type { PkSigning } from "@matrix-org/olm";
-import { IObject, pkSign, pkVerify } from "./olmlib";
-import { logger } from "../logger";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, encryptAES } from "./aes";
-import { DeviceInfo } from "./deviceinfo";
-import { ISignedKey, MatrixClient } from "../client";
-import { OlmDevice } from "./OlmDevice";
-import { ICryptoCallbacks } from ".";
-import { ISignatures } from "../@types/signed";
-import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
-import { CrossSigningKeyInfo, DeviceVerificationStatus, UserVerificationStatus as UserTrustLevel } from "../crypto-api";
-import { decodeBase64, encodeBase64 } from "../base64";
+import { IObject, pkSign, pkVerify } from "./olmlib.ts";
+import { logger } from "../logger.ts";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
+import { decryptAES, encryptAES } from "./aes.ts";
+import { DeviceInfo } from "./deviceinfo.ts";
+import { ISignedKey, MatrixClient } from "../client.ts";
+import { OlmDevice } from "./OlmDevice.ts";
+import { ICryptoCallbacks } from "./index.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { CryptoStore, SecretStorePrivateKeys } from "./store/base.ts";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage.ts";
+import {
+    CrossSigningKeyInfo,
+    DeviceVerificationStatus,
+    UserVerificationStatus as UserTrustLevel,
+} from "../crypto-api/index.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };

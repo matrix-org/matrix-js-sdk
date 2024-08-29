@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { Bitrate } from "./media/mediaTrackStats";
+import { Bitrate } from "./media/mediaTrackStats.ts";
 
 export class ConnectionStatsBuilder {
     public static buildBandwidthReport(now: RTCIceCandidatePairStats): Bitrate {

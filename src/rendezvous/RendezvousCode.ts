@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousTransportDetails, RendezvousIntent } from ".";
+import { RendezvousTransportDetails, RendezvousIntent } from "./index.ts";
 
 export interface RendezvousCode {
     intent: RendezvousIntent;

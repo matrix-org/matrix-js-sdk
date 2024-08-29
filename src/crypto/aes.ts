@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { decodeBase64, encodeBase64 } from "../base64";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);

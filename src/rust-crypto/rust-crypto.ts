@@ -17,20 +17,25 @@ limitations under the License.
 import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
-import { KnownMembership } from "../@types/membership";
-import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import type { IEncryptedEventInfo } from "../crypto/api";
-import { MatrixEvent, MatrixEventEvent } from "../models/event";
-import { Room } from "../models/room";
-import { RoomMember } from "../models/room-member";
-import { BackupDecryptor, CryptoBackend, DecryptionError, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
-import { logger, Logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { RoomEncryptor } from "./RoomEncryptor";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { KeyClaimManager } from "./KeyClaimManager";
-import { logDuration, MapWithDefault } from "../utils";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
+import type { IEncryptedEventInfo } from "../crypto/api.ts";
+import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
+import { Room } from "../models/room.ts";
+import { RoomMember } from "../models/room-member.ts";
+import {
+    BackupDecryptor,
+    CryptoBackend,
+    DecryptionError,
+    OnSyncCompletedData,
+} from "../common-crypto/CryptoBackend.ts";
+import { logger, Logger } from "../logger.ts";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
+import { RoomEncryptor } from "./RoomEncryptor.ts";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { KeyClaimManager } from "./KeyClaimManager.ts";
+import { logDuration, MapWithDefault } from "../utils.ts";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
@@ -53,29 +58,29 @@ import {
     OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
-} from "../crypto-api";
-import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter";
-import { IDownloadKeyResult, IQueryKeysRequest } from "../client";
-import { Device, DeviceMap } from "../models/device";
-import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage";
-import { CrossSigningIdentity } from "./CrossSigningIdentity";
-import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage";
-import { keyFromPassphrase } from "../crypto/key_passphrase";
-import { encodeRecoveryKey } from "../crypto/recoverykey";
-import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification";
-import { EventType, MsgType } from "../@types/event";
-import { CryptoEvent } from "../crypto";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup";
-import { TypedReEmitter } from "../ReEmitter";
-import { randomString } from "../randomstring";
-import { ClientStoppedError } from "../errors";
-import { ISignatures } from "../@types/signed";
-import { encodeBase64 } from "../base64";
-import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
-import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader";
-import { DehydratedDeviceManager } from "./DehydratedDeviceManager";
-import { VerificationMethod } from "../types";
+} from "../crypto-api/index.ts";
+import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
+import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
+import { Device, DeviceMap } from "../models/device.ts";
+import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage.ts";
+import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
+import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
+import { keyFromPassphrase } from "../crypto/key_passphrase.ts";
+import { encodeRecoveryKey } from "../crypto/recoverykey.ts";
+import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
+import { EventType, MsgType } from "../@types/event.ts";
+import { CryptoEvent } from "../crypto/index.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
+import { randomString } from "../randomstring.ts";
+import { ClientStoppedError } from "../errors.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { encodeBase64 } from "../base64.ts";
+import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
+import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";
+import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
+import { VerificationMethod } from "../types.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,

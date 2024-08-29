@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from "../../../randomstring";
-import { logger } from "../../../logger";
+import { randomString } from "../../../randomstring.ts";
+import { logger } from "../../../logger.ts";
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -25,12 +25,12 @@ import {
     READY_TYPE,
     START_TYPE,
     VerificationRequest,
-} from "./VerificationRequest";
-import { errorFromEvent, newUnexpectedMessageError } from "../Error";
-import { MatrixEvent } from "../../../models/event";
-import { IVerificationChannel } from "./Channel";
-import { MatrixClient } from "../../../client";
-import { IRequestsMap } from "../..";
+} from "./VerificationRequest.ts";
+import { errorFromEvent, newUnexpectedMessageError } from "../Error.ts";
+import { MatrixEvent } from "../../../models/event.ts";
+import { IVerificationChannel } from "./Channel.ts";
+import { MatrixClient } from "../../../client.ts";
+import { IRequestsMap } from "../../index.ts";
 
 export type Request = VerificationRequest<ToDeviceChannel>;
 

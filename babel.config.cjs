@@ -14,7 +14,16 @@ module.exports = {
                 modules: process.env.NODE_ENV === "test" ? "commonjs" : false,
             },
         ],
-        "@babel/preset-typescript",
+        [
+            "@babel/preset-typescript",
+            {
+                // When using the transpiled javascript in `lib`, Node.js requires `.js` extensions on any `import`
+                // specifiers. However, Jest uses the TS source (via babel) and fails to resolve the `.js` names.
+                // To resolve this,we use the `.ts` names in the source, and rewrite the `import` specifiers to use
+                // `.js` during transpilation, *except* when we are targetting Jest.
+                rewriteImportExtensions: process.env.NODE_ENV !== "test",
+            },
+        ],
     ],
     plugins: [
         "@babel/plugin-transform-numeric-separator",

@@ -21,13 +21,13 @@ import {
     RendezvousFailureListener,
     LegacyRendezvousFailureReason as RendezvousFailureReason,
     RendezvousIntent,
-} from ".";
-import { MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client";
-import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
-import { logger } from "../logger";
-import { sleep } from "../utils";
-import { CrossSigningKey } from "../crypto-api";
-import { Capabilities, Device, IGetLoginTokenCapability } from "../matrix";
+} from "./index.ts";
+import { MatrixClient, GET_LOGIN_TOKEN_CAPABILITY } from "../client.ts";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature.ts";
+import { logger } from "../logger.ts";
+import { sleep } from "../utils.ts";
+import { CrossSigningKey } from "../crypto-api/index.ts";
+import { Capabilities, Device, IGetLoginTokenCapability } from "../matrix.ts";
 
 enum PayloadType {
     Start = "m.login.start",

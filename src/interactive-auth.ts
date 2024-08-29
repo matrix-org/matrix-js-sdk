@@ -16,12 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { defer, IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
-import { UIAResponse } from "./@types/uia";
-import { UserIdentifier } from "./@types/auth";
+import { logger } from "./logger.ts";
+import { MatrixClient } from "./client.ts";
+import { defer, IDeferred } from "./utils.ts";
+import { MatrixError } from "./http-api/index.ts";
+import { UIAResponse } from "./@types/uia.ts";
+import { UserIdentifier } from "./@types/auth.ts";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";

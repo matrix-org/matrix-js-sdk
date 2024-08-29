@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IContent, IEvent } from "../models/event";
-import { Preset, Visibility } from "./partials";
-import { IEventWithRoomId, SearchKey } from "./search";
-import { IRoomEventFilter } from "../filter";
-import { Direction } from "../models/event-timeline";
-import { PushRuleAction } from "./PushRules";
-import { IRoomEvent } from "../sync-accumulator";
-import { EventType, RelationType, RoomType } from "./event";
+import { IContent, IEvent } from "../models/event.ts";
+import { Preset, Visibility } from "./partials.ts";
+import { IEventWithRoomId, SearchKey } from "./search.ts";
+import { IRoomEventFilter } from "../filter.ts";
+import { Direction } from "../models/event-timeline.ts";
+import { PushRuleAction } from "./PushRules.ts";
+import { IRoomEvent } from "../sync-accumulator.ts";
+import { EventType, RelationType, RoomType } from "./event.ts";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */

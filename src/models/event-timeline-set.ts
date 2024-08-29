@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, IAddEventOptions } from "./event-timeline";
-import { MatrixEvent } from "./event";
-import { logger } from "../logger";
-import { Room, RoomEvent } from "./room";
-import { Filter } from "../filter";
-import { RoomState } from "./room-state";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { RelationsContainer } from "./relations-container";
-import { MatrixClient } from "../client";
-import { Thread, ThreadFilterType } from "./thread";
+import { EventTimeline, IAddEventOptions } from "./event-timeline.ts";
+import { MatrixEvent } from "./event.ts";
+import { logger } from "../logger.ts";
+import { Room, RoomEvent } from "./room.ts";
+import { Filter } from "../filter.ts";
+import { RoomState } from "./room-state.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
+import { RelationsContainer } from "./relations-container.ts";
+import { MatrixClient } from "../client.ts";
+import { Thread, ThreadFilterType } from "./thread.ts";
 
 const DEBUG = true;
 

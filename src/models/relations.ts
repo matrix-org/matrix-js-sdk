@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from "./event";
-import { logger } from "../logger";
-import { RelationType } from "../@types/event";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { MatrixClient } from "../client";
-import { Room } from "./room";
+import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from "./event.ts";
+import { logger } from "../logger.ts";
+import { RelationType } from "../@types/event.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
+import { MatrixClient } from "../client.ts";
+import { Room } from "./room.ts";
 
 export enum RelationsEvent {
     Add = "Relations.add",

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import "./olm";
-import "./megolm";
+import "./olm.ts";
+import "./megolm.ts";
 
-export * from "./base";
+export * from "./base.ts";

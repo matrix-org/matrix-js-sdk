@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Relations } from "./relations";
-import { EventType, RelationType } from "../@types/event";
-import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event";
-import { EventTimelineSet } from "./event-timeline-set";
-import { MatrixClient } from "../client";
-import { Room } from "./room";
+import { Relations } from "./relations.ts";
+import { EventType, RelationType } from "../@types/event.ts";
+import { EventStatus, MatrixEvent, MatrixEventEvent } from "./event.ts";
+import { EventTimelineSet } from "./event-timeline-set.ts";
+import { MatrixClient } from "../client.ts";
+import { Room } from "./room.ts";
 
 export class RelationsContainer {
     // A tree of objects to access a set of related children for an event, as in:

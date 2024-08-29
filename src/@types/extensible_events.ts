@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EitherAnd, NamespacedValue, Optional, UnstableValue } from "matrix-events-sdk";
 
-import { isProvided } from "../extensible_events_v1/utilities";
+import { isProvided } from "../extensible_events_v1/utilities.ts";
 
 // Types and utilities for MSC1767: Extensible events (version 1) in Matrix
 

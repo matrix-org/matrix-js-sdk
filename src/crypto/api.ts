@@ -14,26 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceInfo } from "./deviceinfo";
+import { DeviceInfo } from "./deviceinfo.ts";
 
 /* re-exports for backwards compatibility. */
 // CrossSigningKey is used as a value in `client.ts`, we can't export it as a type
-export { CrossSigningKey } from "../crypto-api";
+export { CrossSigningKey } from "../crypto-api/index.ts";
 export type {
     GeneratedSecretStorageKey as IRecoveryKey,
     CreateSecretStorageOpts as ICreateSecretStorageOpts,
-} from "../crypto-api";
+} from "../crypto-api/index.ts";
 
 export type {
     ImportRoomKeyProgressData as IImportOpts,
     ImportRoomKeysOpts as IImportRoomKeysOpts,
-} from "../crypto-api";
+} from "../crypto-api/index.ts";
 
 export type {
     AddSecretStorageKeyOpts as IAddSecretStorageKeyOpts,
     PassphraseInfo as IPassphraseInfo,
     SecretStorageKeyDescription as ISecretStorageKeyInfo,
-} from "../secret-storage";
+} from "../secret-storage.ts";
 
 // TODO: Merge this with crypto.js once converted
 

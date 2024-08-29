@@ -1,6 +1,6 @@
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient, IMyDevice } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed.ts";
+import { MatrixClient, IMyDevice } from "../client.ts";
 import {
     CallErrorCode,
     CallEvent,
@@ -11,31 +11,31 @@ import {
     setTracksEnabled,
     createNewMatrixCall,
     CallError,
-} from "./call";
-import { RoomMember } from "../models/room-member";
-import { Room } from "../models/room";
-import { RoomStateEvent } from "../models/room-state";
-import { logger } from "../logger";
-import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { CallEventHandlerEvent } from "./callEventHandler";
-import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
-import { IScreensharingOpts } from "./mediaHandler";
-import { mapsEqual } from "../utils";
-import { GroupCallStats } from "./stats/groupCallStats";
+} from "./call.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { Room } from "../models/room.ts";
+import { RoomStateEvent } from "../models/room-state.ts";
+import { logger } from "../logger.ts";
+import { ReEmitter } from "../ReEmitter.ts";
+import { SDPStreamMetadataPurpose } from "./callEventTypes.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType } from "../@types/event.ts";
+import { CallEventHandlerEvent } from "./callEventHandler.ts";
+import { GroupCallEventHandlerEvent } from "./groupCallEventHandler.ts";
+import { IScreensharingOpts } from "./mediaHandler.ts";
+import { mapsEqual } from "../utils.ts";
+import { GroupCallStats } from "./stats/groupCallStats.ts";
 import {
     ByteSentStatsReport,
     CallFeedReport,
     ConnectionStatsReport,
     StatsReport,
     SummaryStatsReport,
-} from "./stats/statsReport";
-import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
-import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
-import { KnownMembership } from "../@types/membership";
-import { CallMembershipData } from "../matrixrtc/CallMembership";
+} from "./stats/statsReport.ts";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.ts";
+import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { CallMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum GroupCallIntent {
     Ring = "m.ring",

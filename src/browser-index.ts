@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./matrix";
+import * as matrixcs from "./matrix.ts";
 
 type BrowserMatrix = typeof matrixcs;
 declare global {
@@ -40,5 +40,5 @@ if (indexedDB) {
     matrixcs.setCryptoStoreFactory(() => new matrixcs.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
 }
 
-export * from "./matrix";
+export * from "./matrix.ts";
 globalThis.matrixcs = matrixcs;

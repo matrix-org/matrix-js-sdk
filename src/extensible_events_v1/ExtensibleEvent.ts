@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ExtensibleEventType, IPartialEvent } from "../@types/extensible_events";
+import { ExtensibleEventType, IPartialEvent } from "../@types/extensible_events.ts";
 
 /**
  * Represents an Extensible Event in Matrix.

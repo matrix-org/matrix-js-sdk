@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ICryptoCallbacks } from ".";
-import { MatrixEvent } from "../models/event";
-import { MatrixClient } from "../client";
+import { ICryptoCallbacks } from "./index.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { MatrixClient } from "../client.ts";
 import {
     SecretStorageKeyDescription,
     SecretStorageKeyTuple,
@@ -25,8 +25,8 @@ import {
     AccountDataClient,
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
-} from "../secret-storage";
-import { ISecretRequest, SecretSharing } from "./SecretSharing";
+} from "../secret-storage.ts";
+import { ISecretRequest, SecretSharing } from "./SecretSharing.ts";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -34,9 +34,9 @@ export type {
     SecretStorageKeyTuple,
     SecretStorageKeyObject,
     SECRET_STORAGE_ALGORITHM_V1_AES,
-} from "../secret-storage";
+} from "../secret-storage.ts";
 
-export type { ISecretRequest } from "./SecretSharing";
+export type { ISecretRequest } from "./SecretSharing.ts";
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)

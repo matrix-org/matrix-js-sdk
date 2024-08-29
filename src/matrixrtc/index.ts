@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from "./CallMembership";
-export * from "./focus";
-export * from "./LivekitFocus";
-export * from "./MatrixRTCSession";
-export * from "./MatrixRTCSessionManager";
-export * from "./types";
+export * from "./CallMembership.ts";
+export * from "./focus.ts";
+export * from "./LivekitFocus.ts";
+export * from "./MatrixRTCSession.ts";
+export * from "./MatrixRTCSessionManager.ts";
+export * from "./types.ts";

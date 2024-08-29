@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event";
-import { logger } from "../logger";
-import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call";
-import { EventType } from "../@types/event";
-import { ClientEvent, MatrixClient } from "../client";
-import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
-import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from "./groupCall";
-import { RoomEvent } from "../models/room";
+import { MatrixEvent } from "../models/event.ts";
+import { logger } from "../logger.ts";
+import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call.ts";
+import { EventType } from "../@types/event.ts";
+import { ClientEvent, MatrixClient } from "../client.ts";
+import { MCallAnswer, MCallHangupReject } from "./callEventTypes.ts";
+import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from "./groupCall.ts";
+import { RoomEvent } from "../models/room.ts";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some
 // time to press the 'accept' button

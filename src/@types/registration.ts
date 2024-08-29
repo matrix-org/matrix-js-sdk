@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AuthDict } from "../interactive-auth";
+import { AuthDict } from "../interactive-auth.ts";
 
 /**
  * The request body of a call to `POST /_matrix/client/v3/register`.

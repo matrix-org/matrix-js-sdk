@@ -16,14 +16,14 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
-import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto";
-import { decodeBase64, encodeBase64 } from "../base64";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, encryptAES } from "./aes";
-import { logger } from "../logger";
-import { Crypto } from "./index";
-import { Method } from "../http-api";
-import { SecretStorageKeyDescription } from "../secret-storage";
+import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
+import { decryptAES, encryptAES } from "./aes.ts";
+import { logger } from "../logger.ts";
+import { Crypto } from "./index.ts";
+import { Method } from "../http-api/index.ts";
+import { SecretStorageKeyDescription } from "../secret-storage.ts";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase

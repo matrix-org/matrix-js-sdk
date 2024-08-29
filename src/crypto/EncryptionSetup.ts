@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { MatrixEvent } from "../models/event";
-import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { Method, ClientPrefix } from "../http-api";
-import { Crypto, ICryptoCallbacks } from "./index";
-import { ClientEvent, ClientEventHandlerMap, CrossSigningKeys, ISignedKey, KeySignatures } from "../client";
-import { IKeyBackupInfo } from "./keybackup";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage";
-import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../crypto-api";
+import { logger } from "../logger.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
+import { Method, ClientPrefix } from "../http-api/index.ts";
+import { Crypto, ICryptoCallbacks } from "./index.ts";
+import { ClientEvent, ClientEventHandlerMap, CrossSigningKeys, ISignedKey, KeySignatures } from "../client.ts";
+import { IKeyBackupInfo } from "./keybackup.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../crypto-api/index.ts";
 
 interface ICrossSigningKeys {
     authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];

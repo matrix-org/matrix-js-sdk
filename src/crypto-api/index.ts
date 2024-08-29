@@ -15,15 +15,15 @@ limitations under the License.
 */
 
 import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
-import type { IMegolmSessionData } from "../@types/crypto";
-import { Room } from "../models/room";
-import { DeviceMap } from "../models/device";
-import { UIAuthCallback } from "../interactive-auth";
-import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage";
-import { VerificationRequest } from "./verification";
-import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup";
-import { ISignatures } from "../@types/signed";
-import { MatrixEvent } from "../models/event";
+import type { IMegolmSessionData } from "../@types/crypto.ts";
+import { Room } from "../models/room.ts";
+import { DeviceMap } from "../models/device.ts";
+import { UIAuthCallback } from "../interactive-auth.ts";
+import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { VerificationRequest } from "./verification.ts";
+import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { MatrixEvent } from "../models/event.ts";
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -965,5 +965,5 @@ export interface OwnDeviceKeys {
     curve25519: string;
 }
 
-export * from "./verification";
-export * from "./keybackup";
+export * from "./verification.ts";
+export * from "./keybackup.ts";

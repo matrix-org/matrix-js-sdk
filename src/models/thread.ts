@@ -16,19 +16,19 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient, PendingEventOrdering } from "../client";
-import { TypedReEmitter } from "../ReEmitter";
-import { RelationType } from "../@types/event";
-import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
-import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
-import { NotificationCountType, Room, RoomEvent } from "./room";
-import { RoomState } from "./room-state";
-import { ServerControlledNamespacedValue } from "../NamespacedValue";
-import { logger } from "../logger";
-import { ReadReceipt } from "./read-receipt";
-import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
-import { Feature, ServerSupport } from "../feature";
+import { MatrixClient, PendingEventOrdering } from "../client.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
+import { RelationType } from "../@types/event.ts";
+import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event.ts";
+import { Direction, EventTimeline } from "./event-timeline.ts";
+import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set.ts";
+import { NotificationCountType, Room, RoomEvent } from "./room.ts";
+import { RoomState } from "./room-state.ts";
+import { ServerControlledNamespacedValue } from "../NamespacedValue.ts";
+import { logger } from "../logger.ts";
+import { ReadReceipt } from "./read-receipt.ts";
+import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts.ts";
+import { Feature, ServerSupport } from "../feature.ts";
 
 export enum ThreadEvent {
     New = "Thread.new",

@@ -17,11 +17,11 @@ limitations under the License.
 import { OlmMachine, CrossSigningStatus, CrossSigningBootstrapRequests } from "@matrix-org/matrix-sdk-crypto-wasm";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { BootstrapCrossSigningOpts } from "../crypto-api";
-import { logger } from "../logger";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { UIAuthCallback } from "../interactive-auth";
-import { ServerSideSecretStorage } from "../secret-storage";
+import { BootstrapCrossSigningOpts } from "../crypto-api/index.ts";
+import { logger } from "../logger.ts";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { UIAuthCallback } from "../interactive-auth.ts";
+import { ServerSideSecretStorage } from "../secret-storage.ts";
 
 /** Manages the cross-signing keys for our own user.
  *

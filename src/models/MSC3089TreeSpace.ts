@@ -16,11 +16,11 @@ limitations under the License.
 
 import promiseRetry from "p-retry";
 
-import { MatrixClient } from "../client";
-import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
-import { Room } from "./room";
-import { logger } from "../logger";
-import { IContent, MatrixEvent } from "./event";
+import { MatrixClient } from "../client.ts";
+import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event.ts";
+import { Room } from "./room.ts";
+import { logger } from "../logger.ts";
+import { IContent, MatrixEvent } from "./event.ts";
 import {
     averageBetweenStrings,
     DEFAULT_ALPHABET,
@@ -28,14 +28,14 @@ import {
     nextString,
     prevString,
     simpleRetryOperation,
-} from "../utils";
-import { MSC3089Branch } from "./MSC3089Branch";
-import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
-import { ISendEventResponse } from "../@types/requests";
-import { FileType } from "../http-api";
-import { KnownMembership } from "../@types/membership";
-import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events";
-import type { EncryptedFile, FileContent } from "../@types/media";
+} from "../utils.ts";
+import { MSC3089Branch } from "./MSC3089Branch.ts";
+import { isRoomSharedHistory } from "../crypto/algorithms/megolm.ts";
+import { ISendEventResponse } from "../@types/requests.ts";
+import { FileType } from "../http-api/index.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events.ts";
+import type { EncryptedFile, FileContent } from "../@types/media.ts";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this

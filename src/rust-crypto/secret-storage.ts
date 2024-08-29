@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ServerSideSecretStorage } from "../secret-storage";
+import { ServerSideSecretStorage } from "../secret-storage.ts";
 
 /**
  * Check that the private cross signing keys (master, self signing, user signing) are stored in the secret storage and encrypted with the default secret storage key.
