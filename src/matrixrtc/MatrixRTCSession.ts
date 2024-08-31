@@ -663,31 +663,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // TODO: This method doesn't work with the Rust Crypto implementation
             // See https://github.com/matrix-org/matrix-rust-sdk-crypto-wasm/pull/101
             // and https://github.com/matrix-org/matrix-js-sdk/issues/3304
-            if (!this.client.crypto) {
+            const crypto = this.client.getCrypto();
+            if (!crypto) {
                 logger.error("No crypto instance available to send keys via to-device event");
                 return;
             }
 
-            const userIds = new Set(membershipsRequiringToDevice.map((m) => m.sender!));
-            const deviceInfoMap = await this.client.crypto.downloadKeys(Array.from(userIds), false);
+            const devices = membershipsRequiringToDevice.map(({ deviceId, sender }) => ({ userId: sender!, deviceId }));
 
-            const deviceTargets: IOlmDevice<DeviceInfo>[] = [];
+            const batch = await crypto.encryptToDeviceMessages(EventType.CallEncryptionKeysPrefix, devices, payload);
 
-            membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
-                const devices = deviceInfoMap.get(sender!);
-                if (!devices) {
-                    logger.warn(`No devices found for user ${sender}`);
-                    return;
-                }
-
-                if (devices.has(deviceId)) {
-                    // Send the message to a specific device
-                    deviceTargets.push({ userId: sender!, deviceInfo: devices.get(deviceId)! });
-                } else {
-                    logger.warn(`No device found for user ${sender} with id ${deviceId}`);
-                }
-            });
-            await this.client.encryptAndSendToDevices(deviceTargets, payload);
+            await this.client.queueToDevice(batch);
         }
     }
 
