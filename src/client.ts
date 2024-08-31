@@ -3217,6 +3217,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     resolves once the message has been encrypted and sent to the given
      *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
      *     of the successfully sent messages.
+     *
+     * @deprecated Instead use {@link CryptoApi.encryptToDeviceMessages} followed by {@link queueToDevice}.
      */
     public encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
         if (!this.crypto) {

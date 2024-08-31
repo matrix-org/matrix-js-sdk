@@ -21,6 +21,7 @@ import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypt
 import { KnownMembership } from "../@types/membership.ts";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
 import type { IEncryptedEventInfo } from "../crypto/api.ts";
+import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
 import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { Room } from "../models/room.ts";
 import { RoomMember } from "../models/room-member.ts";
@@ -1712,6 +1713,37 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
         return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
+    }
+
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const batch: ToDeviceBatch = {
+            batch: [],
+            eventType,
+        };
+
+        for (const { userId, deviceId } of devices) {
+            const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+                new RustSdkCryptoJs.UserId(userId),
+                new RustSdkCryptoJs.DeviceId(deviceId),
+            );
+
+            if (device) {
+                const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
+                batch.batch.push({
+                    deviceId,
+                    userId,
+                    payload: encryptedPayload,
+                });
+            } else {
+                this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
+            }
+        }
+
+        return batch;
     }
 }
 
