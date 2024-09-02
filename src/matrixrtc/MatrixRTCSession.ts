@@ -18,7 +18,7 @@ import { logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { Room } from "../models/room.ts";
-import { MatrixClient } from "../client.ts";
+import { MatrixClient, SendToDeviceContentMap } from "../client.ts";
 import { EventType, ToDeviceMessageId } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import {
@@ -38,8 +38,7 @@ import { MatrixError } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
-import { DeviceInfo } from "../crypto/deviceinfo.ts";
-import { IOlmDevice } from "../crypto/algorithms/megolm.ts";
+import { RoomWidgetClient } from "../embedded.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -644,25 +643,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         this.statistics.counters.toDeviceEncryptionKeysSent += membershipsRequiringToDevice.length;
 
-        if ("widgetApi" in this.client) {
+        if (this.client instanceof RoomWidgetClient) {
             logger.info("Sending keys via widgetApi");
             // embedded mode, getCrypto() returns null and so we make some assumptions about the underlying implementation
-            // See: RoomWidgetClient.encryptAndSendToDevices()
-            const inputToSend: {
-                userId: string;
-                deviceInfo: {
-                    deviceId: string;
-                };
-            }[] = membershipsRequiringToDevice.map(({ sender, deviceId }) => ({
-                userId: sender!,
-                deviceInfo: { deviceId },
-            }));
 
-            await this.client.encryptAndSendToDevices(inputToSend as any as IOlmDevice<DeviceInfo>[], payload);
+            const contentMap: SendToDeviceContentMap = new Map();
+
+            membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
+                if (contentMap.has(sender!)) {
+                    contentMap.set(sender!, new Map());
+                }
+
+                contentMap.get(sender!)!.set(deviceId, payload);
+            });
+
+            await this.client.sendToDeviceViaWidgetApi(EventType.CallEncryptionKeysPrefix, true, contentMap);
         } else {
-            // TODO: This method doesn't work with the Rust Crypto implementation
-            // See https://github.com/matrix-org/matrix-rust-sdk-crypto-wasm/pull/101
-            // and https://github.com/matrix-org/matrix-js-sdk/issues/3304
             const crypto = this.client.getCrypto();
             if (!crypto) {
                 logger.error("No crypto instance available to send keys via to-device event");

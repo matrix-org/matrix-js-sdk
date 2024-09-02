@@ -414,6 +414,22 @@ export class RoomWidgetClient extends MatrixClient {
         await this.widgetApi.sendToDevice((payload as { type: string }).type, true, recursiveMapToObject(contentMap));
     }
 
+    /**
+     * Send an event to a specific list of devices via the widget API.
+     * Optionally encrypts the event.
+     *
+     * @param eventType
+     * @param encrypted - Whether the event should be encrypted.
+     * @param contentMap content to send. Map from user_id to device_id to content object.
+     */
+    public async sendToDeviceViaWidgetApi(
+        eventType: string,
+        encrypted: boolean,
+        contentMap: SendToDeviceContentMap,
+    ): Promise<void> {
+        await this.widgetApi.sendToDevice(eventType, encrypted, recursiveMapToObject(contentMap));
+    }
+
     // Overridden since we get TURN servers automatically over the widget API,
     // and this method would otherwise complain about missing an access token
     public async checkTurnServers(): Promise<boolean> {
