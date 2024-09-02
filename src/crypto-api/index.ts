@@ -341,6 +341,22 @@ export interface CryptoApi {
      */
     getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
 
+    /**
+     * Encrypts a given payload object via Olm to-device messages to a given
+     * set of devices.
+     *
+     * @param eventType the type of the event to send
+     * @param devices an array of (user ID, device ID) pairs to encrypt the payload for
+     * @param payload the payload to encrypt
+     *
+     * @returns the batch of encrypted payloads which can then be sent via {@link MatrixClient#queueToDevice}
+     */
+    encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch>;
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Device/User verification
@@ -551,22 +567,6 @@ export interface CryptoApi {
      * @param secrets - The secrets bundle received from the other device
      */
     importSecretsBundle?(secrets: Awaited<ReturnType<SecretsBundle["to_json"]>>): Promise<void>;
-
-    /**
-     * Encrypts a given payload object via Olm to-device messages to a given
-     * set of devices.
-     *
-     * @param eventType the type of the event to send
-     * @param devices an array of (user ID, device ID) pairs to encrypt the payload for
-     * @param payload the payload to encrypt
-     *
-     * @returns a promise which resolves to the batch of encrypted payloads which can then be sent via {@link MatrixClient#queueToDevice}
-     */
-    encryptToDeviceMessages(
-        eventType: string,
-        devices: { userId: string; deviceId: string }[],
-        payload: ToDevicePayload,
-    ): Promise<ToDeviceBatch>;
 }
 
 /** A reason code for a failure to decrypt an event. */

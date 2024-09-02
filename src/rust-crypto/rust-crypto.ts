@@ -1720,9 +1720,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         devices: { userId: string; deviceId: string }[],
         payload: ToDevicePayload,
     ): Promise<ToDeviceBatch> {
+        await this.olmMachine.getMissingSessions(
+            devices.map(({ userId, deviceId }) => new RustSdkCryptoJs.UserId(userId)),
+        );
         const batch: ToDeviceBatch = {
             batch: [],
-            eventType,
+            eventType: EventType.RoomMessageEncrypted,
         };
 
         for (const { userId, deviceId } of devices) {

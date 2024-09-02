@@ -3527,11 +3527,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
         try {
-            const toDeviceBatch = await this.prepareToDeviceBatch(
-                EventType.RoomMessageEncrypted,
-                userDeviceInfoArr,
-                payload,
-            );
+            const toDeviceBatch = await this.prepareToDeviceBatch(userDeviceInfoArr, payload);
 
             try {
                 await this.baseApis.queueToDevice(toDeviceBatch);
@@ -4264,12 +4260,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     private async prepareToDeviceBatch(
-        eventType: string,
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
     ): Promise<ToDeviceBatch> {
         const toDeviceBatch: ToDeviceBatch = {
-            eventType,
+            eventType: EventType.RoomMessageEncrypted,
             batch: [],
         };
 
@@ -4347,7 +4342,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
         });
 
-        return this.prepareToDeviceBatch(eventType, userDeviceInfoArr, payload);
+        return this.prepareToDeviceBatch(userDeviceInfoArr, payload);
     }
 }
 
