@@ -401,30 +401,14 @@ export class RoomWidgetClient extends MatrixClient {
         await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
     }
 
-    public async encryptAndSendToDevices(
-        devices: { userId: string; deviceId: string }[] | IOlmDevice<DeviceInfo>[],
-        payload: object,
-    ): Promise<void> {
+    public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
         // map: user Id → device Id → payload
         const contentMap: MapWithDefault<string, Map<string, object>> = new MapWithDefault(() => new Map());
-
-        if (devices.length == 0) {
-            return;
-        }
-
-        if ("deviceinfo" in devices[0]) {
-            // pre-CryptoApi style:
-            for (const {
-                userId,
-                deviceInfo: { deviceId },
-            } of devices as IOlmDevice<DeviceInfo>[]) {
-                contentMap.getOrCreate(userId).set(deviceId, payload);
-            }
-        } else {
-            // new CryptoApi style:
-            for (const { userId, deviceId } of devices as { userId: string; deviceId: string }[]) {
-                contentMap.getOrCreate(userId).set(deviceId, payload);
-            }
+        for (const {
+            userId,
+            deviceInfo: { deviceId },
+        } of userDeviceInfoArr) {
+            contentMap.getOrCreate(userId).set(deviceId, payload);
         }
 
         await this.widgetApi.sendToDevice((payload as { type: string }).type, true, recursiveMapToObject(contentMap));

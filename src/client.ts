@@ -3209,43 +3209,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Encrypts and sends a given object via Olm to-device messages to a given
      * set of devices.
      *
-     * @param userDeviceInfoArr - @deprecated list of deviceInfo objects representing the devices to send to
-     * @param devices - list of (userId, deviceId) pairs objects representing the devices to send to
+     * @param userDeviceInfoArr - list of deviceInfo objects representing the devices to send to
      *
      * @param payload - fields to include in the encrypted payload
      *
-     * @returns Promise which resolves once the payload has been encrypted and sent to the given devices
+     * @returns Promise which
+     *     resolves once the message has been encrypted and sent to the given
+     *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
+     *     of the successfully sent messages.
+     *
+     * @deprecated Instead use {@link CryptoApi.encryptToDeviceMessages} followed by {@link queueToDevice}.
      */
-    public encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void>;
-    public encryptAndSendToDevices(devices: { userId: string; deviceId: string }[], payload: object): Promise<void>;
-    public async encryptAndSendToDevices(
-        devices: { userId: string; deviceId: string }[] | IOlmDevice<DeviceInfo>[],
-        payload: object,
-    ): Promise<void> {
-        if (devices.length == 0) {
-            return;
-        }
-
-        if ("deviceinfo" in devices[0]) {
-            if (!this.crypto) {
-                throw new Error("End-to-End encryption disabled");
-            }
-            return this.crypto.encryptAndSendToDevices(devices as IOlmDevice<DeviceInfo>[], payload);
-        }
-
-        const crypto = this.getCrypto();
-        if (!crypto) {
+    public encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
+        if (!this.crypto) {
             throw new Error("End-to-End encryption disabled");
         }
-
-        const { type } = payload as { type: string };
-
-        const batch = await crypto.encryptToDeviceMessages(
-            type,
-            devices as { userId: string; deviceId: string }[],
-            payload,
-        );
-        await this.queueToDevice(batch);
+        return this.crypto.encryptAndSendToDevices(userDeviceInfoArr, payload);
     }
 
     /**
