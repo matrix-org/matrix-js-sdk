@@ -38,7 +38,7 @@ import { MatrixError } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
-import { RoomWidgetClient } from "../embedded.ts";
+import type { RoomWidgetClient } from "../embedded.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -643,7 +643,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         this.statistics.counters.toDeviceEncryptionKeysSent += membershipsRequiringToDevice.length;
 
-        if (this.client instanceof RoomWidgetClient) {
+        // we don't do an instanceof due to circular dependency issues
+        if ("widgetApi" in this.client) {
             logger.info("Sending keys via widgetApi");
             // embedded mode, getCrypto() returns null and so we make some assumptions about the underlying implementation
 
@@ -657,7 +658,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 contentMap.get(sender!)!.set(deviceId, payload);
             });
 
-            await this.client.sendToDeviceViaWidgetApi(EventType.CallEncryptionKeysPrefix, true, contentMap);
+            await (this.client as unknown as RoomWidgetClient).sendToDeviceViaWidgetApi(
+                EventType.CallEncryptionKeysPrefix,
+                true,
+                contentMap,
+            );
         } else {
             const crypto = this.client.getCrypto();
             if (!crypto) {
