@@ -4292,13 +4292,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             signPromise = this.http.requestOtherUrl<IThirdPartySigned>(Method.Post, url);
         }
 
-        let queryParams: QueryDict = {};
+        const queryParams: QueryDict = {};
         if (opts.viaServers) {
+            // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
             queryParams.server_name = opts.viaServers;
             queryParams.via = opts.viaServers;
-            if (this.canSupport.get(Feature.MigrateServerNameToVia) === ServerSupport.Unstable) {
-                queryParams = replaceParam("via", "org.matrix.msc4156.via", queryParams);
-            }
         }
 
         const data: IJoinRequestBody = {};
@@ -4341,13 +4339,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const path = utils.encodeUri("/knock/$roomIdOrAlias", { $roomIdOrAlias: roomIdOrAlias });
 
-        let queryParams: QueryDict = {};
+        const queryParams: QueryDict = {};
         if (opts.viaServers) {
+            // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
             queryParams.server_name = opts.viaServers;
             queryParams.via = opts.viaServers;
-            if (this.canSupport.get(Feature.MigrateServerNameToVia) === ServerSupport.Unstable) {
-                queryParams = replaceParam("via", "org.matrix.msc4156.via", queryParams);
-            }
         }
 
         const body: Record<string, string> = {};
