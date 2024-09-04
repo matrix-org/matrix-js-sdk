@@ -31,7 +31,7 @@ import {
     DecryptionError,
     OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
-import { logger, Logger } from "../logger.ts";
+import { logger, Logger, LogSpan } from "../logger.ts";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RoomEncryptor } from "./RoomEncryptor.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
@@ -1720,8 +1720,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         devices: { userId: string; deviceId: string }[],
         payload: ToDevicePayload,
     ): Promise<ToDeviceBatch> {
+        const logger = new LogSpan(this.logger, "encryptToDeviceMessages");
         const uniqueUsers = new Set(devices.map(({ userId }) => userId));
-        await this.olmMachine.getMissingSessions(
+
+        // This will ensure we have Olm sessions for all of the users' devices.
+        // However, we only care about some of the devices.
+        // So, perhaps we can optimise this later on.
+        await this.keyClaimManager.ensureSessionsForUsers(
+            logger,
             Array.from(uniqueUsers).map((userId) => new RustSdkCryptoJs.UserId(userId)),
         );
         const batch: ToDeviceBatch = {
