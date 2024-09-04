@@ -498,7 +498,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param delayBeforeUse - If true, wait for a short period before setting the key for the
      *                         media encryptor to use. If false, set the key immediately.
      */
-    private makeNewSenderKey(delayBeforeUse = false): void {
+    private makeNewSenderKey(delayBeforeUse = false): number {
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
 
@@ -509,6 +509,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         logger.info("Generated new key at index " + encryptionKeyIndex);
         this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, Date.now(), delayBeforeUse);
+
+        return encryptionKeyIndex;
     }
 
     /**
@@ -535,7 +537,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Re-sends the encryption keys room event
      */
-    private sendEncryptionKeysEvent = async (): Promise<void> => {
+    private sendEncryptionKeysEvent = async (indexToSend?: number): Promise<void> => {
         if (this.keysEventUpdateTimeout !== undefined) {
             clearTimeout(this.keysEventUpdateTimeout);
             this.keysEventUpdateTimeout = undefined;
@@ -557,22 +559,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        if (this.currentEncryptionKeyIndex === -1) {
+        if (typeof indexToSend !== "number" && this.currentEncryptionKeyIndex === -1) {
             logger.warn("Tried to send encryption keys event but no current key index found!");
             return;
         }
 
-        const currentEncryptionKeyIndex = this.currentEncryptionKeyIndex;
-        const currentKey = myKeys[currentEncryptionKeyIndex];
+        const keyIndexToSend = typeof indexToSend === "number" ? indexToSend : this.currentEncryptionKeyIndex;
+        const keyToSend = myKeys[keyIndexToSend];
 
         try {
             await Promise.all([
                 this.sendKeysViaRoomEvent(deviceId, myKeys),
-                this.sendKeysViaToDevice(deviceId, currentKey, currentEncryptionKeyIndex),
+                this.sendKeysViaToDevice(deviceId, keyToSend, keyIndexToSend),
             ]);
 
             logger.debug(
-                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numKeys=${myKeys.length} currentKeyIndex=${currentEncryptionKeyIndex}`,
+                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.currentEncryptionKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
             );
         } catch (error) {
@@ -620,7 +622,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         } as EncryptionKeysEventContent);
     }
 
-    private async sendKeysViaToDevice(deviceId: string, currentKey: Uint8Array, currentIndex: number): Promise<void> {
+    private async sendKeysViaToDevice(deviceId: string, key: Uint8Array, index: number): Promise<void> {
         const membershipsRequiringToDevice = this.memberships.filter(
             (m) => !this.isMyMembership(m) && m.sender && m.keyDistributionMethod === "to_device",
         );
@@ -631,7 +633,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         const content: EncryptionKeysToDeviceContent = {
-            keys: [{ index: currentIndex, key: encodeUnpaddedBase64(currentKey) }],
+            keys: [{ index, key: encodeUnpaddedBase64(key) }],
             device_id: deviceId,
             call_id: "",
             room_id: this.room.roomId,
@@ -1149,9 +1151,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         this.makeNewKeyTimeout = undefined;
         logger.info("Making new sender key for key rotation");
-        this.makeNewSenderKey(true);
+        const newKeyIndex = this.makeNewSenderKey(true);
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
-        this.sendEncryptionKeysEvent();
+        this.sendEncryptionKeysEvent(newKeyIndex);
     };
 }
