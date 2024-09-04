@@ -554,7 +554,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         try {
-            await Promise.allSettled([
+            await Promise.all([
                 this.sendKeysViaRoomEvent(deviceId, myKeys),
                 this.sendKeysViaToDevice(deviceId, myKeys),
             ]);
@@ -631,12 +631,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             sent_ts: Date.now(),
         };
 
-        const payload = {
-            type: EventType.CallEncryptionKeysPrefix,
-            [ToDeviceMessageId]: randomString(32),
-            content,
-        };
-
         logger.info(
             `Sending encryption keys to-device batch for: ${membershipsRequiringToDevice.map(({ sender, deviceId }) => `${sender}:${deviceId}`).join(", ")}`,
         );
@@ -655,7 +649,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     contentMap.set(sender!, new Map());
                 }
 
-                contentMap.get(sender!)!.set(deviceId, payload);
+                contentMap.get(sender!)!.set(deviceId, content);
             });
 
             await (this.client as unknown as RoomWidgetClient).sendToDeviceViaWidgetApi(
@@ -672,7 +666,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
             const devices = membershipsRequiringToDevice.map(({ deviceId, sender }) => ({ userId: sender!, deviceId }));
 
-            const batch = await crypto.encryptToDeviceMessages(EventType.CallEncryptionKeysPrefix, devices, payload);
+            const batch = await crypto.encryptToDeviceMessages(EventType.CallEncryptionKeysPrefix, devices, content);
 
             await this.client.queueToDevice(batch);
         }
