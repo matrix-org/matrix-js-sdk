@@ -483,12 +483,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
                 logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
-                this.currentEncryptionKeyIndex = encryptionKeyIndex;
+                if (userId === this.client.getUserId() && deviceId === this.client.getDeviceId()) {
+                    this.currentEncryptionKeyIndex = encryptionKeyIndex;
+                }
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
             }, USE_KEY_DELAY);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
-            this.currentEncryptionKeyIndex = encryptionKeyIndex;
+            if (userId === this.client.getUserId() && deviceId === this.client.getDeviceId()) {
+                this.currentEncryptionKeyIndex = encryptionKeyIndex;
+            }
             this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
         }
     }
