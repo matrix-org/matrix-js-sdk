@@ -145,6 +145,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
+    private currentEncryptionKeyIndex = -1;
+
     public statistics = {
         counters: {
             toDeviceEncryptionKeysSent: 0,
@@ -481,10 +483,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
                 logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
+                this.currentEncryptionKeyIndex = encryptionKeyIndex;
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
             }, USE_KEY_DELAY);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
+            this.currentEncryptionKeyIndex = encryptionKeyIndex;
             this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
         }
     }
@@ -553,14 +557,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
+        if (this.currentEncryptionKeyIndex === -1) {
+            logger.warn("Tried to send encryption keys event but no current key index found!");
+            return;
+        }
+
+        const currentEncryptionKeyIndex = this.currentEncryptionKeyIndex;
+        const currentKey = myKeys[currentEncryptionKeyIndex];
+
         try {
             await Promise.all([
                 this.sendKeysViaRoomEvent(deviceId, myKeys),
-                this.sendKeysViaToDevice(deviceId, myKeys),
+                this.sendKeysViaToDevice(deviceId, currentKey, currentEncryptionKeyIndex),
             ]);
 
             logger.debug(
-                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
+                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numKeys=${myKeys.length} currentKeyIndex=${currentEncryptionKeyIndex}`,
                 this.encryptionKeys,
             );
         } catch (error) {
@@ -608,7 +620,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         } as EncryptionKeysEventContent);
     }
 
-    private async sendKeysViaToDevice(deviceId: string, myKeys: Uint8Array[]): Promise<void> {
+    private async sendKeysViaToDevice(deviceId: string, currentKey: Uint8Array, currentIndex: number): Promise<void> {
         const membershipsRequiringToDevice = this.memberships.filter(
             (m) => !this.isMyMembership(m) && m.sender && m.keyDistributionMethod === "to_device",
         );
@@ -619,12 +631,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         const content: EncryptionKeysToDeviceContent = {
-            keys: myKeys.map((key, index) => {
-                return {
-                    index,
-                    key: encodeUnpaddedBase64(key),
-                };
-            }),
+            keys: [{ index: currentIndex, key: encodeUnpaddedBase64(currentKey) }],
             device_id: deviceId,
             call_id: "",
             room_id: this.room.roomId,
