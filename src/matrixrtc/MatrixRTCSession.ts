@@ -19,7 +19,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { Room } from "../models/room.ts";
 import { MatrixClient, SendToDeviceContentMap } from "../client.ts";
-import { EventType, ToDeviceMessageId } from "../@types/event.ts";
+import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import {
     CallMembership,
@@ -747,13 +747,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
+        let age: number;
+
         if (event.getRoomId()) {
             this.statistics.counters.roomEventEncryptionKeysReceived += 1;
-            this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += Date.now() - event.getTs();
+            age = Date.now() - event.getTs();
+            this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
         } else {
             this.statistics.counters.toDeviceEncryptionKeysReceived += 1;
-            this.statistics.totals.toDeviceEncryptionKeysReceivedTotalAge +=
-                Date.now() - (content as EncryptionKeysToDeviceContent).sent_ts;
+            age = Date.now() - (content as EncryptionKeysToDeviceContent).sent_ts;
+            this.statistics.totals.toDeviceEncryptionKeysReceivedTotalAge += age;
         }
 
         for (const key of content.keys) {
@@ -781,7 +784,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 );
             } else {
                 logger.debug(
-                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex}`,
+                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} age=${age}ms`,
                     this.encryptionKeys,
                 );
                 this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, event.getTs());
