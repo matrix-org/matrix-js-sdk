@@ -466,8 +466,6 @@ export class PerSessionKeyBackupDownloader {
             return null;
         }
 
-        const authData = currentServerVersion.auth_data as Curve25519AuthData;
-
         const backupKeys = await this.getBackupDecryptionKey();
         if (!backupKeys?.decryptionKey) {
             this.logger.debug(`Not checking key backup for session (no decryption key)`);
@@ -483,8 +481,9 @@ export class PerSessionKeyBackupDownloader {
             return null;
         }
 
+        const authData = currentServerVersion.auth_data as Curve25519AuthData;
         if (authData.public_key != backupKeys.decryptionKey.megolmV1PublicKey.publicKeyBase64) {
-            this.logger.debug(`getBackupDecryptor key mismatch error`);
+            this.logger.debug(`Key backup on server does not match our decryption key`);
             this.hasConfigurationProblem = true;
             return null;
         }
