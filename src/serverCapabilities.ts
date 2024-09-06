@@ -38,6 +38,8 @@ export interface ISetDisplayNameCapability extends ICapability {}
 
 export interface ISetAvatarUrlCapability extends ICapability {}
 
+export interface IProfileFieldsCapability extends ICapability {}
+
 export enum RoomVersionStability {
     Stable = "stable",
     Unstable = "unstable",
@@ -61,6 +63,7 @@ export interface Capabilities {
     "org.matrix.msc3882.get_login_token"?: IGetLoginTokenCapability;
     "m.set_displayname"?: ISetDisplayNameCapability;
     "m.set_avatar_url"?: ISetAvatarUrlCapability;
+    "uk.tcpip.msc4133.profile_fields"?: IProfileFieldsCapability;
 }
 
 type CapabilitiesResponse = {
