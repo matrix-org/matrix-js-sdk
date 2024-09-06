@@ -1735,23 +1735,25 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             eventType: EventType.RoomMessageEncrypted,
         };
 
-        for (const { userId, deviceId } of devices) {
-            const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
-                new RustSdkCryptoJs.UserId(userId),
-                new RustSdkCryptoJs.DeviceId(deviceId),
-            );
+        await Promise.all(
+            devices.map(async ({ userId, deviceId }) => {
+                const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+                    new RustSdkCryptoJs.UserId(userId),
+                    new RustSdkCryptoJs.DeviceId(deviceId),
+                );
 
-            if (device) {
-                const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
-                batch.batch.push({
-                    deviceId,
-                    userId,
-                    payload: encryptedPayload,
-                });
-            } else {
-                this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
-            }
-        }
+                if (device) {
+                    const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
+                    batch.batch.push({
+                        deviceId,
+                        userId,
+                        payload: encryptedPayload,
+                    });
+                } else {
+                    this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
+                }
+            }),
+        );
 
         return batch;
     }
