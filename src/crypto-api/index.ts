@@ -589,6 +589,11 @@ export enum DecryptionFailureCode {
      */
     HISTORICAL_MESSAGE_USER_NOT_JOINED = "HISTORICAL_MESSAGE_USER_NOT_JOINED",
 
+    /**
+     * The sender does not satisfy the requested trust requirement.
+     */
+    SENDER_IDENTITY_NOT_TRUSTED = "SENDER_IDENTITY_NOT_TRUSTED",
+
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
 

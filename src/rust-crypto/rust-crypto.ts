@@ -1741,6 +1741,7 @@ class EventDecryptor {
             const res = (await this.olmMachine.decryptRoomEvent(
                 stringifyEvent(event),
                 new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+                new RustSdkCryptoJs.DecryptionSettings(RustSdkCryptoJs.TrustRequirement.Untrusted),
             )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
             // Success. We can remove the event from the pending list, if
@@ -1846,6 +1847,12 @@ class EventDecryptor {
                     DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX,
                     "The sender's device has not sent us the keys for this message at this index.",
                     errorDetails,
+                );
+
+            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityNotTrusted:
+                throw new DecryptionError(
+                    DecryptionFailureCode.SENDER_IDENTITY_NOT_TRUSTED,
+                    "The sender identity is not trusted.",
                 );
 
             // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
