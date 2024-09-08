@@ -544,6 +544,8 @@ export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_m
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 
+export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
+
 enum CrossSigningKeyType {
     MasterKey = "master_key",
     SelfSigningKey = "self_signing_key",
@@ -8807,125 +8809,174 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Determine if the server supports extended profiles, as described by MSC4133.
+     *
+     * @returns `true` if supported, otherwise `false`
+     */
+    public async doesServerSupportExtendedProfiles(): Promise<boolean> {
+        // Needs https://github.com/element-hq/synapse/pull/17488/files#r1749146498 to be resolved.
+        return true;
+        //return this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES);
+    }
+
+    /**
      * Fetch a user's *extended* profile, which may include additonal keys.
-     * 
+     *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @returns A set of keys to property values.
      */
     public async getExtendedProfile(userId: string): Promise<Record<string, unknown>> {
-        if (!await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133")) {
-            throw new Error('Server does not support extended profiles')
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            //throw new Error('Server does not support extended profiles');
         }
-        const path = await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable") ?
-        '/_matrix/client/v3/profile/$userId' :
-        '/_matrix/client/unstable/uk.tcpip.msc4133/profile/$userId';
-        return this.http.authedRequest(Method.Get, utils.encodeUri(path, { userId }));
+        return this.http.authedRequest(
+            Method.Get,
+            utils.encodeUri("/profile/$userId", { $userId: userId }),
+            undefined,
+            undefined,
+            {
+                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+                    ? undefined
+                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+            },
+        );
     }
 
     /**
      * Fetch a specific key from the user's *extended* profile.
-     * 
+     *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
      * @returns A set of keys to property values.
      */
     public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
-        if (!await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133")) {
-            throw new Error('Server does not support extended profiles')
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            //throw new Error('Server does not support extended profiles');
         }
-        const path = await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable") ?
-            '/_matrix/client/v3/profile/$userId/$key' :
-            '/_matrix/client/unstable/uk.tcpip.msc4133/profile/$userId/$key';
-        const profile = await this.http.authedRequest(Method.Get, utils.encodeUri(path, { userId, key })) as Record<string, unknown>;
+        const profile = (await this.http.authedRequest(
+            Method.Get,
+            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+            undefined,
+            undefined,
+            {
+                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+                    ? undefined
+                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+            },
+        )) as Record<string, unknown>;
         return profile[key];
     }
 
     /**
      * Set a property on your *extended* profile.
-     * 
+     *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param key The key of the property to set.
      * @param value The value to set on the propety.
      * @returns A set of keys to property values.
      */
     public async setExtendedProfileProperty(key: string, value: unknown): Promise<void> {
-        if (!await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133")) {
-            throw new Error('Server does not support extended profiles')
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            //throw new Error('Server does not support extended profiles');
         }
-        const path = await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable") ?
-            '/_matrix/client/v3/profile/$userId/$key' :
-            '/_matrix/client/unstable/uk.tcpip.msc4133/profile/$userId/$key';
-
         const userId = this.getUserId();
 
-        await this.http.authedRequest(Method.Put, utils.encodeUri(path, { userId, key }), { }, { [key]: value });
+        await this.http.authedRequest(
+            Method.Put,
+            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+            undefined,
+            { [key]: value },
+            {
+                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+                    ? undefined
+                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+            },
+        );
     }
 
     /**
      * Delete a property on your *extended* profile.
-     * 
+     *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
      * @returns A set of keys to property values.
      */
     public async deleteExtendedProfileProperty(key: string): Promise<void> {
-        if (!await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133")) {
-            throw new Error('Server does not support extended profiles')
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            //throw new Error('Server does not support extended profiles');
         }
-        const path = await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable") ?
-            '/_matrix/client/v3/profile/$userId/$key' :
-            '/_matrix/client/unstable/uk.tcpip.msc4133/profile/$userId/$key';
-
         const userId = this.getUserId();
 
-        await this.http.authedRequest(Method.Delete, utils.encodeUri(path, { userId, key }));
+        await this.http.authedRequest(
+            Method.Delete,
+            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+            undefined,
+            undefined,
+            {
+                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+                    ? undefined
+                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+            },
+        );
     }
 
     /**
      * Update multiple properties on your *extended* profile. This will
      * update any existing keys and leave unspecified ones intact.
-     * 
+     *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
      * @returns A set of keys to property values.
      */
     public async patchExtendedProfile(profile: Record<string, unknown>): Promise<Record<string, unknown>> {
-        if (!await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133")) {
-            throw new Error('Server does not support extended profiles')
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            //throw new Error('Server does not support extended profiles');
         }
-        const path = await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable") ?
-            '/_matrix/client/v3/profile/$userId' :
-            '/_matrix/client/unstable/uk.tcpip.msc4133/profile/$userId';
-
         const userId = this.getUserId();
 
-        return this.http.authedRequest(Method.Patch, utils.encodeUri(path, { userId }), {}, profile);
+        return this.http.authedRequest(
+            Method.Patch,
+            utils.encodeUri("/profile/$userId", { $userId: userId }),
+            {},
+            profile,
+            {
+                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+                    ? undefined
+                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+            },
+        );
     }
 
     /**
      * Set multiple properties on your *extended* profile. This will completely
      * replace the existing profile, removing any unspecified keys.
-     * 
+     *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
      * @returns A set of keys to property values.
      */
     public async setExtendedProfile(profile: Record<string, unknown>): Promise<Record<string, unknown>> {
-        if (!await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133")) {
-            throw new Error('Server does not support extended profiles')
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            //throw new Error('Server does not support extended profiles');
         }
-        const path = await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable") ?
-            '/_matrix/client/v3/profile/$userId' :
-            '/_matrix/client/unstable/uk.tcpip.msc4133/profile/$userId';
-
         const userId = this.getUserId();
 
-        return this.http.authedRequest(Method.Put, utils.encodeUri(path, { userId }), {}, profile);
+        return this.http.authedRequest(
+            Method.Put,
+            utils.encodeUri("/profile/$userId", { $userId: userId }),
+            {},
+            profile,
+            {
+                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+                    ? undefined
+                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+            },
+        );
     }
 
     /**
