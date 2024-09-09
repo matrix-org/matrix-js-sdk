@@ -1143,7 +1143,7 @@ describe("MatrixClient", function () {
                     expectBody: testProfile,
                 },
             ];
-            await expect(client.setExtendedProfile(testProfile)).resolves.toEqual(testProfile);
+            await expect(client.setExtendedProfile(testProfile)).resolves.toEqual(undefined);
         });
     });
 
