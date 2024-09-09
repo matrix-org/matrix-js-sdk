@@ -8818,6 +8818,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get the prefix used for extended profile requests.
+     *
+     * @returns The prefix for use with `authedRequest`
+     */
+    private async getExtendedProfileRequestPrefix(): Promise<string> {
+        if (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable")) {
+            return ClientPrefix.V3;
+        }
+        return "/_matrix/client/unstable/uk.tcpip.msc4133";
+    }
+
+    /**
      * Fetch a user's *extended* profile, which may include additonal keys.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
@@ -8837,9 +8849,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             undefined,
             {
-                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
-                    ? undefined
-                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+                prefix: await this.getExtendedProfileRequestPrefix(),
             },
         );
     }
@@ -8865,9 +8875,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             undefined,
             {
-                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
-                    ? undefined
-                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+                prefix: await this.getExtendedProfileRequestPrefix(),
             },
         )) as Record<string, unknown>;
         return profile[key];
@@ -8894,9 +8902,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             { [key]: value },
             {
-                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
-                    ? undefined
-                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+                prefix: await this.getExtendedProfileRequestPrefix(),
             },
         );
     }
@@ -8921,9 +8927,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             undefined,
             {
-                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
-                    ? undefined
-                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+                prefix: await this.getExtendedProfileRequestPrefix(),
             },
         );
     }
@@ -8950,9 +8954,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             {},
             profile,
             {
-                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
-                    ? undefined
-                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+                prefix: await this.getExtendedProfileRequestPrefix(),
             },
         );
     }
@@ -8978,9 +8980,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             {},
             profile,
             {
-                prefix: (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
-                    ? undefined
-                    : "/_matrix/client/unstable/uk.tcpip.msc4133",
+                prefix: await this.getExtendedProfileRequestPrefix(),
             },
         );
     }
