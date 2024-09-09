@@ -1455,7 +1455,7 @@
 
 "@matrix-org/matrix-sdk-crypto-wasm@^8.0.0":
   version "8.0.0"
-  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-8.0.0.tgz"
+  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-wasm/-/matrix-sdk-crypto-wasm-8.0.0.tgz#6ddc0e63538e821a2efbc5c1a2f0fa0f71d489ff"
   integrity sha512-s0q3O2dK8b6hOJ+SZFz+s/IiMabmVsNue6r17sTwbrRD8liBkCrpjYnxoMYvtC01GggJ9TZLQbeqpt8hQSPHAg==
 
 "@matrix-org/olm@3.2.15":
