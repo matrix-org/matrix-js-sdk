@@ -8814,9 +8814,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns `true` if supported, otherwise `false`
      */
     public async doesServerSupportExtendedProfiles(): Promise<boolean> {
-        // Needs https://github.com/element-hq/synapse/pull/17488/files#r1749146498 to be resolved.
-        return true;
-        //return this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES);
+        return this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES);
     }
 
     /**
@@ -8825,10 +8823,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @returns A set of keys to property values.
+     *
+     * @throws An error if the server does not support MSC4133.
+     * @throws A M_NOT_FOUND error if the profile could not be found.
      */
     public async getExtendedProfile(userId: string): Promise<Record<string, unknown>> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
-            //throw new Error('Server does not support extended profiles');
+            throw new Error("Server does not support extended profiles");
         }
         return this.http.authedRequest(
             Method.Get,
@@ -8849,11 +8850,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
-     * @returns A set of keys to property values.
+     * @returns The property value.
+     *
+     * @throws An error if the server does not support MSC4133.
+     * @throws A M_NOT_FOUND error if the key was not set OR the profile could not be found.
      */
     public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
-            //throw new Error('Server does not support extended profiles');
+            throw new Error("Server does not support extended profiles");
         }
         const profile = (await this.http.authedRequest(
             Method.Get,
@@ -8875,11 +8879,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param key The key of the property to set.
      * @param value The value to set on the propety.
-     * @returns A set of keys to property values.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
      */
     public async setExtendedProfileProperty(key: string, value: unknown): Promise<void> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
-            //throw new Error('Server does not support extended profiles');
+            throw new Error("Server does not support extended profiles");
         }
         const userId = this.getUserId();
 
@@ -8900,13 +8905,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Delete a property on your *extended* profile.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
-     * @param userId The user ID to fetch the profile of.
-     * @param key The key of the property to fetch.
-     * @returns A set of keys to property values.
+     * @param key The key of the property to delete.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
      */
     public async deleteExtendedProfileProperty(key: string): Promise<void> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
-            //throw new Error('Server does not support extended profiles');
+            throw new Error("Server does not support extended profiles");
         }
         const userId = this.getUserId();
 
@@ -8925,16 +8930,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Update multiple properties on your *extended* profile. This will
-     * update any existing keys and leave unspecified ones intact.
+     * merge with any existing keys.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
-     * @param userId The user ID to fetch the profile of.
-     * @param key The key of the property to fetch.
-     * @returns A set of keys to property values.
+     * @param profile The profile object to merge with the existing profile.
+     * @returns The newly merged profile.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
      */
     public async patchExtendedProfile(profile: Record<string, unknown>): Promise<Record<string, unknown>> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
-            //throw new Error('Server does not support extended profiles');
+            throw new Error("Server does not support extended profiles");
         }
         const userId = this.getUserId();
 
@@ -8956,17 +8962,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * replace the existing profile, removing any unspecified keys.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
-     * @param userId The user ID to fetch the profile of.
-     * @param key The key of the property to fetch.
-     * @returns A set of keys to property values.
+     * @param profile The profile object to set.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
      */
-    public async setExtendedProfile(profile: Record<string, unknown>): Promise<Record<string, unknown>> {
+    public async setExtendedProfile(profile: Record<string, unknown>): Promise<void> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
-            //throw new Error('Server does not support extended profiles');
+            throw new Error("Server does not support extended profiles");
         }
         const userId = this.getUserId();
 
-        return this.http.authedRequest(
+        await this.http.authedRequest(
             Method.Put,
             utils.encodeUri("/profile/$userId", { $userId: userId }),
             {},
