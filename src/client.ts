@@ -544,6 +544,8 @@ export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_m
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 
+export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
+
 enum CrossSigningKeyType {
     MasterKey = "master_key",
     SelfSigningKey = "self_signing_key",
@@ -8804,6 +8806,183 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ? utils.encodeUri("/profile/$userId/$info", { $userId: userId, $info: info })
             : utils.encodeUri("/profile/$userId", { $userId: userId });
         return this.http.authedRequest(Method.Get, path);
+    }
+
+    /**
+     * Determine if the server supports extended profiles, as described by MSC4133.
+     *
+     * @returns `true` if supported, otherwise `false`
+     */
+    public async doesServerSupportExtendedProfiles(): Promise<boolean> {
+        return this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES);
+    }
+
+    /**
+     * Get the prefix used for extended profile requests.
+     *
+     * @returns The prefix for use with `authedRequest`
+     */
+    private async getExtendedProfileRequestPrefix(): Promise<string> {
+        if (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable")) {
+            return ClientPrefix.V3;
+        }
+        return "/_matrix/client/unstable/uk.tcpip.msc4133";
+    }
+
+    /**
+     * Fetch a user's *extended* profile, which may include additonal keys.
+     *
+     * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
+     * @param userId The user ID to fetch the profile of.
+     * @returns A set of keys to property values.
+     *
+     * @throws An error if the server does not support MSC4133.
+     * @throws A M_NOT_FOUND error if the profile could not be found.
+     */
+    public async getExtendedProfile(userId: string): Promise<Record<string, unknown>> {
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            throw new Error("Server does not support extended profiles");
+        }
+        return this.http.authedRequest(
+            Method.Get,
+            utils.encodeUri("/profile/$userId", { $userId: userId }),
+            undefined,
+            undefined,
+            {
+                prefix: await this.getExtendedProfileRequestPrefix(),
+            },
+        );
+    }
+
+    /**
+     * Fetch a specific key from the user's *extended* profile.
+     *
+     * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
+     * @param userId The user ID to fetch the profile of.
+     * @param key The key of the property to fetch.
+     * @returns The property value.
+     *
+     * @throws An error if the server does not support MSC4133.
+     * @throws A M_NOT_FOUND error if the key was not set OR the profile could not be found.
+     */
+    public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            throw new Error("Server does not support extended profiles");
+        }
+        const profile = (await this.http.authedRequest(
+            Method.Get,
+            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+            undefined,
+            undefined,
+            {
+                prefix: await this.getExtendedProfileRequestPrefix(),
+            },
+        )) as Record<string, unknown>;
+        return profile[key];
+    }
+
+    /**
+     * Set a property on your *extended* profile.
+     *
+     * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
+     * @param key The key of the property to set.
+     * @param value The value to set on the propety.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
+     */
+    public async setExtendedProfileProperty(key: string, value: unknown): Promise<void> {
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            throw new Error("Server does not support extended profiles");
+        }
+        const userId = this.getUserId();
+
+        await this.http.authedRequest(
+            Method.Put,
+            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+            undefined,
+            { [key]: value },
+            {
+                prefix: await this.getExtendedProfileRequestPrefix(),
+            },
+        );
+    }
+
+    /**
+     * Delete a property on your *extended* profile.
+     *
+     * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
+     * @param key The key of the property to delete.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
+     */
+    public async deleteExtendedProfileProperty(key: string): Promise<void> {
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            throw new Error("Server does not support extended profiles");
+        }
+        const userId = this.getUserId();
+
+        await this.http.authedRequest(
+            Method.Delete,
+            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+            undefined,
+            undefined,
+            {
+                prefix: await this.getExtendedProfileRequestPrefix(),
+            },
+        );
+    }
+
+    /**
+     * Update multiple properties on your *extended* profile. This will
+     * merge with any existing keys.
+     *
+     * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
+     * @param profile The profile object to merge with the existing profile.
+     * @returns The newly merged profile.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
+     */
+    public async patchExtendedProfile(profile: Record<string, unknown>): Promise<Record<string, unknown>> {
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            throw new Error("Server does not support extended profiles");
+        }
+        const userId = this.getUserId();
+
+        return this.http.authedRequest(
+            Method.Patch,
+            utils.encodeUri("/profile/$userId", { $userId: userId }),
+            {},
+            profile,
+            {
+                prefix: await this.getExtendedProfileRequestPrefix(),
+            },
+        );
+    }
+
+    /**
+     * Set multiple properties on your *extended* profile. This will completely
+     * replace the existing profile, removing any unspecified keys.
+     *
+     * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
+     * @param profile The profile object to set.
+     *
+     * @throws An error if the server does not support MSC4133 OR the server disallows editing the user profile.
+     */
+    public async setExtendedProfile(profile: Record<string, unknown>): Promise<void> {
+        if (!(await this.doesServerSupportExtendedProfiles())) {
+            throw new Error("Server does not support extended profiles");
+        }
+        const userId = this.getUserId();
+
+        await this.http.authedRequest(
+            Method.Put,
+            utils.encodeUri("/profile/$userId", { $userId: userId }),
+            {},
+            profile,
+            {
+                prefix: await this.getExtendedProfileRequestPrefix(),
+            },
+        );
     }
 
     /**
