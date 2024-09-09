@@ -318,20 +318,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
     public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
-        if (backupInfo.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
-            throw new Error(`getBackupDecryptor Unsupported algorithm ${backupInfo.algorithm}`);
+        if (!(privKey instanceof Uint8Array)) {
+            throw new Error(`getBackupDecryptor: expects Uint8Array`);
         }
 
-        const authData = <Curve25519AuthData>backupInfo.auth_data;
-
-        if (!(privKey instanceof Uint8Array)) {
-            throw new Error(`getBackupDecryptor expects Uint8Array`);
+        if (backupInfo.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
+            throw new Error(`getBackupDecryptor: Unsupported algorithm ${backupInfo.algorithm}`);
         }
 
         const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
 
+        const authData = <Curve25519AuthData>backupInfo.auth_data;
         if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
-            throw new Error(`getBackupDecryptor key mismatch error`);
+            throw new Error(`getBackupDecryptor: key backup on server does not match the decryption key`);
         }
 
         return this.backupManager.createBackupDecryptor(backupDecryptionKey);
