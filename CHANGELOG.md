@@ -1,3 +1,10 @@
+Changes in [34.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.5.0) (2024-09-10)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate unused callback hooks `CryptoCallbacks.onSecretRequested` and `CryptoCallbacks.getDehydrationKey` ([#4376](https://github.com/matrix-org/matrix-js-sdk/pull/4376)). Contributed by @richvdh.
+
+
 Changes in [34.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.4.0) (2024-08-27)
 ==================================================================================================
 ## ✨ Features
