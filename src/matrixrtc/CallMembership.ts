@@ -128,6 +128,10 @@ export class CallMembership {
         return this.parentEvent.getSender();
     }
 
+    public get eventId(): string | undefined {
+        return this.parentEvent.getId();
+    }
+
     public get callId(): string {
         return this.membershipData.call_id;
     }
