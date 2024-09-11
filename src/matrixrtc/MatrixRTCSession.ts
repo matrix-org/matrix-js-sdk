@@ -658,7 +658,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const contentMap: SendToDeviceContentMap = new Map();
 
             membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
-                if (contentMap.has(sender!)) {
+                if (!contentMap.has(sender!)) {
                     contentMap.set(sender!, new Map());
                 }
 
