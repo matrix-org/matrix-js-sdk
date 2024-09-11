@@ -291,11 +291,17 @@ export class RoomWidgetClient extends MatrixClient {
         event: MatrixEvent,
         delayOpts?: SendDelayedEventRequestOpts,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        // We need to extend the content with the redacts parameter
+        // The js sdk uses event.redacts but the widget api uses event.content.redacts
+        // This will be converted back to event.redacts in the widget driver.
+        const content = event.event.redacts
+            ? { ...event.getContent(), redacts: event.event.redacts }
+            : event.getContent();
         if (delayOpts) {
             // TODO: updatePendingEvent for delayed events?
             const response = await this.widgetApi.sendRoomEvent(
                 event.getType(),
-                event.getContent(),
+                content,
                 room.roomId,
                 "delay" in delayOpts ? delayOpts.delay : undefined,
                 "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
@@ -305,7 +311,7 @@ export class RoomWidgetClient extends MatrixClient {
 
         let response: ISendEventFromWidgetResponseData;
         try {
-            response = await this.widgetApi.sendRoomEvent(event.getType(), event.getContent(), room.roomId);
+            response = await this.widgetApi.sendRoomEvent(event.getType(), content, room.roomId);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
             throw e;
