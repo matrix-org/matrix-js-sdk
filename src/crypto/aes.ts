@@ -30,12 +30,17 @@ export interface IEncryptedPayload {
 }
 
 /**
- * encrypt a string
+ * Encrypt a string using AES-CTR.
  *
  * @param data - the plaintext to encrypt
- * @param key - the encryption key to use
- * @param name - the name of the secret
- * @param ivStr - the initialization vector to use
+ * @param key - the encryption key to use as an input to the HKDF function which is used to derive the AES key for
+ *    encryption. Obviously, the same key must be provided when decrypting.
+ * @param name - the name of the secret. Used as an input to the HKDF operation which is used to derive the AES key,
+ *    so again the same value must be provided when decrypting.
+ * @param ivStr - the base64-encoded initialization vector to use. If not supplied, a random one will be generated.
+ *
+ * @returns The encrypted result, including the ciphertext itself, the initialization vector (as supplied in `ivStr`,
+ *   or generated), and an HMAC on the ciphertext — all base64-encoded.
  */
 export async function encryptAES(
     data: string,
@@ -79,11 +84,13 @@ export async function encryptAES(
 }
 
 /**
- * decrypt a string
+ * Decrypt an AES-encrypted string.
  *
- * @param data - the encrypted data
- * @param key - the encryption key to use
- * @param name - the name of the secret
+ * @param data - the encrypted data, returned by {@link encryptAES}.
+ * @param key - the encryption key to use as an input to the HKDF function which is used to derive the AES key. Must
+ *    be the same as provided to {@link encryptAES}.
+ * @param name - the name of the secret. Also used as an input to the HKDF operation which is used to derive the AES
+ *    key, so again must be the same as provided to {@link encryptAES}.
  */
 export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
     const [aesKey, hmacKey] = await deriveKeys(key, name);
