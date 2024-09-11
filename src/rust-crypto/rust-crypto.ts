@@ -1849,12 +1849,6 @@ class EventDecryptor {
                     errorDetails,
                 );
 
-            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityNotTrusted:
-                throw new DecryptionError(
-                    DecryptionFailureCode.SENDER_IDENTITY_NOT_TRUSTED,
-                    "The sender identity is not trusted.",
-                );
-
             // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.
             // Just put it on the `UNKNOWN_ERROR` bucket.
             default:
