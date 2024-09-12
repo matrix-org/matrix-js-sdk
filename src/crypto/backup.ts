@@ -40,7 +40,7 @@ import { CryptoEvent } from "./index.ts";
 import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.ts";
 import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
-import { encodeRecoveryKey } from "../crypto-api";
+import { encodeRecoveryKey } from "../crypto-api/index.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
