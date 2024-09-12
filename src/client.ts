@@ -9929,7 +9929,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const clientTimeout = req.clientTimeout;
         delete req.clientTimeout;
         return this.http.authedRequest<MSC3575SlidingSyncResponse>(Method.Post, "/sync", qps, req, {
-            prefix: "/_matrix/client/unstable/org.matrix.msc3575",
+            prefix: "/_matrix/client/unstable/org.matrix.simplified_msc3575",
             baseUrl: proxyBaseUrl,
             localTimeoutMs: clientTimeout,
             abortSignal,

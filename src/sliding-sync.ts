@@ -461,13 +461,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public setListRanges(key: string, ranges: number[][]): Promise<string> {
+    public setListRanges(key: string, ranges: number[][]): void {
         const list = this.lists.get(key);
         if (!list) {
-            return Promise.reject(new Error("no list with key " + key));
+            throw new Error("no list with key " + key);
         }
         list.updateListRange(ranges);
-        return this.resend();
+        //return this.resend();
     }
 
     /**
@@ -479,7 +479,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public setList(key: string, list: MSC3575List): Promise<string> {
+    public setList(key: string, list: MSC3575List): void {
         const existingList = this.lists.get(key);
         if (existingList) {
             existingList.replaceList(list);
@@ -488,7 +488,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             this.lists.set(key, new SlidingList(list));
         }
         this.listModifiedCount += 1;
-        return this.resend();
+        //return this.resend();
     }
 
     /**
@@ -842,7 +842,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 const listModifiedCount = this.listModifiedCount;
                 const reqLists: Record<string, MSC3575List> = {};
                 this.lists.forEach((l: SlidingList, key: string) => {
-                    reqLists[key] = l.getList(false);
+                    reqLists[key] = l.getList(true);
                 });
                 const reqBody: MSC3575SlidingSyncRequest = {
                     lists: reqLists,
