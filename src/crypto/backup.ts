@@ -27,7 +27,6 @@ import { DeviceTrustLevel } from "./CrossSigning.ts";
 import { keyFromPassphrase } from "./key_passphrase.ts";
 import { encodeUri, safeSet, sleep } from "../utils.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
-import { encodeRecoveryKey } from "./recoverykey.ts";
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.ts";
 import {
     Curve25519SessionData,
@@ -41,6 +40,7 @@ import { CryptoEvent } from "./index.ts";
 import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.ts";
 import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { encodeRecoveryKey } from "../crypto-api";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
