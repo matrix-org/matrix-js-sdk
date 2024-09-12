@@ -3632,6 +3632,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.crypto.backupManager.flagAllGroupSessionsForBackup();
     }
 
+    /**
+     * Return true if recovery key is valid.
+     * Try to decode the recovery key and check if it's successful.
+     * @param recoveryKey
+     * @deprecated Use {@link decodeRecoveryKey} directly
+     */
     public isValidRecoveryKey(recoveryKey: string): boolean {
         try {
             decodeRecoveryKey(recoveryKey);
@@ -3663,6 +3669,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param recoveryKey - The recovery key
      * @returns key backup key
+     * @deprecated Use {@link decodeRecoveryKey} directly
      */
     public keyBackupKeyFromRecoveryKey(recoveryKey: string): Uint8Array {
         return decodeRecoveryKey(recoveryKey);
