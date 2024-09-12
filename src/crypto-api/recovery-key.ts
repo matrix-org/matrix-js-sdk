@@ -21,6 +21,10 @@ import bs58 from "bs58";
 const OLM_RECOVERY_KEY_PREFIX = [0x8b, 0x01];
 const KEY_SIZE = 32;
 
+/**
+ * Encode a recovery key using base58 encoding.
+ * @param key
+ */
 export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
     const buf = Buffer.alloc(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
     buf.set(OLM_RECOVERY_KEY_PREFIX, 0);
@@ -36,6 +40,10 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
     return base58key.match(/.{1,4}/g)?.join(" ");
 }
 
+/**
+ * Decode a recovery key from base58 encoding.
+ * @param recoveryKey
+ */
 export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
     const result = bs58.decode(recoveryKey.replace(/ /g, ""));
 
