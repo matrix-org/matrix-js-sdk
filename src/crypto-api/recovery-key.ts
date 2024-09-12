@@ -22,7 +22,7 @@ const OLM_RECOVERY_KEY_PREFIX = [0x8b, 0x01];
 const KEY_SIZE = 32;
 
 /**
- * Encode a recovery key using base58 encoding.
+ * Encode a recovery key using the Matrix {@link https://spec.matrix.org/v1.11/appendices/#cryptographic-key-representation | Cryptographic key representation}
  * @param key
  */
 export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
@@ -41,7 +41,7 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
 }
 
 /**
- * Decode a recovery key from base58 encoding.
+ * Decode a recovery key encoded with the Matrix {@link https://spec.matrix.org/v1.11/appendices/#cryptographic-key-representation | Cryptographic key representation} encoding.
  * @param recoveryKey
  */
 export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
