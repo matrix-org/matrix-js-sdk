@@ -877,6 +877,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             const listKeysWithUpdates: Set<string> = new Set();
             if (!doNotUpdateList) {
                 for (const [key, list] of Object.entries(resp.lists)) {
+                    // TODO: Remove as MSC4186 does not have this.
                     list.ops = list.ops || [];
                     if (list.ops.length > 0) {
                         listKeysWithUpdates.add(key);
@@ -891,6 +892,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (!list) {
                     return;
                 }
+                // TODO: Remove as there is no concept of list updates in MSC4186
                 this.emit(SlidingSyncEvent.List, listKey, list.joinedCount, Object.assign({}, list.roomIndexToRoomId));
             });
         }

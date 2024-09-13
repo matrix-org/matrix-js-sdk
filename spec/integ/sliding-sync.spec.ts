@@ -144,16 +144,14 @@ describe("SlidingSync", () => {
                 });
             await httpBackend!.flushAllExpected();
 
-            // expect nothing but ranges and non-initial extensions to be sent
+            // expect all params to be sent TODO: check MSC4186
             httpBackend!
                 .when("POST", syncUrl)
                 .check(function (req) {
                     const body = req.data;
                     logger.debug("got ", body);
                     expect(body.room_subscriptions).toBeFalsy();
-                    expect(body.lists["a"]).toEqual({
-                        ranges: [[0, 10]],
-                    });
+                    expect(body.lists["a"]).toEqual(listInfo);
                     expect(body.extensions).toBeTruthy();
                     expect(body.extensions["custom_extension"]).toEqual({ initial: false });
                     expect(req.queryParams!["pos"]).toEqual("11");
@@ -390,18 +388,19 @@ describe("SlidingSync", () => {
             [3, 5],
         ];
 
+        // request first 3 rooms
+        const listReq = {
+            ranges: [[0, 2]],
+            sort: ["by_name"],
+            timeline_limit: 1,
+            required_state: [["m.room.topic", ""]],
+            filters: {
+                is_dm: true,
+            },
+        };
+
         let slidingSync: SlidingSync;
         it("should be possible to subscribe to a list", async () => {
-            // request first 3 rooms
-            const listReq = {
-                ranges: [[0, 2]],
-                sort: ["by_name"],
-                timeline_limit: 1,
-                required_state: [["m.room.topic", ""]],
-                filters: {
-                    is_dm: true,
-                },
-            };
             slidingSync = new SlidingSync(proxyBaseUrl, new Map([["a", listReq]]), {}, client!, 1);
             httpBackend!
                 .when("POST", syncUrl)
@@ -468,10 +467,7 @@ describe("SlidingSync", () => {
                     const body = req.data;
                     logger.log("next ranges", body.lists["a"].ranges);
                     expect(body.lists).toBeTruthy();
-                    expect(body.lists["a"]).toEqual({
-                        // only the ranges should be sent as the rest are unchanged and sticky
-                        ranges: newRanges,
-                    });
+                    expect(body.lists["a"]).toEqual(listReq); // resend all values TODO: check MSC4186
                 })
                 .respond(200, {
                     pos: "b",
@@ -514,10 +510,7 @@ describe("SlidingSync", () => {
                     const body = req.data;
                     logger.log("extra list", body);
                     expect(body.lists).toBeTruthy();
-                    expect(body.lists["a"]).toEqual({
-                        // only the ranges should be sent as the rest are unchanged and sticky
-                        ranges: newRanges,
-                    });
+                    expect(body.lists["a"]).toEqual(listReq); // resend all values TODO: check MSC4186
                     expect(body.lists["b"]).toEqual(extraListReq);
                 })
                 .respond(200, {
