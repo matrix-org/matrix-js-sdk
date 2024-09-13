@@ -55,6 +55,7 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
+    keyFromPassphrase,
     OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
@@ -65,7 +66,6 @@ import { Device, DeviceMap } from "../models/device.ts";
 import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage.ts";
 import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
-import { keyFromPassphrase } from "../crypto/key_passphrase.ts";
 import { encodeRecoveryKey } from "../crypto/recoverykey.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
