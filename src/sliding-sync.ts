@@ -527,10 +527,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.extensions[ext.name()] = ext;
     }
 
-    private getExtensionRequest(isInitial: boolean): Record<string, object | undefined> {
+    private getExtensionRequest(): Record<string, object | undefined> {
         const ext: Record<string, object | undefined> = {};
         Object.keys(this.extensions).forEach((extName) => {
-            ext[extName] = this.extensions[extName].onRequest(isInitial);
+            ext[extName] = this.extensions[extName].onRequest(true);
         });
         return ext;
     }
@@ -790,7 +790,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     pos: currentPos,
                     timeout: this.timeoutMS,
                     clientTimeout: this.timeoutMS + BUFFER_PERIOD_MS,
-                    extensions: this.getExtensionRequest(currentPos === undefined),
+                    extensions: this.getExtensionRequest(),
                 };
                 // check if we are (un)subscribing to a room and modify request this one time for it
                 const newSubscriptions = difference(this.desiredRoomSubscriptions, this.confirmedRoomSubscriptions);
