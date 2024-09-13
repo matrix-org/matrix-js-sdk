@@ -3656,7 +3656,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param password - Passphrase
      * @param backupInfo - Backup metadata from `checkKeyBackup`
      * @returns key backup key
-     * @deprecated Use {@link keyFromAuthData} directly.
+     * @deprecated
      */
     public keyBackupKeyFromPassword(password: string, backupInfo: IKeyBackupInfo): Promise<Uint8Array> {
         return keyFromAuthData(backupInfo.auth_data, password);
