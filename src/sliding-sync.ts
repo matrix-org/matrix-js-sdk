@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -347,11 +347,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private terminated = false;
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
     private needsResend = false;
-    // the txn_id to send with the next request.
-    private txnId: string | null = null;
-    // a list (in chronological order of when they were sent) of objects containing the txn ID and
-    // a defer to resolve/reject depending on whether they were successfully sent or not.
-    private txnIdDefers: (IDeferred<string> & { txnId: string })[] = [];
     // map of extension name to req/resp handler
     private extensions: Record<string, Extension<any, any>> = {};
 
@@ -467,7 +462,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             throw new Error("no list with key " + key);
         }
         list.updateListRange(ranges);
-        //return this.resend();
+        this.resend();
     }
 
     /**
@@ -488,7 +483,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             this.lists.set(key, new SlidingList(list));
         }
         this.listModifiedCount += 1;
-        //return this.resend();
+        this.resend();
     }
 
     /**
@@ -508,9 +503,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public modifyRoomSubscriptions(s: Set<string>): Promise<string> {
+    public modifyRoomSubscriptions(s: Set<string>) {
         this.desiredRoomSubscriptions = s;
-        return this.resend();
+        this.resend();
     }
 
     /**
@@ -521,10 +516,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): Promise<string> {
+    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription) {
         this.roomSubscriptionInfo = rs;
         this.confirmedRoomSubscriptions = new Set<string>();
-        return this.resend();
+        this.resend();
     }
 
     /**
@@ -745,53 +740,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
-     * Resend a Sliding Sync request. Used when something has changed in the request. Resolves with
-     * the transaction ID of this request on success. Rejects with the transaction ID of this request
-     * on failure.
+     * Resend a Sliding Sync request. Used when something has changed in the request.
      */
-    public resend(): Promise<string> {
-        if (this.needsResend && this.txnIdDefers.length > 0) {
-            // we already have a resend queued, so just return the same promise
-            return this.txnIdDefers[this.txnIdDefers.length - 1].promise;
-        }
+    public resend(): void {
         this.needsResend = true;
-        this.txnId = this.client.makeTxnId();
-        const d = defer<string>();
-        this.txnIdDefers.push({
-            ...d,
-            txnId: this.txnId,
-        });
         this.abortController?.abort();
         this.abortController = new AbortController();
-        return d.promise;
-    }
-
-    private resolveTransactionDefers(txnId?: string): void {
-        if (!txnId) {
-            return;
-        }
-        // find the matching index
-        let txnIndex = -1;
-        for (let i = 0; i < this.txnIdDefers.length; i++) {
-            if (this.txnIdDefers[i].txnId === txnId) {
-                txnIndex = i;
-                break;
-            }
-        }
-        if (txnIndex === -1) {
-            // this shouldn't happen; we shouldn't be seeing txn_ids for things we don't know about,
-            // whine about it.
-            logger.warn(`resolveTransactionDefers: seen ${txnId} but it isn't a pending txn, ignoring.`);
-            return;
-        }
-        // This list is sorted in time, so if the input txnId ACKs in the middle of this array,
-        // then everything before it that hasn't been ACKed yet never will and we should reject them.
-        for (let i = 0; i < txnIndex; i++) {
-            this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
-        }
-        this.txnIdDefers[txnIndex].resolve(txnId);
-        // clear out settled promises, including the one we resolved.
-        this.txnIdDefers = this.txnIdDefers.slice(txnIndex + 1);
     }
 
     /**
@@ -811,20 +765,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     private resetup(): void {
         logger.warn("SlidingSync: resetting connection info");
-        // any pending txn ID defers will be forgotten already by the server, so clear them out
-        this.txnIdDefers.forEach((d) => {
-            d.reject(d.txnId);
-        });
-        this.txnIdDefers = [];
         // resend sticky params and de-confirm all subscriptions
         this.lists.forEach((l) => {
             l.setModified(true);
         });
         this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
         // reset the connection as we might be wedged
-        this.needsResend = true;
-        this.abortController?.abort();
-        this.abortController = new AbortController();
+        this.resend();
     }
 
     /**
@@ -867,10 +814,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         }
                         reqBody.room_subscriptions[roomId] = sub;
                     }
-                }
-                if (this.txnId) {
-                    reqBody.txn_id = this.txnId;
-                    this.txnId = null;
                 }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl, this.abortController.signal);
                 resp = await this.pendingReq;
@@ -950,8 +893,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 this.emit(SlidingSyncEvent.List, listKey, list.joinedCount, Object.assign({}, list.roomIndexToRoomId));
             });
-
-            this.resolveTransactionDefers(resp.txn_id);
         }
     }
 }
