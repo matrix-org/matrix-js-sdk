@@ -8,6 +8,6 @@
     "type": "module",
     "dependencies": {
         "cli-color": "^1.0.0",
-        "matrix-js-sdk": "^34.5.0-rc.0"
+        "matrix-js-sdk": "^34.5.0"
     }
 }
