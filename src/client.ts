@@ -227,7 +227,6 @@ import {
     CryptoApi,
     decodeRecoveryKey,
     ImportRoomKeysOpts,
-    keyFromAuthData,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
@@ -244,6 +243,7 @@ import { RoomMessageEventContent, StickerEventContent } from "./@types/events.ts
 import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
+import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
 
 export type Store = IStore;
 
