@@ -14,5 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { randomString } from "../randomstring.ts";
+import { deriveRecoveryKeyFromPassphrase } from "../crypto-api/index.ts";
+
+const DEFAULT_ITERATIONS = 500000;
+
+interface IKey {
+    key: Uint8Array;
+    salt: string;
+    iterations: number;
+}
+
+/**
+ * Generate a new recovery key, based on a passphrase.
+ * @param passphrase - The passphrase to generate the key from
+ */
+export async function keyFromPassphrase(passphrase: string): Promise<IKey> {
+    const salt = randomString(32);
+
+    const key = await deriveRecoveryKeyFromPassphrase(passphrase, salt, DEFAULT_ITERATIONS);
+
+    return { key, salt, iterations: DEFAULT_ITERATIONS };
+}
+
 // Re-export the key passphrase functions to avoid breaking changes
-export * from "../crypto-api/key-passphrase.ts";
+export { deriveRecoveryKeyFromPassphrase as deriveKey };
+export { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
