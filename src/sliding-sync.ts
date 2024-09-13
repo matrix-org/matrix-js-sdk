@@ -500,7 +500,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * prepare the room subscriptions for when start() is called.
      * @param s - The new desired room subscriptions.
      */
-    public modifyRoomSubscriptions(s: Set<string>) {
+    public modifyRoomSubscriptions(s: Set<string>): void {
         this.desiredRoomSubscriptions = s;
         this.resend();
     }
@@ -510,7 +510,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * such that they will be sent up afresh.
      * @param rs - The new room subscription fields to fetch.
      */
-    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription) {
+    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): void {
         this.roomSubscriptionInfo = rs;
         this.confirmedRoomSubscriptions = new Set<string>();
         this.resend();
