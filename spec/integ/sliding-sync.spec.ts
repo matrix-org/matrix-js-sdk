@@ -331,6 +331,7 @@ describe("SlidingSync", () => {
             await p;
         });
 
+        // TODO: this does not exist in MSC4186
         it("should be able to unsubscribe from a room", async () => {
             httpBackend!
                 .when("POST", syncUrl)
@@ -551,6 +552,7 @@ describe("SlidingSync", () => {
             await responseProcessed;
         });
 
+        // TODO: this does not exist in MSC4186
         it("should be possible to get list DELETE/INSERTs", async () => {
             // move C (2) to A (0)
             httpBackend!.when("POST", syncUrl).respond(200, {
@@ -637,6 +639,7 @@ describe("SlidingSync", () => {
             await listPromise;
         });
 
+        // TODO: this does not exist in MSC4186
         it("should ignore invalid list indexes", async () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "e",
@@ -677,6 +680,7 @@ describe("SlidingSync", () => {
             await listPromise;
         });
 
+        // TODO: this does not exist in MSC4186
         it("should be possible to update a list", async () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "g",
@@ -728,6 +732,7 @@ describe("SlidingSync", () => {
             await listPromise;
         });
 
+        // TODO: this does not exist in MSC4186
         // this refers to a set of operations where the end result is no change.
         it("should handle net zero operations correctly", async () => {
             const indexToRoomId = {
@@ -780,6 +785,7 @@ describe("SlidingSync", () => {
             await listPromise;
         });
 
+        // TODO: this does not exist in MSC4186
         it("should handle deletions correctly", async () => {
             expect(slidingSync.getListData("a")!.roomIndexToRoomId).toEqual({
                 0: roomB,
@@ -822,6 +828,7 @@ describe("SlidingSync", () => {
             await listPromise;
         });
 
+        // TODO: this does not exist in MSC4186
         it("should handle insertions correctly", async () => {
             expect(slidingSync.getListData("a")!.roomIndexToRoomId).toEqual({
                 0: roomC,
@@ -901,6 +908,7 @@ describe("SlidingSync", () => {
             slidingSync.stop();
         });
 
+        // TODO: this does not exist in MSC4186
         // Regression test to make sure things like DELETE 0 INSERT 0 work correctly and we don't
         // end up losing room IDs.
         it("should handle insertions with a spurious DELETE correctly", async () => {
