@@ -20,36 +20,12 @@ const DEFAULT_ITERATIONS = 500000;
 
 const DEFAULT_BITSIZE = 256;
 
-/* eslint-disable camelcase */
-interface IAuthData {
-    private_key_salt?: string;
-    private_key_iterations?: number;
-    private_key_bits?: number;
-}
 /* eslint-enable camelcase */
 
 interface IKey {
     key: Uint8Array;
     salt: string;
     iterations: number;
-}
-
-/**
- * Derive a key from a passphrase using the salt and iterations from the auth data.
- * @param authData
- * @param password
- */
-export function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
-    if (!authData.private_key_salt || !authData.private_key_iterations) {
-        throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
-    }
-
-    return deriveKey(
-        password,
-        authData.private_key_salt,
-        authData.private_key_iterations,
-        authData.private_key_bits || DEFAULT_BITSIZE,
-    );
 }
 
 /**
