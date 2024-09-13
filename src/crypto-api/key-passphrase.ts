@@ -34,6 +34,11 @@ interface IKey {
     iterations: number;
 }
 
+/**
+ * Derive a key from a passphrase using the salt and iterations from the auth data.
+ * @param authData
+ * @param password
+ */
 export function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
     if (!authData.private_key_salt || !authData.private_key_iterations) {
         throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
@@ -47,6 +52,10 @@ export function keyFromAuthData(authData: IAuthData, password: string): Promise<
     );
 }
 
+/**
+ * Derive a key from a passphrase.
+ * @param password
+ */
 export async function keyFromPassphrase(password: string): Promise<IKey> {
     const salt = randomString(32);
 
@@ -55,6 +64,13 @@ export async function keyFromPassphrase(password: string): Promise<IKey> {
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
+/**
+ * Derive a key from a passphrase using PBKDF2.
+ * @param password
+ * @param salt
+ * @param iterations
+ * @param numBits
+ */
 export async function deriveKey(
     password: string,
     salt: string,
