@@ -18,7 +18,7 @@ import { logger } from "./logger.ts";
 import { MatrixClient } from "./client.ts";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
-import { sleep, IDeferred, defer } from "./utils.ts";
+import { sleep } from "./utils.ts";
 import { HTTPError } from "./http-api/index.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue

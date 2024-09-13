@@ -495,7 +495,9 @@ describe("SlidingSync", () => {
             await httpBackend!.flushAllExpected();
             await responseProcessed;
             // setListRanges for an invalid list key returns an error
-            expect(() => {slidingSync.setListRanges("idontexist", newRanges)}).toThrow();
+            expect(() => {
+                slidingSync.setListRanges("idontexist", newRanges);
+            }).toThrow();
         });
 
         it("should be possible to add an extra list", async () => {
