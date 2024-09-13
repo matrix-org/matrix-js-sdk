@@ -1741,6 +1741,7 @@ class EventDecryptor {
             const res = (await this.olmMachine.decryptRoomEvent(
                 stringifyEvent(event),
                 new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+                new RustSdkCryptoJs.DecryptionSettings(RustSdkCryptoJs.TrustRequirement.Untrusted),
             )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
             // Success. We can remove the event from the pending list, if
