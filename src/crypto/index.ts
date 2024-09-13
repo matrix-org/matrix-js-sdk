@@ -41,7 +41,6 @@ import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
 import { VerificationBase } from "./verification/Base.ts";
 import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode.ts";
 import { SAS as SASVerification } from "./verification/SAS.ts";
-import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey.ts";
 import { VerificationRequest } from "./verification/request/VerificationRequest.ts";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel.ts";
 import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel.ts";
@@ -88,8 +87,10 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningKeyInfo,
     CrossSigningStatus,
+    decodeRecoveryKey,
     DecryptionFailureCode,
     DeviceVerificationStatus,
+    encodeRecoveryKey,
     EventEncryptionInfo,
     EventShieldColour,
     EventShieldReason,

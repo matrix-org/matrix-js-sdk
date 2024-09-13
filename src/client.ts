@@ -85,7 +85,6 @@ import {
     isCryptoAvailable,
 } from "./crypto/index.ts";
 import { DeviceInfo } from "./crypto/deviceinfo.ts";
-import { decodeRecoveryKey } from "./crypto/recoverykey.ts";
 import { User, UserEvent, UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
@@ -226,6 +225,7 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningKeyInfo,
     CryptoApi,
+    decodeRecoveryKey,
     ImportRoomKeysOpts,
     keyFromAuthData,
 } from "./crypto-api/index.ts";
@@ -3632,6 +3632,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.crypto.backupManager.flagAllGroupSessionsForBackup();
     }
 
+    /**
+     * Return true if recovery key is valid.
+     * Try to decode the recovery key and check if it's successful.
+     * @param recoveryKey
+     * @deprecated Use {@link decodeRecoveryKey} directly
+     */
     public isValidRecoveryKey(recoveryKey: string): boolean {
         try {
             decodeRecoveryKey(recoveryKey);
@@ -3664,6 +3670,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param recoveryKey - The recovery key
      * @returns key backup key
+     * @deprecated Use {@link decodeRecoveryKey} directly
      */
     public keyBackupKeyFromRecoveryKey(recoveryKey: string): Uint8Array {
         return decodeRecoveryKey(recoveryKey);

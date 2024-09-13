@@ -28,7 +28,7 @@ jobs:
         with:
             final: ${{ inputs.mode == 'final' }}
             npm: ${{ inputs.npm }}
-            downstreams: '["matrix-org/matrix-react-sdk", "element-hq/element-web"]'
+            downstreams: '["element-hq/matrix-react-sdk", "element-hq/element-web"]'
 
     docs:
         name: Publish Documentation
