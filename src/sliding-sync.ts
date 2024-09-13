@@ -82,10 +82,16 @@ export interface MSC3575SlidingSyncRequest {
     clientTimeout?: number;
 }
 
+export interface MSC4186Hero {
+    user_id: string;
+    displayname: string;
+}
+
 export interface MSC3575RoomData {
     name: string;
     required_state: IStateEvent[];
     timeline: (IRoomEvent | IStateEvent)[];
+    heroes: MSC4186Hero[];
     notification_count?: number;
     highlight_count?: number;
     joined_count?: number;
