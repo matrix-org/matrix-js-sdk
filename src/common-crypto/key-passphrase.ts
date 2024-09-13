@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-import { deriveKey } from "../crypto-api/index.ts";
-
-const DEFAULT_BIT_SIZE = 256;
+import { deriveRecoveryKeyFromPassphrase } from "../crypto-api/index.ts";
 
 /* eslint-disable camelcase */
 interface IAuthData {
@@ -35,10 +33,10 @@ export function keyFromAuthData(authData: IAuthData, passphrase: string): Promis
         throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
     }
 
-    return deriveKey(
+    return deriveRecoveryKeyFromPassphrase(
         passphrase,
         authData.private_key_salt,
         authData.private_key_iterations,
-        authData.private_key_bits || DEFAULT_BIT_SIZE,
+        authData.private_key_bits,
     );
 }

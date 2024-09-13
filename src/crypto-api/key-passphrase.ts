@@ -14,44 +14,22 @@
  * limitations under the License.
  */
 
-import { randomString } from "../randomstring.ts";
-
-const DEFAULT_ITERATIONS = 500000;
-
-const DEFAULT_BITSIZE = 256;
-
-/* eslint-enable camelcase */
-
-interface IKey {
-    key: Uint8Array;
-    salt: string;
-    iterations: number;
-}
+const DEFAULT_BIT_SIZE = 256;
 
 /**
- * Derive a key from a passphrase.
- * @param password
+ * Derive a recovery key from a passphrase and salt using PBKDF2.
+ * @see https://spec.matrix.org/v1.11/client-server-api/#deriving-keys-from-passphrases
+ *
+ * @param passphrase - The passphrase to derive the key from
+ * @param salt - The salt to use in the derivation
+ * @param iterations - The number of iterations to use in the derivation
+ * @param numBits - The number of bits to derive
  */
-export async function keyFromPassphrase(password: string): Promise<IKey> {
-    const salt = randomString(32);
-
-    const key = await deriveKey(password, salt, DEFAULT_ITERATIONS, DEFAULT_BITSIZE);
-
-    return { key, salt, iterations: DEFAULT_ITERATIONS };
-}
-
-/**
- * Derive a key from a passphrase using PBKDF2.
- * @param password
- * @param salt
- * @param iterations
- * @param numBits
- */
-export async function deriveKey(
-    password: string,
+export async function deriveRecoveryKeyFromPassphrase(
+    passphrase: string,
     salt: string,
     iterations: number,
-    numBits = DEFAULT_BITSIZE,
+    numBits = DEFAULT_BIT_SIZE,
 ): Promise<Uint8Array> {
     if (!globalThis.crypto.subtle || !TextEncoder) {
         throw new Error("Password-based backup is not available on this platform");
@@ -59,7 +37,7 @@ export async function deriveKey(
 
     const key = await globalThis.crypto.subtle.importKey(
         "raw",
-        new TextEncoder().encode(password),
+        new TextEncoder().encode(passphrase),
         { name: "PBKDF2" },
         false,
         ["deriveBits"],

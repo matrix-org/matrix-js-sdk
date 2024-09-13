@@ -55,11 +55,11 @@ import {
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    keyFromPassphrase,
     OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
     encodeRecoveryKey,
+    deriveRecoveryKeyFromPassphrase,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -100,6 +100,12 @@ interface ISignableObject {
  * @internal
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
+    /**
+     * The number of iterations to use when deriving a recovery key from a passphrase.
+     * @private
+     */
+    private readonly RECOVERY_KEY_DERIVATION_ITERATION = 500000;
+
     private _trustCrossSignedDevices = true;
 
     /** whether {@link stop} has been called */
@@ -879,17 +885,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<GeneratedSecretStorageKey> {
         if (password) {
             // Generate the key from the passphrase
-            const derivation = await keyFromPassphrase(password);
+            // first we generate a random salt
+            const salt = randomString(32);
+            // then we derive the key from the passphrase
+            const recoveryKey = await deriveRecoveryKeyFromPassphrase(
+                password,
+                salt,
+                this.RECOVERY_KEY_DERIVATION_ITERATION,
+            );
             return {
                 keyInfo: {
                     passphrase: {
                         algorithm: "m.pbkdf2",
-                        iterations: derivation.iterations,
-                        salt: derivation.salt,
+                        iterations: this.RECOVERY_KEY_DERIVATION_ITERATION,
+                        salt,
                     },
                 },
-                privateKey: derivation.key,
-                encodedPrivateKey: encodeRecoveryKey(derivation.key),
+                privateKey: recoveryKey,
+                encodedPrivateKey: encodeRecoveryKey(recoveryKey),
             };
         } else {
             // Using the navigator crypto API to generate the private key
