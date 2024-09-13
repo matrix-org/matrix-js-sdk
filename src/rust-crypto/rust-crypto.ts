@@ -58,6 +58,7 @@ import {
     OwnDeviceKeys,
     UserVerificationStatus,
     VerificationRequest,
+    encodeRecoveryKey,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -66,7 +67,6 @@ import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../sec
 import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { keyFromPassphrase } from "../crypto/key_passphrase.ts";
-import { encodeRecoveryKey } from "../crypto/recoverykey.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { CryptoEvent } from "../crypto/index.ts";
@@ -1741,6 +1741,7 @@ class EventDecryptor {
             const res = (await this.olmMachine.decryptRoomEvent(
                 stringifyEvent(event),
                 new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+                new RustSdkCryptoJs.DecryptionSettings(RustSdkCryptoJs.TrustRequirement.Untrusted),
             )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
             // Success. We can remove the event from the pending list, if
