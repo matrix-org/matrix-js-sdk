@@ -399,4 +399,4 @@ function fixWidth(str, len) {
     return str;
 }
 
-matrixClient.startClient({ initialSyncLimit: numMessagesToShow }); // messages for each room.
+matrixClient.startClient({ initialSyncLimit: numMessagesToShow });
