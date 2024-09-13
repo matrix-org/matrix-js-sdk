@@ -499,9 +499,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * /sync request to resend new subscriptions. If the /sync stream has not started, this will
      * prepare the room subscriptions for when start() is called.
      * @param s - The new desired room subscriptions.
-     * @returns A promise which resolves to the transaction ID when it has been received down sync
-     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
-     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
     public modifyRoomSubscriptions(s: Set<string>) {
         this.desiredRoomSubscriptions = s;
@@ -512,9 +509,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Modify which events to retrieve for room subscriptions. Invalidates all room subscriptions
      * such that they will be sent up afresh.
      * @param rs - The new room subscription fields to fetch.
-     * @returns A promise which resolves to the transaction ID when it has been received down sync
-     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
-     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
     public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription) {
         this.roomSubscriptionInfo = rs;
