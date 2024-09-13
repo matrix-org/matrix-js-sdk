@@ -467,6 +467,8 @@ describe("SlidingSync", () => {
                     const body = req.data;
                     logger.log("next ranges", body.lists["a"].ranges);
                     expect(body.lists).toBeTruthy();
+                    // list range should be changed
+                    listReq.ranges = newRanges;
                     expect(body.lists["a"]).toEqual(listReq); // resend all values TODO: check MSC4186
                 })
                 .respond(200, {
@@ -492,7 +494,7 @@ describe("SlidingSync", () => {
             await httpBackend!.flushAllExpected();
             await responseProcessed;
             // setListRanges for an invalid list key returns an error
-            await expect(slidingSync.setListRanges("idontexist", newRanges)).rejects.toBeTruthy();
+            expect(() => {slidingSync.setListRanges("idontexist", newRanges)}).toThrow();
         });
 
         it("should be possible to add an extra list", async () => {
