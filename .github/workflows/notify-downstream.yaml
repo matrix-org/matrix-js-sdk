@@ -14,7 +14,7 @@ jobs:
                 include:
                     - repo: element-hq/element-web
                       event: element-web-notify
-                    - repo: matrix-org/matrix-react-sdk
+                    - repo: element-hq/matrix-react-sdk
                       event: upstream-sdk-notify
 
         runs-on: ubuntu-latest
