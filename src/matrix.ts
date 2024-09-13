@@ -76,6 +76,7 @@ export * from "./@types/read_receipts.ts";
 export * from "./@types/crypto.ts";
 export * from "./@types/extensible_events.ts";
 export * from "./@types/IIdentityServerProvider.ts";
+export * from "./@types/membership.ts";
 export * from "./models/room-summary.ts";
 export * from "./models/event-status.ts";
 export type { RoomSummary } from "./client.ts";
