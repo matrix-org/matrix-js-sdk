@@ -153,7 +153,7 @@ describe("SlidingSync", () => {
                     expect(body.room_subscriptions).toBeFalsy();
                     expect(body.lists["a"]).toEqual(listInfo);
                     expect(body.extensions).toBeTruthy();
-                    expect(body.extensions["custom_extension"]).toEqual({ initial: false });
+                    expect(body.extensions["custom_extension"]).toEqual({ initial: true });
                     expect(req.queryParams!["pos"]).toEqual("11");
                 })
                 .respond(200, function () {
