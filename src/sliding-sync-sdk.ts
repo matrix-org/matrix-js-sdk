@@ -573,7 +573,7 @@ export class SlidingSyncSdk {
 
         // TODO: handle threaded / beacon events
 
-        if (roomData.initial) {
+        if (roomData.limited || roomData.initial) {
             // we should not know about any of these timeline entries if this is a genuinely new room.
             // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
             // this room, then timeline_limit: 50).
