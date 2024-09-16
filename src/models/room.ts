@@ -29,7 +29,7 @@ import { normalize, noUnsafeEventProps } from "../utils.ts";
 import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { IRoomSummary, RoomSummary } from "./room-summary.ts";
+import { IRoomSummary, IRoomSummaryMSC4186, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
@@ -176,8 +176,10 @@ export type RoomEmittedEvents =
 // It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old 'summary' field.
 // The old form simply contained the hero's user ID, which forced clients to then look up the
 // m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
-// works in a backwards compatible way, we lazily populate the displayName/avatarUrl when heroes
-// are used. We lazily do this to ensure that the hero list updates with the latest profile values.
+// works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
+// values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
+// in SSS mode we will always use the heroes if they exist, but in sync v2 mode these fields will
+// never be set and hence we will always do getMember lookups (at the right time as well).
 export type Hero = {
     userId: string;
     displayName?: string;
@@ -949,6 +951,35 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const nonFunctionalHeroes = this.heroes?.filter((h) => !functionalMembers.includes(h.userId));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
+            // use first hero which exists
+            for (const hero of nonFunctionalHeroes) {
+                if (!hero.displayName && !hero.avatarUrl) {
+                    // attempt to look up renderable fields from the m.room.member event if it exists
+                    const member = this.getMember(hero.userId);
+                    if (member) {
+                        return member;
+                    }
+                }
+                else {
+                    // use the Hero supplied values for the room member.
+                    // TODO: It's unfortunate that this function, which clearly only cares about the
+                    //       avatar url, returns the entire RoomMember event. We need to fake an event
+                    //       to meet this API shape.
+                    const heroMember = new RoomMember(this.roomId, hero.userId);
+                    // set the display name and avatar url
+                    heroMember.setMembershipEvent(new MatrixEvent({
+                        // ensure it's unique even if we hit the same millisecond
+                        event_id: "$" + this.roomId + hero.userId + new Date().getTime(),
+                        type: EventType.RoomMember,
+                        state_key: hero.userId,
+                        content: {
+                            displayname: hero.displayName,
+                            avatar_url: hero.avatarUrl,
+                        }
+                    }));
+                    return heroMember;
+                }
+            }
             const availableMember = nonFunctionalHeroes
                 .map((hero) => {
                     return this.getMember(hero.userId);
@@ -1622,15 +1653,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.setUnreadNotificationCount(type, count);
     }
 
-    public setSummaryHeroes(heroes: Hero[]): void {
-        // filter out ourselves just in case
-        this.heroes = heroes.filter((h) => {
-            return h.userId != this.myUserId;
+    public setSummary(summary: IRoomSummary | IRoomSummaryMSC4186): void {
+        // map heroes onto the MSC4186 form as that has more data
+        const heroes = summary["m.heroes"]?.map((h) => {
+            if (typeof h === "string") {
+                return {
+                    userId: h,
+                };
+            }
+            return h;
         });
-    }
-
-    public setSummary(summary: IRoomSummary): void {
-        const heroUserIds = summary["m.heroes"];
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
@@ -1639,15 +1671,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (Number.isInteger(invitedCount)) {
             this.currentState.setInvitedMemberCount(invitedCount!);
         }
-        if (Array.isArray(heroUserIds)) {
-            this.setSummaryHeroes(heroUserIds.map((userId): Hero => {
-                return {
-                    userId: userId,
-                };
-            }))
+        if (Array.isArray(heroes)) {
+            // filter out ourselves just in case
+            this.heroes = heroes.filter((h) => {
+                return h.userId != this.myUserId;
+            });
         }
 
-        this.emit(RoomEvent.Summary, summary);
+        summary["m.heroes"] = heroes?.map((h) => h.userId);
+
+        this.emit(RoomEvent.Summary, summary as IRoomSummary);
     }
 
     /**
@@ -3450,8 +3483,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     inviteJoinCount--;
                     return;
                 }
-                const member = this.getMember(hero.userId);
-                otherNames.push(member ? member.name : hero.userId);
+                if (hero.displayName) {
+                    otherNames.push(hero.displayName);
+                } else {
+                    const member = this.getMember(hero.userId);
+                    otherNames.push(member ? member.name : hero.userId);
+                }
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {

@@ -85,6 +85,7 @@ export interface MSC3575SlidingSyncRequest {
 export interface MSC4186Hero {
     user_id: string;
     displayname: string;
+    avatar_url: string;
 }
 
 export interface MSC3575RoomData {

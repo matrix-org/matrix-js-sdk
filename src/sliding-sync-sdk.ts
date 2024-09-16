@@ -721,17 +721,13 @@ export class SlidingSyncSdk {
         // synchronous execution prior to emitting SlidingSyncState.Complete
         room.updateMyMembership(KnownMembership.Join);
 
-        // JS SDK expects m.heroes to be a list of user IDs, which it then looks up the display
-        // name via the current state (expecting the m.room.member events to exist). In SSS these
-        // events will not exist. Instead, we will calculate the name of each hero up front and
-        // insert that into the m.heroes array. This only works because the Room will do:
-        //   otherNames.push(member ? member.name : userId);
-        // i.e default to whatever string we give it if the member does not exist.
-        // In practice, we should change the API shape of setSummary to accept the displayname
-        // up-front.
         room.setSummary({
-            "m.heroes": roomData.heroes.map((h) => {
-                return h.displayname ? h.displayname : h.user_id;
+            "m.heroes": roomData.heroes?.map((h) => {
+                return {
+                    userId: h.user_id,
+                    avatarUrl: h.avatar_url,
+                    displayName: h.displayname,
+                };
             }),
             "m.invited_member_count": roomData.invited_count,
             "m.joined_member_count": roomData.joined_count,
