@@ -653,7 +653,7 @@ export class SlidingSyncSdk {
             return;
         }
 
-        if (roomData.initial) {
+        if (roomData.limited) {
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
             room.getLiveTimeline().setPaginationToken(roomData.prev_batch ?? null, EventTimeline.BACKWARDS);
