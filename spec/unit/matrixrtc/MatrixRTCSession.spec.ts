@@ -946,6 +946,7 @@ describe("MatrixRTCSession", () => {
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
                 const firstKeysPayload = await keysSentPromise1;
                 expect(firstKeysPayload.keys).toHaveLength(1);
+                expect(firstKeysPayload.keys[0].index).toEqual(0);
 
                 sendEventMock.mockClear();
 
@@ -962,7 +963,8 @@ describe("MatrixRTCSession", () => {
 
                 const secondKeysPayload = await keysSentPromise2;
 
-                expect(secondKeysPayload.keys).toHaveLength(2);
+                expect(secondKeysPayload.keys).toHaveLength(1);
+                expect(secondKeysPayload.keys[0].index).toEqual(1);
                 expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(2);
             } finally {
                 jest.useRealTimers();
