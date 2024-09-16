@@ -27,6 +27,7 @@ interface IAuthData {
  * Derive a backup key from a passphrase using the salt and iterations from the auth data.
  * @param authData - The auth data containing the salt and iterations
  * @param passphrase - The passphrase to derive the key from
+ * @deprecated
  */
 export function keyFromAuthData(authData: IAuthData, passphrase: string): Promise<Uint8Array> {
     if (!authData.private_key_salt || !authData.private_key_iterations) {
