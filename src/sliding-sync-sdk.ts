@@ -727,6 +727,8 @@ export class SlidingSyncSdk {
         // insert that into the m.heroes array. This only works because the Room will do:
         //   otherNames.push(member ? member.name : userId);
         // i.e default to whatever string we give it if the member does not exist.
+        // In practice, we should change the API shape of setSummary to accept the displayname
+        // up-front.
         room.setSummary({
             "m.heroes": roomData.heroes.map((h) => {
                 return h.displayname ? h.displayname : h.user_id;

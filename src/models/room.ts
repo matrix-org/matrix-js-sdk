@@ -172,6 +172,18 @@ export type RoomEmittedEvents =
     | BeaconEvent.LivenessChange
     | PollEvent.New;
 
+// A Hero is a stripped m.room.member event which contains the key renderable fields from the event.
+// It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old 'summary' field.
+// The old form simply contained the hero's user ID, which forced clients to then look up the
+// m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
+// works in a backwards compatible way, we lazily populate the displayName/avatarUrl when heroes
+// are used. We lazily do this to ensure that the hero list updates with the latest profile values.
+export type Hero = {
+    userId: string;
+    displayName?: string;
+    avatarUrl?: string;
+}
+
 export type RoomEventHandlerMap = {
     /**
      * Fires when the logged in user's membership in the room is updated.
@@ -355,7 +367,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
     private selfMembership?: Membership;
-    private summaryHeroes: string[] | null = null;
+    private heroes: Hero[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
     private getVersionWarning = false;
@@ -873,7 +885,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
             if (memberCount === 2) {
-                return this.summaryHeroes?.[0];
+                return this.heroes?.[0]?.userId;
             }
         }
     }
@@ -891,8 +903,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
         // Remember, we're assuming this room is a DM, so returning the first member we find should be fine
-        if (Array.isArray(this.summaryHeroes) && this.summaryHeroes.length) {
-            return this.summaryHeroes[0];
+        if (Array.isArray(this.heroes) && this.heroes.length) {
+            return this.heroes[0].userId;
         }
         const members = this.currentState.getMembers();
         const anyMember = members.find((m) => m.userId !== this.myUserId);
@@ -934,12 +946,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (nonFunctionalMemberCount > 2) return;
 
         // Prefer the list of heroes, if present. It should only include the single other user in the DM.
-        const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
+        const nonFunctionalHeroes = this.heroes?.filter((h) => !functionalMembers.includes(h.userId));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
             const availableMember = nonFunctionalHeroes
-                .map((userId) => {
-                    return this.getMember(userId);
+                .map((hero) => {
+                    return this.getMember(hero.userId);
                 })
                 .find((member) => !!member);
             if (availableMember) {
@@ -964,8 +976,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
             const availableUser = nonFunctionalHeroes
-                .map((userId) => {
-                    return this.client.getUser(userId);
+                .map((hero) => {
+                    return this.client.getUser(hero.userId);
                 })
                 .find((user) => !!user);
             if (availableUser) {
@@ -1610,8 +1622,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.setUnreadNotificationCount(type, count);
     }
 
+    public setSummaryHeroes(heroes: Hero[]): void {
+        // filter out ourselves just in case
+        this.heroes = heroes.filter((h) => {
+            return h.userId != this.myUserId;
+        });
+    }
+
     public setSummary(summary: IRoomSummary): void {
-        const heroes = summary["m.heroes"];
+        const heroUserIds = summary["m.heroes"];
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
@@ -1620,13 +1639,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (Number.isInteger(invitedCount)) {
             this.currentState.setInvitedMemberCount(invitedCount!);
         }
-        if (Array.isArray(heroes)) {
-            // be cautious about trusting server values,
-            // and make sure heroes doesn't contain our own id
-            // just to be sure
-            this.summaryHeroes = heroes.filter((userId) => {
-                return userId !== this.myUserId;
-            });
+        if (Array.isArray(heroUserIds)) {
+            this.setSummaryHeroes(heroUserIds.map((userId): Hero => {
+                return {
+                    userId: userId,
+                };
+            }))
         }
 
         this.emit(RoomEvent.Summary, summary);
@@ -3424,16 +3442,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames: string[] = [];
-        if (this.summaryHeroes) {
+        if (this.heroes) {
             // if we have a summary, the member state events should be in the room state
-            this.summaryHeroes.forEach((userId) => {
+            this.heroes.forEach((hero) => {
                 // filter service members
-                if (excludedUserIds.includes(userId)) {
+                if (excludedUserIds.includes(hero.userId)) {
                     inviteJoinCount--;
                     return;
                 }
-                const member = this.getMember(userId);
-                otherNames.push(member ? member.name : userId);
+                const member = this.getMember(hero.userId);
+                otherNames.push(member ? member.name : hero.userId);
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
