@@ -722,13 +722,15 @@ export class SlidingSyncSdk {
         room.updateMyMembership(KnownMembership.Join);
 
         room.setSummary({
-            "m.heroes": roomData.heroes?.map((h) => {
-                return {
-                    userId: h.user_id,
-                    avatarUrl: h.avatar_url,
-                    displayName: h.displayname,
-                };
-            }),
+            "m.heroes": roomData.heroes
+                ? roomData.heroes.map((h) => {
+                      return {
+                          userId: h.user_id,
+                          avatarUrl: h.avatar_url,
+                          displayName: h.displayname,
+                      };
+                  })
+                : [],
             "m.invited_member_count": roomData.invited_count,
             "m.joined_member_count": roomData.joined_count,
         });

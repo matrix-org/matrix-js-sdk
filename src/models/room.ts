@@ -184,7 +184,7 @@ export type Hero = {
     userId: string;
     displayName?: string;
     avatarUrl?: string;
-}
+};
 
 export type RoomEventHandlerMap = {
     /**
@@ -959,24 +959,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     if (member) {
                         return member;
                     }
-                }
-                else {
+                } else {
                     // use the Hero supplied values for the room member.
                     // TODO: It's unfortunate that this function, which clearly only cares about the
                     //       avatar url, returns the entire RoomMember event. We need to fake an event
                     //       to meet this API shape.
                     const heroMember = new RoomMember(this.roomId, hero.userId);
                     // set the display name and avatar url
-                    heroMember.setMembershipEvent(new MatrixEvent({
-                        // ensure it's unique even if we hit the same millisecond
-                        event_id: "$" + this.roomId + hero.userId + new Date().getTime(),
-                        type: EventType.RoomMember,
-                        state_key: hero.userId,
-                        content: {
-                            displayname: hero.displayName,
-                            avatar_url: hero.avatarUrl,
-                        }
-                    }));
+                    heroMember.setMembershipEvent(
+                        new MatrixEvent({
+                            // ensure it's unique even if we hit the same millisecond
+                            event_id: "$" + this.roomId + hero.userId + new Date().getTime(),
+                            type: EventType.RoomMember,
+                            state_key: hero.userId,
+                            content: {
+                                displayname: hero.displayName,
+                                avatar_url: hero.avatarUrl,
+                            },
+                        }),
+                    );
                     return heroMember;
                 }
             }
