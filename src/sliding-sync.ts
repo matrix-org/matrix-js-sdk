@@ -368,7 +368,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param key - The list key
      * @returns The list data which contains the rooms in this list
      */
-    public getListData(key: string): { joinedCount: number; } | null {
+    public getListData(key: string): { joinedCount: number } | null {
         const data = this.lists.get(key);
         if (!data) {
             return null;
