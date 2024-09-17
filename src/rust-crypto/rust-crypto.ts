@@ -646,8 +646,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             return new UserVerificationStatus(false, false, false);
         }
         const verified = userIdentity.isVerified();
+        const wasPreviouslyVerified = userIdentity.wasPreviouslyVerified();
         userIdentity.free();
-        return new UserVerificationStatus(verified, false, false);
+        return new UserVerificationStatus(verified, wasPreviouslyVerified, false);
     }
 
     /**
