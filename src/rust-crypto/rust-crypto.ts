@@ -102,9 +102,8 @@ interface ISignableObject {
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
     /**
      * The number of iterations to use when deriving a recovery key from a passphrase.
-     * @private
      */
-    private readonly RECOVERY_KEY_DERIVATION_ITERATION = 500000;
+    private readonly RECOVERY_KEY_DERIVATION_ITERATIONS = 500000;
 
     private _trustCrossSignedDevices = true;
 
@@ -891,13 +890,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             const recoveryKey = await deriveRecoveryKeyFromPassphrase(
                 password,
                 salt,
-                this.RECOVERY_KEY_DERIVATION_ITERATION,
+                this.RECOVERY_KEY_DERIVATION_ITERATIONS,
             );
             return {
                 keyInfo: {
                     passphrase: {
                         algorithm: "m.pbkdf2",
-                        iterations: this.RECOVERY_KEY_DERIVATION_ITERATION,
+                        iterations: this.RECOVERY_KEY_DERIVATION_ITERATIONS,
                         salt,
                     },
                 },
