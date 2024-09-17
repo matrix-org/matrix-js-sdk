@@ -600,12 +600,15 @@ export enum DecryptionFailureCode {
     SENDER_IDENTITY_PREVIOUSLY_VERIFIED = "SENDER_IDENTITY_PREVIOUSLY_VERIFIED",
 
     /**
-     * The sender device is not cross-signed.  This will only be used if the crypto mode is set to a mode that requires cross-signing of devices.  FIXME: which ones?
+     * The sender device is not cross-signed.  This will only be used if the
+     * crypto mode is set to `CryptoMode.Invisible` or `CryptoMode.Transition`.
      */
     UNSIGNED_SENDER_DEVICE = "UNSIGNED_SENDER_DEVICE",
 
     /**
-     * We weren't able to link the message back to any known device.  This will only be used if the crypto mode is set to a mode that requires a known device.
+     * We weren't able to link the message back to any known device.  This will
+     * only be used if the crypto mode is set to `CryptoMode.Invisible` or
+     * `CryptoMode.Transition`.
      */
     UNKNOWN_SENDER_DEVICE = "UNKNOWN_SENDER_DEVICE",
 
