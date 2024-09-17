@@ -41,6 +41,11 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
+     * The cryptography mode to use.
+     */
+    setCryptoMode(cryptoMode: CryptoMode): void;
+
+    /**
      * Return the current version of the crypto module.
      * For example: `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`.
      * @returns the formatted version
@@ -630,6 +635,34 @@ export enum DecryptionFailureCode {
 
     /** @deprecated only used in legacy crypto */
     UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
+}
+
+/**
+ * The cryptography mode.  Affects how messages are encrypted and decrypted.
+ * Only supported by Rust crypto.
+ */
+export enum CryptoMode {
+    /**
+     * Events are encrypted for all devices in the room, except for
+     * blacklisted devices, or unverified devices if
+     * `globalBlacklistUnverifiedDevices` is set.  Events from all senders are
+     * decrypted.
+     */
+    Legacy,
+    /**
+     * Events are encrypted as with `Legacy` mode, but will throw an error if a
+     * verified user has an unsigned device, or if a verified user replaces
+     * their identity.  Events are decrypted only if they come from cross-signed
+     * devices, or devices that existed before the Rust crypto SDK started
+     * tracking device trust.
+     */
+    Transition,
+    /**
+     * Events are only encrypted for cross-signed devices.  Will throw an error
+     * when encrypting if a verified user replaces their identity.  Events are
+     * decrypted only if they come from a cross-signed device.
+     */
+    Invisible,
 }
 
 /**

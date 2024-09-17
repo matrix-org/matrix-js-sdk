@@ -45,6 +45,7 @@ import {
     CrossSigningStatus,
     CryptoApi,
     CryptoCallbacks,
+    CryptoMode,
     Curve25519AuthData,
     DecryptionFailureCode,
     DeviceVerificationStatus,
@@ -201,6 +202,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     // CryptoBackend implementation
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private cryptoMode = CryptoMode.Legacy;
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     */
+    public setCryptoMode(cryptoMode: CryptoMode): void {
+        this.cryptoMode = cryptoMode;
+    }
 
     public set globalErrorOnUnknownDevices(_v: boolean) {
         // Not implemented for rust crypto.
