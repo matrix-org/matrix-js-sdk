@@ -752,14 +752,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             async () => {
                 // This tests that a message will not be decrypted if the sender
                 // is not sufficiently trusted according to the selected crypto
-                // mode.  We select invisible crypto, which requires sender
-                // devices to be cross-signed.  Since the sender is not
-                // cross-signed, we should get a SENDER_UNTRUSTED error.
+                // mode.
                 //
                 // This test is almost the same as the "Alice receives a megolm
                 // message" test, with the main difference that we set the
                 // crypto mode.
                 expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+
+                // Start by using Invisible crypto mode
                 aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Invisible);
 
                 await startClientAndAwaitFirstSync();
@@ -809,8 +809,22 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // it probably won't be decrypted yet, because it takes a while to process the olm keys
                 const decryptedEvent = await testUtils.awaitDecryption(event);
                 // It will error as an unknown device because we haven't fetched
-                // the sender's device keys
+                // the sender's device keys.
                 expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+
+                // Next, try decrypting in transition mode, which should also
+                // fail for the same reason
+                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Transition);
+
+                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
+                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+
+                // Decrypting in legacy mode should succeed since it doesn't
+                // care about device trust.
+                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Legacy);
+
+                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
+                expect(decryptedEvent.decryptionFailureReason).toEqual(null);
             },
         );
 
