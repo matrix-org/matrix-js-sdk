@@ -53,6 +53,41 @@ jobs:
             - name: Run Linter
               run: "yarn run lint:js"
 
+    node_example_lint:
+        name: "Node.js example"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version-file: package.json
+
+            - name: Install Deps
+              run: "yarn install"
+
+            - name: Build Types
+              run: "yarn build:types"
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "npm"
+                  node-version-file: 'examples/node/package.json'
+                  # cache-dependency-path: '**/package-lock.json'
+
+            - name: Install Example Deps
+              run: "npm install"
+              working-directory: "examples/node"
+
+            - name: Check Syntax
+              run: "node --check app.js"
+              working-directory: "examples/node"
+
+            - name: Typecheck
+              run: "npx tsc"
+              working-directory: "examples/node"
+
     workflow_lint:
         name: "Workflow Lint"
         runs-on: ubuntu-latest
