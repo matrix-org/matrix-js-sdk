@@ -73,7 +73,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   cache: "npm"
-                  node-version-file: 'examples/node/package.json'
+                  node-version-file: "examples/node/package.json"
                   # cache-dependency-path: '**/package-lock.json'
 
             - name: Install Example Deps
