@@ -250,12 +250,10 @@ export interface Extension<Req extends {}, Res extends {}> {
  * of information when processing sync responses.
  *  - RoomData: concerns rooms, useful for SlidingSyncSdk to update its knowledge of rooms.
  *  - Lifecycle: concerns callbacks at various well-defined points in the sync process.
- *  - List: concerns lists, useful for UI layers to re-render room lists.
  * Specifically, the order of event invocation is:
  *  - Lifecycle (state=RequestFinished)
  *  - RoomData (N times)
  *  - Lifecycle (state=Complete)
- *  - List (at most once per list)
  */
 export enum SlidingSyncEvent {
     /**

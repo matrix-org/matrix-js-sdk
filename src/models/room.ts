@@ -343,6 +343,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Map<string, MatrixEvent> = new Map(); // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
+    private bumpStamp: number | undefined = undefined;
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
     // Useful to know at what point the current user has started using threads in this room
@@ -1638,6 +1639,24 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         this.emit(RoomEvent.UnreadNotifications);
+    }
+
+    /**
+     * Set the bump stamp for this room. This can be used for sorting rooms when the timeline
+     * entries are unknown. Used in MSC4186: Simplified Sliding Sync.
+     * @param bumpStamp The bump_stamp value from the server
+     */
+    public setBumpStamp(bumpStamp: number): void {
+        this.bumpStamp = bumpStamp;
+    }
+
+    /**
+     * Get the bump stamp for this room. This can be used for sorting rooms when the timeline
+     * entries are unknown. Used in MSC4186: Simplified Sliding Sync.
+     * @returns The bump stamp for the room, if it exists.
+     */
+    public getBumpStamp(): number | undefined {
+        return this.bumpStamp;
     }
 
     /**

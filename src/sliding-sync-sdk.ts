@@ -630,6 +630,9 @@ export class SlidingSyncSdk {
                 room.setUnreadNotificationCount(NotificationCountType.Highlight, roomData.highlight_count);
             }
         }
+        if (roomData.bump_stamp) {
+            room.setBumpStamp(roomData.bump_stamp);
+        }
 
         if (Number.isInteger(roomData.invited_count)) {
             room.currentState.setInvitedMemberCount(roomData.invited_count!);
