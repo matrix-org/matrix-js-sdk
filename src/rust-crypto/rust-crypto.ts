@@ -262,7 +262,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // through decryptEvent and hence get rid of this case.
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
-        return await this.eventDecryptor.attemptEventDecryption(event);
+        return await this.eventDecryptor.attemptEventDecryption(event, this.cryptoMode);
     }
 
     /**
@@ -1740,18 +1740,31 @@ class EventDecryptor {
         private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader,
     ) {}
 
-    public async attemptEventDecryption(event: MatrixEvent): Promise<IEventDecryptionResult> {
+    public async attemptEventDecryption(event: MatrixEvent, cryptoMode: CryptoMode): Promise<IEventDecryptionResult> {
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
+        let trustRequirement;
+        switch (cryptoMode) {
+            case CryptoMode.Legacy:
+                trustRequirement = RustSdkCryptoJs.TrustRequirement.Untrusted;
+                break;
+            case CryptoMode.Transition:
+                trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSignedOrLegacy;
+                break;
+            case CryptoMode.Invisible:
+                trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSigned;
+                break;
+        }
+
         try {
             const res = (await this.olmMachine.decryptRoomEvent(
                 stringifyEvent(event),
                 new RustSdkCryptoJs.RoomId(event.getRoomId()!),
-                new RustSdkCryptoJs.DecryptionSettings(RustSdkCryptoJs.TrustRequirement.Untrusted),
+                new RustSdkCryptoJs.DecryptionSettings(trustRequirement),
             )) as RustSdkCryptoJs.DecryptedRoomEvent;
 
             // Success. We can remove the event from the pending list, if
@@ -1857,6 +1870,36 @@ class EventDecryptor {
                     DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX,
                     "The sender's device has not sent us the keys for this message at this index.",
                     errorDetails,
+                );
+
+            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityPreviouslyVerified:
+                // We're refusing to decrypt due to not trusting the sender,
+                // rather than failing to decrypt due to lack of keys, so we
+                // don't need to keep it on the pending list.
+                this.removeEventFromPendingList(event);
+                throw new DecryptionError(
+                    DecryptionFailureCode.SENDER_IDENTITY_PREVIOUSLY_VERIFIED,
+                    "The sender identity is unverified, but was previously verified.",
+                );
+
+            case RustSdkCryptoJs.DecryptionErrorCode.UnknownSenderDevice:
+                // We're refusing to decrypt due to not trusting the sender,
+                // rather than failing to decrypt due to lack of keys, so we
+                // don't need to keep it on the pending list.
+                this.removeEventFromPendingList(event);
+                throw new DecryptionError(
+                    DecryptionFailureCode.UNKNOWN_SENDER_DEVICE,
+                    "The sender device is not known.",
+                );
+
+            case RustSdkCryptoJs.DecryptionErrorCode.UnsignedSenderDevice:
+                // We're refusing to decrypt due to not trusting the sender,
+                // rather than failing to decrypt due to lack of keys, so we
+                // don't need to keep it on the pending list.
+                this.removeEventFromPendingList(event);
+                throw new DecryptionError(
+                    DecryptionFailureCode.UNSIGNED_SENDER_DEVICE,
+                    "The sender identity is not cross-signed.",
                 );
 
             // We don't map MismatchedIdentityKeys for now, as there is no equivalent in legacy.

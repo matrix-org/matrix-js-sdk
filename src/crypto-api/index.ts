@@ -594,6 +594,21 @@ export enum DecryptionFailureCode {
      */
     HISTORICAL_MESSAGE_USER_NOT_JOINED = "HISTORICAL_MESSAGE_USER_NOT_JOINED",
 
+    /**
+     * The sender's identity is not verified, but was previously verified.
+     */
+    SENDER_IDENTITY_PREVIOUSLY_VERIFIED = "SENDER_IDENTITY_PREVIOUSLY_VERIFIED",
+
+    /**
+     * The sender device is not cross-signed.  This will only be used if the crypto mode is set to a mode that requires cross-signing of devices.  FIXME: which ones?
+     */
+    UNSIGNED_SENDER_DEVICE = "UNSIGNED_SENDER_DEVICE",
+
+    /**
+     * We weren't able to link the message back to any known device.  This will only be used if the crypto mode is set to a mode that requires a known device.
+     */
+    UNKNOWN_SENDER_DEVICE = "UNKNOWN_SENDER_DEVICE",
+
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
 
