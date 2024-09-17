@@ -85,7 +85,6 @@ import {
     isCryptoAvailable,
 } from "./crypto/index.ts";
 import { DeviceInfo } from "./crypto/deviceinfo.ts";
-import { keyFromAuthData } from "./crypto/key_passphrase.ts";
 import { User, UserEvent, UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
@@ -244,6 +243,7 @@ import { RoomMessageEventContent, StickerEventContent } from "./@types/events.ts
 import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
+import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
 
 export type Store = IStore;
 
@@ -3656,6 +3656,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param password - Passphrase
      * @param backupInfo - Backup metadata from `checkKeyBackup`
      * @returns key backup key
+     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/shared via 4S.
      */
     public keyBackupKeyFromPassword(password: string, backupInfo: IKeyBackupInfo): Promise<Uint8Array> {
         return keyFromAuthData(backupInfo.auth_data, password);

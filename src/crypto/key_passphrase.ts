@@ -15,18 +15,9 @@ limitations under the License.
 */
 
 import { randomString } from "../randomstring.ts";
+import { deriveRecoveryKeyFromPassphrase } from "../crypto-api/index.ts";
 
 const DEFAULT_ITERATIONS = 500000;
-
-const DEFAULT_BITSIZE = 256;
-
-/* eslint-disable camelcase */
-interface IAuthData {
-    private_key_salt?: string;
-    private_key_iterations?: number;
-    private_key_bits?: number;
-}
-/* eslint-enable camelcase */
 
 interface IKey {
     key: Uint8Array;
@@ -34,55 +25,18 @@ interface IKey {
     iterations: number;
 }
 
-export function keyFromAuthData(authData: IAuthData, password: string): Promise<Uint8Array> {
-    if (!authData.private_key_salt || !authData.private_key_iterations) {
-        throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
-    }
-
-    return deriveKey(
-        password,
-        authData.private_key_salt,
-        authData.private_key_iterations,
-        authData.private_key_bits || DEFAULT_BITSIZE,
-    );
-}
-
-export async function keyFromPassphrase(password: string): Promise<IKey> {
+/**
+ * Generate a new recovery key, based on a passphrase.
+ * @param passphrase - The passphrase to generate the key from
+ */
+export async function keyFromPassphrase(passphrase: string): Promise<IKey> {
     const salt = randomString(32);
 
-    const key = await deriveKey(password, salt, DEFAULT_ITERATIONS, DEFAULT_BITSIZE);
+    const key = await deriveRecoveryKeyFromPassphrase(passphrase, salt, DEFAULT_ITERATIONS);
 
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
-export async function deriveKey(
-    password: string,
-    salt: string,
-    iterations: number,
-    numBits = DEFAULT_BITSIZE,
-): Promise<Uint8Array> {
-    if (!globalThis.crypto.subtle || !TextEncoder) {
-        throw new Error("Password-based backup is not available on this platform");
-    }
-
-    const key = await globalThis.crypto.subtle.importKey(
-        "raw",
-        new TextEncoder().encode(password),
-        { name: "PBKDF2" },
-        false,
-        ["deriveBits"],
-    );
-
-    const keybits = await globalThis.crypto.subtle.deriveBits(
-        {
-            name: "PBKDF2",
-            salt: new TextEncoder().encode(salt),
-            iterations: iterations,
-            hash: "SHA-512",
-        },
-        key,
-        numBits,
-    );
-
-    return new Uint8Array(keybits);
-}
+// Re-export the key passphrase functions to avoid breaking changes
+export { deriveRecoveryKeyFromPassphrase as deriveKey };
+export { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
