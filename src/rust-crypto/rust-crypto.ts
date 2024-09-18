@@ -102,6 +102,7 @@ interface ISignableObject {
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
     private _trustCrossSignedDevices = true;
+    private cryptoMode = CryptoMode.Legacy;    
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -202,15 +203,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     // CryptoBackend implementation
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    private cryptoMode = CryptoMode.Legacy;
-
-    /**
-     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
-     */
-    public setCryptoMode(cryptoMode: CryptoMode): void {
-        this.cryptoMode = cryptoMode;
-    }
 
     public set globalErrorOnUnknownDevices(_v: boolean) {
         // Not implemented for rust crypto.
@@ -372,6 +364,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`;
     }
 
+    /**
+     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     */
+    public setCryptoMode(cryptoMode: CryptoMode): void {
+        this.cryptoMode = cryptoMode;
+    }
+    
     /**
      * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
      */
