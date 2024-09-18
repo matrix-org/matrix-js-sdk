@@ -56,6 +56,7 @@ export * from "./crypto/store/memory-crypto-store.ts";
 export * from "./crypto/store/localStorage-crypto-store.ts";
 export * from "./crypto/store/indexeddb-crypto-store.ts";
 export type { OutgoingRoomKeyRequest } from "./crypto/store/base.ts";
+export * from "./crypto-api/recovery-key.ts";
 export * from "./content-repo.ts";
 export * from "./@types/common.ts";
 export * from "./@types/uia.ts";
