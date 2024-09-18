@@ -254,9 +254,11 @@ export class RoomEncryptor {
         // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
         // See Room#getBlacklistUnverifiedDevices
         if (this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices) {
-            rustEncryptionSettings.sharingStrategy = CollectStrategy.DeviceBasedStrategyOnlyTrustedDevices;
+            // TODO XXX : CONFIRM THIS WITH CRYPTO TEAM BEFORE LANDING PR
+            rustEncryptionSettings.sharingStrategy = CollectStrategy.deviceBasedStrategy(true, true);
         } else {
-            rustEncryptionSettings.sharingStrategy = CollectStrategy.DeviceBasedStrategyAllDevices;
+            // TODO XXX : CONFIRM THIS WITH CRYPTO TEAM BEFORE LANDING PR
+            rustEncryptionSettings.sharingStrategy = CollectStrategy.deviceBasedStrategy(false, false);
         }
 
         await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
