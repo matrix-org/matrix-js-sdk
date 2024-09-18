@@ -42,6 +42,8 @@ export interface CryptoApi {
 
     /**
      * The cryptography mode to use.
+     *
+     * @see CryptoMode
      */
     setCryptoMode(cryptoMode: CryptoMode): void;
 
@@ -661,24 +663,28 @@ export enum DecryptionFailureCode {
  */
 export enum CryptoMode {
     /**
-     * Events are encrypted for all devices in the room, except for
+     * Message encryption keys are shared with all devices in the room, except for
      * blacklisted devices, or unverified devices if
      * `globalBlacklistUnverifiedDevices` is set.  Events from all senders are
      * decrypted.
      */
     Legacy,
+
     /**
-     * Events are encrypted as with `Legacy` mode, but will throw an error if a
+     * Events are encrypted as with `Legacy` mode, but encryption will throw an error if a
      * verified user has an unsigned device, or if a verified user replaces
      * their identity.  Events are decrypted only if they come from cross-signed
      * devices, or devices that existed before the Rust crypto SDK started
-     * tracking device trust.
+     * tracking device trust: other events will result in a decryption failure. (To access the failure
+     * reason, see {@link MatrixEvent.decryptionFailureReason}.)
      */
     Transition,
+
     /**
-     * Events are only encrypted for cross-signed devices.  Will throw an error
-     * when encrypting if a verified user replaces their identity.  Events are
-     * decrypted only if they come from a cross-signed device.
+     * Message encryption keys are only shared with devices that have been cross-signed by their owner.
+     * Encryption will throw an error if a verified user replaces their identity.  Events are
+     * decrypted only if they come from a cross-signed device other events will result in a decryption
+     * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
      */
     Invisible,
 }
