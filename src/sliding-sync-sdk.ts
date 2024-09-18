@@ -30,7 +30,6 @@ import {
     SetPresence,
 } from "./sync.ts";
 import { MatrixEvent } from "./models/event.ts";
-import { Crypto } from "./crypto/index.ts";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -66,7 +65,7 @@ type ExtensionE2EEResponse = Pick<
 >;
 
 class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
-    public constructor(private readonly crypto: Crypto) {}
+    public constructor(private readonly crypto: SyncCryptoCallbacks) {}
 
     public name(): string {
         return "e2ee";
@@ -373,8 +372,8 @@ export class SlidingSyncSdk {
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
         ];
-        if (this.syncOpts.crypto) {
-            extensions.push(new ExtensionE2EE(this.syncOpts.crypto));
+        if (this.syncOpts.cryptoCallbacks) {
+            extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
@@ -574,7 +573,7 @@ export class SlidingSyncSdk {
 
         // TODO: handle threaded / beacon events
 
-        if (roomData.initial) {
+        if (roomData.limited || roomData.initial) {
             // we should not know about any of these timeline entries if this is a genuinely new room.
             // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
             // this room, then timeline_limit: 50).
@@ -631,6 +630,9 @@ export class SlidingSyncSdk {
                 room.setUnreadNotificationCount(NotificationCountType.Highlight, roomData.highlight_count);
             }
         }
+        if (roomData.bump_stamp) {
+            room.setBumpStamp(roomData.bump_stamp);
+        }
 
         if (Number.isInteger(roomData.invited_count)) {
             room.currentState.setInvitedMemberCount(roomData.invited_count!);
@@ -654,7 +656,7 @@ export class SlidingSyncSdk {
             return;
         }
 
-        if (roomData.initial) {
+        if (roomData.limited) {
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
             room.getLiveTimeline().setPaginationToken(roomData.prev_batch ?? null, EventTimeline.BACKWARDS);
@@ -721,6 +723,20 @@ export class SlidingSyncSdk {
         // local fields must be set before any async calls because call site assumes
         // synchronous execution prior to emitting SlidingSyncState.Complete
         room.updateMyMembership(KnownMembership.Join);
+
+        room.setSummary({
+            "m.heroes": roomData.heroes
+                ? roomData.heroes.map((h) => {
+                      return {
+                          userId: h.user_id,
+                          avatarUrl: h.avatar_url,
+                          displayName: h.displayname,
+                      };
+                  })
+                : [],
+            "m.invited_member_count": roomData.invited_count,
+            "m.joined_member_count": roomData.joined_count,
+        });
 
         room.recalculate();
         if (roomData.initial) {

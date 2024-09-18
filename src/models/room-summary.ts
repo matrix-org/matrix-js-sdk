@@ -14,8 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Hero } from "./room";
+
 export interface IRoomSummary {
     "m.heroes": string[];
+    "m.joined_member_count"?: number;
+    "m.invited_member_count"?: number;
+}
+export interface IRoomSummaryMSC4186 {
+    "m.heroes": Hero[];
     "m.joined_member_count"?: number;
     "m.invited_member_count"?: number;
 }
