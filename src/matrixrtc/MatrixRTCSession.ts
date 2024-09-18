@@ -163,6 +163,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         totals: {
             /**
              * The total age (in milliseconds) of all room events containing encryption keys that we have received.
+             * We track the total age so that we can later calculate the average age of all keys received.
              */
             roomEventEncryptionKeysReceivedTotalAge: 0,
         },
