@@ -102,7 +102,7 @@ interface ISignableObject {
  */
 export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
     private _trustCrossSignedDevices = true;
-    private cryptoMode = CryptoMode.Legacy;    
+    private cryptoMode = CryptoMode.Legacy;
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -370,7 +370,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     public setCryptoMode(cryptoMode: CryptoMode): void {
         this.cryptoMode = cryptoMode;
     }
-    
+
     /**
      * Implementation of {@link CryptoApi#isEncryptionEnabledInRoom}.
      */
