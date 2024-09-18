@@ -82,6 +82,7 @@ import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
+    CryptoMode,
     DecryptionFailureCode,
     EventShieldColour,
     EventShieldReason,
@@ -745,6 +746,87 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 },
             );
         });
+
+        newBackendOnly(
+            "fails with an error when cross-signed sender is required but sender is not cross-signed",
+            async () => {
+                // This tests that a message will not be decrypted if the sender
+                // is not sufficiently trusted according to the selected crypto
+                // mode.
+                //
+                // This test is almost the same as the "Alice receives a megolm
+                // message" test, with the main difference that we set the
+                // crypto mode.
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+
+                // Start by using Invisible crypto mode
+                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Invisible);
+
+                await startClientAndAwaitFirstSync();
+
+                const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
+                const groupSession = new Olm.OutboundGroupSession();
+                groupSession.create();
+
+                // make the room_key event
+                const roomKeyEncrypted = encryptGroupSessionKey({
+                    recipient: aliceClient.getUserId()!,
+                    recipientCurve25519Key: keyReceiver.getDeviceKey(),
+                    recipientEd25519Key: keyReceiver.getSigningKey(),
+                    olmAccount: testOlmAccount,
+                    p2pSession: p2pSession,
+                    groupSession: groupSession,
+                    room_id: ROOM_ID,
+                });
+
+                // encrypt a message with the group session
+                const messageEncrypted = encryptMegolmEvent({
+                    senderKey: testSenderKey,
+                    groupSession: groupSession,
+                    room_id: ROOM_ID,
+                });
+
+                // Alice gets both the events in a single sync
+                const syncResponse = {
+                    next_batch: 1,
+                    to_device: {
+                        events: [roomKeyEncrypted],
+                    },
+                    rooms: {
+                        join: {
+                            [ROOM_ID]: { timeline: { events: [messageEncrypted] } },
+                        },
+                    },
+                };
+
+                syncResponder.sendOrQueueSyncResponse(syncResponse);
+                await syncPromise(aliceClient);
+
+                const room = aliceClient.getRoom(ROOM_ID)!;
+                const event = room.getLiveTimeline().getEvents()[0];
+                expect(event.isEncrypted()).toBe(true);
+
+                // it probably won't be decrypted yet, because it takes a while to process the olm keys
+                const decryptedEvent = await testUtils.awaitDecryption(event);
+                // It will error as an unknown device because we haven't fetched
+                // the sender's device keys.
+                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+
+                // Next, try decrypting in transition mode, which should also
+                // fail for the same reason
+                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Transition);
+
+                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
+                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+
+                // Decrypting in legacy mode should succeed since it doesn't
+                // care about device trust.
+                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Legacy);
+
+                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
+                expect(decryptedEvent.decryptionFailureReason).toEqual(null);
+            },
+        );
 
         it("Decryption fails with Unable to decrypt for other errors", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });

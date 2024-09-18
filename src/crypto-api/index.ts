@@ -41,6 +41,13 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
+     * The cryptography mode to use.
+     *
+     * @see CryptoMode
+     */
+    setCryptoMode(cryptoMode: CryptoMode): void;
+
+    /**
      * Return the current version of the crypto module.
      * For example: `Rust SDK ${versions.matrix_sdk_crypto} (${versions.git_sha}), Vodozemac ${versions.vodozemac}`.
      * @returns the formatted version
@@ -589,6 +596,24 @@ export enum DecryptionFailureCode {
      */
     HISTORICAL_MESSAGE_USER_NOT_JOINED = "HISTORICAL_MESSAGE_USER_NOT_JOINED",
 
+    /**
+     * The sender's identity is not verified, but was previously verified.
+     */
+    SENDER_IDENTITY_PREVIOUSLY_VERIFIED = "SENDER_IDENTITY_PREVIOUSLY_VERIFIED",
+
+    /**
+     * The sender device is not cross-signed.  This will only be used if the
+     * crypto mode is set to `CryptoMode.Invisible` or `CryptoMode.Transition`.
+     */
+    UNSIGNED_SENDER_DEVICE = "UNSIGNED_SENDER_DEVICE",
+
+    /**
+     * We weren't able to link the message back to any known device.  This will
+     * only be used if the crypto mode is set to `CryptoMode.Invisible` or
+     * `CryptoMode.Transition`.
+     */
+    UNKNOWN_SENDER_DEVICE = "UNKNOWN_SENDER_DEVICE",
+
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
 
@@ -630,6 +655,38 @@ export enum DecryptionFailureCode {
 
     /** @deprecated only used in legacy crypto */
     UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
+}
+
+/**
+ * The cryptography mode.  Affects how messages are encrypted and decrypted.
+ * Only supported by Rust crypto.
+ */
+export enum CryptoMode {
+    /**
+     * Message encryption keys are shared with all devices in the room, except for
+     * blacklisted devices, or unverified devices if
+     * `globalBlacklistUnverifiedDevices` is set.  Events from all senders are
+     * decrypted.
+     */
+    Legacy,
+
+    /**
+     * Events are encrypted as with `Legacy` mode, but encryption will throw an error if a
+     * verified user has an unsigned device, or if a verified user replaces
+     * their identity.  Events are decrypted only if they come from cross-signed
+     * devices, or devices that existed before the Rust crypto SDK started
+     * tracking device trust: other events will result in a decryption failure. (To access the failure
+     * reason, see {@link MatrixEvent.decryptionFailureReason}.)
+     */
+    Transition,
+
+    /**
+     * Message encryption keys are only shared with devices that have been cross-signed by their owner.
+     * Encryption will throw an error if a verified user replaces their identity.  Events are
+     * decrypted only if they come from a cross-signed device other events will result in a decryption
+     * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
+     */
+    Invisible,
 }
 
 /**

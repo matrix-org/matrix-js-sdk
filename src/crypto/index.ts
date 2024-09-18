@@ -88,6 +88,7 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningKeyInfo,
     CrossSigningStatus,
+    CryptoMode,
     decodeRecoveryKey,
     DecryptionFailureCode,
     DeviceVerificationStatus,
@@ -646,6 +647,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         logger.log("Crypto: checking for key backup...");
         this.backupManager.checkAndStart();
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     */
+    public setCryptoMode(cryptoMode: CryptoMode): void {
+        throw new Error("Not supported");
     }
 
     /**
