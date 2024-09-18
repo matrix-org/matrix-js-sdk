@@ -23,6 +23,7 @@ export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];
     device_id: string;
     call_id: string;
+    sent_ts?: number;
 }
 
 export type CallNotifyType = "ring" | "notify";

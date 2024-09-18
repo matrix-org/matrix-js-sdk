@@ -594,24 +594,35 @@ describe("MatrixRTCSession", () => {
         });
 
         it("sends keys when joining", async () => {
-            const eventSentPromise = new Promise((resolve) => {
-                sendEventMock.mockImplementation(resolve);
-            });
+            jest.useFakeTimers();
+            try {
+                const eventSentPromise = new Promise((resolve) => {
+                    sendEventMock.mockImplementation(resolve);
+                });
 
-            sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
 
-            await eventSentPromise;
+                await eventSentPromise;
 
-            expect(sendEventMock).toHaveBeenCalledWith(expect.stringMatching(".*"), "io.element.call.encryption_keys", {
-                call_id: "",
-                device_id: "AAAAAAA",
-                keys: [
+                expect(sendEventMock).toHaveBeenCalledWith(
+                    expect.stringMatching(".*"),
+                    "io.element.call.encryption_keys",
                     {
-                        index: 0,
-                        key: expect.stringMatching(".*"),
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        keys: [
+                            {
+                                index: 0,
+                                key: expect.stringMatching(".*"),
+                            },
+                        ],
+                        sent_ts: Date.now(),
                     },
-                ],
-            });
+                );
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it("does not send key if join called when already joined", () => {
@@ -619,10 +630,12 @@ describe("MatrixRTCSession", () => {
 
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             expect(client.sendEvent).toHaveBeenCalledTimes(1);
+            expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
             sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             expect(client.sendEvent).toHaveBeenCalledTimes(1);
+            expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
         });
 
         it("retries key sends", async () => {
@@ -651,6 +664,7 @@ describe("MatrixRTCSession", () => {
                 await eventSentPromise;
 
                 expect(sendEventMock).toHaveBeenCalledTimes(2);
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
             } finally {
                 jest.useRealTimers();
             }
@@ -684,6 +698,7 @@ describe("MatrixRTCSession", () => {
 
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
                 await keysSentPromise1;
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 sendEventMock.mockClear();
                 jest.advanceTimersByTime(10000);
@@ -707,6 +722,7 @@ describe("MatrixRTCSession", () => {
                 await keysSentPromise2;
 
                 expect(sendEventMock).toHaveBeenCalled();
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
             } finally {
                 jest.useRealTimers();
             }
@@ -747,14 +763,17 @@ describe("MatrixRTCSession", () => {
                                 key: expect.stringMatching(".*"),
                             },
                         ],
+                        sent_ts: Date.now(),
                     },
                 );
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 sendEventMock.mockClear();
 
                 // these should be a no-op:
                 sess.onMembershipUpdate();
                 expect(sendEventMock).toHaveBeenCalledTimes(0);
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
             } finally {
                 jest.useRealTimers();
             }
@@ -796,8 +815,10 @@ describe("MatrixRTCSession", () => {
                                 key: expect.stringMatching(".*"),
                             },
                         ],
+                        sent_ts: Date.now(),
                     },
                 );
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 sendEventMock.mockClear();
 
@@ -832,8 +853,10 @@ describe("MatrixRTCSession", () => {
                                 key: expect.stringMatching(".*"),
                             },
                         ],
+                        sent_ts: Date.now(),
                     },
                 );
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
             } finally {
                 jest.useRealTimers();
             }
@@ -877,8 +900,10 @@ describe("MatrixRTCSession", () => {
                                 key: expect.stringMatching(".*"),
                             },
                         ],
+                        sent_ts: Date.now(),
                     },
                 );
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 sendEventMock.mockClear();
 
@@ -913,8 +938,10 @@ describe("MatrixRTCSession", () => {
                                 key: expect.stringMatching(".*"),
                             },
                         ],
+                        sent_ts: Date.now(),
                     },
                 );
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
             } finally {
                 jest.useRealTimers();
             }
@@ -946,6 +973,8 @@ describe("MatrixRTCSession", () => {
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
                 const firstKeysPayload = await keysSentPromise1;
                 expect(firstKeysPayload.keys).toHaveLength(1);
+                expect(firstKeysPayload.keys[0].index).toEqual(0);
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 sendEventMock.mockClear();
 
@@ -962,8 +991,10 @@ describe("MatrixRTCSession", () => {
 
                 const secondKeysPayload = await keysSentPromise2;
 
-                expect(secondKeysPayload.keys).toHaveLength(2);
+                expect(secondKeysPayload.keys).toHaveLength(1);
+                expect(secondKeysPayload.keys[0].index).toEqual(1);
                 expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(2);
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
             } finally {
                 jest.useRealTimers();
             }
@@ -984,6 +1015,7 @@ describe("MatrixRTCSession", () => {
                 await keysSentPromise1;
 
                 sendEventMock.mockClear();
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 const onMembershipsChanged = jest.fn();
                 sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
@@ -1002,6 +1034,7 @@ describe("MatrixRTCSession", () => {
                 });
 
                 expect(sendEventMock).not.toHaveBeenCalled();
+                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
             } finally {
                 jest.useRealTimers();
             }
@@ -1167,6 +1200,7 @@ describe("MatrixRTCSession", () => {
         const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
         expect(bobKeys).toHaveLength(1);
         expect(bobKeys[0]).toEqual(Buffer.from("this is the key", "utf-8"));
+        expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
     });
 
     it("collects keys at non-zero indices", () => {
@@ -1195,6 +1229,7 @@ describe("MatrixRTCSession", () => {
         expect(bobKeys[2]).toBeFalsy();
         expect(bobKeys[3]).toBeFalsy();
         expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
+        expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
     });
 
     it("collects keys by merging", () => {
@@ -1219,6 +1254,7 @@ describe("MatrixRTCSession", () => {
         let bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
         expect(bobKeys).toHaveLength(1);
         expect(bobKeys[0]).toEqual(Buffer.from("this is the key", "utf-8"));
+        expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
 
         sess.onCallEncryption({
             getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
@@ -1239,6 +1275,7 @@ describe("MatrixRTCSession", () => {
         bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
         expect(bobKeys).toHaveLength(5);
         expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
+        expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
     });
 
     it("ignores older keys at same index", () => {
@@ -1279,6 +1316,7 @@ describe("MatrixRTCSession", () => {
         const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
         expect(bobKeys).toHaveLength(1);
         expect(bobKeys[0]).toEqual(Buffer.from("newer key", "utf-8"));
+        expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
     });
 
     it("key timestamps are treated as monotonic", () => {
@@ -1342,5 +1380,73 @@ describe("MatrixRTCSession", () => {
 
         const myKeys = sess.getKeysForParticipant(client.getUserId()!, client.getDeviceId()!)!;
         expect(myKeys).toBeFalsy();
+        expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(0);
+    });
+
+    it("tracks total age statistics for collected keys", () => {
+        jest.useFakeTimers();
+        try {
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+            // defaults to getTs()
+            jest.setSystemTime(1000);
+            sess.onCallEncryption({
+                getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+                getContent: jest.fn().mockReturnValue({
+                    device_id: "bobsphone",
+                    call_id: "",
+                    keys: [
+                        {
+                            index: 0,
+                            key: "dGhpcyBpcyB0aGUga2V5",
+                        },
+                    ],
+                }),
+                getSender: jest.fn().mockReturnValue("@bob:example.org"),
+                getTs: jest.fn().mockReturnValue(0),
+            } as unknown as MatrixEvent);
+            expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(1000);
+
+            jest.setSystemTime(2000);
+            sess.onCallEncryption({
+                getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+                getContent: jest.fn().mockReturnValue({
+                    device_id: "bobsphone",
+                    call_id: "",
+                    keys: [
+                        {
+                            index: 0,
+                            key: "dGhpcyBpcyB0aGUga2V5",
+                        },
+                    ],
+                    sent_ts: 0,
+                }),
+                getSender: jest.fn().mockReturnValue("@bob:example.org"),
+                getTs: jest.fn().mockReturnValue(Date.now()),
+            } as unknown as MatrixEvent);
+            expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(3000);
+
+            jest.setSystemTime(3000);
+            sess.onCallEncryption({
+                getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
+                getContent: jest.fn().mockReturnValue({
+                    device_id: "bobsphone",
+                    call_id: "",
+                    keys: [
+                        {
+                            index: 0,
+                            key: "dGhpcyBpcyB0aGUga2V5",
+                        },
+                    ],
+                    sent_ts: 1000,
+                }),
+                getSender: jest.fn().mockReturnValue("@bob:example.org"),
+                getTs: jest.fn().mockReturnValue(Date.now()),
+            } as unknown as MatrixEvent);
+            expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(5000);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });
