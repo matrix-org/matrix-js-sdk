@@ -104,8 +104,8 @@ describe("SlidingSync", () => {
             };
             const ext: Extension<any, any> = {
                 name: () => "custom_extension",
-                onRequest: (initial) => {
-                    return { initial: initial };
+                onRequest: async (_) => {
+                    return { initial: true };
                 },
                 onResponse: async (res) => {
                     return;
@@ -827,7 +827,7 @@ describe("SlidingSync", () => {
 
         const extPre: Extension<any, any> = {
             name: () => preExtName,
-            onRequest: (initial) => {
+            onRequest: async (initial) => {
                 return onPreExtensionRequest(initial);
             },
             onResponse: (res) => {
@@ -837,7 +837,7 @@ describe("SlidingSync", () => {
         };
         const extPost: Extension<any, any> = {
             name: () => postExtName,
-            onRequest: (initial) => {
+            onRequest: async (initial) => {
                 return onPostExtensionRequest(initial);
             },
             onResponse: (res) => {
@@ -852,7 +852,7 @@ describe("SlidingSync", () => {
 
             const callbackOrder: string[] = [];
             let extensionOnResponseCalled = false;
-            onPreExtensionRequest = () => {
+            onPreExtensionRequest = async () => {
                 return extReq;
             };
             onPreExtensionResponse = async (resp) => {
@@ -892,7 +892,7 @@ describe("SlidingSync", () => {
         });
 
         it("should be able to send nothing in an extension request/response", async () => {
-            onPreExtensionRequest = () => {
+            onPreExtensionRequest = async () => {
                 return undefined;
             };
             let responseCalled = false;
@@ -927,7 +927,7 @@ describe("SlidingSync", () => {
 
         it("is possible to register extensions after start() has been called", async () => {
             slidingSync.registerExtension(extPost);
-            onPostExtensionRequest = () => {
+            onPostExtensionRequest = async () => {
                 return extReq;
             };
             let responseCalled = false;

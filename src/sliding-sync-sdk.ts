@@ -75,9 +75,16 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
         return ExtensionState.PreProcess;
     }
 
-    public onRequest(isInitial: boolean): ExtensionE2EERequest | undefined {
-        if (!isInitial) {
-            return undefined;
+    public async onRequest(isInitial: boolean): Promise<ExtensionE2EERequest> {
+        if (isInitial) {
+            // In SSS, the `?pos=` contains the stream position for device list updates.
+            // If we do not have a `?pos=` (e.g because we forgot it, or because the server
+            // invalidated our connection) then we MUST invlaidate all device lists because
+            // the server will not tell us the delta. This will then cause UTDs as we will fail
+            // to encrypt for new devices. This is an expensive call, so we should
+            // really really remember `?pos=` wherever possible.
+            logger.log("ExtensionE2EE: invalidating all device lists due to missing 'pos'");
+            await this.crypto.markAllTrackedUsersAsDirty();
         }
         return {
             enabled: true, // this is sticky so only send it on the initial request
@@ -127,15 +134,12 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
         return ExtensionState.PreProcess;
     }
 
-    public onRequest(isInitial: boolean): ExtensionToDeviceRequest {
-        const extReq: ExtensionToDeviceRequest = {
+    public async onRequest(isInitial: boolean): Promise<ExtensionToDeviceRequest> {
+        return {
             since: this.nextBatch !== null ? this.nextBatch : undefined,
+            limit: 100,
+            enabled: true,
         };
-        if (isInitial) {
-            extReq["limit"] = 100;
-            extReq["enabled"] = true;
-        }
-        return extReq;
     }
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
@@ -209,10 +213,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): ExtensionAccountDataRequest | undefined {
-        if (!isInitial) {
-            return undefined;
-        }
+    public async onRequest(isInitial: boolean): Promise<ExtensionAccountDataRequest> {
         return {
             enabled: true,
         };
@@ -279,10 +280,7 @@ class ExtensionTyping implements Extension<ExtensionTypingRequest, ExtensionTypi
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): ExtensionTypingRequest | undefined {
-        if (!isInitial) {
-            return undefined; // don't send a JSON object for subsequent requests, we don't need to.
-        }
+    public async onRequest(isInitial: boolean): Promise<ExtensionTypingRequest> {
         return {
             enabled: true,
         };
@@ -318,13 +316,10 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): ExtensionReceiptsRequest | undefined {
-        if (isInitial) {
-            return {
-                enabled: true,
-            };
-        }
-        return undefined; // don't send a JSON object for subsequent requests, we don't need to.
+    public async onRequest(isInitial: boolean): Promise<ExtensionReceiptsRequest> {
+        return {
+            enabled: true,
+        };
     }
 
     public async onResponse(data: ExtensionReceiptsResponse): Promise<void> {

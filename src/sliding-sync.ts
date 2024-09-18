@@ -229,10 +229,10 @@ export interface Extension<Req extends {}, Res extends {}> {
     /**
      * A function which is called when the request JSON is being formed.
      * Returns the data to insert under this key.
-     * @param isInitial - True when this is part of the initial request (send sticky params)
+     * @param isInitial - True when this is part of the initial request.
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): Req | undefined;
+    onRequest(isInitial: boolean): Promise<Req>;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data - The response JSON under the extension name.
@@ -471,11 +471,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.extensions[ext.name()] = ext;
     }
 
-    private getExtensionRequest(): Record<string, object | undefined> {
+    private async getExtensionRequest(isInitial: boolean): Promise<Record<string, object | undefined>> {
         const ext: Record<string, object | undefined> = {};
-        Object.keys(this.extensions).forEach((extName) => {
-            ext[extName] = this.extensions[extName].onRequest(true);
-        });
+        for (const extName in this.extensions) {
+            ext[extName] = await this.extensions[extName].onRequest(isInitial);
+        }
         return ext;
     }
 
@@ -582,7 +582,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     pos: currentPos,
                     timeout: this.timeoutMS,
                     clientTimeout: this.timeoutMS + BUFFER_PERIOD_MS,
-                    extensions: this.getExtensionRequest(),
+                    extensions: await this.getExtensionRequest(currentPos === undefined),
                 };
                 // check if we are (un)subscribing to a room and modify request this one time for it
                 const newSubscriptions = difference(this.desiredRoomSubscriptions, this.confirmedRoomSubscriptions);

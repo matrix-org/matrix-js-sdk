@@ -3446,6 +3446,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoApi#markAllTrackedUsersAsDirty}.
+     */
+    public async markAllTrackedUsersAsDirty(): Promise<void> {
+        // no op: we only expect rust crypto to be used in MSC4186.
+    }
+
+    /**
      * Trigger the appropriate invalidations and removes for a given
      * device list
      *
