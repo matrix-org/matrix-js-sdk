@@ -578,7 +578,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        const keyIndexToSend = typeof indexToSend === "number" ? indexToSend : this.currentEncryptionKeyIndex;
+        const keyIndexToSend = indexToSend ?? this.currentEncryptionKeyIndex;
         const keyToSend = myKeys[keyIndexToSend];
 
         try {
