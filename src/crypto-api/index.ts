@@ -198,6 +198,16 @@ export interface CryptoApi {
     getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
 
     /**
+     * "Pin" the current identity of the given user, accepting it as genuine.
+     *
+     * This is useful if the user has changed identity since we first saw them (leading to
+     * {@link UserVerificationStatus.needsUserApproval}), and we are now accepting their new identity.
+     *
+     * Throws an error if called on our own user ID, or on a user ID that we don't have an identity for.
+     */
+    pinCurrentUserIdentity(userId: string): Promise<void>;
+
+    /**
      * Get the verification status of a given device.
      *
      * @param userId - The ID of the user whose device is to be checked.
