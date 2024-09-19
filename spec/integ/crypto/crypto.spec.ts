@@ -3261,15 +3261,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
     });
 
-    describe("Check if the cross signing keys are available for a user", () => {
+    describe("User identity", () => {
+        let keyResponder: E2EKeyResponder;
         beforeEach(async () => {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-
-            const keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
-            keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
+            keyResponder.addKeyReceiver(TEST_USER_ID, keyReceiver);
             keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
 
@@ -3285,6 +3283,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 .getCrypto()!
                 .userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are available for a tracked user", async () => {
@@ -3295,11 +3299,60 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Alice is the local user and should be tracked !
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are not available for an unknown user", async () => {
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
+        });
+
+        newBackendOnly("An unverified user changes identity", async () => {
+            // We have to be tracking Bob's keys, which means we need to share a room with him
+            syncResponder.sendOrQueueSyncResponse({
+                ...getSyncResponse([BOB_TEST_USER_ID]),
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+
+            // Bob changes his cross-signing keys
+            keyResponder.addCrossSigningData(testData.BOB_ALT_SIGNED_CROSS_SIGNING_KEYS_DATA);
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: "2",
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
+
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.isVerified()).toBe(false);
+                expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.needsUserApproval).toBe(true);
+            }
+
+            // Pinning the new identity should clear the needsUserApproval flag.
+            await aliceClient.getCrypto()!.pinCurrentUserIdentity(BOB_TEST_USER_ID);
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.needsUserApproval).toBe(false);
+            }
         });
     });
 
