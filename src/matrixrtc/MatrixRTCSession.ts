@@ -406,7 +406,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Emit a EncryptionKeyChanged event for all known encryption keys.
+     * Emit an EncryptionKeyChanged event for every tracked encryption keys.
      */
     public emitEncryptionKeys(): void {
         this.encryptionKeys.forEach((keys, participantId) => {
