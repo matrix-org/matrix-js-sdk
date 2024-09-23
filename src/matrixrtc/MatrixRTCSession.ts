@@ -440,11 +440,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      *
      * @deprecated This will be made private in a future release.
      */
-    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
+    public *getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         // the returned array doesn't contain the timestamps
-        return Array.from(this.encryptionKeys.entries())
-            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
-            .values();
+        for (const [participantId, keys] of this.encryptionKeys.entries()) {
+            yield [participantId, keys.map(k => k.key)];
+        }
     }
 
     private getNewEncryptionKeyIndex(): number {
