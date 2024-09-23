@@ -443,7 +443,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     public *getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         // the returned array doesn't contain the timestamps
         for (const [participantId, keys] of this.encryptionKeys.entries()) {
-            yield [participantId, keys.map(k => k.key)];
+            yield [participantId, keys.map((k) => k.key)];
         }
     }
 
