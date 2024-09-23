@@ -777,6 +777,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // Create a new storage key and add it to secret storage
             this.logger.info("bootstrapSecretStorage: creating new secret storage key");
             const recoveryKey = await createSecretStorageKey();
+            if (!recoveryKey) {
+                throw new Error("createSecretStorageKey() callback did not return a secret storage key");
+            }
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
 
