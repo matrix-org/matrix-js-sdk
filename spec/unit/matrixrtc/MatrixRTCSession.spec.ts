@@ -1274,6 +1274,9 @@ describe("MatrixRTCSession", () => {
 
         bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
         expect(bobKeys).toHaveLength(5);
+        expect(bobKeys[1]).toBeUndefined();
+        expect(bobKeys[2]).toBeUndefined();
+        expect(bobKeys[3]).toBeUndefined();
         expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
     });

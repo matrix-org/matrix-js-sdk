@@ -137,7 +137,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private manageMediaKeys = false;
     private useLegacyMemberEvents = true;
     // userId:deviceId => array of (key, timestamp)
-    private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
+    private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number } | undefined>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
     // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
@@ -412,18 +412,21 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param deviceId the device ID of the participant
      * @returns The encryption keys for the given participant, or undefined if they are not known.
      */
-    public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
-        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
+    public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array | undefined> | undefined {
+        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry?.key);
     }
 
     /**
      * A map of keys used to encrypt and decrypt (we are using a symmetric
      * cipher) given participant's media. This also includes our own key
      */
-    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
+    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array | undefined>]> {
         // the returned array doesn't contain the timestamps
         return Array.from(this.encryptionKeys.entries())
-            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
+            .map(([participantId, keys]): [string, (Uint8Array | undefined)[]] => [
+                participantId,
+                keys.map((k) => k?.key),
+            ])
             .values();
     }
 
@@ -483,6 +486,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
 
+        // n.b. this will extend the array if necessary and fill in the gaps with undefined
         participantKeys[encryptionKeyIndex] = {
             key: keyBin,
             timestamp,
@@ -581,6 +585,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         const keyIndexToSend = indexToSend ?? this.currentEncryptionKeyIndex;
         const keyToSend = myKeys[keyIndexToSend];
+
+        if (!keyToSend) {
+            logger.warn(`Tried to send encryption key at index ${indexToSend} but no key found`);
+            return;
+        }
 
         try {
             const content: EncryptionKeysEventContent = {
