@@ -36,6 +36,7 @@ import { HistoryVisibility } from "../@types/partials.ts";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { logDuration } from "../utils.ts";
 import { KnownMembership } from "../@types/membership.ts";
+import { AllDevicesIsolationMode, DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api/index.ts";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -121,8 +122,12 @@ export class RoomEncryptor {
      * in the room.
      *
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @param deviceIsolationMode - The device isolation mode see {@link DeviceIsolationMode}
      */
-    public async prepareForEncryption(globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    public async prepareForEncryption(
+        globalBlacklistUnverifiedDevices: boolean,
+        deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false),
+    ): Promise<void> {
         // We consider a prepareForEncryption as an encryption promise as it will potentially share keys
         // even if it doesn't send an event.
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
@@ -130,7 +135,7 @@ export class RoomEncryptor {
         // If `encryptEvent` is invoked before `prepareForEncryption` has completed, the `encryptEvent` call will wait for
         // `prepareForEncryption` to complete before executing.
         // The part where `encryptEvent` shares the room key will then usually be a no-op as it was already performed by `prepareForEncryption`.
-        await this.encryptEvent(null, globalBlacklistUnverifiedDevices);
+        await this.encryptEvent(null, globalBlacklistUnverifiedDevices, deviceIsolationMode);
     }
 
     /**
@@ -141,8 +146,13 @@ export class RoomEncryptor {
      *
      * @param event - Event to be encrypted, or null if only preparing for encryption (in which case we will pre-share the room key).
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @param deviceIsolationMode - The device isolation mode see {@link DeviceIsolationMode}.
      */
-    public encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    public encryptEvent(
+        event: MatrixEvent | null,
+        globalBlacklistUnverifiedDevices: boolean,
+        deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false),
+    ): Promise<void> {
         const logger = new LogSpan(this.prefixedLogger, event ? (event.getTxnId() ?? "") : "prepareForEncryption");
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
         // events order after they have been encrypted.
@@ -153,7 +163,7 @@ export class RoomEncryptor {
             })
             .then(async () => {
                 await logDuration(logger, "ensureEncryptionSession", async () => {
-                    await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
+                    await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices, deviceIsolationMode);
                 });
                 if (event) {
                     await logDuration(logger, "encryptEventInner", async () => {
@@ -174,8 +184,13 @@ export class RoomEncryptor {
      *
      * @param logger - a place to write diagnostics to
      * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @param deviceIsolationMode - The device isolation mode see {@link DeviceIsolationMode}.
      */
-    private async ensureEncryptionSession(logger: LogSpan, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    private async ensureEncryptionSession(
+        logger: LogSpan,
+        globalBlacklistUnverifiedDevices: boolean,
+        deviceIsolationMode: DeviceIsolationMode,
+    ): Promise<void> {
         if (this.encryptionSettings.algorithm !== "m.megolm.v1.aes-sha2") {
             throw new Error(
                 `Cannot encrypt in ${this.room.roomId} for unsupported algorithm '${this.encryptionSettings.algorithm}'`,
@@ -251,12 +266,22 @@ export class RoomEncryptor {
             rustEncryptionSettings.rotationPeriodMessages = BigInt(this.encryptionSettings.rotation_period_msgs);
         }
 
-        // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
-        // See Room#getBlacklistUnverifiedDevices
-        if (this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices) {
-            rustEncryptionSettings.sharingStrategy = CollectStrategy.deviceBasedStrategy(true, false);
-        } else {
-            rustEncryptionSettings.sharingStrategy = CollectStrategy.deviceBasedStrategy(false, false);
+        switch (deviceIsolationMode.kind) {
+            case DeviceIsolationModeKind.AllDevicesIsolationMode:
+                {
+                    // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
+                    // See Room#getBlacklistUnverifiedDevices
+                    const onlyAllowTrustedDevices =
+                        this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
+                    rustEncryptionSettings.sharingStrategy = CollectStrategy.deviceBasedStrategy(
+                        onlyAllowTrustedDevices,
+                        deviceIsolationMode.errorOnVerifiedUserProblems,
+                    );
+                }
+                break;
+            case DeviceIsolationModeKind.OnlySignedDevicesIsolationMode:
+                rustEncryptionSettings.sharingStrategy = CollectStrategy.identityBasedStrategy();
+                break;
         }
 
         await logDuration(this.prefixedLogger, "shareRoomKey", async () => {

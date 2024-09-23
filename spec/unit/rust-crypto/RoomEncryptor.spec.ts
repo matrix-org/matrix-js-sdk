@@ -17,6 +17,7 @@
  */
 
 import {
+    CollectStrategy,
     Curve25519PublicKey,
     Ed25519PublicKey,
     HistoryVisibility as RustHistoryVisibility,
@@ -31,6 +32,7 @@ import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { defer } from "../../../src/utils";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { KnownMembership } from "../../../src/@types/membership";
+import { DeviceIsolationMode, AllDevicesIsolationMode, OnlySignedDevicesIsolationMode } from "../../../src/crypto-api";
 
 describe("RoomEncryptor", () => {
     describe("History Visibility", () => {
@@ -99,7 +101,7 @@ describe("RoomEncryptor", () => {
                 getEncryptionTargetMembers: jest.fn().mockReturnValue([mockRoomMember]),
                 shouldEncryptForInvitedMembers: jest.fn().mockReturnValue(true),
                 getHistoryVisibility: jest.fn().mockReturnValue(HistoryVisibility.Invited),
-                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
+                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(undefined),
             } as unknown as Mocked<Room>;
 
             roomEncryptor = new RoomEncryptor(
@@ -180,6 +182,103 @@ describe("RoomEncryptor", () => {
             await Promise.all([firstRequest, secondRequest]);
 
             expect(firstMessageFinished).toBe("hello");
+        });
+
+        describe("DeviceIsolationMode", () => {
+            type TestCase = [
+                string,
+                {
+                    mode: DeviceIsolationMode;
+                    expectedStrategy: CollectStrategy;
+                    globalBlacklistUnverifiedDevices: boolean;
+                },
+            ];
+
+            const testCases: TestCase[] = [
+                [
+                    "Share AllDevicesIsolationMode",
+                    {
+                        mode: new AllDevicesIsolationMode(false),
+                        expectedStrategy: CollectStrategy.deviceBasedStrategy(false, false),
+                        globalBlacklistUnverifiedDevices: false,
+                    },
+                ],
+                [
+                    "Share AllDevicesIsolationMode - with blacklist unverified",
+                    {
+                        mode: new AllDevicesIsolationMode(false),
+                        expectedStrategy: CollectStrategy.deviceBasedStrategy(true, false),
+                        globalBlacklistUnverifiedDevices: true,
+                    },
+                ],
+                [
+                    "Share OnlySigned - blacklist true",
+                    {
+                        mode: new OnlySignedDevicesIsolationMode(),
+                        expectedStrategy: CollectStrategy.identityBasedStrategy(),
+                        globalBlacklistUnverifiedDevices: true,
+                    },
+                ],
+                [
+                    "Share OnlySigned",
+                    {
+                        mode: new OnlySignedDevicesIsolationMode(),
+                        expectedStrategy: CollectStrategy.identityBasedStrategy(),
+                        globalBlacklistUnverifiedDevices: false,
+                    },
+                ],
+                [
+                    "Share AllDevicesIsolationMode - Verified user problems true",
+                    {
+                        mode: new AllDevicesIsolationMode(true),
+                        expectedStrategy: CollectStrategy.deviceBasedStrategy(false, true),
+                        globalBlacklistUnverifiedDevices: false,
+                    },
+                ],
+                [
+                    'Share AllDevicesIsolationMode - with blacklist unverified - Verified user problems true"',
+                    {
+                        mode: new AllDevicesIsolationMode(true),
+                        expectedStrategy: CollectStrategy.deviceBasedStrategy(true, true),
+                        globalBlacklistUnverifiedDevices: true,
+                    },
+                ],
+            ];
+
+            let capturedSettings: CollectStrategy | undefined = undefined;
+
+            beforeEach(() => {
+                capturedSettings = undefined;
+                mockOlmMachine.shareRoomKey.mockImplementationOnce(async (roomId, users, encryptionSettings) => {
+                    capturedSettings = encryptionSettings.sharingStrategy;
+                });
+            });
+
+            it("should use Legacy as default mode", async () => {
+                await roomEncryptor.prepareForEncryption(false);
+                expect(mockOlmMachine.shareRoomKey).toHaveBeenCalled();
+                expect(capturedSettings?.eq(CollectStrategy.deviceBasedStrategy(false, false))).toBeTruthy();
+            });
+
+            it.each(testCases)(
+                "prepareForEncryption should properly set sharing strategy based on crypto mode: %s",
+                async (_, { mode, expectedStrategy, globalBlacklistUnverifiedDevices }) => {
+                    await roomEncryptor.prepareForEncryption(globalBlacklistUnverifiedDevices, mode);
+                    expect(mockOlmMachine.shareRoomKey).toHaveBeenCalled();
+                    expect(capturedSettings).toBeDefined();
+                    expect(expectedStrategy.eq(capturedSettings!)).toBeTruthy();
+                },
+            );
+
+            it.each(testCases)(
+                "encryptEvent should properly set sharing strategy based on crypto mode: %s",
+                async (_, { mode, expectedStrategy, globalBlacklistUnverifiedDevices }) => {
+                    await roomEncryptor.encryptEvent(createMockEvent("Hello"), globalBlacklistUnverifiedDevices, mode);
+                    expect(mockOlmMachine.shareRoomKey).toHaveBeenCalled();
+                    expect(capturedSettings).toBeDefined();
+                    expect(expectedStrategy.eq(capturedSettings!)).toBeTruthy();
+                },
+            );
         });
     });
 });
