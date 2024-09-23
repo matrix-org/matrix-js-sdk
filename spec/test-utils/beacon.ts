@@ -101,16 +101,17 @@ export const makeGeolocationPosition = ({
 }: {
     timestamp?: number;
     coords: Partial<GeolocationCoordinates>;
-}): GeolocationPosition => ({
-    timestamp: timestamp ?? 1647256791840,
-    coords: {
-        accuracy: 1,
-        latitude: 54.001927,
-        longitude: -8.253491,
-        altitude: null,
-        altitudeAccuracy: null,
-        heading: null,
-        speed: null,
-        ...coords,
-    },
-});
+}): GeolocationPosition =>
+    ({
+        timestamp: timestamp ?? 1647256791840,
+        coords: {
+            accuracy: 1,
+            latitude: 54.001927,
+            longitude: -8.253491,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+            ...coords,
+        },
+    }) as GeolocationPosition;
