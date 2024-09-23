@@ -2096,7 +2096,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Calls {@link processPollEvent} for a list of events.
+     * Process a list of poll events.
      *
      * @param events - List of events
      */
