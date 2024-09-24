@@ -1362,13 +1362,52 @@ describe("RustCrypto", () => {
         });
 
         it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
-            olmMachine.getIdentity.mockResolvedValue({ free: jest.fn(), isVerified: jest.fn().mockReturnValue(true) });
+            olmMachine.getIdentity.mockResolvedValue({
+                free: jest.fn(),
+                isVerified: jest.fn().mockReturnValue(true),
+                wasPreviouslyVerified: jest.fn().mockReturnValue(true),
+            });
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
             expect(userVerificationStatus.isVerified()).toBeTruthy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
-            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeTruthy();
+        });
+    });
+
+    describe("pinCurrentIdentity", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getIdentity: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                logger,
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("throws an error for an unknown user", async () => {
+            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+                "Cannot pin identity of unknown user",
+            );
+        });
+
+        it("throws an error for our own user", async () => {
+            const ownIdentity = new RustSdkCryptoJs.OwnUserIdentity();
+            olmMachine.getIdentity.mockResolvedValue(ownIdentity);
+
+            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+                "Cannot pin identity of own user",
+            );
         });
     });
 

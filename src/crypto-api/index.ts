@@ -198,6 +198,16 @@ export interface CryptoApi {
     getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
 
     /**
+     * "Pin" the current identity of the given user, accepting it as genuine.
+     *
+     * This is useful if the user has changed identity since we first saw them (leading to
+     * {@link UserVerificationStatus.needsUserApproval}), and we are now accepting their new identity.
+     *
+     * Throws an error if called on our own user ID, or on a user ID that we don't have an identity for.
+     */
+    pinCurrentUserIdentity(userId: string): Promise<void>;
+
+    /**
      * Get the verification status of a given device.
      *
      * @param userId - The ID of the user whose device is to be checked.
@@ -707,11 +717,29 @@ export interface BootstrapCrossSigningOpts {
  * Represents the ways in which we trust a user
  */
 export class UserVerificationStatus {
+    /**
+     * Indicates if the identity has changed in a way that needs user approval.
+     *
+     * This happens if the identity has changed since we first saw it, *unless* the new identity has also been verified
+     * by our user (eg via an interactive verification).
+     *
+     * To rectify this, either:
+     *
+     *  * Conduct a verification of the new identity via {@link CryptoApi.requestVerificationDM}.
+     *  * Pin the new identity, via {@link CryptoApi.pinCurrentUserIdentity}.
+     *
+     * @returns true if the identity has changed in a way that needs user approval.
+     */
+    public readonly needsUserApproval: boolean;
+
     public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
         private readonly tofu: boolean,
-    ) {}
+        needsUserApproval: boolean = false,
+    ) {
+        this.needsUserApproval = needsUserApproval;
+    }
 
     /**
      * @returns true if this user is verified via any means
@@ -737,6 +765,8 @@ export class UserVerificationStatus {
 
     /**
      * @returns true if this user's key is trusted on first use
+     *
+     * @deprecated No longer supported, with the Rust crypto stack.
      */
     public isTofu(): boolean {
         return this.tofu;
