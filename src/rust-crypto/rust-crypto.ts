@@ -62,7 +62,7 @@ import {
     deriveRecoveryKeyFromPassphrase,
     DeviceIsolationMode,
     NoIsolation,
-    IsolationModeKind,
+    DeviceIsolationModeKind,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -1769,10 +1769,10 @@ class EventDecryptor {
         let trustRequirement;
 
         switch (isolationMode.kind) {
-            case IsolationModeKind.None:
+            case DeviceIsolationModeKind.NoIsolation:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.Untrusted;
                 break;
-            case IsolationModeKind.OnlySigned:
+            case DeviceIsolationModeKind.OnlySignedIsolation:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSignedOrLegacy;
                 break;
         }

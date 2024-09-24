@@ -657,15 +657,14 @@ export enum DecryptionFailureCode {
     UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
 }
 
-/** Enum kind for isolation mode, used to discriminate union.*/
-export enum IsolationModeKind {
-    None,
-    OnlySigned,
+/** Base {@link DeviceIsolationMode} kind. */
+export enum DeviceIsolationModeKind {
+    NoIsolation,
+    OnlySignedIsolation,
 }
 
 /**
- * A type of device isolation mode used when encrypting or decrypting messages.
- * Only supported by Rust crypto.
+ * A type of {@link DeviceIsolationMode}.
  *
  * Message encryption keys are shared with all devices in the room, except in case of
  * verified user problems (see {@link errorOnVerifiedUserProblems}).
@@ -674,55 +673,43 @@ export enum IsolationModeKind {
  * of authenticity warnings, see {@link EventEncryptionInfo}).
  */
 export class NoIsolation {
-    // Discriminated Union
-    public readonly kind: IsolationModeKind.None;
+    public readonly kind = DeviceIsolationModeKind.NoIsolation;
 
     /**
-     * Optional behavior when sharing keys to remote devices.
-     * If set to true, sharing keys will fail (i.e. message sending will fail) with an error if:
-     *     - The user was previously verified but is not anymore.
-     *     - A verified user has some unverified devices (not cross-signed).
-     * If false, the keys will be distributed as usual.
-     * If set to false the client UX should display warnings to inform the user.
+     *
+     * @param errorOnVerifiedUserProblems - Behavior when sharing keys to remote devices.
+     * If set to `true`, sharing keys will fail (i.e. message sending will fail) with an error if:
+     *   - The user was previously verified but is not anymore, or:
+     *   - A verified user has some unverified devices (not cross-signed).
+     *
+     * If `false`, the keys will be distributed as usual. In this case, the client UX should display
+     * warnings to inform the user about problematic devices/users, and stop them hitting this case.
      */
-    public errorOnVerifiedUserProblems: boolean;
-
-    public constructor(errorOnVerifiedUserProblems: boolean) {
-        this.kind = IsolationModeKind.None;
+    public constructor(public readonly errorOnVerifiedUserProblems: boolean) {
         this.errorOnVerifiedUserProblems = errorOnVerifiedUserProblems;
     }
 }
 
 /**
- * A type of device isolation mode used when encrypting or decrypting messages.
- * Only supported by Rust crypto.
+ * A type of {@link DeviceIsolationMode}.
  *
  * Message encryption keys are only shared with devices that have been cross-signed by their owner.
  * Encryption will throw an error if a verified user replaces their identity.
  *
- * Events are decrypted only if they come from a cross-signed device other events will result in a decryption
+ * Events are decrypted only if they come from a cross-signed device. Other events will result in a decryption
  * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
  */
 export class OnlySignedIsolation {
-    // Discriminated Union
-    public readonly kind: IsolationModeKind.OnlySigned;
+    public readonly kind = DeviceIsolationModeKind.OnlySignedIsolation;
 
-    public constructor() {
-        this.kind = IsolationModeKind.OnlySigned;
-    }
+    public constructor() {}
 }
 
 /**
  * DeviceIsolationMode represents the mode of device isolation used when encrypting or decrypting messages.
- * It can be one of two types: NoIsolation or OnlySignedIsolation.
+ * It can be one of two types: {@link NoIsolation} or {@link OnlySignedIsolation}.
  *
- * {@link NoIsolation}: In this mode, message encryption keys are shared with all devices in the room,
- * except for blacklisted devices or unverified devices if certain conditions are met.
- * Events from all senders are always decrypted.
- *
- * {@link OnlySignedIsolation}: In this mode, message encryption keys are only shared with devices
- * that have been cross-signed by their owner. Events will be decrypted only if they come from
- * a cross-signed device, other events will result in a decryption failure.
+ * Only supported by rust Crypto.
  */
 export type DeviceIsolationMode = NoIsolation | OnlySignedIsolation;
 
