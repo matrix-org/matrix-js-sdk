@@ -41,11 +41,11 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
-     * The cryptography mode to use.
+     * The {@link DeviceIsolationMode} mode to use.
      *
-     * @see CryptoMode
+     * @see DeviceIsolationMode
      */
-    setCryptoMode(cryptoMode: CryptoMode): void;
+    setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void;
 
     /**
      * Return the current version of the crypto module.
@@ -658,36 +658,67 @@ export enum DecryptionFailureCode {
 }
 
 /**
- * The cryptography mode.  Affects how messages are encrypted and decrypted.
+ * A type of device isolation mode used when encrypting or decrypting messages.
  * Only supported by Rust crypto.
+ *
+ * Message encryption keys are shared with all devices in the room, except in case of
+ * verified user problems (see {@link errorOnVerifiedUserProblems}).
+ *
+ * Events from all senders are always decrypted (and should be decorated with message shields in case
+ * of authenticity warnings, see {@link EventEncryptionInfo}).
  */
-export enum CryptoMode {
-    /**
-     * Message encryption keys are shared with all devices in the room, except for
-     * blacklisted devices, or unverified devices if
-     * `globalBlacklistUnverifiedDevices` is set.  Events from all senders are
-     * decrypted.
-     */
-    Legacy,
+export class NoIsolation {
+    // Discriminated Union
+    public readonly kind: "NoIsolation";
 
     /**
-     * Events are encrypted as with `Legacy` mode, but encryption will throw an error if a
-     * verified user has an unsigned device, or if a verified user replaces
-     * their identity.  Events are decrypted only if they come from cross-signed
-     * devices, or devices that existed before the Rust crypto SDK started
-     * tracking device trust: other events will result in a decryption failure. (To access the failure
-     * reason, see {@link MatrixEvent.decryptionFailureReason}.)
+     * Optional behavior when sharing keys to remote devices.
+     * If set to true, sharing keys will fail (i.e. message sending will fail) with an error if:
+     *     - The user was previously verified but is not anymore.
+     *     - A verified user has some unverified devices (not cross-signed).
+     * If false, the keys will be distributed as usual.
+     * If set to false the client UX should display warnings to inform the user.
      */
-    Transition,
+    public errorOnVerifiedUserProblems: boolean;
 
-    /**
-     * Message encryption keys are only shared with devices that have been cross-signed by their owner.
-     * Encryption will throw an error if a verified user replaces their identity.  Events are
-     * decrypted only if they come from a cross-signed device other events will result in a decryption
-     * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
-     */
-    Invisible,
+    public constructor(errorOnVerifiedUserProblems: boolean) {
+        this.kind = "NoIsolation";
+        this.errorOnVerifiedUserProblems = errorOnVerifiedUserProblems;
+    }
 }
+
+/**
+ * A type of device isolation mode used when encrypting or decrypting messages.
+ * Only supported by Rust crypto.
+ *
+ * Message encryption keys are only shared with devices that have been cross-signed by their owner.
+ * Encryption will throw an error if a verified user replaces their identity.
+ *
+ * Events are decrypted only if they come from a cross-signed device other events will result in a decryption
+ * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
+ */
+export class OnlySignedIsolation {
+    // Discriminated Union
+    public readonly kind: "OnlySignedIsolation";
+
+    public constructor() {
+        this.kind = "OnlySignedIsolation";
+    }
+}
+
+/**
+ * DeviceIsolationMode represents the mode of device isolation used when encrypting or decrypting messages.
+ * It can be one of two types: NoIsolation or OnlySignedIsolation.
+ *
+ * {@link NoIsolation}: In this mode, message encryption keys are shared with all devices in the room,
+ * except for blacklisted devices or unverified devices if certain conditions are met.
+ * Events from all senders are always decrypted.
+ *
+ * {@link OnlySignedIsolation}: In this mode, message encryption keys are only shared with devices
+ * that have been cross-signed by their owner. Events will be decrypted only if they come from
+ * a cross-signed device, other events will result in a decryption failure.
+ */
+export type DeviceIsolationMode = NoIsolation | OnlySignedIsolation;
 
 /**
  * Options object for `CryptoApi.bootstrapCrossSigning`.
