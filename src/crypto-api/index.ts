@@ -657,6 +657,12 @@ export enum DecryptionFailureCode {
     UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
 }
 
+/** Enum kind for isolation mode, used to discriminate union.*/
+export enum IsolationModeKind {
+    None,
+    OnlySigned,
+}
+
 /**
  * A type of device isolation mode used when encrypting or decrypting messages.
  * Only supported by Rust crypto.
@@ -669,7 +675,7 @@ export enum DecryptionFailureCode {
  */
 export class NoIsolation {
     // Discriminated Union
-    public readonly kind: "NoIsolation";
+    public readonly kind: IsolationModeKind.None;
 
     /**
      * Optional behavior when sharing keys to remote devices.
@@ -682,7 +688,7 @@ export class NoIsolation {
     public errorOnVerifiedUserProblems: boolean;
 
     public constructor(errorOnVerifiedUserProblems: boolean) {
-        this.kind = "NoIsolation";
+        this.kind = IsolationModeKind.None;
         this.errorOnVerifiedUserProblems = errorOnVerifiedUserProblems;
     }
 }
@@ -699,10 +705,10 @@ export class NoIsolation {
  */
 export class OnlySignedIsolation {
     // Discriminated Union
-    public readonly kind: "OnlySignedIsolation";
+    public readonly kind: IsolationModeKind.OnlySigned;
 
     public constructor() {
-        this.kind = "OnlySignedIsolation";
+        this.kind = IsolationModeKind.OnlySigned;
     }
 }
 
