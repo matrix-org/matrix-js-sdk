@@ -42,8 +42,6 @@ export interface CryptoApi {
 
     /**
      * The {@link DeviceIsolationMode} mode to use.
-     *
-     * @see DeviceIsolationMode
      */
     setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void;
 
