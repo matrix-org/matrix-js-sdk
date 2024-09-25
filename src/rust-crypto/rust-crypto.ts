@@ -61,7 +61,7 @@ import {
     encodeRecoveryKey,
     deriveRecoveryKeyFromPassphrase,
     DeviceIsolationMode,
-    NoIsolation,
+    AllDevicesIsolationMode,
     DeviceIsolationModeKind,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
@@ -109,7 +109,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private readonly RECOVERY_KEY_DERIVATION_ITERATIONS = 500000;
 
     private _trustCrossSignedDevices = true;
-    private deviceIsolationMode: DeviceIsolationMode = new NoIsolation(false);
+    private deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false);
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -1769,10 +1769,10 @@ class EventDecryptor {
         let trustRequirement;
 
         switch (isolationMode.kind) {
-            case DeviceIsolationModeKind.NoIsolation:
+            case DeviceIsolationModeKind.AllDevicesIsolationMode:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.Untrusted;
                 break;
-            case DeviceIsolationModeKind.OnlySignedIsolation:
+            case DeviceIsolationModeKind.OnlySignedDevicesIsolationMode:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSignedOrLegacy;
                 break;
         }

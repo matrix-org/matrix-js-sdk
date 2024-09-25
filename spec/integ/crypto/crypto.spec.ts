@@ -87,8 +87,8 @@ import {
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
-    NoIsolation,
-    OnlySignedIsolation,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { IKeyBackup } from "../../../src/crypto/backup";
@@ -753,7 +753,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             newBackendOnly(
                 "OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed",
                 async () => {
-                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedIsolation());
+                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
 
                     // It will error as an unknown device because we haven't fetched
                     // the sender's device keys.
@@ -765,7 +765,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             newBackendOnly(
                 "NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed",
                 async () => {
-                    const decryptedEvent = await setUpTestAndDecrypt(new NoIsolation(false));
+                    const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
 
                     expect(decryptedEvent.isDecryptionFailure()).toBe(false);
 

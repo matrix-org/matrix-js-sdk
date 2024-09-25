@@ -657,8 +657,8 @@ export enum DecryptionFailureCode {
 
 /** Base {@link DeviceIsolationMode} kind. */
 export enum DeviceIsolationModeKind {
-    NoIsolation,
-    OnlySignedIsolation,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 }
 
 /**
@@ -670,8 +670,8 @@ export enum DeviceIsolationModeKind {
  * Events from all senders are always decrypted (and should be decorated with message shields in case
  * of authenticity warnings, see {@link EventEncryptionInfo}).
  */
-export class NoIsolation {
-    public readonly kind = DeviceIsolationModeKind.NoIsolation;
+export class AllDevicesIsolationMode {
+    public readonly kind = DeviceIsolationModeKind.AllDevicesIsolationMode;
 
     /**
      *
@@ -697,19 +697,19 @@ export class NoIsolation {
  * Events are decrypted only if they come from a cross-signed device. Other events will result in a decryption
  * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
  */
-export class OnlySignedIsolation {
-    public readonly kind = DeviceIsolationModeKind.OnlySignedIsolation;
+export class OnlySignedDevicesIsolationMode {
+    public readonly kind = DeviceIsolationModeKind.OnlySignedDevicesIsolationMode;
 
     public constructor() {}
 }
 
 /**
  * DeviceIsolationMode represents the mode of device isolation used when encrypting or decrypting messages.
- * It can be one of two types: {@link NoIsolation} or {@link OnlySignedIsolation}.
+ * It can be one of two types: {@link AllDevicesIsolationMode} or {@link OnlySignedDevicesIsolationMode}.
  *
  * Only supported by rust Crypto.
  */
-export type DeviceIsolationMode = NoIsolation | OnlySignedIsolation;
+export type DeviceIsolationMode = AllDevicesIsolationMode | OnlySignedDevicesIsolationMode;
 
 /**
  * Options object for `CryptoApi.bootstrapCrossSigning`.
