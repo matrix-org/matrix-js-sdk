@@ -676,6 +676,7 @@ export class AllDevicesIsolationMode {
     /**
      *
      * @param errorOnVerifiedUserProblems - Behavior when sharing keys to remote devices.
+     *
      * If set to `true`, sharing keys will fail (i.e. message sending will fail) with an error if:
      *   - The user was previously verified but is not anymore, or:
      *   - A verified user has some unverified devices (not cross-signed).
@@ -683,9 +684,7 @@ export class AllDevicesIsolationMode {
      * If `false`, the keys will be distributed as usual. In this case, the client UX should display
      * warnings to inform the user about problematic devices/users, and stop them hitting this case.
      */
-    public constructor(public readonly errorOnVerifiedUserProblems: boolean) {
-        this.errorOnVerifiedUserProblems = errorOnVerifiedUserProblems;
-    }
+    public constructor(public readonly errorOnVerifiedUserProblems: boolean) {}
 }
 
 /**
@@ -699,8 +698,6 @@ export class AllDevicesIsolationMode {
  */
 export class OnlySignedDevicesIsolationMode {
     public readonly kind = DeviceIsolationModeKind.OnlySignedDevicesIsolationMode;
-
-    public constructor() {}
 }
 
 /**
