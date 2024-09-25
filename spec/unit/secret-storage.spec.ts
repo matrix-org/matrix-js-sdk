@@ -25,7 +25,7 @@ import {
     ServerSideSecretStorageImpl,
     trimTrailingEquals,
 } from "../../src/secret-storage";
-import { calculateKeyCheck } from "../../src/crypto/aes";
+import { calculateKeyCheck } from "../../src/utils/calculateKeyCheck";
 import { randomString } from "../../src/randomstring";
 
 describe("ServerSideSecretStorageImpl", function () {

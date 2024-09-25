@@ -22,7 +22,6 @@ import type { PkSigning } from "@matrix-org/olm";
 import { IObject, pkSign, pkVerify } from "./olmlib.ts";
 import { logger } from "../logger.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
-import { decryptAES, encryptAES } from "./aes.ts";
 import { DeviceInfo } from "./deviceinfo.ts";
 import { ISignedKey, MatrixClient } from "../client.ts";
 import { OlmDevice } from "./OlmDevice.ts";
@@ -36,6 +35,8 @@ import {
     UserVerificationStatus as UserTrustLevel,
 } from "../crypto-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
+import { encryptAES } from "../utils/encryptAES.ts";
+import { decryptAES } from "../utils/decryptAES.ts";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };

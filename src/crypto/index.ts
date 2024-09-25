@@ -47,7 +47,6 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel.ts";
 import { IllegalMethod } from "./verification/IllegalMethod.ts";
 import { KeySignatureUploadError } from "../errors.ts";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.ts";
 import { DehydrationManager } from "./dehydration.ts";
 import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup.ts";
 import { IStore } from "../store/index.ts";
@@ -107,6 +106,10 @@ import { deviceInfoToDevice } from "./device-converter.ts";
 import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
+import { calculateKeyCheck } from "../utils/calculateKeyCheck.ts";
+import { decryptAES } from "../utils/decryptAES.ts";
+import { encryptAES } from "../utils/encryptAES.ts";
+import { SecretEncryptedPayload } from "../utils/@types/SecretEncryptedPayload.ts";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -1323,7 +1326,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        const encodedKey = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
+        const encodedKey = await new Promise<Uint8Array | SecretEncryptedPayload | string | null>((resolve) => {
             this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
             });

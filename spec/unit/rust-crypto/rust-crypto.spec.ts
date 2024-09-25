@@ -69,7 +69,7 @@ import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
-import { encryptAES } from "../../../src/crypto/aes";
+import { encryptAES } from "../../../src/utils/encryptAES";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 
 const TEST_USER = "@alice:example.com";

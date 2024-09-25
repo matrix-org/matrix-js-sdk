@@ -21,7 +21,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
-import { encryptAES } from "../../../src/crypto/aes";
+import { encryptAES } from "../../../src/utils/encryptAES";
 import { CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";

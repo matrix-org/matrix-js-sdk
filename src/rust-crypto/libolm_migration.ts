@@ -19,7 +19,6 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { Logger } from "../logger.ts";
 import { CryptoStore, MigrationState, SecretStorePrivateKeys } from "../crypto/store/base.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
-import { decryptAES, IEncryptedPayload } from "../crypto/aes.ts";
 import { IHttpOpts, MatrixHttpApi } from "../http-api/index.ts";
 import { requestKeyBackupVersion } from "./backup.ts";
 import { IRoomEncryption } from "../crypto/RoomList.ts";
@@ -28,6 +27,8 @@ import { RustCrypto } from "./rust-crypto.ts";
 import { KeyBackupInfo } from "../crypto-api/keybackup.ts";
 import { sleep } from "../utils.ts";
 import { encodeBase64 } from "../base64.ts";
+import { decryptAES } from "../utils/decryptAES.ts";
+import { SecretEncryptedPayload } from "../utils/@types/SecretEncryptedPayload.ts";
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -421,7 +422,7 @@ async function getAndDecryptCachedSecretKey(
     });
 
     if (key && key.ciphertext && key.iv && key.mac) {
-        return await decryptAES(key as IEncryptedPayload, legacyPickleKey, name);
+        return await decryptAES(key as SecretEncryptedPayload, legacyPickleKey, name);
     } else if (key instanceof Uint8Array) {
         // This is a legacy backward compatibility case where the key was stored in clear.
         return encodeBase64(key);

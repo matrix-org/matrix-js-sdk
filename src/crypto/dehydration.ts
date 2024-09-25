@@ -19,11 +19,12 @@ import anotherjson from "another-json";
 import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
-import { decryptAES, encryptAES } from "./aes.ts";
 import { logger } from "../logger.ts";
 import { Crypto } from "./index.ts";
 import { Method } from "../http-api/index.ts";
 import { SecretStorageKeyDescription } from "../secret-storage.ts";
+import { decryptAES } from "../utils/decryptAES.ts";
+import { encryptAES } from "../utils/encryptAES.ts";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase

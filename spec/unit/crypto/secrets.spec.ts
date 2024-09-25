@@ -20,7 +20,7 @@ import { IObject } from "../../../src/crypto/olmlib";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
-import { encryptAES } from "../../../src/crypto/aes";
+import { encryptAES } from "../../../src/utils/encryptAES";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
 import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
