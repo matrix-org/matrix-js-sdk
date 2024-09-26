@@ -147,15 +147,13 @@ export class MockRTCPeerConnection {
     }
 
     constructor() {
-        this.localDescription = {
+        const localDescriptionJSON = {
             sdp: DUMMY_SDP,
-            type: "offer",
-            toJSON: function (): RTCSessionDescriptionInit {
-                return {
-                    sdp: DUMMY_SDP,
-                    type: "offer",
-                };
-            },
+            type: "offer" as RTCSdpType,
+        };
+        this.localDescription = {
+            toJSON: () => localDescriptionJSON,
+            ...localDescriptionJSON,
         };
 
         this.readyToNegotiate = new Promise<void>((resolve) => {
