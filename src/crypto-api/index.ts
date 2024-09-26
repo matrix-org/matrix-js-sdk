@@ -41,11 +41,9 @@ export interface CryptoApi {
     globalBlacklistUnverifiedDevices: boolean;
 
     /**
-     * The cryptography mode to use.
-     *
-     * @see CryptoMode
+     * The {@link DeviceIsolationMode} mode to use.
      */
-    setCryptoMode(cryptoMode: CryptoMode): void;
+    setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void;
 
     /**
      * Return the current version of the crypto module.
@@ -196,6 +194,16 @@ export interface CryptoApi {
      *
      */
     getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
+
+    /**
+     * "Pin" the current identity of the given user, accepting it as genuine.
+     *
+     * This is useful if the user has changed identity since we first saw them (leading to
+     * {@link UserVerificationStatus.needsUserApproval}), and we are now accepting their new identity.
+     *
+     * Throws an error if called on our own user ID, or on a user ID that we don't have an identity for.
+     */
+    pinCurrentUserIdentity(userId: string): Promise<void>;
 
     /**
      * Get the verification status of a given device.
@@ -657,37 +665,58 @@ export enum DecryptionFailureCode {
     UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
 }
 
-/**
- * The cryptography mode.  Affects how messages are encrypted and decrypted.
- * Only supported by Rust crypto.
- */
-export enum CryptoMode {
-    /**
-     * Message encryption keys are shared with all devices in the room, except for
-     * blacklisted devices, or unverified devices if
-     * `globalBlacklistUnverifiedDevices` is set.  Events from all senders are
-     * decrypted.
-     */
-    Legacy,
-
-    /**
-     * Events are encrypted as with `Legacy` mode, but encryption will throw an error if a
-     * verified user has an unsigned device, or if a verified user replaces
-     * their identity.  Events are decrypted only if they come from cross-signed
-     * devices, or devices that existed before the Rust crypto SDK started
-     * tracking device trust: other events will result in a decryption failure. (To access the failure
-     * reason, see {@link MatrixEvent.decryptionFailureReason}.)
-     */
-    Transition,
-
-    /**
-     * Message encryption keys are only shared with devices that have been cross-signed by their owner.
-     * Encryption will throw an error if a verified user replaces their identity.  Events are
-     * decrypted only if they come from a cross-signed device other events will result in a decryption
-     * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
-     */
-    Invisible,
+/** Base {@link DeviceIsolationMode} kind. */
+export enum DeviceIsolationModeKind {
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 }
+
+/**
+ * A type of {@link DeviceIsolationMode}.
+ *
+ * Message encryption keys are shared with all devices in the room, except in case of
+ * verified user problems (see {@link errorOnVerifiedUserProblems}).
+ *
+ * Events from all senders are always decrypted (and should be decorated with message shields in case
+ * of authenticity warnings, see {@link EventEncryptionInfo}).
+ */
+export class AllDevicesIsolationMode {
+    public readonly kind = DeviceIsolationModeKind.AllDevicesIsolationMode;
+
+    /**
+     *
+     * @param errorOnVerifiedUserProblems - Behavior when sharing keys to remote devices.
+     *
+     * If set to `true`, sharing keys will fail (i.e. message sending will fail) with an error if:
+     *   - The user was previously verified but is not anymore, or:
+     *   - A verified user has some unverified devices (not cross-signed).
+     *
+     * If `false`, the keys will be distributed as usual. In this case, the client UX should display
+     * warnings to inform the user about problematic devices/users, and stop them hitting this case.
+     */
+    public constructor(public readonly errorOnVerifiedUserProblems: boolean) {}
+}
+
+/**
+ * A type of {@link DeviceIsolationMode}.
+ *
+ * Message encryption keys are only shared with devices that have been cross-signed by their owner.
+ * Encryption will throw an error if a verified user replaces their identity.
+ *
+ * Events are decrypted only if they come from a cross-signed device. Other events will result in a decryption
+ * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
+ */
+export class OnlySignedDevicesIsolationMode {
+    public readonly kind = DeviceIsolationModeKind.OnlySignedDevicesIsolationMode;
+}
+
+/**
+ * DeviceIsolationMode represents the mode of device isolation used when encrypting or decrypting messages.
+ * It can be one of two types: {@link AllDevicesIsolationMode} or {@link OnlySignedDevicesIsolationMode}.
+ *
+ * Only supported by rust Crypto.
+ */
+export type DeviceIsolationMode = AllDevicesIsolationMode | OnlySignedDevicesIsolationMode;
 
 /**
  * Options object for `CryptoApi.bootstrapCrossSigning`.
@@ -707,11 +736,29 @@ export interface BootstrapCrossSigningOpts {
  * Represents the ways in which we trust a user
  */
 export class UserVerificationStatus {
+    /**
+     * Indicates if the identity has changed in a way that needs user approval.
+     *
+     * This happens if the identity has changed since we first saw it, *unless* the new identity has also been verified
+     * by our user (eg via an interactive verification).
+     *
+     * To rectify this, either:
+     *
+     *  * Conduct a verification of the new identity via {@link CryptoApi.requestVerificationDM}.
+     *  * Pin the new identity, via {@link CryptoApi.pinCurrentUserIdentity}.
+     *
+     * @returns true if the identity has changed in a way that needs user approval.
+     */
+    public readonly needsUserApproval: boolean;
+
     public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
         private readonly tofu: boolean,
-    ) {}
+        needsUserApproval: boolean = false,
+    ) {
+        this.needsUserApproval = needsUserApproval;
+    }
 
     /**
      * @returns true if this user is verified via any means
@@ -737,6 +784,8 @@ export class UserVerificationStatus {
 
     /**
      * @returns true if this user's key is trusted on first use
+     *
+     * @deprecated No longer supported, with the Rust crypto stack.
      */
     public isTofu(): boolean {
         return this.tofu;

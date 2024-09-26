@@ -88,9 +88,9 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningKeyInfo,
     CrossSigningStatus,
-    CryptoMode,
     decodeRecoveryKey,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     DeviceVerificationStatus,
     encodeRecoveryKey,
     EventEncryptionInfo,
@@ -650,12 +650,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     * Implementation of {@link Crypto.CryptoApi#setDeviceIsolationMode}.
      */
-    public setCryptoMode(cryptoMode: CryptoMode): void {
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
         throw new Error("Not supported");
     }
-
     /**
      * Implementation of {@link Crypto.CryptoApi#getVersion}.
      */
@@ -1607,6 +1606,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
         return this.checkUserTrust(userId);
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi.pinCurrentUserIdentity}.
+     */
+    public async pinCurrentUserIdentity(userId: string): Promise<void> {
+        throw new Error("not implemented");
     }
 
     /**

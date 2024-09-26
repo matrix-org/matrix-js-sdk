@@ -34,17 +34,20 @@ export type OidcRegistrationClientMetadata = {
     policyUri: OidcRegistrationRequestBody["policy_uri"];
 };
 
+/**
+ * Request body for dynamic registration as defined by https://github.com/matrix-org/matrix-spec-proposals/pull/2966
+ */
 interface OidcRegistrationRequestBody {
-    client_name: string;
+    client_name?: string;
     client_uri: string;
     logo_uri?: string;
-    contacts: NonEmptyArray<string>;
-    tos_uri: string;
-    policy_uri: string;
+    contacts?: string[];
+    tos_uri?: string;
+    policy_uri?: string;
     redirect_uris?: NonEmptyArray<string>;
     response_types?: NonEmptyArray<string>;
     grant_types?: NonEmptyArray<string>;
-    id_token_signed_response_alg: string;
+    id_token_signed_response_alg?: string;
     token_endpoint_auth_method: string;
     application_type: "web" | "native";
 }
