@@ -24,7 +24,7 @@ import { Crypto } from "./index.ts";
 import { Method } from "../http-api/index.ts";
 import { SecretStorageKeyDescription } from "../secret-storage.ts";
 import { decryptAES } from "../utils/decryptAES.ts";
-import { encryptAES } from "../utils/encryptAES.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase
@@ -142,7 +142,7 @@ export class DehydrationManager {
             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
 
             // update the crypto store with the timestamp
-            const key = await encryptAES(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
+            const key = await encryptAESSecretStorageItem(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
             await this.crypto.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.crypto.cryptoStore.storeSecretStorePrivateKey(txn, "dehydration", {
                     keyInfo: this.keyInfo,

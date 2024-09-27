@@ -19,7 +19,7 @@ import { deriveKeys } from "./internal/deriveKeys.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
- * Encrypt a string using AES-CTR.
+ * Encrypt a string as a secret storage item, using AES-CTR.
  *
  * @param data - the plaintext to encrypt
  * @param key - the encryption key to use as an input to the HKDF function which is used to derive the AES key for
@@ -31,7 +31,7 @@ import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretSt
  * @returns The encrypted result, including the ciphertext itself, the initialization vector (as supplied in `ivStr`,
  *   or generated), and an HMAC on the ciphertext — all base64-encoded.
  */
-export async function encryptAES(
+export default async function encryptAESSecretStorageItem(
     data: string,
     key: Uint8Array,
     name: string,

@@ -25,7 +25,7 @@ import { ClientEvent, ClientEventHandlerMap } from "./client.ts";
 import { MatrixEvent } from "./models/event.ts";
 import { randomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
-import { encryptAES } from "./utils/encryptAES.ts";
+import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 import { decryptAES } from "./utils/decryptAES.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
 
@@ -641,7 +641,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
                 encrypt: function (secret: string): Promise<AESEncryptedSecretStoragePayload> {
-                    return encryptAES(secret, privateKey, name);
+                    return encryptAESSecretStorageItem(secret, privateKey, name);
                 },
                 decrypt: function (encInfo: AESEncryptedSecretStoragePayload): Promise<string> {
                     return decryptAES(encInfo, privateKey, name);
@@ -688,5 +688,5 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
  * @returns An object that contains, `mac` and `iv` properties.
  */
 export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<AESEncryptedSecretStoragePayload> {
-    return encryptAES(ZERO_STR, key, "", iv);
+    return encryptAESSecretStorageItem(ZERO_STR, key, "", iv);
 }

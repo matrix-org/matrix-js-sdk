@@ -108,7 +108,7 @@ import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { decryptAES } from "../utils/decryptAES.ts";
-import { encryptAES } from "../utils/encryptAES.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /* re-exports for backwards compatibility */
@@ -1359,7 +1359,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-        const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
         });

@@ -35,7 +35,7 @@ import {
     UserVerificationStatus as UserTrustLevel,
 } from "../crypto-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
-import { encryptAES } from "../utils/encryptAES.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { decryptAES } from "../utils/decryptAES.ts";
 
 // backwards-compatibility re-exports
@@ -677,7 +677,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 throw new Error(`storeCrossSigningKeyCache expects Uint8Array, got ${key}`);
             }
             const pickleKey = Buffer.from(olmDevice.pickleKey);
-            const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, type);
             return store.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 store.storeSecretStorePrivateKey(txn, type, encryptedKey);
             });

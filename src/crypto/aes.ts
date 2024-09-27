@@ -14,8 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+
 // Export for backwards compatibility
 export type { AESEncryptedSecretStoragePayload as IEncryptedPayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
-export { encryptAES } from "../utils/encryptAES.ts";
+export { encryptAESSecretStorageItem };
 export { decryptAES } from "../utils/decryptAES.ts";
 export { calculateKeyCheck } from "../secret-storage.ts";

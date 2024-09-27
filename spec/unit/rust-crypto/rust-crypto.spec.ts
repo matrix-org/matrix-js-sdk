@@ -69,7 +69,7 @@ import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
-import { encryptAES } from "../../../src/utils/encryptAES";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 
 const TEST_USER = "@alice:example.com";
@@ -425,7 +425,7 @@ describe("initRustCrypto", () => {
         }, 10000);
 
         async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
-            const encryptedKey = await encryptAES(encodeBase64(key), Buffer.from(pickleKey), type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), Buffer.from(pickleKey), type);
             store.storeSecretStorePrivateKey(undefined, type as keyof SecretStorePrivateKeys, encryptedKey);
         }
 

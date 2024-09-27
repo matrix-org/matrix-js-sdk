@@ -41,7 +41,7 @@ import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { encodeRecoveryKey } from "../crypto-api/index.ts";
 import { decryptAES } from "../utils/decryptAES.ts";
-import { encryptAES } from "../utils/encryptAES.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { calculateKeyCheck } from "../secret-storage.ts";
 
@@ -833,7 +833,7 @@ export class Aes256 implements BackupAlgorithm {
         delete plainText.session_id;
         delete plainText.room_id;
         delete plainText.first_known_index;
-        return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+        return encryptAESSecretStorageItem(JSON.stringify(plainText), this.key, data.session_id);
     }
 
     public async decryptSessions(
