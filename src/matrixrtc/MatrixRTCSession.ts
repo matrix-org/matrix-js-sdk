@@ -406,7 +406,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Re-emit EncryptionKeyChanged events for every tracked encryption keys. This can be used to export
+     * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
      * the keys.
      */
     public reemitEncryptionKeys(): void {
