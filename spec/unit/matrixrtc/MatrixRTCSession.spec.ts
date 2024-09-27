@@ -686,25 +686,27 @@ describe("MatrixRTCSession", () => {
             expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
         });
 
-        it("Re-sends key if a new member joins", async () => {
+        it("Rotates key if a new member joins", async () => {
             jest.useFakeTimers();
             try {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
 
-                const keysSentPromise1 = new Promise((resolve) => {
-                    sendEventMock.mockImplementation(resolve);
+                const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                    sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                 });
 
                 sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                await keysSentPromise1;
+                const firstKeysPayload = await keysSentPromise1;
+                expect(firstKeysPayload.keys).toHaveLength(1);
+                expect(firstKeysPayload.keys[0].index).toEqual(0);
                 expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                 sendEventMock.mockClear();
                 jest.advanceTimersByTime(10000);
 
-                const keysSentPromise2 = new Promise((resolve) => {
-                    sendEventMock.mockImplementation(resolve);
+                const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                    sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                 });
 
                 const onMembershipsChanged = jest.fn();
@@ -719,9 +721,14 @@ describe("MatrixRTCSession", () => {
                     .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId));
                 sess.onMembershipUpdate();
 
-                await keysSentPromise2;
+                jest.advanceTimersByTime(10000);
+
+                const secondKeysPayload = await keysSentPromise2;
 
                 expect(sendEventMock).toHaveBeenCalled();
+                expect(secondKeysPayload.keys).toHaveLength(1);
+                expect(secondKeysPayload.keys[0].index).toEqual(1);
+                expect(secondKeysPayload.keys[0].key).not.toEqual(firstKeysPayload.keys[0].key);
                 expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
             } finally {
                 jest.useRealTimers();
