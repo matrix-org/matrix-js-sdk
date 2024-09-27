@@ -18,3 +18,4 @@ limitations under the License.
 export type { AESEncryptedSecretStoragePayload as IEncryptedPayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 export { encryptAES } from "../utils/encryptAES.ts";
 export { decryptAES } from "../utils/decryptAES.ts";
+export { calculateKeyCheck } from "../secret-storage.ts";

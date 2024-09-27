@@ -18,6 +18,7 @@ import { Mocked } from "jest-mock";
 
 import {
     AccountDataClient,
+    calculateKeyCheck,
     PassphraseInfo,
     SecretStorageCallbacks,
     SecretStorageKeyDescriptionAesV1,
@@ -25,7 +26,6 @@ import {
     ServerSideSecretStorageImpl,
     trimTrailingEquals,
 } from "../../src/secret-storage";
-import { calculateKeyCheck } from "../../src/utils/calculateKeyCheck";
 import { randomString } from "../../src/randomstring";
 
 describe("ServerSideSecretStorageImpl", function () {

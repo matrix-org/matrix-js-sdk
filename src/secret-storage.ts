@@ -25,7 +25,6 @@ import { ClientEvent, ClientEventHandlerMap } from "./client.ts";
 import { MatrixEvent } from "./models/event.ts";
 import { randomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
-import { calculateKeyCheck } from "./utils/calculateKeyCheck.ts";
 import { encryptAES } from "./utils/encryptAES.ts";
 import { decryptAES } from "./utils/decryptAES.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
@@ -675,4 +674,19 @@ export function trimTrailingEquals(input: string): string {
     } else {
         return input;
     }
+}
+
+// string of zeroes, for calculating the key check
+const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+/**
+ * Calculate the MAC for checking the key.
+ *
+ * @param key - the key to use
+ * @param iv - The initialization vector as a base64-encoded string.
+ *     If omitted, a random initialization vector will be created.
+ * @returns An object that contains, `mac` and `iv` properties.
+ */
+export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<AESEncryptedSecretStoragePayload> {
+    return encryptAES(ZERO_STR, key, "", iv);
 }
