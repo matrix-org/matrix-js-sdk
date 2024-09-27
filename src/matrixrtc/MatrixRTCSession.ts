@@ -406,9 +406,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Emit an EncryptionKeyChanged event for every tracked encryption keys.
+     * Re-emit EncryptionKeyChanged events for every tracked encryption keys. This can be used to export
+     * the keys.
      */
-    public emitEncryptionKeys(): void {
+    public reemitEncryptionKeys(): void {
         this.encryptionKeys.forEach((keys, participantId) => {
             keys.forEach((key, index) => {
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
@@ -440,11 +441,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @deprecated This will be made private in a future release.
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
-        // the returned array doesn't contain the timestamps
-        return this.getEncryptionKeysInternal();
-    }
-
-    private getEncryptionKeysInternal(): IterableIterator<[string, Array<Uint8Array>]> {
         // the returned array doesn't contain the timestamps
         return Array.from(this.encryptionKeys.entries())
             .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
