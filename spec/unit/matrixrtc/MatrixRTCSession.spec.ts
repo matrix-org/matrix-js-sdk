@@ -585,12 +585,15 @@ describe("MatrixRTCSession", () => {
 
         it("creates a key when joining", () => {
             sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-            const keys = sess?.getKeysForParticipant("@alice:example.org", "AAAAAAA");
-            expect(keys).toHaveLength(1);
-
-            const allKeys = sess!.getEncryptionKeys();
-            expect(allKeys).toBeTruthy();
-            expect(Array.from(allKeys)).toHaveLength(1);
+            const encryptionKeyChangedListener = jest.fn();
+            sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+            sess?.reemitEncryptionKeys();
+            expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
+            expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                expect.any(Uint8Array),
+                0,
+                "@alice:example.org:AAAAAAA",
+            );
         });
 
         it("sends keys when joining", async () => {
@@ -1204,9 +1207,16 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(Date.now()),
         } as unknown as MatrixEvent);
 
-        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
-        expect(bobKeys).toHaveLength(1);
-        expect(bobKeys[0]).toEqual(Buffer.from("this is the key", "utf-8"));
+        const encryptionKeyChangedListener = jest.fn();
+        sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("this is the key", "utf-8"),
+            0,
+            "@bob:example.org:bobsphone",
+        );
+
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
     });
 
@@ -1229,13 +1239,16 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(Date.now()),
         } as unknown as MatrixEvent);
 
-        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
-        expect(bobKeys).toHaveLength(5);
-        expect(bobKeys[0]).toBeFalsy();
-        expect(bobKeys[1]).toBeFalsy();
-        expect(bobKeys[2]).toBeFalsy();
-        expect(bobKeys[3]).toBeFalsy();
-        expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
+        const encryptionKeyChangedListener = jest.fn();
+        sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("this is the key", "utf-8"),
+            4,
+            "@bob:example.org:bobsphone",
+        );
+
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
     });
 
@@ -1258,9 +1271,16 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(Date.now()),
         } as unknown as MatrixEvent);
 
-        let bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
-        expect(bobKeys).toHaveLength(1);
-        expect(bobKeys[0]).toEqual(Buffer.from("this is the key", "utf-8"));
+        const encryptionKeyChangedListener = jest.fn();
+        sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("this is the key", "utf-8"),
+            0,
+            "@bob:example.org:bobsphone",
+        );
+
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
 
         sess.onCallEncryption({
@@ -1279,9 +1299,20 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(Date.now()),
         } as unknown as MatrixEvent);
 
-        bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
-        expect(bobKeys).toHaveLength(5);
-        expect(bobKeys[4]).toEqual(Buffer.from("this is the key", "utf-8"));
+        encryptionKeyChangedListener.mockClear();
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("this is the key", "utf-8"),
+            0,
+            "@bob:example.org:bobsphone",
+        );
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("this is the key", "utf-8"),
+            4,
+            "@bob:example.org:bobsphone",
+        );
+
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
     });
 
@@ -1320,9 +1351,16 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(1000), // earlier timestamp than the newer key
         } as unknown as MatrixEvent);
 
-        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
-        expect(bobKeys).toHaveLength(1);
-        expect(bobKeys[0]).toEqual(Buffer.from("newer key", "utf-8"));
+        const encryptionKeyChangedListener = jest.fn();
+        sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("newer key", "utf-8"),
+            0,
+            "@bob:example.org:bobsphone",
+        );
+
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
     });
 
@@ -1361,9 +1399,15 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(1000), // same timestamp as the first key
         } as unknown as MatrixEvent);
 
-        const bobKeys = sess.getKeysForParticipant("@bob:example.org", "bobsphone")!;
-        expect(bobKeys).toHaveLength(1);
-        expect(bobKeys[0]).toEqual(Buffer.from("second key", "utf-8"));
+        const encryptionKeyChangedListener = jest.fn();
+        sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
+        expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+            Buffer.from("second key", "utf-8"),
+            0,
+            "@bob:example.org:bobsphone",
+        );
     });
 
     it("ignores keys event for the local participant", () => {
@@ -1385,8 +1429,11 @@ describe("MatrixRTCSession", () => {
             getTs: jest.fn().mockReturnValue(Date.now()),
         } as unknown as MatrixEvent);
 
-        const myKeys = sess.getKeysForParticipant(client.getUserId()!, client.getDeviceId()!)!;
-        expect(myKeys).toBeFalsy();
+        const encryptionKeyChangedListener = jest.fn();
+        sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
+        sess!.reemitEncryptionKeys();
+        expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(0);
+
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(0);
     });
 

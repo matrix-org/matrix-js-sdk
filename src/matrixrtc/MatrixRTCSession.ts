@@ -406,19 +406,39 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
+     * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
+     * the keys.
+     */
+    public reemitEncryptionKeys(): void {
+        this.encryptionKeys.forEach((keys, participantId) => {
+            keys.forEach((key, index) => {
+                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
+            });
+        });
+    }
+
+    /**
      * Get the known encryption keys for a given participant device.
      *
      * @param userId the user ID of the participant
      * @param deviceId the device ID of the participant
      * @returns The encryption keys for the given participant, or undefined if they are not known.
+     *
+     * @deprecated This will be made private in a future release.
      */
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
+        return this.getKeysForParticipantInternal(userId, deviceId);
+    }
+
+    private getKeysForParticipantInternal(userId: string, deviceId: string): Array<Uint8Array> | undefined {
         return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
     }
 
     /**
      * A map of keys used to encrypt and decrypt (we are using a symmetric
      * cipher) given participant's media. This also includes our own key
+     *
+     * @deprecated This will be made private in a future release.
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         // the returned array doesn't contain the timestamps
@@ -434,7 +454,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!userId) throw new Error("No userId!");
         if (!deviceId) throw new Error("No deviceId!");
 
-        return (this.getKeysForParticipant(userId, deviceId)?.length ?? 0) % 16;
+        return (this.getKeysForParticipantInternal(userId, deviceId)?.length ?? 0) % 16;
     }
 
     /**
