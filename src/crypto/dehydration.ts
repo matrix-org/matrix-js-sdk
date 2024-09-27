@@ -23,7 +23,7 @@ import { logger } from "../logger.ts";
 import { Crypto } from "./index.ts";
 import { Method } from "../http-api/index.ts";
 import { SecretStorageKeyDescription } from "../secret-storage.ts";
-import { decryptAES } from "../utils/decryptAES.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 
 export interface IDehydratedDevice {
@@ -62,7 +62,7 @@ export class DehydrationManager {
                     if (result) {
                         const { key, keyInfo, deviceDisplayName, time } = result;
                         const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
-                        const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
+                        const decrypted = await decryptAESSecretStorageItem(key, pickleKey, DEHYDRATION_ALGORITHM);
                         this.key = decodeBase64(decrypted);
                         this.keyInfo = keyInfo;
                         this.deviceDisplayName = deviceDisplayName;

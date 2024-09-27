@@ -107,7 +107,7 @@ import { deviceInfoToDevice } from "./device-converter.ts";
 import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { decryptAES } from "../utils/decryptAES.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
@@ -1342,7 +1342,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-            const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
+            const decrypted = await decryptAESSecretStorageItem(encodedKey, pickleKey, "m.megolm_backup.v1");
             key = decodeBase64(decrypted);
         }
         return key;

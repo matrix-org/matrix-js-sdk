@@ -40,7 +40,7 @@ import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.
 import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { encodeRecoveryKey } from "../crypto-api/index.ts";
-import { decryptAES } from "../utils/decryptAES.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { calculateKeyCheck } from "../secret-storage.ts";
@@ -843,7 +843,9 @@ export class Aes256 implements BackupAlgorithm {
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
             try {
-                const decrypted = JSON.parse(await decryptAES(sessionData.session_data, this.key, sessionId));
+                const decrypted = JSON.parse(
+                    await decryptAESSecretStorageItem(sessionData.session_data, this.key, sessionId),
+                );
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
             } catch (e) {

@@ -26,7 +26,7 @@ import { MatrixEvent } from "./models/event.ts";
 import { randomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
-import { decryptAES } from "./utils/decryptAES.ts";
+import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
@@ -644,7 +644,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
                     return encryptAESSecretStorageItem(secret, privateKey, name);
                 },
                 decrypt: function (encInfo: AESEncryptedSecretStoragePayload): Promise<string> {
-                    return decryptAES(encInfo, privateKey, name);
+                    return decryptAESSecretStorageItem(encInfo, privateKey, name);
                 },
             };
             return [keyId, decryption];

@@ -27,7 +27,7 @@ import { RustCrypto } from "./rust-crypto.ts";
 import { KeyBackupInfo } from "../crypto-api/keybackup.ts";
 import { sleep } from "../utils.ts";
 import { encodeBase64 } from "../base64.ts";
-import { decryptAES } from "../utils/decryptAES.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
@@ -422,7 +422,7 @@ async function getAndDecryptCachedSecretKey(
     });
 
     if (key && key.ciphertext && key.iv && key.mac) {
-        return await decryptAES(key as AESEncryptedSecretStoragePayload, legacyPickleKey, name);
+        return await decryptAESSecretStorageItem(key as AESEncryptedSecretStoragePayload, legacyPickleKey, name);
     } else if (key instanceof Uint8Array) {
         // This is a legacy backward compatibility case where the key was stored in clear.
         return encodeBase64(key);

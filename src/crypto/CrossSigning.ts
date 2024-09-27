@@ -36,7 +36,7 @@ import {
 } from "../crypto-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
-import { decryptAES } from "../utils/decryptAES.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };
@@ -663,7 +663,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
 
             if (key && key.ciphertext) {
                 const pickleKey = Buffer.from(olmDevice.pickleKey);
-                const decrypted = await decryptAES(key, pickleKey, type);
+                const decrypted = await decryptAESSecretStorageItem(key, pickleKey, type);
                 return decodeBase64(decrypted);
             } else {
                 return key;

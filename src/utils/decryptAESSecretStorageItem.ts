@@ -19,7 +19,7 @@ import { deriveKeys } from "./internal/deriveKeys.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
- * Decrypt an AES-encrypted string.
+ * Decrypt an AES-encrypted Secret Storage item.
  *
  * @param data - the encrypted data, returned by {@link encryptAES}.
  * @param key - the encryption key to use as an input to the HKDF function which is used to derive the AES key. Must
@@ -27,7 +27,7 @@ import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretSt
  * @param name - the name of the secret. Also used as an input to the HKDF operation which is used to derive the AES
  *    key, so again must be the same as provided to {@link encryptAES}.
  */
-export async function decryptAES(
+export default async function decryptAESSecretStorageItem(
     data: AESEncryptedSecretStoragePayload,
     key: Uint8Array,
     name: string,
