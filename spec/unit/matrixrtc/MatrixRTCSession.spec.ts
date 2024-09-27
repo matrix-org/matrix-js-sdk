@@ -587,7 +587,7 @@ describe("MatrixRTCSession", () => {
             sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
             const encryptionKeyChangedListener = jest.fn();
             sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-            sess?.emitEncryptionKeys();
+            sess?.reemitEncryptionKeys();
             expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
             expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                 expect.any(Uint8Array),
@@ -1202,7 +1202,7 @@ describe("MatrixRTCSession", () => {
 
         const encryptionKeyChangedListener = jest.fn();
         sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
         expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
             Buffer.from("this is the key", "utf-8"),
@@ -1234,7 +1234,7 @@ describe("MatrixRTCSession", () => {
 
         const encryptionKeyChangedListener = jest.fn();
         sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
         expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
             Buffer.from("this is the key", "utf-8"),
@@ -1266,7 +1266,7 @@ describe("MatrixRTCSession", () => {
 
         const encryptionKeyChangedListener = jest.fn();
         sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
         expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
             Buffer.from("this is the key", "utf-8"),
@@ -1293,7 +1293,7 @@ describe("MatrixRTCSession", () => {
         } as unknown as MatrixEvent);
 
         encryptionKeyChangedListener.mockClear();
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
         expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
             Buffer.from("this is the key", "utf-8"),
@@ -1346,7 +1346,7 @@ describe("MatrixRTCSession", () => {
 
         const encryptionKeyChangedListener = jest.fn();
         sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
         expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
             Buffer.from("newer key", "utf-8"),
@@ -1394,7 +1394,7 @@ describe("MatrixRTCSession", () => {
 
         const encryptionKeyChangedListener = jest.fn();
         sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
         expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
             Buffer.from("second key", "utf-8"),
@@ -1424,7 +1424,7 @@ describe("MatrixRTCSession", () => {
 
         const encryptionKeyChangedListener = jest.fn();
         sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-        sess!.emitEncryptionKeys();
+        sess!.reemitEncryptionKeys();
         expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(0);
 
         expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(0);
