@@ -19,6 +19,9 @@ const zeroSalt = new Uint8Array(8);
 
 /**
  * Derive AES and HMAC keys from a master key.
+ *
+ * This is used for deriving secret storage keys: see https://spec.matrix.org/v1.11/client-server-api/#msecret_storagev1aes-hmac-sha2 (step 1).
+ *
  * @param key
  * @param name
  */
