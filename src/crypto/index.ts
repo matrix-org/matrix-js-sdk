@@ -87,9 +87,9 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningKeyInfo,
     CrossSigningStatus,
-    CryptoMode,
     decodeRecoveryKey,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     DeviceVerificationStatus,
     encodeRecoveryKey,
     EventEncryptionInfo,
@@ -653,12 +653,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     * Implementation of {@link Crypto.CryptoApi#setDeviceIsolationMode}.
      */
-    public setCryptoMode(cryptoMode: CryptoMode): void {
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
         throw new Error("Not supported");
     }
-
     /**
      * Implementation of {@link Crypto.CryptoApi#getVersion}.
      */

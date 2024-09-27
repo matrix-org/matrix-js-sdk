@@ -82,11 +82,13 @@ import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
-    CryptoMode,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { IKeyBackup } from "../../../src/crypto/backup";
@@ -747,9 +749,34 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
         });
 
-        newBackendOnly(
-            "fails with an error when cross-signed sender is required but sender is not cross-signed",
-            async () => {
+        describe("IsolationMode decryption tests", () => {
+            newBackendOnly(
+                "OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
+
+                    // It will error as an unknown device because we haven't fetched
+                    // the sender's device keys.
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(true);
+                    expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+                },
+            );
+
+            newBackendOnly(
+                "NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
+
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(false);
+
+                    expect(await aliceClient.getCrypto()!.getEncryptionInfoForEvent(decryptedEvent)).toEqual({
+                        shieldColour: EventShieldColour.RED,
+                        shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                    });
+                },
+            );
+
+            async function setUpTestAndDecrypt(isolationMode: DeviceIsolationMode): Promise<MatrixEvent> {
                 // This tests that a message will not be decrypted if the sender
                 // is not sufficiently trusted according to the selected crypto
                 // mode.
@@ -760,7 +787,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
 
                 // Start by using Invisible crypto mode
-                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Invisible);
+                aliceClient.getCrypto()!.setDeviceIsolationMode(isolationMode);
 
                 await startClientAndAwaitFirstSync();
 
@@ -807,26 +834,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(event.isEncrypted()).toBe(true);
 
                 // it probably won't be decrypted yet, because it takes a while to process the olm keys
-                const decryptedEvent = await testUtils.awaitDecryption(event);
-                // It will error as an unknown device because we haven't fetched
-                // the sender's device keys.
-                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
-
-                // Next, try decrypting in transition mode, which should also
-                // fail for the same reason
-                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Transition);
-
-                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
-                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
-
-                // Decrypting in legacy mode should succeed since it doesn't
-                // care about device trust.
-                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Legacy);
-
-                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
-                expect(decryptedEvent.decryptionFailureReason).toEqual(null);
-            },
-        );
+                return await testUtils.awaitDecryption(event);
+            }
+        });
 
         it("Decryption fails with Unable to decrypt for other errors", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
