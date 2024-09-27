@@ -28,7 +28,7 @@ import { logger } from "./logger.ts";
 import { calculateKeyCheck } from "./utils/calculateKeyCheck.ts";
 import { encryptAES } from "./utils/encryptAES.ts";
 import { decryptAES } from "./utils/decryptAES.ts";
-import { SecretEncryptedPayload } from "./utils/@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -203,13 +203,13 @@ export interface SecretStorageCallbacks {
 
 interface SecretInfo {
     encrypted: {
-        [keyId: string]: SecretEncryptedPayload;
+        [keyId: string]: AESEncryptedSecretStoragePayload;
     };
 }
 
 interface Decryptors {
-    encrypt: (plaintext: string) => Promise<SecretEncryptedPayload>;
-    decrypt: (ciphertext: SecretEncryptedPayload) => Promise<string>;
+    encrypt: (plaintext: string) => Promise<AESEncryptedSecretStoragePayload>;
+    decrypt: (ciphertext: AESEncryptedSecretStoragePayload) => Promise<string>;
 }
 
 /**
@@ -494,7 +494,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
-        const encrypted: Record<string, SecretEncryptedPayload> = {};
+        const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {
             const defaultKeyId = await this.getDefaultKeyId();
@@ -641,10 +641,10 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
 
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
-                encrypt: function (secret: string): Promise<SecretEncryptedPayload> {
+                encrypt: function (secret: string): Promise<AESEncryptedSecretStoragePayload> {
                     return encryptAES(secret, privateKey, name);
                 },
-                decrypt: function (encInfo: SecretEncryptedPayload): Promise<string> {
+                decrypt: function (encInfo: AESEncryptedSecretStoragePayload): Promise<string> {
                     return decryptAES(encInfo, privateKey, name);
                 },
             };

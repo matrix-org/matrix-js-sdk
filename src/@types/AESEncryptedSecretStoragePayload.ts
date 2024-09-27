@@ -15,10 +15,10 @@
  */
 
 /**
- * An encrypted payload, as returned by the secret storage API.
+ * An AES-encrypted secret storage payload.
  * See https://spec.matrix.org/v1.11/client-server-api/#msecret_storagev1aes-hmac-sha2-1
  */
-export interface SecretEncryptedPayload {
+export interface AESEncryptedSecretStoragePayload {
     [key: string]: any; // extensible
     /** the initialization vector in base64 */
     iv: string;

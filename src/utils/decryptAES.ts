@@ -16,7 +16,7 @@
 
 import { decodeBase64 } from "../base64.ts";
 import { deriveKeys } from "../rust-crypto/deriveKeys.ts";
-import { SecretEncryptedPayload } from "./@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Decrypt an AES-encrypted string.
@@ -27,7 +27,11 @@ import { SecretEncryptedPayload } from "./@types/SecretEncryptedPayload.ts";
  * @param name - the name of the secret. Also used as an input to the HKDF operation which is used to derive the AES
  *    key, so again must be the same as provided to {@link encryptAES}.
  */
-export async function decryptAES(data: SecretEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
+export async function decryptAES(
+    data: AESEncryptedSecretStoragePayload,
+    key: Uint8Array,
+    name: string,
+): Promise<string> {
     const [aesKey, hmacKey] = await deriveKeys(key, name);
 
     const ciphertext = decodeBase64(data.ciphertext);

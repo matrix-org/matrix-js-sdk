@@ -36,7 +36,7 @@ import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api/index.ts";
 import { IKeyBackupInfo } from "../crypto/keybackup.ts";
 import { IKeyBackup } from "../crypto/backup.ts";
-import { SecretEncryptedPayload } from "../utils/@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -622,7 +622,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
      * Implements {@link BackupDecryptor#decryptSessions}
      */
     public async decryptSessions(
-        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | SecretEncryptedPayload>>,
+        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | AESEncryptedSecretStoragePayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {

@@ -43,7 +43,7 @@ import { encodeRecoveryKey } from "../crypto-api/index.ts";
 import { decryptAES } from "../utils/decryptAES.ts";
 import { calculateKeyCheck } from "../utils/calculateKeyCheck.ts";
 import { encryptAES } from "../utils/encryptAES.ts";
-import { SecretEncryptedPayload } from "../utils/@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -97,7 +97,7 @@ interface BackupAlgorithmClass {
 
 interface BackupAlgorithm {
     untrusted: boolean;
-    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | SecretEncryptedPayload>;
+    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | AESEncryptedSecretStoragePayload>;
     decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
@@ -828,7 +828,7 @@ export class Aes256 implements BackupAlgorithm {
         return false;
     }
 
-    public encryptSession(data: Record<string, any>): Promise<SecretEncryptedPayload> {
+    public encryptSession(data: Record<string, any>): Promise<AESEncryptedSecretStoragePayload> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
@@ -837,7 +837,7 @@ export class Aes256 implements BackupAlgorithm {
     }
 
     public async decryptSessions(
-        sessions: Record<string, IKeyBackupSession<SecretEncryptedPayload>>,
+        sessions: Record<string, IKeyBackupSession<AESEncryptedSecretStoragePayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 

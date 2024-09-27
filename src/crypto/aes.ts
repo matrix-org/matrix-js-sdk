@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // Export for backwards compatibility
-export type { SecretEncryptedPayload as IEncryptedPayload } from "../utils/@types/SecretEncryptedPayload.ts";
+export type { AESEncryptedSecretStoragePayload as IEncryptedPayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 export { encryptAES } from "../utils/encryptAES.ts";
 export { decryptAES } from "../utils/decryptAES.ts";

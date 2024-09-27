@@ -26,7 +26,7 @@ import { InboundGroupSessionData } from "../OlmDevice.ts";
 import { MatrixEvent } from "../../models/event.ts";
 import { DehydrationManager } from "../dehydration.ts";
 import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
-import { SecretEncryptedPayload } from "../../utils/@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Internal module. Definitions for storage for the crypto module
@@ -35,11 +35,11 @@ import { SecretEncryptedPayload } from "../../utils/@types/SecretEncryptedPayloa
 export interface SecretStorePrivateKeys {
     "dehydration": {
         keyInfo: DehydrationManager["keyInfo"];
-        key: SecretEncryptedPayload;
+        key: AESEncryptedSecretStoragePayload;
         deviceDisplayName: string;
         time: number;
     } | null;
-    "m.megolm_backup.v1": SecretEncryptedPayload;
+    "m.megolm_backup.v1": AESEncryptedSecretStoragePayload;
 }
 
 /**

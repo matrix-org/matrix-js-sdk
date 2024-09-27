@@ -16,7 +16,7 @@
 
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { deriveKeys } from "../rust-crypto/deriveKeys.ts";
-import { SecretEncryptedPayload } from "./@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Encrypt a string using AES-CTR.
@@ -36,7 +36,7 @@ export async function encryptAES(
     key: Uint8Array,
     name: string,
     ivStr?: string,
-): Promise<SecretEncryptedPayload> {
+): Promise<AESEncryptedSecretStoragePayload> {
     let iv: Uint8Array;
     if (ivStr) {
         iv = decodeBase64(ivStr);

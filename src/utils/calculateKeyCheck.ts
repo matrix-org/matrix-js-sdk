@@ -15,7 +15,7 @@
  */
 
 import { encryptAES } from "./encryptAES.ts";
-import { SecretEncryptedPayload } from "./@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 // string of zeroes, for calculating the key check
 const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
@@ -27,6 +27,6 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
  *     If omitted, a random initialization vector will be created.
  * @returns An object that contains, `mac` and `iv` properties.
  */
-export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<SecretEncryptedPayload> {
+export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<AESEncryptedSecretStoragePayload> {
     return encryptAES(ZERO_STR, key, "", iv);
 }

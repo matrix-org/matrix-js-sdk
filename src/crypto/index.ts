@@ -109,7 +109,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { calculateKeyCheck } from "../utils/calculateKeyCheck.ts";
 import { decryptAES } from "../utils/decryptAES.ts";
 import { encryptAES } from "../utils/encryptAES.ts";
-import { SecretEncryptedPayload } from "../utils/@types/SecretEncryptedPayload.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -1325,11 +1325,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        const encodedKey = await new Promise<Uint8Array | SecretEncryptedPayload | string | null>((resolve) => {
-            this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-                this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
-            });
-        });
+        const encodedKey = await new Promise<Uint8Array | AESEncryptedSecretStoragePayload | string | null>(
+            (resolve) => {
+                this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                    this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
+                });
+            },
+        );
 
         let key: Uint8Array | null = null;
 
