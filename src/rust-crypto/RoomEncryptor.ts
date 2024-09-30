@@ -120,9 +120,10 @@ export class RoomEncryptor {
      *
      * This ensures that we have a megolm session ready to use and that we have shared its key with all the devices
      * in the room.
-     *
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
-     * @param deviceIsolationMode - The device isolation mode see {@link DeviceIsolationMode}
+     * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
+     * will not send encrypted messages to unverified devices.
+     * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}
      */
     public async prepareForEncryption(
         globalBlacklistUnverifiedDevices: boolean,
@@ -145,8 +146,10 @@ export class RoomEncryptor {
      * then, if an event is provided, encrypt it using the session.
      *
      * @param event - Event to be encrypted, or null if only preparing for encryption (in which case we will pre-share the room key).
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
-     * @param deviceIsolationMode - The device isolation mode see {@link DeviceIsolationMode}.
+     * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
+     * will not send encrypted messages to unverified devices.
+     * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
      */
     public encryptEvent(
         event: MatrixEvent | null,
@@ -183,8 +186,10 @@ export class RoomEncryptor {
      * in the room.
      *
      * @param logger - a place to write diagnostics to
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
-     * @param deviceIsolationMode - The device isolation mode see {@link DeviceIsolationMode}.
+     * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
+     * will not send encrypted messages to unverified devices.
+     * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
      */
     private async ensureEncryptionSession(
         logger: LogSpan,
