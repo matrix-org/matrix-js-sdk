@@ -681,6 +681,7 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
 
 /**
  * Calculate the MAC for checking the key.
+ * See https://spec.matrix.org/v1.11/client-server-api/#msecret_storagev1aes-hmac-sha2, steps 3 and 4.
  *
  * @param key - the key to use
  * @param iv - The initialization vector as a base64-encoded string.
