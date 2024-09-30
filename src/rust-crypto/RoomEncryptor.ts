@@ -123,7 +123,7 @@ export class RoomEncryptor {
      * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
      * will not send encrypted messages to unverified devices.
      * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
-     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
      */
     public async prepareForEncryption(
         globalBlacklistUnverifiedDevices: boolean,
