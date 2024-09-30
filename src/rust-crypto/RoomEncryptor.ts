@@ -36,7 +36,7 @@ import { HistoryVisibility } from "../@types/partials.ts";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { logDuration } from "../utils.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { AllDevicesIsolationMode, DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api/index.ts";
+import { DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api/index.ts";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -127,7 +127,7 @@ export class RoomEncryptor {
      */
     public async prepareForEncryption(
         globalBlacklistUnverifiedDevices: boolean,
-        deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false),
+        deviceIsolationMode: DeviceIsolationMode,
     ): Promise<void> {
         // We consider a prepareForEncryption as an encryption promise as it will potentially share keys
         // even if it doesn't send an event.
@@ -154,7 +154,7 @@ export class RoomEncryptor {
     public encryptEvent(
         event: MatrixEvent | null,
         globalBlacklistUnverifiedDevices: boolean,
-        deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false),
+        deviceIsolationMode: DeviceIsolationMode,
     ): Promise<void> {
         const logger = new LogSpan(this.prefixedLogger, event ? (event.getTxnId() ?? "") : "prepareForEncryption");
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures

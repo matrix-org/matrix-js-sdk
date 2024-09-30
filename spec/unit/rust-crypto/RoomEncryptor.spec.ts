@@ -113,6 +113,8 @@ describe("RoomEncryptor", () => {
             );
         });
 
+        const defaultDevicesIsolationMode = new AllDevicesIsolationMode(false);
+
         it("should ensure that there is only one shareRoomKey at a time", async () => {
             const deferredShare = defer<void>();
             const insideOlmShareRoom = defer<void>();
@@ -122,19 +124,19 @@ describe("RoomEncryptor", () => {
                 await deferredShare.promise;
             });
 
-            roomEncryptor.prepareForEncryption(false);
+            roomEncryptor.prepareForEncryption(false, defaultDevicesIsolationMode);
             await insideOlmShareRoom.promise;
 
             // call several times more
-            roomEncryptor.prepareForEncryption(false);
-            roomEncryptor.encryptEvent(createMockEvent("Hello"), false);
-            roomEncryptor.prepareForEncryption(false);
-            roomEncryptor.encryptEvent(createMockEvent("World"), false);
+            roomEncryptor.prepareForEncryption(false, defaultDevicesIsolationMode);
+            roomEncryptor.encryptEvent(createMockEvent("Hello"), false, defaultDevicesIsolationMode);
+            roomEncryptor.prepareForEncryption(false, defaultDevicesIsolationMode);
+            roomEncryptor.encryptEvent(createMockEvent("World"), false, defaultDevicesIsolationMode);
 
             expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(1);
 
             deferredShare.resolve();
-            await roomEncryptor.prepareForEncryption(false);
+            await roomEncryptor.prepareForEncryption(false, defaultDevicesIsolationMode);
 
             // should have been called again
             expect(mockOlmMachine.shareRoomKey).toHaveBeenCalledTimes(6);
@@ -160,8 +162,16 @@ describe("RoomEncryptor", () => {
 
             let firstMessageFinished: string | null = null;
 
-            const firstRequest = roomEncryptor.encryptEvent(createMockEvent("Hello"), false);
-            const secondRequest = roomEncryptor.encryptEvent(createMockEvent("Edit of Hello"), false);
+            const firstRequest = roomEncryptor.encryptEvent(
+                createMockEvent("Hello"),
+                false,
+                defaultDevicesIsolationMode,
+            );
+            const secondRequest = roomEncryptor.encryptEvent(
+                createMockEvent("Edit of Hello"),
+                false,
+                defaultDevicesIsolationMode,
+            );
 
             firstRequest.then(() => {
                 if (firstMessageFinished === null) {
@@ -252,12 +262,6 @@ describe("RoomEncryptor", () => {
                 mockOlmMachine.shareRoomKey.mockImplementationOnce(async (roomId, users, encryptionSettings) => {
                     capturedSettings = encryptionSettings.sharingStrategy;
                 });
-            });
-
-            it("should use Legacy as default mode", async () => {
-                await roomEncryptor.prepareForEncryption(false);
-                expect(mockOlmMachine.shareRoomKey).toHaveBeenCalled();
-                expect(capturedSettings?.eq(CollectStrategy.deviceBasedStrategy(false, false))).toBeTruthy();
             });
 
             it.each(testCases)(
