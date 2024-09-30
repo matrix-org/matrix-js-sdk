@@ -101,7 +101,7 @@ describe("RoomEncryptor", () => {
                 getEncryptionTargetMembers: jest.fn().mockReturnValue([mockRoomMember]),
                 shouldEncryptForInvitedMembers: jest.fn().mockReturnValue(true),
                 getHistoryVisibility: jest.fn().mockReturnValue(HistoryVisibility.Invited),
-                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(undefined),
+                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(null),
             } as unknown as Mocked<Room>;
 
             roomEncryptor = new RoomEncryptor(
