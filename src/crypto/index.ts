@@ -75,7 +75,6 @@ import { MapWithDefault, recursiveMapToObject } from "../utils.ts";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
-    calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
@@ -110,6 +109,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { calculateKeyCheck } from "../calculateKeyCheck.ts";
 
 /* re-exports for backwards compatibility */
 export type {
