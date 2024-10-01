@@ -611,14 +611,13 @@ export enum DecryptionFailureCode {
 
     /**
      * The sender device is not cross-signed.  This will only be used if the
-     * crypto mode is set to `CryptoMode.Invisible` or `CryptoMode.Transition`.
+     * device isolation mode is set to `OnlySignedDevicesIsolationMode`.
      */
     UNSIGNED_SENDER_DEVICE = "UNSIGNED_SENDER_DEVICE",
 
     /**
      * We weren't able to link the message back to any known device.  This will
-     * only be used if the crypto mode is set to `CryptoMode.Invisible` or
-     * `CryptoMode.Transition`.
+     * only be used if the device isolation mode is set to `OnlySignedDevicesIsolationMode`.
      */
     UNKNOWN_SENDER_DEVICE = "UNKNOWN_SENDER_DEVICE",
 
