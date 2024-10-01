@@ -20,7 +20,7 @@ import { IObject } from "../../../src/crypto/olmlib";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
 import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
@@ -612,7 +612,7 @@ describe("Secrets", function () {
                     type: "m.megolm_backup.v1",
                     content: {
                         encrypted: {
-                            key_id: await encryptAES(
+                            key_id: await encryptAESSecretStorageItem(
                                 "123,45,6,7,89,1,234,56,78,90,12,34,5,67,8,90",
                                 secretStorageKeys.key_id,
                                 "m.megolm_backup.v1",

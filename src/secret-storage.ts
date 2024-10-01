@@ -23,9 +23,12 @@ limitations under the License.
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { ClientEvent, ClientEventHandlerMap } from "./client.ts";
 import { MatrixEvent } from "./models/event.ts";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./crypto/aes.ts";
 import { randomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
+import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
+import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
+import { calculateKeyCheck } from "./crypto/aes.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -200,13 +203,13 @@ export interface SecretStorageCallbacks {
 
 interface SecretInfo {
     encrypted: {
-        [keyId: string]: IEncryptedPayload;
+        [keyId: string]: AESEncryptedSecretStoragePayload;
     };
 }
 
 interface Decryptors {
-    encrypt: (plaintext: string) => Promise<IEncryptedPayload>;
-    decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
+    encrypt: (plaintext: string) => Promise<AESEncryptedSecretStoragePayload>;
+    decrypt: (ciphertext: AESEncryptedSecretStoragePayload) => Promise<string>;
 }
 
 /**
@@ -491,7 +494,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
-        const encrypted: Record<string, IEncryptedPayload> = {};
+        const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {
             const defaultKeyId = await this.getDefaultKeyId();
@@ -638,11 +641,11 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
 
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
-                encrypt: function (secret: string): Promise<IEncryptedPayload> {
-                    return encryptAES(secret, privateKey, name);
+                encrypt: function (secret: string): Promise<AESEncryptedSecretStoragePayload> {
+                    return encryptAESSecretStorageItem(secret, privateKey, name);
                 },
-                decrypt: function (encInfo: IEncryptedPayload): Promise<string> {
-                    return decryptAES(encInfo, privateKey, name);
+                decrypt: function (encInfo: AESEncryptedSecretStoragePayload): Promise<string> {
+                    return decryptAESSecretStorageItem(encInfo, privateKey, name);
                 },
             };
             return [keyId, decryption];
