@@ -1010,6 +1010,48 @@ describe("MatrixRTCSession", () => {
             }
         });
 
+        it("Wraps key index around to 0 when it reaches the maximum", async () => {
+            // this should give us keys with index [0...255, 0, 1]
+            const membersToTest = 258;
+            const members: CallMembershipData[] = [];
+            for (let i = 0; i < membersToTest; i++) {
+                members.push(Object.assign({}, membershipTemplate, { device_id: `DEVICE${i}` }));
+            }
+            jest.useFakeTimers();
+            try {
+                // start with a single member
+                const mockRoom = makeMockRoom(members.slice(0, 1));
+
+                for (let i = 0; i < membersToTest; i++) {
+                    const keysSentPromise = new Promise<EncryptionKeysEventContent>((resolve) => {
+                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                    });
+
+                    if (i === 0) {
+                        // if first time around then set up the session
+                        sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+                        sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    } else {
+                        // otherwise update the state
+                        mockRoom.getLiveTimeline().getState = jest
+                            .fn()
+                            .mockReturnValue(makeMockRoomState(members.slice(0, i + 1), mockRoom.roomId));
+                    }
+
+                    sess!.onMembershipUpdate();
+
+                    // advance time to avoid key throttling
+                    jest.advanceTimersByTime(10000);
+
+                    const keysPayload = await keysSentPromise;
+                    expect(keysPayload.keys).toHaveLength(1);
+                    expect(keysPayload.keys[0].index).toEqual(i % 256);
+                }
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
         it("Doesn't re-send key immediately", async () => {
             const realSetTimeout = setTimeout;
             jest.useFakeTimers();
