@@ -43,7 +43,7 @@ import { encodeRecoveryKey } from "../crypto-api/index.ts";
 import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
-import { calculateKeyCheck } from "../calculateKeyCheck.ts";
+import { calculateKeyCheck } from "../secret-storage.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
