@@ -230,10 +230,14 @@ export interface IMegolmEncryptedContent {
 export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 
 export enum CryptoEvent {
+    /** @deprecated Event not fired by the rust crypto */
     DeviceVerificationChanged = "deviceVerificationChanged",
     UserTrustStatusChanged = "userTrustStatusChanged",
+    /** @deprecated Event not fired by the rust crypto */
     UserCrossSigningUpdated = "userCrossSigningUpdated",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequest = "crypto.roomKeyRequest",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
     KeyBackupStatus = "crypto.keyBackupStatus",
     KeyBackupFailed = "crypto.keyBackupFailed",
@@ -250,6 +254,7 @@ export enum CryptoEvent {
      */
     KeyBackupDecryptionKeyCached = "crypto.keyBackupDecryptionKeyCached",
 
+    /** @deprecated Event not fired by the rust crypto */
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -261,6 +266,7 @@ export enum CryptoEvent {
      */
     VerificationRequestReceived = "crypto.verificationRequestReceived",
 
+    /** @deprecated Event not fired by the rust crypto */
     Warning = "crypto.warning",
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
