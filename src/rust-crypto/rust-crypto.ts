@@ -63,6 +63,7 @@ import {
     DeviceIsolationMode,
     AllDevicesIsolationMode,
     DeviceIsolationModeKind,
+    CryptoEvent,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -72,7 +73,6 @@ import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
-import { CryptoEvent } from "../crypto/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
@@ -2085,7 +2085,7 @@ type RustCryptoEvents =
     | CryptoEvent.DevicesUpdated
     | RustBackupCryptoEvents;
 
-type RustCryptoEventMap = {
+export type RustCryptoEventMap = {
     /**
      * Fires when a key verification request is received.
      */

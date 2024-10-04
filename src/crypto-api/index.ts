@@ -1074,3 +1074,4 @@ export * from "./verification.ts";
 export * from "./keybackup.ts";
 export * from "./recovery-key.ts";
 export * from "./key-passphrase.ts";
+export * from "./CryptoEvent.ts";

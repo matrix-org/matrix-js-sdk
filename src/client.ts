@@ -227,6 +227,7 @@ import {
     CryptoApi,
     decodeRecoveryKey,
     ImportRoomKeysOpts,
+    CryptoEvent as RustCryptoEvent,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
@@ -244,6 +245,7 @@ import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
+import { RustCryptoEventMap } from "./rust-crypto/rust-crypto.ts";
 
 export type Store = IStore;
 
@@ -957,6 +959,18 @@ type CryptoEvents =
     | CryptoEvent.WillUpdateDevices
     | CryptoEvent.LegacyCryptoStoreMigrationProgress;
 
+type RustCryptoEvents =
+    | RustCryptoEvent.KeyBackupStatus
+    | RustCryptoEvent.KeyBackupFailed
+    | RustCryptoEvent.KeyBackupSessionsRemaining
+    | RustCryptoEvent.KeyBackupDecryptionKeyCached
+    | RustCryptoEvent.VerificationRequestReceived
+    | RustCryptoEvent.UserTrustStatusChanged
+    | RustCryptoEvent.KeysChanged
+    | RustCryptoEvent.DevicesUpdated
+    | RustCryptoEvent.WillUpdateDevices
+    | RustCryptoEvent.LegacyCryptoStoreMigrationProgress;
+
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
 type RoomMemberEvents =
@@ -977,6 +991,7 @@ export type EmittedEvents =
     | RoomEvents
     | RoomStateEvents
     | CryptoEvents
+    | RustCryptoEvents
     | MatrixEventEvents
     | RoomMemberEvents
     | UserEvents
@@ -1188,6 +1203,7 @@ export type ClientEventHandlerMap = {
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
+    RustCryptoEventMap &
     MatrixEventHandlerMap &
     RoomMemberEventHandlerMap &
     UserEventHandlerMap &
@@ -2288,15 +2304,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // re-emit the events emitted by the crypto impl
         this.reEmitter.reEmit(rustCrypto, [
-            CryptoEvent.VerificationRequestReceived,
-            CryptoEvent.UserTrustStatusChanged,
-            CryptoEvent.KeyBackupStatus,
-            CryptoEvent.KeyBackupSessionsRemaining,
-            CryptoEvent.KeyBackupFailed,
-            CryptoEvent.KeyBackupDecryptionKeyCached,
-            CryptoEvent.KeysChanged,
-            CryptoEvent.DevicesUpdated,
-            CryptoEvent.WillUpdateDevices,
+            RustCryptoEvent.VerificationRequestReceived,
+            RustCryptoEvent.UserTrustStatusChanged,
+            RustCryptoEvent.KeyBackupStatus,
+            RustCryptoEvent.KeyBackupSessionsRemaining,
+            RustCryptoEvent.KeyBackupFailed,
+            RustCryptoEvent.KeyBackupDecryptionKeyCached,
+            RustCryptoEvent.KeysChanged,
+            RustCryptoEvent.DevicesUpdated,
+            RustCryptoEvent.WillUpdateDevices,
         ]);
     }
 
