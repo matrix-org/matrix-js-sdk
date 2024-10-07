@@ -47,7 +47,6 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel.ts";
 import { IllegalMethod } from "./verification/IllegalMethod.ts";
 import { KeySignatureUploadError } from "../errors.ts";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.ts";
 import { DehydrationManager } from "./dehydration.ts";
 import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup.ts";
 import { IStore } from "../store/index.ts";
@@ -76,6 +75,7 @@ import { MapWithDefault, recursiveMapToObject } from "../utils.ts";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
+    calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
@@ -90,6 +90,7 @@ import {
     CrossSigningStatus,
     decodeRecoveryKey,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     DeviceVerificationStatus,
     encodeRecoveryKey,
     EventEncryptionInfo,
@@ -106,6 +107,9 @@ import { deviceInfoToDevice } from "./device-converter.ts";
 import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -226,10 +230,14 @@ export interface IMegolmEncryptedContent {
 export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 
 export enum CryptoEvent {
+    /** @deprecated Event not fired by the rust crypto */
     DeviceVerificationChanged = "deviceVerificationChanged",
     UserTrustStatusChanged = "userTrustStatusChanged",
+    /** @deprecated Event not fired by the rust crypto */
     UserCrossSigningUpdated = "userCrossSigningUpdated",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequest = "crypto.roomKeyRequest",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
     KeyBackupStatus = "crypto.keyBackupStatus",
     KeyBackupFailed = "crypto.keyBackupFailed",
@@ -246,6 +254,7 @@ export enum CryptoEvent {
      */
     KeyBackupDecryptionKeyCached = "crypto.keyBackupDecryptionKeyCached",
 
+    /** @deprecated Event not fired by the rust crypto */
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -257,7 +266,9 @@ export enum CryptoEvent {
      */
     VerificationRequestReceived = "crypto.verificationRequestReceived",
 
+    /** @deprecated Event not fired by the rust crypto */
     Warning = "crypto.warning",
+    /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
@@ -648,6 +659,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.backupManager.checkAndStart();
     }
 
+    /**
+     * Implementation of {@link Crypto.CryptoApi#setDeviceIsolationMode}.
+     */
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
+        throw new Error("Not supported");
+    }
     /**
      * Implementation of {@link Crypto.CryptoApi#getVersion}.
      */
@@ -1315,11 +1332,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        const encodedKey = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
-            this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-                this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
-            });
-        });
+        const encodedKey = await new Promise<Uint8Array | AESEncryptedSecretStoragePayload | string | null>(
+            (resolve) => {
+                this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                    this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
+                });
+            },
+        );
 
         let key: Uint8Array | null = null;
 
@@ -1330,7 +1349,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-            const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
+            const decrypted = await decryptAESSecretStorageItem(encodedKey, pickleKey, "m.megolm_backup.v1");
             key = decodeBase64(decrypted);
         }
         return key;
@@ -1347,7 +1366,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-        const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
         });
@@ -1599,6 +1618,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
         return this.checkUserTrust(userId);
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi.pinCurrentUserIdentity}.
+     */
+    public async pinCurrentUserIdentity(userId: string): Promise<void> {
+        throw new Error("not implemented");
     }
 
     /**

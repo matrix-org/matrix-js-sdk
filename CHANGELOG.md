@@ -1,3 +1,19 @@
+Changes in [34.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.6.0) (2024-09-24)
+==================================================================================================
+## 🦖 Deprecations
+
+* Element-R: Mark unsupported MatrixClient methods as deprecated ([#4389](https://github.com/matrix-org/matrix-js-sdk/pull/4389)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Add crypto mode setting for invisible crypto, and apply it to decrypting events ([#4407](https://github.com/matrix-org/matrix-js-sdk/pull/4407)). Contributed by @uhoreg.
+* Don't share full key history for RTC per-participant encryption ([#4406](https://github.com/matrix-org/matrix-js-sdk/pull/4406)). Contributed by @hughns.
+* Export membership types ([#4405](https://github.com/matrix-org/matrix-js-sdk/pull/4405)). Contributed by @Johennes.
+* Fix sending redacts in embedded (widget) mode ([#4398](https://github.com/matrix-org/matrix-js-sdk/pull/4398)). Contributed by @toger5.
+* Expose the event ID of a call membership ([#4395](https://github.com/matrix-org/matrix-js-sdk/pull/4395)). Contributed by @robintown.
+* MSC4133 - Extended profiles ([#4391](https://github.com/matrix-org/matrix-js-sdk/pull/4391)). Contributed by @Half-Shot.
+
+
 Changes in [34.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.5.0) (2024-09-10)
 ==================================================================================================
 ## 🦖 Deprecations

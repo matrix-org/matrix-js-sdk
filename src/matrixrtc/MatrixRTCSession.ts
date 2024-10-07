@@ -144,6 +144,31 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
+    private currentEncryptionKeyIndex = -1;
+
+    /**
+     * The statistics for this session.
+     */
+    public statistics = {
+        counters: {
+            /**
+             * The number of times we have sent a room event containing encryption keys.
+             */
+            roomEventEncryptionKeysSent: 0,
+            /**
+             * The number of times we have received a room event containing encryption keys.
+             */
+            roomEventEncryptionKeysReceived: 0,
+        },
+        totals: {
+            /**
+             * The total age (in milliseconds) of all room events containing encryption keys that we have received.
+             * We track the total age so that we can later calculate the average age of all keys received.
+             */
+            roomEventEncryptionKeysReceivedTotalAge: 0,
+        },
+    };
+
     /**
      * The callId (sessionId) of the call.
      *
@@ -381,19 +406,39 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
+     * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
+     * the keys.
+     */
+    public reemitEncryptionKeys(): void {
+        this.encryptionKeys.forEach((keys, participantId) => {
+            keys.forEach((key, index) => {
+                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
+            });
+        });
+    }
+
+    /**
      * Get the known encryption keys for a given participant device.
      *
      * @param userId the user ID of the participant
      * @param deviceId the device ID of the participant
      * @returns The encryption keys for the given participant, or undefined if they are not known.
+     *
+     * @deprecated This will be made private in a future release.
      */
     public getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
+        return this.getKeysForParticipantInternal(userId, deviceId);
+    }
+
+    private getKeysForParticipantInternal(userId: string, deviceId: string): Array<Uint8Array> | undefined {
         return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
     }
 
     /**
      * A map of keys used to encrypt and decrypt (we are using a symmetric
      * cipher) given participant's media. This also includes our own key
+     *
+     * @deprecated This will be made private in a future release.
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         // the returned array doesn't contain the timestamps
@@ -403,13 +448,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private getNewEncryptionKeyIndex(): number {
-        const userId = this.client.getUserId();
-        const deviceId = this.client.getDeviceId();
+        if (this.currentEncryptionKeyIndex === -1) {
+            return 0;
+        }
 
-        if (!userId) throw new Error("No userId!");
-        if (!deviceId) throw new Error("No deviceId!");
-
-        return (this.getKeysForParticipant(userId, deviceId)?.length ?? 0) % 16;
+        // maximum key index is 255
+        return (this.currentEncryptionKeyIndex + 1) % 256;
     }
 
     /**
@@ -467,10 +511,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
                 logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
+                if (userId === this.client.getUserId() && deviceId === this.client.getDeviceId()) {
+                    this.currentEncryptionKeyIndex = encryptionKeyIndex;
+                }
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
             }, USE_KEY_DELAY);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
+            if (userId === this.client.getUserId() && deviceId === this.client.getDeviceId()) {
+                this.currentEncryptionKeyIndex = encryptionKeyIndex;
+            }
             this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
         }
     }
@@ -479,8 +529,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * Generate a new sender key and add it at the next available index
      * @param delayBeforeUse - If true, wait for a short period before setting the key for the
      *                         media encryptor to use. If false, set the key immediately.
+     * @returns The index of the new key
      */
-    private makeNewSenderKey(delayBeforeUse = false): void {
+    private makeNewSenderKey(delayBeforeUse = false): number {
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
 
@@ -491,6 +542,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         logger.info("Generated new key at index " + encryptionKeyIndex);
         this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, Date.now(), delayBeforeUse);
+        return encryptionKeyIndex;
     }
 
     /**
@@ -517,16 +569,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Re-sends the encryption keys room event
      */
-    private sendEncryptionKeysEvent = async (): Promise<void> => {
+    private sendEncryptionKeysEvent = async (indexToSend?: number): Promise<void> => {
         if (this.keysEventUpdateTimeout !== undefined) {
             clearTimeout(this.keysEventUpdateTimeout);
             this.keysEventUpdateTimeout = undefined;
         }
         this.lastEncryptionKeyUpdateRequest = Date.now();
 
-        logger.info("Sending encryption keys event");
-
         if (!this.isJoined()) return;
+
+        logger.info(`Sending encryption keys event. indexToSend=${indexToSend}`);
 
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
@@ -541,20 +593,33 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
+        if (typeof indexToSend !== "number" && this.currentEncryptionKeyIndex === -1) {
+            logger.warn("Tried to send encryption keys event but no current key index found!");
+            return;
+        }
+
+        const keyIndexToSend = indexToSend ?? this.currentEncryptionKeyIndex;
+        const keyToSend = myKeys[keyIndexToSend];
+
         try {
-            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, {
-                keys: myKeys.map((key, index) => {
-                    return {
-                        index,
-                        key: encodeUnpaddedBase64(key),
-                    };
-                }),
+            const content: EncryptionKeysEventContent = {
+                keys: [
+                    {
+                        index: keyIndexToSend,
+                        key: encodeUnpaddedBase64(keyToSend),
+                    },
+                ],
                 device_id: deviceId,
                 call_id: "",
-            } as EncryptionKeysEventContent);
+                sent_ts: Date.now(),
+            };
+
+            this.statistics.counters.roomEventEncryptionKeysSent += 1;
+
+            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, content);
 
             logger.debug(
-                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numSent=${myKeys.length}`,
+                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.currentEncryptionKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
             );
         } catch (error) {
@@ -649,6 +714,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
+        this.statistics.counters.roomEventEncryptionKeysReceived += 1;
+        const age = Date.now() - (typeof content.sent_ts === "number" ? content.sent_ts : event.getTs());
+        this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
+
         for (const key of content.keys) {
             if (!key) {
                 logger.info("Ignoring false-y key in keys event");
@@ -674,7 +743,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 );
             } else {
                 logger.debug(
-                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex}`,
+                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} age=${age}ms`,
                     this.encryptionKeys,
                 );
                 this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKey, event.getTs());
@@ -726,8 +795,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
                 this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (anyJoined) {
-                logger.debug(`New member(s) have joined: re-sending keys`);
-                this.requestKeyEventSend();
+                logger.debug(`New member(s) have joined: queueing sender key rotation`);
+                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
                 const newFingerprints = this.lastMembershipFingerprints!;
@@ -738,7 +807,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     Array.from(oldFingerprints).some((x) => !newFingerprints.has(x)) ||
                     Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
                 if (candidateUpdates) {
-                    logger.debug(`Member(s) have updated/reconnected: re-sending keys`);
+                    logger.debug(`Member(s) have updated/reconnected: re-sending keys to everyone`);
                     this.requestKeyEventSend();
                 }
             }
@@ -1030,9 +1099,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         this.makeNewKeyTimeout = undefined;
         logger.info("Making new sender key for key rotation");
-        this.makeNewSenderKey(true);
+        const newKeyIndex = this.makeNewSenderKey(true);
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
-        this.sendEncryptionKeysEvent();
+        this.sendEncryptionKeysEvent(newKeyIndex);
     };
 }
