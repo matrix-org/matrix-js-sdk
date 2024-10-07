@@ -1630,7 +1630,7 @@ describe("RustCrypto", () => {
             expect(getDevice).toHaveBeenCalledTimes(3);
             expect(batch?.eventType).toEqual("m.room.encrypted");
             expect(batch?.batch).toEqual([]);
-        }, 120000);
+        });
 
         it("returns encrypted batch for known devices", async () => {
             // Make m aware of another device, and get some OTK to be able to establish a session.
