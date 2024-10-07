@@ -268,6 +268,7 @@ export enum CryptoEvent {
 
     /** @deprecated Event not fired by the rust crypto */
     Warning = "crypto.warning",
+    /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
     WillUpdateDevices = "crypto.willUpdateDevices",
     DevicesUpdated = "crypto.devicesUpdated",
     KeysChanged = "crossSigning.keysChanged",
