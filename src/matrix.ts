@@ -108,12 +108,7 @@ export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth.ts";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces.ts";
 export { LocationAssetType } from "./@types/location.ts";
 
-/**
- * Types supporting cryptography.
- *
- * The most important is {@link Crypto.CryptoApi}, an instance of which can be retrieved via
- * {@link MatrixClient.getCrypto}.
- */
+/** @deprecated Backwards-compatibility re-export. Import from `crypto-api` directly. */
 export * as Crypto from "./crypto-api/index.ts";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();

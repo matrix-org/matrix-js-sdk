@@ -65,7 +65,7 @@ export class TypedEventEmitter<
     SuperclassArguments extends ListenerMap<any> = Arguments,
 > extends EventEmitter {
     /**
-     * Alias for {@link TypedEventEmitter#on}.
+     * Alias for {@link on}.
      */
     public addListener<T extends Events | EventEmitterEvents>(
         event: T,
@@ -124,7 +124,7 @@ export class TypedEventEmitter<
     }
 
     /**
-     * Alias for {@link TypedEventEmitter#removeListener}
+     * Alias for {@link removeListener}
      */
     public off<T extends Events | EventEmitterEvents>(event: T, listener: Listener<Events, Arguments, T>): this {
         return super.off(event, listener);
@@ -139,7 +139,7 @@ export class TypedEventEmitter<
      * being added, and called, multiple times.
      *
      * By default, event listeners are invoked in the order they are added. The
-     * {@link TypedEventEmitter#prependListener} method can be used as an alternative to add the
+     * {@link prependListener} method can be used as an alternative to add the
      * event listener to the beginning of the listeners array.
      *
      * @param event - The name of the event.
@@ -158,7 +158,7 @@ export class TypedEventEmitter<
      * Returns a reference to the `EventEmitter`, so that calls can be chained.
      *
      * By default, event listeners are invoked in the order they are added.
-     * The {@link TypedEventEmitter#prependOnceListener} method can be used as an alternative to add the
+     * The {@link prependOnceListener} method can be used as an alternative to add the
      * event listener to the beginning of the listeners array.
      *
      * @param event - The name of the event.
