@@ -373,7 +373,7 @@ export interface CryptoApi {
      * @param devices an array of (user ID, device ID) pairs to encrypt the payload for
      * @param payload the payload to encrypt
      *
-     * @returns the batch of encrypted payloads which can then be sent via {@link MatrixClient#queueToDevice}
+     * @returns the batch of encrypted payloads which can then be sent via {@link matrix.MatrixClient#queueToDevice}
      */
     encryptToDeviceMessages(
         eventType: string,
