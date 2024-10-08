@@ -84,6 +84,7 @@ import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";
 import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
+import { CryptoEvent as LegacyCryptoEvent } from "../crypto/index.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1621,7 +1622,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      * @param userIds - an array of user IDs of users whose devices have updated.
      */
     public async onDevicesUpdated(userIds: string[]): Promise<void> {
-        this.emit(CryptoEvent.WillUpdateDevices, userIds, false);
+        this.emit(LegacyCryptoEvent.WillUpdateDevices, userIds, false);
         this.emit(CryptoEvent.DevicesUpdated, userIds, false);
     }
 
@@ -2081,7 +2082,7 @@ type RustCryptoEvents =
     | CryptoEvent.VerificationRequestReceived
     | CryptoEvent.UserTrustStatusChanged
     | CryptoEvent.KeysChanged
-    | CryptoEvent.WillUpdateDevices
+    | LegacyCryptoEvent.WillUpdateDevices
     | CryptoEvent.DevicesUpdated
     | RustBackupCryptoEvents;
 
@@ -2116,7 +2117,7 @@ export type RustCryptoEventMap = {
      * @param initialFetch - If true, the store is empty (apart
      *     from our own device) and is being seeded.
      */
-    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
+    [LegacyCryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     /**
      * Fires whenever the stored devices for a user have changed
      * @param users - A list of user IDs that were updated

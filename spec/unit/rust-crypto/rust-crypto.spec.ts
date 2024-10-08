@@ -71,6 +71,7 @@ import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
+import { CryptoEvent as LegacyCryptoEvent } from "../../../src/crypto/index.ts";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -1264,7 +1265,7 @@ describe("RustCrypto", () => {
 
         const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
         const willUpdateCallback = jest.fn();
-        rustCrypto.on(CryptoEvent.WillUpdateDevices, willUpdateCallback);
+        rustCrypto.on(LegacyCryptoEvent.WillUpdateDevices, willUpdateCallback);
         const devicesUpdatedCallback = jest.fn();
         rustCrypto.on(CryptoEvent.DevicesUpdated, devicesUpdatedCallback);
 

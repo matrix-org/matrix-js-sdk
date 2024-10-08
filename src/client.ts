@@ -968,7 +968,7 @@ type RustCryptoEvents =
     | RustCryptoEvent.UserTrustStatusChanged
     | RustCryptoEvent.KeysChanged
     | RustCryptoEvent.DevicesUpdated
-    | RustCryptoEvent.WillUpdateDevices
+    | CryptoEvent.WillUpdateDevices
     | RustCryptoEvent.LegacyCryptoStoreMigrationProgress;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
@@ -2312,7 +2312,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             RustCryptoEvent.KeyBackupDecryptionKeyCached,
             RustCryptoEvent.KeysChanged,
             RustCryptoEvent.DevicesUpdated,
-            RustCryptoEvent.WillUpdateDevices,
+            CryptoEvent.WillUpdateDevices,
         ]);
     }
 

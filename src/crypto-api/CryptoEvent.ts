@@ -52,14 +52,6 @@ export enum CryptoEvent {
      */
     VerificationRequestReceived = "crypto.verificationRequestReceived",
     /**
-     * Fires whenever the stored devices for a user will be updated
-     * @deprecated Use {@link DevicesUpdated} instead
-     * @param {string[]} users - A list of user IDs that will be updated
-     * @param {boolean} initialFetch - If true, the store is empty (apart
-     *     from our own device) and is being seeded.
-     */
-    WillUpdateDevices = "crypto.willUpdateDevices",
-    /**
      * Fires whenever the stored devices for a user have been updated
      * @param {string[]} userIds - A list of user IDs that were updated
      * @param {boolean} initialFetch - If true, the store was empty (apart from our own device) and has been seeded.
