@@ -21,7 +21,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
@@ -169,17 +169,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             mockInitialApiRequests(aliceClient.getHomeserverUrl());
 
             // Encrypt the private keys and return them in the /sync response as if they are in Secret Storage
-            const masterKey = await encryptAES(
+            const masterKey = await encryptAESSecretStorageItem(
                 MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,
                 "m.cross_signing.master",
             );
-            const selfSigningKey = await encryptAES(
+            const selfSigningKey = await encryptAESSecretStorageItem(
                 SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,
                 "m.cross_signing.self_signing",
             );
-            const userSigningKey = await encryptAES(
+            const userSigningKey = await encryptAESSecretStorageItem(
                 USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,
                 "m.cross_signing.user_signing",

@@ -66,6 +66,7 @@ BOB_DATA = {
     "TEST_DEVICE_CURVE_PRIVATE_KEY_BYTES": b"Deadmuledeadmuledeadmuledeadmule",
 
     "MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Doyouspeakwhaaaaaaaaaaaaaaaaaale",
+    "ALT_MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"DoYouSpeakWhaaaaaaaaaaaaaaaaaale",
     "USER_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Useruseruseruseruseruseruseruser",
     "SELF_CROSS_SIGNING_PRIVATE_KEY_BYTES": b"Selfselfselfselfselfselfselfself",
 
@@ -208,7 +209,7 @@ def build_test_data(user_data, prefix = "") -> str:
 
     backup_recovery_key = export_recovery_key(user_data["B64_BACKUP_DECRYPTION_KEY"])
 
-    return f"""\
+    result = f"""\
 export const {prefix}TEST_USER_ID = "{user_data['TEST_USER_ID']}";
 export const {prefix}TEST_DEVICE_ID = "{user_data['TEST_DEVICE_ID']}";
 export const {prefix}TEST_ROOM_ID = "{user_data['TEST_ROOM_ID']}";
@@ -239,7 +240,7 @@ export const {prefix}USER_CROSS_SIGNING_PRIVATE_KEY_BASE64 = "{b64_user_signing_
 
 /** Signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
 export const {prefix}SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
-        json.dumps(build_cross_signing_keys_data(user_data), indent=4)
+        json.dumps(build_cross_signing_keys_data(user_data, user_data["MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES"]), indent=4)
 };
 
 /** Signed OTKs, returned by `POST /keys/claim` */
@@ -279,12 +280,20 @@ export const {prefix}CLEAR_EVENT: Partial<IEvent> = {json.dumps(clear_event, ind
 export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_event, indent=4)};
 """
 
+    alt_master_key = user_data.get("ALT_MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES")
+    if alt_master_key is not None:
+        result += f"""
+/** A second set of signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
+export const {prefix}ALT_SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
+        json.dumps(build_cross_signing_keys_data(user_data, alt_master_key), indent=4)
+};
+"""
 
-def build_cross_signing_keys_data(user_data) -> dict:
+    return result
+
+def build_cross_signing_keys_data(user_data, master_key_bytes) -> dict:
     """Build the signed cross-signing-keys data for return from /keys/query"""
-    master_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
-        user_data["MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES"]
-    )
+    master_private_key = ed25519.Ed25519PrivateKey.from_private_bytes(master_key_bytes)
     b64_master_public_key = encode_base64(
         master_private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )

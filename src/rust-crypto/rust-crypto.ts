@@ -45,7 +45,6 @@ import {
     CrossSigningStatus,
     CryptoApi,
     CryptoCallbacks,
-    CryptoMode,
     Curve25519AuthData,
     DecryptionFailureCode,
     DeviceVerificationStatus,
@@ -61,6 +60,9 @@ import {
     VerificationRequest,
     encodeRecoveryKey,
     deriveRecoveryKeyFromPassphrase,
+    DeviceIsolationMode,
+    AllDevicesIsolationMode,
+    DeviceIsolationModeKind,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -107,7 +109,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private readonly RECOVERY_KEY_DERIVATION_ITERATIONS = 500000;
 
     private _trustCrossSignedDevices = true;
-    private cryptoMode = CryptoMode.Legacy;
+    private deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false);
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -246,7 +248,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error(`Cannot encrypt event in unconfigured room ${roomId}`);
         }
 
-        await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices);
+        await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
@@ -259,7 +261,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // through decryptEvent and hence get rid of this case.
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
-        return await this.eventDecryptor.attemptEventDecryption(event, this.cryptoMode);
+        return await this.eventDecryptor.attemptEventDecryption(event, this.deviceIsolationMode);
     }
 
     /**
@@ -370,10 +372,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     * Implementation of {@link CryptoApi#setDeviceIsolationMode}.
      */
-    public setCryptoMode(cryptoMode: CryptoMode): void {
-        this.cryptoMode = cryptoMode;
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
+        this.deviceIsolationMode = isolationMode;
     }
 
     /**
@@ -398,7 +400,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const encryptor = this.roomEncryptors[room.roomId];
 
         if (encryptor) {
-            encryptor.prepareForEncryption(this.globalBlacklistUnverifiedDevices);
+            encryptor.prepareForEncryption(this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
         }
     }
 
@@ -654,9 +656,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
         }
+
         const verified = userIdentity.isVerified();
+        const wasVerified = userIdentity.wasPreviouslyVerified();
+        const needsUserApproval =
+            userIdentity instanceof RustSdkCryptoJs.UserIdentity ? userIdentity.identityNeedsUserApproval() : false;
         userIdentity.free();
-        return new UserVerificationStatus(verified, false, false);
+        return new UserVerificationStatus(verified, wasVerified, false, needsUserApproval);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#pinCurrentUserIdentity}.
+     */
+    public async pinCurrentUserIdentity(userId: string): Promise<void> {
+        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+            await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
+
+        if (userIdentity === undefined) {
+            throw new Error("Cannot pin identity of unknown user");
+        }
+
+        if (userIdentity instanceof RustSdkCryptoJs.OwnUserIdentity) {
+            throw new Error("Cannot pin identity of own user");
+        }
+
+        await userIdentity.pinCurrentMasterKey();
     }
 
     /**
@@ -777,6 +801,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // Create a new storage key and add it to secret storage
             this.logger.info("bootstrapSecretStorage: creating new secret storage key");
             const recoveryKey = await createSecretStorageKey();
+            if (!recoveryKey) {
+                throw new Error("createSecretStorageKey() callback did not return a secret storage key");
+            }
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
 
@@ -1751,7 +1778,10 @@ class EventDecryptor {
         private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader,
     ) {}
 
-    public async attemptEventDecryption(event: MatrixEvent, cryptoMode: CryptoMode): Promise<IEventDecryptionResult> {
+    public async attemptEventDecryption(
+        event: MatrixEvent,
+        isolationMode: DeviceIsolationMode,
+    ): Promise<IEventDecryptionResult> {
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
@@ -1759,15 +1789,13 @@ class EventDecryptor {
         this.addEventToPendingList(event);
 
         let trustRequirement;
-        switch (cryptoMode) {
-            case CryptoMode.Legacy:
+
+        switch (isolationMode.kind) {
+            case DeviceIsolationModeKind.AllDevicesIsolationMode:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.Untrusted;
                 break;
-            case CryptoMode.Transition:
+            case DeviceIsolationModeKind.OnlySignedDevicesIsolationMode:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSignedOrLegacy;
-                break;
-            case CryptoMode.Invisible:
-                trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSigned;
                 break;
         }
 

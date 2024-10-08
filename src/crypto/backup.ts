@@ -27,7 +27,6 @@ import { DeviceTrustLevel } from "./CrossSigning.ts";
 import { keyFromPassphrase } from "./key_passphrase.ts";
 import { encodeUri, safeSet, sleep } from "../utils.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.ts";
 import {
     Curve25519SessionData,
     IAes256AuthData,
@@ -41,6 +40,10 @@ import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.
 import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { encodeRecoveryKey } from "../crypto-api/index.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { calculateKeyCheck } from "../secret-storage.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -94,7 +97,7 @@ interface BackupAlgorithmClass {
 
 interface BackupAlgorithm {
     untrusted: boolean;
-    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | IEncryptedPayload>;
+    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | AESEncryptedSecretStoragePayload>;
     decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
@@ -825,22 +828,24 @@ export class Aes256 implements BackupAlgorithm {
         return false;
     }
 
-    public encryptSession(data: Record<string, any>): Promise<IEncryptedPayload> {
+    public encryptSession(data: Record<string, any>): Promise<AESEncryptedSecretStoragePayload> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
         delete plainText.first_known_index;
-        return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+        return encryptAESSecretStorageItem(JSON.stringify(plainText), this.key, data.session_id);
     }
 
     public async decryptSessions(
-        sessions: Record<string, IKeyBackupSession<IEncryptedPayload>>,
+        sessions: Record<string, IKeyBackupSession<AESEncryptedSecretStoragePayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
             try {
-                const decrypted = JSON.parse(await decryptAES(sessionData.session_data, this.key, sessionId));
+                const decrypted = JSON.parse(
+                    await decryptAESSecretStorageItem(sessionData.session_data, this.key, sessionId),
+                );
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
             } catch (e) {
