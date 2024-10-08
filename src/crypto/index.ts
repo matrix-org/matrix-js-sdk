@@ -101,6 +101,7 @@ import {
     KeyBackupInfo,
     OwnDeviceKeys,
     VerificationRequest as CryptoApiVerificationRequest,
+    CryptoEvent as CryptoApiCryptoEvent,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -232,16 +233,16 @@ export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 export enum CryptoEvent {
     /** @deprecated Event not fired by the rust crypto */
     DeviceVerificationChanged = "deviceVerificationChanged",
-    UserTrustStatusChanged = "userTrustStatusChanged",
+    UserTrustStatusChanged = CryptoApiCryptoEvent.UserTrustStatusChanged,
     /** @deprecated Event not fired by the rust crypto */
     UserCrossSigningUpdated = "userCrossSigningUpdated",
     /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequest = "crypto.roomKeyRequest",
     /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
-    KeyBackupStatus = "crypto.keyBackupStatus",
-    KeyBackupFailed = "crypto.keyBackupFailed",
-    KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    KeyBackupStatus = CryptoApiCryptoEvent.KeyBackupStatus,
+    KeyBackupFailed = CryptoApiCryptoEvent.KeyBackupFailed,
+    KeyBackupSessionsRemaining = CryptoApiCryptoEvent.KeyBackupSessionsRemaining,
 
     /**
      * Fires when a new valid backup decryption key is in cache.
@@ -252,7 +253,7 @@ export enum CryptoEvent {
      *
      * This event is only fired by the rust crypto backend.
      */
-    KeyBackupDecryptionKeyCached = "crypto.keyBackupDecryptionKeyCached",
+    KeyBackupDecryptionKeyCached = CryptoApiCryptoEvent.KeyBackupDecryptionKeyCached,
 
     /** @deprecated Event not fired by the rust crypto */
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
@@ -264,14 +265,14 @@ export enum CryptoEvent {
      *
      * The payload is a {@link Crypto.VerificationRequest}.
      */
-    VerificationRequestReceived = "crypto.verificationRequestReceived",
+    VerificationRequestReceived = CryptoApiCryptoEvent.VerificationRequestReceived,
 
     /** @deprecated Event not fired by the rust crypto */
     Warning = "crypto.warning",
     /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
     WillUpdateDevices = "crypto.willUpdateDevices",
-    DevicesUpdated = "crypto.devicesUpdated",
-    KeysChanged = "crossSigning.keysChanged",
+    DevicesUpdated = CryptoApiCryptoEvent.DevicesUpdated,
+    KeysChanged = CryptoApiCryptoEvent.KeysChanged,
 
     /**
      * Fires when data is being migrated from legacy crypto to rust crypto.
@@ -280,7 +281,7 @@ export enum CryptoEvent {
      * `total` is the total number of steps. When migration is complete, a final instance of the event is emitted, with
      * `progress === total === -1`.
      */
-    LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
+    LegacyCryptoStoreMigrationProgress = CryptoApiCryptoEvent.LegacyCryptoStoreMigrationProgress,
 }
 
 export type CryptoEventHandlerMap = {
