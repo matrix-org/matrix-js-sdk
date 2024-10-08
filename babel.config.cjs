@@ -34,15 +34,18 @@ module.exports = {
         [
             "search-and-replace",
             {
+                // Since rewriteImportExtensions doesn't work on dynamic imports (yet), we need to manually replace
+                // the dynamic rust-crypto import.
+                // (see https://github.com/babel/babel/issues/16750)
                 rules:
-                    process.env.NODE_ENV === "test"
-                        ? []
-                        : [
+                    process.env.NODE_ENV !== "test"
+                        ? [
                               {
-                                  search: 'import("./rust-crypto")',
-                                  replace: 'import("./rust-crypto/index.js")',
+                                  search: "./rust-crypto/index.ts",
+                                  replace: "./rust-crypto/index.js",
                               },
-                          ],
+                          ]
+                        : [],
             },
         ],
     ],

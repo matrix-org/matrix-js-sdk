@@ -2254,9 +2254,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         this.logger.debug("Downloading Rust crypto library");
-        // blocked on https://github.com/matrix-org/matrix-js-sdk/issues/4392 / https://github.com/babel/babel/issues/16750
-        // eslint-disable-next-line node/file-extension-in-import
-        const RustCrypto = await import("./rust-crypto");
+        const RustCrypto = await import("./rust-crypto/index.ts");
 
         const rustCrypto = await RustCrypto.initRustCrypto({
             logger: this.logger,
