@@ -80,3 +80,5 @@ export enum CryptoEvent {
      */
     LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
 }
+
+export type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];

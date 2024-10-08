@@ -228,6 +228,7 @@ import {
     decodeRecoveryKey,
     ImportRoomKeysOpts,
     CryptoEvent as RustCryptoEvent,
+    CryptoEvents as CryptoApiEvents,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
@@ -959,17 +960,7 @@ type CryptoEvents =
     | CryptoEvent.WillUpdateDevices
     | CryptoEvent.LegacyCryptoStoreMigrationProgress;
 
-type RustCryptoEvents =
-    | RustCryptoEvent.KeyBackupStatus
-    | RustCryptoEvent.KeyBackupFailed
-    | RustCryptoEvent.KeyBackupSessionsRemaining
-    | RustCryptoEvent.KeyBackupDecryptionKeyCached
-    | RustCryptoEvent.VerificationRequestReceived
-    | RustCryptoEvent.UserTrustStatusChanged
-    | RustCryptoEvent.KeysChanged
-    | RustCryptoEvent.DevicesUpdated
-    | CryptoEvent.WillUpdateDevices
-    | RustCryptoEvent.LegacyCryptoStoreMigrationProgress;
+type RustCryptoEvents = CryptoApiEvents | LegacyCryptoEvent.WillUpdateDevices;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
