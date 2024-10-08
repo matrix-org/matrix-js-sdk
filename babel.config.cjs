@@ -31,5 +31,19 @@ module.exports = {
         "@babel/plugin-transform-object-rest-spread",
         "@babel/plugin-syntax-dynamic-import",
         "@babel/plugin-transform-runtime",
+        [
+            "search-and-replace",
+            {
+                rules:
+                    process.env.NODE_ENV === "test"
+                        ? []
+                        : [
+                              {
+                                  search: 'import("./rust-crypto")',
+                                  replace: 'import("./rust-crypto/index.js")',
+                              },
+                          ],
+            },
+        ],
     ],
 };
