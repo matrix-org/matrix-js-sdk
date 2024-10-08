@@ -64,6 +64,8 @@ import {
     AllDevicesIsolationMode,
     DeviceIsolationModeKind,
     CryptoEvent,
+    CryptoEvents,
+    CryptoEventHandlerMap,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -74,7 +76,7 @@ import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } 
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup.ts";
+import { RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
@@ -103,7 +105,7 @@ interface ISignableObject {
  *
  * @internal
  */
-export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
+export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventHandlerMap> implements CryptoBackend {
     /**
      * The number of iterations to use when deriving a recovery key from a passphrase.
      */
@@ -126,7 +128,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private outgoingRequestsManager: OutgoingRequestsManager;
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
     private readonly dehydratedDeviceManager: DehydratedDeviceManager;
-    private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
+    private readonly reemitter = new TypedReEmitter<RustCryptoEvents, CryptoEventHandlerMap>(this);
 
     public constructor(
         private readonly logger: Logger,
@@ -2079,50 +2081,5 @@ function rustEncryptionInfoToJsEncryptionInfo(
 }
 
 type RustCryptoEvents =
-    | CryptoEvent.VerificationRequestReceived
-    | CryptoEvent.UserTrustStatusChanged
-    | CryptoEvent.KeysChanged
-    | LegacyCryptoEvent.WillUpdateDevices
-    | CryptoEvent.DevicesUpdated
-    | RustBackupCryptoEvents;
-
-export type RustCryptoEventMap = {
-    /**
-     * Fires when a key verification request is received.
-     */
-    [CryptoEvent.VerificationRequestReceived]: (request: VerificationRequest) => void;
-
-    /**
-     * Fires when the trust status of a user changes.
-     */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
-
-    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
-    /**
-     * Fires when the user's cross-signing keys have changed or cross-signing
-     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
-     * with the user ID of the logged in user to check if cross-signing is
-     * enabled on the account. If enabled, it can test whether the current key
-     * is trusted using with checkUserTrust with the user ID of the logged
-     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
-     * the trust in the account key.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     */
-    [CryptoEvent.KeysChanged]: (data: {}) => void;
-    /**
-     * Fires whenever the stored devices for a user will be updated
-     * @param users - A list of user IDs that will be updated
-     * @param initialFetch - If true, the store is empty (apart
-     *     from our own device) and is being seeded.
-     */
-    [LegacyCryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
-    /**
-     * Fires whenever the stored devices for a user have changed
-     * @param users - A list of user IDs that were updated
-     * @param initialFetch - If true, the store was empty (apart
-     *     from our own device) and has been seeded.
-     */
-    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
-} & RustBackupCryptoEventMap;
+    | Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>
+    | LegacyCryptoEvent.WillUpdateDevices;

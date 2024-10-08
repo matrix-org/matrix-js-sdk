@@ -227,8 +227,9 @@ import {
     CryptoApi,
     decodeRecoveryKey,
     ImportRoomKeysOpts,
-    CryptoEvent as RustCryptoEvent,
+    CryptoEvent,
     CryptoEvents as CryptoApiEvents,
+    CryptoEventHandlerMap,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
@@ -246,7 +247,6 @@ import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
-import { RustCryptoEventMap } from "./rust-crypto/rust-crypto.ts";
 
 export type Store = IStore;
 
@@ -960,7 +960,7 @@ type LegacyCryptoEvents =
     | LegacyCryptoEvent.WillUpdateDevices
     | LegacyCryptoEvent.LegacyCryptoStoreMigrationProgress;
 
-type RustCryptoEvents = CryptoApiEvents | LegacyCryptoEvent.WillUpdateDevices;
+type CryptoEvents = CryptoApiEvents | LegacyCryptoEvent.WillUpdateDevices;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
@@ -982,7 +982,7 @@ export type EmittedEvents =
     | RoomEvents
     | RoomStateEvents
     | LegacyCryptoEvents
-    | RustCryptoEvents
+    | CryptoEvents
     | MatrixEventEvents
     | RoomMemberEvents
     | UserEvents
@@ -1194,7 +1194,7 @@ export type ClientEventHandlerMap = {
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     LegacyCryptoEventHandlerMap &
-    RustCryptoEventMap &
+    CryptoEventHandlerMap &
     MatrixEventHandlerMap &
     RoomMemberEventHandlerMap &
     UserEventHandlerMap &
@@ -2279,7 +2279,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             legacyCryptoStore: this.cryptoStore,
             legacyPickleKey: this.pickleKey ?? "DEFAULT_KEY",
             legacyMigrationProgressListener: (progress: number, total: number): void => {
-                this.emit(LegacyCryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
+                this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
             },
         });
 
@@ -2295,14 +2295,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // re-emit the events emitted by the crypto impl
         this.reEmitter.reEmit(rustCrypto, [
-            RustCryptoEvent.VerificationRequestReceived,
-            RustCryptoEvent.UserTrustStatusChanged,
-            RustCryptoEvent.KeyBackupStatus,
-            RustCryptoEvent.KeyBackupSessionsRemaining,
-            RustCryptoEvent.KeyBackupFailed,
-            RustCryptoEvent.KeyBackupDecryptionKeyCached,
-            RustCryptoEvent.KeysChanged,
-            RustCryptoEvent.DevicesUpdated,
+            CryptoEvent.VerificationRequestReceived,
+            CryptoEvent.UserTrustStatusChanged,
+            CryptoEvent.KeyBackupStatus,
+            CryptoEvent.KeyBackupSessionsRemaining,
+            CryptoEvent.KeyBackupFailed,
+            CryptoEvent.KeyBackupDecryptionKeyCached,
+            CryptoEvent.KeysChanged,
+            CryptoEvent.DevicesUpdated,
             LegacyCryptoEvent.WillUpdateDevices,
         ]);
     }
@@ -2425,7 +2425,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns
      *
      * @remarks
-     * Fires {@link LegacyCryptoEvent#DeviceVerificationChanged}
+     * Fires {@link CryptoEvent#DeviceVerificationChanged}
      */
     public setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         const prom = this.setDeviceVerification(userId, deviceId, verified, null, null);
