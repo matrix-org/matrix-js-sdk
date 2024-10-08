@@ -86,7 +86,6 @@ import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";
 import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
-import { CryptoEvent as LegacyCryptoEvent } from "../crypto/index.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1624,7 +1623,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param userIds - an array of user IDs of users whose devices have updated.
      */
     public async onDevicesUpdated(userIds: string[]): Promise<void> {
-        this.emit(LegacyCryptoEvent.WillUpdateDevices, userIds, false);
+        this.emit(CryptoEvent.WillUpdateDevices, userIds, false);
         this.emit(CryptoEvent.DevicesUpdated, userIds, false);
     }
 
@@ -2080,6 +2079,4 @@ function rustEncryptionInfoToJsEncryptionInfo(
     return { shieldColour, shieldReason };
 }
 
-type RustCryptoEvents =
-    | Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>
-    | LegacyCryptoEvent.WillUpdateDevices;
+type RustCryptoEvents = Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>;

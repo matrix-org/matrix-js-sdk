@@ -228,7 +228,7 @@ import {
     decodeRecoveryKey,
     ImportRoomKeysOpts,
     CryptoEvent,
-    CryptoEvents as CryptoApiEvents,
+    CryptoEvents,
     CryptoEventHandlerMap,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
@@ -959,8 +959,6 @@ type LegacyCryptoEvents =
     | LegacyCryptoEvent.DevicesUpdated
     | LegacyCryptoEvent.WillUpdateDevices
     | LegacyCryptoEvent.LegacyCryptoStoreMigrationProgress;
-
-type CryptoEvents = CryptoApiEvents | LegacyCryptoEvent.WillUpdateDevices;
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
@@ -2303,7 +2301,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.KeyBackupDecryptionKeyCached,
             CryptoEvent.KeysChanged,
             CryptoEvent.DevicesUpdated,
-            LegacyCryptoEvent.WillUpdateDevices,
+            CryptoEvent.WillUpdateDevices,
         ]);
     }
 

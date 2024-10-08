@@ -15,7 +15,6 @@
  */
 
 import { CryptoEvent } from "./CryptoEvent.ts";
-import { CryptoEvent as LegacyCryptoEvent } from "../crypto/index.ts";
 import { VerificationRequest } from "./verification.ts";
 import { UserVerificationStatus } from "./index.ts";
 import { RustBackupCryptoEventMap } from "../rust-crypto/backup.ts";
@@ -51,7 +50,7 @@ export type CryptoEventHandlerMap = {
      * @param initialFetch - If true, the store is empty (apart
      *     from our own device) and is being seeded.
      */
-    [LegacyCryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
+    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     /**
      * Fires whenever the stored devices for a user have changed
      * @param users - A list of user IDs that were updated

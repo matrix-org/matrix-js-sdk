@@ -51,6 +51,8 @@ export enum CryptoEvent {
      * @param {VerificationRequest} - the request that was received
      */
     VerificationRequestReceived = "crypto.verificationRequestReceived",
+    /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
+    WillUpdateDevices = "crypto.willUpdateDevices",
     /**
      * Fires whenever the stored devices for a user have been updated
      * @param {string[]} userIds - A list of user IDs that were updated
