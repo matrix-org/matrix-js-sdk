@@ -100,8 +100,8 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     OwnDeviceKeys,
-    VerificationRequest as CryptoApiVerificationRequest,
     CryptoEvent as CryptoApiCryptoEvent,
+    CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -284,7 +284,7 @@ export enum CryptoEvent {
     LegacyCryptoStoreMigrationProgress = CryptoApiCryptoEvent.LegacyCryptoStoreMigrationProgress,
 }
 
-export type CryptoEventHandlerMap = {
+export type CryptoEventHandlerMap = CryptoApiCryptoEventHandlerMap & {
     /**
      * Fires when a device is marked as verified/unverified/blocked/unblocked by
      * {@link MatrixClient#setDeviceVerified | MatrixClient.setDeviceVerified} or
@@ -296,18 +296,6 @@ export type CryptoEventHandlerMap = {
      */
     [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, deviceInfo: DeviceInfo) => void;
     /**
-     * Fires when the trust status of a user changes
-     * If userId is the userId of the logged-in user, this indicated a change
-     * in the trust status of the cross-signing data on the account.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     *
-     * @param userId - the userId of the user in question
-     * @param trustLevel - The new trust level of the user
-     */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
-    /**
      * Fires when we receive a room key request
      *
      * @param request - request details
@@ -317,28 +305,6 @@ export type CryptoEventHandlerMap = {
      * Fires when we receive a room key request cancellation
      */
     [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
-    /**
-     * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
-     * @param enabled - true if key backup has been enabled, otherwise false
-     * @example
-     * ```
-     * matrixClient.on("crypto.keyBackupStatus", function(enabled){
-     *   if (enabled) {
-     *     [...]
-     *   }
-     * });
-     * ```
-     */
-    [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
-    [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
-    [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
-
-    /**
-     * Fires when the backup decryption key is received and cached.
-     *
-     * @param version - The version of the backup for which we have the key for.
-     */
-    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
     [CryptoEvent.KeySignatureUploadFailure]: (
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
@@ -350,12 +316,6 @@ export type CryptoEventHandlerMap = {
      * Deprecated: use `CryptoEvent.VerificationRequestReceived`.
      */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
-
-    /**
-     * Fires when a key verification request is received.
-     */
-    [CryptoEvent.VerificationRequestReceived]: (request: CryptoApiVerificationRequest) => void;
-
     /**
      * Fires when the app may wish to warn the user about something related
      * the end-to-end crypto.
@@ -363,33 +323,6 @@ export type CryptoEventHandlerMap = {
      * @param type - One of the strings listed above
      */
     [CryptoEvent.Warning]: (type: string) => void;
-    /**
-     * Fires when the user's cross-signing keys have changed or cross-signing
-     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
-     * with the user ID of the logged in user to check if cross-signing is
-     * enabled on the account. If enabled, it can test whether the current key
-     * is trusted using with checkUserTrust with the user ID of the logged
-     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
-     * the trust in the account key.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     */
-    [CryptoEvent.KeysChanged]: (data: {}) => void;
-    /**
-     * Fires whenever the stored devices for a user will be updated
-     * @param users - A list of user IDs that will be updated
-     * @param initialFetch - If true, the store is empty (apart
-     *     from our own device) and is being seeded.
-     */
-    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
-    /**
-     * Fires whenever the stored devices for a user have changed
-     * @param users - A list of user IDs that were updated
-     * @param initialFetch - If true, the store was empty (apart
-     *     from our own device) and has been seeded.
-     */
-    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
 
     [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
