@@ -26,7 +26,6 @@ import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } f
 import * as TestData from "../../test-utils/test-data";
 import {
     ConnectionError,
-    CryptoEvent,
     HttpApiEvent,
     HttpApiEventHandlerMap,
     IHttpOpts,
@@ -37,6 +36,7 @@ import {
 import * as testData from "../../test-utils/test-data";
 import { BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
 import { KeyBackupSession } from "../../../src/crypto-api/keybackup";
+import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 describe("PerSessionKeyBackupDownloader", () => {
     /** The downloader under test */
