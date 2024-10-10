@@ -117,12 +117,14 @@ type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
 type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
 
 export type DelayedEventInfo = {
-    delayed_events: DelayedPartialEvent &
+    delayed_events: Array<
+        DelayedPartialEvent &
         SendDelayedEventResponse &
         SendDelayedEventRequestOpts &
         {
             running_since: number;
-        }[];
+        }
+    >;
     next_batch?: string;
 };
 
