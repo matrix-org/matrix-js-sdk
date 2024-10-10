@@ -111,18 +111,16 @@ type DelayedPartialTimelineEvent = {
 
 type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
     state_key: string;
-    transaction_id: string;
 };
 
 type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
 
 export type DelayedEventInfo = {
-    delayed_events: DelayedPartialEvent &
+    delayed_events: (DelayedPartialEvent &
         SendDelayedEventResponse &
-        SendDelayedEventRequestOpts &
-        {
+        SendDelayedEventRequestOpts & {
             running_since: number;
-        }[];
+        })[];
     next_batch?: string;
 };
 
