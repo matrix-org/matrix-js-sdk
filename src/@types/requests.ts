@@ -111,7 +111,6 @@ type DelayedPartialTimelineEvent = {
 
 type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
     state_key: string;
-    transaction_id: string;
 };
 
 type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
