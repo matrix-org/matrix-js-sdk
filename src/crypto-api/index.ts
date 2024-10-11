@@ -369,11 +369,11 @@ export interface CryptoApi {
      * Encrypts a given payload object via Olm to-device messages to a given
      * set of devices.
      *
-     * @param eventType the type of the event to send
-     * @param devices an array of (user ID, device ID) pairs to encrypt the payload for
-     * @param payload the payload to encrypt
+     * @param eventType - the type of the event to send.
+     * @param devices - an array of devices to encrypt the payload for.
+     * @param payload - the payload to encrypt.
      *
-     * @returns the batch of encrypted payloads which can then be sent via {@link matrix.MatrixClient#queueToDevice}
+     * @returns the batch of encrypted payloads which can then be sent via {@link matrix.MatrixClient#queueToDevice}.
      */
     encryptToDeviceMessages(
         eventType: string,

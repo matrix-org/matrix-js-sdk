@@ -1316,6 +1316,52 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         return secrets;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#encryptToDeviceMessages}.
+     */
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const logger = new LogSpan(this.logger, "encryptToDeviceMessages");
+        const uniqueUsers = new Set(devices.map(({ userId }) => userId));
+
+        // This will ensure we have Olm sessions for all of the users' devices.
+        // However, we only care about some of the devices.
+        // So, perhaps we can optimise this later on.
+        await this.keyClaimManager.ensureSessionsForUsers(
+            logger,
+            Array.from(uniqueUsers).map((userId) => new RustSdkCryptoJs.UserId(userId)),
+        );
+        const batch: ToDeviceBatch = {
+            batch: [],
+            eventType: EventType.RoomMessageEncrypted,
+        };
+
+        await Promise.all(
+            devices.map(async ({ userId, deviceId }) => {
+                const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+                    new RustSdkCryptoJs.UserId(userId),
+                    new RustSdkCryptoJs.DeviceId(deviceId),
+                );
+
+                if (device) {
+                    const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
+                    batch.batch.push({
+                        deviceId,
+                        userId,
+                        payload: encryptedPayload,
+                    });
+                } else {
+                    this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
+                }
+            }),
+        );
+
+        return batch;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -1760,49 +1806,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
      */
     public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
         return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
-    }
-
-    public async encryptToDeviceMessages(
-        eventType: string,
-        devices: { userId: string; deviceId: string }[],
-        payload: ToDevicePayload,
-    ): Promise<ToDeviceBatch> {
-        const logger = new LogSpan(this.logger, "encryptToDeviceMessages");
-        const uniqueUsers = new Set(devices.map(({ userId }) => userId));
-
-        // This will ensure we have Olm sessions for all of the users' devices.
-        // However, we only care about some of the devices.
-        // So, perhaps we can optimise this later on.
-        await this.keyClaimManager.ensureSessionsForUsers(
-            logger,
-            Array.from(uniqueUsers).map((userId) => new RustSdkCryptoJs.UserId(userId)),
-        );
-        const batch: ToDeviceBatch = {
-            batch: [],
-            eventType: EventType.RoomMessageEncrypted,
-        };
-
-        await Promise.all(
-            devices.map(async ({ userId, deviceId }) => {
-                const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
-                    new RustSdkCryptoJs.UserId(userId),
-                    new RustSdkCryptoJs.DeviceId(deviceId),
-                );
-
-                if (device) {
-                    const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
-                    batch.batch.push({
-                        deviceId,
-                        userId,
-                        payload: encryptedPayload,
-                    });
-                } else {
-                    this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
-                }
-            }),
-        );
-
-        return batch;
     }
 }
 
