@@ -3568,6 +3568,95 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
     }
 
+    private async prepareToDeviceBatch(
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<ToDeviceBatch> {
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
+
+        await Promise.all(
+            userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
+                const deviceId = deviceInfo.deviceId;
+                const encryptedContent: IEncryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this.olmDevice.deviceCurve25519Key!,
+                    ciphertext: {},
+                    [ToDeviceMessageId]: uuidv4(),
+                };
+
+                toDeviceBatch.batch.push({
+                    userId,
+                    deviceId,
+                    payload: encryptedContent,
+                });
+
+                await olmlib.ensureOlmSessionsForDevices(
+                    this.olmDevice,
+                    this.baseApis,
+                    new Map([[userId, [deviceInfo]]]),
+                );
+                await olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    this.userId,
+                    this.deviceId,
+                    this.olmDevice,
+                    userId,
+                    deviceInfo,
+                    payload,
+                );
+            }),
+        );
+
+        // prune out any devices that encryptMessageForDevice could not encrypt for,
+        // in which case it will have just not added anything to the ciphertext object.
+        // There's no point sending messages to devices if we couldn't encrypt to them,
+        // since that's effectively a blank message.
+        toDeviceBatch.batch = toDeviceBatch.batch.filter((msg) => {
+            if (Object.keys(msg.payload.ciphertext).length > 0) {
+                return true;
+            } else {
+                logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
+                return false;
+            }
+        });
+
+        return toDeviceBatch;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#encryptToDeviceMessages}.
+     */
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const userIds = new Set(devices.map(({ userId }) => userId));
+        const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
+
+        const userDeviceInfoArr: IOlmDevice<DeviceInfo>[] = [];
+
+        devices.forEach(({ userId, deviceId }) => {
+            const devices = deviceInfoMap.get(userId);
+            if (!devices) {
+                logger.warn(`No devices found for user ${userId}`);
+                return;
+            }
+
+            if (devices.has(deviceId)) {
+                // Send the message to a specific device
+                userDeviceInfoArr.push({ userId, deviceInfo: devices.get(deviceId)! });
+            } else {
+                logger.warn(`No device found for user ${userId} with id ${deviceId}`);
+            }
+        });
+
+        return this.prepareToDeviceBatch(userDeviceInfoArr, payload);
+    }
+
     private onMembership = (event: MatrixEvent, member: RoomMember, oldMembership?: string): void => {
         try {
             this.onRoomMembership(event, member, oldMembership);
@@ -4284,92 +4373,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
         throw new Error("Not implemented");
-    }
-
-    private async prepareToDeviceBatch(
-        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
-        payload: object,
-    ): Promise<ToDeviceBatch> {
-        const toDeviceBatch: ToDeviceBatch = {
-            eventType: EventType.RoomMessageEncrypted,
-            batch: [],
-        };
-
-        await Promise.all(
-            userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
-                const deviceId = deviceInfo.deviceId;
-                const encryptedContent: IEncryptedContent = {
-                    algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: this.olmDevice.deviceCurve25519Key!,
-                    ciphertext: {},
-                    [ToDeviceMessageId]: uuidv4(),
-                };
-
-                toDeviceBatch.batch.push({
-                    userId,
-                    deviceId,
-                    payload: encryptedContent,
-                });
-
-                await olmlib.ensureOlmSessionsForDevices(
-                    this.olmDevice,
-                    this.baseApis,
-                    new Map([[userId, [deviceInfo]]]),
-                );
-                await olmlib.encryptMessageForDevice(
-                    encryptedContent.ciphertext,
-                    this.userId,
-                    this.deviceId,
-                    this.olmDevice,
-                    userId,
-                    deviceInfo,
-                    payload,
-                );
-            }),
-        );
-
-        // prune out any devices that encryptMessageForDevice could not encrypt for,
-        // in which case it will have just not added anything to the ciphertext object.
-        // There's no point sending messages to devices if we couldn't encrypt to them,
-        // since that's effectively a blank message.
-        toDeviceBatch.batch = toDeviceBatch.batch.filter((msg) => {
-            if (Object.keys(msg.payload.ciphertext).length > 0) {
-                return true;
-            } else {
-                logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
-                return false;
-            }
-        });
-
-        return toDeviceBatch;
-    }
-
-    public async encryptToDeviceMessages(
-        eventType: string,
-        devices: { userId: string; deviceId: string }[],
-        payload: ToDevicePayload,
-    ): Promise<ToDeviceBatch> {
-        const userIds = new Set(devices.map(({ userId }) => userId));
-        const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
-
-        const userDeviceInfoArr: IOlmDevice<DeviceInfo>[] = [];
-
-        devices.forEach(({ userId, deviceId }) => {
-            const devices = deviceInfoMap.get(userId);
-            if (!devices) {
-                logger.warn(`No devices found for user ${userId}`);
-                return;
-            }
-
-            if (devices.has(deviceId)) {
-                // Send the message to a specific device
-                userDeviceInfoArr.push({ userId, deviceInfo: devices.get(deviceId)! });
-            } else {
-                logger.warn(`No device found for user ${userId} with id ${deviceId}`);
-            }
-        });
-
-        return this.prepareToDeviceBatch(userDeviceInfoArr, payload);
     }
 }
 
