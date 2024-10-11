@@ -3627,7 +3627,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#encryptToDeviceMessages}.
+     * Implementation of {@link Crypto.CryptoApi#encryptToDeviceMessages}.
      */
     public async encryptToDeviceMessages(
         eventType: string,
