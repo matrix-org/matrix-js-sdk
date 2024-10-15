@@ -93,7 +93,11 @@ export {
     GroupCallType,
     GroupCallStatsReportEvent,
 } from "./webrtc/groupCall.ts";
-export { CryptoEvent } from "./crypto/index.ts";
+
+export {
+    /** @deprecated Use {@link Crypto.CryptoEvent} instead */
+    CryptoEvent,
+} from "./crypto/index.ts";
 export { SyncState, SetPresence } from "./sync.ts";
 export type { ISyncStateData as SyncStateData } from "./sync.ts";
 export { SlidingSyncEvent } from "./sliding-sync.ts";
