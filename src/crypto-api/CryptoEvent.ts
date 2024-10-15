@@ -20,19 +20,19 @@
 export enum CryptoEvent {
     /**
      * Fires when the trust status of a user changes.
-     * The payload is a pair (userId, userTrustLevel).
+     * The payload is a pair (userId, userTrustLevel). The trust level is one of the values from UserVerificationStatus.
      */
     UserTrustStatusChanged = "userTrustStatusChanged",
 
     /**
      * Fires when the key backup status changes.
-     * The payload is a boolean
+     * The payload is a boolean indicating whether the key backup is enabled.
      */
     KeyBackupStatus = "crypto.keyBackupStatus",
 
     /**
      * Fires when we failed to back up the keys
-     * The payload is an errorCode
+     * The payload is the error code of the error that occurred.
      */
     KeyBackupFailed = "crypto.keyBackupFailed",
 
@@ -55,7 +55,7 @@ export enum CryptoEvent {
 
     /**
      * Fires when a key verification request is received.
-     * The payload is a VerificationRequest object.
+     * The payload is a VerificationRequest object representing the request.
      */
     VerificationRequestReceived = "crypto.verificationRequestReceived",
 
