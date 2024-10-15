@@ -14,28 +14,34 @@
  * limitations under the License.
  */
 
+/**
+ * Events emitted by the {@link CryptoApi}
+ */
 export enum CryptoEvent {
     /**
      * Fires when the trust status of a user changes.
-     * @param {string} userId - the user whose trust status changed
-     * @param {UserVerificationStatus} userTrustLevel - the new trust level
+     * The payload is a pair (userId, userTrustLevel).
      */
     UserTrustStatusChanged = "userTrustStatusChanged",
+
     /**
      * Fires when the key backup status changes.
-     * @param {boolean} status - true if the key backup is enabled, false otherwise.
+     * The payload is a boolean
      */
     KeyBackupStatus = "crypto.keyBackupStatus",
+
     /**
      * Fires when we failed to back up the keys
-     * @param {string} errorCode - the error code of the error that occurred
+     * The payload is an errorCode
      */
     KeyBackupFailed = "crypto.keyBackupFailed",
+
     /**
      * Fires when the number of sessions that can be backed up changes.
-     * @param {number} remaining - the remaining number of sessions that can be backed up.
+     * The payload is the remaining number of sessions that can be backed up.
      */
     KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+
     /**
      * Fires when a new valid backup decryption key is in cache.
      * This will happen when a secret is received from another session, from secret storage,
@@ -46,19 +52,22 @@ export enum CryptoEvent {
      * This event is only fired by the rust crypto backend.
      */
     KeyBackupDecryptionKeyCached = "crypto.keyBackupDecryptionKeyCached",
+
     /**
      * Fires when a key verification request is received.
-     * @param {VerificationRequest} - the request that was received
+     * The payload is a VerificationRequest object.
      */
     VerificationRequestReceived = "crypto.verificationRequestReceived",
+
     /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
     WillUpdateDevices = "crypto.willUpdateDevices",
+
     /**
      * Fires whenever the stored devices for a user have been updated
-     * @param {string[]} userIds - A list of user IDs that were updated
-     * @param {boolean} initialFetch - If true, the store was empty (apart from our own device) and has been seeded.
+     * The payload is a pair (userIds, initialFetch).
      */
     DevicesUpdated = "crypto.devicesUpdated",
+
     /**
      * Fires when the user's cross-signing keys have changed or cross-signing
      * has been enabled/disabled. The client can use getStoredCrossSigningForUser
@@ -82,5 +91,3 @@ export enum CryptoEvent {
      */
     LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
 }
-
-export type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];

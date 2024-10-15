@@ -228,7 +228,6 @@ import {
     decodeRecoveryKey,
     ImportRoomKeysOpts,
     CryptoEvent,
-    CryptoEvents,
     CryptoEventHandlerMap,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
@@ -959,6 +958,8 @@ type LegacyCryptoEvents =
     | LegacyCryptoEvent.DevicesUpdated
     | LegacyCryptoEvent.WillUpdateDevices
     | LegacyCryptoEvent.LegacyCryptoStoreMigrationProgress;
+
+type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 

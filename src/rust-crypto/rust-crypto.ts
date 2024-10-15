@@ -64,7 +64,6 @@ import {
     AllDevicesIsolationMode,
     DeviceIsolationModeKind,
     CryptoEvent,
-    CryptoEvents,
     CryptoEventHandlerMap,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
@@ -2079,4 +2078,5 @@ function rustEncryptionInfoToJsEncryptionInfo(
     return { shieldColour, shieldReason };
 }
 
+type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
 type RustCryptoEvents = Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>;
