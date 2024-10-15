@@ -18,10 +18,10 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { CryptoEvent } from "../crypto-api/index.ts";
 import { Logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RustBackupManager } from "./backup.ts";
-import { CryptoEvent } from "../matrix.ts";
 import { encodeUri, sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 
