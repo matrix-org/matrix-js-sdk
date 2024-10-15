@@ -4088,43 +4088,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Share shared-history decryption keys with the given users.
-     *
-     * @param roomId - the room for which keys should be shared.
-     * @param userIds - a list of users to share with.  The keys will be sent to
-     *     all of the user's current devices.
-     *
-     * @deprecated Do not use this method. It does not work with the Rust crypto stack, and even with the legacy
-     *     stack it introduces a security vulnerability.
-     */
-    public async sendSharedHistoryKeys(roomId: string, userIds: string[]): Promise<void> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-
-        const roomEncryption = this.crypto?.getRoomEncryption(roomId);
-        if (!roomEncryption) {
-            // unknown room, or unencrypted room
-            this.logger.error("Unknown room.  Not sharing decryption keys");
-            return;
-        }
-
-        const deviceInfos = await this.crypto.downloadKeys(userIds);
-        const devicesByUser: Map<string, DeviceInfo[]> = new Map();
-        for (const [userId, devices] of deviceInfos) {
-            devicesByUser.set(userId, Array.from(devices.values()));
-        }
-
-        // XXX: Private member access
-        const alg = this.crypto.getRoomDecryptor(roomId, roomEncryption.algorithm);
-        if (alg.sendSharedHistoryInboundSessions) {
-            await alg.sendSharedHistoryInboundSessions(devicesByUser);
-        } else {
-            this.logger.warn("Algorithm does not support sharing previous keys", roomEncryption.algorithm);
-        }
-    }
-
-    /**
      * Get the config for the media repository.
      * @returns Promise which resolves with an object containing the config.
      */
