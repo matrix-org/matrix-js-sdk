@@ -2259,9 +2259,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         this.logger.debug("Downloading Rust crypto library");
-        // blocked on https://github.com/matrix-org/matrix-js-sdk/issues/4392 / https://github.com/babel/babel/issues/16750
-        // eslint-disable-next-line node/file-extension-in-import
-        const RustCrypto = await import("./rust-crypto");
+        const RustCrypto = await import("./rust-crypto/index.ts");
 
         const rustCrypto = await RustCrypto.initRustCrypto({
             logger: this.logger,
@@ -4090,43 +4088,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async deleteKeysFromBackup(roomId?: string, sessionId?: string, version?: string): Promise<void> {
         const path = this.makeKeyBackupPath(roomId!, sessionId!, version);
         await this.http.authedRequest(Method.Delete, path.path, path.queryData, undefined, { prefix: ClientPrefix.V3 });
-    }
-
-    /**
-     * Share shared-history decryption keys with the given users.
-     *
-     * @param roomId - the room for which keys should be shared.
-     * @param userIds - a list of users to share with.  The keys will be sent to
-     *     all of the user's current devices.
-     *
-     * @deprecated Do not use this method. It does not work with the Rust crypto stack, and even with the legacy
-     *     stack it introduces a security vulnerability.
-     */
-    public async sendSharedHistoryKeys(roomId: string, userIds: string[]): Promise<void> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-
-        const roomEncryption = this.crypto?.getRoomEncryption(roomId);
-        if (!roomEncryption) {
-            // unknown room, or unencrypted room
-            this.logger.error("Unknown room.  Not sharing decryption keys");
-            return;
-        }
-
-        const deviceInfos = await this.crypto.downloadKeys(userIds);
-        const devicesByUser: Map<string, DeviceInfo[]> = new Map();
-        for (const [userId, devices] of deviceInfos) {
-            devicesByUser.set(userId, Array.from(devices.values()));
-        }
-
-        // XXX: Private member access
-        const alg = this.crypto.getRoomDecryptor(roomId, roomEncryption.algorithm);
-        if (alg.sendSharedHistoryInboundSessions) {
-            await alg.sendSharedHistoryInboundSessions(devicesByUser);
-        } else {
-            this.logger.warn("Algorithm does not support sharing previous keys", roomEncryption.algorithm);
-        }
     }
 
     /**

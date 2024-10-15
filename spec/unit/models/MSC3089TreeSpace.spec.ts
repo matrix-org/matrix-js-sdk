@@ -107,7 +107,7 @@ describe("MSC3089TreeSpace", () => {
             return Promise.resolve();
         });
         client.invite = fn;
-        await tree.invite(target, false, false);
+        await tree.invite(target, false);
         expect(fn).toHaveBeenCalledTimes(1);
     });
 
@@ -120,7 +120,7 @@ describe("MSC3089TreeSpace", () => {
             return Promise.resolve();
         });
         client.invite = fn;
-        await tree.invite(target, false, false);
+        await tree.invite(target, false);
         expect(fn).toHaveBeenCalledTimes(2);
     });
 
@@ -133,7 +133,7 @@ describe("MSC3089TreeSpace", () => {
         });
         client.invite = fn;
 
-        await expect(tree.invite(target, false, false)).rejects.toThrow("MatrixError: Sample Failure");
+        await expect(tree.invite(target, false)).rejects.toThrow("MatrixError: Sample Failure");
 
         expect(fn).toHaveBeenCalledTimes(1);
     });
@@ -155,59 +155,8 @@ describe("MSC3089TreeSpace", () => {
             { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
         ];
 
-        await tree.invite(target, true, false);
+        await tree.invite(target, true);
         expect(fn).toHaveBeenCalledTimes(4);
-    });
-
-    it("should share keys with invitees", async () => {
-        const target = targetUser;
-        const sendKeysFn = jest.fn().mockImplementation((inviteRoomId: string, userIds: string[]) => {
-            expect(inviteRoomId).toEqual(roomId);
-            expect(userIds).toMatchObject([target]);
-            return Promise.resolve();
-        });
-        client.invite = () => Promise.resolve({}); // we're not testing this here - see other tests
-        client.sendSharedHistoryKeys = sendKeysFn;
-
-        // Mock the history check as best as possible
-        const historyVis = "shared";
-        const historyFn = jest.fn().mockImplementation((eventType: string, stateKey?: string) => {
-            // We're not expecting a super rigid test: the function that calls this internally isn't
-            // really being tested here.
-            expect(eventType).toEqual(EventType.RoomHistoryVisibility);
-            expect(stateKey).toEqual("");
-            return { getContent: () => ({ history_visibility: historyVis }) }; // eslint-disable-line camelcase
-        });
-        room.currentState.getStateEvents = historyFn;
-
-        // Note: inverse test is implicit from other tests, which disable the call stack of this
-        // test in order to pass.
-        await tree.invite(target, false, true);
-        expect(sendKeysFn).toHaveBeenCalledTimes(1);
-        expect(historyFn).toHaveBeenCalledTimes(1);
-    });
-
-    it("should not share keys with invitees if inappropriate history visibility", async () => {
-        const target = targetUser;
-        const sendKeysFn = jest.fn().mockImplementation((inviteRoomId: string, userIds: string[]) => {
-            expect(inviteRoomId).toEqual(roomId);
-            expect(userIds).toMatchObject([target]);
-            return Promise.resolve();
-        });
-        client.invite = () => Promise.resolve({}); // we're not testing this here - see other tests
-        client.sendSharedHistoryKeys = sendKeysFn;
-
-        const historyVis = "joined"; // NOTE: Changed.
-        const historyFn = jest.fn().mockImplementation((eventType: string, stateKey?: string) => {
-            expect(eventType).toEqual(EventType.RoomHistoryVisibility);
-            expect(stateKey).toEqual("");
-            return { getContent: () => ({ history_visibility: historyVis }) }; // eslint-disable-line camelcase
-        });
-        room.currentState.getStateEvents = historyFn;
-
-        await tree.invite(target, false, true);
-        expect(sendKeysFn).toHaveBeenCalledTimes(0);
-        expect(historyFn).toHaveBeenCalledTimes(1);
     });
 
     async function evaluatePowerLevels(pls: any, role: TreePermissions, expectedPl: number) {

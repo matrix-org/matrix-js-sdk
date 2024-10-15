@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "34.6.0",
+    "version": "34.8.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=20.0.0"
@@ -91,6 +91,7 @@
         "@typescript-eslint/eslint-plugin": "^7.0.0",
         "@typescript-eslint/parser": "^7.0.0",
         "babel-jest": "^29.0.0",
+        "babel-plugin-search-and-replace": "^1.1.1",
         "debug": "^4.3.4",
         "eslint": "8.57.0",
         "eslint-config-google": "^0.14.0",
