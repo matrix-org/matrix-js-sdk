@@ -2,7 +2,8 @@ import { Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { CryptoEvent, HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
+import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
+import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import * as testData from "../../test-utils/test-data";
 import * as TestData from "../../test-utils/test-data";

@@ -76,8 +76,8 @@ import {
 } from "./http-api/index.ts";
 import {
     Crypto,
-    CryptoEvent,
-    CryptoEventHandlerMap,
+    CryptoEvent as LegacyCryptoEvent,
+    CryptoEventHandlerMap as LegacyCryptoEventHandlerMap,
     fixBackupKey,
     ICheckOwnCrossSigningTrustOpts,
     ICryptoCallbacks,
@@ -227,6 +227,8 @@ import {
     CryptoApi,
     decodeRecoveryKey,
     ImportRoomKeysOpts,
+    CryptoEvent,
+    CryptoEventHandlerMap,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
@@ -939,23 +941,25 @@ type RoomStateEvents =
     | RoomStateEvent.Update
     | RoomStateEvent.Marker;
 
-type CryptoEvents =
-    | CryptoEvent.KeySignatureUploadFailure
-    | CryptoEvent.KeyBackupStatus
-    | CryptoEvent.KeyBackupFailed
-    | CryptoEvent.KeyBackupSessionsRemaining
-    | CryptoEvent.KeyBackupDecryptionKeyCached
-    | CryptoEvent.RoomKeyRequest
-    | CryptoEvent.RoomKeyRequestCancellation
-    | CryptoEvent.VerificationRequest
-    | CryptoEvent.VerificationRequestReceived
-    | CryptoEvent.DeviceVerificationChanged
-    | CryptoEvent.UserTrustStatusChanged
-    | CryptoEvent.KeysChanged
-    | CryptoEvent.Warning
-    | CryptoEvent.DevicesUpdated
-    | CryptoEvent.WillUpdateDevices
-    | CryptoEvent.LegacyCryptoStoreMigrationProgress;
+type LegacyCryptoEvents =
+    | LegacyCryptoEvent.KeySignatureUploadFailure
+    | LegacyCryptoEvent.KeyBackupStatus
+    | LegacyCryptoEvent.KeyBackupFailed
+    | LegacyCryptoEvent.KeyBackupSessionsRemaining
+    | LegacyCryptoEvent.KeyBackupDecryptionKeyCached
+    | LegacyCryptoEvent.RoomKeyRequest
+    | LegacyCryptoEvent.RoomKeyRequestCancellation
+    | LegacyCryptoEvent.VerificationRequest
+    | LegacyCryptoEvent.VerificationRequestReceived
+    | LegacyCryptoEvent.DeviceVerificationChanged
+    | LegacyCryptoEvent.UserTrustStatusChanged
+    | LegacyCryptoEvent.KeysChanged
+    | LegacyCryptoEvent.Warning
+    | LegacyCryptoEvent.DevicesUpdated
+    | LegacyCryptoEvent.WillUpdateDevices
+    | LegacyCryptoEvent.LegacyCryptoStoreMigrationProgress;
+
+type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
 
 type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
 
@@ -976,6 +980,7 @@ export type EmittedEvents =
     | ClientEvent
     | RoomEvents
     | RoomStateEvents
+    | LegacyCryptoEvents
     | CryptoEvents
     | MatrixEventEvents
     | RoomMemberEvents
@@ -1187,6 +1192,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
+    LegacyCryptoEventHandlerMap &
     CryptoEventHandlerMap &
     MatrixEventHandlerMap &
     RoomMemberEventHandlerMap &
@@ -2176,16 +2182,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const crypto = new Crypto(this, userId, this.deviceId, this.store, this.cryptoStore, this.verificationMethods!);
 
         this.reEmitter.reEmit(crypto, [
-            CryptoEvent.KeyBackupFailed,
-            CryptoEvent.KeyBackupSessionsRemaining,
-            CryptoEvent.RoomKeyRequest,
-            CryptoEvent.RoomKeyRequestCancellation,
-            CryptoEvent.Warning,
-            CryptoEvent.DevicesUpdated,
-            CryptoEvent.WillUpdateDevices,
-            CryptoEvent.DeviceVerificationChanged,
-            CryptoEvent.UserTrustStatusChanged,
-            CryptoEvent.KeysChanged,
+            LegacyCryptoEvent.KeyBackupFailed,
+            LegacyCryptoEvent.KeyBackupSessionsRemaining,
+            LegacyCryptoEvent.RoomKeyRequest,
+            LegacyCryptoEvent.RoomKeyRequestCancellation,
+            LegacyCryptoEvent.Warning,
+            LegacyCryptoEvent.DevicesUpdated,
+            LegacyCryptoEvent.WillUpdateDevices,
+            LegacyCryptoEvent.DeviceVerificationChanged,
+            LegacyCryptoEvent.UserTrustStatusChanged,
+            LegacyCryptoEvent.KeysChanged,
         ]);
 
         this.logger.debug("Crypto: initialising crypto object...");
@@ -2443,7 +2449,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns
      *
      * @remarks
-     * Fires {@link CryptoEvent.DeviceVerificationChanged}
+     * Fires {@link LegacyCryptoEvent.DeviceVerificationChanged}
      *
      * @deprecated Not supported for Rust Cryptography.
      */
