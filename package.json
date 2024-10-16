@@ -93,7 +93,7 @@
         "babel-jest": "^29.0.0",
         "babel-plugin-search-and-replace": "^1.1.1",
         "debug": "^4.3.4",
-        "eslint": "8.57.0",
+        "eslint": "8.57.1",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-import-resolver-typescript": "^3.5.1",
