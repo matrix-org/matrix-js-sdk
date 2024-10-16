@@ -73,10 +73,10 @@ jobs:
             - if: needs.jest.result != 'skipped' && needs.jest.result != 'success'
               run: exit 1
 
-    matrix-react-sdk:
-        name: Downstream test matrix-react-sdk
+    element-web:
+        name: Downstream test element-web
         if: github.event_name == 'merge_group'
-        uses: element-hq/matrix-react-sdk/.github/workflows/tests.yml@develop
+        uses: element-hq/element-web/.github/workflows/tests.yml@develop
         with:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
