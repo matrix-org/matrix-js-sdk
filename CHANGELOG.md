@@ -1,3 +1,7 @@
+Changes in [34.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.8.0) (2024-10-15)
+==================================================================================================
+This release removes insecure functionality, resolving CVE-2024-47080 / GHSA-4jf8-g8wp-cx7c.
+
 Changes in [34.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.7.0) (2024-10-08)
 ==================================================================================================
 ## 🦖 Deprecations
