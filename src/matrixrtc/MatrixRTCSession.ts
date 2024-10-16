@@ -792,11 +792,21 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.storeLastMembershipFingerprints();
 
             if (anyLeft) {
-                logger.debug(`Member(s) have left: queueing sender key rotation`);
-                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
+                if (newMembershipIds.size === 1) {
+                    logger.debug(`New member(s) have left: doing immediate sender key rotation`);
+                    this.doRotateKey(false);
+                } else {
+                    logger.debug(`New member(s) have left: queueing sender key rotation`);
+                    this.makeNewKeyTimeout = setTimeout(() => this.doRotateKey(true), MAKE_KEY_DELAY);
+                }
             } else if (anyJoined) {
-                logger.debug(`New member(s) have joined: queueing sender key rotation`);
-                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
+                if (newMembershipIds.size === 2) {
+                    logger.debug(`New member(s) have joined: doing immediate sender key rotation`);
+                    this.doRotateKey(false);
+                } else {
+                    logger.debug(`New member(s) have joined: queueing sender key rotation`);
+                    this.makeNewKeyTimeout = setTimeout(() => this.doRotateKey(true), MAKE_KEY_DELAY);
+                }
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
                 const newFingerprints = this.lastMembershipFingerprints!;
@@ -1094,12 +1104,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
-    private onRotateKeyTimeout = (): void => {
+    private doRotateKey = (delayOnUse: boolean): void => {
         if (!this.manageMediaKeys) return;
 
         this.makeNewKeyTimeout = undefined;
         logger.info("Making new sender key for key rotation");
-        const newKeyIndex = this.makeNewSenderKey(true);
+        const newKeyIndex = this.makeNewSenderKey(delayOnUse);
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
         this.sendEncryptionKeysEvent(newKeyIndex);
