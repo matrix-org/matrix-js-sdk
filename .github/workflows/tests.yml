@@ -106,7 +106,7 @@ jobs:
         runs-on: ubuntu-latest
         if: always()
         needs:
-            - matrix-react-sdk
+            - element-web
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'
@@ -119,5 +119,5 @@ jobs:
                   sha: ${{ github.sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            - if: needs.matrix-react-sdk.result != 'skipped' && needs.matrix-react-sdk.result != 'success'
+            - if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
               run: exit 1
