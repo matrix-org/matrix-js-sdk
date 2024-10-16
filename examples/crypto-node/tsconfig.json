@@ -1,0 +1,22 @@
+{
+	"compilerOptions": {
+		"target": "es2017",
+		"module": "es2022",
+		"esModuleInterop": true,
+		"moduleResolution": "node",
+		"noUnusedLocals": true,
+		"noImplicitAny": false,
+		"noImplicitThis": true,
+		"strictNullChecks": true,
+		"declaration": true,
+		"strict": true,
+		"outDir": "./lib"
+	},
+
+	"ts-node": {
+		"esm": true
+	},
+
+	"include": ["./src/**/*.ts"],
+	"exclude": ["node_modules"]
+}
