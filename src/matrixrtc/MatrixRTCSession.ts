@@ -1065,12 +1065,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                             UpdateDelayedEventAction.Restart,
                         );
                     } catch (e) {
-                        // TODO: Retry if rate-limited
-                        if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
-                            await prepareDelayedDisconnection();
-                        } else {
-                            this.disconnectDelayId = undefined;
-                        }
+                        // TODO: Make embedded client include errcode, and retry only if not M_NOT_FOUND (or rate-limited)
+                        logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
+                        this.disconnectDelayId = undefined;
+                        await prepareDelayedDisconnection();
                     }
                 }
                 if (this.disconnectDelayId !== undefined) {
