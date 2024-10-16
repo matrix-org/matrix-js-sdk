@@ -912,7 +912,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             let membershipObj;
             try {
                 membershipObj = new CallMembership(myCallMemberEvent!, m);
-            } catch (e) {
+            } catch {
                 return false;
             }
 

@@ -607,7 +607,7 @@ describe("Crypto", function () {
             event.claimedEd25519Key = null;
             try {
                 await bobClient.crypto!.decryptEvent(event);
-            } catch (e) {
+            } catch {
                 // we expect this to fail because we don't have the
                 // decryption keys yet
             }

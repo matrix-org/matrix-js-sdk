@@ -208,7 +208,7 @@ describe("OutgoingRequestProcessor", () => {
         const outgoingRequest = new UploadSigningKeysRequest(JSON.stringify(testReq));
 
         // also create a UIA callback
-        const authCallback: UIAuthCallback<Object> = async (makeRequest) => {
+        const authCallback: UIAuthCallback<object> = async (makeRequest) => {
             return await makeRequest({ type: "test" });
         };
 
@@ -458,7 +458,7 @@ describe("OutgoingRequestProcessor", () => {
                     throw new Error("Failed to fetch");
                 }
             });
-            const authCallback: UIAuthCallback<Object> = async (makeRequest) => {
+            const authCallback: UIAuthCallback<object> = async (makeRequest) => {
                 return await makeRequest({ type: "test" });
             };
             const requestPromise = processor.makeOutgoingRequest(outgoingRequest, authCallback);

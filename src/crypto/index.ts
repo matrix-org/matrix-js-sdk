@@ -1556,7 +1556,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                             devices[deviceId].keys[signame],
                         );
                         deviceIds.push(deviceId);
-                    } catch (e) {}
+                    } catch {}
                 }
             }
         }

@@ -119,7 +119,7 @@ export class TypedEventEmitter<
     /**
      * Returns a copy of the array of listeners for the event named `event`.
      */
-    public listeners(event: Events | EventEmitterEvents): Function[] {
+    public listeners(event: Events | EventEmitterEvents): ReturnType<EventEmitter["listeners"]> {
         return super.listeners(event);
     }
 
@@ -240,7 +240,7 @@ export class TypedEventEmitter<
      * Returns a copy of the array of listeners for the event named `eventName`,
      * including any wrappers (such as those created by `.once()`).
      */
-    public rawListeners(event: Events | EventEmitterEvents): Function[] {
+    public rawListeners(event: Events | EventEmitterEvents): ReturnType<EventEmitter["rawListeners"]> {
         return super.rawListeners(event);
     }
 }

@@ -241,7 +241,7 @@ export class PerSessionKeyBackupDownloader {
     private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
         try {
             return await this.olmMachine.getBackupKeys();
-        } catch (e) {
+        } catch {
             return null;
         }
     }
