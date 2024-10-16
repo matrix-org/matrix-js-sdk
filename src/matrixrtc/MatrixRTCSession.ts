@@ -448,13 +448,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private getNewEncryptionKeyIndex(): number {
-        const userId = this.client.getUserId();
-        const deviceId = this.client.getDeviceId();
+        if (this.currentEncryptionKeyIndex === -1) {
+            return 0;
+        }
 
-        if (!userId) throw new Error("No userId!");
-        if (!deviceId) throw new Error("No deviceId!");
-
-        return (this.getKeysForParticipantInternal(userId, deviceId)?.length ?? 0) % 16;
+        // maximum key index is 255
+        return (this.currentEncryptionKeyIndex + 1) % 256;
     }
 
     /**

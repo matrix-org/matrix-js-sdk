@@ -24,7 +24,7 @@ import { logger } from "../logger.ts";
 import { ISavedSync } from "./index.ts";
 import { IIndexedDBBackend } from "./indexeddb-backend.ts";
 import { ISyncResponse } from "../sync-accumulator.ts";
-import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { IStateEventWithRoomId } from "../@types/search.ts";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 import { IStoredClientOpts } from "../client.ts";
@@ -118,7 +118,10 @@ export class IndexedDBStore extends MemoryStore {
         }
     }
 
-    public on = this.emitter.on.bind(this.emitter);
+    /** Re-exports `TypedEventEmitter.on` */
+    public on(event: EventEmitterEvents | "degraded" | "closed", handler: (...args: any[]) => void): void {
+        this.emitter.on(event, handler);
+    }
 
     /**
      * @returns Resolved when loaded from indexed db.

@@ -30,7 +30,6 @@ import fetchMock from "fetch-mock-jest";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
-    CryptoEvent,
     Device,
     DeviceVerification,
     encodeBase64,
@@ -71,6 +70,7 @@ import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
+import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
