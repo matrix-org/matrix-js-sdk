@@ -1,5 +1,5 @@
 module.exports = {
-    plugins: ["matrix-org", "import", "jsdoc", "node"],
+    plugins: ["matrix-org", "import", "jsdoc", "n"],
     extends: ["plugin:matrix-org/babel", "plugin:matrix-org/jest", "plugin:import/typescript"],
     parserOptions: {
         project: ["./tsconfig.json"],
@@ -129,7 +129,7 @@ module.exports = {
                 // "jsdoc/check-param-names": "error",
                 // "jsdoc/check-indentation": "error",
                 // Ensure .ts extension on imports outside of tests
-                "node/file-extension-in-import": [
+                "n/file-extension-in-import": [
                     "error",
                     "always",
                     {

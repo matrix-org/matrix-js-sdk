@@ -22,7 +22,6 @@ import type { PkSigning } from "@matrix-org/olm";
 import { IObject, pkSign, pkVerify } from "./olmlib.ts";
 import { logger } from "../logger.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
-import { decryptAES, encryptAES } from "./aes.ts";
 import { DeviceInfo } from "./deviceinfo.ts";
 import { ISignedKey, MatrixClient } from "../client.ts";
 import { OlmDevice } from "./OlmDevice.ts";
@@ -36,6 +35,8 @@ import {
     UserVerificationStatus as UserTrustLevel,
 } from "../crypto-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };
@@ -662,7 +663,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
 
             if (key && key.ciphertext) {
                 const pickleKey = Buffer.from(olmDevice.pickleKey);
-                const decrypted = await decryptAES(key, pickleKey, type);
+                const decrypted = await decryptAESSecretStorageItem(key, pickleKey, type);
                 return decodeBase64(decrypted);
             } else {
                 return key;
@@ -676,7 +677,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 throw new Error(`storeCrossSigningKeyCache expects Uint8Array, got ${key}`);
             }
             const pickleKey = Buffer.from(olmDevice.pickleKey);
-            const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, type);
             return store.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 store.storeSecretStorePrivateKey(txn, type, encryptedKey);
             });

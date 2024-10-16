@@ -21,7 +21,7 @@ import { MsgType } from "../@types/event.ts";
  *
  * Used within `m.room.message` events that reference files, such as `m.file` and `m.image`.
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#extensions-to-mroommessage-msgtypes
+ * @see https://spec.matrix.org/v1.11/client-server-api/#extensions-to-mroommessage-msgtypes
  */
 export interface EncryptedFile {
     /**
@@ -84,13 +84,13 @@ interface BaseInfo {
  *
  * Used within `m.room.message` events that reference files.
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#mfile
+ * @see https://spec.matrix.org/v1.11/client-server-api/#mfile
  */
 export interface FileInfo extends BaseInfo {
     /**
      * Information on the encrypted thumbnail file, as specified in End-to-end encryption.
      * Only present if the thumbnail is encrypted.
-     * @see https://spec.matrix.org/v1.9/client-server-api/#sending-encrypted-attachments
+     * @see https://spec.matrix.org/v1.11/client-server-api/#sending-encrypted-attachments
      */
     thumbnail_file?: EncryptedFile;
     /**
@@ -108,7 +108,7 @@ export interface FileInfo extends BaseInfo {
  *
  * Used within `m.room.message` events that reference images.
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#mimage
+ * @see https://spec.matrix.org/v1.11/client-server-api/#mimage
  */
 export interface ImageInfo extends FileInfo, ThumbnailInfo {}
 
@@ -117,7 +117,7 @@ export interface ImageInfo extends FileInfo, ThumbnailInfo {}
  *
  * Used within `m.room.message` events that reference audio files.
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#maudio
+ * @see https://spec.matrix.org/v1.11/client-server-api/#maudio
  */
 export interface AudioInfo extends BaseInfo {
     /**
@@ -131,7 +131,7 @@ export interface AudioInfo extends BaseInfo {
  *
  * Used within `m.room.message` events that reference video files.
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#mvideo
+ * @see https://spec.matrix.org/v1.11/client-server-api/#mvideo
  */
 export interface VideoInfo extends AudioInfo, ImageInfo {
     /**
@@ -148,30 +148,39 @@ export type MediaEventInfo = FileInfo | ImageInfo | AudioInfo | VideoInfo;
 interface BaseContent {
     /**
      * Required if the file is encrypted. Information on the encrypted file, as specified in End-to-end encryption.
-     * @see https://spec.matrix.org/v1.9/client-server-api/#sending-encrypted-attachments
+     * @see https://spec.matrix.org/v1.11/client-server-api/#sending-encrypted-attachments
      */
     file?: EncryptedFile;
     /**
      * Required if the file is unencrypted. The URL (typically mxc:// URI) to the file.
      */
     url?: string;
-}
-
-/**
- * Content format of media events with msgtype `m.file`
- *
- * @see https://spec.matrix.org/v1.9/client-server-api/#mfile
- */
-export interface FileContent extends BaseContent {
     /**
-     * A human-readable description of the file.
-     * This is recommended to be the filename of the original upload.
+     * If filename is not set or the value of both properties are identical,
+     * this is the filename of the original upload. Otherwise, this is a
+     * caption for the file.
      */
     body: string;
     /**
      * The original filename of the uploaded file.
      */
     filename?: string;
+    /**
+     * The format used in the `formatted_body`.
+     */
+    format?: "org.matrix.custom.html";
+    /**
+     * The formatted version of the `body`, when it acts as a caption. This is required if `format` is specified.
+     */
+    formatted_body?: string;
+}
+
+/**
+ * Content format of media events with msgtype `m.file`
+ *
+ * @see https://spec.matrix.org/v1.11/client-server-api/#mfile
+ */
+export interface FileContent extends BaseContent {
     /**
      * Information about the file referred to in url.
      */
@@ -185,15 +194,9 @@ export interface FileContent extends BaseContent {
 /**
  * Content format of media events with msgtype `m.image`
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#mimage
+ * @see https://spec.matrix.org/v1.11/client-server-api/#mimage
  */
 export interface ImageContent extends BaseContent {
-    /**
-     * A textual representation of the image.
-     * This could be the alt text of the image, the filename of the image,
-     * or some kind of content description for accessibility e.g. ‘image attachment’.
-     */
-    body: string;
     /**
      * Metadata about the image referred to in url.
      */
@@ -207,14 +210,9 @@ export interface ImageContent extends BaseContent {
 /**
  * Content format of media events with msgtype `m.audio`
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#maudio
+ * @see https://spec.matrix.org/v1.11/client-server-api/#maudio
  */
 export interface AudioContent extends BaseContent {
-    /**
-     * A description of the audio e.g. ‘Bee Gees - Stayin’ Alive’,
-     * or some kind of content description for accessibility e.g. ‘audio attachment’.
-     */
-    body: string;
     /**
      * Metadata for the audio clip referred to in url.
      */
@@ -228,14 +226,9 @@ export interface AudioContent extends BaseContent {
 /**
  * Content format of media events with msgtype `m.video`
  *
- * @see https://spec.matrix.org/v1.9/client-server-api/#mvideo
+ * @see https://spec.matrix.org/v1.11/client-server-api/#mvideo
  */
 export interface VideoContent extends BaseContent {
-    /**
-     * A description of the video e.g. ‘Gangnam style’,
-     * or some kind of content description for accessibility e.g. ‘video attachment’.
-     */
-    body: string;
     /**
      * Metadata about the video clip referred to in url.
      */

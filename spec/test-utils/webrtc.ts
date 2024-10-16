@@ -147,10 +147,13 @@ export class MockRTCPeerConnection {
     }
 
     constructor() {
-        this.localDescription = {
+        const localDescriptionJSON = {
             sdp: DUMMY_SDP,
-            type: "offer",
-            toJSON: function () {},
+            type: "offer" as RTCSdpType,
+        };
+        this.localDescription = {
+            toJSON: () => localDescriptionJSON,
+            ...localDescriptionJSON,
         };
 
         this.readyToNegotiate = new Promise<void>((resolve) => {
@@ -265,7 +268,7 @@ export class MockRTCRtpTransceiver {
         this.peerConn.needsNegotiation = true;
     }
 
-    public setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
+    public setCodecPreferences = jest.fn<void, RTCRtpCodec[]>();
 }
 
 export class MockMediaStreamTrack {

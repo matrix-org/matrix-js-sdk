@@ -27,16 +27,16 @@ import {
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
-import { CryptoEvent, IMegolmSessionData } from "../crypto/index.ts";
+import { IMegolmSessionData } from "../crypto/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { encodeUri, logDuration } from "../utils.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
-import { IEncryptedPayload } from "../crypto/aes.ts";
-import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
 import { IKeyBackupInfo } from "../crypto/keybackup.ts";
 import { IKeyBackup } from "../crypto/backup.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -622,7 +622,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
      * Implements {@link BackupDecryptor#decryptSessions}
      */
     public async decryptSessions(
-        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | IEncryptedPayload>>,
+        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | AESEncryptedSecretStoragePayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {

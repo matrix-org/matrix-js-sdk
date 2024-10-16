@@ -449,3 +449,50 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
     "origin_server_ts": 1507753886000
 };
 
+/** A second set of signed cross-signing keys data, also suitable for returning from a `/keys/query` call */
+export const BOB_ALT_SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult> = {
+    "master_keys": {
+        "@bob:xyz": {
+            "keys": {
+                "ed25519:MCYxU7myKVkoQ55VYw/rXdg5cEupRfDdHmFPJUmR5+E": "MCYxU7myKVkoQ55VYw/rXdg5cEupRfDdHmFPJUmR5+E"
+            },
+            "user_id": "@bob:xyz",
+            "usage": [
+                "master"
+            ]
+        }
+    },
+    "self_signing_keys": {
+        "@bob:xyz": {
+            "keys": {
+                "ed25519:DaScI3WulBvDjf/d2vdyP5Cgjdypn1c/PSDX23MgN+A": "DaScI3WulBvDjf/d2vdyP5Cgjdypn1c/PSDX23MgN+A"
+            },
+            "user_id": "@bob:xyz",
+            "usage": [
+                "self_signing"
+            ],
+            "signatures": {
+                "@bob:xyz": {
+                    "ed25519:MCYxU7myKVkoQ55VYw/rXdg5cEupRfDdHmFPJUmR5+E": "eDZETBRUw9yW0WJnBZ7vxo12TW09Yb7/47qBPKZzPZzZEvs9M82dnAOtWUv00mcTdp2K9GpeFYDQJ6qLQgxaCA"
+                }
+            }
+        }
+    },
+    "user_signing_keys": {
+        "@bob:xyz": {
+            "keys": {
+                "ed25519:lXP89FP6zvFH9TSbU1S8uSdAsVawm1NmV6z+Rfr3lEw": "lXP89FP6zvFH9TSbU1S8uSdAsVawm1NmV6z+Rfr3lEw"
+            },
+            "user_id": "@bob:xyz",
+            "usage": [
+                "user_signing"
+            ],
+            "signatures": {
+                "@bob:xyz": {
+                    "ed25519:MCYxU7myKVkoQ55VYw/rXdg5cEupRfDdHmFPJUmR5+E": "Q1CbIXvp2BxBsu3F/eZ1ZpuR5rXIt0+FrrA/l6itskpW748xwMoIKxQRVQqs87kh7pCsWEoTy6FzIL8nV+P6BQ"
+                }
+            }
+        }
+    }
+};
+

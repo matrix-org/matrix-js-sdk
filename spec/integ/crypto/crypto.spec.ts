@@ -82,11 +82,13 @@ import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
-    CryptoMode,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { IKeyBackup } from "../../../src/crypto/backup";
@@ -747,9 +749,34 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
         });
 
-        newBackendOnly(
-            "fails with an error when cross-signed sender is required but sender is not cross-signed",
-            async () => {
+        describe("IsolationMode decryption tests", () => {
+            newBackendOnly(
+                "OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
+
+                    // It will error as an unknown device because we haven't fetched
+                    // the sender's device keys.
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(true);
+                    expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+                },
+            );
+
+            newBackendOnly(
+                "NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
+
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(false);
+
+                    expect(await aliceClient.getCrypto()!.getEncryptionInfoForEvent(decryptedEvent)).toEqual({
+                        shieldColour: EventShieldColour.RED,
+                        shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                    });
+                },
+            );
+
+            async function setUpTestAndDecrypt(isolationMode: DeviceIsolationMode): Promise<MatrixEvent> {
                 // This tests that a message will not be decrypted if the sender
                 // is not sufficiently trusted according to the selected crypto
                 // mode.
@@ -760,7 +787,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
 
                 // Start by using Invisible crypto mode
-                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Invisible);
+                aliceClient.getCrypto()!.setDeviceIsolationMode(isolationMode);
 
                 await startClientAndAwaitFirstSync();
 
@@ -807,26 +834,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(event.isEncrypted()).toBe(true);
 
                 // it probably won't be decrypted yet, because it takes a while to process the olm keys
-                const decryptedEvent = await testUtils.awaitDecryption(event);
-                // It will error as an unknown device because we haven't fetched
-                // the sender's device keys.
-                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
-
-                // Next, try decrypting in transition mode, which should also
-                // fail for the same reason
-                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Transition);
-
-                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
-                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
-
-                // Decrypting in legacy mode should succeed since it doesn't
-                // care about device trust.
-                aliceClient.getCrypto()!.setCryptoMode(CryptoMode.Legacy);
-
-                await event.attemptDecryption(aliceClient["cryptoBackend"]!);
-                expect(decryptedEvent.decryptionFailureReason).toEqual(null);
-            },
-        );
+                return await testUtils.awaitDecryption(event);
+            }
+        });
 
         it("Decryption fails with Unable to decrypt for other errors", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -3261,15 +3271,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
     });
 
-    describe("Check if the cross signing keys are available for a user", () => {
+    describe("User identity", () => {
+        let keyResponder: E2EKeyResponder;
         beforeEach(async () => {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-
-            const keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
-            keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
+            keyResponder.addKeyReceiver(TEST_USER_ID, keyReceiver);
             keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
 
@@ -3285,6 +3293,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 .getCrypto()!
                 .userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are available for a tracked user", async () => {
@@ -3295,11 +3309,60 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Alice is the local user and should be tracked !
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are not available for an unknown user", async () => {
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
+        });
+
+        newBackendOnly("An unverified user changes identity", async () => {
+            // We have to be tracking Bob's keys, which means we need to share a room with him
+            syncResponder.sendOrQueueSyncResponse({
+                ...getSyncResponse([BOB_TEST_USER_ID]),
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+
+            // Bob changes his cross-signing keys
+            keyResponder.addCrossSigningData(testData.BOB_ALT_SIGNED_CROSS_SIGNING_KEYS_DATA);
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: "2",
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
+
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.isVerified()).toBe(false);
+                expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.needsUserApproval).toBe(true);
+            }
+
+            // Pinning the new identity should clear the needsUserApproval flag.
+            await aliceClient.getCrypto()!.pinCurrentUserIdentity(BOB_TEST_USER_ID);
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.needsUserApproval).toBe(false);
+            }
         });
     });
 

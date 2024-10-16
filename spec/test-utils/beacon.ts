@@ -101,9 +101,8 @@ export const makeGeolocationPosition = ({
 }: {
     timestamp?: number;
     coords: Partial<GeolocationCoordinates>;
-}): GeolocationPosition => ({
-    timestamp: timestamp ?? 1647256791840,
-    coords: {
+}): GeolocationPosition => {
+    const { toJSON, ...coordsJSON } = {
         accuracy: 1,
         latitude: 54.001927,
         longitude: -8.253491,
@@ -112,5 +111,16 @@ export const makeGeolocationPosition = ({
         heading: null,
         speed: null,
         ...coords,
-    },
-});
+    };
+    const posJSON = {
+        timestamp: timestamp ?? 1647256791840,
+        coords: {
+            toJSON: () => coordsJSON,
+            ...coordsJSON,
+        },
+    };
+    return {
+        toJSON: () => posJSON,
+        ...posJSON,
+    };
+};

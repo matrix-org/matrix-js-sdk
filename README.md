@@ -191,6 +191,7 @@ As well as the primary entry point (`matrix-js-sdk`), there are several other en
 | `matrix-js-sdk/lib/crypto-api` | Cryptography functionality.                                                                         |
 | `matrix-js-sdk/lib/types`      | Low-level types, reflecting data structures defined in the Matrix spec.                             |
 | `matrix-js-sdk/lib/testing`    | Test utilities, which may be useful in test code but should not be used in production code.         |
+| `matrix-js-sdk/lib/utils/*.js` | A set of modules exporting standalone functions (and their types).                                  |
 
 ## Examples
 

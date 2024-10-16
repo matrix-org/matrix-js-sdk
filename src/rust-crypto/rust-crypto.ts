@@ -45,7 +45,6 @@ import {
     CrossSigningStatus,
     CryptoApi,
     CryptoCallbacks,
-    CryptoMode,
     Curve25519AuthData,
     DecryptionFailureCode,
     DeviceVerificationStatus,
@@ -61,6 +60,11 @@ import {
     VerificationRequest,
     encodeRecoveryKey,
     deriveRecoveryKeyFromPassphrase,
+    DeviceIsolationMode,
+    AllDevicesIsolationMode,
+    DeviceIsolationModeKind,
+    CryptoEvent,
+    CryptoEventHandlerMap,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -70,9 +74,8 @@ import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
-import { CryptoEvent } from "../crypto/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "./backup.ts";
+import { RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
@@ -100,14 +103,14 @@ interface ISignableObject {
  *
  * @internal
  */
-export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEventMap> implements CryptoBackend {
+export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventHandlerMap> implements CryptoBackend {
     /**
      * The number of iterations to use when deriving a recovery key from a passphrase.
      */
     private readonly RECOVERY_KEY_DERIVATION_ITERATIONS = 500000;
 
     private _trustCrossSignedDevices = true;
-    private cryptoMode = CryptoMode.Legacy;
+    private deviceIsolationMode: DeviceIsolationMode = new AllDevicesIsolationMode(false);
 
     /** whether {@link stop} has been called */
     private stopped = false;
@@ -123,7 +126,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     private outgoingRequestsManager: OutgoingRequestsManager;
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
     private readonly dehydratedDeviceManager: DehydratedDeviceManager;
-    private readonly reemitter = new TypedReEmitter<RustCryptoEvents, RustCryptoEventMap>(this);
+    private readonly reemitter = new TypedReEmitter<RustCryptoEvents, CryptoEventHandlerMap>(this);
 
     public constructor(
         private readonly logger: Logger,
@@ -246,7 +249,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             throw new Error(`Cannot encrypt event in unconfigured room ${roomId}`);
         }
 
-        await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices);
+        await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
@@ -259,7 +262,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
             // through decryptEvent and hence get rid of this case.
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
-        return await this.eventDecryptor.attemptEventDecryption(event, this.cryptoMode);
+        return await this.eventDecryptor.attemptEventDecryption(event, this.deviceIsolationMode);
     }
 
     /**
@@ -370,10 +373,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
     }
 
     /**
-     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     * Implementation of {@link CryptoApi#setDeviceIsolationMode}.
      */
-    public setCryptoMode(cryptoMode: CryptoMode): void {
-        this.cryptoMode = cryptoMode;
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
+        this.deviceIsolationMode = isolationMode;
     }
 
     /**
@@ -398,7 +401,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         const encryptor = this.roomEncryptors[room.roomId];
 
         if (encryptor) {
-            encryptor.prepareForEncryption(this.globalBlacklistUnverifiedDevices);
+            encryptor.prepareForEncryption(this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
         }
     }
 
@@ -654,9 +657,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, RustCryptoEv
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
         }
+
         const verified = userIdentity.isVerified();
+        const wasVerified = userIdentity.wasPreviouslyVerified();
+        const needsUserApproval =
+            userIdentity instanceof RustSdkCryptoJs.UserIdentity ? userIdentity.identityNeedsUserApproval() : false;
         userIdentity.free();
-        return new UserVerificationStatus(verified, false, false);
+        return new UserVerificationStatus(verified, wasVerified, false, needsUserApproval);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#pinCurrentUserIdentity}.
+     */
+    public async pinCurrentUserIdentity(userId: string): Promise<void> {
+        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+            await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
+
+        if (userIdentity === undefined) {
+            throw new Error("Cannot pin identity of unknown user");
+        }
+
+        if (userIdentity instanceof RustSdkCryptoJs.OwnUserIdentity) {
+            throw new Error("Cannot pin identity of own user");
+        }
+
+        await userIdentity.pinCurrentMasterKey();
     }
 
     /**
@@ -1754,7 +1779,10 @@ class EventDecryptor {
         private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader,
     ) {}
 
-    public async attemptEventDecryption(event: MatrixEvent, cryptoMode: CryptoMode): Promise<IEventDecryptionResult> {
+    public async attemptEventDecryption(
+        event: MatrixEvent,
+        isolationMode: DeviceIsolationMode,
+    ): Promise<IEventDecryptionResult> {
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
@@ -1762,15 +1790,13 @@ class EventDecryptor {
         this.addEventToPendingList(event);
 
         let trustRequirement;
-        switch (cryptoMode) {
-            case CryptoMode.Legacy:
+
+        switch (isolationMode.kind) {
+            case DeviceIsolationModeKind.AllDevicesIsolationMode:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.Untrusted;
                 break;
-            case CryptoMode.Transition:
+            case DeviceIsolationModeKind.OnlySignedDevicesIsolationMode:
                 trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSignedOrLegacy;
-                break;
-            case CryptoMode.Invisible:
-                trustRequirement = RustSdkCryptoJs.TrustRequirement.CrossSigned;
                 break;
         }
 
@@ -2052,51 +2078,5 @@ function rustEncryptionInfoToJsEncryptionInfo(
     return { shieldColour, shieldReason };
 }
 
-type RustCryptoEvents =
-    | CryptoEvent.VerificationRequestReceived
-    | CryptoEvent.UserTrustStatusChanged
-    | CryptoEvent.KeysChanged
-    | CryptoEvent.WillUpdateDevices
-    | CryptoEvent.DevicesUpdated
-    | RustBackupCryptoEvents;
-
-type RustCryptoEventMap = {
-    /**
-     * Fires when a key verification request is received.
-     */
-    [CryptoEvent.VerificationRequestReceived]: (request: VerificationRequest) => void;
-
-    /**
-     * Fires when the trust status of a user changes.
-     */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
-
-    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
-    /**
-     * Fires when the user's cross-signing keys have changed or cross-signing
-     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
-     * with the user ID of the logged in user to check if cross-signing is
-     * enabled on the account. If enabled, it can test whether the current key
-     * is trusted using with checkUserTrust with the user ID of the logged
-     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
-     * the trust in the account key.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     */
-    [CryptoEvent.KeysChanged]: (data: {}) => void;
-    /**
-     * Fires whenever the stored devices for a user will be updated
-     * @param users - A list of user IDs that will be updated
-     * @param initialFetch - If true, the store is empty (apart
-     *     from our own device) and is being seeded.
-     */
-    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
-    /**
-     * Fires whenever the stored devices for a user have changed
-     * @param users - A list of user IDs that were updated
-     * @param initialFetch - If true, the store was empty (apart
-     *     from our own device) and has been seeded.
-     */
-    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
-} & RustBackupCryptoEventMap;
+type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
+type RustCryptoEvents = Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>;

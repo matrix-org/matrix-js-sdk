@@ -47,7 +47,6 @@ import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChan
 import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel.ts";
 import { IllegalMethod } from "./verification/IllegalMethod.ts";
 import { KeySignatureUploadError } from "../errors.ts";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes.ts";
 import { DehydrationManager } from "./dehydration.ts";
 import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup.ts";
 import { IStore } from "../store/index.ts";
@@ -76,6 +75,7 @@ import { MapWithDefault, recursiveMapToObject } from "../utils.ts";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
+    calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
@@ -88,9 +88,9 @@ import {
     BootstrapCrossSigningOpts,
     CrossSigningKeyInfo,
     CrossSigningStatus,
-    CryptoMode,
     decodeRecoveryKey,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     DeviceVerificationStatus,
     encodeRecoveryKey,
     EventEncryptionInfo,
@@ -100,13 +100,17 @@ import {
     KeyBackupCheck,
     KeyBackupInfo,
     OwnDeviceKeys,
-    VerificationRequest as CryptoApiVerificationRequest,
+    CryptoEvent as CryptoApiCryptoEvent,
+    CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
 import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /* re-exports for backwards compatibility */
 export type {
@@ -227,14 +231,18 @@ export interface IMegolmEncryptedContent {
 export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 
 export enum CryptoEvent {
+    /** @deprecated Event not fired by the rust crypto */
     DeviceVerificationChanged = "deviceVerificationChanged",
-    UserTrustStatusChanged = "userTrustStatusChanged",
+    UserTrustStatusChanged = CryptoApiCryptoEvent.UserTrustStatusChanged,
+    /** @deprecated Event not fired by the rust crypto */
     UserCrossSigningUpdated = "userCrossSigningUpdated",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequest = "crypto.roomKeyRequest",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
-    KeyBackupStatus = "crypto.keyBackupStatus",
-    KeyBackupFailed = "crypto.keyBackupFailed",
-    KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    KeyBackupStatus = CryptoApiCryptoEvent.KeyBackupStatus,
+    KeyBackupFailed = CryptoApiCryptoEvent.KeyBackupFailed,
+    KeyBackupSessionsRemaining = CryptoApiCryptoEvent.KeyBackupSessionsRemaining,
 
     /**
      * Fires when a new valid backup decryption key is in cache.
@@ -245,8 +253,9 @@ export enum CryptoEvent {
      *
      * This event is only fired by the rust crypto backend.
      */
-    KeyBackupDecryptionKeyCached = "crypto.keyBackupDecryptionKeyCached",
+    KeyBackupDecryptionKeyCached = CryptoApiCryptoEvent.KeyBackupDecryptionKeyCached,
 
+    /** @deprecated Event not fired by the rust crypto */
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -256,12 +265,14 @@ export enum CryptoEvent {
      *
      * The payload is a {@link Crypto.VerificationRequest}.
      */
-    VerificationRequestReceived = "crypto.verificationRequestReceived",
+    VerificationRequestReceived = CryptoApiCryptoEvent.VerificationRequestReceived,
 
+    /** @deprecated Event not fired by the rust crypto */
     Warning = "crypto.warning",
-    WillUpdateDevices = "crypto.willUpdateDevices",
-    DevicesUpdated = "crypto.devicesUpdated",
-    KeysChanged = "crossSigning.keysChanged",
+    /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
+    WillUpdateDevices = CryptoApiCryptoEvent.WillUpdateDevices,
+    DevicesUpdated = CryptoApiCryptoEvent.DevicesUpdated,
+    KeysChanged = CryptoApiCryptoEvent.KeysChanged,
 
     /**
      * Fires when data is being migrated from legacy crypto to rust crypto.
@@ -270,10 +281,10 @@ export enum CryptoEvent {
      * `total` is the total number of steps. When migration is complete, a final instance of the event is emitted, with
      * `progress === total === -1`.
      */
-    LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
+    LegacyCryptoStoreMigrationProgress = CryptoApiCryptoEvent.LegacyCryptoStoreMigrationProgress,
 }
 
-export type CryptoEventHandlerMap = {
+export type CryptoEventHandlerMap = CryptoApiCryptoEventHandlerMap & {
     /**
      * Fires when a device is marked as verified/unverified/blocked/unblocked by
      * {@link MatrixClient#setDeviceVerified | MatrixClient.setDeviceVerified} or
@@ -285,18 +296,6 @@ export type CryptoEventHandlerMap = {
      */
     [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, deviceInfo: DeviceInfo) => void;
     /**
-     * Fires when the trust status of a user changes
-     * If userId is the userId of the logged-in user, this indicated a change
-     * in the trust status of the cross-signing data on the account.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     *
-     * @param userId - the userId of the user in question
-     * @param trustLevel - The new trust level of the user
-     */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
-    /**
      * Fires when we receive a room key request
      *
      * @param request - request details
@@ -306,28 +305,6 @@ export type CryptoEventHandlerMap = {
      * Fires when we receive a room key request cancellation
      */
     [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
-    /**
-     * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
-     * @param enabled - true if key backup has been enabled, otherwise false
-     * @example
-     * ```
-     * matrixClient.on("crypto.keyBackupStatus", function(enabled){
-     *   if (enabled) {
-     *     [...]
-     *   }
-     * });
-     * ```
-     */
-    [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
-    [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
-    [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
-
-    /**
-     * Fires when the backup decryption key is received and cached.
-     *
-     * @param version - The version of the backup for which we have the key for.
-     */
-    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
     [CryptoEvent.KeySignatureUploadFailure]: (
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
@@ -339,12 +316,6 @@ export type CryptoEventHandlerMap = {
      * Deprecated: use `CryptoEvent.VerificationRequestReceived`.
      */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
-
-    /**
-     * Fires when a key verification request is received.
-     */
-    [CryptoEvent.VerificationRequestReceived]: (request: CryptoApiVerificationRequest) => void;
-
     /**
      * Fires when the app may wish to warn the user about something related
      * the end-to-end crypto.
@@ -352,33 +323,6 @@ export type CryptoEventHandlerMap = {
      * @param type - One of the strings listed above
      */
     [CryptoEvent.Warning]: (type: string) => void;
-    /**
-     * Fires when the user's cross-signing keys have changed or cross-signing
-     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
-     * with the user ID of the logged in user to check if cross-signing is
-     * enabled on the account. If enabled, it can test whether the current key
-     * is trusted using with checkUserTrust with the user ID of the logged
-     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
-     * the trust in the account key.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     */
-    [CryptoEvent.KeysChanged]: (data: {}) => void;
-    /**
-     * Fires whenever the stored devices for a user will be updated
-     * @param users - A list of user IDs that will be updated
-     * @param initialFetch - If true, the store is empty (apart
-     *     from our own device) and is being seeded.
-     */
-    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
-    /**
-     * Fires whenever the stored devices for a user have changed
-     * @param users - A list of user IDs that were updated
-     * @param initialFetch - If true, the store was empty (apart
-     *     from our own device) and has been seeded.
-     */
-    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
 
     [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
@@ -650,12 +594,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link Crypto.CryptoApi#setCryptoMode}.
+     * Implementation of {@link Crypto.CryptoApi#setDeviceIsolationMode}.
      */
-    public setCryptoMode(cryptoMode: CryptoMode): void {
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
         throw new Error("Not supported");
     }
-
     /**
      * Implementation of {@link Crypto.CryptoApi#getVersion}.
      */
@@ -1323,11 +1266,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        const encodedKey = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
-            this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-                this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
-            });
-        });
+        const encodedKey = await new Promise<Uint8Array | AESEncryptedSecretStoragePayload | string | null>(
+            (resolve) => {
+                this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                    this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
+                });
+            },
+        );
 
         let key: Uint8Array | null = null;
 
@@ -1338,7 +1283,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-            const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
+            const decrypted = await decryptAESSecretStorageItem(encodedKey, pickleKey, "m.megolm_backup.v1");
             key = decodeBase64(decrypted);
         }
         return key;
@@ -1355,7 +1300,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-        const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
         });
@@ -1607,6 +1552,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
         return this.checkUserTrust(userId);
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi.pinCurrentUserIdentity}.
+     */
+    public async pinCurrentUserIdentity(userId: string): Promise<void> {
+        throw new Error("not implemented");
     }
 
     /**
