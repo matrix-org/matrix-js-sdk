@@ -93,7 +93,11 @@ export {
     GroupCallType,
     GroupCallStatsReportEvent,
 } from "./webrtc/groupCall.ts";
-export { CryptoEvent } from "./crypto/index.ts";
+
+export {
+    /** @deprecated Use {@link Crypto.CryptoEvent} instead */
+    CryptoEvent,
+} from "./crypto/index.ts";
 export { SyncState, SetPresence } from "./sync.ts";
 export type { ISyncStateData as SyncStateData } from "./sync.ts";
 export { SlidingSyncEvent } from "./sliding-sync.ts";
@@ -108,12 +112,7 @@ export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth.ts";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces.ts";
 export { LocationAssetType } from "./@types/location.ts";
 
-/**
- * Types supporting cryptography.
- *
- * The most important is {@link Crypto.CryptoApi}, an instance of which can be retrieved via
- * {@link MatrixClient.getCrypto}.
- */
+/** @deprecated Backwards-compatibility re-export. Import from `crypto-api` directly. */
 export * as Crypto from "./crypto-api/index.ts";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();

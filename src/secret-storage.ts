@@ -28,7 +28,6 @@ import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
-import { calculateKeyCheck } from "./crypto/aes.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -165,7 +164,7 @@ export interface SecretStorageCallbacks {
      * Descriptions of the secret storage keys are also stored in server-side storage, per the
      * [matrix specification](https://spec.matrix.org/v1.6/client-server-api/#key-storage), so
      * before a key can be used in this way, it must have been stored on the server. This is
-     * done via {@link SecretStorage.ServerSideSecretStorage#addKey}.
+     * done via {@link ServerSideSecretStorage#addKey}.
      *
      * Obviously the keys themselves are not stored server-side, so the js-sdk calls this callback
      * in order to retrieve a secret storage key from the application.
@@ -675,4 +674,20 @@ export function trimTrailingEquals(input: string): string {
     } else {
         return input;
     }
+}
+
+// string of zeroes, for calculating the key check
+const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+/**
+ * Calculate the MAC for checking the key.
+ * See https://spec.matrix.org/v1.11/client-server-api/#msecret_storagev1aes-hmac-sha2, steps 3 and 4.
+ *
+ * @param key - the key to use
+ * @param iv - The initialization vector as a base64-encoded string.
+ *     If omitted, a random initialization vector will be created.
+ * @returns An object that contains, `mac` and `iv` properties.
+ */
+export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<AESEncryptedSecretStoragePayload> {
+    return encryptAESSecretStorageItem(ZERO_STR, key, "", iv);
 }

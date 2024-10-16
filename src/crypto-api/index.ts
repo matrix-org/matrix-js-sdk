@@ -26,6 +26,15 @@ import { ISignatures } from "../@types/signed.ts";
 import { MatrixEvent } from "../models/event.ts";
 
 /**
+ * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.
+ *
+ * The most important type is {@link CryptoApi}, an instance of which can be retrieved via
+ * {@link MatrixClient.getCrypto}.
+ *
+ * @packageDocumentation
+ */
+
+/**
  * Public interface to the cryptography parts of the js-sdk
  *
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
@@ -181,7 +190,7 @@ export interface CryptoApi {
     /**
      * Return whether we trust other user's signatures of their devices.
      *
-     * @see {@link Crypto.CryptoApi#setTrustCrossSignedDevices}
+     * @see {@link CryptoApi.setTrustCrossSignedDevices}
      *
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
@@ -228,7 +237,7 @@ export interface CryptoApi {
      *
      * @throws an error if the device is unknown, or has not published any encryption keys.
      *
-     * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
+     * @remarks Fires {@link matrix.CryptoEvent.DeviceVerificationChanged}
      */
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
 
@@ -259,7 +268,7 @@ export interface CryptoApi {
      *
      * @returns True if cross-signing is ready to be used on this device
      *
-     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
+     * @throws May throw {@link matrix.ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     isCrossSigningReady(): Promise<boolean>;
 
@@ -327,7 +336,7 @@ export interface CryptoApi {
      * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and
      * whether the private keys are in secret storage.
      *
-     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
+     * @throws May throw {@link matrix.ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
 
@@ -407,8 +416,8 @@ export interface CryptoApi {
      *
      * If an all-devices verification is already in flight, returns it. Otherwise, initiates a new one.
      *
-     * To control the methods offered, set {@link ICreateClientOpts.verificationMethods} when creating the
-     * MatrixClient.
+     * To control the methods offered, set {@link matrix.ICreateClientOpts.verificationMethods} when creating the
+     * `MatrixClient`.
      *
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
@@ -422,8 +431,8 @@ export interface CryptoApi {
      *
      * If a verification for this user/device is already in flight, returns it. Otherwise, initiates a new one.
      *
-     * To control the methods offered, set {@link ICreateClientOpts.verificationMethods} when creating the
-     * MatrixClient.
+     * To control the methods offered, set {@link  matrix.ICreateClientOpts.verificationMethods} when creating the
+     * `MatrixClient`.
      *
      * @param userId - ID of the owner of the device to verify
      * @param deviceId - ID of the device to verify
@@ -480,7 +489,7 @@ export interface CryptoApi {
     /**
      * Determine if a key backup can be trusted.
      *
-     * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
+     * @param info - key backup info dict from {@link matrix.MatrixClient.getKeyBackupVersion}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 
@@ -500,7 +509,7 @@ export interface CryptoApi {
      *
      * If there are existing backups they will be replaced.
      *
-     * The decryption key will be saved in Secret Storage (the {@link SecretStorageCallbacks.getSecretStorageKey} Crypto
+     * The decryption key will be saved in Secret Storage (the {@link matrix.SecretStorage.SecretStorageCallbacks.getSecretStorageKey} Crypto
      * callback will be called)
      * and the backup engine will be started.
      */
@@ -841,9 +850,9 @@ export class DeviceVerificationStatus {
      * Check if we should consider this device "verified".
      *
      * A device is "verified" if either:
-     *  * it has been manually marked as such via {@link MatrixClient#setDeviceVerified}.
+     *  * it has been manually marked as such via {@link matrix.MatrixClient.setDeviceVerified}.
      *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
-     *    cross-signed devices via {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
+     *    cross-signed devices via {@link CryptoApi.setTrustCrossSignedDevices}.
      *
      * @returns true if this device is verified via any means.
      */
@@ -1074,3 +1083,5 @@ export * from "./verification.ts";
 export * from "./keybackup.ts";
 export * from "./recovery-key.ts";
 export * from "./key-passphrase.ts";
+export * from "./CryptoEvent.ts";
+export * from "./CryptoEventHandlerMap.ts";
