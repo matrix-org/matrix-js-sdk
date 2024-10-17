@@ -46,9 +46,6 @@ describe("MatrixRTCSession", () => {
         client = new MatrixClient({ baseUrl: "base_url" });
         client.getUserId = jest.fn().mockReturnValue("@alice:example.org");
         client.getDeviceId = jest.fn().mockReturnValue("AAAAAAA");
-        client.doesServerSupportUnstableFeature = jest.fn((feature) =>
-            Promise.resolve(feature === "org.matrix.msc4140"),
-        );
     });
 
     afterEach(() => {
