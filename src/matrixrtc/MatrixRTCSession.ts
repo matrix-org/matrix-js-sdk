@@ -777,8 +777,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 logger.warn("Missing own membership: force re-join");
                 // TODO: Should this be awaited? And is there anything to tell the focus?
                 this.triggerCallMembershipEventUpdate();
-                // TODO: Is this needed?
-                this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
             }
         }
 
