@@ -782,7 +782,7 @@ export class GroupCall extends TypedEventEmitter<
                     return false;
                 }
             }
-        } catch (e) {
+        } catch {
             /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
@@ -817,7 +817,7 @@ export class GroupCall extends TypedEventEmitter<
                 await this.updateLocalUsermediaStream(stream);
                 this.localCallFeed.setAudioVideoMuted(null, muted);
                 setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
-            } catch (_) {
+            } catch {
                 // No permission to video device
                 /* istanbul ignore next */
                 logger.log(

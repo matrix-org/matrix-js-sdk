@@ -454,7 +454,7 @@ describe("SAS verification", function () {
         let bobSasEvent: ISasEvent | null;
         let aliceVerifier: SAS;
         let bobPromise: Promise<void>;
-        let clearTestClientTimeouts: Function;
+        let clearTestClientTimeouts: () => void;
 
         beforeEach(async function () {
             [[alice, bob], clearTestClientTimeouts] = await makeTestClients(

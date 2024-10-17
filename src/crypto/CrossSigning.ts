@@ -521,7 +521,7 @@ export class CrossSigningInfo {
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
-        } catch (e) {
+        } catch {
             userTrusted = false;
         }
         return new UserTrustLevel(userTrusted, userCrossSigning.crossSigningVerifiedBefore, userCrossSigning.firstUse);
@@ -560,7 +560,7 @@ export class CrossSigningInfo {
             pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId);
             // ...then we trust this device as much as far as we trust the user
             return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust, trustCrossSignedDevices);
-        } catch (e) {
+        } catch {
             return new DeviceTrustLevel(false, false, localTrust, trustCrossSignedDevices);
         }
     }

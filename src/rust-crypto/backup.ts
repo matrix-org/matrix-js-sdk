@@ -225,7 +225,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a promise which resolves once the keys have been imported
      */
     public async importRoomKeysAsJson(jsonKeys: string, opts?: ImportRoomKeysOpts): Promise<void> {
-        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: BigInt, total: BigInt): void => {
+        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: bigint, total: bigint): void => {
             const importOpt: ImportRoomKeyProgressData = {
                 total: Number(total),
                 successes: Number(progress),
@@ -254,7 +254,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         await this.olmMachine.importBackedUpRoomKeys(
             keysByRoom,
-            (progress: BigInt, total: BigInt, failures: BigInt): void => {
+            (progress: bigint, total: bigint, failures: bigint): void => {
                 const importOpt: ImportRoomKeyProgressData = {
                     total: Number(total),
                     successes: Number(progress),

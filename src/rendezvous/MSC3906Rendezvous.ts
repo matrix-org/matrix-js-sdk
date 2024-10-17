@@ -112,7 +112,7 @@ export class MSC3906Rendezvous {
         let capabilities: Capabilities = {};
         try {
             capabilities = await this.client.getCapabilities();
-        } catch (e) {}
+        } catch {}
         // in r0 of MSC3882 the availability is exposed as a feature flag
         const features = await buildFeatureSupportMap(await this.client.getVersions());
         const capability = GET_LOGIN_TOKEN_CAPABILITY.findIn<IGetLoginTokenCapability>(capabilities);

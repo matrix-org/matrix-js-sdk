@@ -101,7 +101,7 @@ describe("CallFeed", () => {
         it.each([
             [CallState.Connected, true],
             [CallState.Connecting, false],
-        ])("should react to call state, when !isLocal()", (state: CallState, expected: Boolean) => {
+        ])("should react to call state, when !isLocal()", (state: CallState, expected: boolean) => {
             call.emit(CallEvent.State, state, CallState.InviteSent, call.typed());
 
             expect(feed.connected).toBe(expected);

@@ -50,7 +50,7 @@ export class TrackStatsBuilder {
              */
             const codecShortType = codec.mimeType.split("/")[1];
 
-            codecShortType && trackStats.setCodec(codecShortType);
+            if (codecShortType) trackStats.setCodec(codecShortType);
         }
     }
 

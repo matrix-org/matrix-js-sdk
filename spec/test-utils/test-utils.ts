@@ -127,7 +127,7 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();
             }
-        } catch (ex) {
+        } catch {
             // Direct access to some non-function fields of DOM prototypes may
             // cause exceptions.
             // Overwriting will not work either in that case.

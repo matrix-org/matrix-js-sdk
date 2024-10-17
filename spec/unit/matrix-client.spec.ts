@@ -102,7 +102,7 @@ type HttpLookup = {
     error?: object;
     expectBody?: Record<string, any>;
     expectQueryParams?: QueryDict;
-    thenCall?: Function;
+    thenCall?: () => void;
 };
 
 interface Options extends ICreateRoomOpts {
@@ -403,7 +403,7 @@ describe("MatrixClient", function () {
         async function assertRequestsMade(
             responses: {
                 prefix?: string;
-                error?: { httpStatus: Number; errcode: string };
+                error?: { httpStatus: number; errcode: string };
                 data?: { event_id: string };
             }[],
             expectRejects = false,
@@ -1515,7 +1515,7 @@ describe("MatrixClient", function () {
     });
 
     describe("emitted sync events", function () {
-        function syncChecker(expectedStates: [string, string | null][], done: Function) {
+        function syncChecker(expectedStates: [string, string | null][], done: () => void) {
             return function syncListener(state: SyncState, old: SyncState | null) {
                 const expected = expectedStates.shift();
                 logger.log("'sync' curr=%s old=%s EXPECT=%s", state, old, expected);
@@ -1537,7 +1537,7 @@ describe("MatrixClient", function () {
         it("should transition null -> PREPARED after the first /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1554,7 +1554,7 @@ describe("MatrixClient", function () {
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1594,7 +1594,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["CATCHUP", "ERROR"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1605,7 +1605,7 @@ describe("MatrixClient", function () {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1630,7 +1630,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1649,7 +1649,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["ERROR", "SYNCING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1664,7 +1664,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["SYNCING", "SYNCING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1695,7 +1695,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();

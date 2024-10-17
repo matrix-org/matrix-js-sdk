@@ -612,7 +612,7 @@ export class OlmDevice {
             log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
             try {
                 await this.sessionsInProgress[theirDeviceIdentityKey];
-            } catch (e) {
+            } catch {
                 // if the session failed to be created, just fall through and
                 // return an empty result
             }
@@ -698,7 +698,7 @@ export class OlmDevice {
             log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
             try {
                 await this.sessionsInProgress[deviceIdentityKey];
-            } catch (e) {
+            } catch {
                 // if the session failed to be created, then just fall through and
                 // return an empty result
             }
