@@ -14,7 +14,7 @@ on:
                 description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
 jobs:
     sonarqube:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: |
             github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.event != 'merge_group'

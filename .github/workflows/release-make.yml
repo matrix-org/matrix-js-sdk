@@ -41,7 +41,7 @@ on:
 jobs:
     release:
         name: Release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         environment: Release
         steps:
             - name: Load GPG key
@@ -276,7 +276,7 @@ jobs:
     post-release:
         name: Post release steps
         needs: release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - id: repository
               run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
@@ -304,7 +304,7 @@ jobs:
     bump-downstreams:
         name: Update npm dependency in downstream projects
         needs: npm
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: inputs.downstreams
         strategy:
             matrix:
