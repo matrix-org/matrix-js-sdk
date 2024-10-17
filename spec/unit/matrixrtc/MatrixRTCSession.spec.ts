@@ -414,6 +414,8 @@ describe("MatrixRTCSession", () => {
             client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
             client.sendEvent = sendEventMock;
 
+            client._unstable_updateDelayedEvent = jest.fn();
+
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         });
@@ -490,6 +492,13 @@ describe("MatrixRTCSession", () => {
                 );
                 await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+
+                // should have tried updating the delayed leave to test that it wasn't replaced by own state
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+                // should update delayed disconnect
+                jest.advanceTimersByTime(5000);
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
+
                 jest.useRealTimers();
             }
 
