@@ -12,7 +12,7 @@ concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || gi
 jobs:
     changelog:
         name: Preview Changelog
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: mheap/github-action-required-labels@d25134c992b943fb6ad00c25ea00eb5988c0a9dd # v5
               if: github.event_name != 'merge_group'
@@ -29,7 +29,7 @@ jobs:
 
     prevent-blocked:
         name: Prevent Blocked
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             pull-requests: read
         steps:
@@ -42,7 +42,7 @@ jobs:
 
     community-prs:
         name: Label Community PRs
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: github.event.action == 'opened'
         steps:
             - name: Check membership
@@ -69,7 +69,7 @@ jobs:
 
     close-if-fork-develop:
         name: Forbid develop branch fork contributions
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: >
             github.event.action == 'opened' &&
             github.event.pull_request.head.ref == 'develop' &&

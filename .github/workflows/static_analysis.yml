@@ -11,7 +11,7 @@ concurrency:
 jobs:
     ts_lint:
         name: "Typescript Syntax Check"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
@@ -38,7 +38,7 @@ jobs:
 
     js_lint:
         name: "ESLint"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
@@ -55,7 +55,7 @@ jobs:
 
     workflow_lint:
         name: "Workflow Lint"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
@@ -72,7 +72,7 @@ jobs:
 
     docs:
         name: "JSDoc Checker"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
@@ -97,7 +97,7 @@ jobs:
 
     analyse_dead_code:
         name: "Analyse Dead Code"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 

@@ -13,7 +13,7 @@ env:
 jobs:
     jest:
         name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         timeout-minutes: 10
         strategy:
             matrix:
@@ -68,7 +68,7 @@ jobs:
         name: Jest tests
         needs: jest
         if: always()
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - if: needs.jest.result != 'skipped' && needs.jest.result != 'success'
               run: exit 1
@@ -91,7 +91,7 @@ jobs:
     # we need this so the job is reported properly when run in a merge queue
     downstream-complement-crypto:
         name: Downstream Complement Crypto tests
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: always()
         needs:
             - complement-crypto
@@ -103,7 +103,7 @@ jobs:
     # and skip sonarcloud coverage within merge queues
     downstream:
         name: Downstream tests
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: always()
         needs:
             - matrix-react-sdk
