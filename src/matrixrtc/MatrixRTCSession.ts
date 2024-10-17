@@ -1111,7 +1111,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.memberEventTimeout = setTimeout(this.delayDisconnection, 5000);
     }
 
-    private delayDisconnection = async (): Promise<void> => {
+    private readonly delayDisconnection = async (): Promise<void> => {
         try {
             await this.client._unstable_updateDelayedEvent(this.disconnectDelayId!, UpdateDelayedEventAction.Restart);
             this.scheduleDelayDisconnection();
