@@ -466,9 +466,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param encryptionKeyIndex - The index of the key to set
      * @param encryptionKeyString - The string representation of the key to set in base64
      * @param timestamp - The timestamp of the key. We assume that these are monotonic for each participant device.
-     * @param delayBeforeUse - If true, delay before emitting a key changed event. Useful when setting
-     *                         encryption keys for the local participant to allow time for the key to
-     *                         be distributed.
+     * @param delayBeforeUse - If true, delay ({@link USE_KEY_DELAY} ms) before emitting a key changed event. Useful when setting
+     *                         encryption keys for the local members to allow time for the key to
+     *                         be distributed to remote members.
      */
     private setEncryptionKey(
         userId: string,
@@ -527,8 +527,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     /**
      * Generate a new sender key and add it at the next available index
-     * @param delayBeforeUse - If true, wait for a short period before setting the key for the
-     *                         media encryptor to use. If false, set the key immediately.
+     *
+     * @param delayBeforeUse - See {@link setEncryptionKey}
      * @returns The index of the new key
      */
     private makeNewSenderKey(delayBeforeUse = false): number {
@@ -567,7 +567,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Re-sends the encryption keys room event
+     * Sends the encryption keys room event.
+     *
+     * @param indexToSend - The index of the key to send. If not provided, the current key will be sent.
      */
     private sendEncryptionKeysEvent = async (indexToSend?: number): Promise<void> => {
         if (this.keysEventUpdateTimeout !== undefined) {
@@ -679,7 +681,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * This should be called each time the relevant event is received from a room timeline.
      * If the event is malformed then it will be logged and ignored.
      *
-     * @param event the event to process
+     * @param event - the event to process
      */
     public onCallEncryption = (event: MatrixEvent): void => {
         const userId = event.getSender();
@@ -907,8 +909,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
         return {};
     }
+
     /**
-     * Makes a new membership list given the old list alonng with this user's previous membership event
+     * Makes a new membership list given the old list along with this user's previous membership event
      * (if any) and this device's previous membership (if any)
      */
     private makeNewLegacyMemberships(
@@ -1104,12 +1107,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
     }
 
-    private doRotateKey = (delayOnUse: boolean): void => {
+    /**
+     * Perform a rotation - generation and distribution of new key, and then using the newly generated key - of the sender encryption key.
+     *
+     * @param delayBeforeUse See {@link setEncryptionKey}
+     */
+    private doRotateKey = (delayBeforeUse: boolean): void => {
         if (!this.manageMediaKeys) return;
 
         this.makeNewKeyTimeout = undefined;
         logger.info("Making new sender key for key rotation");
-        const newKeyIndex = this.makeNewSenderKey(delayOnUse);
+        const newKeyIndex = this.makeNewSenderKey(delayBeforeUse);
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
         this.sendEncryptionKeysEvent(newKeyIndex);
