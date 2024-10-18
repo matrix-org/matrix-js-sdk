@@ -140,9 +140,7 @@ describe("Cross Signing", function () {
                 });
             }
 
-            const error = new MatrixError(errorResponse);
-            error.httpStatus == 401;
-            throw error;
+            throw new MatrixError(errorResponse, 401);
         };
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
@@ -827,7 +825,7 @@ describe("Cross Signing", function () {
     });
 
     it("should offer to upgrade device verifications to cross-signing", async function () {
-        let upgradeResolveFunc: Function;
+        let upgradeResolveFunc: () => void;
 
         const { client: alice } = await makeTestClient(
             { userId: "@alice:example.com", deviceId: "Osborne2" },
@@ -866,7 +864,7 @@ describe("Cross Signing", function () {
         // cross-signing key is signed by his Dynabook, which alice has
         // verified, and ask if the device verification should be upgraded to a
         // cross-signing verification
-        let upgradePromise = new Promise((resolve) => {
+        let upgradePromise = new Promise<void>((resolve) => {
             upgradeResolveFunc = resolve;
         });
         await resetCrossSigningKeys(alice);
@@ -885,7 +883,7 @@ describe("Cross Signing", function () {
         expect(bobTrust2.isCrossSigningVerified()).toBeFalsy();
         expect(bobTrust2.isTofu()).toBeTruthy();
 
-        upgradePromise = new Promise((resolve) => {
+        upgradePromise = new Promise<void>((resolve) => {
             upgradeResolveFunc = resolve;
         });
         alice.crypto!.deviceList.emit(CryptoEvent.UserCrossSigningUpdated, "@bob:example.com");

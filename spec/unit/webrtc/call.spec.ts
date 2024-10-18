@@ -1228,7 +1228,7 @@ describe("Call", function () {
     });
 
     describe("Screen sharing", () => {
-        const waitNegotiateFunc = (resolve: Function): void => {
+        const waitNegotiateFunc = (resolve: () => void): void => {
             mockSendEvent.mockImplementationOnce(() => {
                 // Note that the peer connection here is a dummy one and always returns
                 // dummy SDP, so there's not much point returning the content: the SDP will

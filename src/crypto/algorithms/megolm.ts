@@ -1067,7 +1067,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
             // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
             try {
                 await this.encryptionPreparation.promise;
-            } catch (e) {
+            } catch {
                 // ignore any errors -- if the preparation failed, we'll just
                 // restart everything here
             }
@@ -2103,7 +2103,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             pendingList.map(async (ev) => {
                 try {
                     await ev.attemptDecryption(this.crypto, { isRetry: true, forceRedecryptIfUntrusted });
-                } catch (e) {
+                } catch {
                     // don't die if something goes wrong
                 }
             }),
@@ -2128,7 +2128,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     [...pending].map(async (ev) => {
                         try {
                             await ev.attemptDecryption(this.crypto);
-                        } catch (e) {
+                        } catch {
                             // don't die if something goes wrong
                         }
                     }),

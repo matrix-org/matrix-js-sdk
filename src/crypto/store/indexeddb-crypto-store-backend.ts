@@ -1216,7 +1216,7 @@ function abortWithException(txn: IDBTransaction, e: Error): void {
     (txn as IWrappedIDBTransaction)._mx_abortexception = e;
     try {
         txn.abort();
-    } catch (e) {
+    } catch {
         // sometimes we won't be able to abort the transaction
         // (ie. if it's aborted or completed)
     }

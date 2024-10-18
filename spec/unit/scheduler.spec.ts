@@ -12,7 +12,7 @@ jest.useFakeTimers();
 
 describe("MatrixScheduler", function () {
     let scheduler: MatrixScheduler<Record<string, boolean>>;
-    let retryFn: Function | null;
+    let retryFn: ((event: MatrixEvent | null, attempt: number, err: MatrixError) => number) | null;
     let queueFn: ((event: MatrixEvent) => string | null) | null;
     let deferred: IDeferred<Record<string, boolean>>;
     const roomId = "!foo:bar";

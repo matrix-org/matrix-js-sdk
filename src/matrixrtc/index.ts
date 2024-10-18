@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 export * from "./CallMembership.ts";
-export * from "./focus.ts";
+export type * from "./focus.ts";
 export * from "./LivekitFocus.ts";
 export * from "./MatrixRTCSession.ts";
 export * from "./MatrixRTCSessionManager.ts";
-export * from "./types.ts";
+export type * from "./types.ts";
