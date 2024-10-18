@@ -329,6 +329,46 @@ describe("initRustCrypto", () => {
             }
         }, 10000);
 
+        it("turns on tracing when tracingEnabled is true", async () => {
+            const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+            const tracingSpy = jest.spyOn(RustSdkCryptoJs.Tracing.prototype, 'turnOn').mockImplementation(() => {});
+    
+            await initRustCrypto({
+                logger,
+                http: {} as MatrixClient["http"],
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                tracingEnabled: true,  // Assuming you've added this parameter
+            });
+    
+            expect(tracingSpy).toHaveBeenCalled();
+            tracingSpy.mockRestore();  // Clean up the spy
+        });
+    
+        it("turns off tracing when tracingEnabled is false", async () => {
+            const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+            const tracingSpy = jest.spyOn(RustSdkCryptoJs.Tracing.prototype, 'turnOff').mockImplementation(() => {});
+    
+            await initRustCrypto({
+                logger,
+                http: {} as MatrixClient["http"],
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                tracingEnabled: false,  // Assuming you've added this parameter
+            });
+    
+            expect(tracingSpy).toHaveBeenCalled();
+            tracingSpy.mockRestore();  // Clean up the spy
+        });
+
         it("migrates data from a legacy crypto store when secret are not encrypted", async () => {
             const PICKLE_KEY = "pickle1234";
             const legacyStore = new MemoryCryptoStore();
