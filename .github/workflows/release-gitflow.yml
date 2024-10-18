@@ -61,26 +61,25 @@ jobs:
                       CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
                       echo "Current $PACKAGE version is $CURRENT_VERSION"
 
-                      if [ "$CURRENT_VERSION" == "null" ]
+                      if [[ "$CURRENT_VERSION" == "null" ]]
                       then
                           echo "Unable to find $PACKAGE in package.json"
                           exit 1
                       fi
 
-                      if [ "$CURRENT_VERSION" == "develop" ]
+                      if [[ "$CURRENT_VERSION" == *"#develop" ]]
                       then
                           echo "Not updating dependency $PACKAGE"
                           continue
                       fi
 
-                      echo "Resetting $1 to develop branch..."
+                      echo "Resetting $PACKAGE to develop branch..."
                       yarn add "github:matrix-org/$PACKAGE#develop"
                       git add -u
                       git commit -m "Reset $PACKAGE back to develop branch"
                   done <<< "$DEPENDENCIES"
               env:
                   DEPENDENCIES: ${{ inputs.dependencies }}
-                  FINAL: ${{ inputs.final }}
 
             - name: Push changes
               run: git push origin develop
