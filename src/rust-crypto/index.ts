@@ -84,22 +84,29 @@ export async function initRustCrypto(args: {
 
     /** The pickle key for `legacyCryptoStore` */
     legacyPickleKey?: string;
-
     /**
      * A callback which will receive progress updates on migration from `legacyCryptoStore`.
      *
      * Called with (-1, -1) to mark the end of migration.
      */
     legacyMigrationProgressListener?: (progress: number, total: number) => void;
+    /**
+     * Whether to enable tracing. Defaults to true.
+     */
+    tracingEnabled?: boolean;
 }): Promise<RustCrypto> {
-    const { logger } = args;
+    const { logger, tracingEnabled = true } = args;
 
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
     logger.debug("Initialising Rust crypto-sdk WASM artifact");
     await RustSdkCryptoJs.initAsync();
 
-    // enable tracing in the rust-sdk
-    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
+    // Enable tracing in the rust-sdk based on the parameter
+    if (tracingEnabled) {
+        new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
+    } else {
+        new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Off).turnOn();
+    }
 
     logger.debug("Opening Rust CryptoStore");
     let storeHandle;
