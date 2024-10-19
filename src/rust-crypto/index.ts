@@ -105,7 +105,7 @@ export async function initRustCrypto(args: {
     if (tracingEnabled) {
         new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
     } else {
-        new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Off).turnOn();
+        // Do not initialize tracing when disabled
     }
 
     logger.debug("Opening Rust CryptoStore");
