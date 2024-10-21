@@ -421,7 +421,9 @@ describe("MatrixRTCSession", () => {
             const wasJoined = sess!.isJoined();
             // stop the timers
             const left = await sess!.leaveRoomSession();
-            expect(left).toBe(wasJoined);
+            if (left !== wasJoined) {
+                throw new Error(`Unexpected leave result: wanted ${wasJoined}, got ${left}`);
+            }
         });
 
         it("starts un-joined", () => {
