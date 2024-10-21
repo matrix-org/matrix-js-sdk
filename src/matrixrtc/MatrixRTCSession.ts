@@ -381,9 +381,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (timeout) {
             // The sleep promise returns the string 'timeout' and the membership update void
             // A success implies that the membership update was quicker then the timeout.
-            return (
-                (await Promise.race([this.triggerCallMembershipEventUpdate(), sleep(timeout, "timeout")])) !== "timeout"
-            );
+            const raceResult = await Promise.race([this.triggerCallMembershipEventUpdate(), sleep(timeout, "timeout")]);
+            return raceResult !== "timeout";
         } else {
             await this.triggerCallMembershipEventUpdate();
             return false;
