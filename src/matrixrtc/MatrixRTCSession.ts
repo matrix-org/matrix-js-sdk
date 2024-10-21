@@ -344,6 +344,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
+     * @returns Whether the membership update was attempted and did not time out.
      */
     public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
         if (!this.isJoined()) {
@@ -385,7 +386,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return raceResult !== "timeout";
         } else {
             await this.triggerCallMembershipEventUpdate();
-            return false;
+            return true;
         }
     }
 

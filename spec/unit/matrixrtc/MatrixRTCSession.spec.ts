@@ -417,9 +417,11 @@ describe("MatrixRTCSession", () => {
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         });
 
-        afterEach(() => {
+        afterEach(async () => {
+            const wasJoined = sess!.isJoined();
             // stop the timers
-            sess!.leaveRoomSession();
+            const left = await sess!.leaveRoomSession();
+            expect(left).toBe(wasJoined);
         });
 
         it("starts un-joined", () => {
