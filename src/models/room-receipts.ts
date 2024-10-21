@@ -176,7 +176,7 @@ export class RoomReceipts {
      * @returns true if the thread with this ID can be found, and the supplied
      *          user sent the latest message in it.
      */
-    private userSentLatestEventInThread(threadId: string, userId: String): boolean {
+    private userSentLatestEventInThread(threadId: string, userId: string): boolean {
         const timeline =
             threadId === MAIN_ROOM_TIMELINE
                 ? this.room.getLiveTimeline().getEvents()
@@ -278,7 +278,7 @@ class ReceiptsByUser {
     private room: Room;
 
     /** map of userId: UserReceipts */
-    private data: Map<String, UserReceipts>;
+    private data: Map<string, UserReceipts>;
 
     public constructor(room: Room) {
         this.room = room;

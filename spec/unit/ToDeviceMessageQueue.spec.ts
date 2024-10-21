@@ -9,7 +9,7 @@ import { defer } from "../../src/utils";
 
 describe("onResumedSync", () => {
     let batch: IndexedToDeviceBatch | null;
-    let shouldFailSendToDevice: Boolean;
+    let shouldFailSendToDevice: boolean;
     let onSendToDeviceFailure: () => void;
     let onSendToDeviceSuccess: () => void;
     let resumeSync: (newState: SyncState, oldState: SyncState) => void;
