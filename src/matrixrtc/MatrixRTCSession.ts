@@ -46,12 +46,12 @@ const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
 const UPDATE_ENCRYPTION_KEY_THROTTLE = 3000;
 
-// A delay after a member leaves before we create and publish a new key, because people
-// tend to leave calls at the same time
+// A delay after a member leaves/joins before we create and publish a new key, because people
+// tend to leave/join calls at the same time
 const MAKE_KEY_DELAY = 3000;
 // The delay between creating and sending a new key and starting to encrypt with it. This gives others
 // a chance to receive the new key to minimise the chance they don't get media they can't decrypt.
-// The total time between a member leaving and the call switching to new keys is therefore
+// The total time between a member leaving/joining and the call switching to new keys is therefore
 // MAKE_KEY_DELAY + SEND_KEY_DELAY
 const USE_KEY_DELAY = 5000;
 
@@ -793,21 +793,41 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // always store the fingerprints of these latest memberships
             this.storeLastMembershipFingerprints();
 
-            if (anyLeft) {
-                if (newMembershipIds.size === 1) {
+            // if there are leavers or joiners then we want to rotate the keys
+            if (anyLeft || anyJoined) {
+                /**
+                 * When rotating keys the are three conflicting things to balance:
+                 * 1. protect privacy of media => rotating as soon as possible after someone leaves.
+                 * 2. not disrupting the session => because key distribution can take some number of seconds, we _generate_ a new key
+                 *    and immediately distribute it, but we then wait a short delay ({@link USE_KEY_DELAY}ms) before *using* the key.
+                 * 3. not sending too many key updates => members often join or leave sessions at a similar time, so we would like to wait
+                 *    a short delay ({@link MAKE_KEY_DELAY}ms) for memberships to settle before rotating.
+                 */
+                let delayBeforeRotate = false;
+                let delayBeforeUse = false;
+                if (anyLeft && newMembershipIds.size === 1) {
+                    // we are now the only member, so we can immediately rotate and use the new key
                     logger.debug(`New member(s) have left: doing immediate sender key rotation`);
-                    this.doRotateKey(false);
-                } else {
-                    logger.debug(`New member(s) have left: queueing sender key rotation`);
-                    this.makeNewKeyTimeout = setTimeout(() => this.doRotateKey(true), MAKE_KEY_DELAY);
-                }
-            } else if (anyJoined) {
-                if (newMembershipIds.size === 2) {
+                    delayBeforeRotate = false;
+                    delayBeforeUse = false;
+                } else if (anyJoined && oldMembershipIds.size === 1 && newMembershipIds.size >= 2) {
+                    // we were the only member, but now some other members have joined us
+                    // we can rotate and use the new key immediately as no one was using the old key
                     logger.debug(`New member(s) have joined: doing immediate sender key rotation`);
-                    this.doRotateKey(false);
+                    delayBeforeRotate = false;
+                    delayBeforeUse = false;
                 } else {
-                    logger.debug(`New member(s) have joined: queueing sender key rotation`);
-                    this.makeNewKeyTimeout = setTimeout(() => this.doRotateKey(true), MAKE_KEY_DELAY);
+                    logger.debug(
+                        `New member(s) have ${anyJoined ? "joined" : "left"}: queueing sender key rotation with delayed use`,
+                    );
+                    delayBeforeRotate = true;
+                    delayBeforeUse = true;
+                }
+
+                if (delayBeforeRotate) {
+                    this.makeNewKeyTimeout = setTimeout(() => this.doRotateKey(delayBeforeUse), MAKE_KEY_DELAY);
+                } else {
+                    this.doRotateKey(delayBeforeUse);
                 }
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?

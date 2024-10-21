@@ -798,11 +798,15 @@ describe("MatrixRTCSession", () => {
                 return { onMyEncryptionKeyChanged, session: sess, initialKeysPayload, changeMembers };
             }
 
-            it("rotates key and emits immediately when second member joins", async () => {
+            it("rotates key and emits immediately when we were alone but other members join", async () => {
                 jest.useFakeTimers();
                 try {
                     const member2 = Object.assign({}, membershipTemplate, {
                         device_id: "BBBBBBB",
+                    });
+
+                    const member3 = Object.assign({}, membershipTemplate, {
+                        device_id: "CCCCCCC",
                     });
 
                     const { session, onMyEncryptionKeyChanged, changeMembers } = await setupParticipantChangeTest([
@@ -812,7 +816,7 @@ describe("MatrixRTCSession", () => {
                     jest.advanceTimersByTime(10000);
 
                     jest.clearAllMocks();
-                    await changeMembers([membershipTemplate, member2]);
+                    await changeMembers([membershipTemplate, member2, member3]);
 
                     expect(session.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
                     expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(1);
@@ -1081,31 +1085,7 @@ describe("MatrixRTCSession", () => {
                 }
             });
 
-            it("rotates key and emits immediately when second member leaves", async () => {
-                jest.useFakeTimers();
-                try {
-                    const member2 = Object.assign({}, membershipTemplate, {
-                        device_id: "BBBBBBB",
-                    });
-
-                    const { onMyEncryptionKeyChanged, changeMembers } = await setupParticipantChangeTest([
-                        membershipTemplate,
-                        member2,
-                    ]);
-
-                    jest.advanceTimersByTime(10000);
-
-                    jest.clearAllMocks();
-                    await changeMembers([membershipTemplate]);
-
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                    expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(1);
-                } finally {
-                    jest.useRealTimers();
-                }
-            });
-
-            it("rotates key after delay when additional member leaves", async () => {
+            it("rotates key and emits immediately when members leave and we become only remaining member", async () => {
                 jest.useFakeTimers();
                 try {
                     const member2 = Object.assign({}, membershipTemplate, {
@@ -1120,6 +1100,40 @@ describe("MatrixRTCSession", () => {
                         membershipTemplate,
                         member2,
                         member3,
+                    ]);
+
+                    jest.advanceTimersByTime(10000);
+
+                    jest.clearAllMocks();
+                    await changeMembers([membershipTemplate]);
+
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
+                    expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(1);
+                } finally {
+                    jest.useRealTimers();
+                }
+            });
+
+            it("rotates key after delay when additional members leave", async () => {
+                jest.useFakeTimers();
+                try {
+                    const member2 = Object.assign({}, membershipTemplate, {
+                        device_id: "BBBBBBB",
+                    });
+
+                    const member3 = Object.assign({}, membershipTemplate, {
+                        device_id: "CCCCCCC",
+                    });
+
+                    const member4 = Object.assign({}, membershipTemplate, {
+                        device_id: "DDDDDDD",
+                    });
+
+                    const { onMyEncryptionKeyChanged, changeMembers } = await setupParticipantChangeTest([
+                        membershipTemplate,
+                        member2,
+                        member3,
+                        member4,
                     ]);
 
                     jest.advanceTimersByTime(10000);
