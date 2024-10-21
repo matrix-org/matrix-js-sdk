@@ -1677,6 +1677,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Get the current dehydrated device, if any
      * @returns A promise of an object containing the dehydrated device
+     *
+     * @deprecated MSC2697 device dehydration is not supported for rust cryptography.
      */
     public async getDehydratedDevice(): Promise<IDehydratedDevice | undefined> {
         try {
