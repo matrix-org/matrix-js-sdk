@@ -98,7 +98,7 @@ describe("secret-storage", () => {
                 } else if (secretName == "secretE") {
                     return { aaaa: {}, bbbb: {} };
                 } else {
-                    null;
+                    return null;
                 }
             }),
             getDefaultKeyId: jest.fn().mockResolvedValue("aaaa"),

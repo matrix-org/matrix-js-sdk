@@ -1080,8 +1080,8 @@ export interface OwnDeviceKeys {
 }
 
 export * from "./verification.ts";
-export * from "./keybackup.ts";
+export type * from "./keybackup.ts";
 export * from "./recovery-key.ts";
 export * from "./key-passphrase.ts";
 export * from "./CryptoEvent.ts";
-export * from "./CryptoEventHandlerMap.ts";
+export type * from "./CryptoEventHandlerMap.ts";
