@@ -1,3 +1,15 @@
+Changes in [34.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.9.0) (2024-10-22)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate the crypto events which are not used by the rust-crypto ([#4442](https://github.com/matrix-org/matrix-js-sdk/pull/4442)). Contributed by @florianduros.
+
+## 🐛 Bug Fixes
+
+* Fix the rust crypto import in esm environments. ([#4445](https://github.com/matrix-org/matrix-js-sdk/pull/4445)). Contributed by @saul-jb.
+* Fix MatrixRTC sender key wrapping ([#4441](https://github.com/matrix-org/matrix-js-sdk/pull/4441)). Contributed by @hughns.
+
+
 Changes in [34.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.8.0) (2024-10-15)
 ==================================================================================================
 This release removes insecure functionality, resolving CVE-2024-47080 / GHSA-4jf8-g8wp-cx7c.
