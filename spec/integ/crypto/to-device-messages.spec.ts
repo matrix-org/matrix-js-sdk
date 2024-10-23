@@ -18,10 +18,12 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, InitCrypto } from "../../test-utils/test-utils";
+import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import { createClient, MatrixClient } from "../../../src";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { SyncResponder } from "../../test-utils/SyncResponder";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -41,6 +43,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
 
     /** an object which intercepts `/keys/query` requests on the test homeserver */
     let e2eKeyResponder: E2EKeyResponder;
+    let syncResponder: SyncResponder;
 
     beforeEach(
         async () => {
@@ -57,14 +60,24 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
             });
 
             e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
-            // /** an object which intercepts `/keys/upload` requests on the test homeserver */
-            // new E2EKeyReceiver(homeserverUrl);
+            new E2EKeyReceiver(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl);
 
             // Silence warnings from the backup manager
             fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
                 status: 404,
                 body: { errcode: "M_NOT_FOUND" },
             });
+
+            fetchMock.get(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {});
+            fetchMock.get(new URL("/_matrix/client/versions/", homeserverUrl).toString(), {});
+            fetchMock.post(
+                new URL(
+                    `/_matrix/client/v3/user/${encodeURIComponent(testData.TEST_USER_ID)}/filter`,
+                    homeserverUrl,
+                ).toString(),
+                { filter_id: "fid" },
+            );
 
             await initCrypto(aliceClient);
         },
@@ -79,6 +92,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
 
     describe("encryptToDeviceMessages", () => {
         it("returns empty batch for device without key", async () => {
+            await aliceClient.startClient();
+
             const toDeviceBatch = await aliceClient
                 .getCrypto()
                 ?.encryptToDeviceMessages(
@@ -96,10 +111,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
         });
 
         it("returns encrypted batch for known device", async () => {
+            await aliceClient.startClient();
             e2eKeyResponder.addDeviceKeys(testData.BOB_SIGNED_TEST_DEVICE_DATA);
             fetchMock.post("express:/_matrix/client/v3/keys/claim", () => ({
                 one_time_keys: testData.BOB_ONE_TIME_KEYS,
             }));
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([testData.BOB_TEST_USER_ID]));
+            await syncPromise(aliceClient);
 
             const toDeviceBatch = await aliceClient
                 .getCrypto()
