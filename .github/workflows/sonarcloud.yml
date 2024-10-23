@@ -14,7 +14,7 @@ on:
                 description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
 jobs:
     sonarqube:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: |
             github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.event != 'merge_group'
@@ -30,7 +30,7 @@ jobs:
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             - name: "🧮 Checkout code"
-              uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+              uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
               with:
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow

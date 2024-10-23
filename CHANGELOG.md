@@ -1,3 +1,34 @@
+Changes in [34.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.9.0) (2024-10-22)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate the crypto events which are not used by the rust-crypto ([#4442](https://github.com/matrix-org/matrix-js-sdk/pull/4442)). Contributed by @florianduros.
+
+## 🐛 Bug Fixes
+
+* Fix the rust crypto import in esm environments. ([#4445](https://github.com/matrix-org/matrix-js-sdk/pull/4445)). Contributed by @saul-jb.
+* Fix MatrixRTC sender key wrapping ([#4441](https://github.com/matrix-org/matrix-js-sdk/pull/4441)). Contributed by @hughns.
+
+
+Changes in [34.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.8.0) (2024-10-15)
+==================================================================================================
+This release removes insecure functionality, resolving CVE-2024-47080 / GHSA-4jf8-g8wp-cx7c.
+
+Changes in [34.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.7.0) (2024-10-08)
+==================================================================================================
+## 🦖 Deprecations
+
+* RTCSession cleanup: deprecate getKeysForParticipant() and getEncryption(); add emitEncryptionKeys() ([#4427](https://github.com/matrix-org/matrix-js-sdk/pull/4427)). Contributed by @hughns.
+
+## ✨ Features
+
+* Bump matrix-rust-sdk to 9.1.0 ([#4435](https://github.com/matrix-org/matrix-js-sdk/pull/4435)). Contributed by @richvdh.
+* Rotate Matrix RTC media encryption key when a new member joins a call for Post Compromise Security ([#4422](https://github.com/matrix-org/matrix-js-sdk/pull/4422)). Contributed by @hughns.
+* Update media event content types to include captions ([#4403](https://github.com/matrix-org/matrix-js-sdk/pull/4403)). Contributed by @tulir.
+* Update OIDC registration types to match latest MSC2966 state ([#4432](https://github.com/matrix-org/matrix-js-sdk/pull/4432)). Contributed by @t3chguy.
+* Add `CryptoApi.pinCurrentUserIdentity` and `UserIdentity.needsUserApproval` ([#4415](https://github.com/matrix-org/matrix-js-sdk/pull/4415)). Contributed by @richvdh.
+
+
 Changes in [34.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.6.0) (2024-09-24)
 ==================================================================================================
 ## 🦖 Deprecations

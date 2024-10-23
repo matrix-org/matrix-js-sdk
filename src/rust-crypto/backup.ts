@@ -27,13 +27,13 @@ import {
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
-import { CryptoEvent, IMegolmSessionData } from "../crypto/index.ts";
+import { IMegolmSessionData } from "../crypto/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { encodeUri, logDuration } from "../utils.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
-import { ImportRoomKeyProgressData, ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
 import { IKeyBackupInfo } from "../crypto/keybackup.ts";
 import { IKeyBackup } from "../crypto/backup.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
@@ -225,7 +225,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a promise which resolves once the keys have been imported
      */
     public async importRoomKeysAsJson(jsonKeys: string, opts?: ImportRoomKeysOpts): Promise<void> {
-        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: BigInt, total: BigInt): void => {
+        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: bigint, total: bigint): void => {
             const importOpt: ImportRoomKeyProgressData = {
                 total: Number(total),
                 successes: Number(progress),
@@ -254,7 +254,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         await this.olmMachine.importBackedUpRoomKeys(
             keysByRoom,
-            (progress: BigInt, total: BigInt, failures: BigInt): void => {
+            (progress: bigint, total: bigint, failures: bigint): void => {
                 const importOpt: ImportRoomKeyProgressData = {
                     total: Number(total),
                     successes: Number(progress),

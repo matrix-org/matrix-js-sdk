@@ -3499,7 +3499,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             return client;
         }
 
-        function mkEncryptionEvent(content: Object) {
+        function mkEncryptionEvent(content: object) {
             return mkEventCustom({
                 sender: persistentStoreClient.getSafeUserId(),
                 type: "m.room.encryption",
@@ -3512,7 +3512,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          *
          * @param stateEvents - Additional state events for the test room
          */
-        function getSyncResponseWithState(stateEvents: Array<Object>) {
+        function getSyncResponseWithState(stateEvents: Array<object>) {
             const roomResponse = {
                 state: {
                     events: [

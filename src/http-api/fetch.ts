@@ -356,7 +356,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
 
             return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
-        } catch (error) {
+        } catch {
             // defensive coding for malformed url
             return "??";
         }

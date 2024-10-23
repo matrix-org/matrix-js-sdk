@@ -11,7 +11,7 @@ on:
 jobs:
     npm:
         name: Publish to npm
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         outputs:
             id: ${{ steps.npm-publish.outputs.id }}
         steps:

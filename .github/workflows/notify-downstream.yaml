@@ -14,10 +14,8 @@ jobs:
                 include:
                     - repo: element-hq/element-web
                       event: element-web-notify
-                    - repo: element-hq/matrix-react-sdk
-                      event: upstream-sdk-notify
 
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: Notify matrix-react-sdk repo that a new SDK build is on develop so it can CI against it
               uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
