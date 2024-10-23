@@ -16,20 +16,7 @@ limitations under the License.
 
 export type RendezvousFailureListener = (reason: RendezvousFailureReason) => void;
 
-export type RendezvousFailureReason =
-    | LegacyRendezvousFailureReason
-    | MSC4108FailureReason
-    | ClientRendezvousFailureReason;
-
-export enum LegacyRendezvousFailureReason {
-    UserDeclined = "user_declined",
-    Unknown = "unknown",
-    Expired = "expired",
-    UserCancelled = "user_cancelled",
-    UnsupportedAlgorithm = "unsupported_algorithm",
-    UnsupportedProtocol = "unsupported_protocol",
-    HomeserverLacksSupport = "homeserver_lacks_support",
-}
+export type RendezvousFailureReason = MSC4108FailureReason | ClientRendezvousFailureReason;
 
 export enum MSC4108FailureReason {
     AuthorizationExpired = "authorization_expired",
