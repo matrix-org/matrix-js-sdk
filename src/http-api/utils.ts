@@ -79,17 +79,25 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
         return <Error>e;
     }
 
-    if (contentType?.type === "application/json" && body) {
-        return new MatrixError(
+    const httpHeaders = !isXhr(response)
+        ? response.headers
+        : new Headers(
+            response.getAllResponseHeaders().trim().split(/[\r\n]+/)
+            .map((h) => h.split(": ") as [string, string])
+        );
+    return contentType?.type === "application/json" && body ?
+        new MatrixError(
             JSON.parse(body),
             response.status,
             isXhr(response) ? response.responseURL : response.url,
+            undefined,
+            httpHeaders,
+        ) :
+        new HTTPError(
+            `Server returned ${response.status} error${contentType?.type === "text/plain" ? `: ${body}` : ""}`,
+            response.status,
+            httpHeaders,
         );
-    }
-    if (contentType?.type === "text/plain") {
-        return new HTTPError(`Server returned ${response.status} error: ${body}`, response.status);
-    }
-    return new HTTPError(`Server returned ${response.status} error`, response.status);
 }
 
 function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest {

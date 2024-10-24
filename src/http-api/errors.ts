@@ -28,11 +28,13 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * specific to HTTP responses.
  * @param msg - The error message to include.
  * @param httpStatus - The HTTP response status code.
+ * @param httpHeaders - The HTTP response headers.
  */
 export class HTTPError extends Error {
     public constructor(
         msg: string,
         public readonly httpStatus?: number,
+        public readonly httpHeaders?: Headers,
     ) {
         super(msg);
     }
@@ -49,12 +51,14 @@ export class MatrixError extends HTTPError {
      * information specific to the standard Matrix error response.
      * @param errorJson - The Matrix error JSON returned from the homeserver.
      * @param httpStatus - The numeric HTTP status code given
+     * @param httpHeaders - The HTTP response headers given
      */
     public constructor(
         errorJson: IErrorJson = {},
         public readonly httpStatus?: number,
         public url?: string,
         public event?: MatrixEvent,
+        public readonly httpHeaders?: Headers,
     ) {
         let message = errorJson.error || "Unknown message";
         if (httpStatus) {
@@ -63,7 +67,7 @@ export class MatrixError extends HTTPError {
         if (url) {
             message = `${message} (${url})`;
         }
-        super(`MatrixError: ${message}`, httpStatus);
+        super(`MatrixError: ${message}`, httpStatus, httpHeaders);
         this.errcode = errorJson.errcode;
         this.name = errorJson.errcode || "Unknown error code";
         this.data = errorJson;
