@@ -16,6 +16,7 @@ limitations under the License.
 
 import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IMegolmSessionData } from "../@types/crypto.ts";
+import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { Room } from "../models/room.ts";
 import { DeviceMap } from "../models/device.ts";
 import { UIAuthCallback } from "../interactive-auth.ts";
@@ -363,6 +364,22 @@ export interface CryptoApi {
      *      object with information about the encryption of the event.
      */
     getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
+
+    /**
+     * Encrypts a given payload object via Olm to-device messages to a given
+     * set of devices.
+     *
+     * @param eventType - the type of the event to send.
+     * @param devices - an array of devices to encrypt the payload for.
+     * @param payload - the payload to encrypt.
+     *
+     * @returns the batch of encrypted payloads which can then be sent via {@link matrix.MatrixClient#queueToDevice}.
+     */
+    encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
