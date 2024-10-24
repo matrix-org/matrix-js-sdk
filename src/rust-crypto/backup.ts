@@ -460,8 +460,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             return;
                         } else if (errCode == "M_LIMIT_EXCEEDED") {
                             // wait for that and then continue?
-                            const waitTime = err.data.retry_after_ms;
-                            if (waitTime > 0) {
+                            const waitTime = err.getRetryAfterMs();
+                            if (waitTime !== null && waitTime > 0) {
                                 await sleep(waitTime);
                                 continue;
                             } // else go to the normal backoff

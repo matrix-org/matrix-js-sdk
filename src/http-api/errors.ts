@@ -16,6 +16,7 @@ limitations under the License.
 
 import { IUsageLimit } from "../@types/partials.ts";
 import { MatrixEvent } from "../models/event.ts";
+import { parseRetryAfterMs } from "./utils.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
@@ -71,6 +72,27 @@ export class MatrixError extends HTTPError {
         this.errcode = errorJson.errcode;
         this.name = errorJson.errcode || "Unknown error code";
         this.data = errorJson;
+    }
+
+    /**
+     * @returns the recommended delay in milliseconds to wait before retrying
+     * the request that triggered this error, or null if no delay is recommended.
+     * @remarks Callers should first check that {@link errcode} is "M_LIMIT_EXCEEDED".
+     */
+    public getRetryAfterMs(): number | null {
+        if (this.httpStatus === 429) {
+            const retryAfter = this.httpHeaders?.get("Retry-After");
+            if (retryAfter != null) {
+                return parseRetryAfterMs(retryAfter);
+            }
+        }
+        if ("retry_after_ms" in this.data) {
+            if (!Number.isInteger(this.data.retry_after_ms)) {
+                throw new Error("retry_after_ms is not an integer");
+            }
+            return this.data.retry_after_ms;
+        }
+        return null;
     }
 }
 
