@@ -41,6 +41,7 @@ describe("MatrixHttpApi", () => {
             setRequestHeader: jest.fn(),
             onreadystatechange: undefined,
             getResponseHeader: jest.fn(),
+            getAllResponseHeaders: jest.fn(),
         } as unknown as XMLHttpRequest;
         // We stub out XHR here as it is not available in JSDOM
         // @ts-ignore

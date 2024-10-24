@@ -371,8 +371,8 @@ export class PerSessionKeyBackupDownloader {
                     throw new KeyDownloadError(KeyDownloadErrorCode.MISSING_DECRYPTION_KEY);
                 }
                 if (errCode == "M_LIMIT_EXCEEDED") {
-                    const waitTime = e.data.retry_after_ms;
-                    if (waitTime > 0) {
+                    const waitTime = e.getRetryAfterMs();
+                    if (waitTime !== null && waitTime > 0) {
                         this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
                         throw new KeyDownloadRateLimitError(waitTime);
                     } else {

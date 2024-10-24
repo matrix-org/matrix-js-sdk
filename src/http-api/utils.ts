@@ -79,17 +79,29 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
         return <Error>e;
     }
 
-    if (contentType?.type === "application/json" && body) {
-        return new MatrixError(
-            JSON.parse(body),
-            response.status,
-            isXhr(response) ? response.responseURL : response.url,
-        );
-    }
-    if (contentType?.type === "text/plain") {
-        return new HTTPError(`Server returned ${response.status} error: ${body}`, response.status);
-    }
-    return new HTTPError(`Server returned ${response.status} error`, response.status);
+    const httpHeaders = !isXhr(response)
+        ? response.headers
+        : new Headers(
+              response
+                  .getAllResponseHeaders()
+                  ?.trim()
+                  .split(/[\r\n]+/)
+                  .map((h) => h.split(": ") as [string, string]),
+          );
+
+    return contentType?.type === "application/json" && body
+        ? new MatrixError(
+              JSON.parse(body),
+              response.status,
+              isXhr(response) ? response.responseURL : response.url,
+              undefined,
+              httpHeaders,
+          )
+        : new HTTPError(
+              `Server returned ${response.status} error${contentType?.type === "text/plain" ? `: ${body}` : ""}`,
+              response.status,
+              httpHeaders,
+          );
 }
 
 function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest {
@@ -120,6 +132,26 @@ function getResponseContentType(response: XMLHttpRequest | Response): ParsedMedi
     } catch (e) {
         throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
     }
+}
+
+/**
+ * Parse a Retry-After header value and convert it into a relative delay in milliseconds.
+ * @see {@link https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3-2}
+ * @throws Error if the provided value is not a valid Date HTTP header value
+ */
+export function parseRetryAfterMs(retryAfter: string): number {
+    if (/^\d+$/.test(retryAfter)) {
+        const ms = Number.parseInt(retryAfter) * 1000;
+        if (!Number.isFinite(ms)) {
+            throw new Error("numeric value is too large");
+        }
+        return ms;
+    }
+    const date = new Date(retryAfter);
+    if (date.toUTCString() !== retryAfter) {
+        throw new Error("value does not match Date HTTP header syntax");
+    }
+    return date.getTime() - Date.now();
 }
 
 /**
