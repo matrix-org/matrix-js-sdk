@@ -84,7 +84,7 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
         : new Headers(
               response
                   .getAllResponseHeaders()
-                  .trim()
+                  ?.trim()
                   .split(/[\r\n]+/)
                   .map((h) => h.split(": ") as [string, string]),
           );

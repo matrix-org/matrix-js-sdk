@@ -93,6 +93,9 @@ describe("parseErrorResponse", () => {
                     getResponseHeader(name: string): string | null {
                         return name === "Content-Type" ? "application/json" : null;
                     },
+                    getAllResponseHeaders() {
+                        return "Content-Type: application/json";
+                    },
                     status: 500,
                 } as XMLHttpRequest,
                 '{"errcode": "TEST"}',
@@ -137,6 +140,9 @@ describe("parseErrorResponse", () => {
                     responseURL: "https://example.com",
                     getResponseHeader(name: string): string | null {
                         return name === "Content-Type" ? "application/json" : null;
+                    },
+                    getAllResponseHeaders() {
+                        return "Content-Type: application/json";
                     },
                     status: 500,
                 } as XMLHttpRequest,
