@@ -56,10 +56,10 @@ export class MatrixError extends HTTPError {
      */
     public constructor(
         errorJson: IErrorJson = {},
-        public readonly httpStatus?: number,
+        httpStatus?: number,
         public url?: string,
         public event?: MatrixEvent,
-        public readonly httpHeaders?: Headers,
+        httpHeaders?: Headers,
     ) {
         let message = errorJson.error || "Unknown message";
         if (httpStatus) {
