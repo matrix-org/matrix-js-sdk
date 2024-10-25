@@ -79,15 +79,18 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
         return <Error>e;
     }
 
-    const httpHeaders = !isXhr(response)
-        ? response.headers
-        : new Headers(
+    const httpHeaders = isXhr(response)
+        ? new Headers(
               response
                   .getAllResponseHeaders()
-                  ?.trim()
+                  .trim()
                   .split(/[\r\n]+/)
-                  .map((h) => h.split(": ") as [string, string]),
-          );
+                  .map((header): [string, string] => {
+                      const colonIdx = header.indexOf(":");
+                      return [header.substring(0, colonIdx), header.substring(colonIdx + 1)];
+                  }),
+          )
+        : response.headers;
 
     return contentType?.type === "application/json" && body
         ? new MatrixError(
