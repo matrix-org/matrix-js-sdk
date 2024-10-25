@@ -327,7 +327,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Joining call session in room ${this.room.roomId} with manageMediaKeys=${this.manageMediaKeys}`);
         if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
-            this.requestKeyEventSend();
+            this.requestSendCurrentKey();
         }
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
@@ -548,10 +548,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Requests that we resend our keys to the room. May send a keys event immediately
+     * Requests that we resend our current keys to the room. May send a keys event immediately
      * or queue for alter if one has already been sent recently.
      */
-    private requestKeyEventSend(): void {
+    private requestSendCurrentKey(): void {
         if (!this.manageMediaKeys) return;
 
         if (
@@ -798,7 +798,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (anyJoined) {
                 logger.debug(`New member(s) have joined: re-sending keys`);
-                this.requestKeyEventSend();
+                this.requestSendCurrentKey();
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
                 const newFingerprints = this.lastMembershipFingerprints!;
@@ -810,7 +810,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
                 if (candidateUpdates) {
                     logger.debug(`Member(s) have updated/reconnected: re-sending keys to everyone`);
-                    this.requestKeyEventSend();
+                    this.requestSendCurrentKey();
                 }
             }
         }
