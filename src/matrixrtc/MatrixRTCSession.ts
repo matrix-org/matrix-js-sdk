@@ -797,8 +797,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
                 this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (anyJoined) {
-                logger.debug(`New member(s) have joined: queueing sender key rotation`);
-                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
+                logger.debug(`New member(s) have joined: re-sending keys`);
+                this.requestKeyEventSend();
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
                 const newFingerprints = this.lastMembershipFingerprints!;
