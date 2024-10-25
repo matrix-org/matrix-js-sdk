@@ -140,19 +140,19 @@ function getResponseContentType(response: XMLHttpRequest | Response): ParsedMedi
 /**
  * Parse a Retry-After header value and convert it into a relative delay in milliseconds.
  * @see {@link https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3-2}
- * @throws Error if the provided value is not a valid Date HTTP header value
+ * @throws Error if the provided value is an invalid Retry-After header value
  */
 export function parseRetryAfterMs(retryAfter: string): number {
     if (/^\d+$/.test(retryAfter)) {
         const ms = Number.parseInt(retryAfter) * 1000;
         if (!Number.isFinite(ms)) {
-            throw new Error("numeric value is too large");
+            throw new Error("integer value is too large");
         }
         return ms;
     }
     const date = new Date(retryAfter);
     if (date.toUTCString() !== retryAfter) {
-        throw new Error("value does not match Date HTTP header syntax");
+        throw new Error("value is not a valid HTTP-date or non-negative decimal integer");
     }
     return date.getTime() - Date.now();
 }
