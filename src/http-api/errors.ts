@@ -86,6 +86,7 @@ export class MatrixError extends HTTPError {
                 return parseRetryAfterMs(retryAfter);
             }
         }
+        // Note: retry_after_ms is deprecated as of spec version v1.10
         if ("retry_after_ms" in this.data) {
             if (!Number.isInteger(this.data.retry_after_ms)) {
                 throw new Error("retry_after_ms is not an integer");
