@@ -43,7 +43,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
 
     /** an object which intercepts `/keys/query` requests on the test homeserver */
     let e2eKeyResponder: E2EKeyResponder;
-    let syncResponder: SyncResponder;
 
     beforeEach(
         async () => {
@@ -61,7 +60,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
 
             e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
             new E2EKeyReceiver(homeserverUrl);
-            syncResponder = new SyncResponder(homeserverUrl);
+            const syncResponder = new SyncResponder(homeserverUrl);
+
+            // add bob as known user
+            syncResponder.sendOrQueueSyncResponse(getSyncResponse([testData.BOB_TEST_USER_ID]));
 
             // Silence warnings from the backup manager
             fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
@@ -91,7 +93,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
     });
 
     describe("encryptToDeviceMessages", () => {
-        it("returns empty batch for device without key", async () => {
+        it("returns empty batch for device that is not known", async () => {
             await aliceClient.startClient();
 
             const toDeviceBatch = await aliceClient
@@ -116,7 +118,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
             fetchMock.post("express:/_matrix/client/v3/keys/claim", () => ({
                 one_time_keys: testData.BOB_ONE_TIME_KEYS,
             }));
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse([testData.BOB_TEST_USER_ID]));
             await syncPromise(aliceClient);
 
             const toDeviceBatch = await aliceClient
