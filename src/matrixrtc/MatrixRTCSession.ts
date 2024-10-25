@@ -38,6 +38,7 @@ import { MatrixError } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
+import { sleep } from "../utils.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -343,11 +344,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
+     * @returns Whether the membership update was attempted and did not time out.
      */
     public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
         if (!this.isJoined()) {
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring leave call`);
-            return new Promise((resolve) => resolve(false));
+            return false;
         }
 
         const userId = this.client.getUserId();
@@ -377,19 +379,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
-        const timeoutPromise = new Promise((r) => {
-            if (timeout) {
-                // will never resolve if timeout is not set
-                setTimeout(r, timeout, "timeout");
-            }
-        });
-        return new Promise((resolve) => {
-            Promise.race([this.triggerCallMembershipEventUpdate(), timeoutPromise]).then((value) => {
-                // The timeoutPromise returns the string 'timeout' and the membership update void
-                // A success implies that the membership update was quicker then the timeout.
-                resolve(value != "timeout");
-            });
-        });
+        if (timeout) {
+            // The sleep promise returns the string 'timeout' and the membership update void
+            // A success implies that the membership update was quicker then the timeout.
+            const raceResult = await Promise.race([this.triggerCallMembershipEventUpdate(), sleep(timeout, "timeout")]);
+            return raceResult !== "timeout";
+        } else {
+            await this.triggerCallMembershipEventUpdate();
+            return true;
+        }
     }
 
     public getActiveFocus(): Focus | undefined {
@@ -1102,7 +1100,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         } catch (e) {
             const resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
             logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
-            await new Promise((resolve) => setTimeout(resolve, resendDelay));
+            await sleep(resendDelay);
             await this.triggerCallMembershipEventUpdate();
         }
     }
