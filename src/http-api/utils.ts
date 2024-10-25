@@ -72,13 +72,6 @@ export function anySignal(signals: AbortSignal[]): {
  * @returns
  */
 export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
-    let contentType: ParsedMediaType | null;
-    try {
-        contentType = getResponseContentType(response);
-    } catch (e) {
-        return <Error>e;
-    }
-
     const httpHeaders = isXhr(response)
         ? new Headers(
               response
@@ -92,6 +85,12 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
           )
         : response.headers;
 
+    let contentType: ParsedMediaType | null;
+    try {
+        contentType = getResponseContentType(httpHeaders);
+    } catch (e) {
+        return <Error>e;
+    }
     if (contentType?.type === "application/json" && body) {
         return new MatrixError(
             JSON.parse(body),
@@ -112,7 +111,7 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
 }
 
 /**
- * extract the Content-Type header from the response object, and
+ * extract the Content-Type header from response headers, and
  * parse it to a `{type, parameters}` object.
  *
  * returns null if no content-type header could be found.
@@ -120,14 +119,8 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
  * @param response - response object
  * @returns parsed content-type header, or null if not found
  */
-function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
-    let contentType: string | null;
-    if (isXhr(response)) {
-        contentType = response.getResponseHeader("Content-Type");
-    } else {
-        contentType = response.headers.get("Content-Type");
-    }
-
+function getResponseContentType(headers: Headers): ParsedMediaType | null {
+    const contentType = headers.get("Content-Type");
     if (!contentType) return null;
 
     try {
