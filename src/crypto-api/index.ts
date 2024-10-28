@@ -974,6 +974,7 @@ export interface CreateSecretStorageOpts {
     /**
      * The current key backup object. If passed,
      * the passphrase and recovery key from this backup will be used.
+     * @deprecated Not used by the Rust crypto stack.
      */
     keyBackupInfo?: KeyBackupInfo;
 
