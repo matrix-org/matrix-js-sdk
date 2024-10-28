@@ -121,7 +121,7 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
  */
 function getResponseContentType(headers: Headers): ParsedMediaType | null {
     const contentType = headers.get("Content-Type");
-    if (!contentType) return null;
+    if (contentType === null) return null;
 
     try {
         return parseContentType(contentType);
