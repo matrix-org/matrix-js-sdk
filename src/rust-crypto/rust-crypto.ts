@@ -21,6 +21,7 @@ import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypt
 import { KnownMembership } from "../@types/membership.ts";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
 import type { IEncryptedEventInfo } from "../crypto/api.ts";
+import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
 import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { Room } from "../models/room.ts";
 import { RoomMember } from "../models/room-member.ts";
@@ -30,7 +31,7 @@ import {
     DecryptionError,
     OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
-import { logger, Logger } from "../logger.ts";
+import { logger, Logger, LogSpan } from "../logger.ts";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RoomEncryptor } from "./RoomEncryptor.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
@@ -1316,6 +1317,52 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         return secrets;
     }
 
+    /**
+     * Implementation of {@link CryptoApi#encryptToDeviceMessages}.
+     */
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const logger = new LogSpan(this.logger, "encryptToDeviceMessages");
+        const uniqueUsers = new Set(devices.map(({ userId }) => userId));
+
+        // This will ensure we have Olm sessions for all of the users' devices.
+        // However, we only care about some of the devices.
+        // So, perhaps we can optimise this later on.
+        await this.keyClaimManager.ensureSessionsForUsers(
+            logger,
+            Array.from(uniqueUsers).map((userId) => new RustSdkCryptoJs.UserId(userId)),
+        );
+        const batch: ToDeviceBatch = {
+            batch: [],
+            eventType: EventType.RoomMessageEncrypted,
+        };
+
+        await Promise.all(
+            devices.map(async ({ userId, deviceId }) => {
+                const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+                    new RustSdkCryptoJs.UserId(userId),
+                    new RustSdkCryptoJs.DeviceId(deviceId),
+                );
+
+                if (device) {
+                    const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
+                    batch.batch.push({
+                        deviceId,
+                        userId,
+                        payload: encryptedPayload,
+                    });
+                } else {
+                    this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
+                }
+            }),
+        );
+
+        return batch;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -1537,7 +1584,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
         if (this.stopped) return;
         this.logger.debug(
-            `Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`,
+            `Got update for session ${key.sessionId} from sender ${key.senderKey.toBase64()} in ${key.roomId.toString()}`,
         );
         const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key.roomId.toString(), key.sessionId);
         if (pendingList.length === 0) return;
@@ -1842,7 +1889,7 @@ class EventDecryptor {
         serverBackupInfo: KeyBackupInfo | null | undefined,
     ): never {
         const content = event.getWireContent();
-        const errorDetails = { session: content.sender_key + "|" + content.session_id };
+        const errorDetails = { sender_key: content.sender_key, session_id: content.session_id };
 
         // If the error looks like it might be recoverable from backup, queue up a request to try that.
         if (
