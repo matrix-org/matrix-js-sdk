@@ -419,9 +419,13 @@ describe("MatrixRTCSession", () => {
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
         });
 
-        afterEach(() => {
+        afterEach(async () => {
+            const wasJoined = sess!.isJoined();
             // stop the timers
-            sess!.leaveRoomSession();
+            const left = await sess!.leaveRoomSession();
+            if (left !== wasJoined) {
+                throw new Error(`Unexpected leave result: wanted ${wasJoined}, got ${left}`);
+            }
         });
 
         it("starts un-joined", () => {
@@ -769,7 +773,7 @@ describe("MatrixRTCSession", () => {
                 expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
             });
 
-            it("rotates key if a new member joins", async () => {
+            it("Re-sends key if a new member joins", async () => {
                 jest.useFakeTimers();
                 try {
                     const mockRoom = makeMockRoom([membershipTemplate]);
@@ -780,9 +784,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                    const firstKeysPayload = await keysSentPromise1;
-                    expect(firstKeysPayload.keys).toHaveLength(1);
-                    expect(firstKeysPayload.keys[0].index).toEqual(0);
+                    await keysSentPromise1;
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                     sendEventMock.mockClear();
@@ -804,14 +806,9 @@ describe("MatrixRTCSession", () => {
                         .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId));
                     sess.onMembershipUpdate();
 
-                    jest.advanceTimersByTime(10000);
-
-                    const secondKeysPayload = await keysSentPromise2;
+                    await keysSentPromise2;
 
                     expect(sendEventMock).toHaveBeenCalled();
-                    expect(secondKeysPayload.keys).toHaveLength(1);
-                    expect(secondKeysPayload.keys[0].index).toEqual(1);
-                    expect(secondKeysPayload.keys[0].key).not.toEqual(firstKeysPayload.keys[0].key);
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
                 } finally {
                     jest.useRealTimers();
@@ -1099,8 +1096,8 @@ describe("MatrixRTCSession", () => {
                 }
                 jest.useFakeTimers();
                 try {
-                    // start with a single member
-                    const mockRoom = makeMockRoom(members.slice(0, 1));
+                    // start with all members
+                    const mockRoom = makeMockRoom(members);
 
                     for (let i = 0; i < membersToTest; i++) {
                         const keysSentPromise = new Promise<EncryptionKeysEventContent>((resolve) => {
@@ -1112,10 +1109,12 @@ describe("MatrixRTCSession", () => {
                             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                             sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
                         } else {
-                            // otherwise update the state
+                            // otherwise update the state reducing the membership each time in order to trigger key rotation
                             mockRoom.getLiveTimeline().getState = jest
                                 .fn()
-                                .mockReturnValue(makeMockRoomState(members.slice(0, i + 1), mockRoom.roomId));
+                                .mockReturnValue(
+                                    makeMockRoomState(members.slice(0, membersToTest - i), mockRoom.roomId),
+                                );
                         }
 
                         sess!.onMembershipUpdate();

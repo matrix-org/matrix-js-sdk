@@ -1584,7 +1584,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
         if (this.stopped) return;
         this.logger.debug(
-            `Got update for session ${key.senderKey.toBase64()}|${key.sessionId} in ${key.roomId.toString()}`,
+            `Got update for session ${key.sessionId} from sender ${key.senderKey.toBase64()} in ${key.roomId.toString()}`,
         );
         const pendingList = this.eventDecryptor.getEventsPendingRoomKey(key.roomId.toString(), key.sessionId);
         if (pendingList.length === 0) return;
@@ -1889,7 +1889,7 @@ class EventDecryptor {
         serverBackupInfo: KeyBackupInfo | null | undefined,
     ): never {
         const content = event.getWireContent();
-        const errorDetails = { session: content.sender_key + "|" + content.session_id };
+        const errorDetails = { sender_key: content.sender_key, session_id: content.session_id };
 
         // If the error looks like it might be recoverable from backup, queue up a request to try that.
         if (

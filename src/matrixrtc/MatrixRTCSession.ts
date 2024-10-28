@@ -38,6 +38,7 @@ import { MatrixError } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
+import { sleep } from "../utils.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -327,7 +328,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         logger.info(`Joining call session in room ${this.room.roomId} with manageMediaKeys=${this.manageMediaKeys}`);
         if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
-            this.requestKeyEventSend();
+            this.requestSendCurrentKey();
         }
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
@@ -343,11 +344,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
+     * @returns Whether the membership update was attempted and did not time out.
      */
     public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
         if (!this.isJoined()) {
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring leave call`);
-            return new Promise((resolve) => resolve(false));
+            return false;
         }
 
         const userId = this.client.getUserId();
@@ -377,19 +379,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.membershipId = undefined;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
-        const timeoutPromise = new Promise((r) => {
-            if (timeout) {
-                // will never resolve if timeout is not set
-                setTimeout(r, timeout, "timeout");
-            }
-        });
-        return new Promise((resolve) => {
-            Promise.race([this.triggerCallMembershipEventUpdate(), timeoutPromise]).then((value) => {
-                // The timeoutPromise returns the string 'timeout' and the membership update void
-                // A success implies that the membership update was quicker then the timeout.
-                resolve(value != "timeout");
-            });
-        });
+        if (timeout) {
+            // The sleep promise returns the string 'timeout' and the membership update void
+            // A success implies that the membership update was quicker then the timeout.
+            const raceResult = await Promise.race([this.triggerCallMembershipEventUpdate(), sleep(timeout, "timeout")]);
+            return raceResult !== "timeout";
+        } else {
+            await this.triggerCallMembershipEventUpdate();
+            return true;
+        }
     }
 
     public getActiveFocus(): Focus | undefined {
@@ -548,10 +546,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Requests that we resend our keys to the room. May send a keys event immediately
+     * Requests that we resend our current keys to the room. May send a keys event immediately
      * or queue for alter if one has already been sent recently.
      */
-    private requestKeyEventSend(): void {
+    private requestSendCurrentKey(): void {
         if (!this.manageMediaKeys) return;
 
         if (
@@ -797,8 +795,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
                 this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (anyJoined) {
-                logger.debug(`New member(s) have joined: queueing sender key rotation`);
-                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
+                logger.debug(`New member(s) have joined: re-sending keys`);
+                this.requestSendCurrentKey();
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
                 const newFingerprints = this.lastMembershipFingerprints!;
@@ -810,7 +808,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
                 if (candidateUpdates) {
                     logger.debug(`Member(s) have updated/reconnected: re-sending keys to everyone`);
-                    this.requestKeyEventSend();
+                    this.requestSendCurrentKey();
                 }
             }
         }
@@ -1102,7 +1100,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         } catch (e) {
             const resendDelay = CALL_MEMBER_EVENT_RETRY_DELAY_MIN + Math.random() * 2000;
             logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
-            await new Promise((resolve) => setTimeout(resolve, resendDelay));
+            await sleep(resendDelay);
             await this.triggerCallMembershipEventUpdate();
         }
     }
