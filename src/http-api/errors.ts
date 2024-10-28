@@ -86,11 +86,9 @@ export class MatrixError extends HTTPError {
      * the request that triggered this error, or null if no delay is recommended.
      */
     public getRetryAfterMs(): number | null {
-        if (this.httpStatus === 429) {
-            const retryAfter = this.httpHeaders?.get("Retry-After");
-            if (retryAfter != null) {
-                return parseRetryAfterMs(retryAfter);
-            }
+        const retryAfter = this.httpHeaders?.get("Retry-After");
+        if (retryAfter != null) {
+            return parseRetryAfterMs(retryAfter);
         }
         // Note: retry_after_ms is deprecated as of spec version v1.10
         if (this.errcode === "M_LIMIT_EXCEEDED" && "retry_after_ms" in this.data) {
