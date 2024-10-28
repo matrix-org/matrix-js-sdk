@@ -75,9 +75,15 @@ export class MatrixError extends HTTPError {
     }
 
     /**
+     * @returns whether this error is due to rate-limiting.
+     */
+    public isRateLimitError(): boolean {
+        return this.errcode === "M_LIMIT_EXCEEDED" || (this.errcode === "M_UNKNOWN" && this.httpStatus === 429);
+    }
+
+    /**
      * @returns the recommended delay in milliseconds to wait before retrying
      * the request that triggered this error, or null if no delay is recommended.
-     * @remarks Callers should first check that {@link errcode} is "M_LIMIT_EXCEEDED".
      */
     public getRetryAfterMs(): number | null {
         if (this.httpStatus === 429) {
@@ -87,7 +93,7 @@ export class MatrixError extends HTTPError {
             }
         }
         // Note: retry_after_ms is deprecated as of spec version v1.10
-        if ("retry_after_ms" in this.data) {
+        if (this.errcode === "M_LIMIT_EXCEEDED" && "retry_after_ms" in this.data) {
             if (!Number.isInteger(this.data.retry_after_ms)) {
                 throw new Error("retry_after_ms is not an integer");
             }
