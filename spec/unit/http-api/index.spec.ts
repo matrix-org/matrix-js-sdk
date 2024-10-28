@@ -172,7 +172,10 @@ describe("MatrixHttpApi", () => {
         xhr.readyState = DONE;
         xhr.responseText = '{"errcode": "M_NOT_FOUND", "error": "Not found"}';
         xhr.status = 404;
-        mocked(xhr.getResponseHeader).mockReturnValue("application/json");
+        mocked(xhr.getResponseHeader).mockImplementation((name) =>
+            name.toLowerCase() === "content-type" ? "application/json" : null,
+        );
+        mocked(xhr.getAllResponseHeaders).mockReturnValue("content-type: application/json\r\n");
         // @ts-ignore
         xhr.onreadystatechange?.(new Event("test"));
 
