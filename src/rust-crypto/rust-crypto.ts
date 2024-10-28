@@ -21,6 +21,7 @@ import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypt
 import { KnownMembership } from "../@types/membership.ts";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
 import type { IEncryptedEventInfo } from "../crypto/api.ts";
+import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
 import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { Room } from "../models/room.ts";
 import { RoomMember } from "../models/room-member.ts";
@@ -30,7 +31,7 @@ import {
     DecryptionError,
     OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
-import { logger, Logger } from "../logger.ts";
+import { logger, Logger, LogSpan } from "../logger.ts";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RoomEncryptor } from "./RoomEncryptor.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
@@ -1314,6 +1315,52 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const secrets = secretsBundle.to_json();
         secretsBundle.free();
         return secrets;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#encryptToDeviceMessages}.
+     */
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const logger = new LogSpan(this.logger, "encryptToDeviceMessages");
+        const uniqueUsers = new Set(devices.map(({ userId }) => userId));
+
+        // This will ensure we have Olm sessions for all of the users' devices.
+        // However, we only care about some of the devices.
+        // So, perhaps we can optimise this later on.
+        await this.keyClaimManager.ensureSessionsForUsers(
+            logger,
+            Array.from(uniqueUsers).map((userId) => new RustSdkCryptoJs.UserId(userId)),
+        );
+        const batch: ToDeviceBatch = {
+            batch: [],
+            eventType: EventType.RoomMessageEncrypted,
+        };
+
+        await Promise.all(
+            devices.map(async ({ userId, deviceId }) => {
+                const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+                    new RustSdkCryptoJs.UserId(userId),
+                    new RustSdkCryptoJs.DeviceId(deviceId),
+                );
+
+                if (device) {
+                    const encryptedPayload = JSON.parse(await device.encryptToDeviceEvent(eventType, payload));
+                    batch.batch.push({
+                        deviceId,
+                        userId,
+                        payload: encryptedPayload,
+                    });
+                } else {
+                    this.logger.warn(`encryptToDeviceMessages: unknown device ${userId}:${deviceId}`);
+                }
+            }),
+        );
+
+        return batch;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

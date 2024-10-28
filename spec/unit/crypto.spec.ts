@@ -26,6 +26,7 @@ import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { EventDecryptionResult } from "../../src/common-crypto/CryptoBackend";
 import * as testData from "../test-utils/test-data";
 import { KnownMembership } from "../../src/@types/membership";
+import type { DeviceInfoMap } from "../../src/crypto/DeviceList";
 
 const Olm = global.Olm;
 
@@ -1242,6 +1243,117 @@ describe("Crypto", function () {
                 payload,
             );
             client.httpBackend.verifyNoOutstandingRequests();
+        });
+    });
+
+    describe("encryptToDeviceMessages", () => {
+        let client: TestClient;
+        let ensureOlmSessionsForDevices: jest.SpiedFunction<typeof olmlib.ensureOlmSessionsForDevices>;
+        let encryptMessageForDevice: jest.SpiedFunction<typeof olmlib.encryptMessageForDevice>;
+        const payload = { hello: "world" };
+        let encryptedPayload: object;
+        let crypto: Crypto;
+
+        beforeEach(async () => {
+            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices.mockResolvedValue(new Map());
+            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
+            });
+
+            client = new TestClient("@alice:example.org", "aliceweb");
+
+            // running initCrypto should trigger a key upload
+            client.httpBackend.when("POST", "/keys/upload").respond(200, {});
+            await Promise.all([client.client.initCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
+
+            encryptedPayload = {
+                algorithm: "m.olm.v1.curve25519-aes-sha2",
+                sender_key: client.client.crypto!.olmDevice.deviceCurve25519Key,
+                ciphertext: { plaintext: { type: 0, body: JSON.stringify(payload) } },
+            };
+
+            crypto = client.client.getCrypto() as Crypto;
+        });
+
+        afterEach(async () => {
+            ensureOlmSessionsForDevices.mockRestore();
+            encryptMessageForDevice.mockRestore();
+            await client.stop();
+        });
+
+        it("returns encrypted batch where devices known", async () => {
+            const deviceInfoMap: DeviceInfoMap = new Map([
+                [
+                    "@bob:example.org",
+                    new Map([
+                        ["bobweb", new DeviceInfo("bobweb")],
+                        ["bobmobile", new DeviceInfo("bobmobile")],
+                    ]),
+                ],
+                ["@carol:example.org", new Map([["caroldesktop", new DeviceInfo("caroldesktop")]])],
+            ]);
+            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(deviceInfoMap);
+            // const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
+
+            const batch = await client.client.getCrypto()?.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { userId: "@bob:example.org", deviceId: "bobweb" },
+                    { userId: "@bob:example.org", deviceId: "bobmobile" },
+                    { userId: "@carol:example.org", deviceId: "caroldesktop" },
+                    { userId: "@carol:example.org", deviceId: "carolmobile" }, // not known
+                ],
+                payload,
+            );
+            expect(crypto.deviceList.downloadKeys).toHaveBeenCalledWith(
+                ["@bob:example.org", "@carol:example.org"],
+                false,
+            );
+            expect(encryptMessageForDevice).toHaveBeenCalledTimes(3);
+            const expectedPayload = expect.objectContaining({
+                ...encryptedPayload,
+                "org.matrix.msgid": expect.any(String),
+                "sender_key": expect.any(String),
+            });
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch.length).toEqual(3);
+            expect(batch).toEqual({
+                eventType: "m.room.encrypted",
+                batch: expect.arrayContaining([
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "bobweb",
+                        payload: expectedPayload,
+                    },
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "bobmobile",
+                        payload: expectedPayload,
+                    },
+                    {
+                        userId: "@carol:example.org",
+                        deviceId: "caroldesktop",
+                        payload: expectedPayload,
+                    },
+                ]),
+            });
+        });
+
+        it("returns empty batch if no devices known", async () => {
+            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(new Map());
+            const batch = await crypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                ],
+                payload,
+            );
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch).toEqual([]);
         });
     });
 

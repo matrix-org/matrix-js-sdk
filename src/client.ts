@@ -3260,7 +3260,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
      *     of the successfully sent messages.
      *
-     * @deprecated Not supported for Rust Cryptography.
+     * @deprecated Instead use {@link CryptoApi.encryptToDeviceMessages} followed by {@link queueToDevice}.
      */
     public encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
         if (!this.crypto) {
