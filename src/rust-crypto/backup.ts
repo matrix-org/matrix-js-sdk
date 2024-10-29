@@ -602,33 +602,11 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     ): Promise<KeyBackupRestoreResult> {
         try {
             const roomKeysResponse = await this.downloadRoomKeys(backupInfoVersion);
-
             opts?.progressCallback?.({
                 stage: "load_keys",
             });
 
-            if ((roomKeysResponse as RoomsKeysResponse).rooms) {
-                return this.handleRoomsKeysResponse(
-                    roomKeysResponse as RoomsKeysResponse,
-                    backupInfoVersion,
-                    backupDecryptor,
-                    opts,
-                );
-            } else if ((roomKeysResponse as RoomKeysResponse).sessions) {
-                return this.handleRoomKeysResponse(
-                    roomKeysResponse as RoomKeysResponse,
-                    backupInfoVersion,
-                    backupDecryptor,
-                    opts,
-                );
-            } else {
-                return this.handleKeyBackupSessionResponse(
-                    roomKeysResponse as KeyBackupSession,
-                    backupInfoVersion,
-                    backupDecryptor,
-                    opts,
-                );
-            }
+            return this.handleRoomsKeysResponse(roomKeysResponse, backupInfoVersion, backupDecryptor, opts);
         } finally {
             backupDecryptor.free();
         }
@@ -636,12 +614,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Call `/room_keys/keys` to download the room keys for the given backup version.
+     * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
+     *
      * @param backupInfoVersion
+     * @returns The response from the server containing the keys to import.
      */
-    private downloadRoomKeys(
-        backupInfoVersion: string,
-    ): Promise<KeyBackupSession | RoomKeysResponse | RoomsKeysResponse> {
-        return this.http.authedRequest<KeyBackupSession | RoomKeysResponse | RoomsKeysResponse>(
+    private downloadRoomKeys(backupInfoVersion: string): Promise<RoomsKeysResponse> {
+        return this.http.authedRequest<RoomsKeysResponse>(
             Method.Get,
             "/room_keys/keys",
             { version: backupInfoVersion },
@@ -653,62 +632,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Decrypt a key backup session and import the keys.
-     * @param session
-     * @param backupInfoVersion
-     * @param backupDecryptor
-     * @param opts
+     * Import the room keys from a `/room_keys/keys` call.
+     * Call the opts.progressCallback with the progress of the import.
+     *
+     * @param response - The response from the server containing the keys to import.
+     * @param backupInfoVersion - The version of the backup info.
+     * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
+     * @param opts - Options for the import.
+     *
+     * @return The total number of keys and the total imported.
+     *
+     * @private
      */
-    private async handleKeyBackupSessionResponse(
-        session: KeyBackupSession,
-        backupInfoVersion: string,
-        backupDecryptor: BackupDecryptor,
-        opts?: KeyBackupRestoreOpts,
-    ): Promise<KeyBackupRestoreResult> {
-        let imported = 0;
-        try {
-            const [key] = await backupDecryptor.decryptSessions({
-                [undefined!]: session,
-            });
-
-            await this.importBackedUpRoomKeys([key], backupInfoVersion, {
-                progressCallback: opts?.progressCallback,
-            });
-            imported = 1;
-        } catch (e) {
-            logger.debug("Failed to decrypt megolm session from backup", e);
-        }
-
-        return { total: 1, imported };
-    }
-
-    /**
-     * Decrypt and import
-     * @param response
-     * @param backupInfoVersion
-     * @param backupDecryptor
-     * @param opts
-     */
-    private async handleRoomKeysResponse(
-        response: RoomKeysResponse,
-        backupInfoVersion: string,
-        backupDecryptor: BackupDecryptor,
-        opts?: KeyBackupRestoreOpts,
-    ): Promise<KeyBackupRestoreResult> {
-        // For now we don't chunk for a single room backup, but we could in the future.
-        // Currently it is not used by the application.
-        const { sessions } = response;
-        const keys = await backupDecryptor.decryptSessions(sessions);
-        for (const k of keys) {
-            k.room_id = undefined!;
-        }
-        await this.importBackedUpRoomKeys(keys, backupInfoVersion, {
-            progressCallback: opts?.progressCallback,
-        });
-
-        return { total: Object.keys(sessions).length, imported: keys.length };
-    }
-
     private async handleRoomsKeysResponse(
         response: RoomsKeysResponse,
         backupInfoVersion: string,
@@ -917,10 +852,10 @@ export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 };
 
-interface RoomKeysResponse {
-    sessions: KeyBackupRoomSessions;
-}
-
+/**
+ * Response from GET `/room_keys/keys` endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
+ */
 interface RoomsKeysResponse {
-    rooms: Record<string, RoomKeysResponse>;
+    rooms: Record<string, { sessions: KeyBackupRoomSessions }>;
 }
