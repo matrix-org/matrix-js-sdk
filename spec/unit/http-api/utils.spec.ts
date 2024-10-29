@@ -192,33 +192,29 @@ describe("parseErrorResponse", () => {
         headers.set("x-empty", "");
         headers.set("x-multi", "1");
         headers.append("x-multi", "2");
-    };
+    }
 
     function compareHeaders(expectedHeaders: Headers, otherHeaders: Headers | undefined) {
         expect(new Map(otherHeaders)).toEqual(new Map(expectedHeaders));
-    };
+    }
 
     it("should resolve HTTP Errors from XHR with headers", () => {
         headers.set("Content-Type", "text/plain");
         addHeaders(headers);
-        const err = parseErrorResponse(
-            {
-                ...xhrHeaderMethods,
-                status: 500,
-            } as XMLHttpRequest,
-        ) as HTTPError;
+        const err = parseErrorResponse({
+            ...xhrHeaderMethods,
+            status: 500,
+        } as XMLHttpRequest) as HTTPError;
         compareHeaders(headers, err.httpHeaders);
     });
 
     it("should resolve HTTP Errors from fetch with headers", () => {
         headers.set("Content-Type", "text/plain");
         addHeaders(headers);
-        const err = parseErrorResponse(
-            {
-                headers,
-                status: 500,
-            } as Response,
-        ) as HTTPError;
+        const err = parseErrorResponse({
+            headers,
+            status: 500,
+        } as Response) as HTTPError;
         compareHeaders(headers, err.httpHeaders);
     });
 

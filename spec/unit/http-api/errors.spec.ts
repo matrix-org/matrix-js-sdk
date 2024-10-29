@@ -22,7 +22,7 @@ describe("MatrixError", () => {
     let headers: Headers;
 
     beforeEach(() => {
-        headers = new Headers({"Content-Type": "application/json"});
+        headers = new Headers({ "Content-Type": "application/json" });
     });
 
     function makeMatrixError(httpStatus: number, data: IErrorJson): MatrixError {
@@ -84,7 +84,9 @@ describe("MatrixError", () => {
         for (const invalidValue of ["-1", "1.23", new Date(0).toString()]) {
             headers.set("Retry-After", invalidValue);
             const err = makeMatrixError(429, { errcode: "M_LIMIT_EXCEEDED" });
-            expect(() => err.getRetryAfterMs()).toThrow("value is not a valid HTTP-date or non-negative decimal integer");
+            expect(() => err.getRetryAfterMs()).toThrow(
+                "value is not a valid HTTP-date or non-negative decimal integer",
+            );
         }
     });
 

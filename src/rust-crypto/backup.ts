@@ -467,7 +467,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                                     continue;
                                 }
                             } catch (error) {
-                                logger.warn("Backup: An error occurred while retrieving a rate-limit retry delay", error);
+                                logger.warn(
+                                    "Backup: An error occurred while retrieving a rate-limit retry delay",
+                                    error,
+                                );
                             } // else go to the normal backoff
                         }
                     }
