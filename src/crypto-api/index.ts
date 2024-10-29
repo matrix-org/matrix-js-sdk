@@ -22,7 +22,13 @@ import { DeviceMap } from "../models/device.ts";
 import { UIAuthCallback } from "../interactive-auth.ts";
 import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage.ts";
 import { VerificationRequest } from "./verification.ts";
-import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup.ts";
+import {
+    BackupTrustInfo,
+    KeyBackupCheck,
+    KeyBackupInfo,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
+} from "./keybackup.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { MatrixEvent } from "../models/event.ts";
 
@@ -538,6 +544,25 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    /**
+     * Restores a key backup.
+     * If the recovery key is not provided, it will try to restore the key backup using the recovery key stored
+     * in the local cache or in the Secret Storage.
+     *
+     * @param recoveryKey - The recovery key to use to restore the key backup.
+     * @param opts
+     */
+    restoreKeyBackup(recoveryKey: string | undefined, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
+
+    /**
+     * Restores a key backup using a passphrase.
+     * @param phassphrase - The passphrase to use to restore the key backup.
+     * @param opts
+     *
+     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/ shared via 4S.
+     */
+    restoreKeyBackupWithPassphrase(phassphrase: string, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //

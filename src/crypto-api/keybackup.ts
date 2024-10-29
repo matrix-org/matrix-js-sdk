@@ -16,6 +16,7 @@ limitations under the License.
 
 import { ISigned } from "../@types/signed.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { ImportRoomKeyProgressData } from "./index.ts";
 
 export interface Curve25519AuthData {
     public_key: string;
@@ -86,4 +87,21 @@ export interface KeyBackupSession<T = Curve25519SessionData | AESEncryptedSecret
 
 export interface KeyBackupRoomSessions {
     [sessionId: string]: KeyBackupSession;
+}
+
+export interface RoomKeysResponse {
+    sessions: KeyBackupRoomSessions;
+}
+
+export interface RoomsKeysResponse {
+    rooms: Record<string, RoomKeysResponse>;
+}
+
+export interface KeyBackupRestoreOpts {
+    progressCallback?: (progress: ImportRoomKeyProgressData) => void;
+}
+
+export interface KeyBackupRestoreResult {
+    total: number;
+    imported: number;
 }

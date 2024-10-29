@@ -24,6 +24,10 @@ import {
     KeyBackupInfo,
     KeyBackupSession,
     Curve25519SessionData,
+    RoomKeysResponse,
+    RoomsKeysResponse,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -34,7 +38,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
-import { IKeyBackupInfo } from "../crypto/keybackup.ts";
+import { IKeyBackupInfo, IKeyBackupRoomSessions } from "../crypto/keybackup.ts";
 import { IKeyBackup } from "../crypto/backup.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
@@ -584,6 +588,240 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     public createBackupDecryptor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey): BackupDecryptor {
         return new RustBackupDecryptor(decryptionKey);
+    }
+
+    /**
+     * Restore a key backup.
+     * @param backupInfoVersion
+     * @param backupDecryptor
+     * @param opts
+     */
+    public async restoreKeyBackup(
+        backupInfoVersion: string,
+        backupDecryptor: BackupDecryptor,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        try {
+            const roomKeysResponse = await this.downloadRoomKeys(backupInfoVersion);
+
+            opts?.progressCallback?.({
+                stage: "load_keys",
+            });
+
+            if ((roomKeysResponse as RoomsKeysResponse).rooms) {
+                return this.handleRoomsKeysResponse(
+                    roomKeysResponse as RoomsKeysResponse,
+                    backupInfoVersion,
+                    backupDecryptor,
+                    opts,
+                );
+            } else if ((roomKeysResponse as RoomKeysResponse).sessions) {
+                return this.handleRoomKeysResponse(
+                    roomKeysResponse as RoomKeysResponse,
+                    backupInfoVersion,
+                    backupDecryptor,
+                    opts,
+                );
+            } else {
+                return this.handleKeyBackupSessionResponse(
+                    roomKeysResponse as KeyBackupSession,
+                    backupInfoVersion,
+                    backupDecryptor,
+                    opts,
+                );
+            }
+        } finally {
+            backupDecryptor.free();
+        }
+    }
+
+    /**
+     * Call `/room_keys/keys` to download the room keys for the given backup version.
+     * @param backupInfoVersion
+     */
+    private downloadRoomKeys(
+        backupInfoVersion: string,
+    ): Promise<KeyBackupSession | RoomKeysResponse | RoomsKeysResponse> {
+        return this.http.authedRequest<KeyBackupSession | RoomKeysResponse | RoomsKeysResponse>(
+            Method.Get,
+            "/room_keys/keys",
+            { version: backupInfoVersion },
+            undefined,
+            {
+                prefix: ClientPrefix.V3,
+            },
+        );
+    }
+
+    /**
+     * Decrypt a key backup session and import the keys.
+     * @param session
+     * @param backupInfoVersion
+     * @param backupDecryptor
+     * @param opts
+     */
+    private async handleKeyBackupSessionResponse(
+        session: KeyBackupSession,
+        backupInfoVersion: string,
+        backupDecryptor: BackupDecryptor,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        let imported = 0;
+        try {
+            const [key] = await backupDecryptor.decryptSessions({
+                [undefined!]: session,
+            });
+
+            await this.importBackedUpRoomKeys([key], backupInfoVersion, {
+                progressCallback: opts?.progressCallback,
+            });
+            imported = 1;
+        } catch (e) {
+            logger.debug("Failed to decrypt megolm session from backup", e);
+        }
+
+        return { total: 1, imported };
+    }
+
+    /**
+     * Decrypt and import
+     * @param response
+     * @param backupInfoVersion
+     * @param backupDecryptor
+     * @param opts
+     */
+    private async handleRoomKeysResponse(
+        response: RoomKeysResponse,
+        backupInfoVersion: string,
+        backupDecryptor: BackupDecryptor,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        // For now we don't chunk for a single room backup, but we could in the future.
+        // Currently it is not used by the application.
+        const { sessions } = response;
+        const keys = await backupDecryptor.decryptSessions(sessions);
+        for (const k of keys) {
+            k.room_id = undefined!;
+        }
+        await this.importBackedUpRoomKeys(keys, backupInfoVersion, {
+            progressCallback: opts?.progressCallback,
+        });
+
+        return { total: Object.keys(sessions).length, imported: keys.length };
+    }
+
+    private async handleRoomsKeysResponse(
+        response: RoomsKeysResponse,
+        backupInfoVersion: string,
+        backupDecryptor: BackupDecryptor,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        // We have a full backup here, it can get quite big, so we need to decrypt and import it in chunks.
+
+        // Get the total count as a first pass
+        const totalKeyCount = this.getTotalKeyCount(response);
+        let totalImported = 0;
+        let totalFailures = 0;
+        // Now decrypt and import the keys in chunks
+        await this.handleDecryptionOfAFullBackup(response, backupDecryptor, 200, async (chunk) => {
+            // We have a chunk of decrypted keys: import them
+            try {
+                await this.importBackedUpRoomKeys(chunk, backupInfoVersion);
+                totalImported += chunk.length;
+            } catch (e) {
+                totalFailures += chunk.length;
+                // We failed to import some keys, but we should still try to import the rest?
+                // Log the error and continue
+                logger.error("Error importing keys from backup", e);
+            }
+
+            opts?.progressCallback?.({
+                total: totalKeyCount,
+                successes: totalImported,
+                stage: "load_keys",
+                failures: totalFailures,
+            });
+        });
+
+        return { total: totalKeyCount, imported: totalImported };
+    }
+
+    /**
+     * This method calculates the total number of keys present in the response of a `/room_keys/keys` call.
+     *
+     * @param res - The response from the server containing the keys to be counted.
+     *
+     * @returns The total number of keys in the backup.
+     */
+    private getTotalKeyCount(res: RoomsKeysResponse): number {
+        const rooms = res.rooms;
+        let totalKeyCount = 0;
+        for (const roomData of Object.values(rooms)) {
+            if (!roomData.sessions) continue;
+            totalKeyCount += Object.keys(roomData.sessions).length;
+        }
+        return totalKeyCount;
+    }
+
+    /**
+     * This method handles the decryption of a full backup, i.e a call to `/room_keys/keys`.
+     * It will decrypt the keys in chunks and call the `block` callback for each chunk.
+     *
+     * @param res - The response from the server containing the keys to be decrypted.
+     * @param backupDecryptor - An instance of the BackupDecryptor class used to decrypt the keys.
+     * @param chunkSize - The size of the chunks to be processed at a time.
+     * @param block - A callback function that is called for each chunk of keys.
+     *
+     * @returns A promise that resolves when the decryption is complete.
+     */
+    private async handleDecryptionOfAFullBackup(
+        res: RoomsKeysResponse,
+        backupDecryptor: BackupDecryptor,
+        chunkSize: number,
+        block: (chunk: IMegolmSessionData[]) => Promise<void>,
+    ): Promise<void> {
+        const { rooms } = res;
+
+        let groupChunkCount = 0;
+        let chunkGroupByRoom: Map<string, IKeyBackupRoomSessions> = new Map();
+
+        const handleChunkCallback = async (roomChunks: Map<string, IKeyBackupRoomSessions>): Promise<void> => {
+            const currentChunk: IMegolmSessionData[] = [];
+            for (const roomId of roomChunks.keys()) {
+                const decryptedSessions = await backupDecryptor.decryptSessions(roomChunks.get(roomId)!);
+                for (const sessionId in decryptedSessions) {
+                    const k = decryptedSessions[sessionId];
+                    k.room_id = roomId;
+                    currentChunk.push(k);
+                }
+            }
+            await block(currentChunk);
+        };
+
+        for (const [roomId, roomData] of Object.entries(rooms)) {
+            if (!roomData.sessions) continue;
+
+            chunkGroupByRoom.set(roomId, {});
+
+            for (const [sessionId, session] of Object.entries(roomData.sessions)) {
+                const sessionsForRoom = chunkGroupByRoom.get(roomId)!;
+                sessionsForRoom[sessionId] = session;
+                groupChunkCount += 1;
+                if (groupChunkCount >= chunkSize) {
+                    // We have enough chunks to decrypt
+                    await handleChunkCallback(chunkGroupByRoom);
+                    chunkGroupByRoom = new Map();
+                    // There might be remaining keys for that room, so add back an entry for the current room.
+                    chunkGroupByRoom.set(roomId, {});
+                    groupChunkCount = 0;
+                }
+            }
+        }
+
+        // Handle remaining chunk if needed
+        if (groupChunkCount > 0) {
+            await handleChunkCallback(chunkGroupByRoom);
+        }
     }
 }
 

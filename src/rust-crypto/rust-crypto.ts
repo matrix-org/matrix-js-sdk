@@ -66,6 +66,9 @@ import {
     DeviceIsolationModeKind,
     CryptoEvent,
     CryptoEventHandlerMap,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
+    decodeRecoveryKey,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -81,11 +84,12 @@ import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
 import { ISignatures } from "../@types/signed.ts";
-import { encodeBase64 } from "../base64.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";
 import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
+import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1278,6 +1282,90 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         if (unsigned !== undefined) obj.unsigned = unsigned;
         obj.signatures = Object.fromEntries(sigs.entries());
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#restoreKeyBackupWithPassphrase}.
+     */
+    public async restoreKeyBackupWithPassphrase(
+        phassphrase: string,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        const backupInfo = await this.backupManager.getServerBackupInfo();
+        if (!backupInfo?.version) {
+            throw new Error("No backup info available");
+        }
+
+        const privateKey = await keyFromAuthData(backupInfo.auth_data, phassphrase);
+        return this.restoreKeyBackupWithKey(privateKey, backupInfo, opts);
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#restoreKeyBackup}.
+     */
+    public async restoreKeyBackup(
+        recoveryKey: string | undefined,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        // If the recovery key is not provided, we try to get it from the local cache or the secret storage
+        const privateKey = recoveryKey
+            ? decodeRecoveryKey(recoveryKey)
+            : await this.getPrivateKeyFromCacheOrSecretStorage();
+
+        if (!privateKey) {
+            throw new Error("No recovery key available");
+        }
+
+        const backupInfo = await this.backupManager.getServerBackupInfo();
+        if (!backupInfo) throw new Error("No backup info available");
+
+        return this.restoreKeyBackupWithKey(privateKey, backupInfo, opts);
+    }
+
+    /**
+     *
+     * @param recoveryKey
+     * @param backupInfo
+     * @param opts
+     * @private
+     */
+    private async restoreKeyBackupWithKey(
+        recoveryKey: Uint8Array,
+        backupInfo: KeyBackupInfo,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        if (!backupInfo.version) throw new Error("Missing version in backup info");
+
+        // Cache the key, if possible.
+        // This is async.
+        this.storeSessionBackupPrivateKey(recoveryKey, backupInfo.version).catch((e) => {
+            this.logger.warn("Error caching session backup key:", e);
+        });
+
+        const backupDecryptor = await this.getBackupDecryptor(backupInfo, recoveryKey);
+
+        opts?.progressCallback?.({
+            stage: "fetch",
+        });
+
+        return this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+    }
+
+    /**
+     * Get the private key from the cache or the secret storage.
+     * If the key is not found, returns null.
+     * @private
+     */
+    private async getPrivateKeyFromCacheOrSecretStorage(): Promise<Uint8Array | null> {
+        // First we try to git from our local store
+        const privateKeyFromCache = await this.getSessionBackupPrivateKey();
+        if (privateKeyFromCache) return privateKeyFromCache;
+
+        // If not found, we try to get it from the secret storage
+        const encodedKey = await this.secretStorage.get("m.megolm_backup.v1");
+        if (!encodedKey) return null;
+
+        return decodeBase64(encodedKey);
     }
 
     /**

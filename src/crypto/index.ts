@@ -102,6 +102,8 @@ import {
     OwnDeviceKeys,
     CryptoEvent as CryptoApiCryptoEvent,
     CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
+    KeyBackupRestoreResult,
+    KeyBackupRestoreOpts,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -4306,6 +4308,26 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Stub function -- dehydration is not implemented here, so throw error
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackup is not implemented here, so throw error
+     */
+    public restoreKeyBackup(
+        recoveryKey: string | undefined,
+        opts: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreBackupWithPassphrase is not implemented here, so throw error
+     */
+    public restoreKeyBackupWithPassphrase(
+        phassphrase: string,
+        opts: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
     }
 }
