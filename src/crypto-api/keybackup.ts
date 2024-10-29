@@ -89,14 +89,6 @@ export interface KeyBackupRoomSessions {
     [sessionId: string]: KeyBackupSession;
 }
 
-export interface RoomKeysResponse {
-    sessions: KeyBackupRoomSessions;
-}
-
-export interface RoomsKeysResponse {
-    rooms: Record<string, RoomKeysResponse>;
-}
-
 export interface KeyBackupRestoreOpts {
     progressCallback?: (progress: ImportRoomKeyProgressData) => void;
 }

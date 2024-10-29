@@ -24,10 +24,9 @@ import {
     KeyBackupInfo,
     KeyBackupSession,
     Curve25519SessionData,
-    RoomKeysResponse,
-    RoomsKeysResponse,
     KeyBackupRestoreOpts,
     KeyBackupRestoreResult,
+    KeyBackupRoomSessions,
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -38,7 +37,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
-import { IKeyBackupInfo, IKeyBackupRoomSessions } from "../crypto/keybackup.ts";
+import { IKeyBackupInfo } from "../crypto/keybackup.ts";
 import { IKeyBackup } from "../crypto/backup.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
@@ -783,9 +782,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const { rooms } = res;
 
         let groupChunkCount = 0;
-        let chunkGroupByRoom: Map<string, IKeyBackupRoomSessions> = new Map();
+        let chunkGroupByRoom: Map<string, KeyBackupRoomSessions> = new Map();
 
-        const handleChunkCallback = async (roomChunks: Map<string, IKeyBackupRoomSessions>): Promise<void> => {
+        const handleChunkCallback = async (roomChunks: Map<string, KeyBackupRoomSessions>): Promise<void> => {
             const currentChunk: IMegolmSessionData[] = [];
             for (const roomId of roomChunks.keys()) {
                 const decryptedSessions = await backupDecryptor.decryptSessions(roomChunks.get(roomId)!);
@@ -917,3 +916,11 @@ export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupFailed]: (errCode: string) => void;
     [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 };
+
+interface RoomKeysResponse {
+    sessions: KeyBackupRoomSessions;
+}
+
+interface RoomsKeysResponse {
+    rooms: Record<string, RoomKeysResponse>;
+}
