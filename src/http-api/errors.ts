@@ -100,21 +100,21 @@ export class MatrixError extends HTTPError {
         }
         return null;
     }
+}
 
-    /**
-     * @returns the recommended delay in milliseconds to wait before retrying
-     * the request that triggered this error, or {@link defaultMs} if no valid
-     * delay is recommended.
-     */
-    public safeGetRetryAfterMs(defaultMs: number): number {
-        if (!this.isRateLimitError()) {
-            return defaultMs;
-        }
-        try {
-            return this.getRetryAfterMs() ?? defaultMs;
-        } catch (e) {
-            return defaultMs;
-        }
+/**
+ * @returns the recommended delay in milliseconds to wait before retrying
+ * the request that triggered {@link error}, or {@link defaultMs} if no valid
+ * delay is recommended.
+ */
+export function safeGetRetryAfterMs(error: unknown, defaultMs: number): number {
+    if (!(error instanceof MatrixError) || !error.isRateLimitError()) {
+        return defaultMs;
+    }
+    try {
+        return error.getRetryAfterMs() ?? defaultMs;
+    } catch (e) {
+        return defaultMs;
     }
 }
 
