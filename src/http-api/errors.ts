@@ -16,7 +16,6 @@ limitations under the License.
 
 import { IUsageLimit } from "../@types/partials.ts";
 import { MatrixEvent } from "../models/event.ts";
-import { parseRetryAfterMs } from "./utils.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
@@ -89,7 +88,18 @@ export class MatrixError extends HTTPError {
     public getRetryAfterMs(): number | null {
         const retryAfter = this.httpHeaders?.get("Retry-After");
         if (retryAfter != null) {
-            return parseRetryAfterMs(retryAfter);
+            if (/^\d+$/.test(retryAfter)) {
+                const ms = Number.parseInt(retryAfter) * 1000;
+                if (!Number.isFinite(ms)) {
+                    throw new Error("Retry-After header integer value is too large");
+                }
+                return ms;
+            }
+            const date = new Date(retryAfter);
+            if (date.toUTCString() !== retryAfter) {
+                throw new Error("Retry-After header value is not a valid HTTP-date or non-negative decimal integer");
+            }
+            return date.getTime() - Date.now();
         }
         // Note: retry_after_ms is deprecated as of spec version v1.10
         if (this.errcode === "M_LIMIT_EXCEEDED" && "retry_after_ms" in this.data) {
