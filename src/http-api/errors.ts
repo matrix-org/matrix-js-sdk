@@ -84,6 +84,7 @@ export class MatrixError extends HTTPError {
     /**
      * @returns the recommended delay in milliseconds to wait before retrying
      * the request that triggered this error, or null if no delay is recommended.
+     * @throws Error if the recommended delay is an invalid value.
      */
     public getRetryAfterMs(): number | null {
         const retryAfter = this.httpHeaders?.get("Retry-After");
@@ -98,6 +99,22 @@ export class MatrixError extends HTTPError {
             return this.data.retry_after_ms;
         }
         return null;
+    }
+
+    /**
+     * @returns the recommended delay in milliseconds to wait before retrying
+     * the request that triggered this error, or {@link defaultMs} if no valid
+     * delay is recommended.
+     */
+    public safeGetRetryAfterMs(defaultMs: number): number {
+        if (!this.isRateLimitError()) {
+            return defaultMs;
+        }
+        try {
+            return this.getRetryAfterMs() ?? defaultMs;
+        } catch (e) {
+            return defaultMs;
+        }
     }
 }
 

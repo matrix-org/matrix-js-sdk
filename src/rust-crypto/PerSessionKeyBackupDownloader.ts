@@ -371,14 +371,16 @@ export class PerSessionKeyBackupDownloader {
                     throw new KeyDownloadError(KeyDownloadErrorCode.MISSING_DECRYPTION_KEY);
                 }
                 if (errCode == "M_LIMIT_EXCEEDED") {
-                    const waitTime = e.getRetryAfterMs();
-                    if (waitTime !== null && waitTime > 0) {
-                        this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
-                        throw new KeyDownloadRateLimitError(waitTime);
-                    } else {
-                        // apply the default backoff time
-                        throw new KeyDownloadRateLimitError(KEY_BACKUP_BACKOFF);
+                    let waitTime: number | undefined;
+                    try {
+                        waitTime = e.getRetryAfterMs() ?? undefined;
+                    } catch (error) {
+                        this.logger.warn("Error while retrieving a rate-limit retry delay", error);
                     }
+                    if (waitTime && waitTime > 0) {
+                        this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
+                    }
+                    throw new KeyDownloadRateLimitError(waitTime ?? KEY_BACKUP_BACKOFF);
                 }
             }
             throw new KeyDownloadError(KeyDownloadErrorCode.NETWORK_ERROR);

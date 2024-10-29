@@ -460,10 +460,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             return;
                         } else if (errCode == "M_LIMIT_EXCEEDED") {
                             // wait for that and then continue?
-                            const waitTime = err.getRetryAfterMs();
-                            if (waitTime !== null && waitTime > 0) {
-                                await sleep(waitTime);
-                                continue;
+                            try {
+                                const waitTime = err.getRetryAfterMs();
+                                if (waitTime && waitTime > 0) {
+                                    await sleep(waitTime);
+                                    continue;
+                                }
+                            } catch (error) {
+                                logger.warn("Backup: An error occurred while retrieving a rate-limit retry delay", error);
                             } // else go to the normal backoff
                         }
                     }
