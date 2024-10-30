@@ -128,8 +128,7 @@ export function safeGetRetryAfterMs(error: unknown, defaultMs: number): number {
     }
     try {
         return error.getRetryAfterMs() ?? defaultMs;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_) {
+    } catch {
         return defaultMs;
     }
 }
