@@ -612,7 +612,7 @@ export class SlidingSyncSdk {
             timelineEvents = newEvents;
             if (oldEvents.length > 0) {
                 // old events are scrollback, insert them now
-                room.addEventsToTimeline(oldEvents, true, room.getLiveTimeline(), roomData.prev_batch);
+                room.addEventsToTimeline(oldEvents, true, false, room.getLiveTimeline(), roomData.prev_batch);
             }
         }
 
@@ -826,10 +826,12 @@ export class SlidingSyncSdk {
         // to be decorated with sender etc.
         await room.addLiveEvents(timelineEventList, {
             fromCache: true,
+            addToState: false,
         });
         if (liveTimelineEvents.length > 0) {
             await room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
+                addToState: false,
             });
         }
 
@@ -966,7 +968,7 @@ export class SlidingSyncSdk {
             return a.getTs() - b.getTs();
         });
         this.notifEvents.forEach((event) => {
-            this.client.getNotifTimelineSet()?.addLiveEvent(event);
+            this.client.getNotifTimelineSet()?.addLiveEvent(event, { addToState: false });
         });
         this.notifEvents = [];
     }

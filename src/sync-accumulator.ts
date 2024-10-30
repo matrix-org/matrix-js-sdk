@@ -78,6 +78,7 @@ export interface ITimeline {
 export interface IJoinedRoom {
     "summary": IRoomSummary;
     "state": IState;
+    "state_after"?: IState;
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -107,6 +108,7 @@ export interface IInvitedRoom {
 
 export interface ILeftRoom {
     state: IState;
+    state_after?: IState;
     timeline: ITimeline;
     account_data: IAccountData;
 }
@@ -567,6 +569,7 @@ export class SyncAccumulator {
                 ephemeral: { events: [] },
                 account_data: { events: [] },
                 state: { events: [] },
+                state_after: undefined,
                 timeline: {
                     events: [],
                     prev_batch: null,

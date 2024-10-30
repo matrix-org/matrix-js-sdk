@@ -1144,7 +1144,7 @@ describe("MatrixClient event timelines", function () {
 
         const prom = emitPromise(room, ThreadEvent.Update);
         // Assume we're seeing the reply while loading backlog
-        await room.addLiveEvents([THREAD_REPLY2]);
+        await room.addLiveEvents([THREAD_REPLY2], { addToState: false });
         httpBackend
             .when(
                 "GET",
@@ -1155,7 +1155,7 @@ describe("MatrixClient event timelines", function () {
             });
         await flushHttp(prom);
         // but while loading the metadata, a new reply has arrived
-        await room.addLiveEvents([THREAD_REPLY3]);
+        await room.addLiveEvents([THREAD_REPLY3], { addToState: false });
         const thread = room.getThread(THREAD_ROOT_UPDATED.event_id!)!;
         // then the events should still be all in the right order
         expect(thread.events.map((it) => it.getId())).toEqual([
@@ -1247,7 +1247,7 @@ describe("MatrixClient event timelines", function () {
 
         const prom = emitPromise(room, ThreadEvent.Update);
         // Assume we're seeing the reply while loading backlog
-        await room.addLiveEvents([THREAD_REPLY2]);
+        await room.addLiveEvents([THREAD_REPLY2], { addToState: false });
         httpBackend
             .when(
                 "GET",
@@ -1263,7 +1263,7 @@ describe("MatrixClient event timelines", function () {
             });
         await flushHttp(prom);
         // but while loading the metadata, a new reply has arrived
-        await room.addLiveEvents([THREAD_REPLY3]);
+        await room.addLiveEvents([THREAD_REPLY3], { addToState: false });
         const thread = room.getThread(THREAD_ROOT_UPDATED.event_id!)!;
         // then the events should still be all in the right order
         expect(thread.events.map((it) => it.getId())).toEqual([
@@ -1560,7 +1560,7 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.NewReply);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                await room.addLiveEvents([THREAD_REPLY2]);
+                await room.addLiveEvents([THREAD_REPLY2], { addToState: false });
                 await httpBackend.flushAllExpected();
                 await prom;
                 expect(thread.length).toBe(2);
@@ -1685,7 +1685,7 @@ describe("MatrixClient event timelines", function () {
                 thread.initialEventsFetched = true;
                 const prom = emitPromise(room, ThreadEvent.Update);
                 respondToEvent(THREAD_ROOT_UPDATED);
-                await room.addLiveEvents([THREAD_REPLY_REACTION]);
+                await room.addLiveEvents([THREAD_REPLY_REACTION], { addToState: false });
                 await httpBackend.flushAllExpected();
                 await prom;
                 expect(thread.length).toBe(1); // reactions don't count towards the length of a thread

@@ -175,14 +175,15 @@ export enum SetPresence {
 }
 
 interface ISyncParams {
-    filter?: string;
-    timeout: number;
-    since?: string;
+    "filter"?: string;
+    "timeout": number;
+    "since"?: string;
     // eslint-disable-next-line camelcase
-    full_state?: boolean;
+    "full_state"?: boolean;
     // eslint-disable-next-line camelcase
-    set_presence?: SetPresence;
-    _cacheBuster?: string | number; // not part of the API itself
+    "set_presence"?: SetPresence;
+    "_cacheBuster"?: string | number; // not part of the API itself
+    "io.element.sync_v2_state_after"?: boolean;
 }
 
 type WrappedRoom<T> = T & {
@@ -464,6 +465,7 @@ export class SyncApi {
             this._peekRoom.addEventsToTimeline(
                 messages.reverse(),
                 true,
+                true,
                 this._peekRoom.getLiveTimeline(),
                 response.messages.start,
             );
@@ -551,7 +553,7 @@ export class SyncApi {
                         })
                         .map(this.client.getEventMapper());
 
-                    await peekRoom.addLiveEvents(events);
+                    await peekRoom.addLiveEvents(events, { addToState: true });
                     this.peekPoll(peekRoom, res.end);
                 },
                 (err) => {
@@ -1001,6 +1003,8 @@ export class SyncApi {
             qps.timeout = 0;
         }
 
+        qps["io.element.sync_v2_state_after"] = true;
+
         return qps;
     }
 
@@ -1242,7 +1246,7 @@ export class SyncApi {
             const room = inviteObj.room;
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
-            await this.injectRoomEvents(room, stateEvents);
+            await this.injectRoomEvents(room, stateEvents, undefined);
 
             const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId()!)?.getSender();
 
@@ -1282,15 +1286,22 @@ export class SyncApi {
         await promiseMapSeries(joinRooms, async (joinObj) => {
             const room = joinObj.room;
             const stateEvents = this.mapSyncEventsFormat(joinObj.state, room);
+            const stateAfterEvents = this.mapSyncEventsFormat(joinObj.state_after, room);
             // Prevent events from being decrypted ahead of time
             // this helps large account to speed up faster
             // room::decryptCriticalEvent is in charge of decrypting all the events
             // required for a client to function properly
-            const events = this.mapSyncEventsFormat(joinObj.timeline, room, false);
+            const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
             const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
-            const encrypted = this.isRoomEncrypted(room, stateEvents, events);
+            // If state_after is present, this is the events that form the state at the end of the timeline block and
+            // regular timeline events do *not* count towards state. If it's not present, then the state is formed by
+            // the state events plus the timeline events. Note mapSyncEventsFormat returns an empty array if the field
+            // is absent so we explicitly check the field on the original object.
+            const eventsFormingFinalState = joinObj.state_after ? stateAfterEvents : stateEvents.concat(timelineEvents);
+
+            const encrypted = this.isRoomEncrypted(room, eventsFormingFinalState);
             // We store the server-provided value first so it's correct when any of the events fire.
             if (joinObj.unread_notifications) {
                 /**
@@ -1378,8 +1389,8 @@ export class SyncApi {
                 // which we'll try to paginate but not get any new events (which
                 // will stop us linking the empty timeline into the chain).
                 //
-                for (let i = events.length - 1; i >= 0; i--) {
-                    const eventId = events[i].getId()!;
+                for (let i = timelineEvents.length - 1; i >= 0; i--) {
+                    const eventId = timelineEvents[i].getId()!;
                     if (room.getTimelineForEvent(eventId)) {
                         debuglog(`Already have event ${eventId} in limited sync - not resetting`);
                         limited = false;
@@ -1387,7 +1398,7 @@ export class SyncApi {
                         // we might still be missing some of the events before i;
                         // we don't want to be adding them to the end of the
                         // timeline because that would put them out of order.
-                        events.splice(0, i);
+                        timelineEvents.splice(0, i);
 
                         // XXX: there's a problem here if the skipped part of the
                         // timeline modifies the state set in stateEvents, because
@@ -1419,8 +1430,9 @@ export class SyncApi {
             // avoids a race condition if the application tries to send a message after the
             // state event is processed, but before crypto is enabled, which then causes the
             // crypto layer to complain.
+
             if (this.syncOpts.cryptoCallbacks) {
-                for (const e of stateEvents.concat(events)) {
+                for (const e of eventsFormingFinalState) {
                     if (e.isState() && e.getType() === EventType.RoomEncryption && e.getStateKey() === "") {
                         await this.syncOpts.cryptoCallbacks.onCryptoEvent(room, e);
                     }
@@ -1428,7 +1440,13 @@ export class SyncApi {
             }
 
             try {
-                await this.injectRoomEvents(room, stateEvents, events, syncEventData.fromCache);
+                await this.injectRoomEvents(
+                    room,
+                    joinObj.state ? stateEvents : undefined,
+                    joinObj.state_after ? stateAfterEvents : undefined,
+                    timelineEvents,
+                    syncEventData.fromCache,
+                );
             } catch (e) {
                 logger.error(`Failed to process events on room ${room.roomId}:`, e);
             }
@@ -1452,11 +1470,11 @@ export class SyncApi {
                 client.emit(ClientEvent.Room, room);
             }
 
-            this.processEventsForNotifs(room, events);
+            this.processEventsForNotifs(room, timelineEvents);
 
             const emitEvent = (e: MatrixEvent): boolean => client.emit(ClientEvent.Event, e);
             stateEvents.forEach(emitEvent);
-            events.forEach(emitEvent);
+            timelineEvents.forEach(emitEvent);
             ephemeralEvents.forEach(emitEvent);
             accountDataEvents.forEach(emitEvent);
 
@@ -1500,7 +1518,7 @@ export class SyncApi {
             const room = knockObj.room;
             const stateEvents = this.mapSyncEventsFormat(knockObj.knock_state, room);
 
-            await this.injectRoomEvents(room, stateEvents);
+            await this.injectRoomEvents(room, stateEvents, undefined);
 
             if (knockObj.isBrandNewRoom) {
                 room.recalculate();
@@ -1525,7 +1543,7 @@ export class SyncApi {
                 return a.getTs() - b.getTs();
             });
             this.notifEvents.forEach(function (event) {
-                client.getNotifTimelineSet()?.addLiveEvent(event);
+                client.getNotifTimelineSet()?.addLiveEvent(event, { addToState: true });
             });
         }
 
@@ -1669,7 +1687,7 @@ export class SyncApi {
     }
 
     private mapSyncEventsFormat(
-        obj: IInviteState | ITimeline | IEphemeral,
+        obj: IInviteState | ITimeline | IEphemeral | undefined,
         room?: Room,
         decrypt = true,
     ): MatrixEvent[] {
@@ -1737,28 +1755,39 @@ export class SyncApi {
 
     // When processing the sync response we cannot rely on Room.hasEncryptionStateEvent we actually
     // inject the events into the room object, so we have to inspect the events themselves.
-    private isRoomEncrypted(room: Room, stateEventList: MatrixEvent[], timelineEventList?: MatrixEvent[]): boolean {
-        return (
-            room.hasEncryptionStateEvent() ||
-            !!this.findEncryptionEvent(stateEventList) ||
-            !!this.findEncryptionEvent(timelineEventList)
-        );
+    private isRoomEncrypted(room: Room, eventsFormingFinalState: MatrixEvent[]): boolean {
+        return room.hasEncryptionStateEvent() || !!this.findEncryptionEvent(eventsFormingFinalState);
     }
 
     /**
      * Injects events into a room's model.
      * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
+     * @param stateAfterEventList - A list of state events. This is the state
+     * at the *END* of the timeline list if it is supplied.
      * @param timelineEventList - A list of timeline events, including threaded. Lower index
      * is earlier in time. Higher index is later.
      * @param fromCache - whether the sync response came from cache
+     *
+     * Exactly one of stateEventList and stateAfterEventList must be supplied. If
+     * stateEventList is supplied, the events in timelineEventList are added to the state
+     * after stateEventList. If stateAfterEventList is supplied, the events in timelineEventList
+     * are not added to the state.
      */
     public async injectRoomEvents(
         room: Room,
-        stateEventList: MatrixEvent[],
+        stateEventList: MatrixEvent[] | undefined,
+        stateAfterEventList: MatrixEvent[] | undefined,
         timelineEventList?: MatrixEvent[],
         fromCache = false,
     ): Promise<void> {
+        const eitherStateEventList = stateAfterEventList ?? stateEventList;
+        if (eitherStateEventList === undefined || (stateEventList && stateAfterEventList)) {
+            throw new Error(
+                "injectRoomEvents: Exactly one of stateEventList or stateAfterEventList must be non-undefined",
+            );
+        }
+
         // If there are no events in the timeline yet, initialise it with
         // the given state events
         const liveTimeline = room.getLiveTimeline();
@@ -1772,10 +1801,11 @@ export class SyncApi {
             // push actions cache elsewhere so we can freeze MatrixEvents, or otherwise
             // find some solution where MatrixEvents are immutable but allow for a cache
             // field.
-            for (const ev of stateEventList) {
+
+            for (const ev of eitherStateEventList) {
                 this.client.getPushActionsForEvent(ev);
             }
-            liveTimeline.initialiseState(stateEventList, {
+            liveTimeline.initialiseState(eitherStateEventList, {
                 timelineWasEmpty,
             });
         }
@@ -1807,8 +1837,8 @@ export class SyncApi {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...
-            room.oldState.setStateEvents(stateEventList || []);
-            room.currentState.setStateEvents(stateEventList || []);
+            room.oldState.setStateEvents(eitherStateEventList);
+            room.currentState.setStateEvents(eitherStateEventList);
         }
 
         // Execute the timeline events. This will continue to diverge the current state
@@ -1818,6 +1848,7 @@ export class SyncApi {
         await room.addLiveEvents(timelineEventList || [], {
             fromCache,
             timelineWasEmpty,
+            addToState: Boolean(stateEventList),
         });
         this.client.processBeaconEvents(room, timelineEventList);
     }

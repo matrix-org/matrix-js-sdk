@@ -317,6 +317,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 toStartOfTimeline,
                 fromCache: false,
                 roomState: this.roomState,
+                addToState: false,
             });
         }
     }
@@ -343,7 +344,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (this.findEventById(eventId)) {
             return;
         }
-        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState);
+        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
@@ -618,7 +619,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                     // if the thread has regular events, this will just load the last reply.
                     // if the thread is newly created, this will load the root event.
                     if (this.replyCount === 0 && this.rootEvent) {
-                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, this.liveTimeline, null);
+                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, false, this.liveTimeline, null);
                         this.liveTimeline.setPaginationToken(null, Direction.Backward);
                     } else {
                         this.initalEventFetchProm = this.client.paginateEventTimeline(this.liveTimeline, {
