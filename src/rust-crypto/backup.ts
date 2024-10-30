@@ -703,34 +703,48 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     ): Promise<void> {
         const { rooms } = keyBackup;
 
-        let groupChunkCount = 0;
-        let chunkGroupByRoom: Map<string, KeyBackupRoomSessions> = new Map();
-
+        /**
+         * This method is called when we have enough chunks to decrypt.
+         * It will decrypt the chunks and call the `block` callback.
+         * @param roomChunks
+         */
         const handleChunkCallback = async (roomChunks: Map<string, KeyBackupRoomSessions>): Promise<void> => {
             const currentChunk: IMegolmSessionData[] = [];
+            // const decryptedSessions: IMegolmSessionData[] = [];
             for (const roomId of roomChunks.keys()) {
+                // Decrypt the sessions for the given room
                 const decryptedSessions = await backupDecryptor.decryptSessions(roomChunks.get(roomId)!);
-                for (const sessionId in decryptedSessions) {
-                    const k = decryptedSessions[sessionId];
-                    k.room_id = roomId;
-                    currentChunk.push(k);
-                }
+                // Add the decrypted sessions to the current chunk
+                decryptedSessions.forEach((session) => {
+                    // We set the room_id for each session
+                    session.room_id = roomId;
+                    currentChunk.push(session);
+                });
             }
+
             await block(currentChunk);
         };
 
+        let groupChunkCount = 0;
+        let chunkGroupByRoom: Map<string, KeyBackupRoomSessions> = new Map();
+
         for (const [roomId, roomData] of Object.entries(rooms)) {
+            // If there are no sessions for the room, skip it
             if (!roomData.sessions) continue;
 
+            // Initialize a new chunk group for the current room
             chunkGroupByRoom.set(roomId, {});
 
             for (const [sessionId, session] of Object.entries(roomData.sessions)) {
+                // We set previously the chunk group for the current room, so we can safely get it
                 const sessionsForRoom = chunkGroupByRoom.get(roomId)!;
                 sessionsForRoom[sessionId] = session;
                 groupChunkCount += 1;
+                // If we have enough chunks to decrypt, call the block callback
                 if (groupChunkCount >= chunkSize) {
                     // We have enough chunks to decrypt
                     await handleChunkCallback(chunkGroupByRoom);
+                    // Reset the chunk group
                     chunkGroupByRoom = new Map();
                     // There might be remaining keys for that room, so add back an entry for the current room.
                     chunkGroupByRoom.set(roomId, {});
