@@ -74,14 +74,19 @@ export class MatrixError extends HTTPError {
     }
 
     /**
-     * @returns whether this error is due to rate-limiting.
+     * Check if this error was due to rate-limiting on the server side (and should therefore be retried after a delay).
+     *
+     * If this returns `true`, {@link getRetryAfterMs} can be called to retrieve the server-side 
+     * recommendation for the retry period.
+     *
+     * @returns Whether this error is due to rate-limiting.
      */
     public isRateLimitError(): boolean {
         return this.errcode === "M_LIMIT_EXCEEDED" || (this.errcode === "M_UNKNOWN" && this.httpStatus === 429);
     }
 
     /**
-     * @returns the recommended delay in milliseconds to wait before retrying
+     * @returns The recommended delay in milliseconds to wait before retrying
      * the request that triggered this error, or null if no delay is recommended.
      * @throws Error if the recommended delay is an invalid value.
      */
@@ -113,7 +118,7 @@ export class MatrixError extends HTTPError {
 }
 
 /**
- * @returns the recommended delay in milliseconds to wait before retrying
+ * @returns The recommended delay in milliseconds to wait before retrying
  * the request that triggered {@link error}, or {@link defaultMs} if no valid
  * delay is recommended.
  */
