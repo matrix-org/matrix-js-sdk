@@ -24,6 +24,7 @@ import {
     KeyBackupInfo,
     KeyBackupSession,
     Curve25519SessionData,
+    KeyBackupRoomSessions,
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -34,8 +35,6 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
-import { IKeyBackupInfo } from "../crypto/keybackup.ts";
-import { IKeyBackup } from "../crypto/backup.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /** Authentification of the backup info, depends on algorithm */
@@ -488,7 +487,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns The number of keys in the backup request.
      */
     private keysCountInBatch(batch: RustSdkCryptoJs.KeysBackupRequest): number {
-        const parsedBody: IKeyBackup = JSON.parse(batch.body);
+        const parsedBody: KeyBackup = JSON.parse(batch.body);
         let count = 0;
         for (const { sessions } of Object.values(parsedBody.rooms)) {
             count += Object.keys(sessions).length;
@@ -653,7 +652,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
 
 export async function requestKeyBackupVersion(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-): Promise<IKeyBackupInfo | null> {
+): Promise<KeyBackupInfo | null> {
     try {
         return await http.authedRequest<KeyBackupInfo>(Method.Get, "/room_keys/version", undefined, undefined, {
             prefix: ClientPrefix.V3,
@@ -679,3 +678,11 @@ export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupFailed]: (errCode: string) => void;
     [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 };
+
+/**
+ * Response from GET `/room_keys/keys` endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
+ */
+export interface KeyBackup {
+    rooms: Record<string, { sessions: KeyBackupRoomSessions }>;
+}
