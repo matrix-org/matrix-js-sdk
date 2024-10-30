@@ -220,7 +220,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Import a list of room keys previously exported by exportRoomKeysAsJson
      *
-     * @param keys - a JSON string encoding a list of session export objects,
+     * @param jsonKeys - a JSON string encoding a list of session export objects,
      *    each of which is an IMegolmSessionData
      * @param opts - options object
      * @returns a promise which resolves once the keys have been imported
