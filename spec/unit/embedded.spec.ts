@@ -35,7 +35,7 @@ import {
 import { createRoomWidgetClient, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
-import { ICapabilities } from "../../src/embedded";
+import { ICapabilities, RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
 import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
@@ -493,6 +493,23 @@ describe("RoomWidgetClient", () => {
             ["@bob:example.org"]: { ["bobDesktop"]: { hello: "bob!" } },
         };
 
+        const encryptedContentMap = new Map<string, Map<string, object>>([
+            ["@alice:example.org", new Map([["aliceMobile", { hello: "alice!" }]])],
+            ["@bob:example.org", new Map([["bobDesktop", { hello: "bob!" }]])],
+        ]);
+
+        it("sends unencrypted (sendToDeviceViaWidgetApi)", async () => {
+            await makeClient({ sendToDevice: ["org.example.foo"] });
+            expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
+
+            await (client as RoomWidgetClient).sendToDeviceViaWidgetApi(
+                "org.example.foo",
+                false,
+                unencryptedContentMap,
+            );
+            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, expectedRequestData);
+        });
+
         it("sends unencrypted (sendToDevice)", async () => {
             await makeClient({ sendToDevice: ["org.example.foo"] });
             expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
@@ -531,6 +548,17 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", true, {
                 "@alice:example.org": { aliceWeb: payload },
                 "@bob:example.org": { bobDesktop: payload },
+            });
+        });
+
+        it("sends encrypted (sendToDeviceViaWidgetApi)", async () => {
+            await makeClient({ sendToDevice: ["org.example.foo"] });
+            expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
+
+            await (client as RoomWidgetClient).sendToDeviceViaWidgetApi("org.example.foo", true, encryptedContentMap);
+            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", true, {
+                "@alice:example.org": { aliceMobile: { hello: "alice!" } },
+                "@bob:example.org": { bobDesktop: { hello: "bob!" } },
             });
         });
 
