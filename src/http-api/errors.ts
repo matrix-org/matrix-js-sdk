@@ -38,6 +38,43 @@ export class HTTPError extends Error {
     ) {
         super(msg);
     }
+
+    /**
+     * Check if this error was due to rate-limiting on the server side (and should therefore be retried after a delay).
+     *
+     * If this returns `true`, {@link getRetryAfterMs} can be called to retrieve the server-side
+     * recommendation for the retry period.
+     *
+     * @returns Whether this error is due to rate-limiting.
+     */
+    public isRateLimitError(): boolean {
+        return this.httpStatus === 429;
+    }
+
+    /**
+     * @returns The recommended delay in milliseconds to wait before retrying
+     * the request that triggered this error, or null if no delay is recommended.
+     * @throws Error if the recommended delay is an invalid value.
+     * @see {@link safeGetRetryAfterMs} for a version of this check that doesn't throw.
+     */
+    public getRetryAfterMs(): number | null {
+        const retryAfter = this.httpHeaders?.get("Retry-After");
+        if (retryAfter != null) {
+            if (/^\d+$/.test(retryAfter)) {
+                const ms = Number.parseInt(retryAfter) * 1000;
+                if (!Number.isFinite(ms)) {
+                    throw new Error("Retry-After header integer value is too large");
+                }
+                return ms;
+            }
+            const date = new Date(retryAfter);
+            if (date.toUTCString() !== retryAfter) {
+                throw new Error("Retry-After header value is not a valid HTTP-date or non-negative decimal integer");
+            }
+            return date.getTime() - Date.now();
+        }
+        return null;
+    }
 }
 
 export class MatrixError extends HTTPError {
@@ -73,38 +110,14 @@ export class MatrixError extends HTTPError {
         this.data = errorJson;
     }
 
-    /**
-     * Check if this error was due to rate-limiting on the server side (and should therefore be retried after a delay).
-     *
-     * If this returns `true`, {@link getRetryAfterMs} can be called to retrieve the server-side 
-     * recommendation for the retry period.
-     *
-     * @returns Whether this error is due to rate-limiting.
-     */
     public isRateLimitError(): boolean {
-        return this.errcode === "M_LIMIT_EXCEEDED" || (this.errcode === "M_UNKNOWN" && this.httpStatus === 429);
+        return this.errcode === "M_LIMIT_EXCEEDED" || (this.errcode === "M_UNKNOWN" && super.isRateLimitError());
     }
 
-    /**
-     * @returns The recommended delay in milliseconds to wait before retrying
-     * the request that triggered this error, or null if no delay is recommended.
-     * @throws Error if the recommended delay is an invalid value.
-     */
     public getRetryAfterMs(): number | null {
-        const retryAfter = this.httpHeaders?.get("Retry-After");
-        if (retryAfter != null) {
-            if (/^\d+$/.test(retryAfter)) {
-                const ms = Number.parseInt(retryAfter) * 1000;
-                if (!Number.isFinite(ms)) {
-                    throw new Error("Retry-After header integer value is too large");
-                }
-                return ms;
-            }
-            const date = new Date(retryAfter);
-            if (date.toUTCString() !== retryAfter) {
-                throw new Error("Retry-After header value is not a valid HTTP-date or non-negative decimal integer");
-            }
-            return date.getTime() - Date.now();
+        const headerValue = super.getRetryAfterMs();
+        if (headerValue !== null) {
+            return headerValue;
         }
         // Note: retry_after_ms is deprecated as of spec version v1.10
         if (this.errcode === "M_LIMIT_EXCEEDED" && "retry_after_ms" in this.data) {
@@ -123,7 +136,7 @@ export class MatrixError extends HTTPError {
  * delay is recommended.
  */
 export function safeGetRetryAfterMs(error: unknown, defaultMs: number): number {
-    if (!(error instanceof MatrixError) || !error.isRateLimitError()) {
+    if (!(error instanceof HTTPError) || !error.isRateLimitError()) {
         return defaultMs;
     }
     try {
