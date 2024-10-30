@@ -111,7 +111,10 @@ export class MatrixError extends HTTPError {
     }
 
     public isRateLimitError(): boolean {
-        return this.errcode === "M_LIMIT_EXCEEDED" || (this.errcode === "M_UNKNOWN" && super.isRateLimitError());
+        return (
+            this.errcode === "M_LIMIT_EXCEEDED" ||
+            ((this.errcode === "M_UNKNOWN" || this.errcode === undefined) && super.isRateLimitError())
+        );
     }
 
     public getRetryAfterMs(): number | null {
