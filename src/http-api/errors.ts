@@ -135,8 +135,8 @@ export class MatrixError extends HTTPError {
 
 /**
  * @returns The recommended delay in milliseconds to wait before retrying
- * the request that triggered {@link error}, or {@link defaultMs} if no valid
- * delay is recommended.
+ * the request that triggered {@link error}, or {@link defaultMs} if the
+ * error was not due to rate-limiting or if no valid delay is recommended.
  */
 export function safeGetRetryAfterMs(error: unknown, defaultMs: number): number {
     if (!(error instanceof HTTPError) || !error.isRateLimitError()) {
