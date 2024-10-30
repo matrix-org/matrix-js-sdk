@@ -713,7 +713,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        await this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
+        await this.injectRoomEvents(room, undefined, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -762,10 +762,18 @@ export class SlidingSyncSdk {
      */
     public async injectRoomEvents(
         room: Room,
-        stateEventList: MatrixEvent[],
+        stateEventList?: MatrixEvent[],
+        stateAfterEventList?: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
         numLive?: number,
     ): Promise<void> {
+        const eitherStateEventList = stateAfterEventList ?? stateEventList;
+        if (eitherStateEventList === undefined || (stateEventList && stateAfterEventList)) {
+            throw new Error(
+                "injectRoomEvents: Exactly one of stateEventList or stateAfterEventList must be non-undefined",
+            );
+        }
+
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
         numLive = numLive || 0;
@@ -783,10 +791,10 @@ export class SlidingSyncSdk {
             // push actions cache elsewhere so we can freeze MatrixEvents, or otherwise
             // find some solution where MatrixEvents are immutable but allow for a cache
             // field.
-            for (const ev of stateEventList) {
+            for (const ev of eitherStateEventList) {
                 this.client.getPushActionsForEvent(ev);
             }
-            liveTimeline.initialiseState(stateEventList);
+            liveTimeline.initialiseState(eitherStateEventList);
         }
 
         // If the timeline wasn't empty, we process the state events here: they're
@@ -803,8 +811,8 @@ export class SlidingSyncSdk {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...
-            room.oldState.setStateEvents(stateEventList);
-            room.currentState.setStateEvents(stateEventList);
+            room.oldState.setStateEvents(eitherStateEventList);
+            room.currentState.setStateEvents(eitherStateEventList);
         }
 
         // the timeline is broken into 'live' events which just happened and normal timeline events

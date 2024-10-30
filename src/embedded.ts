@@ -243,7 +243,7 @@ export class RoomWidgetClient extends MatrixClient {
                 const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
                 const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
-                await this.syncApi!.injectRoomEvents(this.room!, [], events);
+                await this.syncApi!.injectRoomEvents(this.room!, undefined, events, events);
                 events.forEach((event) => {
                     this.emit(ClientEvent.Event, event);
                     logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
@@ -469,7 +469,7 @@ export class RoomWidgetClient extends MatrixClient {
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
             const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
-            await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+            await this.syncApi!.injectRoomEvents(this.room!, undefined, [event], [event]);
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
