@@ -186,62 +186,64 @@ describe("parseErrorResponse", () => {
         );
     });
 
-    function addHeaders(headers: Headers) {
-        headers.set("Age", "0");
-        headers.set("Date", "Thu, 01 Jan 1970 00:00:00 GMT"); // value contains colons
-        headers.set("x-empty", "");
-        headers.set("x-multi", "1");
-        headers.append("x-multi", "2");
-    }
+    describe("with HTTP headers", () => {
+        function addHeaders(headers: Headers) {
+            headers.set("Age", "0");
+            headers.set("Date", "Thu, 01 Jan 1970 00:00:00 GMT"); // value contains colons
+            headers.set("x-empty", "");
+            headers.set("x-multi", "1");
+            headers.append("x-multi", "2");
+        }
 
-    function compareHeaders(expectedHeaders: Headers, otherHeaders: Headers | undefined) {
-        expect(new Map(otherHeaders)).toEqual(new Map(expectedHeaders));
-    }
+        function compareHeaders(expectedHeaders: Headers, otherHeaders: Headers | undefined) {
+            expect(new Map(otherHeaders)).toEqual(new Map(expectedHeaders));
+        }
 
-    it("should resolve HTTP Errors from XHR with headers", () => {
-        headers.set("Content-Type", "text/plain");
-        addHeaders(headers);
-        const err = parseErrorResponse({
-            ...xhrHeaderMethods,
-            status: 500,
-        } as XMLHttpRequest) as HTTPError;
-        compareHeaders(headers, err.httpHeaders);
-    });
-
-    it("should resolve HTTP Errors from fetch with headers", () => {
-        headers.set("Content-Type", "text/plain");
-        addHeaders(headers);
-        const err = parseErrorResponse({
-            headers,
-            status: 500,
-        } as Response) as HTTPError;
-        compareHeaders(headers, err.httpHeaders);
-    });
-
-    it("should resolve Matrix Errors from XHR with headers", () => {
-        headers.set("Content-Type", "application/json");
-        addHeaders(headers);
-        const err = parseErrorResponse(
-            {
+        it("should resolve HTTP Errors from XHR with headers", () => {
+            headers.set("Content-Type", "text/plain");
+            addHeaders(headers);
+            const err = parseErrorResponse({
                 ...xhrHeaderMethods,
                 status: 500,
-            } as XMLHttpRequest,
-            '{"errcode": "TEST"}',
-        ) as MatrixError;
-        compareHeaders(headers, err.httpHeaders);
-    });
+            } as XMLHttpRequest) as HTTPError;
+            compareHeaders(headers, err.httpHeaders);
+        });
 
-    it("should resolve Matrix Errors from fetch with headers", () => {
-        headers.set("Content-Type", "application/json");
-        addHeaders(headers);
-        const err = parseErrorResponse(
-            {
+        it("should resolve HTTP Errors from fetch with headers", () => {
+            headers.set("Content-Type", "text/plain");
+            addHeaders(headers);
+            const err = parseErrorResponse({
                 headers,
                 status: 500,
-            } as Response,
-            '{"errcode": "TEST"}',
-        ) as MatrixError;
-        compareHeaders(headers, err.httpHeaders);
+            } as Response) as HTTPError;
+            compareHeaders(headers, err.httpHeaders);
+        });
+
+        it("should resolve Matrix Errors from XHR with headers", () => {
+            headers.set("Content-Type", "application/json");
+            addHeaders(headers);
+            const err = parseErrorResponse(
+                {
+                    ...xhrHeaderMethods,
+                    status: 500,
+                } as XMLHttpRequest,
+                '{"errcode": "TEST"}',
+            ) as MatrixError;
+            compareHeaders(headers, err.httpHeaders);
+        });
+
+        it("should resolve Matrix Errors from fetch with headers", () => {
+            headers.set("Content-Type", "application/json");
+            addHeaders(headers);
+            const err = parseErrorResponse(
+                {
+                    headers,
+                    status: 500,
+                } as Response,
+                '{"errcode": "TEST"}',
+            ) as MatrixError;
+            compareHeaders(headers, err.httpHeaders);
+        });
     });
 
     it("should set a sensible default error message on MatrixError", () => {
