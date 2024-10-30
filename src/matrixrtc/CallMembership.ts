@@ -22,6 +22,7 @@ import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 
 type CallScope = "m.room" | "m.user";
+
 // Represents an entry in the memberships section of an m.call.member event as it is on the wire
 
 // There are two different data interfaces. One for the Legacy types and one compliant with MSC4143
@@ -39,6 +40,8 @@ export type SessionMembershipData = {
 
     // Application specific data
     scope?: CallScope;
+
+    key_distribution?: KeyDistributionMechanism;
 };
 
 export const isSessionMembershipData = (data: CallMembershipData): data is SessionMembershipData =>
@@ -69,6 +72,7 @@ export type CallMembershipDataLegacy = {
     membershipID: string;
     created_ts?: number;
     foci_active?: Focus[];
+    key_distribution?: KeyDistributionMechanism;
 } & EitherAnd<{ expires: number }, { expires_ts: number }>;
 
 export const isLegacyCallMembershipData = (data: CallMembershipData): data is CallMembershipDataLegacy =>
@@ -102,6 +106,8 @@ const checkCallMembershipDataLegacy = (data: any, errors: string[]): data is Cal
 };
 
 export type CallMembershipData = CallMembershipDataLegacy | SessionMembershipData;
+
+type KeyDistributionMechanism = "room_event" | "to_device";
 
 export class CallMembership {
     public static equal(a: CallMembership, b: CallMembership): boolean {
@@ -243,5 +249,9 @@ export class CallMembership {
                 return focusActive.focus_selection;
             }
         }
+    }
+
+    public get keyDistributionMethod(): KeyDistributionMechanism {
+        return this.membershipData.key_distribution ?? "room_event";
     }
 }

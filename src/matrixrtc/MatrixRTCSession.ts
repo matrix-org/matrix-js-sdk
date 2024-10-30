@@ -18,7 +18,7 @@ import { logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { Room } from "../models/room.ts";
-import { MatrixClient } from "../client.ts";
+import { MatrixClient, SendToDeviceContentMap } from "../client.ts";
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import {
@@ -31,7 +31,7 @@ import {
 import { RoomStateEvent } from "../models/room-state.ts";
 import { Focus } from "./focus.ts";
 import { randomString, secureRandomBase64Url } from "../randomstring.ts";
-import { EncryptionKeysEventContent } from "./types.ts";
+import { EncryptionKeysEventContent, EncryptionKeysToDeviceContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MatrixError } from "../http-api/errors.ts";
@@ -39,6 +39,7 @@ import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
 import { sleep } from "../utils.ts";
+import type { RoomWidgetClient } from "../embedded.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -162,8 +163,21 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
              * The number of times we have received a room event containing encryption keys.
              */
             roomEventEncryptionKeysReceived: 0,
+            /**
+             * The number of times we have sent a to-device event containing encryption keys.
+             */
+            toDeviceEncryptionKeysSent: 0,
+            /**
+             * The number of times we have received a to-device event containing encryption keys.
+             */
+            toDeviceEncryptionKeysReceived: 0,
         },
         totals: {
+            /**
+             * The total age (in milliseconds) of all to-device events containing encryption keys that we have received.
+             * We track the total age so that we can later calculate the average age of all keys received.
+             */
+            toDeviceEncryptionKeysReceivedTotalAge: 0,
             /**
              * The total age (in milliseconds) of all room events containing encryption keys that we have received.
              * We track the total age so that we can later calculate the average age of all keys received.
@@ -546,7 +560,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * Requests that we resend our current keys to the room. May send a keys event immediately
+     * Requests that we (re)-send our current keys to the room. May send a keys event immediately
      * or queue for alter if one has already been sent recently.
      */
     private requestSendCurrentKey(): void {
@@ -602,21 +616,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const keyToSend = myKeys[keyIndexToSend];
 
         try {
-            const content: EncryptionKeysEventContent = {
-                keys: [
-                    {
-                        index: keyIndexToSend,
-                        key: encodeUnpaddedBase64(keyToSend),
-                    },
-                ],
-                device_id: deviceId,
-                call_id: "",
-                sent_ts: Date.now(),
-            };
-
-            this.statistics.counters.roomEventEncryptionKeysSent += 1;
-
-            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, content);
+            await Promise.all([
+                this.sendKeysViaRoomEvent(deviceId, keyToSend, keyIndexToSend),
+                this.sendKeysViaToDevice(deviceId, keyToSend, keyIndexToSend),
+            ]);
 
             logger.debug(
                 `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${userId}:${deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.currentEncryptionKeyIndex} keyIndexToSend=${keyIndexToSend}`,
@@ -638,6 +641,96 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
     };
+
+    private async sendKeysViaRoomEvent(deviceId: string, key: Uint8Array, index: number): Promise<void> {
+        const membersRequiringRoomEvent = this.memberships.filter(
+            (m) => !this.isMyMembership(m) && m.keyDistributionMethod === "room_event",
+        );
+
+        if (membersRequiringRoomEvent.length === 0) {
+            logger.info("No members require keys via room event");
+            return;
+        }
+
+        logger.info(
+            `Sending encryption keys event for: ${membersRequiringRoomEvent.map((m) => `${m.sender}:${m.deviceId}`).join(", ")}`,
+        );
+
+        const content: EncryptionKeysEventContent = {
+            keys: [
+                {
+                    index,
+                    key: encodeUnpaddedBase64(key),
+                },
+            ],
+            device_id: deviceId,
+            call_id: "",
+            sent_ts: Date.now(),
+        };
+
+        this.statistics.counters.roomEventEncryptionKeysSent += 1;
+
+        await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, content);
+    }
+
+    private async sendKeysViaToDevice(deviceId: string, key: Uint8Array, index: number): Promise<void> {
+        const membershipsRequiringToDevice = this.memberships.filter(
+            (m) => !this.isMyMembership(m) && m.sender && m.keyDistributionMethod === "to_device",
+        );
+
+        if (membershipsRequiringToDevice.length === 0) {
+            logger.info("No members require keys via to-device event");
+            return;
+        }
+
+        const content: EncryptionKeysToDeviceContent = {
+            keys: [{ index, key: encodeUnpaddedBase64(key) }],
+            device_id: deviceId,
+            call_id: "",
+            room_id: this.room.roomId,
+            sent_ts: Date.now(),
+        };
+
+        logger.info(
+            `Sending encryption keys to-device batch for: ${membershipsRequiringToDevice.map(({ sender, deviceId }) => `${sender}:${deviceId}`).join(", ")}`,
+        );
+
+        this.statistics.counters.toDeviceEncryptionKeysSent += membershipsRequiringToDevice.length;
+
+        // we don't do an instanceof due to circular dependency issues
+        if ("widgetApi" in this.client) {
+            logger.info("Sending keys via widgetApi");
+            // embedded mode, getCrypto() returns null and so we make some assumptions about the underlying implementation
+
+            const contentMap: SendToDeviceContentMap = new Map();
+
+            membershipsRequiringToDevice.forEach(({ sender, deviceId }) => {
+                if (!contentMap.has(sender!)) {
+                    contentMap.set(sender!, new Map());
+                }
+
+                contentMap.get(sender!)!.set(deviceId, content);
+            });
+
+            await (this.client as unknown as RoomWidgetClient).sendToDeviceViaWidgetApi(
+                EventType.CallEncryptionKeysPrefix,
+                true,
+                contentMap,
+            );
+        } else {
+            const crypto = this.client.getCrypto();
+            if (!crypto) {
+                logger.error("No crypto instance available to send keys via to-device event");
+                return;
+            }
+
+            const devices = membershipsRequiringToDevice.map(({ deviceId, sender }) => ({ userId: sender!, deviceId }));
+
+            const batch = await crypto.encryptToDeviceMessages(EventType.CallEncryptionKeysPrefix, devices, content);
+
+            await this.client.queueToDevice(batch);
+        }
+    }
 
     /**
      * Sets a timer for the soonest membership expiry
@@ -714,9 +807,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         }
 
-        this.statistics.counters.roomEventEncryptionKeysReceived += 1;
-        const age = Date.now() - (typeof content.sent_ts === "number" ? content.sent_ts : event.getTs());
-        this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
+        let age: number;
+
+        if (event.getRoomId()) {
+            this.statistics.counters.roomEventEncryptionKeysReceived += 1;
+            age = Date.now() - (typeof content.sent_ts === "number" ? content.sent_ts : event.getTs());
+            this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
+        } else {
+            this.statistics.counters.toDeviceEncryptionKeysReceived += 1;
+            age = Date.now() - (content as EncryptionKeysToDeviceContent).sent_ts;
+            this.statistics.totals.toDeviceEncryptionKeysReceivedTotalAge += age;
+        }
 
         for (const key of content.keys) {
             if (!key) {
@@ -795,8 +896,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 logger.debug(`Member(s) have left: queueing sender key rotation`);
                 this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (anyJoined) {
-                logger.debug(`New member(s) have joined: re-sending keys`);
-                this.requestSendCurrentKey();
+                logger.debug(`New member(s) have joined: rotating keys`);
+                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, MAKE_KEY_DELAY);
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
                 const newFingerprints = this.lastMembershipFingerprints!;
@@ -849,6 +950,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             foci_active: this.ownFociPreferred,
             membershipID: this.membershipId,
             ...(createdTs ? { created_ts: createdTs } : {}),
+            key_distribution: "to_device",
         };
     }
     /**
@@ -862,6 +964,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             device_id: deviceId,
             focus_active: { type: "livekit", focus_selection: "oldest_membership" },
             foci_preferred: this.ownFociPreferred ?? [],
+            key_distribution: "to_device",
         };
     }
 

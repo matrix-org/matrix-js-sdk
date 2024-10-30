@@ -22,6 +22,7 @@ import { RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import { EncryptionKeysToDeviceContent } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSessionManager");
 
@@ -56,7 +57,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
     public start(): void {
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
-        // returing nothing, and breaks tests if you change it to return an empty array :'(
+        // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
             const session = MatrixRTCSession.roomSessionForRoom(this.client, room);
             if (session.memberships.length > 0) {
@@ -67,6 +68,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.client.on(ClientEvent.Room, this.onRoom);
         this.client.on(RoomEvent.Timeline, this.onTimeline);
         this.client.on(RoomStateEvent.Events, this.onRoomState);
+        this.client.on(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
     public stop(): void {
@@ -78,6 +80,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.client.off(ClientEvent.Room, this.onRoom);
         this.client.off(RoomEvent.Timeline, this.onTimeline);
         this.client.off(RoomStateEvent.Events, this.onRoomState);
+        this.client.off(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
     /**
@@ -100,7 +103,32 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
-    private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
+    private onTimeline = (event: MatrixEvent): void => {
+        this.consumeCallEncryptionEvent(event, (event) => event.getRoomId(), false);
+    };
+
+    private onToDeviceEvent = (event: MatrixEvent): void => {
+        if (!event.isEncrypted()) {
+            logger.warn("Ignoring unencrypted to-device call encryption event", event);
+            return;
+        }
+        this.consumeCallEncryptionEvent(
+            event,
+            (event) => event.getContent<EncryptionKeysToDeviceContent>().room_id,
+            false,
+        );
+    };
+
+    /**
+     * @param event - the event to consume
+     * @param roomIdExtractor - the function to extract the room id from the event
+     * @param isRetry - whether this is a retry. If false we will retry decryption failures once
+     */
+    private consumeCallEncryptionEvent = async (
+        event: MatrixEvent,
+        roomIdExtractor: (event: MatrixEvent) => string | undefined,
+        isRetry: boolean,
+    ): Promise<void> => {
         await this.client.decryptEventIfNeeded(event);
         if (event.isDecryptionFailure()) {
             if (!isRetry) {
@@ -108,7 +136,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
                     `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
                 );
                 // retry after 1 second. After this we give up.
-                setTimeout(() => this.consumeCallEncryptionEvent(event, true), 1000);
+                setTimeout(() => this.consumeCallEncryptionEvent(event, roomIdExtractor, true), 1000);
             } else {
                 logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
             }
@@ -117,18 +145,20 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
             logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
         }
 
-        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return Promise.resolve();
-
-        const room = this.client.getRoom(event.getRoomId());
-        if (!room) {
-            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
-            return Promise.resolve();
+        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return;
+        const roomId = roomIdExtractor(event);
+        if (!roomId) {
+            logger.error("Received call encryption event with no room_id!");
+            return;
         }
 
+        const room = this.client.getRoom(roomId);
+
+        if (!room) {
+            logger.error(`Got encryption event for unknown room ${roomId}!`);
+            return;
+        }
         this.getRoomSession(room).onCallEncryption(event);
-    }
-    private onTimeline = (event: MatrixEvent): void => {
-        this.consumeCallEncryptionEvent(event);
     };
 
     private onRoom = (room: Room): void => {
