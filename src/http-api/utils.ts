@@ -18,7 +18,7 @@ import { parse as parseContentType, ParsedMediaType } from "content-type";
 
 import { logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
-import { ConnectionError, HTTPError, MatrixError } from "./errors.ts";
+import { ConnectionError, HTTPError, MatrixError, safeGetRetryAfterMs } from "./errors.ts";
 
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
@@ -196,12 +196,5 @@ export function calculateRetryBackoff(err: any, attempts: number, retryConnectio
         return -1;
     }
 
-    if (err.name === "M_LIMIT_EXCEEDED") {
-        const waitTime = err.data.retry_after_ms;
-        if (waitTime > 0) {
-            return waitTime;
-        }
-    }
-
-    return 1000 * Math.pow(2, attempts);
+    return safeGetRetryAfterMs(err, 1000 * Math.pow(2, attempts));
 }

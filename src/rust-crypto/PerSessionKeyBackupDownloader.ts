@@ -370,7 +370,7 @@ export class PerSessionKeyBackupDownloader {
                     // Notice that this request will be lost if instead the backup got out of sync (updated from other session).
                     throw new KeyDownloadError(KeyDownloadErrorCode.MISSING_DECRYPTION_KEY);
                 }
-                if (errCode == "M_LIMIT_EXCEEDED") {
+                if (e.isRateLimitError()) {
                     let waitTime: number | undefined;
                     try {
                         waitTime = e.getRetryAfterMs() ?? undefined;

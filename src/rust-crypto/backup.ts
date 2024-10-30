@@ -458,7 +458,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             this.backupKeysLoopRunning = false;
                             this.checkKeyBackupAndEnable(true);
                             return;
-                        } else if (errCode == "M_LIMIT_EXCEEDED") {
+                        } else if (err.isRateLimitError()) {
                             // wait for that and then continue?
                             try {
                                 const waitTime = err.getRetryAfterMs();
