@@ -3,13 +3,11 @@ import fetchMock from "fetch-mock-jest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
-import { CryptoEvent } from "../../../src/crypto-api/index.ts";
+import { CryptoEvent, KeyBackupSession } from "../../../src/crypto-api/index.ts";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import * as testData from "../../test-utils/test-data";
 import * as TestData from "../../test-utils/test-data";
-import { IKeyBackup } from "../../../src/crypto/backup";
-import { IKeyBackupSession } from "../../../src/crypto/keybackup";
-import { RustBackupManager } from "../../../src/rust-crypto/backup";
+import { RustBackupManager, KeyBackup } from "../../../src/rust-crypto/backup";
 
 describe("Upload keys to backup", () => {
     /** The backup manager under test */
@@ -27,7 +25,7 @@ describe("Upload keys to backup", () => {
 
     let idGenerator = 0;
     function mockBackupRequest(keyCount: number): RustSdkCryptoJs.KeysBackupRequest {
-        const requestBody: IKeyBackup = {
+        const requestBody: KeyBackup = {
             rooms: {
                 "!room1:server": {
                     sessions: {},
@@ -35,7 +33,7 @@ describe("Upload keys to backup", () => {
             },
         };
         for (let i = 0; i < keyCount; i++) {
-            requestBody.rooms["!room1:server"].sessions["session" + i] = {} as IKeyBackupSession;
+            requestBody.rooms["!room1:server"].sessions["session" + i] = {} as KeyBackupSession;
         }
         return {
             id: "id" + idGenerator++,
