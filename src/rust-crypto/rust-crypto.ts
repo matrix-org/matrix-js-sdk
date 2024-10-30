@@ -1348,7 +1348,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             stage: "fetch",
         });
 
-        return this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+        try {
+            return this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+        } finally {
+            backupDecryptor.free();
+        }
     }
 
     /**

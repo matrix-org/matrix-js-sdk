@@ -608,16 +608,12 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         backupDecryptor: BackupDecryptor,
         opts?: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
-        try {
-            const keyBackup = await this.downloadKeyBackup(backupInfoVersion);
-            opts?.progressCallback?.({
-                stage: "load_keys",
-            });
+        const keyBackup = await this.downloadKeyBackup(backupInfoVersion);
+        opts?.progressCallback?.({
+            stage: "load_keys",
+        });
 
-            return this.importKeyBackup(keyBackup, backupInfoVersion, backupDecryptor, opts);
-        } finally {
-            backupDecryptor.free();
-        }
+        return this.importKeyBackup(keyBackup, backupInfoVersion, backupDecryptor, opts);
     }
 
     /**
