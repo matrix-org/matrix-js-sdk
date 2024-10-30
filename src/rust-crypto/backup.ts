@@ -490,8 +490,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     private keysCountInBatch(batch: RustSdkCryptoJs.KeysBackupRequest): number {
         const parsedBody: KeyBackup = JSON.parse(batch.body);
+        return this.getTotalKeyCount(parsedBody);
+    }
+
+    /**
+     * This method calculates the total number of keys present in a key backup
+     * @param keyBackup - The key backup to count the keys from.
+     *
+     * @returns The total number of keys in the backup.
+     */
+    private getTotalKeyCount(keyBackup: KeyBackup): number {
         let count = 0;
-        for (const { sessions } of Object.values(parsedBody.rooms)) {
+        for (const { sessions } of Object.values(keyBackup.rooms)) {
             count += Object.keys(sessions).length;
         }
         return count;
@@ -599,26 +609,26 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         opts?: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
         try {
-            const roomKeysResponse = await this.downloadRoomKeys(backupInfoVersion);
+            const keyBackup = await this.downloadKeyBackup(backupInfoVersion);
             opts?.progressCallback?.({
                 stage: "load_keys",
             });
 
-            return this.handleRoomsKeysResponse(roomKeysResponse, backupInfoVersion, backupDecryptor, opts);
+            return this.importKeyBackup(keyBackup, backupInfoVersion, backupDecryptor, opts);
         } finally {
             backupDecryptor.free();
         }
     }
 
     /**
-     * Call `/room_keys/keys` to download the room keys for the given backup version.
+     * Call `/room_keys/keys` to download the key backup (room keys) for the given backup version.
      * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
      *
      * @param backupInfoVersion
-     * @returns The response from the server containing the keys to import.
+     * @returns The key backup response.
      */
-    private downloadRoomKeys(backupInfoVersion: string): Promise<RoomsKeysResponse> {
-        return this.http.authedRequest<RoomsKeysResponse>(
+    private downloadKeyBackup(backupInfoVersion: string): Promise<KeyBackup> {
+        return this.http.authedRequest<KeyBackup>(
             Method.Get,
             "/room_keys/keys",
             { version: backupInfoVersion },
@@ -633,7 +643,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Import the room keys from a `/room_keys/keys` call.
      * Call the opts.progressCallback with the progress of the import.
      *
-     * @param response - The response from the server containing the keys to import.
+     * @param keyBackup - The response from the server containing the keys to import.
      * @param backupInfoVersion - The version of the backup info.
      * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
      * @param opts - Options for the import.
@@ -642,8 +652,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      *
      * @private
      */
-    private async handleRoomsKeysResponse(
-        response: RoomsKeysResponse,
+    private async importKeyBackup(
+        keyBackup: KeyBackup,
         backupInfoVersion: string,
         backupDecryptor: BackupDecryptor,
         opts?: KeyBackupRestoreOpts,
@@ -651,11 +661,11 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // We have a full backup here, it can get quite big, so we need to decrypt and import it in chunks.
 
         // Get the total count as a first pass
-        const totalKeyCount = this.getTotalKeyCount(response);
+        const totalKeyCount = this.getTotalKeyCount(keyBackup);
         let totalImported = 0;
         let totalFailures = 0;
         // Now decrypt and import the keys in chunks
-        await this.handleDecryptionOfAFullBackup(response, backupDecryptor, 200, async (chunk) => {
+        await this.handleDecryptionOfAFullBackup(keyBackup, backupDecryptor, 200, async (chunk) => {
             // We have a chunk of decrypted keys: import them
             try {
                 await this.importBackedUpRoomKeys(chunk, backupInfoVersion);
@@ -679,27 +689,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * This method calculates the total number of keys present in the response of a `/room_keys/keys` call.
-     *
-     * @param res - The response from the server containing the keys to be counted.
-     *
-     * @returns The total number of keys in the backup.
-     */
-    private getTotalKeyCount(res: RoomsKeysResponse): number {
-        const rooms = res.rooms;
-        let totalKeyCount = 0;
-        for (const roomData of Object.values(rooms)) {
-            if (!roomData.sessions) continue;
-            totalKeyCount += Object.keys(roomData.sessions).length;
-        }
-        return totalKeyCount;
-    }
-
-    /**
      * This method handles the decryption of a full backup, i.e a call to `/room_keys/keys`.
      * It will decrypt the keys in chunks and call the `block` callback for each chunk.
      *
-     * @param res - The response from the server containing the keys to be decrypted.
+     * @param keyBackup - The key backup from the server containing the keys to be decrypted.
      * @param backupDecryptor - An instance of the BackupDecryptor class used to decrypt the keys.
      * @param chunkSize - The size of the chunks to be processed at a time.
      * @param block - A callback function that is called for each chunk of keys.
@@ -707,12 +700,12 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns A promise that resolves when the decryption is complete.
      */
     private async handleDecryptionOfAFullBackup(
-        res: RoomsKeysResponse,
+        keyBackup: KeyBackup,
         backupDecryptor: BackupDecryptor,
         chunkSize: number,
         block: (chunk: IMegolmSessionData[]) => Promise<void>,
     ): Promise<void> {
-        const { rooms } = res;
+        const { rooms } = keyBackup;
 
         let groupChunkCount = 0;
         let chunkGroupByRoom: Map<string, KeyBackupRoomSessions> = new Map();
