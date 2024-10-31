@@ -1850,7 +1850,7 @@ export class SyncApi {
         await room.addLiveEvents(timelineEventList || [], {
             fromCache,
             timelineWasEmpty,
-            addToState: Boolean(stateEventList),
+            addToState: stateAfterEventList === undefined,
         });
         this.client.processBeaconEvents(room, timelineEventList);
     }
