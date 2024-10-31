@@ -15,8 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeUnpaddedBase64Url } from "./base64";
-import { crypto } from "./crypto/crypto";
+import { encodeUnpaddedBase64Url } from "./base64.ts";
 
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -24,7 +23,7 @@ const DIGITS = "0123456789";
 
 export function secureRandomBase64Url(len: number): string {
     const key = new Uint8Array(len);
-    crypto.getRandomValues(key);
+    globalThis.crypto.getRandomValues(key);
 
     return encodeUnpaddedBase64Url(key);
 }

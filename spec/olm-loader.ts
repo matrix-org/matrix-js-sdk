@@ -19,7 +19,7 @@ import { logger } from "../src/logger";
 
 // try to load the olm library.
 try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     globalThis.Olm = require("@matrix-org/olm");
     logger.log("loaded libolm");
 } catch (e) {

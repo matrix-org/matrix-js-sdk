@@ -1,0 +1,333 @@
+name: Release Make
+on:
+    workflow_call:
+        secrets:
+            ELEMENT_BOT_TOKEN:
+                required: true
+            NPM_TOKEN:
+                required: false
+            GPG_PASSPHRASE:
+                required: false
+            GPG_PRIVATE_KEY:
+                required: false
+        inputs:
+            final:
+                description: Make final release
+                required: true
+                default: false
+                type: boolean
+            npm:
+                description: Publish to npm
+                type: boolean
+                default: false
+            downstreams:
+                description: List of github projects (owner/repo) which should have their dependency bumped to the newly released version (in JSON string array string syntax)
+                type: string
+                required: false
+            gpg-fingerprint:
+                description: Fingerprint of the GPG key to use for signing the git tag and assets, if any.
+                type: string
+                required: false
+            asset-path:
+                description: |
+                    The path to the asset you want to upload, if any. You can use glob patterns here.
+                    Will be GPG signed and an `.asc` file included in the release artifacts if `gpg-fingerprint` is set.
+                type: string
+                required: false
+            expected-asset-count:
+                description: The number of expected assets, including signatures, excluding generated zip & tarball.
+                type: number
+                required: false
+jobs:
+    release:
+        name: Release
+        runs-on: ubuntu-24.04
+        environment: Release
+        steps:
+            - name: Load GPG key
+              id: gpg
+              if: inputs.gpg-fingerprint
+              uses: crazy-max/ghaction-import-gpg@01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6
+              with:
+                  gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+                  passphrase: ${{ secrets.GPG_PASSPHRASE }}
+                  fingerprint: ${{ inputs.gpg-fingerprint }}
+
+            - name: Get draft release
+              id: draft-release
+              uses: cardinalby/git-get-release-action@5172c3a026600b1d459b117738c605fabc9e4e44 # v1
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+              with:
+                  draft: true
+                  latest: true
+
+            - uses: actions/checkout@v4
+              with:
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  fetch-depth: 0
+
+            - name: Get actions scripts
+              uses: actions/checkout@v4
+              with:
+                  repository: matrix-org/matrix-js-sdk
+                  persist-credentials: false
+                  path: .action-repo
+                  sparse-checkout: |
+                      .github/actions
+                      scripts/release
+
+            - name: Prepare variables
+              id: prepare
+              run: |
+                  echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+                  HAS_DIST=0
+                  jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
+                  echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
+              env:
+                  VERSION: ${{ steps.draft-release.outputs.tag_name }}
+
+            - name: Finalise version
+              if: inputs.final
+              run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
+
+            - name: Check version number not in use
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const { VERSION } = process.env;
+                      github.rest.repos.getReleaseByTag({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          tag: VERSION,
+                      }).then(() => {
+                          core.setFailed(`Version ${VERSION} already exists`);
+                      }).catch(() => {
+                        // This is fine, we expect there to not be any release with this version yet
+                      });
+
+            - name: Set up git
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version-file: package.json
+
+            - name: Install dependencies
+              run: "yarn install --frozen-lockfile"
+
+            - name: Handle develop dependencies
+              run: |
+                  ret=0
+                  cat package.json | jq -r '.dependencies | to_entries | .[] | "\(.key) \(.value)"' | grep '#develop$' | while read -r dep ; do
+                      IFS=" "
+                      PACKAGE=${dep[0]}
+                      VERSION=${dep[1]}
+
+                      echo "::warning title=Develop dependency found::$DEPENDENCY will be kept at $VERSION"
+                      yarn upgrade "$PACKAGE@$VERSION" --exact
+                      git add -u
+                      git commit -m "Keep $PACKAGE at $VERSION"
+                  done
+
+            - name: Bump package.json version
+              run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
+
+            - name: Add to CHANGELOG.md
+              if: inputs.final
+              run: |
+                  mv CHANGELOG.md CHANGELOG.md.old
+                  HEADER="Changes in [${VERSION#v}](https://github.com/${{ github.repository }}/releases/tag/$VERSION) ($(date '+%Y-%m-%d'))"
+
+                  {
+                      echo "$HEADER"
+                      printf '=%.0s' $(seq ${#HEADER})
+                      echo ""
+                      echo "$RELEASE_NOTES"
+                      echo ""
+                  } > CHANGELOG.md
+
+                  cat CHANGELOG.md.old >> CHANGELOG.md
+                  rm CHANGELOG.md.old
+                  git add CHANGELOG.md
+              env:
+                  RELEASE_NOTES: ${{ steps.draft-release.outputs.body }}
+
+            - name: Run pre-release script to update package.json fields
+              run: |
+                  ./.action-repo/scripts/release/pre-release.sh
+                  git add package.json
+
+            - name: Commit changes
+              run: git commit -m "$VERSION"
+
+            - name: Build assets
+              if: steps.prepare.outputs.has-dist-script == '1'
+              run: DIST_VERSION="$VERSION" yarn dist
+
+            - name: Upload release assets & signatures
+              if: inputs.asset-path
+              uses: ./.action-repo/.github/actions/upload-release-assets
+              with:
+                  gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
+                  asset-path: ${{ inputs.asset-path }}
+
+            - name: Create signed tag
+              if: inputs.gpg-fingerprint
+              run: |
+                  GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
+              env:
+                  SIGNING_ID: ${{ steps.gpg.outputs.email }}
+
+            - name: Generate & upload tarball signature
+              if: inputs.gpg-fingerprint
+              uses: ./.action-repo/.github/actions/sign-release-tarball
+              with:
+                  gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
+
+            # We defer pushing changes until after the release assets are built,
+            # signed & uploaded to improve the atomicity of this action.
+            - name: Push changes to staging
+              run: |
+                  git push origin staging $TAG
+                  git reset --hard
+              env:
+                  TAG: ${{ inputs.gpg-fingerprint && env.VERSION || '' }}
+
+            - name: Validate tarball signature
+              if: inputs.gpg-fingerprint
+              run: |
+                  wget https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$VERSION.tar.gz
+                  gpg --verify "$VERSION.tar.gz.asc" "$VERSION.tar.gz"
+
+            - name: Validate release has expected assets
+              if: inputs.expected-asset-count
+              uses: actions/github-script@v7
+              env:
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
+                  EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
+              with:
+                  retries: 3
+                  script: |
+                      const { RELEASE_ID: release_id, EXPECTED_ASSET_COUNT } = process.env;
+                      const { owner, repo } = context.repo;
+
+                      const { data: release } = await github.rest.repos.getRelease({
+                          owner,
+                          repo,
+                          release_id,
+                      });
+
+                      if (release.assets.length !== parseInt(EXPECTED_ASSET_COUNT, 10)) {
+                          core.setFailed(`Found ${release.assets.length} assets but expected ${EXPECTED_ASSET_COUNT}`);
+                      }
+
+            - name: Merge to master
+              if: inputs.final
+              run: |
+                  git checkout master
+                  git merge -X theirs staging
+                  git push origin master
+
+            - name: Publish release
+              uses: actions/github-script@v7
+              env:
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
+                  FINAL: ${{ inputs.final }}
+              with:
+                  retries: 3
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  script: |
+                      const { RELEASE_ID: release_id, RELEASE_NOTES, VERSION, FINAL } = process.env;
+                      const { owner, repo } = context.repo;
+
+                      const opts = {
+                          owner,
+                          repo,
+                          release_id,
+                          tag_name: VERSION,
+                          name: VERSION,
+                          draft: false,
+                          body: RELEASE_NOTES,
+                      };
+
+                      if (FINAL == "true") {
+                          opts.prerelease = false;
+                          opts.make_latest = true;
+                      }
+
+                      github.rest.repos.updateRelease(opts);
+
+    npm:
+        name: Publish to npm
+        needs: release
+        if: inputs.npm
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+        secrets:
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    post-release:
+        name: Post release steps
+        needs: release
+        runs-on: ubuntu-24.04
+        steps:
+            - id: repository
+              run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
+
+            - name: Advance release blocker labels
+              uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
+              with:
+                  owner: ${{ github.repository_owner }}
+                  repo: ${{ steps.repository.outputs.REPO }}
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  filter-labels: X-Upcoming-Release-Blocker
+                  remove-labels: X-Upcoming-Release-Blocker
+                  add-labels: X-Release-Blocker
+
+    #            - name: Wait for master->develop gitflow merge
+    #              if: inputs.final
+    #              uses: t3chguy/wait-on-check-action@18541021811b56544d90e0f073401c2b99e249d6 # fork
+    #              with:
+    #                  ref: master
+    #                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+    #                  wait-interval: 10
+    #                  check-name: merge
+    #                  allowed-conclusions: success
+
+    bump-downstreams:
+        name: Update npm dependency in downstream projects
+        needs: npm
+        runs-on: ubuntu-24.04
+        if: inputs.downstreams
+        strategy:
+            matrix:
+                repo: ${{ fromJSON(inputs.downstreams) }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ matrix.repo }}
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version: "lts/*"
+
+            - name: Bump dependency
+              env:
+                  DEPENDENCY: ${{ needs.npm.outputs.id }}
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  yarn upgrade "$DEPENDENCY" --exact
+                  git add package.json yarn.lock
+                  git commit -am"Upgrade dependency to $DEPENDENCY"
+                  git push origin staging

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ServerControlledNamespacedValue } from "../NamespacedValue";
+import { ServerControlledNamespacedValue } from "../NamespacedValue.ts";
 
 /**
  * https://github.com/matrix-org/matrix-doc/pull/3773

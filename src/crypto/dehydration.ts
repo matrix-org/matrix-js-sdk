@@ -16,14 +16,15 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
-import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto";
-import { decodeBase64, encodeBase64 } from "../base64";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, encryptAES } from "./aes";
-import { logger } from "../logger";
-import { Crypto } from "./index";
-import { Method } from "../http-api";
-import { SecretStorageKeyDescription } from "../secret-storage";
+import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
+import { logger } from "../logger.ts";
+import { Crypto } from "./index.ts";
+import { Method } from "../http-api/index.ts";
+import { SecretStorageKeyDescription } from "../secret-storage.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase
@@ -61,7 +62,7 @@ export class DehydrationManager {
                     if (result) {
                         const { key, keyInfo, deviceDisplayName, time } = result;
                         const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
-                        const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
+                        const decrypted = await decryptAESSecretStorageItem(key, pickleKey, DEHYDRATION_ALGORITHM);
                         this.key = decodeBase64(decrypted);
                         this.keyInfo = keyInfo;
                         this.deviceDisplayName = deviceDisplayName;
@@ -141,7 +142,7 @@ export class DehydrationManager {
             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
 
             // update the crypto store with the timestamp
-            const key = await encryptAES(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
+            const key = await encryptAESSecretStorageItem(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
             await this.crypto.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.crypto.cryptoStore.storeSecretStorePrivateKey(txn, "dehydration", {
                     keyInfo: this.keyInfo,

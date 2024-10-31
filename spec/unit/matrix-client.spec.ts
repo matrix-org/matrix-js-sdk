@@ -22,6 +22,7 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
+    MsgType,
     RelationType,
     RoomCreateTypeField,
     RoomType,
@@ -38,38 +39,43 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
-    ContentHelpers,
     ClientPrefix,
+    ConditionKind,
+    ContentHelpers,
     Direction,
     EventTimeline,
+    EventTimelineSet,
+    getHttpUriForMxc,
     ICreateRoomOpts,
+    IPushRule,
     IRequestOpts,
     MatrixError,
     MatrixHttpApi,
     MatrixScheduler,
     Method,
-    Room,
-    EventTimelineSet,
     PushRuleActionName,
-    TweakName,
+    Room,
     RuleId,
-    IPushRule,
-    ConditionKind,
+    TweakName,
+    UpdateDelayedEventAction,
 } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import {
     IGNORE_INVITES_ACCOUNT_EVENT_KEY,
     POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
-import { QueryDict } from "../../src/utils";
+import { defer, QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { KnownMembership } from "../../src/@types/membership";
+import { RoomMessageEventContent } from "../../src/@types/events";
 
 jest.useFakeTimers();
 
@@ -92,11 +98,11 @@ type HttpLookup = {
     method: string;
     path: string;
     prefix?: string;
-    data?: Record<string, any>;
+    data?: Record<string, any> | Record<string, any>[];
     error?: object;
     expectBody?: Record<string, any>;
     expectQueryParams?: QueryDict;
-    thenCall?: Function;
+    thenCall?: () => void;
 };
 
 interface Options extends ICreateRoomOpts {
@@ -293,7 +299,9 @@ describe("MatrixClient", function () {
             ...(opts || {}),
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = (["authedRequest", "getContentUri", "request", "uploadContent"] as const).reduce((r, k) => {
+        client.http = (
+            ["authedRequest", "getContentUri", "request", "uploadContent", "idServerRequest"] as const
+        ).reduce((r, k) => {
             r[k] = jest.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
@@ -369,6 +377,24 @@ describe("MatrixClient", function () {
         client.stopClient();
     });
 
+    describe("mxcUrlToHttp", () => {
+        it("should call getHttpUriForMxc", () => {
+            const mxc = "mxc://server/example";
+            expect(client.mxcUrlToHttp(mxc)).toBe(getHttpUriForMxc(client.baseUrl, mxc));
+            expect(client.mxcUrlToHttp(mxc, 32)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32));
+            expect(client.mxcUrlToHttp(mxc, 32, 46)).toBe(getHttpUriForMxc(client.baseUrl, mxc, 32, 46));
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale")).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale"),
+            );
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true)).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true),
+            );
+            expect(client.mxcUrlToHttp(mxc, 32, 46, "scale", false, true, true)).toBe(
+                getHttpUriForMxc(client.baseUrl, mxc, 32, 46, "scale", false, true, true),
+            );
+        });
+    });
+
     describe("timestampToEvent", () => {
         const roomId = "!room:server.org";
         const eventId = "$eventId:example.org";
@@ -377,7 +403,7 @@ describe("MatrixClient", function () {
         async function assertRequestsMade(
             responses: {
                 prefix?: string;
-                error?: { httpStatus: Number; errcode: string };
+                error?: { httpStatus: number; errcode: string };
                 data?: { event_id: string };
             }[],
             expectRejects = false,
@@ -549,7 +575,7 @@ describe("MatrixClient", function () {
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
-        const content = { body };
+        const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
 
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
@@ -644,12 +670,13 @@ describe("MatrixClient", function () {
 
             const content = {
                 body,
+                "msgtype": MsgType.Text,
                 "m.relates_to": {
                     "m.in_reply_to": {
                         event_id: "$other:event",
                     },
                 },
-            };
+            } satisfies RoomMessageEventContent;
 
             const room = new Room(roomId, client, userId);
             mocked(store.getRoom).mockReturnValue(room);
@@ -677,6 +704,446 @@ describe("MatrixClient", function () {
             ];
 
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
+        });
+    });
+
+    describe("_unstable_sendDelayedEvent", () => {
+        const unstableMSC4140Prefix = `${ClientPrefix.Unstable}/org.matrix.msc4140`;
+
+        const roomId = "!room:example.org";
+        const body = "This is the body";
+        const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
+        const timeoutDelayOpts = { delay: 2000 };
+        const realTimeoutDelayOpts = { "org.matrix.msc4140.delay": 2000 };
+
+        beforeEach(() => {
+            unstableFeatures["org.matrix.msc4140"] = true;
+        });
+
+        it("throws when unsupported by server", async () => {
+            unstableFeatures["org.matrix.msc4140"] = false;
+            const errorMessage = "Server does not support";
+
+            await expect(
+                client._unstable_sendDelayedEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    null,
+                    EventType.RoomMessage,
+                    { ...content },
+                    client.makeTxnId(),
+                ),
+            ).rejects.toThrow(errorMessage);
+
+            await expect(
+                client._unstable_sendDelayedStateEvent(roomId, timeoutDelayOpts, EventType.RoomTopic, {
+                    topic: "topic",
+                }),
+            ).rejects.toThrow(errorMessage);
+
+            await expect(client._unstable_getDelayedEvents()).rejects.toThrow(errorMessage);
+
+            await expect(
+                client._unstable_updateDelayedEvent("anyDelayId", UpdateDelayedEventAction.Send),
+            ).rejects.toThrow(errorMessage);
+        });
+
+        it("works with null threadId", async () => {
+            httpLookups = [];
+
+            const timeoutDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                expectQueryParams: realTimeoutDelayOpts,
+                data: { delay_id: "id1" },
+                expectBody: content,
+            });
+
+            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                roomId,
+                timeoutDelayOpts,
+                null,
+                EventType.RoomMessage,
+                { ...content },
+                timeoutDelayTxnId,
+            );
+
+            const actionDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                data: { delay_id: "id2" },
+                expectBody: content,
+            });
+
+            await client._unstable_sendDelayedEvent(
+                roomId,
+                { parent_delay_id: timeoutDelayId },
+                null,
+                EventType.RoomMessage,
+                { ...content },
+                actionDelayTxnId,
+            );
+        });
+
+        it("works with non-null threadId", async () => {
+            httpLookups = [];
+            const threadId = "$threadId:server";
+            const expectBody = {
+                ...content,
+                "m.relates_to": {
+                    event_id: threadId,
+                    is_falling_back: true,
+                    rel_type: "m.thread",
+                },
+            };
+
+            const timeoutDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                expectQueryParams: realTimeoutDelayOpts,
+                data: { delay_id: "id1" },
+                expectBody,
+            });
+
+            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                roomId,
+                timeoutDelayOpts,
+                threadId,
+                EventType.RoomMessage,
+                { ...content },
+                timeoutDelayTxnId,
+            );
+
+            const actionDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                data: { delay_id: "id2" },
+                expectBody,
+            });
+
+            await client._unstable_sendDelayedEvent(
+                roomId,
+                { parent_delay_id: timeoutDelayId },
+                threadId,
+                EventType.RoomMessage,
+                { ...content },
+                actionDelayTxnId,
+            );
+        });
+
+        it("should add thread relation if threadId is passed and the relation is missing", async () => {
+            httpLookups = [];
+            const threadId = "$threadId:server";
+            const expectBody = {
+                ...content,
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        event_id: threadId,
+                    },
+                    "event_id": threadId,
+                    "is_falling_back": true,
+                    "rel_type": "m.thread",
+                },
+            };
+
+            const room = new Room(roomId, client, userId);
+            mocked(store.getRoom).mockReturnValue(room);
+
+            const rootEvent = new MatrixEvent({ event_id: threadId });
+            room.createThread(threadId, rootEvent, [rootEvent], false);
+
+            const timeoutDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                expectQueryParams: realTimeoutDelayOpts,
+                data: { delay_id: "id1" },
+                expectBody,
+            });
+
+            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                roomId,
+                timeoutDelayOpts,
+                threadId,
+                EventType.RoomMessage,
+                { ...content },
+                timeoutDelayTxnId,
+            );
+
+            const actionDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                data: { delay_id: "id2" },
+                expectBody,
+            });
+
+            await client._unstable_sendDelayedEvent(
+                roomId,
+                { parent_delay_id: timeoutDelayId },
+                threadId,
+                EventType.RoomMessage,
+                { ...content },
+                actionDelayTxnId,
+            );
+        });
+
+        it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
+            httpLookups = [];
+            const threadId = "$threadId:server";
+
+            const content = {
+                body,
+                "msgtype": MsgType.Text,
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        event_id: "$other:event",
+                    },
+                },
+            } satisfies RoomMessageEventContent;
+            const expectBody = {
+                ...content,
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        event_id: "$other:event",
+                    },
+                    "event_id": threadId,
+                    "is_falling_back": false,
+                    "rel_type": "m.thread",
+                },
+            };
+
+            const room = new Room(roomId, client, userId);
+            mocked(store.getRoom).mockReturnValue(room);
+
+            const rootEvent = new MatrixEvent({ event_id: threadId });
+            room.createThread(threadId, rootEvent, [rootEvent], false);
+
+            const timeoutDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                expectQueryParams: realTimeoutDelayOpts,
+                data: { delay_id: "id1" },
+                expectBody,
+            });
+
+            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                roomId,
+                timeoutDelayOpts,
+                threadId,
+                EventType.RoomMessage,
+                { ...content },
+                timeoutDelayTxnId,
+            );
+
+            const actionDelayTxnId = client.makeTxnId();
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                data: { delay_id: "id2" },
+                expectBody,
+            });
+
+            await client._unstable_sendDelayedEvent(
+                roomId,
+                { parent_delay_id: timeoutDelayId },
+                threadId,
+                EventType.RoomMessage,
+                { ...content },
+                actionDelayTxnId,
+            );
+        });
+
+        it("can send a delayed state event", async () => {
+            httpLookups = [];
+            const content = { topic: "The year 2000" };
+
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                expectQueryParams: realTimeoutDelayOpts,
+                data: { delay_id: "id1" },
+                expectBody: content,
+            });
+
+            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedStateEvent(
+                roomId,
+                timeoutDelayOpts,
+                EventType.RoomTopic,
+                { ...content },
+            );
+
+            httpLookups.push({
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                data: { delay_id: "id2" },
+                expectBody: content,
+            });
+
+            await client._unstable_sendDelayedStateEvent(
+                roomId,
+                { parent_delay_id: timeoutDelayId },
+                EventType.RoomTopic,
+                { ...content },
+            );
+        });
+
+        it("can look up delayed events", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4140Prefix,
+                    path: "/delayed_events",
+                    data: [],
+                },
+            ];
+
+            await client._unstable_getDelayedEvents();
+        });
+
+        it("can update delayed events", async () => {
+            const delayId = "id";
+            const action = UpdateDelayedEventAction.Restart;
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    data: {
+                        action,
+                    },
+                },
+            ];
+
+            await client._unstable_updateDelayedEvent(delayId, action);
+        });
+    });
+
+    describe("extended profiles", () => {
+        const unstableMSC4133Prefix = `${ClientPrefix.Unstable}/uk.tcpip.msc4133`;
+        const userId = "@profile_user:example.org";
+
+        beforeEach(() => {
+            unstableFeatures["uk.tcpip.msc4133"] = true;
+        });
+
+        it("throws when unsupported by server", async () => {
+            unstableFeatures["uk.tcpip.msc4133"] = false;
+            const errorMessage = "Server does not support extended profiles";
+
+            await expect(client.doesServerSupportExtendedProfiles()).resolves.toEqual(false);
+
+            await expect(client.getExtendedProfile(userId)).rejects.toThrow(errorMessage);
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).rejects.toThrow(errorMessage);
+            await expect(client.setExtendedProfileProperty("test_key", "foo")).rejects.toThrow(errorMessage);
+            await expect(client.deleteExtendedProfileProperty("test_key")).rejects.toThrow(errorMessage);
+            await expect(client.patchExtendedProfile({ test_key: "foo" })).rejects.toThrow(errorMessage);
+            await expect(client.setExtendedProfile({ test_key: "foo" })).rejects.toThrow(errorMessage);
+        });
+
+        it("can fetch a extended user profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId),
+                    data: testProfile,
+                },
+            ];
+            await expect(client.getExtendedProfile(userId)).resolves.toEqual(testProfile);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can fetch a property from a extended user profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: testProfile,
+                },
+            ];
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can set a property in our extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!) + "/test_key",
+                    expectBody: {
+                        test_key: "foo",
+                    },
+                },
+            ];
+            await expect(client.setExtendedProfileProperty("test_key", "foo")).resolves.toEqual(undefined);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can delete a property in our extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "DELETE",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!) + "/test_key",
+                },
+            ];
+            await expect(client.deleteExtendedProfileProperty("test_key")).resolves.toEqual(undefined);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can patch our extended profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            const patchedProfile = {
+                existing: "key",
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "PATCH",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!),
+                    data: patchedProfile,
+                    expectBody: testProfile,
+                },
+            ];
+            await expect(client.patchExtendedProfile(testProfile)).resolves.toEqual(patchedProfile);
+        });
+
+        it("can replace our extended profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "PUT",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!),
+                    data: testProfile,
+                    expectBody: testProfile,
+                },
+            ];
+            await expect(client.setExtendedProfile(testProfile)).resolves.toEqual(undefined);
         });
     });
 
@@ -734,7 +1201,7 @@ describe("MatrixClient", function () {
     it("should get (unstable) file trees with valid state", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -773,7 +1240,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees if not joined", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "leave", // "not join"
+            getMyMembership: () => KnownMembership.Leave, // "not join"
         } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
@@ -796,7 +1263,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees with invalid create contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -833,7 +1300,7 @@ describe("MatrixClient", function () {
     it("should not get (unstable) file trees with invalid purpose/subtype contents", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     /* eslint-disable jest/no-conditional-expect */
@@ -939,7 +1406,7 @@ describe("MatrixClient", function () {
             const filter = new Filter(client.credentials.userId);
 
             const filterId = await client.getOrCreateFilter(filterName, filter);
-            expect(filterId).toEqual(FILTER_RESPONSE.data?.filter_id);
+            expect(filterId).toEqual(!Array.isArray(FILTER_RESPONSE.data) && FILTER_RESPONSE.data?.filter_id);
         });
     });
 
@@ -1048,7 +1515,7 @@ describe("MatrixClient", function () {
     });
 
     describe("emitted sync events", function () {
-        function syncChecker(expectedStates: [string, string | null][], done: Function) {
+        function syncChecker(expectedStates: [string, string | null][], done: () => void) {
             return function syncListener(state: SyncState, old: SyncState | null) {
                 const expected = expectedStates.shift();
                 logger.log("'sync' curr=%s old=%s EXPECT=%s", state, old, expected);
@@ -1070,7 +1537,7 @@ describe("MatrixClient", function () {
         it("should transition null -> PREPARED after the first /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1087,7 +1554,7 @@ describe("MatrixClient", function () {
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1127,7 +1594,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["CATCHUP", "ERROR"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1138,7 +1605,7 @@ describe("MatrixClient", function () {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1163,7 +1630,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1182,7 +1649,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["ERROR", "SYNCING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1197,7 +1664,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["SYNCING", "SYNCING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1228,7 +1695,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1293,7 +1760,7 @@ describe("MatrixClient", function () {
     describe("redactEvent", () => {
         const roomId = "!room:example.org";
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomEncryption) {
@@ -1432,26 +1899,12 @@ describe("MatrixClient", function () {
         const txnId = "m12345";
 
         const mockRoom = {
-            getMyMembership: () => "join",
+            getMyMembership: () => KnownMembership.Join,
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomCreate) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({
-                            content: {
-                                [RoomCreateTypeField]: RoomType.Space,
-                            },
-                        });
-                    } else if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
+            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
+
+        let mockCrypto: Mocked<Crypto>;
 
         let event: MatrixEvent;
         beforeEach(async () => {
@@ -1467,11 +1920,12 @@ describe("MatrixClient", function () {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-            client.crypto = client["cryptoBackend"] = {
-                // mock crypto
-                encryptEvent: () => new Promise(() => {}),
+            mockCrypto = {
+                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
+                encryptEvent: jest.fn(),
                 stop: jest.fn(),
-            } as unknown as Crypto;
+            } as unknown as Mocked<Crypto>;
+            client.crypto = client["cryptoBackend"] = mockCrypto;
         });
 
         function assertCancelled() {
@@ -1488,11 +1942,20 @@ describe("MatrixClient", function () {
         });
 
         it("should cancel an event which is encrypting", async () => {
+            const encryptEventDefer = defer();
+            mockCrypto.encryptEvent.mockReturnValue(encryptEventDefer.promise);
+
+            const statusPromise = testUtils.emitPromise(event, "Event.status");
             // @ts-ignore protected method access
-            client.encryptAndSendEvent(mockRoom, event);
-            await testUtils.emitPromise(event, "Event.status");
+            const encryptAndSendPromise = client.encryptAndSendEvent(mockRoom, event);
+            await statusPromise;
             expect(event.status).toBe(EventStatus.ENCRYPTING);
             client.cancelPendingEvent(event);
+            assertCancelled();
+
+            // now let the encryption complete, and check that the message is not sent.
+            encryptEventDefer.resolve();
+            await encryptAndSendPromise;
             assertCancelled();
         });
 
@@ -1514,8 +1977,6 @@ describe("MatrixClient", function () {
             { startOpts: {}, hasThreadSupport: false },
             { startOpts: { threadSupport: true }, hasThreadSupport: true },
             { startOpts: { threadSupport: false }, hasThreadSupport: false },
-            { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
-            { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
         ])("enabled thread support for the SDK instance", async ({ startOpts, hasThreadSupport }) => {
             await client.startClient(startOpts);
             expect(client.supportsThreads()).toBe(hasThreadSupport);
@@ -1542,7 +2003,6 @@ describe("MatrixClient", function () {
                     },
                 },
                 event_id: "$ev1",
-                user_id: "@alice:matrix.org",
             });
 
             expect(rootEvent.isThreadRoot).toBe(true);
@@ -2069,10 +2529,10 @@ describe("MatrixClient", function () {
             await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
 
             // Add a rule in the new source room.
-            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, PolicyScope.User, {
+            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, EventType.PolicyRuleUser, {
                 entity: "*:example.org",
                 reason: "just a test",
-                recommendation: "m.ban",
+                recommendation: PolicyRecommendation.Ban,
             });
 
             // We should reject this invite.
@@ -2159,8 +2619,8 @@ describe("MatrixClient", function () {
             // Check where it shows up.
             const targetRoomId = ignoreInvites2.target;
             const targetRoom = client.getRoom(targetRoomId) as WrappedRoom;
-            expect(targetRoom._state.get(PolicyScope.User)[eventId]).toBeTruthy();
-            expect(newSourceRoom._state.get(PolicyScope.User)?.[eventId]).toBeFalsy();
+            expect(targetRoom._state.get(EventType.PolicyRuleUser)[eventId]).toBeTruthy();
+            expect(newSourceRoom._state.get(EventType.PolicyRuleUser)?.[eventId]).toBeFalsy();
         });
     });
 
@@ -2211,8 +2671,7 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": true,
                 },
             };
-            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
             const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
@@ -2250,8 +2709,7 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": false,
                 },
             };
-            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
             // populate version support
@@ -3000,6 +3458,65 @@ describe("MatrixClient", function () {
                 kind: null,
             });
             expect(result).toEqual({});
+        });
+    });
+
+    describe("getAuthIssuer", () => {
+        it("should use unstable prefix", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_issuer`,
+                    data: {
+                        issuer: "https://issuer/",
+                    },
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+
+            await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
+            expect(httpLookups.length).toEqual(0);
+        });
+    });
+
+    describe("identityHashedLookup", () => {
+        it("should return hashed lookup results", async () => {
+            const ID_ACCESS_TOKEN = "hello_id_server_please_let_me_make_a_request";
+
+            client.http.idServerRequest = jest.fn().mockImplementation((method, path, params) => {
+                if (method === "GET" && path === "/hash_details") {
+                    return { algorithms: ["sha256"], lookup_pepper: "carrot" };
+                } else if (method === "POST" && path === "/lookup") {
+                    return {
+                        mappings: {
+                            "WHA-MgrrsZACDI9F8OaVagpiyiV2sjZylGHJteT4OMU": "@bob:homeserver.dummy",
+                        },
+                    };
+                }
+
+                throw new Error("Test impl doesn't know about this request");
+            });
+
+            const lookupResult = await client.identityHashedLookup([["bob@email.dummy", "email"]], ID_ACCESS_TOKEN);
+
+            expect(client.http.idServerRequest).toHaveBeenCalledWith(
+                "GET",
+                "/hash_details",
+                undefined,
+                "/_matrix/identity/v2",
+                ID_ACCESS_TOKEN,
+            );
+
+            expect(client.http.idServerRequest).toHaveBeenCalledWith(
+                "POST",
+                "/lookup",
+                { pepper: "carrot", algorithm: "sha256", addresses: ["WHA-MgrrsZACDI9F8OaVagpiyiV2sjZylGHJteT4OMU"] },
+                "/_matrix/identity/v2",
+                ID_ACCESS_TOKEN,
+            );
+
+            expect(lookupResult).toHaveLength(1);
+            expect(lookupResult[0]).toEqual({ address: "bob@email.dummy", mxid: "@bob:homeserver.dummy" });
         });
     });
 });

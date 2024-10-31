@@ -16,8 +16,8 @@ limitations under the License.
 
 import { EitherAnd } from "matrix-events-sdk";
 
-import { UnstableValue } from "../NamespacedValue";
-import { IMessageRendering } from "./extensible_events";
+import { UnstableValue } from "../NamespacedValue.ts";
+import { IMessageRendering } from "./extensible_events.ts";
 
 /**
  * Extensible topic event type based on MSC3765

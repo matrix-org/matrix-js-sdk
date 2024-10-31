@@ -16,13 +16,14 @@ limitations under the License.
 
 import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
 
-import { logger, Logger } from "../logger";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import * as algorithms from "./algorithms";
-import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
-import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
-import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto";
-import { IMessage } from "./algorithms/olm";
+import { logger, Logger } from "../logger.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
+import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base.ts";
+import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm.ts";
+import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto.ts";
+import { IMessage } from "./algorithms/olm.ts";
+import { DecryptionFailureCode } from "../crypto-api/index.ts";
+import { DecryptionError } from "../common-crypto/CryptoBackend.ts";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -55,7 +56,14 @@ function checkPayloadLength(payloadString: string): void {
 }
 
 interface IInitOpts {
+    /**
+     * (Optional) data from exported device that must be re-created.
+     * If present, opts.pickleKey is ignored (exported data already provides a pickle key)
+     */
     fromExportedDevice?: IExportedDevice;
+    /**
+     * (Optional) pickle key to set instead of default one
+     */
     pickleKey?: string;
 }
 
@@ -64,7 +72,7 @@ export interface InboundGroupSessionData {
     room_id: string; // eslint-disable-line camelcase
     /** pickled Olm.InboundGroupSession */
     session: string;
-    keysClaimed: Record<string, string>;
+    keysClaimed?: Record<string, string>;
     /** Devices involved in forwarding this session to us (normally empty). */
     forwardingCurve25519KeyChain: string[];
     /** whether this session is untrusted. */
@@ -174,11 +182,7 @@ export class OlmDevice {
      *
      * Reads the device keys from the OlmAccount object.
      *
-     * @param fromExportedDevice - (Optional) data from exported device
-     *     that must be re-created.
-     *     If present, opts.pickleKey is ignored
-     *     (exported data already provides a pickle key)
-     * @param pickleKey - (Optional) pickle key to set instead of default one
+     * @param IInitOpts - opts to initialise the OlmAccount with
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;
@@ -608,7 +612,7 @@ export class OlmDevice {
             log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
             try {
                 await this.sessionsInProgress[theirDeviceIdentityKey];
-            } catch (e) {
+            } catch {
                 // if the session failed to be created, just fall through and
                 // return an empty result
             }
@@ -694,7 +698,7 @@ export class OlmDevice {
             log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
             try {
                 await this.sessionsInProgress[deviceIdentityKey];
-            } catch (e) {
+            } catch {
                 // if the session failed to be created, then just fall through and
                 // return an empty result
             }
@@ -1217,13 +1221,13 @@ export class OlmDevice {
                 this.getInboundGroupSession(roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null || sessionData === null) {
                         if (withheld) {
-                            error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
-                                calculateWithheldMessage(withheld),
-                                {
-                                    session: senderKey + "|" + sessionId,
-                                },
-                            );
+                            const failureCode =
+                                withheld.code === "m.unverified"
+                                    ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
+                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD;
+                            error = new DecryptionError(failureCode, calculateWithheldMessage(withheld), {
+                                session: senderKey + "|" + sessionId,
+                            });
                         }
                         result = null;
                         return;
@@ -1233,13 +1237,13 @@ export class OlmDevice {
                         res = session.decrypt(body);
                     } catch (e) {
                         if ((<Error>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
-                            error = new algorithms.DecryptionError(
-                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
-                                calculateWithheldMessage(withheld),
-                                {
-                                    session: senderKey + "|" + sessionId,
-                                },
-                            );
+                            const failureCode =
+                                withheld.code === "m.unverified"
+                                    ? DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE
+                                    : DecryptionFailureCode.MEGOLM_KEY_WITHHELD;
+                            error = new DecryptionError(failureCode, calculateWithheldMessage(withheld), {
+                                session: senderKey + "|" + sessionId,
+                            });
                         } else {
                             error = <Error>e;
                         }

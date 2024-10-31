@@ -136,11 +136,6 @@ describe("EventTimelineSet", () => {
             expect(eventsInLiveTimeline.length).toStrictEqual(1);
             expect(eventsInLiveTimeline[0]).toStrictEqual(duplicateMessageEvent);
         });
-
-        it("Make sure legacy overload passing options directly as parameters still works", () => {
-            expect(() => eventTimelineSet.addLiveEvent(messageEvent, DuplicateStrategy.Replace, false)).not.toThrow();
-            expect(() => eventTimelineSet.addLiveEvent(messageEvent, DuplicateStrategy.Ignore, true)).not.toThrow();
-        });
     });
 
     describe("addEventToTimeline", () => {

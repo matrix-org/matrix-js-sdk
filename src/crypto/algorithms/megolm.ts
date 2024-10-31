@@ -20,30 +20,32 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto";
-import { logger, Logger } from "../../logger";
-import * as olmlib from "../olmlib";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto.ts";
+import { logger, Logger } from "../../logger.ts";
+import * as olmlib from "../olmlib.ts";
 import {
     DecryptionAlgorithm,
     DecryptionClassParams,
-    DecryptionError,
     EncryptionAlgorithm,
     IParams,
     registerAlgorithm,
     UnknownDeviceError,
-} from "./base";
-import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice";
-import { Room } from "../../models/room";
-import { DeviceInfo } from "../deviceinfo";
-import { IOlmSessionResult } from "../olmlib";
-import { DeviceInfoMap } from "../DeviceList";
-import { IContent, MatrixEvent } from "../../models/event";
-import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event";
-import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { OlmGroupSessionExtraData } from "../../@types/crypto";
-import { MatrixError } from "../../http-api";
-import { immediate, MapWithDefault } from "../../utils";
+} from "./base.ts";
+import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice.ts";
+import { Room } from "../../models/room.ts";
+import { DeviceInfo } from "../deviceinfo.ts";
+import { IOlmSessionResult } from "../olmlib.ts";
+import { DeviceInfoMap } from "../DeviceList.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event.ts";
+import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index.ts";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
+import { OlmGroupSessionExtraData } from "../../@types/crypto.ts";
+import { MatrixError } from "../../http-api/index.ts";
+import { immediate, MapWithDefault } from "../../utils.ts";
+import { KnownMembership } from "../../@types/membership.ts";
+import { DecryptionFailureCode } from "../../crypto-api/index.ts";
+import { DecryptionError } from "../../common-crypto/CryptoBackend.ts";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -164,7 +166,10 @@ class OutboundSessionInfo {
      * @param sharedHistory - whether the session can be freely shared with
      *    other group members, according to the room history visibility settings
      */
-    public constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
+    public constructor(
+        public readonly sessionId: string,
+        public readonly sharedHistory = false,
+    ) {
         this.creationTime = new Date().getTime();
     }
 
@@ -1062,7 +1067,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
             // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
             try {
                 await this.encryptionPreparation.promise;
-            } catch (e) {
+            } catch {
                 // ignore any errors -- if the preparation failed, we'll just
                 // restart everything here
             }
@@ -1309,7 +1314,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const content = event.getWireContent();
 
         if (!content.sender_key || !content.session_id || !content.ciphertext) {
-            throw new DecryptionError("MEGOLM_MISSING_FIELDS", "Missing fields in input");
+            throw new DecryptionError(DecryptionFailureCode.MEGOLM_MISSING_FIELDS, "Missing fields in input");
         }
 
         // we add the event to the pending list *before* we start decryption.
@@ -1335,12 +1340,12 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 throw e;
             }
 
-            let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
+            let errorCode = DecryptionFailureCode.OLM_DECRYPT_GROUP_MESSAGE_ERROR;
 
             if ((<MatrixError>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX") {
                 this.requestKeysForEvent(event);
 
-                errorCode = "OLM_UNKNOWN_MESSAGE_INDEX";
+                errorCode = DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX;
             }
 
             throw new DecryptionError(errorCode, e instanceof Error ? e.message : "Unknown Error: Error is undefined", {
@@ -1373,13 +1378,13 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 if (problem.fixed) {
                     problemDescription += " Trying to create a new secure channel and re-requesting the keys.";
                 }
-                throw new DecryptionError("MEGOLM_UNKNOWN_INBOUND_SESSION_ID", problemDescription, {
+                throw new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, problemDescription, {
                     session: content.sender_key + "|" + content.session_id,
                 });
             }
 
             throw new DecryptionError(
-                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                 "The sender's device has not sent us the keys for this message.",
                 {
                     session: content.sender_key + "|" + content.session_id,
@@ -1401,7 +1406,10 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         // (this is somewhat redundant, since the megolm session is scoped to the
         // room, so neither the sender nor a MITM can lie about the room_id).
         if (payload.room_id !== event.getRoomId()) {
-            throw new DecryptionError("MEGOLM_BAD_ROOM", "Message intended for room " + payload.room_id);
+            throw new DecryptionError(
+                DecryptionFailureCode.MEGOLM_BAD_ROOM,
+                "Message intended for room " + payload.room_id,
+            );
         }
 
         return {
@@ -1677,7 +1685,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const fromInviter =
             memberEvent?.getSender() === senderKeyUser ||
             (memberEvent?.getUnsigned()?.prev_sender === senderKeyUser &&
-                memberEvent?.getPrevContent()?.membership === "invite");
+                memberEvent?.getPrevContent()?.membership === KnownMembership.Invite);
 
         if (room && fromInviter) {
             return true;
@@ -2095,7 +2103,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             pendingList.map(async (ev) => {
                 try {
                     await ev.attemptDecryption(this.crypto, { isRetry: true, forceRedecryptIfUntrusted });
-                } catch (e) {
+                } catch {
                     // don't die if something goes wrong
                 }
             }),
@@ -2120,7 +2128,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     [...pending].map(async (ev) => {
                         try {
                             await ev.attemptDecryption(this.crypto);
-                        } catch (e) {
+                        } catch {
                             // don't die if something goes wrong
                         }
                     }),

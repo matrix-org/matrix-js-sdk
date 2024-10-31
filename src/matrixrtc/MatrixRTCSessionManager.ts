@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { MatrixClient, ClientEvent } from "../client";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Room, RoomEvent } from "../models/room";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { MatrixEvent } from "../models/event";
-import { MatrixRTCSession } from "./MatrixRTCSession";
-import { EventType } from "../@types/event";
+import { logger as rootLogger } from "../logger.ts";
+import { MatrixClient, ClientEvent } from "../client.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { Room, RoomEvent } from "../models/room.ts";
+import { RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { MatrixRTCSession } from "./MatrixRTCSession.ts";
+import { EventType } from "../@types/event.ts";
+
+const logger = rootLogger.getChild("MatrixRTCSessionManager");
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -73,9 +75,9 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
         this.roomSessions.clear();
 
-        this.client.removeListener(ClientEvent.Room, this.onRoom);
-        this.client.removeListener(RoomEvent.Timeline, this.onTimeline);
-        this.client.removeListener(RoomStateEvent.Events, this.onRoomState);
+        this.client.off(ClientEvent.Room, this.onRoom);
+        this.client.off(RoomEvent.Timeline, this.onTimeline);
+        this.client.off(RoomStateEvent.Events, this.onRoomState);
     }
 
     /**
@@ -98,16 +100,35 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
-    private onTimeline = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return;
+    private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
+        await this.client.decryptEventIfNeeded(event);
+        if (event.isDecryptionFailure()) {
+            if (!isRetry) {
+                logger.warn(
+                    `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
+                );
+                // retry after 1 second. After this we give up.
+                setTimeout(() => this.consumeCallEncryptionEvent(event, true), 1000);
+            } else {
+                logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
+            }
+            return;
+        } else if (isRetry) {
+            logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
+        }
+
+        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return Promise.resolve();
 
         const room = this.client.getRoom(event.getRoomId());
         if (!room) {
             logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
-            return;
+            return Promise.resolve();
         }
 
         this.getRoomSession(room).onCallEncryption(event);
+    }
+    private onTimeline = (event: MatrixEvent): void => {
+        this.consumeCallEncryptionEvent(event);
     };
 
     private onRoom = (room: Room): void => {

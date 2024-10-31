@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,16 +24,18 @@ import {
     KeyBackupInfo,
     KeyBackupSession,
     Curve25519SessionData,
-} from "../crypto-api/keybackup";
-import { logger } from "../logger";
-import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api";
-import { CryptoEvent, IMegolmSessionData } from "../crypto";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { encodeUri, immediate } from "../utils";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { sleep } from "../utils";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend";
-import { IEncryptedPayload } from "../crypto/aes";
+    KeyBackupRoomSessions,
+} from "../crypto-api/keybackup.ts";
+import { logger } from "../logger.ts";
+import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
+import { IMegolmSessionData } from "../crypto/index.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { encodeUri, logDuration } from "../utils.ts";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { sleep } from "../utils.ts";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -55,6 +57,16 @@ interface KeyBackupCreationInfo {
 export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap> {
     /** Have we checked if there is a backup on the server which we can use */
     private checkedForBackup = false;
+
+    /**
+     * The latest backup version on the server, when we last checked.
+     *
+     * If there was no backup on the server, `null`. If our attempt to check resulted in an error, `undefined`.
+     *
+     * Note that the backup was not necessarily verified.
+     */
+    private serverBackupInfo: KeyBackupInfo | null | undefined = undefined;
+
     private activeBackupVersion: string | null = null;
     private stopped = false;
 
@@ -84,6 +96,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     public async getActiveBackupVersion(): Promise<string | null> {
         if (!(await this.olmMachine.isBackupEnabled())) return null;
         return this.activeBackupVersion;
+    }
+
+    /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This normally returns a cached value, but if we haven't yet made a request to the server, it will fire one off.
+     * It will always return the details of the active backup if key backup is enabled.
+     *
+     * If there was no backup on the server, `null`. If our attempt to check resulted in an error, `undefined`.
+     */
+    public async getServerBackupInfo(): Promise<KeyBackupInfo | null | undefined> {
+        // Do a validity check if we haven't already done one. The check is likely to fail if we don't yet have the
+        // backup keys -- but as a side-effect, it will populate `serverBackupInfo`.
+        await this.checkKeyBackupAndEnable(false);
+        return this.serverBackupInfo;
     }
 
     /**
@@ -126,7 +153,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Handles a backup secret received event and store it if it matches the current backup version.
      *
-     * @param secret - The secret as received from a `m.secert.send` event for secret `m.megolm_backup.v1`.
+     * @param secret - The secret as received from a `m.secret.send` event for secret `m.megolm_backup.v1`.
      * @returns true if the secret is valid and has been stored, false otherwise.
      */
     public async handleBackupSecretReceived(secret: string): Promise<boolean> {
@@ -139,7 +166,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         if (!backupCheck?.backupInfo?.version || !backupCheck.trustInfo.trusted) {
             // There is no server-side key backup, or the backup is not signed by a trusted cross-signing key or trusted own device.
             // This decryption key is useless to us.
-            logger.warn("Received backup decryption key, but there is no trusted server-side key backup");
+            logger.warn(
+                "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
+            );
             return false;
         }
 
@@ -147,15 +176,16 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
             const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(backupCheck.backupInfo, backupDecryptionKey);
             if (!privateKeyMatches) {
-                logger.debug(`onReceiveSecret: backup decryption key does not match current backup version`);
+                logger.warn(
+                    `handleBackupSecretReceived: Private decryption key does not match the public key of the current remote backup.`,
+                );
                 // just ignore the secret
                 return false;
             }
             logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
-
-            await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
+            await this.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
             return true;
         } catch (e) {
             logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
@@ -164,23 +194,98 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         return false;
     }
 
+    public async saveBackupDecryptionKey(
+        backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey,
+        version: string,
+    ): Promise<void> {
+        await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, version);
+        // Emit an event that we have a new backup decryption key, so that the sdk can start
+        // importing keys from backup if needed.
+        this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
+    }
+
+    /**
+     * Import a list of room keys previously exported by exportRoomKeys
+     *
+     * @param keys - a list of session export objects
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void> {
+        await this.importRoomKeysAsJson(JSON.stringify(keys), opts);
+    }
+
+    /**
+     * Import a list of room keys previously exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export objects,
+     *    each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeysAsJson(jsonKeys: string, opts?: ImportRoomKeysOpts): Promise<void> {
+        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: bigint, total: bigint): void => {
+            const importOpt: ImportRoomKeyProgressData = {
+                total: Number(total),
+                successes: Number(progress),
+                stage: "load_keys",
+                failures: 0,
+            };
+            opts?.progressCallback?.(importOpt);
+        });
+    }
+
+    /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public async importBackedUpRoomKeys(
+        keys: IMegolmSessionData[],
+        backupVersion: string,
+        opts?: ImportRoomKeysOpts,
+    ): Promise<void> {
+        const keysByRoom: Map<RustSdkCryptoJs.RoomId, Map<string, IMegolmSessionData>> = new Map();
+        for (const key of keys) {
+            const roomId = new RustSdkCryptoJs.RoomId(key.room_id);
+            if (!keysByRoom.has(roomId)) {
+                keysByRoom.set(roomId, new Map());
+            }
+            keysByRoom.get(roomId)!.set(key.session_id, key);
+        }
+        await this.olmMachine.importBackedUpRoomKeys(
+            keysByRoom,
+            (progress: bigint, total: bigint, failures: bigint): void => {
+                const importOpt: ImportRoomKeyProgressData = {
+                    total: Number(total),
+                    successes: Number(progress),
+                    stage: "load_keys",
+                    failures: Number(failures),
+                };
+                opts?.progressCallback?.(importOpt);
+            },
+            backupVersion,
+        );
+    }
+
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
 
     /** Helper for `checkKeyBackup` */
     private async doCheckKeyBackup(): Promise<KeyBackupCheck | null> {
         logger.log("Checking key backup status...");
-        let backupInfo: KeyBackupInfo | null = null;
+        let backupInfo: KeyBackupInfo | null | undefined;
         try {
             backupInfo = await this.requestKeyBackupVersion();
         } catch (e) {
             logger.warn("Error checking for active key backup", e);
+            this.serverBackupInfo = undefined;
             return null;
         }
         this.checkedForBackup = true;
 
         if (backupInfo && !backupInfo.version) {
             logger.warn("active backup lacks a useful 'version'; ignoring it");
+            backupInfo = undefined;
         }
+        this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
 
@@ -260,7 +365,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         this.backupKeysLoopRunning = true;
 
-        logger.log(`Starting loop for ${this.activeBackupVersion}.`);
+        logger.log(`Backup: Starting keys upload loop for backup version:${this.activeBackupVersion}.`);
 
         // wait between 0 and `maxDelay` seconds, to avoid backup
         // requests from different clients hitting the server all at
@@ -269,43 +374,102 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await sleep(delay);
 
         try {
-            let numFailures = 0; // number of consecutive network failures for exponential backoff
+            // number of consecutive network failures for exponential backoff
+            let numFailures = 0;
+            // The number of keys left to back up. (Populated lazily: see more comments below.)
+            let remainingToUploadCount: number | null = null;
+            // To avoid computing the key when only a few keys were added (after a sync for example),
+            // we compute the count only when at least two iterations are needed.
+            let isFirstIteration = true;
 
             while (!this.stopped) {
                 // Get a batch of room keys to upload
-                const request: RustSdkCryptoJs.KeysBackupRequest | null = await this.olmMachine.backupRoomKeys();
+                let request: RustSdkCryptoJs.KeysBackupRequest | null = null;
+                try {
+                    request = await logDuration(
+                        logger,
+                        "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
+                        async () => {
+                            return await this.olmMachine.backupRoomKeys();
+                        },
+                    );
+                } catch (err) {
+                    logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
+                }
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
-                    logger.log(`Ending loop for ${this.activeBackupVersion}.`);
+                    logger.log(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
+                    if (!request) {
+                        // nothing more to upload
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
+                    }
                     return;
                 }
 
                 try {
                     await this.outgoingRequestProcessor.makeOutgoingRequest(request);
                     numFailures = 0;
+                    if (this.stopped) break;
 
-                    const keyCount: RustSdkCryptoJs.RoomKeyCounts = await this.olmMachine.roomKeyCounts();
-                    const remaining = keyCount.total - keyCount.backedUp;
-                    this.emit(CryptoEvent.KeyBackupSessionsRemaining, remaining);
+                    // Key count performance (`olmMachine.roomKeyCounts()`) can be pretty bad on some configurations.
+                    // In particular, we detected on some M1 macs that when the object store reaches a threshold, the count
+                    // performance stops growing in O(n) and suddenly becomes very slow (40s, 60s or more).
+                    // For reference, the performance drop occurs around 300-400k keys on the platforms where this issue is observed.
+                    // Even on other configurations, the count can take several seconds.
+                    // This will block other operations on the database, like sending messages.
+                    //
+                    // This is a workaround to avoid calling `olmMachine.roomKeyCounts()` too often, and only when necessary.
+                    // We don't call it on the first loop because there could be only a few keys to upload, and we don't want to wait for the count.
+                    if (!isFirstIteration && remainingToUploadCount === null) {
+                        try {
+                            const keyCount = await this.olmMachine.roomKeyCounts();
+                            remainingToUploadCount = keyCount.total - keyCount.backedUp;
+                        } catch (err) {
+                            logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                        }
+                    }
+
+                    if (remainingToUploadCount !== null) {
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, remainingToUploadCount);
+                        const keysCountInBatch = this.keysCountInBatch(request);
+                        // `OlmMachine.roomKeyCounts` is called only once for the current backupKeysLoop. But new
+                        // keys could be added during the current loop (after a sync for example).
+                        // So the count can get out of sync with the real number of remaining keys to upload.
+                        // Depending on the number of new keys imported and the time to complete the loop,
+                        // this could result in multiple events being emitted with a remaining key count of 0.
+                        remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
+                    }
                 } catch (err) {
                     numFailures++;
-                    logger.error("Error processing backup request for rust crypto-sdk", err);
+                    logger.error("Backup: Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
                         const errCode = err.data.errcode;
                         if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
-                            await this.disableKeyBackup();
+                            logger.log(`Backup: Failed to upload keys to current vesion: ${errCode}.`);
+                            try {
+                                await this.disableKeyBackup();
+                            } catch (error) {
+                                logger.error("Backup: An error occurred while disabling key backup:", error);
+                            }
                             this.emit(CryptoEvent.KeyBackupFailed, err.data.errcode!);
                             // There was an active backup and we are out of sync with the server
                             // force a check server side
                             this.backupKeysLoopRunning = false;
                             this.checkKeyBackupAndEnable(true);
                             return;
-                        } else if (errCode == "M_LIMIT_EXCEEDED") {
+                        } else if (err.isRateLimitError()) {
                             // wait for that and then continue?
-                            const waitTime = err.data.retry_after_ms;
-                            if (waitTime > 0) {
-                                sleep(waitTime);
-                                continue;
+                            try {
+                                const waitTime = err.getRetryAfterMs();
+                                if (waitTime && waitTime > 0) {
+                                    await sleep(waitTime);
+                                    continue;
+                                }
+                            } catch (error) {
+                                logger.warn(
+                                    "Backup: An error occurred while retrieving a rate-limit retry delay",
+                                    error,
+                                );
                             } // else go to the normal backoff
                         }
                     }
@@ -314,10 +478,28 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     // exponential backoff if we have failures
                     await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
                 }
+                isFirstIteration = false;
             }
         } finally {
             this.backupKeysLoopRunning = false;
         }
+    }
+
+    /**
+     * Utility method to count the number of keys in a backup request, in order to update the remaining keys count.
+     * This should be the chunk size of the backup request for all requests but the last, but we don't have access to it
+     * (it's static in the Rust SDK).
+     * @param batch - The backup request to count the keys from.
+     *
+     * @returns The number of keys in the backup request.
+     */
+    private keysCountInBatch(batch: RustSdkCryptoJs.KeysBackupRequest): number {
+        const parsedBody: KeyBackup = JSON.parse(batch.body);
+        let count = 0;
+        for (const { sessions } of Object.values(parsedBody.rooms)) {
+            count += Object.keys(sessions).length;
+        }
+        return count;
     }
 
     /**
@@ -326,23 +508,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns Information object from API or null if there is no active backup.
      */
     private async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
-        try {
-            return await this.http.authedRequest<KeyBackupInfo>(
-                Method.Get,
-                "/room_keys/version",
-                undefined,
-                undefined,
-                {
-                    prefix: ClientPrefix.V3,
-                },
-            );
-        } catch (e) {
-            if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
-                return null;
-            } else {
-                throw e;
-            }
-        }
+        return await requestKeyBackupVersion(this.http);
     }
 
     /**
@@ -379,7 +545,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             },
         );
 
-        this.olmMachine.saveBackupDecryptionKey(randomKey, res.version);
+        await this.saveBackupDecryptionKey(randomKey, res.version);
 
         return {
             version: res.version,
@@ -416,6 +582,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
+    }
+
+    /**
+     * Creates a new backup decryptor for the given private key.
+     * @param decryptionKey - The private key to use for decryption.
+     */
+    public createBackupDecryptor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey): BackupDecryptor {
+        return new RustBackupDecryptor(decryptionKey);
     }
 }
 
@@ -454,7 +628,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
      * Implements {@link BackupDecryptor#decryptSessions}
      */
     public async decryptSessions(
-        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | IEncryptedPayload>>,
+        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | AESEncryptedSecretStoragePayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {
@@ -468,9 +642,6 @@ export class RustBackupDecryptor implements BackupDecryptor {
                 );
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
-
-                // there might be lots of sessions, so don't hog the event loop
-                await immediate();
             } catch (e) {
                 logger.log("Failed to decrypt megolm session from backup", e, sessionData);
             }
@@ -486,13 +657,39 @@ export class RustBackupDecryptor implements BackupDecryptor {
     }
 }
 
+export async function requestKeyBackupVersion(
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+): Promise<KeyBackupInfo | null> {
+    try {
+        return await http.authedRequest<KeyBackupInfo>(Method.Get, "/room_keys/version", undefined, undefined, {
+            prefix: ClientPrefix.V3,
+        });
+    } catch (e) {
+        if ((<MatrixError>e).errcode === "M_NOT_FOUND") {
+            return null;
+        } else {
+            throw e;
+        }
+    }
+}
+
 export type RustBackupCryptoEvents =
     | CryptoEvent.KeyBackupStatus
     | CryptoEvent.KeyBackupSessionsRemaining
-    | CryptoEvent.KeyBackupFailed;
+    | CryptoEvent.KeyBackupFailed
+    | CryptoEvent.KeyBackupDecryptionKeyCached;
 
 export type RustBackupCryptoEventMap = {
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
     [CryptoEvent.KeyBackupFailed]: (errCode: string) => void;
+    [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
 };
+
+/**
+ * Response from GET `/room_keys/keys` endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
+ */
+export interface KeyBackup {
+    rooms: Record<string, { sessions: KeyBackupRoomSessions }>;
+}

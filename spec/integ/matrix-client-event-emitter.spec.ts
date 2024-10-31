@@ -28,6 +28,7 @@ import {
 } from "../../src";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient events", function () {
     const selfUserId = "@alice:localhost";
@@ -85,7 +86,7 @@ describe("MatrixClient events", function () {
                             events: [
                                 utils.mkMembership({
                                     room: "!erufh:bar",
-                                    mship: "join",
+                                    mship: KnownMembership.Join,
                                     user: "@foo:bar",
                                 }),
                                 utils.mkEvent({
@@ -272,7 +273,7 @@ describe("MatrixClient events", function () {
                 membersInvokeCount++;
                 expect(member.roomId).toEqual("!erufh:bar");
                 expect(member.userId).toEqual("@foo:bar");
-                expect(member.membership).toEqual("join");
+                expect(member.membership).toEqual(KnownMembership.Join);
             });
             client!.on(RoomStateEvent.NewMember, function (event, state, member) {
                 newMemberInvokeCount++;
@@ -310,7 +311,7 @@ describe("MatrixClient events", function () {
             });
             client!.on(RoomMemberEvent.Membership, function (event, member) {
                 membershipInvokeCount++;
-                expect(member.membership).toEqual("join");
+                expect(member.membership).toEqual(KnownMembership.Join);
             });
 
             client!.startClient();

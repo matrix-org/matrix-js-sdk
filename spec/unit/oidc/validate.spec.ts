@@ -15,106 +15,13 @@ limitations under the License.
 */
 
 import { mocked } from "jest-mock";
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 
-import { M_AUTHENTICATION } from "../../../src";
 import { logger } from "../../../src/logger";
-import {
-    validateIdToken,
-    validateOIDCIssuerWellKnown,
-    validateWellKnownAuthentication,
-} from "../../../src/oidc/validate";
+import { validateIdToken, validateOIDCIssuerWellKnown } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
 jest.mock("jwt-decode");
-
-describe("validateWellKnownAuthentication()", () => {
-    const baseWk = {
-        "m.homeserver": {
-            base_url: "https://hs.org",
-        },
-    };
-    it("should throw not supported error when wellKnown has no m.authentication section", () => {
-        expect(() => validateWellKnownAuthentication(undefined)).toThrow(OidcError.NotSupported);
-    });
-
-    it("should throw misconfigured error when authentication issuer is not a string", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: { url: "test.com" },
-            },
-        };
-        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
-            OidcError.Misconfigured,
-        );
-    });
-
-    it("should throw misconfigured error when authentication account is not a string", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                account: { url: "test" },
-            },
-        };
-        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
-            OidcError.Misconfigured,
-        );
-    });
-
-    it("should throw misconfigured error when authentication account is false", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                account: false,
-            },
-        };
-        expect(() => validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!] as any)).toThrow(
-            OidcError.Misconfigured,
-        );
-    });
-
-    it("should return valid config when wk uses stable m.authentication", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                account: "account.com",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
-            issuer: "test.com",
-            account: "account.com",
-        });
-    });
-
-    it("should return valid config when m.authentication account is missing", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
-            issuer: "test.com",
-        });
-    });
-
-    it("should remove unexpected properties", () => {
-        const wk = {
-            ...baseWk,
-            [M_AUTHENTICATION.stable!]: {
-                issuer: "test.com",
-                somethingElse: "test",
-            },
-        };
-        expect(validateWellKnownAuthentication(wk[M_AUTHENTICATION.stable!])).toEqual({
-            issuer: "test.com",
-        });
-    });
-});
 
 describe("validateOIDCIssuerWellKnown", () => {
     const validWk: any = {
@@ -125,6 +32,8 @@ describe("validateOIDCIssuerWellKnown", () => {
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
+        account_management_uri: "https://authorize.org/account",
+        account_management_actions_supported: ["org.matrix.cross_signing_reset"],
     };
     beforeEach(() => {
         // stub to avoid console litter
@@ -157,6 +66,8 @@ describe("validateOIDCIssuerWellKnown", () => {
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: validWk.registration_endpoint,
+            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
+            accountManagementEndpoint: "https://authorize.org/account",
         });
     });
 
@@ -167,6 +78,8 @@ describe("validateOIDCIssuerWellKnown", () => {
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: undefined,
+            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
+            accountManagementEndpoint: "https://authorize.org/account",
         });
     });
 
@@ -186,6 +99,8 @@ describe("validateOIDCIssuerWellKnown", () => {
         ["code_challenge_methods_supported", undefined],
         ["code_challenge_methods_supported", "not an array"],
         ["code_challenge_methods_supported", ["doesnt include S256"]],
+        ["account_management_uri", { not: "a string" }],
+        ["account_management_actions_supported", { not: "an array" }],
     ])("should throw OP support error when %s is %s", (key, value) => {
         const wk = {
             ...validWk,

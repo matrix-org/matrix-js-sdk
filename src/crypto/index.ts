@@ -20,95 +20,103 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
+import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto.ts";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
-import { EventType, ToDeviceMessageId } from "../@types/event";
-import { TypedReEmitter } from "../ReEmitter";
-import { logger } from "../logger";
-import { IExportedDevice, OlmDevice } from "./OlmDevice";
-import { IOlmDevice } from "./algorithms/megolm";
-import * as olmlib from "./olmlib";
-import { DeviceInfoMap, DeviceList } from "./DeviceList";
-import { DeviceInfo, IDevice } from "./deviceinfo";
-import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
-import * as algorithms from "./algorithms";
-import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
-import { EncryptionSetupBuilder } from "./EncryptionSetup";
-import { SecretStorage as LegacySecretStorage } from "./SecretStorage";
-import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./api";
-import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { VerificationBase } from "./verification/Base";
-import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode";
-import { SAS as SASVerification } from "./verification/SAS";
-import { keyFromPassphrase } from "./key_passphrase";
-import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey";
-import { VerificationRequest } from "./verification/request/VerificationRequest";
-import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
-import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel";
-import { IllegalMethod } from "./verification/IllegalMethod";
-import { KeySignatureUploadError } from "../errors";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
-import { DehydrationManager } from "./dehydration";
-import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup";
-import { IStore } from "../store";
-import { Room, RoomEvent } from "../models/room";
-import { RoomMember, RoomMemberEvent } from "../models/room-member";
-import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
-import { ToDeviceBatch } from "../models/ToDeviceMessage";
+import { EventType, ToDeviceMessageId } from "../@types/event.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
+import { logger } from "../logger.ts";
+import { IExportedDevice, OlmDevice } from "./OlmDevice.ts";
+import { IOlmDevice } from "./algorithms/megolm.ts";
+import * as olmlib from "./olmlib.ts";
+import { DeviceInfoMap, DeviceList } from "./DeviceList.ts";
+import { DeviceInfo, IDevice } from "./deviceinfo.ts";
+import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms/index.ts";
+import * as algorithms from "./algorithms/index.ts";
+import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning.ts";
+import { EncryptionSetupBuilder } from "./EncryptionSetup.ts";
+import { SecretStorage as LegacySecretStorage } from "./SecretStorage.ts";
+import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./api.ts";
+import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
+import { VerificationBase } from "./verification/Base.ts";
+import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode.ts";
+import { SAS as SASVerification } from "./verification/SAS.ts";
+import { keyFromPassphrase } from "./key_passphrase.ts";
+import { VerificationRequest } from "./verification/request/VerificationRequest.ts";
+import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel.ts";
+import { Request, ToDeviceChannel, ToDeviceRequests } from "./verification/request/ToDeviceChannel.ts";
+import { IllegalMethod } from "./verification/IllegalMethod.ts";
+import { KeySignatureUploadError } from "../errors.ts";
+import { DehydrationManager } from "./dehydration.ts";
+import { BackupManager, LibOlmBackupDecryptor, backupTrustInfoFromLegacyTrustInfo } from "./backup.ts";
+import { IStore } from "../store/index.ts";
+import { Room, RoomEvent } from "../models/room.ts";
+import { RoomMember, RoomMemberEvent } from "../models/room-member.ts";
+import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event.ts";
+import { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
+import { ClientEvent, IKeysUploadResponse, ISignedKey, IUploadKeySignaturesResponse, MatrixClient } from "../client.ts";
+import { IRoomEncryption, RoomList } from "./RoomList.ts";
+import { IKeyBackupInfo } from "./keybackup.ts";
+import { ISyncStateData } from "../sync.ts";
+import { CryptoStore } from "./store/base.ts";
+import { IVerificationChannel } from "./verification/request/Channel.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { IMessage } from "./algorithms/olm.ts";
 import {
-    ClientEvent,
-    ICrossSigningKey,
-    IKeysUploadResponse,
-    ISignedKey,
-    IUploadKeySignaturesResponse,
-    MatrixClient,
-} from "../client";
-import type { IRoomEncryption, RoomList } from "./RoomList";
-import { IKeyBackupInfo } from "./keybackup";
-import { ISyncStateData } from "../sync";
-import { CryptoStore } from "./store/base";
-import { IVerificationChannel } from "./verification/request/Channel";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IDeviceLists, ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
-import { ISignatures } from "../@types/signed";
-import { IMessage } from "./algorithms/olm";
-import { BackupDecryptor, CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { MapWithDefault, recursiveMapToObject } from "../utils";
+    BackupDecryptor,
+    CryptoBackend,
+    DecryptionError,
+    OnSyncCompletedData,
+} from "../common-crypto/CryptoBackend.ts";
+import { RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { MapWithDefault, recursiveMapToObject } from "../utils.ts";
 import {
     AccountDataClient,
     AddSecretStorageKeyOpts,
+    calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
     ServerSideSecretStorageImpl,
-} from "../secret-storage";
-import { ISecretRequest } from "./SecretSharing";
+} from "../secret-storage.ts";
+import { ISecretRequest } from "./SecretSharing.ts";
 import {
     BackupTrustInfo,
     BootstrapCrossSigningOpts,
+    CrossSigningKeyInfo,
     CrossSigningStatus,
+    decodeRecoveryKey,
+    DecryptionFailureCode,
+    DeviceIsolationMode,
     DeviceVerificationStatus,
+    encodeRecoveryKey,
     EventEncryptionInfo,
     EventShieldColour,
     EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
     KeyBackupInfo,
-    VerificationRequest as CryptoApiVerificationRequest,
-} from "../crypto-api";
-import { Device, DeviceMap } from "../models/device";
-import { deviceInfoToDevice } from "./device-converter";
-import { ClientPrefix, MatrixError, Method } from "../http-api";
-import { decodeBase64, encodeBase64 } from "../base64";
+    OwnDeviceKeys,
+    CryptoEvent as CryptoApiCryptoEvent,
+    CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
+} from "../crypto-api/index.ts";
+import { Device, DeviceMap } from "../models/device.ts";
+import { deviceInfoToDevice } from "./device-converter.ts";
+import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /* re-exports for backwards compatibility */
 export type {
     BootstrapCrossSigningOpts as IBootstrapCrossSigningOpts,
     CryptoCallbacks as ICryptoCallbacks,
-} from "../crypto-api";
+} from "../crypto-api/index.ts";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -223,14 +231,31 @@ export interface IMegolmEncryptedContent {
 export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 
 export enum CryptoEvent {
+    /** @deprecated Event not fired by the rust crypto */
     DeviceVerificationChanged = "deviceVerificationChanged",
-    UserTrustStatusChanged = "userTrustStatusChanged",
+    UserTrustStatusChanged = CryptoApiCryptoEvent.UserTrustStatusChanged,
+    /** @deprecated Event not fired by the rust crypto */
     UserCrossSigningUpdated = "userCrossSigningUpdated",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequest = "crypto.roomKeyRequest",
+    /** @deprecated Event not fired by the rust crypto */
     RoomKeyRequestCancellation = "crypto.roomKeyRequestCancellation",
-    KeyBackupStatus = "crypto.keyBackupStatus",
-    KeyBackupFailed = "crypto.keyBackupFailed",
-    KeyBackupSessionsRemaining = "crypto.keyBackupSessionsRemaining",
+    KeyBackupStatus = CryptoApiCryptoEvent.KeyBackupStatus,
+    KeyBackupFailed = CryptoApiCryptoEvent.KeyBackupFailed,
+    KeyBackupSessionsRemaining = CryptoApiCryptoEvent.KeyBackupSessionsRemaining,
+
+    /**
+     * Fires when a new valid backup decryption key is in cache.
+     * This will happen when a secret is received from another session, from secret storage,
+     * or when a new backup is created from this session.
+     *
+     * The payload is the version of the backup for which we have the key for.
+     *
+     * This event is only fired by the rust crypto backend.
+     */
+    KeyBackupDecryptionKeyCached = CryptoApiCryptoEvent.KeyBackupDecryptionKeyCached,
+
+    /** @deprecated Event not fired by the rust crypto */
     KeySignatureUploadFailure = "crypto.keySignatureUploadFailure",
     /** @deprecated Use `VerificationRequestReceived`. */
     VerificationRequest = "crypto.verification.request",
@@ -240,15 +265,26 @@ export enum CryptoEvent {
      *
      * The payload is a {@link Crypto.VerificationRequest}.
      */
-    VerificationRequestReceived = "crypto.verificationRequestReceived",
+    VerificationRequestReceived = CryptoApiCryptoEvent.VerificationRequestReceived,
 
+    /** @deprecated Event not fired by the rust crypto */
     Warning = "crypto.warning",
-    WillUpdateDevices = "crypto.willUpdateDevices",
-    DevicesUpdated = "crypto.devicesUpdated",
-    KeysChanged = "crossSigning.keysChanged",
+    /** @deprecated Use {@link DevicesUpdated} instead when using rust crypto */
+    WillUpdateDevices = CryptoApiCryptoEvent.WillUpdateDevices,
+    DevicesUpdated = CryptoApiCryptoEvent.DevicesUpdated,
+    KeysChanged = CryptoApiCryptoEvent.KeysChanged,
+
+    /**
+     * Fires when data is being migrated from legacy crypto to rust crypto.
+     *
+     * The payload is a pair `(progress, total)`, where `progress` is the number of steps completed so far, and
+     * `total` is the total number of steps. When migration is complete, a final instance of the event is emitted, with
+     * `progress === total === -1`.
+     */
+    LegacyCryptoStoreMigrationProgress = CryptoApiCryptoEvent.LegacyCryptoStoreMigrationProgress,
 }
 
-export type CryptoEventHandlerMap = {
+export type CryptoEventHandlerMap = CryptoApiCryptoEventHandlerMap & {
     /**
      * Fires when a device is marked as verified/unverified/blocked/unblocked by
      * {@link MatrixClient#setDeviceVerified | MatrixClient.setDeviceVerified} or
@@ -258,44 +294,17 @@ export type CryptoEventHandlerMap = {
      * @param deviceId - the id of the verified device
      * @param deviceInfo - updated device information
      */
-    [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
-    /**
-     * Fires when the trust status of a user changes
-     * If userId is the userId of the logged-in user, this indicated a change
-     * in the trust status of the cross-signing data on the account.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     *
-     * @param userId - the userId of the user in question
-     * @param trustLevel - The new trust level of the user
-     */
-    [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
+    [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, deviceInfo: DeviceInfo) => void;
     /**
      * Fires when we receive a room key request
      *
-     * @param req - request details
+     * @param request - request details
      */
     [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
     /**
      * Fires when we receive a room key request cancellation
      */
     [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
-    /**
-     * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
-     * @param enabled - true if key backup has been enabled, otherwise false
-     * @example
-     * ```
-     * matrixClient.on("crypto.keyBackupStatus", function(enabled){
-     *   if (enabled) {
-     *     [...]
-     *   }
-     * });
-     * ```
-     */
-    [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
-    [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
-    [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
     [CryptoEvent.KeySignatureUploadFailure]: (
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
@@ -307,12 +316,6 @@ export type CryptoEventHandlerMap = {
      * Deprecated: use `CryptoEvent.VerificationRequestReceived`.
      */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
-
-    /**
-     * Fires when a key verification request is received.
-     */
-    [CryptoEvent.VerificationRequestReceived]: (request: CryptoApiVerificationRequest) => void;
-
     /**
      * Fires when the app may wish to warn the user about something related
      * the end-to-end crypto.
@@ -320,34 +323,9 @@ export type CryptoEventHandlerMap = {
      * @param type - One of the strings listed above
      */
     [CryptoEvent.Warning]: (type: string) => void;
-    /**
-     * Fires when the user's cross-signing keys have changed or cross-signing
-     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
-     * with the user ID of the logged in user to check if cross-signing is
-     * enabled on the account. If enabled, it can test whether the current key
-     * is trusted using with checkUserTrust with the user ID of the logged
-     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
-     * the trust in the account key.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     * @experimental
-     */
-    [CryptoEvent.KeysChanged]: (data: {}) => void;
-    /**
-     * Fires whenever the stored devices for a user will be updated
-     * @param users - A list of user IDs that will be updated
-     * @param initialFetch - If true, the store is empty (apart
-     *     from our own device) and is being seeded.
-     */
-    [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
-    /**
-     * Fires whenever the stored devices for a user have changed
-     * @param users - A list of user IDs that were updated
-     * @param initialFetch - If true, the store was empty (apart
-     *     from our own device) and has been seeded.
-     */
-    [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
+
+    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {
@@ -365,6 +343,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public readonly dehydrationManager: DehydrationManager;
     public readonly secretStorage: LegacySecretStorage;
 
+    private readonly roomList: RoomList;
     private readonly reEmitter: TypedReEmitter<CryptoEvent, CryptoEventHandlerMap>;
     private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>;
     public readonly supportedAlgorithms: string[];
@@ -441,8 +420,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param cryptoStore - storage for the crypto layer.
      *
-     * @param roomList - An initialised RoomList object
-     *
      * @param verificationMethods - Array of verification methods to use.
      *    Each element can either be a string from MatrixClient.verificationMethods
      *    or a class that implements a verification method.
@@ -453,10 +430,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         private readonly deviceId: string,
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
-        private readonly roomList: RoomList,
         verificationMethods: Array<VerificationMethod | (typeof VerificationBase & { NAME: string })>,
     ) {
         super();
+
+        logger.debug("Crypto: initialising roomlist...");
+        this.roomList = new RoomList(cryptoStore);
+
         this.reEmitter = new TypedReEmitter(this);
 
         if (verificationMethods) {
@@ -606,12 +586,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // (this is important for key backups & things)
         this.deviceList.startTrackingDeviceList(this.userId);
 
+        logger.debug("Crypto: initialising roomlist...");
+        await this.roomList.init();
+
         logger.log("Crypto: checking for key backup...");
         this.backupManager.checkAndStart();
     }
 
     /**
-     * Implementation of {@link CryptoApi#getVersion}.
+     * Implementation of {@link Crypto.CryptoApi#setDeviceIsolationMode}.
+     */
+    public setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void {
+        throw new Error("Not supported");
+    }
+    /**
+     * Implementation of {@link Crypto.CryptoApi#getVersion}.
      */
     public getVersion(): string {
         const olmVersionTuple = Crypto.getOlmVersion();
@@ -681,25 +670,30 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
         const decryption = new global.Olm.PkDecryption();
         try {
-            const keyInfo: Partial<IRecoveryKey["keyInfo"]> = {};
             if (password) {
                 const derivation = await keyFromPassphrase(password);
-                keyInfo.passphrase = {
-                    algorithm: "m.pbkdf2",
-                    iterations: derivation.iterations,
-                    salt: derivation.salt,
+
+                decryption.init_with_private_key(derivation.key);
+                const privateKey = decryption.get_private_key();
+                return {
+                    keyInfo: {
+                        passphrase: {
+                            algorithm: "m.pbkdf2",
+                            iterations: derivation.iterations,
+                            salt: derivation.salt,
+                        },
+                    },
+                    privateKey: privateKey,
+                    encodedPrivateKey: encodeRecoveryKey(privateKey),
                 };
-                keyInfo.pubkey = decryption.init_with_private_key(derivation.key);
             } else {
-                keyInfo.pubkey = decryption.generate_key();
+                decryption.generate_key();
+                const privateKey = decryption.get_private_key();
+                return {
+                    privateKey: privateKey,
+                    encodedPrivateKey: encodeRecoveryKey(privateKey),
+                };
             }
-            const privateKey = decryption.get_private_key();
-            const encodedPrivateKey = encodeRecoveryKey(privateKey);
-            return {
-                keyInfo: keyInfo as IRecoveryKey["keyInfo"],
-                encodedPrivateKey,
-                privateKey,
-            };
         } finally {
             decryption?.free();
         }
@@ -766,7 +760,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#getCrossSigningStatus}
+     * Implementation of {@link Crypto.CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
         const publicKeysOnDevice = Boolean(this.crossSigningInfo.getId());
@@ -799,15 +793,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *   secret storage (if it has been setup)
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
-     *
-     * @param authUploadDeviceSigningKeys - Function
-     * called to await an interactive auth flow when uploading device signing keys.
-     * @param setupNewCrossSigning - Optional. Reset even if keys
-     * already exist.
-     * Args:
-     *     A function that makes the request requiring auth. Receives the
-     *     auth data as an object. Can be called multiple times, first with an empty
-     *     authDict, to obtain the flows.
      */
     public async bootstrapCrossSigning({
         authUploadDeviceSigningKeys,
@@ -921,27 +906,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
-     * @param createSecretStorageKey - Optional. Function
-     * called to await a secret storage key creation flow.
-     *     Returns a Promise which resolves to an object with public key metadata, encoded private
-     *     recovery key which should be disposed of after displaying to the user,
-     *     and raw private key to avoid round tripping if needed.
-     * @param keyBackupInfo - The current key backup object. If passed,
-     * the passphrase and recovery key from this backup will be used.
-     * @param setupNewKeyBackup - If true, a new key backup version will be
-     * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
-     * is supplied.
-     * @param setupNewSecretStorage - Optional. Reset even if keys already exist.
-     * @param getKeyBackupPassphrase - Optional. Function called to get the user's
-     *     current key backup passphrase. Should return a promise that resolves with a Buffer
-     *     containing the key, or rejects if the key cannot be obtained.
      * Returns:
      *     A promise which resolves to key creation data for
      *     SecretStorage#addKey: an object with `passphrase` etc fields.
      */
     // TODO this does not resolve with what it says it does
     public async bootstrapSecretStorage({
-        createSecretStorageKey = async (): Promise<IRecoveryKey> => ({} as IRecoveryKey),
+        createSecretStorageKey = async (): Promise<IRecoveryKey> => ({}) as IRecoveryKey,
         keyBackupInfo,
         setupNewKeyBackup,
         setupNewSecretStorage,
@@ -959,17 +930,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let newKeyId: string | null = null;
 
         // create a new SSSS key and set it as default
-        const createSSSS = async (opts: AddSecretStorageKeyOpts, privateKey?: Uint8Array): Promise<string> => {
-            if (privateKey) {
-                opts.key = privateKey;
-            }
-
+        const createSSSS = async (opts: AddSecretStorageKeyOpts): Promise<string> => {
             const { keyId, keyInfo } = await secretStorage.addKey(SECRET_STORAGE_ALGORITHM_V1_AES, opts);
 
-            if (privateKey) {
-                // make the private key available to encrypt 4S secrets
-                builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, privateKey);
-            }
+            // make the private key available to encrypt 4S secrets
+            builder.ssssCryptoCallbacks.addPrivateKey(keyId, keyInfo, opts.key);
 
             await secretStorage.setDefaultKeyId(keyId);
             return keyId;
@@ -1033,8 +998,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // secrets using it, in theory. We could move them to the new key but a)
             // that would mean we'd need to prompt for the old passphrase, and b)
             // it's not clear that would be the right thing to do anyway.
-            const { keyInfo = {} as AddSecretStorageKeyOpts, privateKey } = await createSecretStorageKey();
-            newKeyId = await createSSSS(keyInfo, privateKey);
+            const { keyInfo, privateKey } = await createSecretStorageKey();
+            newKeyId = await createSSSS({ passphrase: keyInfo?.passphrase, key: privateKey, name: keyInfo?.name });
         } else if (!storageExists && keyBackupInfo) {
             // we have an existing backup, but no SSSS
             logger.log("Secret storage does not exist, using key backup key");
@@ -1044,7 +1009,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             const backupKey = (await this.getSessionBackupPrivateKey()) || (await getKeyBackupPassphrase?.());
 
             // create a new SSSS key and use the backup key as the new SSSS key
-            const opts = {} as AddSecretStorageKeyOpts;
+            const opts = { key: backupKey } as AddSecretStorageKeyOpts;
 
             if (keyBackupInfo.auth_data.private_key_salt && keyBackupInfo.auth_data.private_key_iterations) {
                 // FIXME: ???
@@ -1056,7 +1021,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 };
             }
 
-            newKeyId = await createSSSS(opts, backupKey);
+            newKeyId = await createSSSS(opts);
 
             // store the backup key in secret storage
             await secretStorage.store("m.megolm_backup.v1", encodeBase64(backupKey!), [newKeyId]);
@@ -1159,7 +1124,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#resetKeyBackup}.
+     * Implementation of {@link Crypto.CryptoApi#resetKeyBackup}.
      */
     public async resetKeyBackup(): Promise<void> {
         // Delete existing ones
@@ -1191,10 +1156,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.storeSessionBackupPrivateKey(privateKey);
 
         await this.backupManager.checkAndStart();
+        await this.backupManager.scheduleAllGroupSessionsForBackup();
     }
 
     /**
-     * Implementation of {@link CryptoApi#deleteKeyBackupVersion}.
+     * Implementation of {@link Crypto.CryptoApi#deleteKeyBackupVersion}.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
         await this.backupManager.deleteKeyBackupVersion(version);
@@ -1300,11 +1266,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns the key, if any, or null
      */
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
-        const encodedKey = await new Promise<Uint8Array | IEncryptedPayload | string | null>((resolve) => {
-            this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-                this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
-            });
-        });
+        const encodedKey = await new Promise<Uint8Array | AESEncryptedSecretStoragePayload | string | null>(
+            (resolve) => {
+                this.cryptoStore.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                    this.cryptoStore.getSecretStorePrivateKey(txn, resolve, "m.megolm_backup.v1");
+                });
+            },
+        );
 
         let key: Uint8Array | null = null;
 
@@ -1315,7 +1283,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         if (encodedKey && typeof encodedKey === "object" && "ciphertext" in encodedKey) {
             const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-            const decrypted = await decryptAES(encodedKey, pickleKey, "m.megolm_backup.v1");
+            const decrypted = await decryptAESSecretStorageItem(encodedKey, pickleKey, "m.megolm_backup.v1");
             key = decodeBase64(decrypted);
         }
         return key;
@@ -1332,7 +1300,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
-        const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
+        const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
         });
@@ -1341,7 +1309,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the current status of key backup.
      *
-     * Implementation of {@link CryptoApi.getActiveSessionBackupVersion}.
+     * Implementation of {@link Crypto.CryptoApi.getActiveSessionBackupVersion}.
      */
     public async getActiveSessionBackupVersion(): Promise<string | null> {
         if (this.backupManager.getKeyBackupEnabled()) {
@@ -1363,7 +1331,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
      *
-     * Implementation of {@link CryptoApi.checkKeyBackupAndEnable}.
+     * Implementation of {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
      */
     public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
         const checkResult = await this.backupManager.checkKeyBackup();
@@ -1512,7 +1480,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     private async checkForValidDeviceSignature(
         userId: string,
-        key: ICrossSigningKey,
+        key: CrossSigningKeyInfo,
         devices: Record<string, IDevice>,
     ): Promise<string[]> {
         const deviceIds: string[] = [];
@@ -1529,7 +1497,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                             devices[deviceId].keys[signame],
                         );
                         deviceIds.push(deviceId);
-                    } catch (e) {}
+                    } catch {}
                 }
             }
         }
@@ -1580,10 +1548,17 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi.getUserVerificationStatus}.
+     * Implementation of {@link Crypto.CryptoApi.getUserVerificationStatus}.
      */
     public async getUserVerificationStatus(userId: string): Promise<UserTrustLevel> {
         return this.checkUserTrust(userId);
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi.pinCurrentUserIdentity}.
+     */
+    public async pinCurrentUserIdentity(userId: string): Promise<void> {
+        throw new Error("not implemented");
     }
 
     /**
@@ -1877,11 +1852,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link CryptoBackend#importBackedUpRoomKeys}.
+     */
+    public importBackedUpRoomKeys(
+        keys: IMegolmSessionData[],
+        backupVersion: string,
+        opts: ImportRoomKeysOpts = {},
+    ): Promise<void> {
+        opts.source = "backup";
+        return this.importRoomKeys(keys, opts);
+    }
+
+    /**
      * Store a set of keys as our own, trusted, cross-signing keys.
      *
      * @param keys - The new trusted set of keys
      */
-    private async storeTrustedSelfKeys(keys: Record<string, ICrossSigningKey> | null): Promise<void> {
+    private async storeTrustedSelfKeys(keys: Record<string, CrossSigningKeyInfo> | null): Promise<void> {
         if (keys) {
             this.crossSigningInfo.setKeys(keys);
         } else {
@@ -1968,6 +1955,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the Ed25519 key for this device
      *
      * @returns base64-encoded ed25519 key.
+     *
+     * @deprecated Use {@link Crypto.CryptoApi#getOwnDeviceKeys}.
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
@@ -1977,9 +1966,27 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the Curve25519 key for this device
      *
      * @returns base64-encoded curve25519 key.
+     *
+     * @deprecated Use {@link Crypto.CryptoApi#getOwnDeviceKeys}
      */
     public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#getOwnDeviceKeys}.
+     */
+    public async getOwnDeviceKeys(): Promise<OwnDeviceKeys> {
+        if (!this.olmDevice.deviceCurve25519Key) {
+            throw new Error("Curve25519 key not yet created");
+        }
+        if (!this.olmDevice.deviceEd25519Key) {
+            throw new Error("Ed25519 key not yet created");
+        }
+        return {
+            ed25519: this.olmDevice.deviceEd25519Key,
+            curve25519: this.olmDevice.deviceCurve25519Key,
+        };
     }
 
     /**
@@ -2188,10 +2195,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const res = await this.baseApis.uploadKeysRequest(requestBody);
 
         if (fallbackJson) {
-            this.fallbackCleanup = setTimeout(() => {
-                delete this.fallbackCleanup;
-                this.olmDevice.forgetOldFallbackKey();
-            }, 60 * 60 * 1000);
+            this.fallbackCleanup = setTimeout(
+                () => {
+                    delete this.fallbackCleanup;
+                    this.olmDevice.forgetOldFallbackKey();
+                },
+                60 * 60 * 1000,
+            );
         }
 
         await this.olmDevice.markKeysAsPublished();
@@ -2300,10 +2310,19 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Mark the given device as locally verified.
      *
-     * Implementation of {@link CryptoApi#setDeviceVerified}.
+     * Implementation of {@link Crypto.CryptoApi#setDeviceVerified}.
      */
     public async setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         await this.setDeviceVerification(userId, deviceId, verified);
+    }
+
+    /**
+     * Blindly cross-sign one of our other devices.
+     *
+     * Implementation of {@link Crypto.CryptoApi#crossSignDevice}.
+     */
+    public async crossSignDevice(deviceId: string): Promise<void> {
+        await this.setDeviceVerified(this.userId, deviceId, true);
     }
 
     /**
@@ -2335,7 +2354,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         blocked: boolean | null = null,
         known: boolean | null = null,
         keys?: Record<string, string>,
-    ): Promise<DeviceInfo | CrossSigningInfo | ICrossSigningKey | undefined> {
+    ): Promise<DeviceInfo | CrossSigningInfo | CrossSigningKeyInfo | undefined> {
         // Check if the 'device' is actually a cross signing key
         // The js-sdk's verification treats cross-signing keys as devices
         // and so uses this method to mark them verified.
@@ -2736,7 +2755,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi.getEncryptionInfoForEvent}.
+     * Implementation of {@link Crypto.CryptoApi.getEncryptionInfoForEvent}.
      */
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
         const encryptionInfo = this.getEventEncryptionInfo(event);
@@ -3065,6 +3084,16 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Get a JSON list containing all of the room keys
+     *
+     * @returns a JSON string encoding a list of session
+     *    export objects, each of which is an IMegolmSessionData
+     */
+    public async exportRoomKeysAsJson(): Promise<string> {
+        return JSON.stringify(await this.exportRoomKeys());
+    }
+
+    /**
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
@@ -3104,6 +3133,19 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 });
             }),
         ).then();
+    }
+
+    /**
+     * Import a JSON string encoding a list of room keys previously
+     * exported by exportRoomKeysAsJson
+     *
+     * @param keys - a JSON string encoding a list of session export
+     *    objects, each of which is an IMegolmSessionData
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    public async importRoomKeysAsJson(keys: string, opts?: ImportRoomKeysOpts): Promise<void> {
+        return await this.importRoomKeys(JSON.parse(keys));
     }
 
     /**
@@ -3428,7 +3470,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // ignore any rooms which we have left
             const myMembership = room.getMyMembership();
-            return myMembership === "join" || myMembership === "invite";
+            return myMembership === KnownMembership.Join || myMembership === KnownMembership.Invite;
         });
     }
 
@@ -3441,59 +3483,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *     resolves once the message has been encrypted and sent to the given
      *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
      *     of the successfully sent messages.
+     *
+     * @deprecated Instead use {@link encryptToDeviceMessages} followed by {@link MatrixClient.queueToDevice}.
      */
     public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
-        const toDeviceBatch: ToDeviceBatch = {
-            eventType: EventType.RoomMessageEncrypted,
-            batch: [],
-        };
-
         try {
-            await Promise.all(
-                userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
-                    const deviceId = deviceInfo.deviceId;
-                    const encryptedContent: IEncryptedContent = {
-                        algorithm: olmlib.OLM_ALGORITHM,
-                        sender_key: this.olmDevice.deviceCurve25519Key!,
-                        ciphertext: {},
-                        [ToDeviceMessageId]: uuidv4(),
-                    };
-
-                    toDeviceBatch.batch.push({
-                        userId,
-                        deviceId,
-                        payload: encryptedContent,
-                    });
-
-                    await olmlib.ensureOlmSessionsForDevices(
-                        this.olmDevice,
-                        this.baseApis,
-                        new Map([[userId, [deviceInfo]]]),
-                    );
-                    await olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        this.userId,
-                        this.deviceId,
-                        this.olmDevice,
-                        userId,
-                        deviceInfo,
-                        payload,
-                    );
-                }),
-            );
-
-            // prune out any devices that encryptMessageForDevice could not encrypt for,
-            // in which case it will have just not added anything to the ciphertext object.
-            // There's no point sending messages to devices if we couldn't encrypt to them,
-            // since that's effectively a blank message.
-            toDeviceBatch.batch = toDeviceBatch.batch.filter((msg) => {
-                if (Object.keys(msg.payload.ciphertext).length > 0) {
-                    return true;
-                } else {
-                    logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
-                    return false;
-                }
-            });
+            const toDeviceBatch = await this.prepareToDeviceBatch(userDeviceInfoArr, payload);
 
             try {
                 await this.baseApis.queueToDevice(toDeviceBatch);
@@ -3505,6 +3500,95 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.error("encryptAndSendToDevices promises failed", e);
             throw e;
         }
+    }
+
+    private async prepareToDeviceBatch(
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<ToDeviceBatch> {
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
+
+        await Promise.all(
+            userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
+                const deviceId = deviceInfo.deviceId;
+                const encryptedContent: IEncryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this.olmDevice.deviceCurve25519Key!,
+                    ciphertext: {},
+                    [ToDeviceMessageId]: uuidv4(),
+                };
+
+                toDeviceBatch.batch.push({
+                    userId,
+                    deviceId,
+                    payload: encryptedContent,
+                });
+
+                await olmlib.ensureOlmSessionsForDevices(
+                    this.olmDevice,
+                    this.baseApis,
+                    new Map([[userId, [deviceInfo]]]),
+                );
+                await olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    this.userId,
+                    this.deviceId,
+                    this.olmDevice,
+                    userId,
+                    deviceInfo,
+                    payload,
+                );
+            }),
+        );
+
+        // prune out any devices that encryptMessageForDevice could not encrypt for,
+        // in which case it will have just not added anything to the ciphertext object.
+        // There's no point sending messages to devices if we couldn't encrypt to them,
+        // since that's effectively a blank message.
+        toDeviceBatch.batch = toDeviceBatch.batch.filter((msg) => {
+            if (Object.keys(msg.payload.ciphertext).length > 0) {
+                return true;
+            } else {
+                logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
+                return false;
+            }
+        });
+
+        return toDeviceBatch;
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#encryptToDeviceMessages}.
+     */
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const userIds = new Set(devices.map(({ userId }) => userId));
+        const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
+
+        const userDeviceInfoArr: IOlmDevice<DeviceInfo>[] = [];
+
+        devices.forEach(({ userId, deviceId }) => {
+            const devices = deviceInfoMap.get(userId);
+            if (!devices) {
+                logger.warn(`No devices found for user ${userId}`);
+                return;
+            }
+
+            if (devices.has(deviceId)) {
+                // Send the message to a specific device
+                userDeviceInfoArr.push({ userId, deviceInfo: devices.get(deviceId)! });
+            } else {
+                logger.warn(`No device found for user ${userId} with id ${deviceId}`);
+            }
+        });
+
+        return this.prepareToDeviceBatch(userDeviceInfoArr, payload);
     }
 
     private onMembership = (event: MatrixEvent, member: RoomMember, oldMembership?: string): void => {
@@ -3911,12 +3995,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // the result of anyway, as we'll need to do a query again once all the members are fetched
         // by calling _trackRoomDevices
         if (roomId in this.roomDeviceTrackingState) {
-            if (member.membership == "join") {
+            if (member.membership == KnownMembership.Join) {
                 logger.log("Join event for " + member.userId + " in " + roomId);
                 // make sure we are tracking the deviceList for this user
                 this.deviceList.startTrackingDeviceList(member.userId);
             } else if (
-                member.membership == "invite" &&
+                member.membership == KnownMembership.Invite &&
                 this.clientStore.getRoom(roomId)?.shouldEncryptForInvitedMembers()
             ) {
                 logger.log("Invite event for " + member.userId + " in " + roomId);
@@ -4132,8 +4216,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
-            throw new algorithms.DecryptionError(
-                "UNKNOWN_ENCRYPTION_ALGORITHM",
+            throw new DecryptionError(
+                DecryptionFailureCode.UNKNOWN_ENCRYPTION_ALGORITHM,
                 'Unknown encryption algorithm "' + algorithm + '".',
             );
         }
@@ -4185,6 +4269,44 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         userSignatures["ed25519:" + this.deviceId] = await this.olmDevice.sign(anotherjson.stringify(obj));
         obj.signatures = recursiveMapToObject(sigs);
         if (unsigned !== undefined) obj.unsigned = unsigned;
+    }
+
+    /**
+     * @returns true if the room with the supplied ID is encrypted. False if the
+     * room is not encrypted, or is unknown to us.
+     */
+    public isRoomEncrypted(roomId: string): boolean {
+        return this.roomList.isRoomEncrypted(roomId);
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#isEncryptionEnabledInRoom}.
+     */
+    public async isEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        return this.isRoomEncrypted(roomId);
+    }
+
+    /**
+     * @returns information about the encryption on the room with the supplied
+     * ID, or null if the room is not encrypted or unknown to us.
+     */
+    public getRoomEncryption(roomId: string): IRoomEncryption | null {
+        return this.roomList.getRoomEncryption(roomId);
+    }
+
+    /**
+     * Returns whether dehydrated devices are supported by the crypto backend
+     * and by the server.
+     */
+    public async isDehydrationSupported(): Promise<boolean> {
+        return false;
+    }
+
+    /**
+     * Stub function -- dehydration is not implemented here, so throw error
+     */
+    public async startDehydration(createNewKey?: boolean): Promise<void> {
+        throw new Error("Not implemented");
     }
 }
 
@@ -4260,4 +4382,4 @@ class IncomingRoomKeyRequestCancellation {
 }
 
 // a number of types are re-exported for backwards compatibility, in case any applications are referencing it.
-export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";

@@ -14,13 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../client";
-import { IEncryptedFile, RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event";
-import { IContent, MatrixEvent } from "./event";
-import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
-import { EventTimeline } from "./event-timeline";
-import { FileType } from "../http-api";
-import type { ISendEventResponse } from "../@types/requests";
+import { MatrixClient } from "../client.ts";
+import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../@types/event.ts";
+import { IContent, MatrixEvent } from "./event.ts";
+import { MSC3089TreeSpace } from "./MSC3089TreeSpace.ts";
+import { EventTimeline } from "./event-timeline.ts";
+import { FileType } from "../http-api/index.ts";
+import type { ISendEventResponse } from "../@types/requests.ts";
+import { EncryptedFile } from "../@types/media.ts";
+
+export interface MSC3089EventContent {
+    active?: boolean;
+    name?: string;
+    locked?: boolean;
+    version?: number;
+}
+
+export interface MSC3089EventContent {
+    active?: boolean;
+    name?: string;
+    locked?: boolean;
+    version?: number;
+}
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -131,7 +146,7 @@ export class MSC3089Branch {
      * Gets information about the file needed to download it.
      * @returns Information about the file.
      */
-    public async getFileInfo(): Promise<{ info: IEncryptedFile; httpUrl: string }> {
+    public async getFileInfo(): Promise<{ info: EncryptedFile; httpUrl: string }> {
         const event = await this.getFileEvent();
 
         const file = event.getOriginalContent()["file"];
@@ -162,9 +177,8 @@ export class MSC3089Branch {
 
         if (!event) throw new Error("Failed to find event");
 
-        // Sometimes the event isn't decrypted for us, so do that. We specifically set `emit: true`
-        // to ensure that the relations system in the sdk will function.
-        await this.client.decryptEventIfNeeded(event, { emit: true, isRetry: true });
+        // Sometimes the event isn't decrypted for us, so do that.
+        await this.client.decryptEventIfNeeded(event);
 
         return event;
     }
@@ -180,7 +194,7 @@ export class MSC3089Branch {
     public async createNewVersion(
         name: string,
         encryptedContents: FileType,
-        info: Partial<IEncryptedFile>,
+        info: EncryptedFile,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
         const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {

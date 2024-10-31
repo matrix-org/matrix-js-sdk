@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "../NamespacedValue";
-import { IClientWellKnown } from "../client";
+import { UnstableValue } from "../NamespacedValue.ts";
+import { IClientWellKnown } from "../client.ts";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
@@ -147,11 +147,6 @@ export interface LoginRequest {
      * The login type being used.
      */
     type: "m.login.password" | "m.login.token" | string;
-    /**
-     * Third-party identifier for the user.
-     * @deprecated in favour of `identifier`.
-     */
-    address?: string;
     /**
      * ID of the client device.
      * If this does not correspond to a known client device, a new device will be created.

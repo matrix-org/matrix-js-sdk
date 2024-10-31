@@ -24,12 +24,12 @@ limitations under the License.
 import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
-import { logger } from "../logger";
-import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils";
-import { IContent, MatrixEvent } from "../models/event";
-import { EventType, ToDeviceMessageId } from "../@types/event";
-import { RoomMember } from "../models/room-member";
-import { randomString } from "../randomstring";
+import { logger } from "../logger.ts";
+import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType, TimelineEvents, ToDeviceMessageId } from "../@types/event.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { randomString } from "../randomstring.ts";
 import {
     MCallReplacesEvent,
     MCallAnswer,
@@ -44,15 +44,15 @@ import {
     MCallCandidates,
     MCallBase,
     MCallHangupReject,
-} from "./callEventTypes";
-import { CallFeed } from "./callFeed";
-import { MatrixClient } from "../client";
-import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
-import { DeviceInfo } from "../crypto/deviceinfo";
-import { GroupCallUnknownDeviceError } from "./groupCall";
-import { IScreensharingOpts } from "./mediaHandler";
-import { MatrixError } from "../http-api";
-import { GroupCallStats } from "./stats/groupCallStats";
+} from "./callEventTypes.ts";
+import { CallFeed } from "./callFeed.ts";
+import { MatrixClient } from "../client.ts";
+import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { DeviceInfo } from "../crypto/deviceinfo.ts";
+import { GroupCallUnknownDeviceError } from "./groupCall.ts";
+import { IScreensharingOpts } from "./mediaHandler.ts";
+import { MatrixError } from "../http-api/index.ts";
+import { GroupCallStats } from "./stats/groupCallStats.ts";
 
 interface CallOpts {
     // The room ID for this call.
@@ -293,13 +293,24 @@ function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
     return mods;
 }
 
+type CallEventType =
+    | EventType.CallReplaces
+    | EventType.CallAnswer
+    | EventType.CallSelectAnswer
+    | EventType.CallNegotiate
+    | EventType.CallInvite
+    | EventType.CallCandidates
+    | EventType.CallHangup
+    | EventType.CallReject
+    | EventType.CallSDPStreamMetadataChangedPrefix;
+
 export interface VoipEvent {
     type: "toDevice" | "sendEvent";
     eventType: string;
     userId?: string;
     opponentDeviceId?: string;
     roomId?: string;
-    content: Record<string, unknown>;
+    content: TimelineEvents[CallEventType];
 }
 
 /**
@@ -406,7 +417,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // If candidates arrive before we've picked an opponent (which, in particular,
     // will happen if the opponent sends candidates eagerly before the user answers
     // the call) we buffer them up here so we can then add the ones from the party we pick
-    private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
+    private remoteCandidateBuffer = new Map<string, MCallCandidates["candidates"]>();
 
     private remoteAssertedIdentity?: AssertedIdentity;
     private remoteSDPStreamMetadata?: SDPStreamMetadata;
@@ -1156,7 +1167,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
         if ([CallState.Fledgling, CallState.WaitLocalMedia].includes(this.state)) return;
-        const content: IContent = {};
+        const content: Omit<MCallHangupReject, "version" | "call_id" | "party_id" | "conf_id"> = {};
         // Don't send UserHangup reason to older clients
         if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
             content["reason"] = reason;
@@ -1235,7 +1246,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * Starts/stops screensharing
      * @param enabled - the desired screensharing state
-     * @param desktopCapturerSourceId - optional id of the desktop capturer source to use
+     * @param opts - screen sharing options
      * @returns new screensharing state
      */
     public async setScreensharingEnabled(enabled: boolean, opts?: IScreensharingOpts): Promise<boolean> {
@@ -1292,7 +1303,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Starts/stops screensharing
      * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
      * @param enabled - the desired screensharing state
-     * @param desktopCapturerSourceId - optional id of the desktop capturer source to use
+     * @param opts - screen sharing options
      * @returns new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(
@@ -1916,7 +1927,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.opponentPartyId !== null) {
             try {
                 await this.sendVoipEvent(EventType.CallSelectAnswer, {
-                    selected_party_id: this.opponentPartyId,
+                    selected_party_id: this.opponentPartyId!,
                 });
             } catch (err) {
                 // This isn't fatal, and will just mean that if another party has raced to answer
@@ -2012,7 +2023,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.debug(`Call ${this.callId} onNegotiateReceived() create an answer`);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
-                    description: this.peerConn!.localDescription?.toJSON(),
+                    lifetime: CALL_TIMEOUT_MS,
+                    description: this.peerConn!.localDescription?.toJSON() as RTCSessionDescription,
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
@@ -2140,9 +2152,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
-            content.offer = this.peerConn!.localDescription?.toJSON();
+            content.offer = this.peerConn!.localDescription?.toJSON() as RTCSessionDescription;
         } else {
-            content.description = this.peerConn!.localDescription?.toJSON();
+            content.description = this.peerConn!.localDescription?.toJSON() as RTCSessionDescription;
         }
 
         content.capabilities = {
@@ -2369,22 +2381,40 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF before v113
         if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
 
-        const recvCodecs = RTCRtpReceiver.getCapabilities("video")!.codecs;
-        const sendCodecs = RTCRtpSender.getCapabilities("video")!.codecs;
-        const codecs = [...sendCodecs, ...recvCodecs];
-
-        for (const codec of codecs) {
-            if (codec.mimeType === "video/rtx") {
-                const rtxCodecIndex = codecs.indexOf(codec);
-                codecs.splice(rtxCodecIndex, 1);
-            }
-        }
-
         const screenshareVideoTransceiver = this.transceivers.get(
             getTransceiverKey(SDPStreamMetadataPurpose.Screenshare, "video"),
         );
+
         // setCodecPreferences isn't supported on FF (as of v113)
-        screenshareVideoTransceiver?.setCodecPreferences?.(codecs);
+        if (!screenshareVideoTransceiver || !screenshareVideoTransceiver.setCodecPreferences) return;
+
+        const recvCodecs = RTCRtpReceiver.getCapabilities("video")!.codecs;
+        const sendCodecs = RTCRtpSender.getCapabilities("video")!.codecs;
+        const codecs = [];
+
+        for (const codec of [...recvCodecs, ...sendCodecs]) {
+            if (codec.mimeType !== "video/rtx") {
+                codecs.push(codec);
+                try {
+                    screenshareVideoTransceiver.setCodecPreferences(codecs);
+                } catch (e) {
+                    // Specifically, Chrome around version 125 and Electron 30 (which is Chromium 124) return an H.264 codec in
+                    // the sender's capabilities but throw when you try to set it. Hence... this mess.
+                    // Specifically, that codec is:
+                    // {
+                    //   clockRate: 90000,
+                    //   mimeType: "video/H264",
+                    //   sdpFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=640034",
+                    // }
+                    logger.info(
+                        "Working around buggy WebRTC impl: claimed to support codec but threw when setting codec preferences",
+                        codec,
+                        e,
+                    );
+                    codecs.pop();
+                }
+            }
+        }
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
@@ -2444,13 +2474,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * @internal
      */
-    private async sendVoipEvent(eventType: string, content: object): Promise<void> {
-        const realContent = Object.assign({}, content, {
+    private async sendVoipEvent<K extends keyof Pick<TimelineEvents, CallEventType>>(
+        eventType: K,
+        content: Omit<TimelineEvents[K], "version" | "call_id" | "party_id" | "conf_id">,
+    ): Promise<void> {
+        const realContent = {
+            ...content,
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
             party_id: this.ourPartyId,
             conf_id: this.groupCallId,
-        });
+        } as TimelineEvents[K];
 
         if (this.opponentDeviceId) {
             const toDeviceSeq = this.toDeviceSeq++;
@@ -2729,7 +2763,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const candidates = this.candidateSendQueue;
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
-        const content = { candidates: candidates.map((candidate) => candidate.toJSON()) };
+        const content: Pick<MCallCandidates, "candidates"> = {
+            candidates: candidates.map((candidate) => candidate.toJSON()),
+        };
         if (this.candidatesEnded) {
             // If there are no more candidates, signal this by adding an empty string candidate
             content.candidates.push({
@@ -2923,7 +2959,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteCandidateBuffer.clear();
     }
 
-    private async addIceCandidates(candidates: RTCIceCandidate[]): Promise<void> {
+    private async addIceCandidates(candidates: RTCIceCandidate[] | MCallCandidates["candidates"]): Promise<void> {
         for (const candidate of candidates) {
             if (
                 (candidate.sdpMid === null || candidate.sdpMid === undefined) &&

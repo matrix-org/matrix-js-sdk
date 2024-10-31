@@ -15,6 +15,22 @@ limitations under the License.
 */
 
 /**
- * The minimum Matrix specification version the js-sdk supports.
+ * A list of the spec versions which the js-sdk is compatible with.
+ *
+ * In practice, this means: when we connect to a server, it must declare support for one of the versions in this list.
+ *
+ * Note that it does not *necessarily* mean that the js-sdk has good support for all the features in the listed spec
+ * versions; only that we should be able to provide a base level of functionality with a server that offers support for
+ * any of the listed versions.
  */
-export const MINIMUM_MATRIX_VERSION = "v1.1";
+export const SUPPORTED_MATRIX_VERSIONS = ["v1.1", "v1.2", "v1.3", "v1.4", "v1.5", "v1.6", "v1.7", "v1.8", "v1.9"];
+
+/**
+ * The oldest Matrix specification version the js-sdk supports.
+ */
+export const MINIMUM_MATRIX_VERSION = SUPPORTED_MATRIX_VERSIONS[0];
+
+/**
+ * The most recent Matrix specification version the js-sdk supports.
+ */
+export const MAXIMUM_MATRIX_VERSION = SUPPORTED_MATRIX_VERSIONS[SUPPORTED_MATRIX_VERSIONS.length - 1];

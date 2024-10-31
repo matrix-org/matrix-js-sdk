@@ -5,19 +5,23 @@ on:
         secrets:
             SONAR_TOKEN:
                 required: true
+            ELEMENT_BOT_TOKEN:
+                required: true
         inputs:
-            extra_args:
-                type: string
+            sharded:
+                type: boolean
                 required: false
-                description: "Extra args to pass to SonarCloud"
+                description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
 jobs:
     sonarqube:
-        runs-on: ubuntu-latest
-        if: github.event.workflow_run.conclusion == 'success'
+        runs-on: ubuntu-24.04
+        if: |
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event != 'merge_group'
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
-            # This provides an easy link to this workflow_run from the PR before Cypress is done.
-            - uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
+            # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
+            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: pending
@@ -25,24 +29,53 @@ jobs:
                   sha: ${{ github.event.workflow_run.head_sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+            - name: "🧮 Checkout code"
+              uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+              with:
+                  repository: ${{ github.event.workflow_run.head_repository.full_name }}
+                  ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow
+                  fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+
+            - name: 📥 Download artifact
+              uses: actions/download-artifact@v4
+              if: ${{ !inputs.sharded }}
+              with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  run-id: ${{ github.event.workflow_run.id }}
+                  name: coverage
+                  path: coverage
+            - name: 📥 Download sharded artifacts
+              uses: actions/download-artifact@v4
+              if: inputs.sharded
+              with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  run-id: ${{ github.event.workflow_run.id }}
+                  pattern: coverage-*
+                  path: coverage
+                  merge-multiple: true
+
+            - id: extra_args
+              run: |
+                  coverage=$(find coverage -type f -name '*lcov.info' -printf '%h/%f,' | tr -d '\r\n' | sed 's/,$//g')
+                  echo "sonar.javascript.lcov.reportPaths=$coverage" >> sonar-project.properties
+                  reports=$(find coverage -type f -name 'jest-sonar-report*.xml' -printf '%h/%f,' | tr -d '\r\n' | sed 's/,$//g')
+                  echo "sonar.testExecutionReportPaths=$reports" >> sonar-project.properties
+
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
-              uses: matrix-org/sonarcloud-workflow-action@v2.6
+              uses: matrix-org/sonarcloud-workflow-action@v3.3
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
+                  skip_checkout: true
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
                   version_cmd: "cat package.json | jq -r .version"
                   branch: ${{ github.event.workflow_run.head_branch }}
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
-                  coverage_run_id: ${{ github.event.workflow_run.id }}
-                  coverage_workflow_name: tests.yml
-                  coverage_extract_path: coverage
-                  extra_args: ${{ inputs.extra_args }}
 
-            - uses: Sibz/github-status-action@faaa4d96fecf273bd762985e0e7f9f933c774918 # v1
+            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
               if: always()
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}

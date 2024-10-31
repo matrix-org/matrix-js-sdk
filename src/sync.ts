@@ -25,15 +25,14 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
-import { User } from "./models/user";
-import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils";
-import { Filter } from "./filter";
-import { EventTimeline } from "./models/event-timeline";
-import { logger } from "./logger";
-import { InvalidStoreError, InvalidStoreState } from "./errors";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
+import { User } from "./models/user.ts";
+import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
+import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
+import { Filter } from "./filter.ts";
+import { EventTimeline } from "./models/event-timeline.ts";
+import { logger } from "./logger.ts";
+import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client.ts";
 import {
     IEphemeral,
     IInvitedRoom,
@@ -48,19 +47,20 @@ import {
     ISyncResponse,
     ITimeline,
     IToDeviceEvent,
-} from "./sync-accumulator";
-import { MatrixEvent } from "./models/event";
-import { MatrixError, Method } from "./http-api";
-import { ISavedSync } from "./store";
-import { EventType } from "./@types/event";
-import { IPushRules } from "./@types/PushRules";
-import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
-import { RoomMemberEvent } from "./models/room-member";
-import { BeaconEvent } from "./models/beacon";
-import { IEventsResponse } from "./@types/requests";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
-import { Feature, ServerSupport } from "./feature";
-import { Crypto } from "./crypto";
+} from "./sync-accumulator.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { MatrixError, Method } from "./http-api/index.ts";
+import { ISavedSync } from "./store/index.ts";
+import { EventType } from "./@types/event.ts";
+import { IPushRules } from "./@types/PushRules.ts";
+import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state.ts";
+import { RoomMemberEvent } from "./models/room-member.ts";
+import { BeaconEvent } from "./models/beacon.ts";
+import { IEventsResponse } from "./@types/requests.ts";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
+import { Feature, ServerSupport } from "./feature.ts";
+import { Crypto } from "./crypto/index.ts";
+import { KnownMembership } from "./@types/membership.ts";
 
 const DEBUG = true;
 
@@ -234,7 +234,11 @@ export class SyncApi {
      * @param syncOpts - sync-specific options passed by the client
      * @internal
      */
-    public constructor(private readonly client: MatrixClient, opts?: IStoredClientOpts, syncOpts?: SyncApiOptions) {
+    public constructor(
+        private readonly client: MatrixClient,
+        opts?: IStoredClientOpts,
+        syncOpts?: SyncApiOptions,
+    ) {
         this.opts = defaultClientOpts(opts);
         this.syncOpts = defaultSyncApiOpts(syncOpts);
 
@@ -397,17 +401,18 @@ export class SyncApi {
      * Peek into a room. This will result in the room in question being synced so it
      * is accessible via getRooms(). Live updates for the room will be provided.
      * @param roomId - The room ID to peek into.
+     * @param limit - The number of timeline events to initially retrieve.
      * @returns A promise which resolves once the room has been added to the
      * store.
      */
-    public peek(roomId: string): Promise<Room> {
+    public peek(roomId: string, limit: number = 20): Promise<Room> {
         if (this._peekRoom?.roomId === roomId) {
             return Promise.resolve(this._peekRoom);
         }
 
         const client = this.client;
         this._peekRoom = this.createRoom(roomId);
-        return this.client.roomInitialSync(roomId, 20).then((response) => {
+        return this.client.roomInitialSync(roomId, limit).then((response) => {
             if (this._peekRoom?.roomId !== roomId) {
                 throw new Error("Peeking aborted");
             }
@@ -588,25 +593,6 @@ export class SyncApi {
         await keepaliveProm;
     }
 
-    /**
-     * Is the lazy loading option different than in previous session?
-     * @param lazyLoadMembers - current options for lazy loading
-     * @returns whether or not the option has changed compared to the previous session */
-    private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
-        // assume it was turned off before
-        // if we don't know any better
-        let lazyLoadMembersBefore = false;
-        const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
-        if (!isStoreNewlyCreated) {
-            const prevClientOptions = await this.client.store.getClientOptions();
-            if (prevClientOptions) {
-                lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
-            }
-            return lazyLoadMembersBefore !== lazyLoadMembers;
-        }
-        return false;
-    }
-
     private shouldAbortSync(error: MatrixError): boolean {
         if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
@@ -644,9 +630,9 @@ export class SyncApi {
         return filter;
     };
 
-    private checkLazyLoadStatus = async (): Promise<void> => {
-        debuglog("Checking lazy load status...");
-        if (this.opts.lazyLoadMembers && this.client.isGuest()) {
+    private prepareLazyLoadingForSync = async (): Promise<void> => {
+        debuglog("Prepare lazy loading for sync...");
+        if (this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
@@ -656,23 +642,12 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
-        // need to vape the store when enabling LL and wasn't enabled before
-        debuglog("Checking whether lazy loading has changed in store...");
-        const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
-        if (shouldClear) {
-            this.storeIsInvalid = true;
-            const error = new InvalidStoreError(InvalidStoreState.ToggledLazyLoading, !!this.opts.lazyLoadMembers);
-            this.updateSyncState(SyncState.Error, { error });
-            // bail out of the sync loop now: the app needs to respond to this error.
-            // we leave the state as 'ERROR' which isn't great since this normally means
-            // we're retrying. The client must be stopped before clearing the stores anyway
-            // so the app should stop the client, clear the store and start it again.
-            logger.warn("InvalidStoreError: store is not usable: stopping sync.");
-            return;
-        }
         if (this.opts.lazyLoadMembers) {
             this.syncOpts.crypto?.enableLazyLoading();
         }
+    };
+
+    private storeClientOptions = async (): Promise<void> => {
         try {
             debuglog("Storing client options...");
             await this.client.storeClientOptions();
@@ -752,14 +727,16 @@ export class SyncApi {
         //   1) We need to get push rules so we can check if events should bing as we get
         //      them from /sync.
         //   2) We need to get/create a filter which we can use for /sync.
-        //   3) We need to check the lazy loading option matches what was used in the
-        //       stored sync. If it doesn't, we can't use the stored sync.
+        //   3) We need to prepare lazy loading for sync
+        //   4) We need to store the client options
 
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
         // to finish while we process our saved sync data.
         await this.getPushRules();
-        await this.checkLazyLoadStatus();
+        await this.prepareLazyLoadingForSync();
+        await this.storeClientOptions();
+
         const { filterId, filter } = await this.getFilter();
         if (!filter) return; // bail, getFilter failed
 
@@ -1350,11 +1327,11 @@ export class SyncApi {
             const unreadThreadNotifications =
                 joinObj[UNREAD_THREAD_NOTIFICATIONS.name] ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName!];
             if (unreadThreadNotifications) {
-                // Only partially reset unread notification
-                // We want to keep the client-generated count. Particularly important
-                // for encrypted room that refresh their notification count on event
-                // decryption
-                room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                // This mirrors the logic above for rooms: take the *total* notification count from
+                // the server for unencrypted rooms or is it's zero. Any threads not present in this
+                // object implicitly have zero notifications, so start by clearing the total counts
+                // for all such threads.
+                room.resetThreadUnreadNotificationCountFromSync(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     if (!encrypted || unreadNotification.notification_count === 0) {
                         room.setThreadUnreadNotificationCount(
@@ -1375,7 +1352,7 @@ export class SyncApi {
                     }
                 }
             } else {
-                room.resetThreadUnreadNotificationCount();
+                room.resetThreadUnreadNotificationCountFromSync();
             }
 
             joinObj.timeline = joinObj.timeline || ({} as ITimeline);
@@ -1426,7 +1403,9 @@ export class SyncApi {
                 if (limited) {
                     room.resetLiveTimeline(
                         joinObj.timeline.prev_batch,
-                        this.syncOpts.canResetEntireTimeline!(room.roomId) ? null : syncEventData.oldSyncToken ?? null,
+                        this.syncOpts.canResetEntireTimeline!(room.roomId)
+                            ? null
+                            : (syncEventData.oldSyncToken ?? null),
                     );
 
                     // We have to assume any gap in any timeline is
@@ -1716,7 +1695,7 @@ export class SyncApi {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -1736,7 +1715,7 @@ export class SyncApi {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member;
-                    if (inviteEvent?.getContent().membership !== "invite") {
+                    if (inviteEvent?.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }
@@ -1756,11 +1735,11 @@ export class SyncApi {
         return events?.find((e) => e.getType() === EventType.RoomEncryption && e.getStateKey() === "");
     }
 
-    // When processing the sync response we cannot rely on MatrixClient::isRoomEncrypted before we actually
+    // When processing the sync response we cannot rely on Room.hasEncryptionStateEvent we actually
     // inject the events into the room object, so we have to inspect the events themselves.
     private isRoomEncrypted(room: Room, stateEventList: MatrixEvent[], timelineEventList?: MatrixEvent[]): boolean {
         return (
-            this.client.isRoomEncrypted(room.roomId) ||
+            room.hasEncryptionStateEvent() ||
             !!this.findEncryptionEvent(stateEventList) ||
             !!this.findEncryptionEvent(timelineEventList)
         );

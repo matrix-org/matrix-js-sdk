@@ -1,7 +1,7 @@
 // allow non-camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
-import { CallErrorCode } from "./call";
+import { CallErrorCode } from "./call.ts";
 
 // TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
 export const SDPStreamMetadataKey = "org.matrix.msc3077.sdp_stream_metadata";
@@ -34,6 +34,7 @@ export interface CallReplacesTarget {
 
 export interface MCallBase {
     call_id: string;
+    conf_id?: string;
     version: string | number;
     party_id?: string;
     sender_session_id?: string;
@@ -82,7 +83,7 @@ export interface MCAllAssertedIdentity extends MCallBase {
 }
 
 export interface MCallCandidates extends MCallBase {
-    candidates: RTCIceCandidate[];
+    candidates: Omit<RTCIceCandidateInit, "usernameFragment">[];
 }
 
 export interface MCallHangupReject extends MCallBase {

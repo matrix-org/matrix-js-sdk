@@ -22,12 +22,15 @@ import { Room } from "../../src/models/room";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { TimelineIndex, TimelineWindow } from "../../src/timeline-window";
 import { mkMessage } from "../test-utils/test-utils";
+import { MatrixEvent } from "../../src/models/event";
 
 const ROOM_ID = "roomId";
 const USER_ID = "userId";
 const mockClient = {
     getEventTimeline: jest.fn(),
     paginateEventTimeline: jest.fn(),
+    supportsThreads: jest.fn(),
+    getUserId: jest.fn().mockReturnValue(USER_ID),
 } as unknown as MockedObject<MatrixClient>;
 
 /*
@@ -62,6 +65,23 @@ function addEventsToTimeline(timeline: EventTimeline, numEvents: number, toStart
             { toStartOfTimeline },
         );
     }
+}
+
+function createEvents(numEvents: number): Array<MatrixEvent> {
+    const ret = [];
+
+    for (let i = 0; i < numEvents; i++) {
+        ret.push(
+            mkMessage({
+                room: ROOM_ID,
+                user: USER_ID,
+                event: true,
+                unsigned: { age: 1 },
+            }),
+        );
+    }
+
+    return ret;
 }
 
 /*
@@ -410,6 +430,48 @@ describe("TimelineWindow", function () {
 
             expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
             expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
+        });
+    });
+
+    function idsOf(events: Array<MatrixEvent>): Array<string> {
+        return events.map((e) => (e ? (e.getId() ?? "MISSING_ID") : "MISSING_EVENT"));
+    }
+
+    describe("removing events", () => {
+        it("should shorten if removing an event within the window makes it overflow", function () {
+            // Given a room with events in two timelines
+            const room = new Room(ROOM_ID, mockClient, USER_ID, { timelineSupport: true });
+            const timelineSet = room.getUnfilteredTimelineSet();
+            const liveTimeline = room.getLiveTimeline();
+            const oldTimeline = room.addTimeline();
+            liveTimeline.setNeighbouringTimeline(oldTimeline, EventTimeline.BACKWARDS);
+            oldTimeline.setNeighbouringTimeline(liveTimeline, EventTimeline.FORWARDS);
+
+            const oldEvents = createEvents(5);
+            const liveEvents = createEvents(5);
+            const [, , e3, e4, e5] = oldEvents;
+            const [, e7, e8, e9, e10] = liveEvents;
+            room.addLiveEvents(liveEvents);
+            room.addEventsToTimeline(oldEvents, true, oldTimeline);
+
+            // And 2 windows over the timelines in this room
+            const oldWindow = new TimelineWindow(mockClient, timelineSet);
+            oldWindow.load(e5.getId(), 6);
+            expect(idsOf(oldWindow.getEvents())).toEqual(idsOf([e5, e4, e3]));
+
+            const newWindow = new TimelineWindow(mockClient, timelineSet);
+            newWindow.load(e9.getId(), 4);
+            expect(idsOf(newWindow.getEvents())).toEqual(idsOf([e7, e8, e9, e10]));
+
+            // When I remove an event
+            room.removeEvent(e8.getId()!);
+
+            // Then the affected timeline is shortened (because it would have
+            // been too long with the removed event gone)
+            expect(idsOf(newWindow.getEvents())).toEqual(idsOf([e7, e9, e10]));
+
+            // And the unaffected one is not
+            expect(idsOf(oldWindow.getEvents())).toEqual(idsOf([e5, e4, e3]));
         });
     });
 });

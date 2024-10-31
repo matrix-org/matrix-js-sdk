@@ -23,54 +23,51 @@ on:
 concurrency: ${{ github.workflow }}
 jobs:
     release:
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-action.yml@develop
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop
         secrets: inherit
         with:
             final: ${{ inputs.mode == 'final' }}
             npm: ${{ inputs.npm }}
+            downstreams: '["element-hq/element-web"]'
 
     docs:
         name: Publish Documentation
         needs: release
         if: inputs.docs
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🧮 Checkout code
               uses: actions/checkout@v4
-
-            - name: 🧮 Checkout gh-pages
-              uses: actions/checkout@v4
-              with:
-                  ref: gh-pages
-                  path: _docs
 
             - name: 🔧 Yarn cache
               uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version-file: package.json
 
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: 🔨 Install symlinks
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y symlinks
-
             - name: 📖 Generate docs
-              run: |
-                  yarn tpv purge --yes --out _docs --stale --major 10
-                  yarn gendoc
-                  symlinks -rc _docs
+              run: yarn gendoc
 
-            - name: 🔨 Set up git
-              run: |
-                  git config --global user.email "releases@riot.im"
-                  git config --global user.name "RiotRobot"
+            - name: Upload artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: _docs
 
-            - name: 🚀 Deploy
-              run: |
-                  git add . --all
-                  git commit -m "Update docs"
-                  git push
-              working-directory: _docs
+    docs-deploy:
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        runs-on: ubuntu-24.04
+        needs: docs
+        # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+        permissions:
+            contents: read
+            pages: write
+            id-token: write
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4

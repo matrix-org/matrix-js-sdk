@@ -20,12 +20,14 @@ limitations under the License.
  * @see https://spec.matrix.org/v1.6/client-server-api/#storage
  */
 
-import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { ClientEvent, ClientEventHandlerMap } from "./client";
-import { MatrixEvent } from "./models/event";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./crypto/aes";
-import { randomString } from "./randomstring";
-import { logger } from "./logger";
+import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { ClientEvent, ClientEventHandlerMap } from "./client.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { randomString } from "./randomstring.ts";
+import { logger } from "./logger.ts";
+import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
+import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -100,10 +102,12 @@ export interface PassphraseInfo {
  * Options for {@link ServerSideSecretStorageImpl#addKey}.
  */
 export interface AddSecretStorageKeyOpts {
-    pubkey?: string;
+    /** Information for deriving the key from a passphrase if any. */
     passphrase?: PassphraseInfo;
+    /** Optional name of the key. */
     name?: string;
-    key?: Uint8Array;
+    /** The private key. Will be used to generate the key check values in the key info; it will not be stored on the server */
+    key: Uint8Array;
 }
 
 /**
@@ -160,7 +164,7 @@ export interface SecretStorageCallbacks {
      * Descriptions of the secret storage keys are also stored in server-side storage, per the
      * [matrix specification](https://spec.matrix.org/v1.6/client-server-api/#key-storage), so
      * before a key can be used in this way, it must have been stored on the server. This is
-     * done via {@link SecretStorage.ServerSideSecretStorage#addKey}.
+     * done via {@link ServerSideSecretStorage#addKey}.
      *
      * Obviously the keys themselves are not stored server-side, so the js-sdk calls this callback
      * in order to retrieve a secret storage key from the application.
@@ -198,13 +202,13 @@ export interface SecretStorageCallbacks {
 
 interface SecretInfo {
     encrypted: {
-        [keyId: string]: IEncryptedPayload;
+        [keyId: string]: AESEncryptedSecretStoragePayload;
     };
 }
 
 interface Decryptors {
-    encrypt: (plaintext: string) => Promise<IEncryptedPayload>;
-    decrypt: (ciphertext: IEncryptedPayload) => Promise<string>;
+    encrypt: (plaintext: string) => Promise<AESEncryptedSecretStoragePayload>;
+    decrypt: (ciphertext: AESEncryptedSecretStoragePayload) => Promise<string>;
 }
 
 /**
@@ -380,7 +384,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      */
     public async addKey(
         algorithm: string,
-        opts: AddSecretStorageKeyOpts = {},
+        opts: AddSecretStorageKeyOpts,
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
         if (algorithm !== SECRET_STORAGE_ALGORITHM_V1_AES) {
@@ -396,11 +400,10 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         if (opts.passphrase) {
             keyInfo.passphrase = opts.passphrase;
         }
-        if (opts.key) {
-            const { iv, mac } = await calculateKeyCheck(opts.key);
-            keyInfo.iv = iv;
-            keyInfo.mac = mac;
-        }
+
+        const { iv, mac } = await calculateKeyCheck(opts.key);
+        keyInfo.iv = iv;
+        keyInfo.mac = mac;
 
         // Create a unique key id. XXX: this is racey.
         if (!keyId) {
@@ -490,7 +493,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
-        const encrypted: Record<string, IEncryptedPayload> = {};
+        const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {
             const defaultKeyId = await this.getDefaultKeyId();
@@ -637,11 +640,11 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
 
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
-                encrypt: function (secret: string): Promise<IEncryptedPayload> {
-                    return encryptAES(secret, privateKey, name);
+                encrypt: function (secret: string): Promise<AESEncryptedSecretStoragePayload> {
+                    return encryptAESSecretStorageItem(secret, privateKey, name);
                 },
-                decrypt: function (encInfo: IEncryptedPayload): Promise<string> {
-                    return decryptAES(encInfo, privateKey, name);
+                decrypt: function (encInfo: AESEncryptedSecretStoragePayload): Promise<string> {
+                    return decryptAESSecretStorageItem(encInfo, privateKey, name);
                 },
             };
             return [keyId, decryption];
@@ -671,4 +674,20 @@ export function trimTrailingEquals(input: string): string {
     } else {
         return input;
     }
+}
+
+// string of zeroes, for calculating the key check
+const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+/**
+ * Calculate the MAC for checking the key.
+ * See https://spec.matrix.org/v1.11/client-server-api/#msecret_storagev1aes-hmac-sha2, steps 3 and 4.
+ *
+ * @param key - the key to use
+ * @param iv - The initialization vector as a base64-encoded string.
+ *     If omitted, a random initialization vector will be created.
+ * @returns An object that contains, `mac` and `iv` properties.
+ */
+export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<AESEncryptedSecretStoragePayload> {
+    return encryptAESSecretStorageItem(ZERO_STR, key, "", iv);
 }

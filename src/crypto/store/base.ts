@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { ICrossSigningKey } from "../../client";
-import { IOlmDevice } from "../algorithms/megolm";
-import { TrackingStatus } from "../DeviceList";
-import { IRoomEncryption } from "../RoomList";
-import { IDevice } from "../deviceinfo";
-import { ICrossSigningInfo } from "../CrossSigning";
-import { Logger } from "../../logger";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { MatrixEvent } from "../../models/event";
-import { DehydrationManager } from "../dehydration";
-import { IEncryptedPayload } from "../aes";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
+import { IOlmDevice } from "../algorithms/megolm.ts";
+import { TrackingStatus } from "../DeviceList.ts";
+import { IRoomEncryption } from "../RoomList.ts";
+import { IDevice } from "../deviceinfo.ts";
+import { ICrossSigningInfo } from "../CrossSigning.ts";
+import { Logger } from "../../logger.ts";
+import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { MatrixEvent } from "../../models/event.ts";
+import { DehydrationManager } from "../dehydration.ts";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Internal module. Definitions for storage for the crypto module
@@ -35,19 +35,52 @@ import { IEncryptedPayload } from "../aes";
 export interface SecretStorePrivateKeys {
     "dehydration": {
         keyInfo: DehydrationManager["keyInfo"];
-        key: IEncryptedPayload;
+        key: AESEncryptedSecretStoragePayload;
         deviceDisplayName: string;
         time: number;
     } | null;
-    "m.megolm_backup.v1": IEncryptedPayload;
+    "m.megolm_backup.v1": AESEncryptedSecretStoragePayload;
 }
 
 /**
  * Abstraction of things that can store data required for end-to-end encryption
  */
 export interface CryptoStore {
+    /**
+     * Returns true if this CryptoStore has ever been initialised (ie, it might contain data).
+     *
+     * Unlike the rest of the methods in this interface, can be called before {@link CryptoStore#startup}.
+     *
+     * @internal
+     */
+    containsData(): Promise<boolean>;
+
+    /**
+     * Initialise this crypto store.
+     *
+     * Typically, this involves provisioning storage, and migrating any existing data to the current version of the
+     * storage schema where appropriate.
+     *
+     * Must be called before any of the rest of the methods in this interface.
+     */
     startup(): Promise<CryptoStore>;
+
     deleteAllData(): Promise<void>;
+
+    /**
+     * Get data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * @internal
+     */
+    getMigrationState(): Promise<MigrationState>;
+
+    /**
+     * Set data on how much of the libolm to Rust Crypto migration has been done.
+     *
+     * @internal
+     */
+    setMigrationState(migrationState: MigrationState): Promise<void>;
+
     getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest>;
     getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null>;
     getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null>;
@@ -67,13 +100,13 @@ export interface CryptoStore {
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
     storeAccount(txn: unknown, accountPickle: string): void;
-    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
+    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void;
-    storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void;
+    storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void;
     storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         type: K,
@@ -98,6 +131,23 @@ export interface CryptoStore {
     storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void>;
     getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;
     filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]>;
+
+    /**
+     * Get a batch of end-to-end sessions from the database.
+     *
+     * @returns A batch of Olm Sessions, or `null` if no sessions are left.
+     * @internal
+     */
+    getEndToEndSessionsBatch(): Promise<ISessionInfo[] | null>;
+
+    /**
+     * Delete a batch of end-to-end sessions from the database.
+     *
+     * Any sessions in the list which are not found are silently ignored.
+     *
+     * @internal
+     */
+    deleteEndToEndSessionsBatch(sessions: { deviceKey?: string; sessionId?: string }[]): Promise<void>;
 
     // Inbound Group Sessions
     getEndToEndInboundGroupSession(
@@ -126,6 +176,30 @@ export interface CryptoStore {
         txn: unknown,
     ): void;
 
+    /**
+     * Count the number of Megolm sessions in the database.
+     *
+     * @internal
+     */
+    countEndToEndInboundGroupSessions(): Promise<number>;
+
+    /**
+     * Get a batch of Megolm sessions from the database.
+     *
+     * @returns A batch of Megolm Sessions, or `null` if no sessions are left.
+     * @internal
+     */
+    getEndToEndInboundGroupSessionsBatch(): Promise<SessionExtended[] | null>;
+
+    /**
+     * Delete a batch of Megolm sessions from the database.
+     *
+     * Any sessions in the list which are not found are silently ignored.
+     *
+     * @internal
+     */
+    deleteEndToEndInboundGroupSessionsBatch(sessions: { senderKey: string; sessionId: string }[]): Promise<void>;
+
     // Device Data
     getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void;
     storeEndToEndDeviceData(deviceData: IDeviceData, txn: unknown): void;
@@ -149,12 +223,19 @@ export interface CryptoStore {
 
 export type Mode = "readonly" | "readwrite";
 
+/** Data on a Megolm session */
 export interface ISession {
     senderKey: string;
     sessionId: string;
     sessionData?: InboundGroupSessionData;
 }
 
+/** Extended data on a Megolm session */
+export interface SessionExtended extends ISession {
+    needsBackup: boolean;
+}
+
+/** Data on an Olm session */
 export interface ISessionInfo {
     deviceKey?: string;
     sessionId?: string;
@@ -224,3 +305,44 @@ export interface ParkedSharedHistory {
     keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
     forwardingCurve25519KeyChain: string[];
 }
+
+/**
+ * Keys for the `account` object store to store the migration state.
+ * Values are defined in `MigrationState`.
+ * @internal
+ */
+export const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
+
+/**
+ * A record of which steps have been completed in the libolm to Rust Crypto migration.
+ *
+ * Used by {@link CryptoStore#getMigrationState} and {@link CryptoStore#setMigrationState}.
+ *
+ * @internal
+ */
+export enum MigrationState {
+    /** No migration steps have yet been completed. */
+    NOT_STARTED,
+
+    /** We have migrated the account data, cross-signing keys, etc. */
+    INITIAL_DATA_MIGRATED,
+
+    /** INITIAL_DATA_MIGRATED, and in addition, we have migrated all the Olm sessions. */
+    OLM_SESSIONS_MIGRATED,
+
+    /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
+    MEGOLM_SESSIONS_MIGRATED,
+
+    /** MEGOLM_SESSIONS_MIGRATED, and in addition, we have migrated all the room settings. */
+    ROOM_SETTINGS_MIGRATED,
+
+    /** ROOM_SETTINGS_MIGRATED, and in addition, we have done the first own keys query in order to
+     * load the public part of the keys that have been migrated */
+    INITIAL_OWN_KEY_QUERY_DONE,
+}
+
+/**
+ * The size of batches to be returned by {@link CryptoStore#getEndToEndSessionsBatch} and
+ * {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
+ */
+export const SESSION_BATCH_SIZE = 50;

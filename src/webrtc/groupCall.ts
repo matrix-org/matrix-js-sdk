@@ -1,6 +1,6 @@
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient, IMyDevice } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed.ts";
+import { MatrixClient, IMyDevice } from "../client.ts";
 import {
     CallErrorCode,
     CallEvent,
@@ -11,29 +11,31 @@ import {
     setTracksEnabled,
     createNewMatrixCall,
     CallError,
-} from "./call";
-import { RoomMember } from "../models/room-member";
-import { Room } from "../models/room";
-import { RoomStateEvent } from "../models/room-state";
-import { logger } from "../logger";
-import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { CallEventHandlerEvent } from "./callEventHandler";
-import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
-import { IScreensharingOpts } from "./mediaHandler";
-import { mapsEqual } from "../utils";
-import { GroupCallStats } from "./stats/groupCallStats";
+} from "./call.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { Room } from "../models/room.ts";
+import { RoomStateEvent } from "../models/room-state.ts";
+import { logger } from "../logger.ts";
+import { ReEmitter } from "../ReEmitter.ts";
+import { SDPStreamMetadataPurpose } from "./callEventTypes.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType } from "../@types/event.ts";
+import { CallEventHandlerEvent } from "./callEventHandler.ts";
+import { GroupCallEventHandlerEvent } from "./groupCallEventHandler.ts";
+import { IScreensharingOpts } from "./mediaHandler.ts";
+import { mapsEqual } from "../utils.ts";
+import { GroupCallStats } from "./stats/groupCallStats.ts";
 import {
     ByteSentStatsReport,
     CallFeedReport,
     ConnectionStatsReport,
     StatsReport,
     SummaryStatsReport,
-} from "./stats/statsReport";
-import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer";
-import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter";
+} from "./stats/statsReport.ts";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.ts";
+import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { CallMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -89,7 +91,7 @@ export type GroupCallEventHandlerMap = {
      * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
      * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
      * to their audio/video hardware.
-     * @param err - The error raised by MatrixCall.
+     * @param error - The error raised by MatrixCall.
      * @example
      * ```
      * matrixCall.on("error", function(err){
@@ -166,6 +168,7 @@ export interface IGroupCallDataChannelOptions {
 export interface IGroupCallRoomState {
     "m.intent": GroupCallIntent;
     "m.type": GroupCallType;
+    "m.terminated"?: GroupCallTerminationReason;
     "io.element.ptt"?: boolean;
     // TODO: Specify data-channels
     "dataChannelsEnabled"?: boolean;
@@ -193,6 +196,11 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
+}
+
+// XXX: this hasn't made it into the MSC yet
+export interface ExperimentalGroupCallRoomMemberState {
+    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {
@@ -774,7 +782,7 @@ export class GroupCall extends TypedEventEmitter<
                     return false;
                 }
             }
-        } catch (e) {
+        } catch {
             /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
@@ -809,7 +817,7 @@ export class GroupCall extends TypedEventEmitter<
                 await this.updateLocalUsermediaStream(stream);
                 this.localCallFeed.setAudioVideoMuted(null, muted);
                 setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
-            } catch (_) {
+            } catch {
                 // No permission to video device
                 /* istanbul ignore next */
                 logger.log(
@@ -1485,7 +1493,7 @@ export class GroupCall extends TypedEventEmitter<
             }
 
             // Must have a connected device and be joined to the room
-            if (validDevices.length > 0 && member?.membership === "join") {
+            if (validDevices.length > 0 && member?.membership === KnownMembership.Join) {
                 const deviceMap = new Map<string, ParticipantState>();
                 participants.set(member, deviceMap);
 
@@ -1605,17 +1613,20 @@ export class GroupCall extends TypedEventEmitter<
             await this.addDeviceToMemberState();
 
             // Resend the state event every so often so it doesn't become stale
-            this.resendMemberStateTimer = setInterval(async () => {
-                logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
-                try {
-                    await this.addDeviceToMemberState();
-                } catch (e) {
-                    logger.error(
-                        `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
-                        e,
-                    );
-                }
-            }, (DEVICE_TIMEOUT * 3) / 4);
+            this.resendMemberStateTimer = setInterval(
+                async () => {
+                    logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
+                    try {
+                        await this.addDeviceToMemberState();
+                    } catch (e) {
+                        logger.error(
+                            `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
+                            e,
+                        );
+                    }
+                },
+                (DEVICE_TIMEOUT * 3) / 4,
+            );
         } else {
             // Remove the local device
             await this.updateDevices(

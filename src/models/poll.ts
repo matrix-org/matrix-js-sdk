@@ -16,13 +16,13 @@ limitations under the License.
 
 import { M_POLL_START } from "matrix-events-sdk";
 
-import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls";
-import { MatrixClient } from "../client";
-import { PollStartEvent } from "../extensible_events_v1/PollStartEvent";
-import { MatrixEvent } from "./event";
-import { Relations } from "./relations";
-import { Room } from "./room";
-import { TypedEventEmitter } from "./typed-event-emitter";
+import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls.ts";
+import { MatrixClient } from "../client.ts";
+import { PollStartEvent } from "../extensible_events_v1/PollStartEvent.ts";
+import { MatrixEvent } from "./event.ts";
+import { Relations } from "./relations.ts";
+import { Room } from "./room.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
 
 export enum PollEvent {
     New = "Poll.new",
@@ -75,7 +75,11 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
      */
     private undecryptableRelationEventIds = new Set<string>();
 
-    public constructor(public readonly rootEvent: MatrixEvent, private matrixClient: MatrixClient, private room: Room) {
+    public constructor(
+        public readonly rootEvent: MatrixEvent,
+        private matrixClient: MatrixClient,
+        private room: Room,
+    ) {
         super();
         if (!this.rootEvent.getRoomId() || !this.rootEvent.getId()) {
             throw new Error("Invalid poll start event.");

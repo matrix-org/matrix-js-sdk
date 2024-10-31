@@ -20,15 +20,16 @@ import { IObject } from "../../../src/crypto/olmlib";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
-import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "../../../src/client";
+import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { decodeBase64 } from "../../../src/base64";
+import { CrossSigningKeyInfo } from "../../../src/crypto-api";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -190,10 +191,7 @@ describe("Secrets", function () {
         };
         resetCrossSigningKeys(alice);
 
-        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
-            pubkey: undefined,
-            key: undefined,
-        });
+        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, { key });
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
         alice.setDefaultSecretStorageKeyId(newKeyId);
@@ -335,7 +333,6 @@ describe("Secrets", function () {
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
             const decryption = new global.Olm.PkDecryption();
-            const storagePublicKey = decryption.generate_key();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(
@@ -378,8 +375,6 @@ describe("Secrets", function () {
             });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey: async () => ({
-                    // `pubkey` not used anymore with symmetric 4S
-                    keyInfo: { pubkey: storagePublicKey },
                     privateKey: storagePrivateKey,
                 }),
             });
@@ -481,7 +476,7 @@ describe("Secrets", function () {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign<ICrossSigningKey>(
+                    self_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["self_signing"],
@@ -492,7 +487,7 @@ describe("Secrets", function () {
                         XSK,
                         "@alice:example.com",
                     ),
-                    user_signing: sign<ICrossSigningKey>(
+                    user_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["user_signing"],
@@ -617,7 +612,7 @@ describe("Secrets", function () {
                     type: "m.megolm_backup.v1",
                     content: {
                         encrypted: {
-                            key_id: await encryptAES(
+                            key_id: await encryptAESSecretStorageItem(
                                 "123,45,6,7,89,1,234,56,78,90,12,34,5,67,8,90",
                                 secretStorageKeys.key_id,
                                 "m.megolm_backup.v1",
@@ -637,7 +632,7 @@ describe("Secrets", function () {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign<ICrossSigningKey>(
+                    self_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["self_signing"],
@@ -648,7 +643,7 @@ describe("Secrets", function () {
                         XSK,
                         "@alice:example.com",
                     ),
-                    user_signing: sign<ICrossSigningKey>(
+                    user_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["user_signing"],

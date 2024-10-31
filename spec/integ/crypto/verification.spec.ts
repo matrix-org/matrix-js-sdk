@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
-import { MockResponse } from "fetch-mock";
+import FetchMock from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
@@ -85,7 +85,8 @@ import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
-jest.useFakeTimers();
+// But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
@@ -94,6 +95,7 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
@@ -743,6 +745,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             expect(toDeviceMessage.code).toEqual("m.user");
             expect(request.phase).toEqual(VerificationPhase.Cancelled);
+            expect(request.cancellationCode).toEqual("m.user");
+            expect(request.cancellingUserId).toEqual("@alice:localhost");
         });
 
         it("can cancel during the SAS phase", async () => {
@@ -1259,14 +1263,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
+            const keyBackupIsCached = emitPromise(aliceClient, CryptoEvent.KeyBackupDecryptionKeyCached);
+
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, matchingBackupInfo);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers();
+            await keyBackupIsCached;
 
             // the backup secret should be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1288,7 +1289,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1312,7 +1313,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1337,7 +1338,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1358,7 +1359,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1511,7 +1512,7 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     return new Promise((resolve) => {
         fetchMock.putOnce(
             new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp(msgtype)}`),
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 resolve(JSON.parse(opts.body as string));
                 return {};
             },
@@ -1535,7 +1536,7 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
 
     fetchMock.put(
         new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
-        (url: string, opts: RequestInit): MockResponse => {
+        (url: string, opts: RequestInit): FetchMock.MockResponse => {
             const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
             // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
             const content = Object.values(messages)[0] as any;

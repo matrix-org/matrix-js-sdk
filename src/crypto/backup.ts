@@ -18,30 +18,32 @@ limitations under the License.
  * Classes for dealing with key backup.
  */
 
-import type { IMegolmSessionData } from "../@types/crypto";
-import { MatrixClient } from "../client";
-import { logger } from "../logger";
-import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
-import { DeviceInfo } from "./deviceinfo";
-import { DeviceTrustLevel } from "./CrossSigning";
-import { keyFromPassphrase } from "./key_passphrase";
-import { encodeUri, safeSet, sleep } from "../utils";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { encodeRecoveryKey } from "./recoverykey";
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
+import type { IMegolmSessionData } from "../@types/crypto.ts";
+import { MatrixClient } from "../client.ts";
+import { logger } from "../logger.ts";
+import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib.ts";
+import { DeviceInfo } from "./deviceinfo.ts";
+import { DeviceTrustLevel } from "./CrossSigning.ts";
+import { keyFromPassphrase } from "./key_passphrase.ts";
+import { encodeUri, safeSet, sleep } from "../utils.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
 import {
     Curve25519SessionData,
     IAes256AuthData,
     ICurve25519AuthData,
     IKeyBackupInfo,
     IKeyBackupSession,
-} from "./keybackup";
-import { UnstableValue } from "../NamespacedValue";
-import { CryptoEvent } from "./index";
-import { crypto } from "./crypto";
-import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api";
-import { BackupTrustInfo } from "../crypto-api/keybackup";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend";
+} from "./keybackup.ts";
+import { UnstableValue } from "../NamespacedValue.ts";
+import { CryptoEvent } from "./index.ts";
+import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.ts";
+import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
+import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { encodeRecoveryKey } from "../crypto-api/index.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { calculateKeyCheck } from "../secret-storage.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -95,7 +97,7 @@ interface BackupAlgorithmClass {
 
 interface BackupAlgorithm {
     untrusted: boolean;
-    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | IEncryptedPayload>;
+    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | AESEncryptedSecretStoragePayload>;
     decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
@@ -124,7 +126,10 @@ export class BackupManager {
     // The backup manager will schedule backup of keys when active (`scheduleKeyBackupSend`), this allows cancel when client is stopped
     private clientRunning = true;
 
-    public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
+    public constructor(
+        private readonly baseApis: MatrixClient,
+        public readonly getKey: GetKey,
+    ) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
     }
@@ -761,7 +766,7 @@ export class Curve25519 implements BackupAlgorithm {
 
 function randomBytes(size: number): Uint8Array {
     const buf = new Uint8Array(size);
-    crypto.getRandomValues(buf);
+    globalThis.crypto.getRandomValues(buf);
     return buf;
 }
 
@@ -773,7 +778,10 @@ const UNSTABLE_MSC3270_NAME = new UnstableValue(
 export class Aes256 implements BackupAlgorithm {
     public static algorithmName = UNSTABLE_MSC3270_NAME.name;
 
-    public constructor(public readonly authData: IAes256AuthData, private readonly key: Uint8Array) {}
+    public constructor(
+        public readonly authData: IAes256AuthData,
+        private readonly key: Uint8Array,
+    ) {}
 
     public static async init(authData: IAes256AuthData, getKey: () => Promise<Uint8Array>): Promise<Aes256> {
         if (!authData) {
@@ -820,22 +828,24 @@ export class Aes256 implements BackupAlgorithm {
         return false;
     }
 
-    public encryptSession(data: Record<string, any>): Promise<IEncryptedPayload> {
+    public encryptSession(data: Record<string, any>): Promise<AESEncryptedSecretStoragePayload> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
         delete plainText.first_known_index;
-        return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
+        return encryptAESSecretStorageItem(JSON.stringify(plainText), this.key, data.session_id);
     }
 
     public async decryptSessions(
-        sessions: Record<string, IKeyBackupSession<IEncryptedPayload>>,
+        sessions: Record<string, IKeyBackupSession<AESEncryptedSecretStoragePayload>>,
     ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {
             try {
-                const decrypted = JSON.parse(await decryptAES(sessionData.session_data, this.key, sessionId));
+                const decrypted = JSON.parse(
+                    await decryptAESSecretStorageItem(sessionData.session_data, this.key, sessionId),
+                );
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
             } catch (e) {
@@ -865,6 +875,9 @@ export const algorithmsByName: Record<string, BackupAlgorithmClass> = {
     [Aes256.algorithmName]: Aes256,
 };
 
+// the linter doesn't like this but knip does
+// eslint-disable-next-line tsdoc/syntax
+/** @alias */
 export const DefaultAlgorithm: BackupAlgorithmClass = Curve25519;
 
 /**

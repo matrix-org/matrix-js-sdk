@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./matrix";
+import * as matrixcs from "./matrix.ts";
 
 type BrowserMatrix = typeof matrixcs;
 declare global {
@@ -33,12 +33,12 @@ globalThis.__js_sdk_entrypoint = true;
 let indexedDB: IDBFactory | undefined;
 try {
     indexedDB = globalThis.indexedDB;
-} catch (e) {}
+} catch {}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {
     matrixcs.setCryptoStoreFactory(() => new matrixcs.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
 }
 
-export * from "./matrix";
+export * from "./matrix.ts";
 globalThis.matrixcs = matrixcs;

@@ -19,6 +19,7 @@ import {
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 import { TEST_ROOM_ID } from "./test-data";
+import { KnownMembership, Membership } from "../../src/@types/membership";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -87,7 +88,7 @@ export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): I
     for (let i = 0; i < roomMembers.length; i++) {
         roomResponse.state.events.push(
             mkMembershipCustom({
-                membership: "join",
+                membership: KnownMembership.Join,
                 sender: roomMembers[i],
             }),
         );
@@ -126,7 +127,7 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();
             }
-        } catch (ex) {
+        } catch {
             // Direct access to some non-function fields of DOM prototypes may
             // cause exceptions.
             // Overwriting will not work either in that case.
@@ -172,8 +173,10 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
-        prev_content: opts.prev_content,
-        unsigned: opts.unsigned || {},
+        unsigned: {
+            ...opts.unsigned,
+            prev_content: opts.prev_content,
+        },
         event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),
         redacts: opts.redacts,
@@ -251,7 +254,7 @@ export function mkPresence(opts: IPresenceOpts & { event?: boolean }): Partial<I
 
 interface IMembershipOpts {
     room?: string;
-    mship: string;
+    mship: Membership;
     sender?: string;
     user?: string;
     skey?: string;
@@ -297,7 +300,7 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Parti
 }
 
 export function mkMembershipCustom<T>(
-    base: T & { membership: string; sender: string; content?: IContent },
+    base: T & { membership: Membership; sender: string; content?: IContent },
 ): T & { type: EventType; sender: string; state_key: string; content: IContent } & GeneratedMetadata {
     const content = base.content || {};
     return mkEventCustom({
@@ -315,6 +318,7 @@ export interface IMessageOpts {
     event?: boolean;
     relatesTo?: IEventRelation;
     ts?: number;
+    unsigned?: IUnsigned;
 }
 
 /**

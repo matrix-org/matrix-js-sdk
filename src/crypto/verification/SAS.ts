@@ -21,26 +21,27 @@ limitations under the License.
 import anotherjson from "another-json";
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
-import { VerificationBase as Base, SwitchStartEventError } from "./Base";
+import { VerificationBase as Base, SwitchStartEventError } from "./Base.ts";
 import {
     errorFactory,
     newInvalidMessageError,
     newKeyMismatchError,
     newUnknownMethodError,
     newUserCancelledError,
-} from "./Error";
-import { logger } from "../../logger";
-import { IContent, MatrixEvent } from "../../models/event";
-import { generateDecimalSas } from "./SASDecimal";
-import { EventType } from "../../@types/event";
-import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification";
+} from "./Error.ts";
+import { logger } from "../../logger.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { generateDecimalSas } from "./SASDecimal.ts";
+import { EventType } from "../../@types/event.ts";
+import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
+import { VerificationMethod } from "../../types.ts";
 
 // backwards-compatibility exports
 export type {
     ShowSasCallbacks as ISasEvent,
     GeneratedSas as IGeneratedSas,
     EmojiMapping,
-} from "../../crypto-api/verification";
+} from "../../crypto-api/verification.ts";
 
 const START_TYPE = EventType.KeyVerificationStart;
 
@@ -233,7 +234,7 @@ export class SAS extends Base {
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {
-        return "m.sas.v1";
+        return VerificationMethod.Sas;
     }
 
     public get events(): string[] {
@@ -307,8 +308,8 @@ export class SAS extends Base {
                         reject(err);
                     }
                 },
-                cancel: () => reject(newUserCancelledError()),
-                mismatch: () => reject(newMismatchedSASError()),
+                cancel: (): void => reject(newUserCancelledError()),
+                mismatch: (): void => reject(newMismatchedSASError()),
             };
             this.emit(SasEvent.ShowSas, this.sasEvent);
         });

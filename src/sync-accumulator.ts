@@ -18,13 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link SyncAccumulator} for the public class.
  */
 
-import { logger } from "./logger";
-import { deepCopy } from "./utils";
-import { IContent, IUnsigned } from "./models/event";
-import { IRoomSummary } from "./models/room-summary";
-import { EventType } from "./@types/event";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
-import { ReceiptAccumulator } from "./receipt-accumulator";
+import { logger } from "./logger.ts";
+import { deepCopy } from "./utils.ts";
+import { IContent, IUnsigned } from "./models/event.ts";
+import { IRoomSummary } from "./models/room-summary.ts";
+import { EventType } from "./@types/event.ts";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
+import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 
 interface IOpts {
     /**
@@ -58,8 +58,6 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
-    /** @deprecated - legacy field */
-    age?: number;
 }
 
 export interface IStateEvent extends IRoomEvent {
@@ -498,7 +496,7 @@ export class SyncAccumulator {
                 if (transformedEvent.unsigned !== undefined) {
                     transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
                 }
-                const age = e.unsigned ? e.unsigned.age : e.age;
+                const age = e.unsigned?.age;
                 if (age !== undefined) transformedEvent._localTs = Date.now() - age;
             } else {
                 transformedEvent = e;
@@ -506,7 +504,7 @@ export class SyncAccumulator {
 
             currentData._timeline.push({
                 event: transformedEvent,
-                token: index === 0 ? data.timeline.prev_batch ?? null : null,
+                token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
         });
 

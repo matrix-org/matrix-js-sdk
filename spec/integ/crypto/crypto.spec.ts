@@ -19,16 +19,18 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { MockResponse, MockResponseFunction } from "fetch-mock";
+import FetchMock from "fetch-mock";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
 import {
     advanceTimersUntil,
     CRYPTO_BACKENDS,
+    emitPromise,
     getSyncResponse,
     InitCrypto,
     mkEventCustom,
+    mkMembershipCustom,
     syncPromise,
 } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
@@ -38,6 +40,7 @@ import {
     BOB_TEST_USER_ID,
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
+    TEST_ROOM_ID,
     TEST_ROOM_ID as ROOM_ID,
     TEST_USER_ID,
 } from "../../test-utils/test-data";
@@ -48,6 +51,7 @@ import {
     ClientEvent,
     createClient,
     CryptoEvent,
+    HistoryVisibility,
     IClaimOTKsResult,
     IContent,
     IDownloadKeyResult,
@@ -57,11 +61,11 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
+    MsgType,
     PendingEventOrdering,
     Room,
     RoomMember,
     RoomStateEvent,
-    HistoryVisibility,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -74,16 +78,19 @@ import {
     mockSetupCrossSigningRequests,
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
-import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
+import { SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
     CryptoCallbacks,
+    DecryptionFailureCode,
+    DeviceIsolationMode,
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { DecryptionError } from "../../../src/crypto/algorithms";
 import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
@@ -96,12 +103,17 @@ import {
     getTestOlmAccountKeys,
 } from "./olm-utils";
 import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
+import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
+import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
+import { KnownMembership } from "../../../src/@types/membership";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
+
+    jest.useRealTimers();
 });
 
 /**
@@ -148,7 +160,7 @@ async function expectSendRoomKey(
     return await new Promise<Olm.InboundGroupSession>((resolve) => {
         fetchMock.putOnce(
             new RegExp("/sendToDevice/m.room.encrypted/"),
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 const content = JSON.parse(opts.body as string);
                 resolve(onSendRoomKey(content));
                 return {};
@@ -229,9 +241,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} to catch the uploaded keys */
     let keyReceiver: E2EKeyReceiver;
 
-    /** an object which intercepts `/keys/query` requests on the test homeserver */
-    let keyResponder: E2EKeyResponder;
-
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
     let syncResponder: ISyncResponder;
 
@@ -285,7 +294,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
      * @param response - the response to return from the request. Normally an {@link IClaimOTKsResult}
      *   (or a function that returns one).
      */
-    function expectAliceKeyClaim(response: MockResponse | MockResponseFunction) {
+    function expectAliceKeyClaim(response: FetchMock.MockResponse | FetchMock.MockResponseFunction) {
         const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
         fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/claim"), response);
     }
@@ -339,7 +348,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     function createCryptoCallbacks(): CryptoCallbacks {
         // Store the cached secret storage key and return it when `getSecretStorageKey` is called
         let cachedKey: { keyId: string; key: Uint8Array };
-        const cacheSecretStorageKey = (keyId: string, keyInfo: AddSecretStorageKeyOpts, key: Uint8Array) => {
+        const cacheSecretStorageKey = (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => {
             cachedKey = {
                 keyId,
                 key,
@@ -367,6 +376,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 accessToken: "akjgkrgjs",
                 deviceId: "xzcvb",
                 cryptoCallbacks: createCryptoCallbacks(),
+                logger: logger.getChild("aliceClient"),
             });
 
             /* set up listeners for /keys/upload and /sync */
@@ -395,6 +405,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("MatrixClient.getCrypto returns a CryptoApi", () => {
         expect(aliceClient.getCrypto()).toHaveProperty("globalBlacklistUnverifiedDevices");
+    });
+
+    it("CryptoAPI.getOwnDeviceKeys returns plausible values", async () => {
+        const deviceKeys = await aliceClient.getCrypto()!.getOwnDeviceKeys();
+        // We just check for a 43-character base64 string
+        expect(deviceKeys.curve25519).toMatch(/^[A-Za-z0-9+/]{43}$/);
+        expect(deviceKeys.ed25519).toMatch(/^[A-Za-z0-9+/]{43}$/);
     });
 
     it("Alice receives a megolm message", async () => {
@@ -456,56 +473,58 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("Unable to decrypt error codes", function () {
-        it("Encryption fails with expected UISI error", async () => {
+        beforeEach(() => {
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        });
+
+        it("Decryption fails with UISI error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
-            const awaitUISI = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                    const error = err as DecryptionError;
-                    if (error.code == "MEGOLM_UNKNOWN_INBOUND_SESSION_ID") {
-                        resolve();
-                    }
-                });
-            });
+            // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+            const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
 
-            // Alice gets both the events in a single sync
+            // Ensure that the timestamp post-dates the creation of our device
+            const encryptedEvent = {
+                ...testData.ENCRYPTED_EVENT,
+                origin_server_ts: Date.now(),
+            };
+
             const syncResponse = {
                 next_batch: 1,
                 rooms: {
                     join: {
-                        [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [encryptedEvent] } },
                     },
                 },
             };
 
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
-
-            await awaitUISI;
+            const ev = await awaitDecryption;
+            expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID);
         });
 
-        it("Encryption fails with expected Unknown Index error", async () => {
+        it("Decryption fails with Unknown Index error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
-            const awaitUnknownIndex = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                    const error = err as DecryptionError;
-                    if (error.code == "OLM_UNKNOWN_MESSAGE_INDEX") {
-                        resolve();
-                    }
-                });
-            });
+            // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+            const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
 
             await aliceClient.getCrypto()!.importRoomKeys([testData.RATCHTED_MEGOLM_SESSION_DATA]);
 
-            // Alice gets both the events in a single sync
+            // Ensure that the timestamp post-dates the creation of our device
+            const encryptedEvent = {
+                ...testData.ENCRYPTED_EVENT,
+                origin_server_ts: Date.now(),
+            };
+
             const syncResponse = {
                 next_batch: 1,
                 rooms: {
                     join: {
-                        [testData.TEST_ROOM_ID]: { timeline: { events: [testData.ENCRYPTED_EVENT] } },
+                        [testData.TEST_ROOM_ID]: { timeline: { events: [encryptedEvent] } },
                     },
                 },
             };
@@ -513,23 +532,325 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
-            await awaitUnknownIndex;
+            const ev = await awaitDecryption;
+            expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX);
         });
 
-        it("Encryption fails with Unable to decrypt for other errors", async () => {
+        describe("Historical events", () => {
+            async function sendEventAndAwaitDecryption(props: Partial<IEvent> = {}): Promise<MatrixEvent> {
+                // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+                const awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
+
+                // Ensure that the timestamp pre-dates the creation of our device: set it to 24 hours ago
+                const encryptedEvent = {
+                    ...testData.ENCRYPTED_EVENT,
+                    origin_server_ts: Date.now() - 24 * 3600 * 1000,
+                    ...props,
+                };
+
+                const syncResponse = {
+                    next_batch: 1,
+                    rooms: {
+                        join: {
+                            [testData.TEST_ROOM_ID]: { timeline: { events: [encryptedEvent] } },
+                        },
+                    },
+                };
+
+                syncResponder.sendOrQueueSyncResponse(syncResponse);
+                return await awaitDecryption;
+            }
+
+            newBackendOnly("fails with HISTORICAL_MESSAGE_BACKUP_NO_BACKUP when there is no backup", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
+
+                const ev = await sendEventAndAwaitDecryption();
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+            });
+
+            newBackendOnly("fails with HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED when the backup is broken", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {});
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
+
+                const ev = await sendEventAndAwaitDecryption();
+                expect(ev.decryptionFailureReason).toEqual(
+                    DecryptionFailureCode.HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED,
+                );
+            });
+
+            newBackendOnly("fails with HISTORICAL_MESSAGE_WORKING_BACKUP when backup is working", async () => {
+                // The test backup data is signed by a dummy device. We'll need to tell Alice about the device, and
+                // later, tell her to trust it, so that she trusts the backup.
+                const e2eResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+                e2eResponder.addDeviceKeys(testData.SIGNED_TEST_DEVICE_DATA);
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+                await startClientAndAwaitFirstSync();
+
+                await aliceClient
+                    .getCrypto()!
+                    .storeSessionBackupPrivateKey(
+                        Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                        testData.SIGNED_BACKUP_DATA.version!,
+                    );
+
+                // Tell Alice to trust the dummy device that signed the backup
+                const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
+                expect(devices.get(TEST_USER_ID)!.keys()).toContain(testData.TEST_DEVICE_ID);
+                await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+                // Tell Alice to check and enable backup
+                await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+
+                // Sanity: Alice should now have working backup.
+                expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toEqual(
+                    testData.SIGNED_BACKUP_DATA.version,
+                );
+
+                // Finally! we can check what happens when we get an event.
+                const ev = await sendEventAndAwaitDecryption();
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP);
+            });
+
+            newBackendOnly("fails with NOT_JOINED if user is not member of room", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
+
+                const ev = await sendEventAndAwaitDecryption({
+                    unsigned: {
+                        [UNSIGNED_MEMBERSHIP_FIELD.name]: "leave",
+                    },
+                });
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
+            });
+
+            newBackendOnly(
+                "fails with NOT_JOINED if user is not member of room (MSC4115 unstable prefix)",
+                async () => {
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "leave",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(
+                        DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED,
+                    );
+                },
+            );
+
+            newBackendOnly(
+                "fails with another error when the server reports user was a member of the room",
+                async () => {
+                    // This tests that when the server reports that the user
+                    // was invited at the time the event was sent, then we
+                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
+                    // and instead get some other error, since the user should
+                    // have gotten the key for the event.
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.name]: "invite",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+                },
+            );
+
+            newBackendOnly(
+                "fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)",
+                async () => {
+                    // This tests that when the server reports that the user
+                    // was invited at the time the event was sent, then we
+                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
+                    // and instead get some other error, since the user should
+                    // have gotten the key for the event.
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "invite",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+                },
+            );
+
+            newBackendOnly(
+                "fails with another error when the server reports user was a member of the room",
+                async () => {
+                    // This tests that when the server reports the user's
+                    // membership, and reports that the user was joined, then we
+                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
+                    // instead get some other error.
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.name]: "join",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+                },
+            );
+
+            newBackendOnly(
+                "fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)",
+                async () => {
+                    // This tests that when the server reports the user's
+                    // membership, and reports that the user was joined, then we
+                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
+                    // instead get some other error.
+                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                        status: 404,
+                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                    });
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    const ev = await sendEventAndAwaitDecryption({
+                        unsigned: {
+                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "join",
+                        },
+                    });
+                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+                },
+            );
+        });
+
+        describe("IsolationMode decryption tests", () => {
+            newBackendOnly(
+                "OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
+
+                    // It will error as an unknown device because we haven't fetched
+                    // the sender's device keys.
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(true);
+                    expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+                },
+            );
+
+            newBackendOnly(
+                "NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
+
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(false);
+
+                    expect(await aliceClient.getCrypto()!.getEncryptionInfoForEvent(decryptedEvent)).toEqual({
+                        shieldColour: EventShieldColour.RED,
+                        shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                    });
+                },
+            );
+
+            async function setUpTestAndDecrypt(isolationMode: DeviceIsolationMode): Promise<MatrixEvent> {
+                // This tests that a message will not be decrypted if the sender
+                // is not sufficiently trusted according to the selected crypto
+                // mode.
+                //
+                // This test is almost the same as the "Alice receives a megolm
+                // message" test, with the main difference that we set the
+                // crypto mode.
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+
+                // Start by using Invisible crypto mode
+                aliceClient.getCrypto()!.setDeviceIsolationMode(isolationMode);
+
+                await startClientAndAwaitFirstSync();
+
+                const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
+                const groupSession = new Olm.OutboundGroupSession();
+                groupSession.create();
+
+                // make the room_key event
+                const roomKeyEncrypted = encryptGroupSessionKey({
+                    recipient: aliceClient.getUserId()!,
+                    recipientCurve25519Key: keyReceiver.getDeviceKey(),
+                    recipientEd25519Key: keyReceiver.getSigningKey(),
+                    olmAccount: testOlmAccount,
+                    p2pSession: p2pSession,
+                    groupSession: groupSession,
+                    room_id: ROOM_ID,
+                });
+
+                // encrypt a message with the group session
+                const messageEncrypted = encryptMegolmEvent({
+                    senderKey: testSenderKey,
+                    groupSession: groupSession,
+                    room_id: ROOM_ID,
+                });
+
+                // Alice gets both the events in a single sync
+                const syncResponse = {
+                    next_batch: 1,
+                    to_device: {
+                        events: [roomKeyEncrypted],
+                    },
+                    rooms: {
+                        join: {
+                            [ROOM_ID]: { timeline: { events: [messageEncrypted] } },
+                        },
+                    },
+                };
+
+                syncResponder.sendOrQueueSyncResponse(syncResponse);
+                await syncPromise(aliceClient);
+
+                const room = aliceClient.getRoom(ROOM_ID)!;
+                const event = room.getLiveTimeline().getEvents()[0];
+                expect(event.isEncrypted()).toBe(true);
+
+                // it probably won't be decrypted yet, because it takes a while to process the olm keys
+                return await testUtils.awaitDecryption(event);
+            }
+        });
+
+        it("Decryption fails with Unable to decrypt for other errors", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
             await aliceClient.getCrypto()!.importRoomKeys([testData.MEGOLM_SESSION_DATA]);
 
             const awaitDecryptionError = new Promise<void>((resolve) => {
-                aliceClient.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                    const error = err as DecryptionError;
+                aliceClient.on(MatrixEventEvent.Decrypted, (ev) => {
                     // rust and libolm can't have an exact 1:1 mapping for all errors,
                     // but some errors are part of API and should match
                     if (
-                        error.code != "MEGOLM_UNKNOWN_INBOUND_SESSION_ID" &&
-                        error.code != "OLM_UNKNOWN_MESSAGE_INDEX"
+                        ev.decryptionFailureReason !== DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID &&
+                        ev.decryptionFailureReason !== DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX
                     ) {
                         resolve();
                     }
@@ -693,7 +1014,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     it("prepareToEncrypt", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -724,7 +1045,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -752,7 +1073,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     it("We should start a new megolm session after forceDiscardSession", async () => {
         aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
-        keyResponder = new E2EKeyResponder(homeserverUrl);
+        const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
         const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -999,10 +1320,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             return encryptedMessage;
         }
 
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         newBackendOnly("should rotate the session after 2 messages", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -1055,8 +1372,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            // We need to fake the timers to advance the time
-            jest.useFakeTimers();
+            // We need to fake the timers to advance the time, but the wasm bindings of matrix-sdk-crypto rely on a
+            // working `queueMicrotask`
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -1193,7 +1511,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         fetchMock.putOnce(
             { url: new RegExp("/send/"), name: "send-event" },
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 const content = JSON.parse(opts.body as string);
                 logger.log("/send:", content);
                 // make sure that a new session is used
@@ -1233,7 +1551,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                     content: { algorithm: "m.megolm.v1.aes-sha2" },
                                 }),
                                 testUtils.mkMembership({
-                                    mship: "join",
+                                    mship: KnownMembership.Join,
                                     sender: aliceClient.getUserId()!,
                                 }),
                             ],
@@ -1258,7 +1576,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // mark the device as known, and resend.
         aliceClient.setDeviceKnown(aliceClient.getUserId()!, "DEVICE_ID");
-        expectAliceKeyClaim((url: string, opts: RequestInit): MockResponse => {
+        expectAliceKeyClaim((url: string, opts: RequestInit): FetchMock.MockResponse => {
             const content = JSON.parse(opts.body as string);
             expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
             return getTestKeysClaimResponse(aliceClient.getUserId()!);
@@ -1370,7 +1688,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         expect(decryptedEvent.getContent().body).toEqual("42");
 
-        const exported = await aliceClient.exportRoomKeys();
+        const exported = await aliceClient.getCrypto()!.exportRoomKeysAsJson();
 
         // start a new client
         await aliceClient.stopClient();
@@ -1386,7 +1704,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         keyReceiver = new E2EKeyReceiver(homeserverUrl);
         syncResponder = new SyncResponder(homeserverUrl);
         await initCrypto(aliceClient);
-        await aliceClient.importRoomKeys(exported);
+        await aliceClient.getCrypto()!.importRoomKeysAsJson(exported);
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
 
@@ -1652,7 +1970,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                     type: "m.room.member",
                                     state_key: "@alice:localhost",
                                     content: {
-                                        membership: "invite",
+                                        membership: KnownMembership.Invite,
                                     },
                                 },
                             ],
@@ -1801,7 +2119,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                     type: "m.room.member",
                                     state_key: "@alice:localhost",
                                     content: {
-                                        membership: "invite",
+                                        membership: KnownMembership.Invite,
                                     },
                                 },
                             ],
@@ -1877,7 +2195,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 {
                                     type: "m.room.member",
                                     state_key: aliceClient.getUserId(),
-                                    content: { membership: "join" },
+                                    content: { membership: KnownMembership.Join },
                                     event_id: "$alijoin",
                                 },
                             ],
@@ -1904,7 +2222,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 {
                                     type: "m.room.member",
                                     state_key: "@other:user",
-                                    content: { membership: "invite" },
+                                    content: { membership: KnownMembership.Invite },
                                     event_id: "$otherinvite",
                                 },
                             ],
@@ -1918,7 +2236,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expectAliceKeyQuery({ device_keys: { "@other:user": {} }, failures: {} });
         aliceClient.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
             if (member.userId == "@other:user") {
-                aliceClient.sendMessage(testRoomId, { msgtype: "m.text", body: "Hello, World" });
+                aliceClient.sendMessage(testRoomId, { msgtype: MsgType.Text, body: "Hello, World" });
             }
         });
 
@@ -1954,11 +2272,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
 
             // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
-            const sendRoomMessageDefer = defer<MockResponse>();
+            const sendRoomMessageDefer = defer<FetchMock.MockResponse>();
             const reqProm = new Promise<IContent>((resolve) => {
                 fetchMock.putOnce(
                     new RegExp("/send/m.room.encrypted/"),
-                    async (url: string, opts: RequestInit): Promise<MockResponse> => {
+                    async (url: string, opts: RequestInit): Promise<FetchMock.MockResponse> => {
                         resolve(JSON.parse(opts.body as string));
                         return await sendRoomMessageDefer.promise;
                     },
@@ -2052,7 +2370,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             fetchMock.getOnce(new RegExp(membersPath), {
                 chunk: [
                     testUtils.mkMembershipCustom({
-                        membership: "join",
+                        membership: KnownMembership.Join,
                         sender: "@bob:xyz",
                     }),
                 ],
@@ -2061,7 +2379,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("Sending an event initiates a member list sync", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
-            keyResponder = new E2EKeyResponder(homeserverUrl);
+            const keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
             const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2084,7 +2402,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("loading the membership list inhibits a later load", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
-            keyResponder = new E2EKeyResponder(homeserverUrl);
+            const keyResponder = new E2EKeyResponder(homeserverUrl);
             keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
 
             const testDeviceKeys = getTestOlmAccountKeys(testOlmAccount, "@bob:xyz", "DEVICE_ID");
@@ -2107,8 +2425,84 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("m.room_key.withheld handling", () => {
-        // TODO: there are a bunch more tests for this sort of thing in spec/unit/crypto/algorithms/megolm.spec.ts.
-        //   They should be converted to integ tests and moved.
+        describe.each([
+            ["m.blacklisted", "The sender has blocked you.", DecryptionFailureCode.MEGOLM_KEY_WITHHELD],
+            [
+                "m.unverified",
+                "The sender has disabled encrypting to unverified devices.",
+                DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+            ],
+        ])(
+            "Decryption fails with withheld error if a withheld notice with code '%s' is received",
+            (withheldCode, expectedMessage, expectedErrorCode) => {
+                it.each(["before", "after"])("%s the event", async (when) => {
+                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                    await startClientAndAwaitFirstSync();
+
+                    // A promise which resolves, with the MatrixEvent which wraps the event, once the decryption fails.
+                    let awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
+
+                    // Send Alice an encrypted room event which looks like it was encrypted with a megolm session
+                    async function sendEncryptedEvent() {
+                        const event = {
+                            ...testData.ENCRYPTED_EVENT,
+                            origin_server_ts: Date.now(),
+                        };
+                        const syncResponse = {
+                            next_batch: 1,
+                            rooms: { join: { [ROOM_ID]: { timeline: { events: [event] } } } },
+                        };
+
+                        syncResponder.sendOrQueueSyncResponse(syncResponse);
+                        await syncPromise(aliceClient);
+                    }
+
+                    // Send Alice a withheld notice
+                    async function sendWithheldMessage() {
+                        const withheldMessage = {
+                            type: "m.room_key.withheld",
+                            sender: "@bob:example.com",
+                            content: {
+                                algorithm: "m.megolm.v1.aes-sha2",
+                                room_id: ROOM_ID,
+                                sender_key: testData.ENCRYPTED_EVENT.content!.sender_key,
+                                session_id: testData.ENCRYPTED_EVENT.content!.session_id,
+                                code: withheldCode,
+                                reason: "zzz",
+                            },
+                        };
+
+                        syncResponder.sendOrQueueSyncResponse({
+                            next_batch: 1,
+                            to_device: { events: [withheldMessage] },
+                        });
+                        await syncPromise(aliceClient);
+                    }
+
+                    if (when === "before") {
+                        await sendWithheldMessage();
+                        await sendEncryptedEvent();
+                    } else {
+                        await sendEncryptedEvent();
+                        // Make sure that the first attempt to decrypt has happened before the withheld arrives
+                        await awaitDecryption;
+                        awaitDecryption = emitPromise(aliceClient, MatrixEventEvent.Decrypted);
+                        await sendWithheldMessage();
+                    }
+
+                    const ev = await awaitDecryption;
+                    expect(ev.getContent()).toEqual({
+                        body: `** Unable to decrypt: DecryptionError: ${expectedMessage} **`,
+                        msgtype: "m.bad.encrypted",
+                    });
+
+                    expect(ev.decryptionFailureReason).toEqual(expectedErrorCode);
+
+                    // `isEncryptedDisabledForUnverifiedDevices` should be true for `m.unverified` and false for other errors.
+                    expect(ev.isEncryptedDisabledForUnverifiedDevices).toEqual(withheldCode === "m.unverified");
+                });
+            },
+        );
 
         oldBackendOnly("does not block decryption on an 'm.unavailable' report", async function () {
             // there may be a key downloads for alice
@@ -2181,11 +2575,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("key upload request", () => {
         beforeEach(() => {
-            jest.useFakeTimers();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
@@ -2250,10 +2641,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("getUserDeviceInfo", () => {
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         // From https://spec.matrix.org/v1.6/client-server-api/#post_matrixclientv3keysquery
         // Using extracted response from matrix.org, it needs to have real keys etc to pass old crypto verification
         const queryResponseBody = {
@@ -2381,8 +2768,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(devicesInfo.get(user)?.size).toBeFalsy();
         });
 
-        it("Get devices from tacked users", async () => {
-            jest.useFakeTimers();
+        it("Get devices from tracked users", async () => {
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -2425,12 +2813,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     describe("Secret Storage and Key Backup", () => {
-        /**
-         * The account data events to be returned by the sync.
-         * Will be updated when fecthMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
-         * Will be used by `sendSyncResponseWithUpdatedAccountData`
-         */
-        let accountDataEvents: Map<String, any>;
+        let accountDataAccumulator: AccountDataAccumulator;
 
         /**
          * Create a fake secret storage key
@@ -2443,76 +2826,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         beforeEach(async () => {
             createSecretStorageKey.mockClear();
-            accountDataEvents = new Map();
+            accountDataAccumulator = new AccountDataAccumulator();
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
         });
-
-        function mockGetAccountData() {
-            fetchMock.get(
-                `path:/_matrix/client/v3/user/:userId/account_data/:type`,
-                (url) => {
-                    const type = url.split("/").pop();
-                    const existing = accountDataEvents.get(type!);
-                    if (existing) {
-                        // return it
-                        return {
-                            status: 200,
-                            body: existing.content,
-                        };
-                    } else {
-                        // 404
-                        return {
-                            status: 404,
-                            body: { errcode: "M_NOT_FOUND", error: "Account data not found." },
-                        };
-                    }
-                },
-                { overwriteRoutes: true },
-            );
-        }
 
         /**
          * Create a mock to respond to the PUT request `/_matrix/client/v3/user/:userId/account_data/m.cross_signing.${key}`
          * Resolved when the cross signing key is uploaded
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
-        function awaitCrossSigningKeyUpload(key: string): Promise<Record<string, {}>> {
-            return new Promise((resolve) => {
-                // Called when the cross signing key is uploaded
-                fetchMock.put(
-                    `express:/_matrix/client/v3/user/:userId/account_data/m.cross_signing.${key}`,
-                    (url: string, options: RequestInit) => {
-                        const content = JSON.parse(options.body as string);
-                        const type = url.split("/").pop();
-                        // update account data for sync response
-                        accountDataEvents.set(type!, content);
-                        resolve(content.encrypted);
-                        return {};
-                    },
-                );
-            });
-        }
-
-        /**
-         * Send in the sync response the current account data events, as stored by `accountDataEvents`.
-         */
-        function sendSyncResponseWithUpdatedAccountData() {
-            try {
-                syncResponder.sendOrQueueSyncResponse({
-                    next_batch: 1,
-                    account_data: {
-                        events: Array.from(accountDataEvents, ([type, content]) => ({
-                            type: type,
-                            content: content,
-                        })),
-                    },
-                });
-            } catch (err) {
-                // Might fail with "Cannot queue more than one /sync response" if called too often.
-                // It's ok if it fails here, the sync response is cumulative and will contain
-                // the latest account data.
-            }
+        async function awaitCrossSigningKeyUpload(key: string): Promise<Record<string, {}>> {
+            const content = await accountDataAccumulator.interceptSetAccountData(`m.cross_signing.${key}`);
+            return content.encrypted;
         }
 
         /**
@@ -2520,28 +2846,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          * Resolved when a key is uploaded (ie in `body.content.key`)
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
-        function awaitSecretStorageKeyStoredInAccountData(): Promise<string> {
-            return new Promise((resolve) => {
-                // This url is called multiple times during the secret storage bootstrap process
-                // When we received the newly generated key, we return it
-                fetchMock.put(
-                    "express:/_matrix/client/v3/user/:userId/account_data/:type(m.secret_storage.*)",
-                    (url: string, options: RequestInit) => {
-                        const type = url.split("/").pop();
-                        const content = JSON.parse(options.body as string);
-
-                        // update account data for sync response
-                        accountDataEvents.set(type!, content);
-
-                        if (content.key) {
-                            resolve(content.key);
-                        }
-                        sendSyncResponseWithUpdatedAccountData();
-                        return {};
-                    },
-                    { overwriteRoutes: true },
-                );
-            });
+        async function awaitSecretStorageKeyStoredInAccountData(): Promise<string> {
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const content = await accountDataAccumulator.interceptSetAccountData(":type(m.secret_storage.*)", {
+                    repeat: 1,
+                    overwriteRoutes: true,
+                });
+                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
+                if (content.key) {
+                    return content.key;
+                }
+            }
         }
 
         function awaitMegolmBackupKeyUpload(): Promise<Record<string, {}>> {
@@ -2552,7 +2868,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     (url: string, options: RequestInit) => {
                         const content = JSON.parse(options.body as string);
                         // update account data for sync response
-                        accountDataEvents.set("m.megolm_backup.v1", content);
+                        accountDataAccumulator.accountDataEvents.set("m.megolm_backup.v1", content);
                         resolve(content.encrypted);
                         return {};
                     },
@@ -2617,13 +2933,37 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await bootstrapPromise;
 
             // Return the newly created key in the sync response
-            sendSyncResponseWithUpdatedAccountData();
+            accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
             // Finally ensure backup is working
             await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
 
             await backupStatusUpdate;
         }
+
+        describe("Generate 4S recovery keys", () => {
+            it("should create a random recovery key", async () => {
+                const generatedKey = await aliceClient.getCrypto()!.createRecoveryKeyFromPassphrase();
+                expect(generatedKey.privateKey).toBeDefined();
+                expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
+                expect(generatedKey.privateKey.length).toBe(32);
+                expect(generatedKey.keyInfo?.passphrase).toBeUndefined();
+                expect(generatedKey.encodedPrivateKey).toBeDefined();
+                expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
+            });
+
+            it("should create a recovery key from passphrase", async () => {
+                const generatedKey = await aliceClient.getCrypto()!.createRecoveryKeyFromPassphrase("mypassphrase");
+                expect(generatedKey.privateKey).toBeDefined();
+                expect(generatedKey.privateKey).toBeInstanceOf(Uint8Array);
+                expect(generatedKey.privateKey.length).toBe(32);
+                expect(generatedKey.keyInfo?.passphrase?.algorithm).toBe("m.pbkdf2");
+                expect(generatedKey.keyInfo?.passphrase?.iterations).toBe(500000);
+
+                expect(generatedKey.encodedPrivateKey).toBeDefined();
+                expect(generatedKey.encodedPrivateKey!.indexOf("Es")).toBe(0);
+            });
+        });
 
         describe("bootstrapSecretStorage", () => {
             // Doesn't work with legacy crypto, which will try to bootstrap even without private key, which is buggy.
@@ -2639,7 +2979,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
 
             it("Should create a 4S key", async () => {
-                mockGetAccountData();
+                accountDataAccumulator.interceptGetAccountData();
 
                 const awaitAccountData = awaitAccountDataUpdate("m.secret_storage.default_key");
 
@@ -2650,8 +2990,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Wait for the key to be uploaded in the account data
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
+                // check that the key content contains the key check info
+                const keyContent = accountDataAccumulator.accountDataEvents.get(
+                    `m.secret_storage.key.${secretStorageKey}`,
+                )!;
+                // In order to verify if the key is valid, a zero secret is encrypted with the key
+                expect(keyContent.iv).toBeDefined();
+                expect(keyContent.mac).toBeDefined();
+
                 // Return the newly created key in the sync response
-                sendSyncResponseWithUpdatedAccountData();
+                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Finally, wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2675,7 +3023,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponseWithUpdatedAccountData();
+                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2699,7 +3047,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponseWithUpdatedAccountData();
+                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2713,7 +3061,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponseWithUpdatedAccountData();
+                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2737,7 +3085,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
 
                 // Return the newly created key in the sync response
-                sendSyncResponseWithUpdatedAccountData();
+                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Wait for the cross signing keys to be uploaded
                 const [masterKey, userSigningKey, selfSigningKey] = await Promise.all([
@@ -2777,11 +3125,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         describe("Manage Key Backup", () => {
             beforeEach(async () => {
-                jest.useFakeTimers();
-            });
-
-            afterEach(() => {
-                jest.useRealTimers();
+                // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+                jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
             });
 
             it("Should be able to restore from 4S after bootstrap", async () => {
@@ -2890,6 +3235,19 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 const newBackupUploadPromise = awaitMegolmBackupKeyUpload();
 
+                // Track calls to scheduleAllGroupSessionsForBackup. This is
+                // only relevant on legacy encryption.
+                const scheduleAllGroupSessionsForBackup = jest.fn();
+                if (backend === "libolm") {
+                    aliceClient.crypto!.backupManager.scheduleAllGroupSessionsForBackup =
+                        scheduleAllGroupSessionsForBackup;
+                } else {
+                    // With Rust crypto, we don't need to call this function, so
+                    // we call the dummy value here so we pass our later
+                    // expectation.
+                    scheduleAllGroupSessionsForBackup();
+                }
+
                 await aliceClient.getCrypto()!.resetKeyBackup();
                 await awaitDeleteCalled;
                 await newBackupStatusUpdate;
@@ -2901,6 +3259,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(nextVersion).toBeDefined();
                 expect(nextVersion).not.toEqual(currentVersion);
                 expect(nextKey).not.toEqual(currentBackupKey);
+                expect(scheduleAllGroupSessionsForBackup).toHaveBeenCalled();
 
                 // The `deleteKeyBackupVersion` API is deprecated but has been modified to work with both crypto backend
                 // ensure that it works anyhow
@@ -2912,15 +3271,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
     });
 
-    describe("Check if the cross signing keys are available for a user", () => {
+    describe("User identity", () => {
+        let keyResponder: E2EKeyResponder;
         beforeEach(async () => {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-
             keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
-            keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
+            keyResponder.addKeyReceiver(TEST_USER_ID, keyReceiver);
             keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
 
@@ -2936,6 +3293,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 .getCrypto()!
                 .userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are available for a tracked user", async () => {
@@ -2946,11 +3309,239 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Alice is the local user and should be tracked !
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are not available for an unknown user", async () => {
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
+
+        newBackendOnly("An unverified user changes identity", async () => {
+            // We have to be tracking Bob's keys, which means we need to share a room with him
+            syncResponder.sendOrQueueSyncResponse({
+                ...getSyncResponse([BOB_TEST_USER_ID]),
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+
+            // Bob changes his cross-signing keys
+            keyResponder.addCrossSigningData(testData.BOB_ALT_SIGNED_CROSS_SIGNING_KEYS_DATA);
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: "2",
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
+
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.isVerified()).toBe(false);
+                expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.needsUserApproval).toBe(true);
+            }
+
+            // Pinning the new identity should clear the needsUserApproval flag.
+            await aliceClient.getCrypto()!.pinCurrentUserIdentity(BOB_TEST_USER_ID);
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.needsUserApproval).toBe(false);
+            }
+        });
+    });
+
+    /** Guards against downgrade attacks from servers hiding or manipulating the crypto settings. */
+    describe("Persistent encryption settings", () => {
+        let persistentStoreClient: MatrixClient;
+        let client2: MatrixClient;
+
+        beforeEach(async () => {
+            const homeserverurl = "https://alice-server.com";
+            const userId = "@alice:localhost";
+
+            const keyResponder = new E2EKeyResponder(homeserverurl);
+            keyResponder.addKeyReceiver(userId, keyReceiver);
+
+            // For legacy crypto, these tests only work properly with a proper (indexeddb-based) CryptoStore, so
+            // rather than using the existing `aliceClient`, create a new client. Once we drop legacy crypto, we can
+            // just use `aliceClient` here.
+            persistentStoreClient = await makeNewClient(homeserverurl, userId, "persistentStoreClient");
+            await persistentStoreClient.startClient({});
+        });
+
+        afterEach(async () => {
+            persistentStoreClient.stopClient();
+            client2?.stopClient();
+        });
+
+        test("Sending a message in a room where the server is hiding the state event does not send a plaintext event", async () => {
+            // Alice is in an encrypted room
+            const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2" });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
+            await syncPromise(persistentStoreClient);
+
+            // Send a message, and expect to get an `m.room.encrypted` event.
+            await Promise.all([persistentStoreClient.sendTextMessage(ROOM_ID, "test"), expectEncryptedSendMessage()]);
+
+            // We now replace the client, and allow the new one to resync, *without* the encryption event.
+            client2 = await replaceClient(persistentStoreClient);
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([]));
+            await client2.startClient({});
+            await syncPromise(client2);
+            logger.log(client2.getUserId() + ": restarted");
+
+            await expectSendMessageToFail(client2);
+        });
+
+        test("Changes to the rotation period should be ignored", async () => {
+            // Alice is in an encrypted room, where the rotation period is set to 2 messages
+            const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
+            await syncPromise(persistentStoreClient);
+
+            // Send a message, and expect to get an `m.room.encrypted` event.
+            const [, msg1Content] = await Promise.all([
+                persistentStoreClient.sendTextMessage(ROOM_ID, "test1"),
+                expectEncryptedSendMessage(),
+            ]);
+
+            // Replace the state with one which bumps the rotation period. This should be ignored, though it's not
+            // clear that is correct behaviour (see https://github.com/element-hq/element-meta/issues/69)
+            const encryptionState2 = mkEncryptionEvent({
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_msgs: 100,
+            });
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: "1",
+                rooms: { join: { [TEST_ROOM_ID]: { timeline: { events: [encryptionState2], prev_batch: "" } } } },
+            });
+            await syncPromise(persistentStoreClient);
+
+            // Send two more messages. The first should use the same megolm session as the first; the second should
+            // use a different one.
+            const [, msg2Content] = await Promise.all([
+                persistentStoreClient.sendTextMessage(ROOM_ID, "test2"),
+                expectEncryptedSendMessage(),
+            ]);
+            expect(msg2Content.session_id).toEqual(msg1Content.session_id);
+            const [, msg3Content] = await Promise.all([
+                persistentStoreClient.sendTextMessage(ROOM_ID, "test3"),
+                expectEncryptedSendMessage(),
+            ]);
+            expect(msg3Content.session_id).not.toEqual(msg1Content.session_id);
+        });
+
+        test("Changes to the rotation period should be ignored after a client restart", async () => {
+            // Alice is in an encrypted room, where the rotation period is set to 2 messages
+            const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
+            await syncPromise(persistentStoreClient);
+
+            // Send a message, and expect to get an `m.room.encrypted` event.
+            await Promise.all([persistentStoreClient.sendTextMessage(ROOM_ID, "test1"), expectEncryptedSendMessage()]);
+
+            // We now replace the client, and allow the new one to resync with a *different* encryption event.
+            client2 = await replaceClient(persistentStoreClient);
+            const encryptionState2 = mkEncryptionEvent({
+                algorithm: "m.megolm.v1.aes-sha2",
+                rotation_period_msgs: 100,
+            });
+            syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState2]));
+            await client2.startClient({});
+            await syncPromise(client2);
+            logger.log(client2.getUserId() + ": restarted");
+
+            // Now send another message, which should (for now) be rejected.
+            await expectSendMessageToFail(client2);
+        });
+
+        /** Shut down `oldClient`, and build a new MatrixClient for the same user. */
+        async function replaceClient(oldClient: MatrixClient) {
+            oldClient.stopClient();
+            syncResponder.sendOrQueueSyncResponse({}); // flush pending request from old client
+            return makeNewClient(oldClient.getHomeserverUrl(), oldClient.getSafeUserId(), "client2");
+        }
+
+        async function makeNewClient(
+            homeserverUrl: string,
+            userId: string,
+            loggerPrefix: string,
+        ): Promise<MatrixClient> {
+            const client = createClient({
+                baseUrl: homeserverUrl,
+                userId: userId,
+                accessToken: "akjgkrgjs",
+                deviceId: "xzcvb",
+                cryptoCallbacks: createCryptoCallbacks(),
+                logger: logger.getChild(loggerPrefix),
+
+                // For legacy crypto, these tests only work with a proper persistent cryptoStore.
+                cryptoStore: new IndexedDBCryptoStore(indexedDB, "test"),
+            });
+            await initCrypto(client);
+            mockInitialApiRequests(client.getHomeserverUrl());
+            return client;
+        }
+
+        function mkEncryptionEvent(content: object) {
+            return mkEventCustom({
+                sender: persistentStoreClient.getSafeUserId(),
+                type: "m.room.encryption",
+                state_key: "",
+                content: content,
+            });
+        }
+
+        /** Sync response which includes `TEST_ROOM_ID`, where alice is a member
+         *
+         * @param stateEvents - Additional state events for the test room
+         */
+        function getSyncResponseWithState(stateEvents: Array<object>) {
+            const roomResponse = {
+                state: {
+                    events: [
+                        mkMembershipCustom({
+                            membership: KnownMembership.Join,
+                            sender: persistentStoreClient.getSafeUserId(),
+                        }),
+                        ...stateEvents,
+                    ],
+                },
+                timeline: {
+                    events: [],
+                    prev_batch: "",
+                },
+            };
+
+            return {
+                next_batch: "1",
+                rooms: { join: { [TEST_ROOM_ID]: roomResponse } },
+            };
+        }
+
+        /** Send a message with the given client, and check that it is not sent in plaintext */
+        async function expectSendMessageToFail(aliceClient2: MatrixClient) {
+            // The precise failure mode here is somewhat up for debate (https://github.com/element-hq/element-meta/issues/69).
+            // For now, the attempt to send is rejected with an exception. The text is different between old and new stacks.
+            await expect(aliceClient2.sendTextMessage(ROOM_ID, "test")).rejects.toThrow(
+                /unconfigured room !room:id|Room !room:id was previously configured to use encryption/,
+            );
+        }
     });
 });

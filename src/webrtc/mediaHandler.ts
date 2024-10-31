@@ -17,10 +17,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
-import { logger } from "../logger";
-import { MatrixClient } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { GroupCallType, GroupCallState } from "../webrtc/groupCall.ts";
+import { logger } from "../logger.ts";
+import { MatrixClient } from "../client.ts";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed",
@@ -31,6 +31,9 @@ export type MediaHandlerEventHandlerMap = {
 };
 
 export interface IScreensharingOpts {
+    /**
+     * sourceId for Electron DesktopCapturer
+     */
     desktopCapturerSourceId?: string;
     audio?: boolean;
     // For electron screen capture, there are very few options for detecting electron
@@ -351,7 +354,7 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     /**
-     * @param desktopCapturerSourceId - sourceId for Electron DesktopCapturer
+     * @param opts - screensharing stream options
      * @param reusable - is allowed to be reused by the MediaHandler
      * @returns based on passed parameters
      */

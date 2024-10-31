@@ -25,6 +25,8 @@ import {
 } from "../../../src/models/MSC3089TreeSpace";
 import { DEFAULT_ALPHABET } from "../../../src/utils";
 import { MatrixError } from "../../../src/http-api";
+import { KnownMembership } from "../../../src/@types/membership";
+import { EncryptedFile } from "../../../src/@types/media";
 
 describe("MSC3089TreeSpace", () => {
     let client: MatrixClient;
@@ -105,7 +107,7 @@ describe("MSC3089TreeSpace", () => {
             return Promise.resolve();
         });
         client.invite = fn;
-        await tree.invite(target, false, false);
+        await tree.invite(target, false);
         expect(fn).toHaveBeenCalledTimes(1);
     });
 
@@ -118,7 +120,7 @@ describe("MSC3089TreeSpace", () => {
             return Promise.resolve();
         });
         client.invite = fn;
-        await tree.invite(target, false, false);
+        await tree.invite(target, false);
         expect(fn).toHaveBeenCalledTimes(2);
     });
 
@@ -131,7 +133,7 @@ describe("MSC3089TreeSpace", () => {
         });
         client.invite = fn;
 
-        await expect(tree.invite(target, false, false)).rejects.toThrow("MatrixError: Sample Failure");
+        await expect(tree.invite(target, false)).rejects.toThrow("MatrixError: Sample Failure");
 
         expect(fn).toHaveBeenCalledTimes(1);
     });
@@ -153,59 +155,8 @@ describe("MSC3089TreeSpace", () => {
             { invite: (userId) => fn(tree.roomId, userId) } as MSC3089TreeSpace,
         ];
 
-        await tree.invite(target, true, false);
+        await tree.invite(target, true);
         expect(fn).toHaveBeenCalledTimes(4);
-    });
-
-    it("should share keys with invitees", async () => {
-        const target = targetUser;
-        const sendKeysFn = jest.fn().mockImplementation((inviteRoomId: string, userIds: string[]) => {
-            expect(inviteRoomId).toEqual(roomId);
-            expect(userIds).toMatchObject([target]);
-            return Promise.resolve();
-        });
-        client.invite = () => Promise.resolve({}); // we're not testing this here - see other tests
-        client.sendSharedHistoryKeys = sendKeysFn;
-
-        // Mock the history check as best as possible
-        const historyVis = "shared";
-        const historyFn = jest.fn().mockImplementation((eventType: string, stateKey?: string) => {
-            // We're not expecting a super rigid test: the function that calls this internally isn't
-            // really being tested here.
-            expect(eventType).toEqual(EventType.RoomHistoryVisibility);
-            expect(stateKey).toEqual("");
-            return { getContent: () => ({ history_visibility: historyVis }) }; // eslint-disable-line camelcase
-        });
-        room.currentState.getStateEvents = historyFn;
-
-        // Note: inverse test is implicit from other tests, which disable the call stack of this
-        // test in order to pass.
-        await tree.invite(target, false, true);
-        expect(sendKeysFn).toHaveBeenCalledTimes(1);
-        expect(historyFn).toHaveBeenCalledTimes(1);
-    });
-
-    it("should not share keys with invitees if inappropriate history visibility", async () => {
-        const target = targetUser;
-        const sendKeysFn = jest.fn().mockImplementation((inviteRoomId: string, userIds: string[]) => {
-            expect(inviteRoomId).toEqual(roomId);
-            expect(userIds).toMatchObject([target]);
-            return Promise.resolve();
-        });
-        client.invite = () => Promise.resolve({}); // we're not testing this here - see other tests
-        client.sendSharedHistoryKeys = sendKeysFn;
-
-        const historyVis = "joined"; // NOTE: Changed.
-        const historyFn = jest.fn().mockImplementation((eventType: string, stateKey?: string) => {
-            expect(eventType).toEqual(EventType.RoomHistoryVisibility);
-            expect(stateKey).toEqual("");
-            return { getContent: () => ({ history_visibility: historyVis }) }; // eslint-disable-line camelcase
-        });
-        room.currentState.getStateEvents = historyFn;
-
-        await tree.invite(target, false, true);
-        expect(sendKeysFn).toHaveBeenCalledTimes(0);
-        expect(historyFn).toHaveBeenCalledTimes(1);
     });
 
     async function evaluatePowerLevels(pls: any, role: TreePermissions, expectedPl: number) {
@@ -399,7 +350,7 @@ describe("MSC3089TreeSpace", () => {
                 ];
             },
         };
-        client.getRoom = () => ({} as Room); // to appease the TreeSpace constructor
+        client.getRoom = () => ({}) as Room; // to appease the TreeSpace constructor
 
         const getFn = jest.fn().mockImplementation((roomId: string) => {
             if (roomId === thirdChildRoom) {
@@ -422,7 +373,7 @@ describe("MSC3089TreeSpace", () => {
     });
 
     it("should find specific directories", () => {
-        client.getRoom = () => ({} as Room); // to appease the TreeSpace constructor
+        client.getRoom = () => ({}) as Room; // to appease the TreeSpace constructor
 
         // Only mocking used API
         const firstSubdirectory = { roomId: "!first:example.org" } as any as MSC3089TreeSpace;
@@ -458,14 +409,14 @@ describe("MSC3089TreeSpace", () => {
                 expect(stateKey).toBeUndefined();
                 return [
                     // Partial implementations
-                    { getContent: () => ({ membership: "join" }), getStateKey: () => joinMemberId },
-                    { getContent: () => ({ membership: "knock" }), getStateKey: () => knockMemberId },
-                    { getContent: () => ({ membership: "invite" }), getStateKey: () => inviteMemberId },
-                    { getContent: () => ({ membership: "leave" }), getStateKey: () => leaveMemberId },
-                    { getContent: () => ({ membership: "ban" }), getStateKey: () => banMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Join }), getStateKey: () => joinMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Knock }), getStateKey: () => knockMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Invite }), getStateKey: () => inviteMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Leave }), getStateKey: () => leaveMemberId },
+                    { getContent: () => ({ membership: KnownMembership.Ban }), getStateKey: () => banMemberId },
 
                     // ensure we don't kick ourselves
-                    { getContent: () => ({ membership: "join" }), getStateKey: () => selfUserId },
+                    { getContent: () => ({ membership: KnownMembership.Join }), getStateKey: () => selfUserId },
                 ];
             },
         };
@@ -946,7 +897,7 @@ describe("MSC3089TreeSpace", () => {
         const fileInfo = {
             mimetype: "text/plain",
             // other fields as required by encryption, but ignored here
-        };
+        } as unknown as EncryptedFile;
         const fileEventId = "$file";
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
@@ -1006,7 +957,7 @@ describe("MSC3089TreeSpace", () => {
         const fileInfo = {
             mimetype: "text/plain",
             // other fields as required by encryption, but ignored here
-        };
+        } as unknown as EncryptedFile;
         const fileEventId = "$file";
         const fileName = "My File.txt";
         const fileContents = "This is a test file";

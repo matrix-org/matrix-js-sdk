@@ -15,13 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { VerificationRequest, REQUEST_TYPE, READY_TYPE, START_TYPE } from "./VerificationRequest";
-import { logger } from "../../../logger";
-import { IVerificationChannel } from "./Channel";
-import { EventType } from "../../../@types/event";
-import { MatrixClient } from "../../../client";
-import { MatrixEvent } from "../../../models/event";
-import { IRequestsMap } from "../..";
+import { VerificationRequest, REQUEST_TYPE, READY_TYPE, START_TYPE } from "./VerificationRequest.ts";
+import { logger } from "../../../logger.ts";
+import { IVerificationChannel } from "./Channel.ts";
+import { EventType, TimelineEvents } from "../../../@types/event.ts";
+import { MatrixClient } from "../../../client.ts";
+import { MatrixEvent } from "../../../models/event.ts";
+import { IRequestsMap } from "../../index.ts";
 
 const MESSAGE_TYPE = EventType.RoomMessage;
 const M_REFERENCE = "m.reference";
@@ -39,7 +39,11 @@ export class InRoomChannel implements IVerificationChannel {
      * @param roomId - id of the room where verification events should be posted in, should be a DM with the given user.
      * @param userId - id of user that the verification request is directed at, should be present in the room.
      */
-    public constructor(private readonly client: MatrixClient, public readonly roomId: string, public userId?: string) {}
+    public constructor(
+        private readonly client: MatrixClient,
+        public readonly roomId: string,
+        public userId?: string,
+    ) {}
 
     public get receiveStartFromOtherDevices(): boolean {
         return true;
@@ -295,7 +299,11 @@ export class InRoomChannel implements IVerificationChannel {
         if (type === REQUEST_TYPE) {
             sendType = MESSAGE_TYPE;
         }
-        const response = await this.client.sendEvent(this.roomId, sendType, content);
+        const response = await this.client.sendEvent(
+            this.roomId,
+            sendType as keyof TimelineEvents,
+            content as TimelineEvents[keyof TimelineEvents],
+        );
         if (type === REQUEST_TYPE) {
             this.requestEventId = response.event_id;
         }

@@ -19,8 +19,17 @@ version-resolver:
         labels:
             - "X-Breaking-Change"
     default: minor
+exclude-labels:
+    - "T-Task"
+    - "X-Reverted"
+    - "backport staging"
+exclude-contributors:
+    - "RiotRobot"
 template: |
     $CHANGES
+#no-changes-template: ""
 prerelease: true
 prerelease-identifier: rc
 include-pre-releases: false
+stable-ref: master
+staging-ref: staging

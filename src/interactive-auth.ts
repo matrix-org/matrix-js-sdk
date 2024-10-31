@@ -16,12 +16,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { defer, IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
-import { UIAResponse } from "./@types/uia";
-import { UserIdentifier } from "./@types/auth";
+import { logger } from "./logger.ts";
+import { MatrixClient } from "./client.ts";
+import { defer, IDeferred } from "./utils.ts";
+import { MatrixError } from "./http-api/index.ts";
+import { UIAResponse } from "./@types/uia.ts";
+import { UserIdentifier } from "./@types/auth.ts";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -121,10 +121,6 @@ interface ThreepidCreds {
 type EmailIdentityDict = {
     type: AuthType.Email;
     threepid_creds: ThreepidCreds;
-    /**
-     * @deprecated in favour of `threepid_creds` - kept for backwards compatibility
-     */
-    threepidCreds?: ThreepidCreds;
     session: string;
 };
 
@@ -140,17 +136,15 @@ export type AuthDict =
     | { type: Exclude<string, AuthType>; [key: string]: any }
     | {};
 
-/**
- * Backwards compatible export
- * @deprecated in favour of AuthDict
- */
-export type IAuthDict = AuthDict;
-
 export class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-    public constructor(m: string, public readonly required_stages: string[], public readonly flows: UIAFlow[]) {
+    public constructor(
+        m: string,
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+        public readonly required_stages: string[],
+        public readonly flows: UIAFlow[],
+    ) {
         super(m);
     }
 }
@@ -164,7 +158,7 @@ export class NoAuthFlowFoundError extends Error {
  *
  * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
  */
-export type UIAuthCallback<T> = (makeRequest: (authData: IAuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
+export type UIAuthCallback<T> = (makeRequest: (authData: AuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
 
 interface IOpts<T> {
     /**
@@ -336,7 +330,7 @@ export class InteractiveAuth<T> {
         // another just to check what the status is
         if (this.submitPromise) return;
 
-        let authDict: IAuthDict = {};
+        let authDict: AuthDict = {};
         if (this.currentStage == EMAIL_STAGE_TYPE) {
             // The email can be validated out-of-band, but we need to provide the
             // creds so the HS can go & check it.
@@ -345,15 +339,13 @@ export class InteractiveAuth<T> {
                     sid: this.emailSid,
                     client_secret: this.clientSecret,
                 };
-                const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl()!);
-                creds.id_server = idServerParsedUrl.host;
+                const isUrl = this.matrixClient.getIdentityServerUrl();
+                if (isUrl) {
+                    creds.id_server = new URL(isUrl).host;
+                }
                 authDict = {
                     type: EMAIL_STAGE_TYPE,
-                    // TODO: Remove `threepid_creds` once servers support proper UIA
-                    // See https://github.com/matrix-org/synapse/issues/5665
-                    // See https://github.com/matrix-org/matrix-doc/issues/2220
                     threepid_creds: creds,
-                    threepidCreds: creds,
                 };
             }
         }
@@ -406,7 +398,7 @@ export class InteractiveAuth<T> {
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    public async submitAuthDict(authData: IAuthDict, background = false): Promise<void> {
+    public async submitAuthDict(authData: AuthDict, background = false): Promise<void> {
         if (!this.attemptAuthDeferred) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -423,11 +415,11 @@ export class InteractiveAuth<T> {
         while (this.submitPromise) {
             try {
                 await this.submitPromise;
-            } catch (e) {}
+            } catch {}
         }
 
         // use the sessionid from the last request, if one is present.
-        let auth: IAuthDict;
+        let auth: AuthDict;
         if ((this.data as IAuthData)?.session) {
             auth = {
                 session: (this.data as IAuthData).session,
@@ -511,7 +503,7 @@ export class InteractiveAuth<T> {
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
      */
-    private async doRequest(auth: IAuthDict | null, background = false): Promise<void> {
+    private async doRequest(auth: AuthDict | null, background = false): Promise<void> {
         try {
             const result = await this.requestCallback(auth, background);
             this.attemptAuthDeferred!.resolve(result);
