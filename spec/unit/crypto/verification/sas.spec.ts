@@ -29,13 +29,13 @@ import { MatrixClient } from "../../../../src";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
 import { TestClient } from "../../../TestClient";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 let ALICE_DEVICES: Record<string, IDevice>;
 let BOB_DEVICES: Record<string, IDevice>;
 
 describe("SAS verification", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }
