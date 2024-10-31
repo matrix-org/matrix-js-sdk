@@ -654,44 +654,18 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         timeline: EventTimeline,
         { toStartOfTimeline, fromCache, roomState, timelineWasEmpty }: IAddEventToTimelineOptions,
     ): void;
-    /**
-     * @deprecated In favor of the overload with `IAddEventToTimelineOptions`
-     */
-    /*public addEventToTimeline(
-        event: MatrixEvent,
-        timeline: EventTimeline,
-        toStartOfTimeline: boolean,
-        fromCache?: boolean,
-        roomState?: RoomState,
-    ): void;*/
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        toStartOfTimelineOrOpts: boolean | IAddEventToTimelineOptions,
+        opts: IAddEventToTimelineOptions,
         fromCache = false,
         roomState?: RoomState,
     ): void {
-        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
+        let toStartOfTimeline = false;
         let timelineWasEmpty: boolean | undefined;
         let addToState = true;
-        if (typeof toStartOfTimelineOrOpts === "object") {
-            ({
-                toStartOfTimeline,
-                fromCache = false,
-                roomState,
-                timelineWasEmpty,
-                addToState,
-            } = toStartOfTimelineOrOpts);
-        } else if (toStartOfTimelineOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimelineSet.addEventToTimeline(event, timeline, toStartOfTimeline, fromCache?, roomState?)` " +
-                    "is deprecated in favor of the overload with " +
-                    "`EventTimelineSet.addEventToTimeline(event, timeline, IAddEventToTimelineOptions)`",
-            );
-        }
+
+        ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty, addToState } = opts);
 
         if (timeline.getTimelineSet() !== this) {
             throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " +

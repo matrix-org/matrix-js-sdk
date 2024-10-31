@@ -366,12 +366,7 @@ export class EventTimeline {
      */
     public addEvent(
         event: MatrixEvent,
-        {
-            toStartOfTimeline,
-            roomState,
-            timelineWasEmpty,
-            addToState,
-        }: IAddEventOptions /*= { toStartOfTimeline: false } */,
+        { toStartOfTimeline, roomState, timelineWasEmpty, addToState }: IAddEventOptions,
     ): void {
         if (!roomState) {
             roomState = toStartOfTimeline ? this.startState : this.endState;
