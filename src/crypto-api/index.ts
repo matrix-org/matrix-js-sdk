@@ -273,8 +273,13 @@ export interface CryptoApi {
     isCrossSigningReady(): Promise<boolean>;
 
     /**
-     * Get the ID of one of the user's cross-signing keys, if the private is available.
-     * If the private key is not available, this will return null.
+     * Get the ID of one of the user's cross-signing keys, if both private and matching
+     * public parts of that key are available (ie. cached in the local crypto store).
+     *
+     * The public part may not be available if a /keys/query request has not yet been
+     * performed, or if the device that created the keys failed to publish them.
+     *
+     * If the keypair is not available, this will return null.
      *
      * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigningKey.SelfSigning`,
      *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
