@@ -32,7 +32,7 @@ export async function resetCrossSigningKeys(
 }
 
 export async function createSecretStorageKey(): Promise<IRecoveryKey> {
-    const decryption = new global.Olm.PkDecryption();
+    const decryption = new globalThis.Olm.PkDecryption();
     decryption.generate_key();
     const storagePrivateKey = decryption.get_private_key();
     decryption.free();

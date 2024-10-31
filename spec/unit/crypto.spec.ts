@@ -28,7 +28,7 @@ import * as testData from "../test-utils/test-data";
 import { KnownMembership } from "../../src/@types/membership";
 import type { DeviceInfoMap } from "../../src/crypto/DeviceList";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 function awaitEvent(emitter: EventEmitter, event: string): Promise<void> {
     return new Promise((resolve) => {

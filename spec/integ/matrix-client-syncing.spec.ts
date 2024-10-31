@@ -2406,7 +2406,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
 
     it("should emit ClientEvent.Room when invited while using indexeddb crypto store", async () => {
         const idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
-            cryptoStore: new IndexedDBCryptoStore(global.indexedDB, "tests"),
+            cryptoStore: new IndexedDBCryptoStore(globalThis.indexedDB, "tests"),
         });
         const idbHttpBackend = idbTestClient.httpBackend;
         const idbClient = idbTestClient.client;
@@ -2486,7 +2486,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
 
         let idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
             store: new IndexedDBStore({
-                indexedDB: global.indexedDB,
+                indexedDB: globalThis.indexedDB,
                 dbName: "test",
             }),
         });
@@ -2558,7 +2558,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
 
         idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
             store: new IndexedDBStore({
-                indexedDB: global.indexedDB,
+                indexedDB: globalThis.indexedDB,
                 dbName: "test",
             }),
         });
