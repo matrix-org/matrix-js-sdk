@@ -834,12 +834,15 @@ export class SlidingSyncSdk {
         // to be decorated with sender etc.
         await room.addLiveEvents(timelineEventList, {
             fromCache: true,
-            addToState: false,
+            // XXX: This seems very broken that the timeline events need to be added to the sate, since
+            // in sliding sync the point is that state events come down separately, excplitly. However,
+            // the sliding-sync-sdk tests don't pass unless we add them.
+            addToState: true,
         });
         if (liveTimelineEvents.length > 0) {
             await room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
-                addToState: false,
+                addToState: true,
             });
         }
 
