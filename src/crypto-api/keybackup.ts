@@ -89,11 +89,27 @@ export interface KeyBackupRoomSessions {
     [sessionId: string]: KeyBackupSession;
 }
 
+/**
+ * Extra parameters for {@link CryptoApi.restoreKeyBackup} and {@link CryptoApi.restoreKeyBackupWithPassphrase}.
+ */
 export interface KeyBackupRestoreOpts {
+    /**
+     * Reports ongoing progress of the import process.
+     * @param progress
+     */
     progressCallback?: (progress: ImportRoomKeyProgressData) => void;
 }
 
+/**
+ * The result of {@link CryptoApi.restoreKeyBackup}.
+ */
 export interface KeyBackupRestoreResult {
+    /**
+     * The total number of keys that were found in the backup.
+     */
     total: number;
+    /**
+     * The number of keys that were imported.
+     */
     imported: number;
 }
