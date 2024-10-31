@@ -7548,8 +7548,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 if ((<HTTPError>err).httpStatus === 403) {
                     // We got a 403, so there's no point in looping forever.
                     this.logger.info("TURN access unavailable for this account: stopping credentials checks");
-                    if (this.checkTurnServersIntervalID !== null)
+                    if (this.checkTurnServersIntervalID !== null) {
                         globalThis.clearInterval(this.checkTurnServersIntervalID);
+                    }
                     this.checkTurnServersIntervalID = undefined;
                     this.emit(ClientEvent.TurnServersError, <HTTPError>err, true); // fatal
                 } else {
