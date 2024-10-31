@@ -1323,10 +1323,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
-     *
-     * @param recoveryKey
-     * @param backupInfo
-     * @param opts
+     * Restore a key backup with the given key.
+     * @param recoveryKey - the key to use for decryption
+     * @param backupInfo - the backup info
+     * @param opts - additional options
      * @private
      */
     private async restoreKeyBackupWithKey(
