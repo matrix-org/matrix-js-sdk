@@ -5796,16 +5796,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public forget(roomId: string, deleteRoom = true): Promise<{}> {
-        const promise = this.membershipChange(roomId, undefined, "forget");
-        if (!deleteRoom) {
-            return promise;
-        }
-        return promise.then((response) => {
+    public async forget(roomId: string, deleteRoom = true): Promise<{}> {
+        // API returns an empty object
+        const path = utils.encodeUri("/rooms/$room_id/forget", {
+            $room_id: roomId,
+        });
+        const response = await this.http.authedRequest<{}>(Method.Post, path);
+        if (deleteRoom) {
             this.store.removeRoom(roomId);
             this.emit(ClientEvent.DeleteRoom, roomId);
-            return response;
-        });
+        }
+        return response;
     }
 
     /**
@@ -5846,7 +5847,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private membershipChange(
         roomId: string,
         userId: string | undefined,
-        membership: Membership | "forget",
+        membership: Membership,
         reason?: string,
     ): Promise<{}> {
         // API returns an empty object
