@@ -118,7 +118,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
-    // const newBackendOnly = backend === "libolm" ? test.skip : test;
+    const newBackendOnly = backend === "libolm" ? test.skip : test;
 
     const isNewBackend = backend === "rust-sdk";
 
@@ -611,6 +611,25 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                           check!.backupInfo!,
                       ),
             ).rejects.toThrow();
+        });
+
+        newBackendOnly("Should restore the backup from the secret storage", async () => {
+            // @ts-ignore - mock a private method for testing purpose
+            jest.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
+
+            const fullBackup = {
+                rooms: {
+                    [ROOM_ID]: {
+                        sessions: {
+                            [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
+                        },
+                    },
+                },
+            };
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+            const result = await aliceCrypto.restoreKeyBackup(undefined);
+            expect(result.imported).toStrictEqual(1);
         });
     });
 
