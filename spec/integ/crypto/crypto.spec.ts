@@ -91,7 +91,6 @@ import {
     OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
     createOlmSession,
@@ -106,6 +105,7 @@ import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
+import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -3138,11 +3138,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Import a new key that should be uploaded
                 const newKey = testData.MEGOLM_SESSION_DATA;
 
-                const awaitKeyUploaded = new Promise<IKeyBackup>((resolve) => {
+                const awaitKeyUploaded = new Promise<KeyBackup>((resolve) => {
                     fetchMock.put(
                         "path:/_matrix/client/v3/room_keys/keys",
                         (url, request) => {
-                            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
                             resolve(uploadPayload);
                             return {
                                 status: 200,

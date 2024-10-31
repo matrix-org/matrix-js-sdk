@@ -42,10 +42,10 @@ import {
 } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
-import { IKeyBackup } from "../../../src/crypto/backup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
 import { DecryptionFailureCode } from "../../../src/crypto-api";
+import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
 
@@ -91,7 +91,7 @@ function mockUploadEmitter(
                     },
                 };
             }
-            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
             let count = 0;
             for (const [roomId, value] of Object.entries(uploadPayload.rooms)) {
                 for (const sessionId of Object.keys(value.sessions)) {
