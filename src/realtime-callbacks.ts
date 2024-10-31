@@ -158,7 +158,7 @@ function runCallbacks(): void {
 
     for (const cb of callbacksToRun) {
         try {
-            cb.func.apply(global, cb.params);
+            cb.func.apply(globalThis, cb.params);
         } catch (e) {
             logger.error("Uncaught exception in callback function", e);
         }

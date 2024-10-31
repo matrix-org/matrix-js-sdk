@@ -206,13 +206,13 @@ describe("MegolmBackup", function () {
             // ideally we would use lolex, but we have no oportunity
             // to tick the clock between the first try and the retry.
             const realSetTimeout = globalThis.setTimeout;
-            jest.spyOn(global, "setTimeout").mockImplementation(function (f, n) {
+            jest.spyOn(globalThis, "setTimeout").mockImplementation(function (f, n) {
                 return realSetTimeout(f!, n! / 100);
             });
         });
 
         afterEach(function () {
-            jest.spyOn(global, "setTimeout").mockRestore();
+            jest.spyOn(globalThis, "setTimeout").mockRestore();
         });
 
         test("fail if crypto not enabled", async () => {

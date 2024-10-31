@@ -266,7 +266,7 @@ describe("MSC4108SignInWithQR", () => {
         });
 
         it("should abort if device doesn't come up by timeout", async () => {
-            jest.spyOn(global, "setTimeout").mockImplementation((fn) => {
+            jest.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
                 fn();
                 // TODO: mock timers properly
                 return -1 as any;
@@ -319,7 +319,7 @@ describe("MSC4108SignInWithQR", () => {
         });
 
         it("should not send secrets if user cancels", async () => {
-            jest.spyOn(global, "setTimeout").mockImplementation((fn) => {
+            jest.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
                 fn();
                 // TODO: mock timers properly
                 return -1 as any;

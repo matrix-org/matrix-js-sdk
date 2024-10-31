@@ -819,21 +819,21 @@ describe("rewriteDefaultRules", () => {
 
         // By the time we get here, we expect the PushProcessor to have merged the new .m.rule.is_room_mention rule into the existing list of rules.
         // Check that has happened, and that it is in the right place.
-        const containsDisplayNameRuleIdx = pushRules.globalThis.override?.findIndex(
+        const containsDisplayNameRuleIdx = pushRules.global.override?.findIndex(
             (rule) => rule.rule_id === RuleId.ContainsDisplayName,
         );
         expect(containsDisplayNameRuleIdx).toBeGreaterThan(-1);
-        const isRoomMentionRuleIdx = pushRules.globalThis.override?.findIndex(
+        const isRoomMentionRuleIdx = pushRules.global.override?.findIndex(
             (rule) => rule.rule_id === RuleId.IsRoomMention,
         );
         expect(isRoomMentionRuleIdx).toBeGreaterThan(-1);
-        const mReactionRuleIdx = pushRules.globalThis.override?.findIndex((rule) => rule.rule_id === ".m.rule.reaction");
+        const mReactionRuleIdx = pushRules.global.override?.findIndex((rule) => rule.rule_id === ".m.rule.reaction");
         expect(mReactionRuleIdx).toBeGreaterThan(-1);
 
         expect(containsDisplayNameRuleIdx).toBeLessThan(isRoomMentionRuleIdx!);
         expect(isRoomMentionRuleIdx).toBeLessThan(mReactionRuleIdx!);
 
-        expect(pushRules.globalThis.override?.map((r) => r.rule_id)).toEqual([
+        expect(pushRules.global.override?.map((r) => r.rule_id)).toEqual([
             ".m.rule.master",
             "coffee",
             ".m.rule.contains_display_name",
@@ -842,7 +842,7 @@ describe("rewriteDefaultRules", () => {
             ".m.rule.reaction",
             ".org.matrix.msc3786.rule.room.server_acl",
         ]);
-        expect(pushRules.globalThis.underride?.map((r) => r.rule_id)).toEqual([
+        expect(pushRules.global.underride?.map((r) => r.rule_id)).toEqual([
             "user-defined",
             ".org.matrix.msc3914.rule.room.call",
             // Assert that unknown default rules are maintained
@@ -993,7 +993,7 @@ describe("rewriteDefaultRules", () => {
             },
         });
 
-        expect(pushRules.globalThis.underride?.map((r) => r.rule_id)).toEqual([
+        expect(pushRules.global.underride?.map((r) => r.rule_id)).toEqual([
             ".m.rule.call",
             ".org.matrix.msc3914.rule.room.call",
             ".m.rule.room_one_to_one",

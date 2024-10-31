@@ -57,7 +57,7 @@ describe("MatrixError", () => {
 
     it("should retrieve Date Retry-After header from rate-limit error", () => {
         headers.set("Retry-After", `${new Date(160000).toUTCString()}`);
-        jest.spyOn(global.Date, "now").mockImplementationOnce(() => 100000);
+        jest.spyOn(globalThis.Date, "now").mockImplementationOnce(() => 100000);
         const err = makeMatrixError(429, { errcode: "M_LIMIT_EXCEEDED", retry_after_ms: 150000 });
         expect(err.isRateLimitError()).toBe(true);
         // prefer Retry-After header over retry_after_ms
