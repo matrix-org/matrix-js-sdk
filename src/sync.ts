@@ -1806,10 +1806,10 @@ export class SyncApi {
                 for (const ev of eitherStateEventList) {
                     this.client.getPushActionsForEvent(ev);
                 }
-                liveTimeline.initialiseState(eitherStateEventList, {
-                    timelineWasEmpty,
-                });
             }
+            liveTimeline.initialiseState(eitherStateEventList ?? [], {
+                timelineWasEmpty,
+            });
         }
 
         this.resolveInvites(room);
