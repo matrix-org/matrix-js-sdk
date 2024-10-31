@@ -130,7 +130,7 @@ function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
     opts.store =
         opts.store ??
         new MemoryStore({
-            localStorage: global.localStorage,
+            localStorage: globalThis.localStorage,
         });
     opts.scheduler = opts.scheduler ?? new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();

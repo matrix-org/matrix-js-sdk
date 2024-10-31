@@ -53,11 +53,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
         this.abortController = new AbortController();
     }
 
-    public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+    public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
         if (this.opts.fetchFn) {
             return this.opts.fetchFn(resource, options);
         }
-        return global.fetch(resource, options);
+        return globalThis.fetch(resource, options);
     }
 
     /**
