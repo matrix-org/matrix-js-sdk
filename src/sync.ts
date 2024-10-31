@@ -384,7 +384,7 @@ export class SyncApi {
                 // events so that clients can start back-paginating.
                 room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
 
-                await this.injectRoomEvents(room, stateEvents, events);
+                await this.injectRoomEvents(room, undefined, stateEvents, events);
 
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -1491,7 +1491,7 @@ export class SyncApi {
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            await this.injectRoomEvents(room, stateEvents, events);
+            await this.injectRoomEvents(room, undefined, stateEvents, events);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();
@@ -1769,7 +1769,7 @@ export class SyncApi {
      * is earlier in time. Higher index is later.
      * @param fromCache - whether the sync response came from cache
      *
-     * Exactly one of stateEventList and stateAfterEventList must be supplied. If
+     * No more than one of stateEventList and stateAfterEventList must be supplied. If
      * stateEventList is supplied, the events in timelineEventList are added to the state
      * after stateEventList. If stateAfterEventList is supplied, the events in timelineEventList
      * are not added to the state.
@@ -1782,9 +1782,9 @@ export class SyncApi {
         fromCache = false,
     ): Promise<void> {
         const eitherStateEventList = stateAfterEventList ?? stateEventList;
-        if (eitherStateEventList === undefined || (stateEventList && stateAfterEventList)) {
+        if (stateEventList && stateAfterEventList) {
             throw new Error(
-                "injectRoomEvents: Exactly one of stateEventList or stateAfterEventList must be non-undefined",
+                "injectRoomEvents: At least one of stateEventList or stateAfterEventList must be undefined",
             );
         }
 
@@ -1802,12 +1802,14 @@ export class SyncApi {
             // find some solution where MatrixEvents are immutable but allow for a cache
             // field.
 
-            for (const ev of eitherStateEventList) {
-                this.client.getPushActionsForEvent(ev);
+            if (eitherStateEventList) {
+                for (const ev of eitherStateEventList) {
+                    this.client.getPushActionsForEvent(ev);
+                }
+                liveTimeline.initialiseState(eitherStateEventList, {
+                    timelineWasEmpty,
+                });
             }
-            liveTimeline.initialiseState(eitherStateEventList, {
-                timelineWasEmpty,
-            });
         }
 
         this.resolveInvites(room);
@@ -1833,7 +1835,7 @@ export class SyncApi {
         // very wrong because there could be events in the timeline that diverge the
         // state, in which case this is going to leave things out of sync. However,
         // for now I think it;s best to behave the same as the code has done previously.
-        if (!timelineWasEmpty) {
+        if (!timelineWasEmpty && eitherStateEventList) {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...
@@ -1841,8 +1843,8 @@ export class SyncApi {
             room.currentState.setStateEvents(eitherStateEventList);
         }
 
-        // Execute the timeline events. This will continue to diverge the current state
-        // if the timeline has any state events in it.
+        // Execute the timeline events. If addToState is true the timeline has any state
+        // events in it, this will continue to diverge the current state.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         await room.addLiveEvents(timelineEventList || [], {
