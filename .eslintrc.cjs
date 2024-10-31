@@ -65,8 +65,8 @@ module.exports = {
             },
             {
                 name: "global",
-                message: "Use globalThis instead."
-            }
+                message: "Use globalThis instead.",
+            },
         ],
 
         "import/no-restricted-paths": [
