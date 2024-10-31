@@ -599,9 +599,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Restore a key backup.
-     * @param backupInfoVersion
-     * @param backupDecryptor
-     * @param opts
+     * @param backupInfoVersion - The version of the backup info.
+     * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
+     * @param opts - Options for the restore.
+     * @returns The total number of keys and the total imported.
      */
     public async restoreKeyBackup(
         backupInfoVersion: string,
@@ -644,7 +645,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
      * @param opts - Options for the import.
      *
-     * @return The total number of keys and the total imported.
+     * @returns The total number of keys and the total imported.
      *
      * @private
      */
