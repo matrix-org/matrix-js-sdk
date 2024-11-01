@@ -183,7 +183,7 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     "set_presence"?: SetPresence;
     "_cacheBuster"?: string | number; // not part of the API itself
-    "io.element.sync_v2_state_after"?: boolean;
+    "org.matrix.use_state_after"?: boolean;
 }
 
 type WrappedRoom<T> = T & {
@@ -1003,7 +1003,7 @@ export class SyncApi {
             qps.timeout = 0;
         }
 
-        qps["io.element.sync_v2_state_after"] = true;
+        qps["org.matrix.use_state_after"] = true;
 
         return qps;
     }
