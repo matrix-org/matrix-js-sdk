@@ -775,7 +775,6 @@ export class SlidingSyncSdk {
         }
 
         timelineEventList = timelineEventList || [];
-        stateEventList = stateEventList || [];
         numLive = numLive || 0;
 
         // If there are no events in the timeline yet, initialise it with
