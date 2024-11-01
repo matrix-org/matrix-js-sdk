@@ -34,7 +34,7 @@ import { randomString, secureRandomBase64Url } from "../randomstring.ts";
 import { EncryptionKeysEventContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
+import { HTTPError, MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
@@ -1031,7 +1031,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 const prepareDelayedDisconnection = async (): Promise<void> => {
                     try {
                         // TODO: If delayed event times out, re-join!
-                        const res = await this.client._unstable_sendDelayedStateEvent(
+                        const res = await resendIfRateLimited(() => this.client._unstable_sendDelayedStateEvent(
                             this.room.roomId,
                             {
                                 delay: 8000,
@@ -1039,10 +1039,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                             EventType.GroupCallMemberPrefix,
                             {}, // leave event
                             stateKey,
-                        );
+                        ));
                         this.disconnectDelayId = res.delay_id;
                     } catch (e) {
-                        // TODO: Retry if rate-limited
                         logger.error("Failed to prepare delayed disconnection event:", e);
                     }
                 };
@@ -1058,12 +1057,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 // TODO: Remove this once MSC4140 is stable & doesn't cancel own delayed state
                 if (this.disconnectDelayId !== undefined) {
                     try {
-                        await this.client._unstable_updateDelayedEvent(
-                            this.disconnectDelayId,
+                        const knownDisconnectDelayId = this.disconnectDelayId;
+                        await resendIfRateLimited(() => this.client._unstable_updateDelayedEvent(
+                            knownDisconnectDelayId,
                             UpdateDelayedEventAction.Restart,
-                        );
+                        ));
                     } catch (e) {
-                        // TODO: Make embedded client include errcode, and retry only if not M_NOT_FOUND (or rate-limited)
                         logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
                         this.disconnectDelayId = undefined;
                         await prepareDelayedDisconnection();
@@ -1076,13 +1075,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 let sentDelayedDisconnect = false;
                 if (this.disconnectDelayId !== undefined) {
                     try {
-                        await this.client._unstable_updateDelayedEvent(
-                            this.disconnectDelayId,
+                        const knownDisconnectDelayId = this.disconnectDelayId;
+                        await resendIfRateLimited(() => this.client._unstable_updateDelayedEvent(
+                            knownDisconnectDelayId,
                             UpdateDelayedEventAction.Send,
-                        );
+                        ));
                         sentDelayedDisconnect = true;
                     } catch (e) {
-                        // TODO: Retry if rate-limited
                         logger.error("Failed to send our delayed disconnection event:", e);
                     }
                     this.disconnectDelayId = undefined;
@@ -1111,10 +1110,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private readonly delayDisconnection = async (): Promise<void> => {
         try {
-            await this.client._unstable_updateDelayedEvent(this.disconnectDelayId!, UpdateDelayedEventAction.Restart);
+            const knownDisconnectDelayId = this.disconnectDelayId!;
+            await resendIfRateLimited(() => this.client._unstable_updateDelayedEvent(knownDisconnectDelayId, UpdateDelayedEventAction.Restart));
             this.scheduleDelayDisconnection();
         } catch (e) {
-            // TODO: Retry if rate-limited
             logger.error("Failed to delay our disconnection event:", e);
         }
     };
@@ -1160,5 +1159,29 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
         this.sendEncryptionKeysEvent(newKeyIndex);
+    };
+}
+
+async function resendIfRateLimited<T>(func: () => Promise<T>, numRetriesAllowed: number = 1): Promise<T> {
+    while (true) {
+        try {
+            return await func();
+        } catch (e) {
+            if (numRetriesAllowed > 0 && e instanceof HTTPError && e.isRateLimitError()) {
+                numRetriesAllowed--;
+                let resendDelay: number;
+                const defaultMs = 5000;
+                try {
+                    resendDelay = e.getRetryAfterMs() ?? defaultMs;
+                    logger.info(`Rate limited by server, retrying in ${resendDelay}ms`);
+                } catch (e) {
+                    logger.warn(`Error while retrieving a rate-limit retry delay, retrying after default delay of ${defaultMs}`, e);
+                    resendDelay = defaultMs;
+                }
+                await sleep(resendDelay);
+            } else {
+                throw e;
+            }
+        }
     };
 }
