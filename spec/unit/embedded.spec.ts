@@ -90,7 +90,11 @@ class MockWidgetApi extends EventEmitter {
     public getTurnServers = jest.fn(() => []);
     public sendContentLoaded = jest.fn();
 
-    public transport = { reply: jest.fn() };
+    public transport = {
+        reply: jest.fn(),
+        send: jest.fn(),
+        sendComplete: jest.fn(),
+    };
 }
 
 declare module "../../src/types" {
