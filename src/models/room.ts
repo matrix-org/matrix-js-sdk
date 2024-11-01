@@ -2858,22 +2858,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    /**
-     * Add some events to this room. This can include state events, message
-     * events and typing notifications. These events are treated as "live" so
-     * they will go to the end of the timeline.
-     *
-     * @param events - A list of events to add.
-     * @param addLiveEventOptions - addLiveEvent options
-     * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
-     */
-    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void> {
-        const { duplicateStrategy, fromCache, timelineWasEmpty = false } = addLiveEventOptions ?? {};
-        if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
-            throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
-        }
-
-        // sanity check that the live timeline is still live
+    private assertTimelineSetsAreLive(): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
             const liveTimeline = this.timelineSets[i].getLiveTimeline();
             if (liveTimeline.getPaginationToken(EventTimeline.FORWARDS)) {
@@ -2890,6 +2875,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 throw new Error(`live timeline ${i} is no longer live - it has a neighbouring timeline`);
             }
         }
+    }
+
+    /**
+     * Add some events to this room. This can include state events, message
+     * events and typing notifications. These events are treated as "live" so
+     * they will go to the end of the timeline.
+     *
+     * @param events - A list of events to add.
+     * @param addLiveEventOptions - addLiveEvent options
+     * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
+     */
+    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void> {
+        const { duplicateStrategy, fromCache, timelineWasEmpty = false } = addLiveEventOptions ?? {};
+        if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
+            throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
+        }
+
+        // sanity check that the live timeline is still live
+        this.assertTimelineSetsAreLive();
 
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
@@ -2916,11 +2920,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
             }
 
-            let { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
-                event,
-                neighbouringEvents,
-                threadRoots,
-            );
+            let {
+                shouldLiveInRoom,
+                shouldLiveInThread,
+                threadId = "",
+            } = this.eventShouldLiveIn(event, neighbouringEvents, threadRoots);
 
             if (!shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
                 try {
@@ -2935,20 +2939,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         event.setUnsigned(unsigned);
                     }
 
-                    ({ shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
-                        event,
-                        neighbouringEvents,
-                        threadRoots,
-                    ));
+                    ({
+                        shouldLiveInRoom,
+                        shouldLiveInThread,
+                        threadId = "",
+                    } = this.eventShouldLiveIn(event, neighbouringEvents, threadRoots));
                 } catch (e) {
                     logger.error("Failed to load parent event of unhandled relation", e);
                 }
             }
 
-            if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
-                eventsByThread[threadId ?? ""] = [];
+            if (shouldLiveInThread && !eventsByThread[threadId]) {
+                eventsByThread[threadId] = [];
             }
-            eventsByThread[threadId ?? ""]?.push(event);
+            eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(event, options);
