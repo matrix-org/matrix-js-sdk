@@ -652,21 +652,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        { toStartOfTimeline, fromCache, roomState, timelineWasEmpty }: IAddEventToTimelineOptions,
-    ): void;
-    public addEventToTimeline(
-        event: MatrixEvent,
-        timeline: EventTimeline,
-        opts: IAddEventToTimelineOptions,
-        fromCache = false,
-        roomState?: RoomState,
+        { toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty, addToState }: IAddEventToTimelineOptions,
     ): void {
-        let toStartOfTimeline = false;
-        let timelineWasEmpty: boolean | undefined;
-        let addToState = true;
-
-        ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty, addToState } = opts);
-
         if (timeline.getTimelineSet() !== this) {
             throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " +
                 "in timelineSet(threadId=${this.thread?.id})`);
