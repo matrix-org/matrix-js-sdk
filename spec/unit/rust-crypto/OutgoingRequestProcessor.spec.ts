@@ -61,7 +61,7 @@ describe("OutgoingRequestProcessor", () => {
         const httpApi = new MatrixHttpApi(dummyEventEmitter, {
             baseUrl: "https://example.com",
             prefix: "/_matrix",
-            fetchFn: httpBackend.fetchFn as typeof global.fetch,
+            fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
             onlyData: true,
         });
 

@@ -560,7 +560,7 @@ export const CRYPTO_BACKENDS: Record<string, InitCrypto> = {};
 export type InitCrypto = (_: MatrixClient) => Promise<void>;
 
 CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
-if (global.Olm) {
+if (globalThis.Olm) {
     CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
 }
 

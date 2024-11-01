@@ -68,7 +68,7 @@ export class DehydrationManager {
                         this.deviceDisplayName = deviceDisplayName;
                         const now = Date.now();
                         const delay = Math.max(1, time + oneweek - now);
-                        this.timeoutId = global.setTimeout(this.dehydrateDevice.bind(this), delay);
+                        this.timeoutId = globalThis.setTimeout(this.dehydrateDevice.bind(this), delay);
                     }
                 },
                 "dehydration",
@@ -97,7 +97,7 @@ export class DehydrationManager {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
             if (this.timeoutId) {
-                global.clearTimeout(this.timeoutId);
+                globalThis.clearTimeout(this.timeoutId);
                 this.timeoutId = undefined;
             }
             // clear storage
@@ -135,7 +135,7 @@ export class DehydrationManager {
         }
         this.inProgress = true;
         if (this.timeoutId) {
-            global.clearTimeout(this.timeoutId);
+            globalThis.clearTimeout(this.timeoutId);
             this.timeoutId = undefined;
         }
         try {
@@ -155,7 +155,7 @@ export class DehydrationManager {
 
             logger.log("Creating account");
             // create the account and all the necessary keys
-            const account = new global.Olm.Account();
+            const account = new globalThis.Olm.Account();
             account.create();
             const e2eKeys = JSON.parse(account.identity_keys());
 
@@ -255,7 +255,7 @@ export class DehydrationManager {
             logger.log("Done dehydrating");
 
             // dehydrate again in a week
-            this.timeoutId = global.setTimeout(this.dehydrateDevice.bind(this), oneweek);
+            this.timeoutId = globalThis.setTimeout(this.dehydrateDevice.bind(this), oneweek);
 
             return deviceId;
         } finally {
@@ -265,7 +265,7 @@ export class DehydrationManager {
 
     public stop(): void {
         if (this.timeoutId) {
-            global.clearTimeout(this.timeoutId);
+            globalThis.clearTimeout(this.timeoutId);
             this.timeoutId = undefined;
         }
     }

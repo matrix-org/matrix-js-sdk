@@ -20,7 +20,7 @@ import { IndexedDBCryptoStore, LocalStorageCryptoStore, MemoryCryptoStore } from
 import { CryptoStore, MigrationState, SESSION_BATCH_SIZE } from "../../../../src/crypto/store/base";
 
 describe.each([
-    ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
+    ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(globalThis.indexedDB, "tests")],
     ["LocalStorageCryptoStore", () => new LocalStorageCryptoStore(localStorage)],
     ["MemoryCryptoStore", () => new MemoryCryptoStore()],
 ])("CryptoStore tests for %s", function (name, dbFactory) {

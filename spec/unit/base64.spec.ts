@@ -29,8 +29,8 @@ describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
             // eslint-disable-next-line no-global-assign
             Buffer = undefined;
 
-            global.atob = NodeBuffer.atob;
-            global.btoa = NodeBuffer.btoa;
+            globalThis.atob = NodeBuffer.atob;
+            globalThis.btoa = NodeBuffer.btoa;
         }
     });
 
@@ -38,9 +38,9 @@ describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
         // eslint-disable-next-line no-global-assign
         Buffer = origBuffer;
         // @ts-ignore
-        global.atob = undefined;
+        globalThis.atob = undefined;
         // @ts-ignore
-        global.btoa = undefined;
+        globalThis.btoa = undefined;
     });
 
     it("Should decode properly encoded data", () => {
