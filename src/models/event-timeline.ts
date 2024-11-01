@@ -36,8 +36,9 @@ export interface IAddEventOptions extends Pick<IMarkerFoundOptions, "timelineWas
     /** The state events to reconcile metadata from */
     roomState?: RoomState;
     /** Whether to add timeline events to the state as was done in legacy sync v2.
+     * If true then timeline events will be added to the state.
      * In sync v2 with org.matrix.use_state_after and simplified sliding sync,
-     * all state arrives explicitly and timeline events shoyuld not be added.  */
+     * all state arrives explicitly and timeline events should not be added. */
     addToState: boolean;
 }
 
