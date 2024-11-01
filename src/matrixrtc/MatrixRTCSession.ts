@@ -1031,15 +1031,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 const prepareDelayedDisconnection = async (): Promise<void> => {
                     try {
                         // TODO: If delayed event times out, re-join!
-                        const res = await resendIfRateLimited(() => this.client._unstable_sendDelayedStateEvent(
-                            this.room.roomId,
-                            {
-                                delay: 8000,
-                            },
-                            EventType.GroupCallMemberPrefix,
-                            {}, // leave event
-                            stateKey,
-                        ));
+                        const res = await resendIfRateLimited(() =>
+                            this.client._unstable_sendDelayedStateEvent(
+                                this.room.roomId,
+                                {
+                                    delay: 8000,
+                                },
+                                EventType.GroupCallMemberPrefix,
+                                {}, // leave event
+                                stateKey,
+                            ),
+                        );
                         this.disconnectDelayId = res.delay_id;
                     } catch (e) {
                         logger.error("Failed to prepare delayed disconnection event:", e);
@@ -1058,10 +1060,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 if (this.disconnectDelayId !== undefined) {
                     try {
                         const knownDisconnectDelayId = this.disconnectDelayId;
-                        await resendIfRateLimited(() => this.client._unstable_updateDelayedEvent(
-                            knownDisconnectDelayId,
-                            UpdateDelayedEventAction.Restart,
-                        ));
+                        await resendIfRateLimited(() =>
+                            this.client._unstable_updateDelayedEvent(
+                                knownDisconnectDelayId,
+                                UpdateDelayedEventAction.Restart,
+                            ),
+                        );
                     } catch (e) {
                         logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
                         this.disconnectDelayId = undefined;
@@ -1076,10 +1080,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 if (this.disconnectDelayId !== undefined) {
                     try {
                         const knownDisconnectDelayId = this.disconnectDelayId;
-                        await resendIfRateLimited(() => this.client._unstable_updateDelayedEvent(
-                            knownDisconnectDelayId,
-                            UpdateDelayedEventAction.Send,
-                        ));
+                        await resendIfRateLimited(() =>
+                            this.client._unstable_updateDelayedEvent(
+                                knownDisconnectDelayId,
+                                UpdateDelayedEventAction.Send,
+                            ),
+                        );
                         sentDelayedDisconnect = true;
                     } catch (e) {
                         logger.error("Failed to send our delayed disconnection event:", e);
@@ -1111,7 +1117,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private readonly delayDisconnection = async (): Promise<void> => {
         try {
             const knownDisconnectDelayId = this.disconnectDelayId!;
-            await resendIfRateLimited(() => this.client._unstable_updateDelayedEvent(knownDisconnectDelayId, UpdateDelayedEventAction.Restart));
+            await resendIfRateLimited(() =>
+                this.client._unstable_updateDelayedEvent(knownDisconnectDelayId, UpdateDelayedEventAction.Restart),
+            );
             this.scheduleDelayDisconnection();
         } catch (e) {
             logger.error("Failed to delay our disconnection event:", e);
@@ -1163,6 +1171,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 }
 
 async function resendIfRateLimited<T>(func: () => Promise<T>, numRetriesAllowed: number = 1): Promise<T> {
+    // eslint-disable-next-line no-constant-condition
     while (true) {
         try {
             return await func();
@@ -1175,7 +1184,10 @@ async function resendIfRateLimited<T>(func: () => Promise<T>, numRetriesAllowed:
                     resendDelay = e.getRetryAfterMs() ?? defaultMs;
                     logger.info(`Rate limited by server, retrying in ${resendDelay}ms`);
                 } catch (e) {
-                    logger.warn(`Error while retrieving a rate-limit retry delay, retrying after default delay of ${defaultMs}`, e);
+                    logger.warn(
+                        `Error while retrieving a rate-limit retry delay, retrying after default delay of ${defaultMs}`,
+                        e,
+                    );
                     resendDelay = defaultMs;
                 }
                 await sleep(resendDelay);
@@ -1183,5 +1195,5 @@ async function resendIfRateLimited<T>(func: () => Promise<T>, numRetriesAllowed:
                 throw e;
             }
         }
-    };
+    }
 }
