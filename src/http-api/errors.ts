@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
+
 import { IUsageLimit } from "../@types/partials.ts";
 import { MatrixEvent } from "../models/event.ts";
 
@@ -130,6 +132,42 @@ export class MatrixError extends HTTPError {
             return this.data.retry_after_ms;
         }
         return null;
+    }
+
+    /**
+     * @returns this error expressed as a {@link IWidgetMatrixError}
+     * for use by Widget API error responses.
+     */
+    public asWidgetApiErrorData(): IWidgetMatrixError {
+        const headers: Record<string, string> = {};
+        if (this.httpHeaders) {
+            for (const [name, value] of this.httpHeaders) {
+                headers[name] = value;
+            }
+        }
+        return {
+            http_status: this.httpStatus ?? 400,
+            http_headers: headers,
+            url: this.url ?? "",
+            response: {
+                errcode: this.errcode ?? "M_UNKNOWN",
+                error: this.name,
+                ...this.data,
+            },
+        };
+    }
+
+    public static fromWidgetApiErrorData(data: IWidgetMatrixError): MatrixError {
+        return new MatrixError(
+            {
+                errcode: data.response.errcode,
+                error: data.response.error,
+            },
+            data.http_status,
+            data.url,
+            undefined,
+            new Headers(data.http_headers),
+        );
     }
 }
 
