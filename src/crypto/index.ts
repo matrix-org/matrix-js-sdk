@@ -4314,10 +4314,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Stub function -- restoreKeyBackup is not implemented here, so throw error
      */
-    public restoreKeyBackup(
-        recoveryKey: string | undefined,
-        opts: KeyBackupRestoreOpts,
-    ): Promise<KeyBackupRestoreResult> {
+    public restoreKeyBackup(opts: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
     }
 
@@ -4328,6 +4325,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         phassphrase: string,
         opts: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- getSecretStorageBackupPrivateKey is not implemented here, so throw error
+     */
+    public getSecretStorageBackupPrivateKey(): Promise<Uint8Array | null> {
         throw new Error("Not implemented");
     }
 }

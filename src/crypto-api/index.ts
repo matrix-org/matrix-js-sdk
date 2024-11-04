@@ -471,6 +471,15 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * Fetch the backup decryption key we have saved in our secret storage.
+     *
+     * This can be used for gossiping the key to other devices.
+     *
+     * @returns the key, if any, or null
+     */
+    getSecretStorageBackupPrivateKey(): Promise<Uint8Array | null>;
+
+    /**
      * Fetch the backup decryption key we have saved in our store.
      *
      * This can be used for gossiping the key to other devices.
@@ -546,14 +555,12 @@ export interface CryptoApi {
     deleteKeyBackupVersion(version: string): Promise<void>;
 
     /**
-     * Restores a key backup.
-     * If the recovery key is not provided, it will try to restore the key backup using the recovery key stored
-     * in the local cache or in the Secret Storage.
+     * Download the last key backup from the homeserver (endpoint GET /room_keys/keys/).
+     * The key backup is decrypted and imported by using the decryption key stored locally. The decryption key should be stored locally by using {@link CryptoApi#storeSessionBackupPrivateKey}.
      *
-     * @param recoveryKey - The recovery key to use to restore the key backup.
      * @param opts
      */
-    restoreKeyBackup(recoveryKey: string | undefined, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
+    restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     /**
      * Restores a key backup using a passphrase.
