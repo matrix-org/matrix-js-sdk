@@ -167,7 +167,7 @@ export class OlmDevice {
      * @returns The version of Olm.
      */
     public static getOlmVersion(): [number, number, number] {
-        return global.Olm.get_library_version();
+        return globalThis.Olm.get_library_version();
     }
 
     /**
@@ -186,7 +186,7 @@ export class OlmDevice {
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;
-        const account = new global.Olm.Account();
+        const account = new globalThis.Olm.Account();
 
         try {
             if (fromExportedDevice) {
@@ -268,7 +268,7 @@ export class OlmDevice {
      */
     private getAccount(txn: unknown, func: (account: Account) => void): void {
         this.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-            const account = new global.Olm.Account();
+            const account = new globalThis.Olm.Account();
             try {
                 account.unpickle(this.pickleKey, pickledAccount!);
                 func(account);
@@ -352,7 +352,7 @@ export class OlmDevice {
         sessionInfo: ISessionInfo,
         func: (unpickledSessionInfo: IUnpickledSessionInfo) => void,
     ): void {
-        const session = new global.Olm.Session();
+        const session = new globalThis.Olm.Session();
         try {
             session.unpickle(this.pickleKey, sessionInfo.session!);
             const unpickledSessInfo: IUnpickledSessionInfo = Object.assign({}, sessionInfo, { session });
@@ -390,7 +390,7 @@ export class OlmDevice {
      * @internal
      */
     private getUtility<T>(func: (utility: Utility) => T): T {
-        const utility = new global.Olm.Utility();
+        const utility = new globalThis.Olm.Utility();
         try {
             return func(utility);
         } finally {
@@ -517,7 +517,7 @@ export class OlmDevice {
             [IndexedDBCryptoStore.STORE_ACCOUNT, IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
-                    const session = new global.Olm.Session();
+                    const session = new globalThis.Olm.Session();
                     try {
                         session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
                         newSessionId = session.session_id();
@@ -567,7 +567,7 @@ export class OlmDevice {
             [IndexedDBCryptoStore.STORE_ACCOUNT, IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
-                    const session = new global.Olm.Session();
+                    const session = new globalThis.Olm.Session();
                     try {
                         session.create_inbound_from(account, theirDeviceIdentityKey, ciphertext);
                         account.remove_one_time_keys(session);
@@ -889,7 +889,7 @@ export class OlmDevice {
             throw new Error("Unknown outbound group session " + sessionId);
         }
 
-        const session = new global.Olm.OutboundGroupSession();
+        const session = new globalThis.Olm.OutboundGroupSession();
         try {
             session.unpickle(this.pickleKey, pickled);
             return func(session);
@@ -904,7 +904,7 @@ export class OlmDevice {
      * @returns sessionId for the outbound session.
      */
     public createOutboundGroupSession(): string {
-        const session = new global.Olm.OutboundGroupSession();
+        const session = new globalThis.Olm.OutboundGroupSession();
         try {
             session.create();
             this.saveOutboundGroupSession(session);
@@ -966,7 +966,7 @@ export class OlmDevice {
         sessionData: InboundGroupSessionData,
         func: (session: InboundGroupSession) => T,
     ): T {
-        const session = new global.Olm.InboundGroupSession();
+        const session = new globalThis.Olm.InboundGroupSession();
         try {
             session.unpickle(this.pickleKey, sessionData.session);
             return func(session);
@@ -1068,7 +1068,7 @@ export class OlmDevice {
                         existingSessionData: InboundGroupSessionData | null,
                     ) => {
                         // new session.
-                        const session = new global.Olm.InboundGroupSession();
+                        const session = new globalThis.Olm.InboundGroupSession();
                         try {
                             if (exportFormat) {
                                 session.import_session(sessionKey);

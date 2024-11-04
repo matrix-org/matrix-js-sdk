@@ -307,7 +307,7 @@ export interface ICreateClientOpts {
      * The function to invoke for HTTP requests.
      * Most supported environments have a global `fetch` registered to which this will fall back.
      */
-    fetchFn?: typeof global.fetch;
+    fetchFn?: typeof globalThis.fetch;
 
     userId?: string;
 
@@ -1581,11 +1581,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.callEventHandler = undefined;
         this.groupCallEventHandler = undefined;
 
-        global.clearInterval(this.checkTurnServersIntervalID);
+        globalThis.clearInterval(this.checkTurnServersIntervalID);
         this.checkTurnServersIntervalID = undefined;
 
         if (this.clientWellKnownIntervalID !== undefined) {
-            global.clearInterval(this.clientWellKnownIntervalID);
+            globalThis.clearInterval(this.clientWellKnownIntervalID);
         }
 
         this.toDeviceMessageQueue.stop();
@@ -1625,7 +1625,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        const account = new global.Olm.Account();
+        const account = new globalThis.Olm.Account();
         try {
             const deviceData = getDeviceResult.device_data;
             if (deviceData.algorithm !== DEHYDRATION_ALGORITHM) {
@@ -1781,7 +1781,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const deleteRustSdkStore = async (): Promise<void> => {
             let indexedDB: IDBFactory;
             try {
-                indexedDB = global.indexedDB;
+                indexedDB = globalThis.indexedDB;
                 if (!indexedDB) return; // No indexedDB support
             } catch {
                 // No indexedDB support
@@ -1799,7 +1799,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         resolve(0);
                     };
                     req.onerror = (e): void => {
-                        // In private browsing, Firefox has a global.indexedDB, but attempts to delete an indexeddb
+                        // In private browsing, Firefox has a globalThis.indexedDB, but attempts to delete an indexeddb
                         // (even a non-existent one) fail with "DOMException: A mutation operation was attempted on a
                         // database that did not allow mutations."
                         //
@@ -7563,7 +7563,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 if ((<HTTPError>err).httpStatus === 403) {
                     // We got a 403, so there's no point in looping forever.
                     this.logger.info("TURN access unavailable for this account: stopping credentials checks");
-                    if (this.checkTurnServersIntervalID !== null) global.clearInterval(this.checkTurnServersIntervalID);
+                    if (this.checkTurnServersIntervalID !== null) {
+                        globalThis.clearInterval(this.checkTurnServersIntervalID);
+                    }
                     this.checkTurnServersIntervalID = undefined;
                     this.emit(ClientEvent.TurnServersError, <HTTPError>err, true); // fatal
                 } else {

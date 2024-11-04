@@ -67,7 +67,7 @@ function getSyncResponse(roomMembers: string[]) {
 }
 
 describe("DeviceList management:", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("not running deviceList tests: Olm not present");
         return;
     }

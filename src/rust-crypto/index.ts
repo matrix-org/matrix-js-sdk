@@ -20,7 +20,6 @@ import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { RustCrypto } from "./rust-crypto.ts";
 import { IHttpOpts, MatrixHttpApi } from "../http-api/index.ts";
 import { ServerSideSecretStorage } from "../secret-storage.ts";
-import { ICryptoCallbacks } from "../crypto/index.ts";
 import { Logger } from "../logger.ts";
 import { CryptoStore, MigrationState } from "../crypto/store/base.ts";
 import {
@@ -28,6 +27,7 @@ import {
     migrateLegacyLocalTrustIfNeeded,
     migrateRoomSettingsFromLegacyCrypto,
 } from "./libolm_migration.ts";
+import { CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -55,7 +55,7 @@ export async function initRustCrypto(args: {
     secretStorage: ServerSideSecretStorage;
 
     /** Crypto callbacks provided by the application. */
-    cryptoCallbacks: ICryptoCallbacks;
+    cryptoCallbacks: CryptoCallbacks;
 
     /**
      * The prefix to use on the indexeddbs created by rust-crypto.
@@ -145,7 +145,7 @@ async function initOlmMachine(
     userId: string,
     deviceId: string,
     secretStorage: ServerSideSecretStorage,
-    cryptoCallbacks: ICryptoCallbacks,
+    cryptoCallbacks: CryptoCallbacks,
     storeHandle: StoreHandle,
     legacyCryptoStore?: CryptoStore,
 ): Promise<RustCrypto> {

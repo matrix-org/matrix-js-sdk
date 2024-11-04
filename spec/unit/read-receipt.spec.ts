@@ -54,7 +54,7 @@ describe("Read receipt", () => {
             userId: "@user:server",
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            fetchFn: httpBackend.fetchFn as typeof global.fetch,
+            fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
         });
         client.isGuest = () => false;
         client.supportsThreads = () => true;

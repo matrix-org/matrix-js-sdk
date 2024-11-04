@@ -22,12 +22,12 @@ import { AutoDiscovery } from "../../src/autodiscovery";
 
 // keep to reset the fetch function after using MockHttpBackend
 // @ts-ignore private property
-const realAutoDiscoveryFetch: typeof global.fetch = AutoDiscovery.fetchFn;
+const realAutoDiscoveryFetch: typeof globalThis.fetch = AutoDiscovery.fetchFn;
 
 describe("AutoDiscovery", function () {
     const getHttpBackend = (): MockHttpBackend => {
         const httpBackend = new MockHttpBackend();
-        AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof global.fetch);
+        AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof globalThis.fetch);
         return httpBackend;
     };
 

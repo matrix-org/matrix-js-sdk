@@ -63,6 +63,10 @@ module.exports = {
                 name: "setImmediate",
                 message: "Use setTimeout instead.",
             },
+            {
+                name: "global",
+                message: "Use globalThis instead.",
+            },
         ],
 
         "import/no-restricted-paths": [

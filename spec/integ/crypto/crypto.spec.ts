@@ -91,7 +91,6 @@ import {
     OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
     createOlmSession,
@@ -106,6 +105,7 @@ import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
+import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -136,7 +136,7 @@ async function expectSendRoomKey(
     recipientOlmAccount: Olm.Account,
     recipientOlmSession: Olm.Session | null = null,
 ): Promise<Olm.InboundGroupSession> {
-    const Olm = global.Olm;
+    const Olm = globalThis.Olm;
     const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
 
     function onSendRoomKey(content: any): Olm.InboundGroupSession {
@@ -219,7 +219,7 @@ async function expectSendMegolmMessage(
 }
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, initCrypto: InitCrypto) => {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
         return;
@@ -230,7 +230,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
     const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
-    const Olm = global.Olm;
+    const Olm = globalThis.Olm;
 
     let testOlmAccount = {} as unknown as Olm.Account;
     let testSenderKey = "";
@@ -1897,13 +1897,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
-        const p2pSession = new global.Olm.Session();
+        const p2pSession = new globalThis.Olm.Session();
         await beccaTestClient.client.crypto!.cryptoStore.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-                    const account = new global.Olm.Account();
+                    const account = new globalThis.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
@@ -2045,13 +2045,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
-        const p2pSession = new global.Olm.Session();
+        const p2pSession = new globalThis.Olm.Session();
         await beccaTestClient.client.crypto!.cryptoStore.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-                    const account = new global.Olm.Account();
+                    const account = new globalThis.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
@@ -3138,11 +3138,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Import a new key that should be uploaded
                 const newKey = testData.MEGOLM_SESSION_DATA;
 
-                const awaitKeyUploaded = new Promise<IKeyBackup>((resolve) => {
+                const awaitKeyUploaded = new Promise<KeyBackup>((resolve) => {
                     fetchMock.put(
                         "path:/_matrix/client/v3/room_keys/keys",
                         (url, request) => {
-                            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
                             resolve(uploadPayload);
                             return {
                                 status: 200,

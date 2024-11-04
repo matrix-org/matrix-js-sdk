@@ -27,21 +27,21 @@ describe("IndexedDBCryptoStore", () => {
 
         it("Should be true if there is a legacy database", async () => {
             // should detect a store that is not migrated
-            const store = new IndexedDBCryptoStore(global.indexedDB, "tests");
+            const store = new IndexedDBCryptoStore(globalThis.indexedDB, "tests");
             await store.startup();
 
-            const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(global.indexedDB, "tests");
+            const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(globalThis.indexedDB, "tests");
 
             expect(result).toBe(true);
         });
 
         it("Should be true if there is a legacy database in non migrated state", async () => {
             // should detect a store that is not migrated
-            const store = new IndexedDBCryptoStore(global.indexedDB, "tests");
+            const store = new IndexedDBCryptoStore(globalThis.indexedDB, "tests");
             await store.startup();
             await store.setMigrationState(MigrationState.NOT_STARTED);
 
-            const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(global.indexedDB, "tests");
+            const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(globalThis.indexedDB, "tests");
 
             expect(result).toBe(true);
         });
@@ -54,18 +54,18 @@ describe("IndexedDBCryptoStore", () => {
         ])("Exists and Migration state is %s", (migrationState) => {
             it("Should be false if migration has started", async () => {
                 // should detect a store that is not migrated
-                const store = new IndexedDBCryptoStore(global.indexedDB, "tests");
+                const store = new IndexedDBCryptoStore(globalThis.indexedDB, "tests");
                 await store.startup();
                 await store.setMigrationState(migrationState);
 
-                const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(global.indexedDB, "tests");
+                const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(globalThis.indexedDB, "tests");
 
                 expect(result).toBe(false);
             });
         });
 
         it("Should be false if there is no legacy database", async () => {
-            const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(global.indexedDB, "tests");
+            const result = await IndexedDBCryptoStore.existsAndIsNotMigrated(globalThis.indexedDB, "tests");
 
             expect(result).toBe(false);
         });

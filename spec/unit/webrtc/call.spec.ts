@@ -119,9 +119,9 @@ describe("Call", function () {
     const errorListener = () => {};
 
     beforeEach(function () {
-        prevNavigator = global.navigator;
-        prevDocument = global.document;
-        prevWindow = global.window;
+        prevNavigator = globalThis.navigator;
+        prevDocument = globalThis.document;
+        prevWindow = globalThis.window;
 
         installWebRTCMocks();
 
@@ -159,9 +159,9 @@ describe("Call", function () {
         call.hangup(CallErrorCode.UserHangup, true);
 
         client.stop();
-        global.navigator = prevNavigator;
-        global.window = prevWindow;
-        global.document = prevDocument;
+        globalThis.navigator = prevNavigator;
+        globalThis.window = prevWindow;
+        globalThis.document = prevDocument;
 
         jest.useRealTimers();
     });
@@ -788,17 +788,17 @@ describe("Call", function () {
         });
 
         it("should return false if window or document are undefined", () => {
-            global.window = undefined!;
+            globalThis.window = undefined!;
             expect(supportsMatrixCall()).toBe(false);
-            global.window = prevWindow;
-            global.document = undefined!;
+            globalThis.window = prevWindow;
+            globalThis.document = undefined!;
             expect(supportsMatrixCall()).toBe(false);
         });
 
         it("should return false if RTCPeerConnection throws", () => {
             // @ts-ignore - writing to window as we are simulating browser edge-cases
-            global.window = {};
-            Object.defineProperty(global.window, "RTCPeerConnection", {
+            globalThis.window = {};
+            Object.defineProperty(globalThis.window, "RTCPeerConnection", {
                 get: () => {
                     throw Error("Secure mode, naaah!");
                 },
@@ -810,11 +810,11 @@ describe("Call", function () {
             "should return false if RTCPeerConnection & RTCSessionDescription " +
                 "& RTCIceCandidate & mediaDevices are unavailable",
             () => {
-                global.window.RTCPeerConnection = undefined!;
-                global.window.RTCSessionDescription = undefined!;
-                global.window.RTCIceCandidate = undefined!;
+                globalThis.window.RTCPeerConnection = undefined!;
+                globalThis.window.RTCSessionDescription = undefined!;
+                globalThis.window.RTCIceCandidate = undefined!;
                 // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
-                global.navigator.mediaDevices = undefined;
+                globalThis.navigator.mediaDevices = undefined;
                 expect(supportsMatrixCall()).toBe(false);
             },
         );
@@ -1305,7 +1305,7 @@ describe("Call", function () {
         });
 
         it("removes RTX codec from screen sharing transcievers", async () => {
-            mocked(global.RTCRtpSender.getCapabilities).mockReturnValue({
+            mocked(globalThis.RTCRtpSender.getCapabilities).mockReturnValue({
                 codecs: [
                     { mimeType: "video/rtx", clockRate: 90000 },
                     { mimeType: "video/somethingelse", clockRate: 90000 },
@@ -1816,8 +1816,8 @@ describe("Call", function () {
 
     it("should emit IceFailed error on the successor call if RTCPeerConnection throws", async () => {
         // @ts-ignore - writing to window as we are simulating browser edge-cases
-        global.window = {};
-        Object.defineProperty(global.window, "RTCPeerConnection", {
+        globalThis.window = {};
+        Object.defineProperty(globalThis.window, "RTCPeerConnection", {
             get: () => {
                 throw Error("Secure mode, naaah!");
             },

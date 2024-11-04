@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -370,15 +370,17 @@ export class PerSessionKeyBackupDownloader {
                     // Notice that this request will be lost if instead the backup got out of sync (updated from other session).
                     throw new KeyDownloadError(KeyDownloadErrorCode.MISSING_DECRYPTION_KEY);
                 }
-                if (errCode == "M_LIMIT_EXCEEDED") {
-                    const waitTime = e.data.retry_after_ms;
-                    if (waitTime > 0) {
-                        this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
-                        throw new KeyDownloadRateLimitError(waitTime);
-                    } else {
-                        // apply the default backoff time
-                        throw new KeyDownloadRateLimitError(KEY_BACKUP_BACKOFF);
+                if (e.isRateLimitError()) {
+                    let waitTime: number | undefined;
+                    try {
+                        waitTime = e.getRetryAfterMs() ?? undefined;
+                    } catch (error) {
+                        this.logger.warn("Error while retrieving a rate-limit retry delay", error);
                     }
+                    if (waitTime && waitTime > 0) {
+                        this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
+                    }
+                    throw new KeyDownloadRateLimitError(waitTime ?? KEY_BACKUP_BACKOFF);
                 }
             }
             throw new KeyDownloadError(KeyDownloadErrorCode.NETWORK_ERROR);

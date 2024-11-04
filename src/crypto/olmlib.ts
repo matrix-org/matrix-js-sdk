@@ -471,7 +471,7 @@ export async function verifySignature(
 export function pkSign(obj: object & IObject, key: Uint8Array | PkSigning, userId: string, pubKey: string): string {
     let createdKey = false;
     if (key instanceof Uint8Array) {
-        const keyObj = new global.Olm.PkSigning();
+        const keyObj = new globalThis.Olm.PkSigning();
         pubKey = keyObj.init_with_seed(key);
         key = keyObj;
         createdKey = true;
@@ -506,7 +506,7 @@ export function pkVerify(obj: IObject, pubKey: string, userId: string): void {
         throw new Error("No signature");
     }
     const signature = obj.signatures[userId][keyId];
-    const util = new global.Olm.Utility();
+    const util = new globalThis.Olm.Utility();
     const sigs = obj.signatures;
     delete obj.signatures;
     const unsigned = obj.unsigned;
