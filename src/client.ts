@@ -3706,6 +3706,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackupWithPassphrase | `CryptoApi.restoreKeyBackupWithPassphrase`}.
+     */
     public async restoreKeyBackupWithPassword(
         password: string,
         targetRoomId: string,
@@ -3713,6 +3716,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackupWithPassphrase | `CryptoApi.restoreKeyBackupWithPassphrase`}.
+     */
     public async restoreKeyBackupWithPassword(
         password: string,
         targetRoomId: string,
@@ -3720,6 +3726,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackupWithPassphrase | `CryptoApi.restoreKeyBackupWithPassphrase`}.
+     */
     public async restoreKeyBackupWithPassword(
         password: string,
         targetRoomId: string | undefined,
@@ -3792,6 +3801,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackup | `CryptoApi.restoreKeyBackup`}.
+     */
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string,
@@ -3799,6 +3811,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackup | `CryptoApi.restoreKeyBackup`}.
+     */
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string,
@@ -3806,6 +3821,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackup | `CryptoApi.restoreKeyBackup`}.
+     */
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string | undefined,
@@ -3832,18 +3850,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackup | `CryptoApi.restoreKeyBackup`}.
+     */
     public async restoreKeyBackupWithCache(
         targetRoomId: string,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackup | `CryptoApi.restoreKeyBackup`}.
+     */
     public async restoreKeyBackupWithCache(
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
+    /**
+     * @deprecated Prefer {@link CryptoApi.restoreKeyBackup | `CryptoApi.restoreKeyBackup`}.
+     */
     public async restoreKeyBackupWithCache(
         targetRoomId: string | undefined,
         targetSessionId: string | undefined,
