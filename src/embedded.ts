@@ -46,7 +46,7 @@ import {
 import { SyncApi, SyncState } from "./sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
 import { User } from "./models/user.ts";
-import { Room } from "./models/room.ts";
+import { Room, RoomEvent } from "./models/room.ts";
 import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { DeviceInfo } from "./crypto/deviceinfo.ts";
 import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
@@ -318,6 +318,11 @@ export class RoomWidgetClient extends MatrixClient {
         }
 
         // This also checks for an event id on the response
+        const remoteEcho = this.room
+            ?.getTimelineForEvent(event.getId()!)
+            ?.getEvents()
+            .find((e) => e.getId() === event.getId());
+        if (remoteEcho && event.getTxnId()) remoteEcho.setTxnId(event.getTxnId()!);
         room.updatePendingEvent(event, EventStatus.SENT, response.event_id);
         return { event_id: response.event_id! };
     }
@@ -469,6 +474,15 @@ export class RoomWidgetClient extends MatrixClient {
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
             const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
+            const localEcho = this.room
+                ?.getTimelineForEvent(event.getId()!)
+                ?.getEvents()
+                .find((e) => e.getId() === event.getId());
+            if (localEcho) {
+                const oldStatus = localEcho.status;
+                localEcho.setStatus(null);
+                this.emit(RoomEvent.LocalEchoUpdated, localEcho, this.room!, undefined, oldStatus);
+            }
             await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
