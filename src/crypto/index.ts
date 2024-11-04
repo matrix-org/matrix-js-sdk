@@ -537,7 +537,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async init({ exportedOlmDevice, pickleKey }: IInitOpts = {}): Promise<void> {
         logger.log("Crypto: initialising Olm...");
-        await global.Olm.init();
+        await globalThis.Olm.init();
         logger.log(
             exportedOlmDevice
                 ? "Crypto: initialising Olm device from exported device..."
@@ -668,7 +668,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *     and raw private key to avoid round tripping if needed.
      */
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
-        const decryption = new global.Olm.PkDecryption();
+        const decryption = new globalThis.Olm.PkDecryption();
         try {
             if (password) {
                 const derivation = await keyFromPassphrase(password);
@@ -1252,7 +1252,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public checkSecretStoragePrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
         let decryption: PkDecryption | null = null;
         try {
-            decryption = new global.Olm.PkDecryption();
+            decryption = new globalThis.Olm.PkDecryption();
             const gotPubkey = decryption.init_with_private_key(privateKey);
             // make sure it agrees with the given pubkey
             return gotPubkey === expectedPublicKey;
@@ -1354,7 +1354,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public checkCrossSigningPrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
         let signing: PkSigning | null = null;
         try {
-            signing = new global.Olm.PkSigning();
+            signing = new globalThis.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(privateKey);
             // make sure it agrees with the given pubkey
             return gotPubkey === expectedPublicKey;

@@ -56,7 +56,7 @@ describe("oidc authorization", () => {
             delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
             mockOpenIdConfiguration(),
         );
-        global.TextEncoder = TextEncoder;
+        globalThis.TextEncoder = TextEncoder;
     });
 
     beforeEach(() => {

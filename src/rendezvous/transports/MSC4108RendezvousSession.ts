@@ -29,7 +29,7 @@ export class MSC4108RendezvousSession {
     public url?: string;
     private readonly client?: MatrixClient;
     private readonly fallbackRzServer?: string;
-    private readonly fetchFn?: typeof global.fetch;
+    private readonly fetchFn?: typeof globalThis.fetch;
     private readonly onFailure?: RendezvousFailureListener;
     private etag?: string;
     private expiresAt?: Date;
@@ -42,7 +42,7 @@ export class MSC4108RendezvousSession {
         url,
         fetchFn,
     }: {
-        fetchFn?: typeof global.fetch;
+        fetchFn?: typeof globalThis.fetch;
         onFailure?: RendezvousFailureListener;
         url: string;
     });
@@ -52,7 +52,7 @@ export class MSC4108RendezvousSession {
         fallbackRzServer,
         fetchFn,
     }: {
-        fetchFn?: typeof global.fetch;
+        fetchFn?: typeof globalThis.fetch;
         onFailure?: RendezvousFailureListener;
         client?: MatrixClient;
         fallbackRzServer?: string;
@@ -64,7 +64,7 @@ export class MSC4108RendezvousSession {
         client,
         fallbackRzServer,
     }: {
-        fetchFn?: typeof global.fetch;
+        fetchFn?: typeof globalThis.fetch;
         onFailure?: RendezvousFailureListener;
         url?: string;
         client?: MatrixClient;
@@ -91,11 +91,11 @@ export class MSC4108RendezvousSession {
         return this._cancelled;
     }
 
-    private fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+    private fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
         if (this.fetchFn) {
             return this.fetchFn(resource, options);
         }
-        return global.fetch(resource, options);
+        return globalThis.fetch(resource, options);
     }
 
     private async getPostEndpoint(): Promise<string | undefined> {

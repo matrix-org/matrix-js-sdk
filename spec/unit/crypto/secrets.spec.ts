@@ -69,20 +69,20 @@ function sign<T extends IObject | ICurve25519AuthData>(
 }
 
 describe("Secrets", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should store and retrieve a secret", async function () {
         const key = new Uint8Array(16);
         for (let i = 0; i < 16; i++) key[i] = i;
 
-        const signing = new global.Olm.PkSigning();
+        const signing = new globalThis.Olm.PkSigning();
         const signingKey = signing.generate_seed();
         const signingPubKey = signing.init_with_seed(signingKey);
 
@@ -332,7 +332,7 @@ describe("Secrets", function () {
         });
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
-            const decryption = new global.Olm.PkDecryption();
+            const decryption = new globalThis.Olm.PkDecryption();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(

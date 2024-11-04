@@ -47,13 +47,13 @@ function alwaysSucceed<T>(promise: Promise<T>): Promise<T | void> {
 }
 
 describe("OlmDevice", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     let aliceOlmDevice: OlmDevice;

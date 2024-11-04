@@ -82,7 +82,7 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
             client = new MatrixClient({
                 baseUrl: "https://my.home.server",
                 accessToken: "my.access.token",
-                fetchFn: httpBackend.fetchFn as typeof global.fetch,
+                fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
                 store,
             });
         });
@@ -256,7 +256,7 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
             client = new MatrixClient({
                 baseUrl: "https://my.home.server",
                 accessToken: "my.access.token",
-                fetchFn: httpBackend.fetchFn as typeof global.fetch,
+                fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
                 store,
             });
         });

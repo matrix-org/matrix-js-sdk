@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import { randomString, secureRandomBase64Url } from "../randomstring.ts";
 import { EncryptionKeysEventContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { MatrixError } from "../http-api/errors.ts";
+import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { ExperimentalGroupCallRoomMemberState } from "../webrtc/groupCall.ts";
@@ -630,7 +630,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.client.cancelPendingEvent(matrixError.event);
             }
             if (this.keysEventUpdateTimeout === undefined) {
-                const resendDelay = matrixError.data?.retry_after_ms ?? 5000;
+                const resendDelay = safeGetRetryAfterMs(matrixError, 5000);
                 logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
                 this.keysEventUpdateTimeout = setTimeout(this.sendEncryptionKeysEvent, resendDelay);
             } else {

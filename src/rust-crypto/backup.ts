@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -457,12 +457,19 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             this.backupKeysLoopRunning = false;
                             this.checkKeyBackupAndEnable(true);
                             return;
-                        } else if (errCode == "M_LIMIT_EXCEEDED") {
+                        } else if (err.isRateLimitError()) {
                             // wait for that and then continue?
-                            const waitTime = err.data.retry_after_ms;
-                            if (waitTime > 0) {
-                                await sleep(waitTime);
-                                continue;
+                            try {
+                                const waitTime = err.getRetryAfterMs();
+                                if (waitTime && waitTime > 0) {
+                                    await sleep(waitTime);
+                                    continue;
+                                }
+                            } catch (error) {
+                                logger.warn(
+                                    "Backup: An error occurred while retrieving a rate-limit retry delay",
+                                    error,
+                                );
                             } // else go to the normal backoff
                         }
                     }

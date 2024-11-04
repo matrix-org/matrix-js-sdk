@@ -66,7 +66,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
             userId: userId,
             accessToken: accessToken,
             deviceId: deviceId,
-            fetchFn: this.httpBackend.fetchFn as typeof global.fetch,
+            fetchFn: this.httpBackend.fetchFn as typeof globalThis.fetch,
             ...options,
         };
         if (!fullOptions.cryptoStore) {
