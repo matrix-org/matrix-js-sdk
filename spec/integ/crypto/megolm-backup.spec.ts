@@ -44,7 +44,7 @@ import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
-import { DecryptionFailureCode } from "../../../src/crypto-api";
+import { decodeRecoveryKey, DecryptionFailureCode } from "../../../src/crypto-api";
 import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
@@ -346,9 +346,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 onKeyCached = resolve;
             });
 
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
+            );
+
             const result = await advanceTimersUntil(
                 isNewBackend
-                    ? aliceCrypto.restoreKeyBackup(testData.BACKUP_DECRYPTION_KEY_BASE58)
+                    ? aliceCrypto.restoreKeyBackup()
                     : aliceClient.restoreKeyBackupWithRecoveryKey(
                           testData.BACKUP_DECRYPTION_KEY_BASE58,
                           undefined,
@@ -362,13 +367,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             expect(result.imported).toStrictEqual(1);
 
-            if (!isNewBackend) await awaitKeyCached;
+            if (isNewBackend) return;
+
+            await awaitKeyCached;
 
             // The key should be now cached
             const afterCache = await advanceTimersUntil(
-                isNewBackend
-                    ? aliceCrypto.restoreKeyBackup(undefined)
-                    : aliceClient.restoreKeyBackupWithCache(undefined, undefined, check!.backupInfo!),
+                aliceClient.restoreKeyBackupWithCache(undefined, undefined, check!.backupInfo!),
             );
 
             expect(afterCache.imported).toStrictEqual(1);
@@ -419,9 +424,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
+            );
+
             const progressCallback = jest.fn();
             const result = await (isNewBackend
-                ? aliceCrypto.restoreKeyBackup(testData.BACKUP_DECRYPTION_KEY_BASE58, {
+                ? aliceCrypto.restoreKeyBackup({
                       progressCallback,
                   })
                 : aliceClient.restoreKeyBackupWithRecoveryKey(
@@ -488,10 +498,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", response);
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
+            );
 
             const progressCallback = jest.fn();
             const result = await (isNewBackend
-                ? aliceCrypto.restoreKeyBackup(testData.BACKUP_DECRYPTION_KEY_BASE58, { progressCallback })
+                ? aliceCrypto.restoreKeyBackup({ progressCallback })
                 : aliceClient.restoreKeyBackupWithRecoveryKey(
                       testData.BACKUP_DECRYPTION_KEY_BASE58,
                       undefined,
@@ -551,9 +565,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", response);
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
+            );
 
             const result = await (isNewBackend
-                ? aliceCrypto.restoreKeyBackup(testData.BACKUP_DECRYPTION_KEY_BASE58)
+                ? aliceCrypto.restoreKeyBackup()
                 : aliceClient.restoreKeyBackupWithRecoveryKey(
                       testData.BACKUP_DECRYPTION_KEY_BASE58,
                       undefined,
@@ -586,7 +604,34 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result.imported).toStrictEqual(1);
         });
 
-        it("Fails on bad recovery key", async function () {
+        newBackendOnly(
+            "Should get the decryption key from the secret storage and restore the key backup",
+            async function () {
+                // @ts-ignore - mock a private method for testing purpose
+                jest.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
+
+                const fullBackup = {
+                    rooms: {
+                        [ROOM_ID]: {
+                            sessions: {
+                                [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
+                            },
+                        },
+                    },
+                };
+                fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+                const check = await aliceCrypto.checkKeyBackupAndEnable();
+                const recoveryKey = await aliceCrypto.getSecretStorageBackupPrivateKey();
+                expect(recoveryKey).not.toBeNull();
+
+                await aliceCrypto.storeSessionBackupPrivateKey(recoveryKey!, check!.backupInfo!.version!);
+                const result = await aliceCrypto.restoreKeyBackup();
+                expect(result.imported).toStrictEqual(1);
+            },
+        );
+
+        oldBackendOnly("Fails on bad recovery key", async function () {
             const fullBackup = {
                 rooms: {
                     [ROOM_ID]: {
@@ -602,34 +647,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
             await expect(
-                isNewBackend
-                    ? aliceCrypto.restoreKeyBackup("EsTx A7Xn aNFF k3jH zpV3 MQoN LJEg mscC HecF 982L wC77 mYQD")
-                    : aliceClient.restoreKeyBackupWithRecoveryKey(
-                          "EsTx A7Xn aNFF k3jH zpV3 MQoN LJEg mscC HecF 982L wC77 mYQD",
-                          undefined,
-                          undefined,
-                          check!.backupInfo!,
-                      ),
+                aliceClient.restoreKeyBackupWithRecoveryKey(
+                    "EsTx A7Xn aNFF k3jH zpV3 MQoN LJEg mscC HecF 982L wC77 mYQD",
+                    undefined,
+                    undefined,
+                    check!.backupInfo!,
+                ),
             ).rejects.toThrow();
         });
 
-        newBackendOnly("Should restore the backup from the secret storage", async () => {
-            // @ts-ignore - mock a private method for testing purpose
-            jest.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
-
-            const fullBackup = {
-                rooms: {
-                    [ROOM_ID]: {
-                        sessions: {
-                            [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
-                        },
-                    },
-                },
-            };
-            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
-
-            const result = await aliceCrypto.restoreKeyBackup(undefined);
-            expect(result.imported).toStrictEqual(1);
+        newBackendOnly("Should throw an error if the decryption key is found in cache", async () => {
+            await expect(aliceCrypto.restoreKeyBackup()).rejects.toThrow("No decryption key found in cache");
         });
     });
 
