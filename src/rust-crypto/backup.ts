@@ -606,7 +606,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Restore a key backup.
-     * @param backupInfoVersion - The version of the backup info.
+     *
+     * @param backupVersion - The backup version to restore.
      * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
      * @param opts - Options for the restore.
      * @returns The total number of keys and the total imported.

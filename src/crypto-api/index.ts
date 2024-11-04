@@ -560,7 +560,7 @@ export interface CryptoApi {
      * @param phassphrase - The passphrase to use to restore the key backup.
      * @param opts
      *
-     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/ shared via 4S.
+     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/shared via 4S.
      */
     restoreKeyBackupWithPassphrase(phassphrase: string, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 

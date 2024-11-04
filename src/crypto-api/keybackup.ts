@@ -94,7 +94,7 @@ export interface KeyBackupRoomSessions {
  */
 export interface KeyBackupRestoreOpts {
     /**
-     * Reports ongoing progress of the import process.
+     * A callback which, if defined, will be called periodically to report ongoing progress of the backup restore process.
      * @param progress
      */
     progressCallback?: (progress: ImportRoomKeyProgressData) => void;
