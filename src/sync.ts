@@ -183,7 +183,7 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     "set_presence"?: SetPresence;
     "_cacheBuster"?: string | number; // not part of the API itself
-    "org.matrix.use_state_after"?: boolean;
+    "org.matrix.msc4222.use_state_after"?: boolean;
 }
 
 type WrappedRoom<T> = T & {
@@ -1003,7 +1003,7 @@ export class SyncApi {
             qps.timeout = 0;
         }
 
-        qps["org.matrix.use_state_after"] = true;
+        qps["org.matrix.msc4222.use_state_after"] = true;
 
         return qps;
     }
@@ -1286,7 +1286,7 @@ export class SyncApi {
         await promiseMapSeries(joinRooms, async (joinObj) => {
             const room = joinObj.room;
             const stateEvents = this.mapSyncEventsFormat(joinObj.state, room);
-            const stateAfterEvents = this.mapSyncEventsFormat(joinObj.state_after, room);
+            const stateAfterEvents = this.mapSyncEventsFormat(joinObj["org.matrix.msc4222.state_after"], room);
             // Prevent events from being decrypted ahead of time
             // this helps large account to speed up faster
             // room::decryptCriticalEvent is in charge of decrypting all the events
@@ -1299,7 +1299,9 @@ export class SyncApi {
             // regular timeline events do *not* count towards state. If it's not present, then the state is formed by
             // the state events plus the timeline events. Note mapSyncEventsFormat returns an empty array if the field
             // is absent so we explicitly check the field on the original object.
-            const eventsFormingFinalState = joinObj.state_after ? stateAfterEvents : stateEvents.concat(timelineEvents);
+            const eventsFormingFinalState = joinObj["org.matrix.msc4222.state_after"]
+                ? stateAfterEvents
+                : stateEvents.concat(timelineEvents);
 
             const encrypted = this.isRoomEncrypted(room, eventsFormingFinalState);
             // We store the server-provided value first so it's correct when any of the events fire.
@@ -1443,7 +1445,7 @@ export class SyncApi {
                 await this.injectRoomEvents(
                     room,
                     joinObj.state ? stateEvents : undefined,
-                    joinObj.state_after ? stateAfterEvents : undefined,
+                    joinObj["org.matrix.msc4222.state_after"] ? stateAfterEvents : undefined,
                     timelineEvents,
                     syncEventData.fromCache,
                 );

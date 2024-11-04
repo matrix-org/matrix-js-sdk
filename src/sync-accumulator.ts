@@ -78,7 +78,7 @@ export interface ITimeline {
 export interface IJoinedRoom {
     "summary": IRoomSummary;
     "state": IState;
-    "state_after"?: IState;
+    "org.matrix.msc4222.state_after"?: IState;
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -107,10 +107,10 @@ export interface IInvitedRoom {
 }
 
 export interface ILeftRoom {
-    state: IState;
-    state_after?: IState;
-    timeline: ITimeline;
-    account_data: IAccountData;
+    "state": IState;
+    "org.matrix.msc4222.state_after"?: IState;
+    "timeline": ITimeline;
+    "account_data": IAccountData;
 }
 
 export interface IKnockedRoom {
@@ -566,17 +566,17 @@ export class SyncAccumulator {
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
             const roomJson: IJoinedRoom = {
-                ephemeral: { events: [] },
-                account_data: { events: [] },
-                state: { events: [] },
-                state_after: undefined,
-                timeline: {
+                "ephemeral": { events: [] },
+                "account_data": { events: [] },
+                "state": { events: [] },
+                "org.matrix.msc4222.state_after": undefined,
+                "timeline": {
                     events: [],
                     prev_batch: null,
                 },
-                unread_notifications: roomData._unreadNotifications,
-                unread_thread_notifications: roomData._unreadThreadNotifications,
-                summary: roomData._summary as IRoomSummary,
+                "unread_notifications": roomData._unreadNotifications,
+                "unread_thread_notifications": roomData._unreadThreadNotifications,
+                "summary": roomData._summary as IRoomSummary,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
