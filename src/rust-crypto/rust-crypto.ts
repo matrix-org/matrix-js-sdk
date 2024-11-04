@@ -1327,7 +1327,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             stage: "fetch",
         });
 
-        return this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+        let result: KeyBackupRestoreResult;
+        try {
+            result = await this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+        } finally {
+            // Free to avoid to keep in memory the decryption key stored in it. To avoid to exposing it to an attacker.
+            backupDecryptor.free();
+        }
+
+        return result;
     }
 
     /**

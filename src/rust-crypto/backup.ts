@@ -656,30 +656,26 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         let totalImported = 0;
         let totalFailures = 0;
 
-        try {
-            // Now decrypt and import the keys in chunks
-            await this.handleDecryptionOfAFullBackup(keyBackup, backupDecryptor, 200, async (chunk) => {
-                // We have a chunk of decrypted keys: import them
-                try {
-                    await this.importBackedUpRoomKeys(chunk, backupInfoVersion);
-                    totalImported += chunk.length;
-                } catch (e) {
-                    totalFailures += chunk.length;
-                    // We failed to import some keys, but we should still try to import the rest?
-                    // Log the error and continue
-                    logger.error("Error importing keys from backup", e);
-                }
+        // Now decrypt and import the keys in chunks
+        await this.handleDecryptionOfAFullBackup(keyBackup, backupDecryptor, 200, async (chunk) => {
+            // We have a chunk of decrypted keys: import them
+            try {
+                await this.importBackedUpRoomKeys(chunk, backupInfoVersion);
+                totalImported += chunk.length;
+            } catch (e) {
+                totalFailures += chunk.length;
+                // We failed to import some keys, but we should still try to import the rest?
+                // Log the error and continue
+                logger.error("Error importing keys from backup", e);
+            }
 
-                opts?.progressCallback?.({
-                    total: totalKeyCount,
-                    successes: totalImported,
-                    stage: "load_keys",
-                    failures: totalFailures,
-                });
+            opts?.progressCallback?.({
+                total: totalKeyCount,
+                successes: totalImported,
+                stage: "load_keys",
+                failures: totalFailures,
             });
-        } finally {
-            backupDecryptor.free();
-        }
+        });
 
         return { total: totalKeyCount, imported: totalImported };
     }
