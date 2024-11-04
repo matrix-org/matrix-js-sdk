@@ -912,8 +912,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
- * Used when calling {@link CryptoApi#importRoomKeys} or
- * {@link CryptoApi#importRoomKeysAsJson} as the parameter of
+ * Used when calling {@link CryptoApi#importRoomKeys},
+ * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {
