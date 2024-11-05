@@ -630,6 +630,45 @@ describe("MatrixClient", function () {
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
 
+        it("overload with custom event type works", async () => {
+            const eventId = "$eventId:example.org";
+            const customEventType = "org.example.my.custom.type";
+            const txnId = client.makeTxnId();
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/${customEventType}/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: content,
+                },
+            ];
+
+            await client.sendEvent(roomId, customEventType, { ...content }, txnId);
+        });
+
+        it("overload with custom event type and threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const customEventType = "org.example.my.custom.type";
+            const txnId = client.makeTxnId();
+            const threadId = "$threadId:server";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/${customEventType}/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: {
+                        ...content,
+                        "m.relates_to": {
+                            event_id: threadId,
+                            is_falling_back: true,
+                            rel_type: "m.thread",
+                        },
+                    },
+                },
+            ];
+            await client.sendEvent(roomId, threadId, customEventType, { ...content }, txnId);
+        });
+
         it("should add thread relation if threadId is passed and the relation is missing", async () => {
             const eventId = "$eventId:example.org";
             const threadId = "$threadId:server";

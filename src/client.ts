@@ -4576,6 +4576,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K],
         txnId?: string,
     ): Promise<ISendEventResponse>;
+    public sendEvent(roomId: string, eventType: string, content: IContent, txnId?: string): Promise<ISendEventResponse>;
+    public sendEvent(
+        roomId: string,
+        threadId: string | null,
+        eventType: string,
+        content: IContent,
+        txnId?: string,
+    ): Promise<ISendEventResponse>;
     public sendEvent(
         roomId: string,
         threadIdOrEventType: string | null,
