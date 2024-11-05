@@ -49,9 +49,6 @@ jobs:
                   git checkout develop
                   git merge -X ours master
 
-            - name: Run post-merge-master script to revert package.json fields
-              run: ./.action-repo/scripts/release/post-merge-master.sh
-
             - name: Reset dependencies
               if: inputs.dependencies
               run: |
