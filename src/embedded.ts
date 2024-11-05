@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// eslint-disable-next-line no-restricted-imports
+import { EventEmitter } from "events";
 import {
     WidgetApi,
     WidgetApiToWidgetAction,
@@ -128,6 +130,8 @@ export class RoomWidgetClient extends MatrixClient {
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
+    private pendingSendingEventsTxId: { type: string; id: string | undefined; txId: string }[] = [];
+    private sendingEmitter = new EventEmitter();
     /**
      *
      * @param widgetApi - The widget api to use for communication.
@@ -297,6 +301,8 @@ export class RoomWidgetClient extends MatrixClient {
         const content = event.event.redacts
             ? { ...event.getContent(), redacts: event.event.redacts }
             : event.getContent();
+
+        // Delayed event special case.
         if (delayOpts) {
             // TODO: updatePendingEvent for delayed events?
             const response = await this.widgetApi.sendRoomEvent(
@@ -309,6 +315,10 @@ export class RoomWidgetClient extends MatrixClient {
             return this.validateSendDelayedEventResponse(response);
         }
 
+        const txId = event.getTxnId();
+        // Add the txnId to the pending list (still with unknown evID)
+        if (txId) this.pendingSendingEventsTxId.push({ type: event.getType(), id: undefined, txId });
+
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi.sendRoomEvent(event.getType(), content, room.roomId);
@@ -319,6 +329,16 @@ export class RoomWidgetClient extends MatrixClient {
 
         // This also checks for an event id on the response
         room.updatePendingEvent(event, EventStatus.SENT, response.event_id);
+
+        // Update the pending events list with the eventId
+        if (txId) {
+            this.pendingSendingEventsTxId.map((old) => {
+                if (old.txId === txId) old.id = response.event_id;
+                return old;
+            });
+        }
+        this.sendingEmitter.emit(event.getType());
+
         return { event_id: response.event_id! };
     }
 
@@ -469,6 +489,36 @@ export class RoomWidgetClient extends MatrixClient {
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
             const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
+
+            if (
+                // This could theoretically be an event send by this device
+                // In that case we need to update the txId of the event because the embedded client/widget
+                // knows this event with a different transaction Id than what was used by the host client.
+                event.getSender() === this.getUserId() &&
+                // this is an optimization so we do not block events from types that we have not send
+                // with this client
+                this.pendingSendingEventsTxId.some((p) => event.getType() === p.type)
+            ) {
+                // Compare by event Id if we have a matching pending event where we know the txId.
+                let matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
+                // Block injection this event until we have received the sending response.
+                // -> until we know the event id.
+                while (!matchingTxId) {
+                    // Recheck whenever we successfully sent an event with that type
+                    await new Promise<void>((resolve, reject) => {
+                        this.sendingEmitter.once(event.getType(), () => {
+                            resolve();
+                        });
+                    });
+                    matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
+                }
+
+                // we found the correct txId: we update the event and delete the entry of the pending events.
+                event.setTxnId(matchingTxId);
+                event.setUnsigned({ ...event.getUnsigned(), transaction_id: matchingTxId });
+                this.pendingSendingEventsTxId.filter((p) => p.id !== event.getId());
+            }
+
             await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
