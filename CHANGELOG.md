@@ -1,3 +1,26 @@
+Changes in [34.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.10.0) (2024-11-05)
+====================================================================================================
+## 🦖 Deprecations
+
+* Deprecate `CreateSecretStorageOpts.keyBackupInfo` used in `CryptoApi.bootstrapSecretStorage.` ([#4474](https://github.com/matrix-org/matrix-js-sdk/pull/4474)). Contributed by @florianduros.
+* Add CryptoApi.encryptToDeviceMessages() and deprecate Crypto.encryptAndSendToDevices() ([#4380](https://github.com/matrix-org/matrix-js-sdk/pull/4380)). Contributed by @hughns.
+* Remove abandoned MSC3886, MSC3903, MSC3906 experimental implementations ([#4469](https://github.com/matrix-org/matrix-js-sdk/pull/4469)). Contributed by @t3chguy.
+* Deprecate `MatrixClient.getDehydratedDevice` ([#4467](https://github.com/matrix-org/matrix-js-sdk/pull/4467)). Contributed by @florianduros.
+* Deprecate top level crypto events re-export ([#4444](https://github.com/matrix-org/matrix-js-sdk/pull/4444)). Contributed by @florianduros.
+
+## ✨ Features
+
+* Add CryptoApi.encryptToDeviceMessages() and deprecate Crypto.encryptAndSendToDevices() ([#4380](https://github.com/matrix-org/matrix-js-sdk/pull/4380)). Contributed by @hughns.
+* Do not rotate MatrixRTC media encryption key when a new member joins a session ([#4472](https://github.com/matrix-org/matrix-js-sdk/pull/4472)). Contributed by @hughns.
+* Avoid `<sender>|<session>` notation in log messages ([#4473](https://github.com/matrix-org/matrix-js-sdk/pull/4473)). Contributed by @richvdh.
+* Refactor/simplify Promises in MatrixRTCSession ([#4466](https://github.com/matrix-org/matrix-js-sdk/pull/4466)). Contributed by @AndrewFerr.
+* Prepare delayed call leave events more reliably ([#4447](https://github.com/matrix-org/matrix-js-sdk/pull/4447)). Contributed by @AndrewFerr.
+
+## 🐛 Bug Fixes
+
+* Fix DelayedEventInfo type ([#4446](https://github.com/matrix-org/matrix-js-sdk/pull/4446)). Contributed by @AndrewFerr.
+
+
 Changes in [34.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.9.0) (2024-10-22)
 ==================================================================================================
 ## 🦖 Deprecations
