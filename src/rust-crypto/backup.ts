@@ -651,57 +651,15 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     ): Promise<KeyBackupRestoreResult> {
         // We have a full backup here, it can get quite big, so we need to decrypt and import it in chunks.
 
+        const CHUNK_SIZE = 200;
         // Get the total count as a first pass
         const totalKeyCount = calculateKeyCountInKeyBackup(keyBackup);
         let totalImported = 0;
         let totalFailures = 0;
 
-        // Now decrypt and import the keys in chunks
-        await this.handleDecryptionOfAFullBackup(keyBackup, backupDecryptor, 200, async (chunk) => {
-            // We have a chunk of decrypted keys: import them
-            try {
-                await this.importBackedUpRoomKeys(chunk, backupInfoVersion);
-                totalImported += chunk.length;
-            } catch (e) {
-                totalFailures += chunk.length;
-                // We failed to import some keys, but we should still try to import the rest?
-                // Log the error and continue
-                logger.error("Error importing keys from backup", e);
-            }
-
-            opts?.progressCallback?.({
-                total: totalKeyCount,
-                successes: totalImported,
-                stage: "load_keys",
-                failures: totalFailures,
-            });
-        });
-
-        return { total: totalKeyCount, imported: totalImported };
-    }
-
-    /**
-     * This method handles the decryption of a full backup, i.e a call to `/room_keys/keys`.
-     * It will decrypt the keys in chunks and call the `block` callback for each chunk.
-     *
-     * @param keyBackup - The key backup from the server containing the keys to be decrypted.
-     * @param backupDecryptor - An instance of the BackupDecryptor class used to decrypt the keys.
-     * @param chunkSize - The size of the chunks to be processed at a time.
-     * @param block - A callback function that is called for each chunk of keys.
-     *
-     * @returns A promise that resolves when the decryption is complete.
-     */
-    private async handleDecryptionOfAFullBackup(
-        keyBackup: KeyBackup,
-        backupDecryptor: BackupDecryptor,
-        chunkSize: number,
-        block: (chunk: IMegolmSessionData[]) => Promise<void>,
-    ): Promise<void> {
-        const { rooms } = keyBackup;
-
         /**
          * This method is called when we have enough chunks to decrypt.
-         * It will decrypt the chunks and call the `block` callback.
+         * It will decrypt the chunks and try to import the room keys.
          * @param roomChunks
          */
         const handleChunkCallback = async (roomChunks: Map<string, KeyBackupRoomSessions>): Promise<void> => {
@@ -717,13 +675,31 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 });
             }
 
-            await block(currentChunk);
+            // We have a chunk of decrypted keys: import them
+            try {
+                await this.importBackedUpRoomKeys(currentChunk, backupInfoVersion);
+                totalImported += currentChunk.length;
+            } catch (e) {
+                totalFailures += currentChunk.length;
+                // We failed to import some keys, but we should still try to import the rest?
+                // Log the error and continue
+                logger.error("Error importing keys from backup", e);
+            }
+
+            opts?.progressCallback?.({
+                total: totalKeyCount,
+                successes: totalImported,
+                stage: "load_keys",
+                failures: totalFailures,
+            });
         };
 
         let groupChunkCount = 0;
         let chunkGroupByRoom: Map<string, KeyBackupRoomSessions> = new Map();
 
-        for (const [roomId, roomData] of Object.entries(rooms)) {
+        // Iterate over the rooms and sessions to group them in chunks
+        // And we call the handleChunkCallback when we have enough chunks to decrypt
+        for (const [roomId, roomData] of Object.entries(keyBackup.rooms)) {
             // If there are no sessions for the room, skip it
             if (!roomData.sessions) continue;
 
@@ -736,7 +712,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 sessionsForRoom[sessionId] = session;
                 groupChunkCount += 1;
                 // If we have enough chunks to decrypt, call the block callback
-                if (groupChunkCount >= chunkSize) {
+                if (groupChunkCount >= CHUNK_SIZE) {
                     // We have enough chunks to decrypt
                     await handleChunkCallback(chunkGroupByRoom);
                     // Reset the chunk group
@@ -752,6 +728,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         if (groupChunkCount > 0) {
             await handleChunkCallback(chunkGroupByRoom);
         }
+
+        return { total: totalKeyCount, imported: totalImported };
     }
 }
 
