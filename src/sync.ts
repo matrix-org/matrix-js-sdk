@@ -345,8 +345,9 @@ export class SyncApi {
         );
 
         const qps: ISyncParams = {
-            timeout: 0, // don't want to block since this is a single isolated req
-            filter: filterId,
+            "timeout": 0, // don't want to block since this is a single isolated req
+            "filter": filterId,
+            "org.matrix.msc4222.use_state_after": true,
         };
 
         const data = await client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
@@ -379,12 +380,17 @@ export class SyncApi {
                 const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
 
                 const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
+                const stateAfterEvents = this.mapSyncEventsFormat(leaveObj["org.matrix.msc4222.state_after"], room);
 
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
                 room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
 
-                await this.injectRoomEvents(room, undefined, stateEvents, events);
+                if ("org.matrix.msc4222.state_after" in leaveObj) {
+                    await this.injectRoomEvents(room, undefined, stateAfterEvents, events);
+                } else {
+                    await this.injectRoomEvents(room, stateEvents, undefined, events);
+                }
 
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -1442,13 +1448,17 @@ export class SyncApi {
             }
 
             try {
-                await this.injectRoomEvents(
-                    room,
-                    joinObj.state ? stateEvents : undefined,
-                    joinObj["org.matrix.msc4222.state_after"] ? stateAfterEvents : undefined,
-                    timelineEvents,
-                    syncEventData.fromCache,
-                );
+                if ("org.matrix.msc4222.state_after" in joinObj) {
+                    await this.injectRoomEvents(
+                        room,
+                        undefined,
+                        stateAfterEvents,
+                        timelineEvents,
+                        syncEventData.fromCache,
+                    );
+                } else {
+                    await this.injectRoomEvents(room, stateEvents, undefined, timelineEvents, syncEventData.fromCache);
+                }
             } catch (e) {
                 logger.error(`Failed to process events on room ${room.roomId}:`, e);
             }
@@ -1778,17 +1788,26 @@ export class SyncApi {
      */
     public async injectRoomEvents(
         room: Room,
+        stateEventList: MatrixEvent[],
+        stateAfterEventList: undefined,
+        timelineEventList?: MatrixEvent[],
+        fromCache?: boolean,
+    ): Promise<void>;
+    public async injectRoomEvents(
+        room: Room,
+        stateEventList: undefined,
+        stateAfterEventList: MatrixEvent[],
+        timelineEventList?: MatrixEvent[],
+        fromCache?: boolean,
+    ): Promise<void>;
+    public async injectRoomEvents(
+        room: Room,
         stateEventList: MatrixEvent[] | undefined,
         stateAfterEventList: MatrixEvent[] | undefined,
         timelineEventList?: MatrixEvent[],
         fromCache = false,
     ): Promise<void> {
-        const eitherStateEventList = stateAfterEventList ?? stateEventList;
-        if (stateEventList && stateAfterEventList) {
-            throw new Error(
-                "injectRoomEvents: At least one of stateEventList or stateAfterEventList must be undefined",
-            );
-        }
+        const eitherStateEventList = stateAfterEventList ?? stateEventList!;
 
         // If there are no events in the timeline yet, initialise it with
         // the given state events
@@ -1804,10 +1823,8 @@ export class SyncApi {
             // find some solution where MatrixEvents are immutable but allow for a cache
             // field.
 
-            if (eitherStateEventList) {
-                for (const ev of eitherStateEventList) {
-                    this.client.getPushActionsForEvent(ev);
-                }
+            for (const ev of eitherStateEventList) {
+                this.client.getPushActionsForEvent(ev);
             }
             liveTimeline.initialiseState(eitherStateEventList ?? [], {
                 timelineWasEmpty,
@@ -1837,7 +1854,7 @@ export class SyncApi {
         // very wrong because there could be events in the timeline that diverge the
         // state, in which case this is going to leave things out of sync. However,
         // for now I think it;s best to behave the same as the code has done previously.
-        if (!timelineWasEmpty && eitherStateEventList) {
+        if (!timelineWasEmpty) {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...

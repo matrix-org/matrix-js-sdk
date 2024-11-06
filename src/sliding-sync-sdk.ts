@@ -713,7 +713,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        await this.injectRoomEvents(room, undefined, stateEvents, timelineEvents, roomData.num_live);
+        await this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -754,7 +754,7 @@ export class SlidingSyncSdk {
     /**
      * Injects events into a room's model.
      * @param stateEventList - A list of state events. This is the state
-     * at the *START* of the timeline list if it is supplied.
+     * at the *END* of the timeline list if it is supplied.
      * @param timelineEventList - A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      * @param numLive - the number of events in timelineEventList which just happened,
@@ -762,21 +762,10 @@ export class SlidingSyncSdk {
      */
     public async injectRoomEvents(
         room: Room,
-        stateEventList?: MatrixEvent[],
-        stateAfterEventList?: MatrixEvent[],
-        timelineEventList?: MatrixEvent[],
-        numLive?: number,
+        stateEventList: MatrixEvent[],
+        timelineEventList: MatrixEvent[] = [],
+        numLive: number = 0,
     ): Promise<void> {
-        const eitherStateEventList = stateAfterEventList ?? stateEventList;
-        if (eitherStateEventList === undefined || (stateEventList && stateAfterEventList)) {
-            throw new Error(
-                "injectRoomEvents: Exactly one of stateEventList or stateAfterEventList must be non-undefined",
-            );
-        }
-
-        timelineEventList = timelineEventList || [];
-        numLive = numLive || 0;
-
         // If there are no events in the timeline yet, initialise it with
         // the given state events
         const liveTimeline = room.getLiveTimeline();
@@ -790,10 +779,10 @@ export class SlidingSyncSdk {
             // push actions cache elsewhere so we can freeze MatrixEvents, or otherwise
             // find some solution where MatrixEvents are immutable but allow for a cache
             // field.
-            for (const ev of eitherStateEventList) {
+            for (const ev of stateEventList) {
                 this.client.getPushActionsForEvent(ev);
             }
-            liveTimeline.initialiseState(eitherStateEventList);
+            liveTimeline.initialiseState(stateEventList);
         }
 
         // If the timeline wasn't empty, we process the state events here: they're
@@ -810,8 +799,8 @@ export class SlidingSyncSdk {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...
-            room.oldState.setStateEvents(eitherStateEventList);
-            room.currentState.setStateEvents(eitherStateEventList);
+            room.oldState.setStateEvents(stateEventList);
+            room.currentState.setStateEvents(stateEventList);
         }
 
         // the timeline is broken into 'live' events which just happened and normal timeline events
@@ -827,21 +816,17 @@ export class SlidingSyncSdk {
             timelineEventList = timelineEventList.slice(0, -1 * liveTimelineEvents.length);
         }
 
-        // execute the timeline events. This will continue to diverge the current state
-        // if the timeline has any state events in it.
+        // Execute the timeline events.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         await room.addLiveEvents(timelineEventList, {
             fromCache: true,
-            // XXX: This seems very broken that the timeline events need to be added to the sate, since
-            // in sliding sync the point is that state events come down separately, excplitly. However,
-            // the sliding-sync-sdk tests don't pass unless we add them.
-            addToState: true,
+            addToState: false,
         });
         if (liveTimelineEvents.length > 0) {
             await room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
-                addToState: true,
+                addToState: false,
             });
         }
 

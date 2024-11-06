@@ -243,7 +243,11 @@ export class RoomWidgetClient extends MatrixClient {
                 const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
                 const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
-                await this.syncApi!.injectRoomEvents(this.room!, undefined, events, events);
+                if (this.syncApi instanceof SyncApi) {
+                    await this.syncApi!.injectRoomEvents(this.room!, undefined, events, []);
+                } else {
+                    await this.syncApi!.injectRoomEvents(this.room!, events, []);
+                }
                 events.forEach((event) => {
                     this.emit(ClientEvent.Event, event);
                     logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
@@ -469,7 +473,13 @@ export class RoomWidgetClient extends MatrixClient {
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
             const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
-            await this.syncApi!.injectRoomEvents(this.room!, undefined, [event], [event]);
+
+            // The widget API does not tell us whether a state event came from `state_after` or not so we assume legacy behaviour for now.
+            if (this.syncApi instanceof SyncApi) {
+                await this.syncApi!.injectRoomEvents(this.room!, [], undefined, [event]);
+            } else {
+                await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+            }
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
