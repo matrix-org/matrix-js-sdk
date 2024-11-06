@@ -593,36 +593,36 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Restore a key backup.
      *
-     * @param backupInfoVersion - The version of the backup to restore.
+     * @param backupVersion - The version of the backup to restore.
      * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
      * @param opts - Options for the restore.
      * @returns The total number of keys and the total imported.
      */
     public async restoreKeyBackup(
-        backupInfoVersion: string,
+        backupVersion: string,
         backupDecryptor: BackupDecryptor,
         opts?: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
-        const keyBackup = await this.downloadKeyBackup(backupInfoVersion);
+        const keyBackup = await this.downloadKeyBackup(backupVersion);
         opts?.progressCallback?.({
             stage: "load_keys",
         });
 
-        return this.importKeyBackup(keyBackup, backupInfoVersion, backupDecryptor, opts);
+        return this.importKeyBackup(keyBackup, backupVersion, backupDecryptor, opts);
     }
 
     /**
      * Call `/room_keys/keys` to download the key backup (room keys) for the given backup version.
      * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
      *
-     * @param backupInfoVersion
+     * @param backupVersion
      * @returns The key backup response.
      */
-    private downloadKeyBackup(backupInfoVersion: string): Promise<KeyBackup> {
+    private downloadKeyBackup(backupVersion: string): Promise<KeyBackup> {
         return this.http.authedRequest<KeyBackup>(
             Method.Get,
             "/room_keys/keys",
-            { version: backupInfoVersion },
+            { version: backupVersion },
             undefined,
             {
                 prefix: ClientPrefix.V3,
@@ -635,7 +635,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Call the opts.progressCallback with the progress of the import.
      *
      * @param keyBackup - The response from the server containing the keys to import.
-     * @param backupInfoVersion - The version of the backup info.
+     * @param backupVersion - The version of the backup info.
      * @param backupDecryptor - The backup decryptor to use to decrypt the keys.
      * @param opts - Options for the import.
      *
@@ -645,7 +645,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     private async importKeyBackup(
         keyBackup: KeyBackup,
-        backupInfoVersion: string,
+        backupVersion: string,
         backupDecryptor: BackupDecryptor,
         opts?: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
@@ -677,7 +677,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
             // We have a chunk of decrypted keys: import them
             try {
-                await this.importBackedUpRoomKeys(currentChunk, backupInfoVersion);
+                await this.importBackedUpRoomKeys(currentChunk, backupVersion);
                 totalImported += currentChunk.length;
             } catch (e) {
                 totalFailures += currentChunk.length;
