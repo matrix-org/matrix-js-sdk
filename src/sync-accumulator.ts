@@ -78,7 +78,7 @@ export interface ITimeline {
 export interface IJoinedRoom {
     "summary": IRoomSummary;
     "state": IState;
-    "org.matrix.msc4222.state_after"?: IState;
+    "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -569,7 +569,7 @@ export class SyncAccumulator {
                 "ephemeral": { events: [] },
                 "account_data": { events: [] },
                 "state": { events: [] },
-                "org.matrix.msc4222.state_after": undefined,
+                "org.matrix.msc4222.state_after": { events: [] },
                 "timeline": {
                     events: [],
                     prev_batch: null,
@@ -657,6 +657,9 @@ export class SyncAccumulator {
                         // use the reverse clobbered event instead.
                         ev = rollBackState[evType][stateKey];
                     }
+                    // Push to both fields to provide downgrade compatibility in the sync accumulator db
+                    // the code will prefer `state_after` if it is present
+                    roomJson["org.matrix.msc4222.state_after"]?.events.push(ev);
                     roomJson.state.events.push(ev);
                 });
             });

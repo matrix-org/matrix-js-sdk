@@ -183,7 +183,7 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     "set_presence"?: SetPresence;
     "_cacheBuster"?: string | number; // not part of the API itself
-    "org.matrix.msc4222.use_state_after"?: boolean;
+    "org.matrix.msc4222.use_state_after"?: boolean; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
 }
 
 type WrappedRoom<T> = T & {
@@ -984,7 +984,11 @@ export class SyncApi {
             filter = this.getGuestFilter();
         }
 
-        const qps: ISyncParams = { filter, timeout };
+        const qps: ISyncParams = {
+            filter,
+            timeout,
+            "org.matrix.msc4222.use_state_after": true,
+        };
 
         if (this.opts.disablePresence) {
             qps.set_presence = SetPresence.Offline;
@@ -1008,8 +1012,6 @@ export class SyncApi {
             // for an event or a timeout before emiting the SYNCING event.
             qps.timeout = 0;
         }
-
-        qps["org.matrix.msc4222.use_state_after"] = true;
 
         return qps;
     }
