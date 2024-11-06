@@ -85,6 +85,7 @@ describe("SyncAccumulator", function () {
         // technically cheating since we also cheekily pre-populate keys we
         // know that the sync accumulator will pre-populate.
         // It isn't 100% transitive.
+        const events = [member("alice", KnownMembership.Join), member("bob", KnownMembership.Join)];
         const res = {
             next_batch: "abc",
             rooms: {
@@ -92,18 +93,17 @@ describe("SyncAccumulator", function () {
                 leave: {},
                 join: {
                     "!foo:bar": {
-                        account_data: { events: [] },
-                        ephemeral: { events: [] },
-                        unread_notifications: {},
-                        state: {
-                            events: [member("alice", KnownMembership.Join), member("bob", KnownMembership.Join)],
-                        },
-                        summary: {
+                        "account_data": { events: [] },
+                        "ephemeral": { events: [] },
+                        "unread_notifications": {},
+                        "org.matrix.msc4222.state_after": { events },
+                        "state": { events },
+                        "summary": {
                             "m.heroes": undefined,
                             "m.joined_member_count": undefined,
                             "m.invited_member_count": undefined,
                         },
-                        timeline: {
+                        "timeline": {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
                         },
