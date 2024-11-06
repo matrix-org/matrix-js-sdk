@@ -1049,11 +1049,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 };
                 await prepareDelayedDisconnection();
                 // Send join event _after_ preparing the delayed disconnection event
-                await this.client.sendStateEvent(
-                    this.room.roomId,
-                    EventType.GroupCallMemberPrefix,
-                    newContent,
-                    stateKey,
+                await resendIfRateLimited(() =>
+                    this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, newContent, stateKey),
                 );
                 // If sending state cancels your own delayed state, prepare another delayed state
                 // TODO: Remove this once MSC4140 is stable & doesn't cancel own delayed state
@@ -1093,11 +1090,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.disconnectDelayId = undefined;
                 }
                 if (!sentDelayedDisconnect) {
-                    await this.client.sendStateEvent(
-                        this.room.roomId,
-                        EventType.GroupCallMemberPrefix,
-                        {},
-                        this.makeMembershipStateKey(localUserId, localDeviceId),
+                    await resendIfRateLimited(() =>
+                        this.client.sendStateEvent(
+                            this.room.roomId,
+                            EventType.GroupCallMemberPrefix,
+                            {},
+                            this.makeMembershipStateKey(localUserId, localDeviceId),
+                        ),
                     );
                 }
             }
