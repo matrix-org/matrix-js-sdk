@@ -555,15 +555,18 @@ export interface CryptoApi {
     deleteKeyBackupVersion(version: string): Promise<void>;
 
     /**
-     * Download the last key backup from the homeserver (endpoint GET /room_keys/keys/).
+     * Download and restore the last key backup from the homeserver (endpoint GET /room_keys/keys/).
      * The key backup is decrypted and imported by using the decryption key stored locally. The decryption key should be stored locally by using {@link CryptoApi#storeSessionBackupPrivateKey}.
      *
+     * Warning: the full key backup may be quite large, so this operation may take several hours to complete.
+     * Use of {@link KeyBackupRestoreOpts.progressCallback} is recommended.
      * @param opts
      */
     restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     /**
      * Restores a key backup using a passphrase.
+     * The decoded key (derivated from the passphrase) is store locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
      * @param passphrase - The passphrase to use to restore the key backup.
      * @param opts
      *
