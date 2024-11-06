@@ -159,10 +159,7 @@ export class MatrixError extends HTTPError {
 
     public static fromWidgetApiErrorData(data: IWidgetMatrixError): MatrixError {
         return new MatrixError(
-            {
-                errcode: data.response.errcode,
-                error: data.response.error,
-            },
+            data.response,
             data.http_status,
             data.url,
             undefined,
