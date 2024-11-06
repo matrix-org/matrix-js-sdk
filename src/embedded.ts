@@ -244,7 +244,7 @@ export class RoomWidgetClient extends MatrixClient {
                 const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
                 if (this.syncApi instanceof SyncApi) {
-                    await this.syncApi!.injectRoomEvents(this.room!, undefined, events, []);
+                    await this.syncApi.injectRoomEvents(this.room!, undefined, events, []);
                 } else {
                     await this.syncApi!.injectRoomEvents(this.room!, events, []);
                 }
@@ -476,7 +476,7 @@ export class RoomWidgetClient extends MatrixClient {
 
             // The widget API does not tell us whether a state event came from `state_after` or not so we assume legacy behaviour for now.
             if (this.syncApi instanceof SyncApi) {
-                await this.syncApi!.injectRoomEvents(this.room!, [], undefined, [event]);
+                await this.syncApi.injectRoomEvents(this.room!, [], undefined, [event]);
             } else {
                 await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
             }
