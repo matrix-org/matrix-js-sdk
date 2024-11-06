@@ -1309,6 +1309,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link Crypto.loadSessionBackupPrivateKeyFromSecretStorage}.
+     */
+    public loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void> {
+        throw new Error("Not implmeented");
+    }
+
+    /**
      * Get the current status of key backup.
      *
      * Implementation of {@link Crypto.CryptoApi.getActiveSessionBackupVersion}.
@@ -4325,13 +4332,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         passphrase: string,
         opts: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
-        throw new Error("Not implemented");
-    }
-
-    /**
-     * Stub function -- getSecretStorageBackupPrivateKey is not implemented here, so throw error
-     */
-    public getSecretStorageBackupPrivateKey(): Promise<Uint8Array | null> {
         throw new Error("Not implemented");
     }
 }

@@ -1172,15 +1172,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
-     * Implementation of {@link CryptoApi#getSecretStorageBackupPrivateKey}.
-     */
-    public async getSecretStorageBackupPrivateKey(): Promise<Uint8Array | null> {
-        const backupKey = await this.secretStorage.get("m.megolm_backup.v1");
-        if (!backupKey) return null;
-        return decodeBase64(backupKey);
-    }
-
-    /**
      * Fetch the backup decryption key we have saved in our store.
      *
      * Implementation of {@link CryptoApi#getSessionBackupPrivateKey}.
@@ -1212,6 +1203,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
         );
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#loadSessionBackupPrivateKeyFromSecretStorage}.
+     */
+    public async loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void> {
+        const backupKey = await this.secretStorage.get("m.megolm_backup.v1");
+        if (!backupKey) {
+            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: missing decryption key in secret storage");
+        }
+
+        const decodedKey = decodeBase64(backupKey);
+        const keyBackupInfo = await this.backupManager.getServerBackupInfo();
+        if (!keyBackupInfo) {
+            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: unable to get backup version");
+        }
+
+        await this.storeSessionBackupPrivateKey(decodedKey, keyBackupInfo.version);
     }
 
     /**
@@ -1323,19 +1332,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         const backupDecryptor = await this.getBackupDecryptor(backupInfo, privateKeyFromCache);
 
-        opts?.progressCallback?.({
-            stage: "fetch",
-        });
-
-        let result: KeyBackupRestoreResult;
         try {
-            result = await this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+            opts?.progressCallback?.({
+                stage: "fetch",
+            });
+
+            const result = await this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+            return result;
         } finally {
             // Free to avoid to keep in memory the decryption key stored in it. To avoid to exposing it to an attacker.
             backupDecryptor.free();
         }
-
-        return result;
     }
 
     /**

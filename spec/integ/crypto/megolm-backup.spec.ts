@@ -23,6 +23,7 @@ import {
     createClient,
     Crypto,
     CryptoEvent,
+    encodeBase64,
     ICreateClientOpts,
     IEvent,
     IMegolmSessionData,
@@ -621,11 +622,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 };
                 fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
 
-                const check = await aliceCrypto.checkKeyBackupAndEnable();
-                const recoveryKey = await aliceCrypto.getSecretStorageBackupPrivateKey();
-                expect(recoveryKey).not.toBeNull();
+                await aliceCrypto.loadSessionBackupPrivateKeyFromSecretStorage();
+                const decryptionKey = await aliceCrypto.getSessionBackupPrivateKey();
+                expect(encodeBase64(decryptionKey!)).toStrictEqual(testData.BACKUP_DECRYPTION_KEY_BASE64);
 
-                await aliceCrypto.storeSessionBackupPrivateKey(recoveryKey!, check!.backupInfo!.version!);
                 const result = await aliceCrypto.restoreKeyBackup();
                 expect(result.imported).toStrictEqual(1);
             },

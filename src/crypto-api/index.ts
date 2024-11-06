@@ -471,15 +471,6 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Fetch the backup decryption key we have saved in our secret storage.
-     *
-     * This can be used for gossiping the key to other devices.
-     *
-     * @returns the key, if any, or null
-     */
-    getSecretStorageBackupPrivateKey(): Promise<Uint8Array | null>;
-
-    /**
      * Fetch the backup decryption key we have saved in our store.
      *
      * This can be used for gossiping the key to other devices.
@@ -510,6 +501,12 @@ export interface CryptoApi {
      * @param version - the backup version corresponding to this decryption key
      */
     storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void>;
+
+    /**
+     * Fetch the backup decryption key from the secret storage, fetch the backup info version.
+     * Store locally the key and the backup info version by calling {@link storeSessionBackupPrivateKey}.
+     */
+    loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
 
     /**
      * Get the current status of key backup.
