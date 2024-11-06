@@ -46,11 +46,12 @@ import {
 import { SyncApi, SyncState } from "./sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
 import { User } from "./models/user.ts";
-import { Room, RoomEvent } from "./models/room.ts";
+import { Room } from "./models/room.ts";
 import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { DeviceInfo } from "./crypto/deviceinfo.ts";
 import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
 import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
+import { TypedEventEmitter } from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -117,6 +118,10 @@ export interface ICapabilities {
     updateDelayedEvents?: boolean;
 }
 
+export enum PendingEvent {
+    PendingEventsChanged = "PendingEvent.pendingEventsChanged",
+}
+export type PendingEventHandlerMap = { [PendingEvent.PendingEventsChanged]: () => void };
 /**
  * A MatrixClient that routes its requests through the widget API instead of the
  * real CS API.
@@ -129,6 +134,7 @@ export class RoomWidgetClient extends MatrixClient {
     private syncState: SyncState | null = null;
 
     private pendingSendingEventsTxId: { type: string; id: string | undefined; txId: string }[] = [];
+    private pendingEventsEmitter = new TypedEventEmitter<PendingEvent.PendingEventsChanged, PendingEventHandlerMap>();
 
     /**
      *
@@ -324,17 +330,14 @@ export class RoomWidgetClient extends MatrixClient {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
             throw e;
         }
-
-        // Update the pending events list with the eventId
-        if (txId) {
-            this.pendingSendingEventsTxId.map((old) => {
-                if (old.txId === txId) old.id = response.event_id;
-                return old;
-            });
-        }
-
         // This also checks for an event id on the response
         room.updatePendingEvent(event, EventStatus.SENT, response.event_id);
+
+        // Update the pending events list with the eventId
+        this.pendingSendingEventsTxId.forEach((p) => {
+            if (p.txId === txId) p.id = response.event_id;
+        });
+        this.pendingEventsEmitter.emit(PendingEvent.PendingEventsChanged);
 
         return { event_id: response.event_id! };
     }
@@ -479,6 +482,48 @@ export class RoomWidgetClient extends MatrixClient {
         await this.widgetApi.transport.reply<IWidgetApiAcknowledgeResponseData>(ev.detail, {});
     }
 
+    private updateTxId = async (event: MatrixEvent): Promise<void> => {
+        // We update the txId for remote echos that originate from this client.
+        // This happens with the help of `pendingSendingEventsTxId` where we store all events that are currently sending
+        // with their widget txId and once ready the final evId.
+        if (
+            // This could theoretically be an event send by this device
+            // In that case we need to update the txId of the event because the embedded client/widget
+            // knows this event with a different transaction Id than what was used by the host client.
+            event.getSender() === this.getUserId() &&
+            // We optimize by not blocking events from types that we have not send
+            // with this client.
+            this.pendingSendingEventsTxId.some((p) => event.getType() === p.type)
+        ) {
+            // Compare by event Id if we have a matching pending event where we know the txId.
+            let matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
+            // Block any further processing of this event until we have received the sending response.
+            // -> until we know the event id.
+            // -> until we have not pending events anymore.
+            while (!matchingTxId && this.pendingSendingEventsTxId.length > 0) {
+                // Recheck whenever the PendingEventsChanged
+                await new Promise<void>((resolve) =>
+                    this.pendingEventsEmitter.once(PendingEvent.PendingEventsChanged, () => resolve()),
+                );
+                matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
+            }
+
+            // We found the correct txId: we update the event and delete the entry of the pending events.
+            if (matchingTxId) {
+                event.setTxnId(matchingTxId);
+                event.setUnsigned({ ...event.getUnsigned(), transaction_id: matchingTxId });
+            }
+            this.pendingSendingEventsTxId = this.pendingSendingEventsTxId.filter((p) => p.id !== event.getId());
+
+            // Emit once there are no pending events anymore to release all other events that got
+            // awaited in the `while (!matchingTxId && this.pendingSendingEventsTxId.length > 0)` loop
+            // but are not send by this client.
+            if (this.pendingSendingEventsTxId.length === 0) {
+                this.pendingEventsEmitter.emit(PendingEvent.PendingEventsChanged);
+            }
+        }
+    };
+
     private onEvent = async (ev: CustomEvent<ISendEventToWidgetActionRequest>): Promise<void> => {
         ev.preventDefault();
 
@@ -487,31 +532,8 @@ export class RoomWidgetClient extends MatrixClient {
         if (ev.detail.data.room_id === this.roomId) {
             const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
 
-            if (
-                // This could theoretically be an event send by this device
-                // In that case we need to update the txId of the event because the embedded client/widget
-                // knows this event with a different transaction Id than what was used by the host client.
-                event.getSender() === this.getUserId() &&
-                // this is an optimization so we do not block events from types that we have not send
-                // with this client
-                this.pendingSendingEventsTxId.some((p) => event.getType() === p.type)
-            ) {
-                // Compare by event Id if we have a matching pending event where we know the txId.
-                let matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
-                // Block injection this event until we have received the sending response.
-                // -> until we know the event id.
-                while (!matchingTxId) {
-                    // Recheck whenever the LocalEchoUpdated
-                    await new Promise<void>((resolve) => this.room?.once(RoomEvent.LocalEchoUpdated, () => resolve()));
-                    matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
-                }
-
-                // We found the correct txId: we update the event and delete the entry of the pending events.
-                event.setTxnId(matchingTxId);
-                event.setUnsigned({ ...event.getUnsigned(), transaction_id: matchingTxId });
-                this.pendingSendingEventsTxId.filter((p) => p.id !== event.getId());
-            }
-
+            // Only inject once we have update the txId
+            await this.updateTxId(event);
             await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);

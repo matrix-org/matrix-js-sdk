@@ -30,6 +30,7 @@ import {
     ITurnServer,
     IRoomEvent,
     IOpenIDCredentials,
+    ISendEventFromWidgetResponseData,
 } from "matrix-widget-api";
 
 import { createRoomWidgetClient, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
@@ -186,6 +187,28 @@ describe("RoomWidgetClient", () => {
                     .getEvents()
                     .map((e) => e.getEffectiveEvent()),
             ).toEqual([event]);
+        });
+        it("updates local echo", async () => {
+            await makeClient({
+                receiveEvent: ["org.matrix.rageshake_request"],
+                sendEvent: ["org.matrix.rageshake_request"],
+            });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+            expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
+            // const sendSpy = jest.spyOn(widgetApi.transport, "send");
+            const sendMock = jest.fn();
+            new Promise((resolve, _) => {
+                widgetApi.sendRoomEvent.mockImplementation(
+                    async (eType, content, roomId): Promise<ISendEventFromWidgetResponseData> => {},
+                );
+            });
+            // widgetApi.transport.o;
+            client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+            expect(sendMock).toHaveBeenCalledWith("abc");
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.SendEvent}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+            );
         });
     });
 
