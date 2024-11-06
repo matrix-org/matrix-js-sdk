@@ -292,6 +292,11 @@ export interface ICreateClientOpts {
      * {@link setCryptoStoreFactory} if unspecified; or if no factory has been
      * specified, uses a default implementation (indexeddb in the browser,
      * in-memory otherwise).
+     *
+     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initCrypto}),
+     * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
+     * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
+     * data can be migrated from the legacy store.
      */
     cryptoStore?: CryptoStore;
 
@@ -1269,6 +1274,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected isGuestAccount = false;
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
+    /* @deprecated  */
     protected cryptoStore?: CryptoStore;
     protected verificationMethods?: string[];
     protected fallbackICEServerAllowed = false;
