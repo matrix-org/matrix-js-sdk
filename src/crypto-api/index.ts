@@ -936,8 +936,11 @@ export interface CrossSigningStatus {
  * Crypto callbacks provided by the application
  */
 export interface CryptoCallbacks extends SecretStorageCallbacks {
+    /** @deprecated: unused with the Rust crypto stack. */
     getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    /** @deprecated: unused with the Rust crypto stack. */
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    /** @deprecated: unused with the Rust crypto stack. */
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
     /**
      * Called by {@link CryptoApi#bootstrapSecretStorage}
@@ -962,6 +965,7 @@ export interface CryptoCallbacks extends SecretStorageCallbacks {
         checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
 
+    /** @deprecated: unused with the Rust crypto stack. */
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
