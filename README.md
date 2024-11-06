@@ -303,44 +303,153 @@ Then visit `http://localhost:8005` to see the API docs.
 
 # End-to-end encryption support
 
-**This section is outdated.** Use of `libolm` is deprecated and we are replacing it with support
-from the matrix-rust-sdk (https://github.com/element-hq/element-web/issues/21972).
+The matrix-js-sdk uses underneath the [matrix-sdk-crypto-wasm bindings](https://github.com/matrix-org/matrix-rust-sdk-crypto-wasm) of the [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk/) to provide end-to-end encryption support.
 
-The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
-[libolm](https://gitlab.matrix.org/matrix-org/olm). It is left up to the
-application to make libolm available, via the `Olm` global.
+## Initialization
 
-It is also necessary to call `await matrixClient.initCrypto()` after creating a new
-`MatrixClient` (but **before** calling `matrixClient.startClient()`) to
-initialise the crypto layer.
+**Do not use `matrixClient.initCrypto()`. This method is deprecated and no longer maintained.**
 
-If the `Olm` global is not available, the SDK will show a warning, as shown
-below; `initCrypto()` will also fail.
+To initialize the end-to-end encryption support in the matrix client:
 
+```javascript
+// Create a new matrix client
+const matrixClient = sdk.createClient({
+    baseUrl: "http://localhost:8008",
+    accessToken: myAccessToken,
+    userId: myUserId,
+});
+
+// Initialize to enable end-to-end encryption support.
+// This will use an in-memory store.
+await matrixClient.initRustCrypto();
 ```
-Unable to load crypto module: crypto will be disabled: Error: global.Olm is not defined
+
+To persist the local data, you can use the indexedDB store:
+
+```javascript
+// If you not provide a storage key or a password (using a storage key is preferred), the indexedDB store will be uncrypted.
+// The storage key must be a 32 bytes long Uint8Array.
+await matrixClient.initRustCrypto({
+    useIndexedDB: true,
+    storageKey: my32BytesKey,
+});
 ```
 
-If the crypto layer is not (successfully) initialised, the SDK will continue to
-work for unencrypted rooms, but it will not support the E2E parts of the Matrix
-specification.
+### Secret storage
 
-To provide the Olm library in a browser application:
+If your [secret storage](https://spec.matrix.org/v1.12/client-server-api/#secret-storage) is not set up, you need to bootstrap it before using the `CryptoApi`:
 
--   download the transpiled libolm (from https://packages.matrix.org/npm/olm/).
--   load `olm.js` as a `<script>` _before_ `browser-matrix.js`.
+```javascript
+const matrixClient = sdk.createClient({
+    ...,
+    cryptoCallbacks: {
+        getSecretStorageKey: (keys) => {
+            // This function should return the secret storage keys returned in `bootstrapSecretStorage#createSecretStorageKey`
+            return mySecretStorageKeys;
+        },
+    },
+});
 
-To provide the Olm library in a node.js application:
+matrixClient.getCrypto().bootstrapSecretStorage({
+    // This will reset the secret storage if it is already set up.
+    // If you want to keep the current secret storage, you can set `setupNewSecretStorage` to `false`.
+    // If `setupNewSecretStorage` is `true`, you need to fill `createSecretStorageKey`
+    setupNewSecretStorage: true,
+    // This function will be called if `setupNewSecretStorage` is `true`.
+    // You should remember the key you return here, because you will need it to unlock the secret storage.
+    // This key should implement the https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.GeneratedSecretStorageKey.html interface.
+    createSecretStorageKey: () => {
+        return mySecretStorageKey;
+    },
+});
+```
 
--   `yarn add https://packages.matrix.org/npm/olm/olm-3.1.4.tgz`
-    (replace the URL with the latest version you want to use from
-    https://packages.matrix.org/npm/olm/)
--   `global.Olm = require('olm');` _before_ loading `matrix-js-sdk`.
+In the example above, we are setting up a new secret storage. The secret storage data will be encrypted using the secret storage key returned in `createSecretStorageKey`.
+You should remember this key because when access to the secret storage is needed, the crypto moduel is expecting the `getSecretStorageKey` to return this key.
 
-If you want to package Olm as dependency for your node.js application, you can
-use `yarn add https://packages.matrix.org/npm/olm/olm-3.1.4.tgz`. If your
-application also works without e2e crypto enabled, add `--optional` to mark it
-as an optional dependency.
+-   [CryptoCallbacks#getSecretStorageKey](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoCallbacks.html#getSecretStorageKey)
+-   [CryptoApi#bootstrapSecretStorage](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapSecretStorage)
+
+Also, if you don't have a [key backup](https://spec.matrix.org/v1.12/client-server-api/#server-side-key-backups) you should create one:
+
+```javascript
+matrixClient.getCrypto().bootstrapSecretStorage({
+    ...,
+    setupNewKeyBackup: true,
+});
+```
+
+Once the key backup and the secret storage are set up, you don't need to set them up again for all your devices.
+
+### Verify a device and cross-signing
+
+### Set up cross-signing
+
+In order to use cross-signing to verify devices, you need to set up cross-signing:
+
+```javascript
+matrixClient.getCrypto().bootstrapCrossSigning({
+    authUploadDeviceSigningKeys: (makeRequest) => {
+        return makeRequest(authDict);
+    },
+});
+```
+
+The `authUploadDeviceSigningKeys` callback is optional but strongly recommended in order to upload the device signing keys to the server.
+
+-   [AuthDict](https://matrix-org.github.io/matrix-js-sdk/types/matrix.AuthDict.html)
+-   [CryptoApi#bootstrapCrossSigning](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapCrossSigning)
+
+### Verify a device
+
+Once the cross-signing is set up on one of your devices, you can verify another device with two methods:
+
+1. Use `CryptoApi#bootstrapCrossSigning`
+
+`bootstrapCrossSigning`will call the [CryptoCallbacks#getSecretStorageKey](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoCallbacks.html#getSecretStorageKey) provided in [Secret storage chapter](#secret-storage). The device is verified with the private cross-signing keys fetched from the secret storage.
+
+2. Request a verification with [CryptoApi#requestOwnUserVerification](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#requestOwnUserVerification) or [CryptoApi#requestDeviceVerification](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#requestDeviceVerification).
+
+## Migrate from the legacy crypto to the new crypto
+
+To migrate from the legacy crypto to the new crypto:
+
+```javascript
+// You should provide the legacy crypto store and the pickle key to the matrix client in order to migrate the data.
+const matrixClient = sdk.createClient({
+    cryptoStore: myCryptoStore,
+    pickleKey: myPickleKey,
+    baseUrl: "http://localhost:8008",
+    accessToken: myAccessToken,
+    userId: myUserId,
+});
+
+// The migration will be done automatically when you call `initRustCrypto`.
+await matrixClient.initRustCrypto();
+```
+
+To follow the migration progress, you can listen to the `CryptoEvent.LegacyCryptoStoreMigrationProgress` event:
+
+```javascript
+// When progress === total === -1, the migration is finished.
+matrixClient.on(CryptoEvent.LegacyCryptoStoreMigrationProgress, (progress, total) => {
+    ...
+});
+```
+
+After the migration is finished, you can remove the legacy crypto store and the pickle key from the matrix client creation.
+
+## Use the `CryptoApi`
+
+The `CryptoApi` is the main entry point for end-to-end encryption.
+
+```javascript
+// If the `CryptoApi` object is `undefined`, the end-to-end encryption is not enabled.
+// You must call `initRustCrypto` before.
+matrixClient.getCrypto();
+```
+
+The CryptoApi documentation is available [here](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html).
 
 # Contributing
 
