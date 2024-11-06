@@ -1296,7 +1296,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#restoreKeyBackupWithPassphrase}.
      */
     public async restoreKeyBackupWithPassphrase(
-        phassphrase: string,
+        passphrase: string,
         opts?: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
         const backupInfo = await this.backupManager.getServerBackupInfo();
@@ -1304,7 +1304,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("No backup info available");
         }
 
-        const privateKey = await keyFromAuthData(backupInfo.auth_data, phassphrase);
+        const privateKey = await keyFromAuthData(backupInfo.auth_data, passphrase);
 
         // Cache the key
         await this.storeSessionBackupPrivateKey(privateKey, backupInfo.version);

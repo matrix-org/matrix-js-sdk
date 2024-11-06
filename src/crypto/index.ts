@@ -4322,7 +4322,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Stub function -- restoreKeyBackupWithPassphrase is not implemented here, so throw error
      */
     public restoreKeyBackupWithPassphrase(
-        phassphrase: string,
+        passphrase: string,
         opts: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
