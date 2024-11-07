@@ -24,6 +24,10 @@ import {
     ISendEventToWidgetActionRequest,
     ISendToDeviceToWidgetActionRequest,
     ISendEventFromWidgetResponseData,
+    IWidgetApiRequestData,
+    WidgetApiAction,
+    IWidgetApiResponse,
+    IWidgetApiResponseData,
 } from "matrix-widget-api";
 
 import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event.ts";
@@ -150,20 +154,24 @@ export class RoomWidgetClient extends MatrixClient {
         super(opts);
 
         const transportSend = this.widgetApi.transport.send.bind(this.widgetApi.transport);
-        // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-        this.widgetApi.transport.send = async (action, data) => {
+        this.widgetApi.transport.send = async <T extends IWidgetApiRequestData, R extends IWidgetApiResponseData = IWidgetApiAcknowledgeResponseData>(
+            action: WidgetApiAction,
+            data: T,
+        ): Promise<R> => {
             try {
-                return await transportSend(action, data);
+                return await transportSend<T, R>(action, data);
             } catch (error) {
                 processAndThrow(error);
             }
         };
 
         const transportSendComplete = this.widgetApi.transport.sendComplete.bind(this.widgetApi.transport);
-        // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-        this.widgetApi.transport.sendComplete = async (action, data) => {
+        this.widgetApi.transport.sendComplete = async <T extends IWidgetApiRequestData, R extends IWidgetApiResponse>(
+            action: WidgetApiAction,
+            data: T,
+        ): Promise<R> => {
             try {
-                return await transportSendComplete(action, data);
+                return await transportSendComplete<T, R>(action, data);
             } catch (error) {
                 processAndThrow(error);
             }
