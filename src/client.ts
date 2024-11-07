@@ -286,9 +286,8 @@ export interface ICreateClientOpts {
     store?: Store;
 
     /**
-     * A store to be used for end-to-end crypto session data. If not specified,
-     * end-to-end crypto will be disabled. The `createClient` helper will create
-     * a default store if needed. Calls the factory supplied to
+     * A store to be used for end-to-end crypto session data.
+     * The `createClient` helper will create a default store if needed. Calls the factory supplied to
      * {@link setCryptoStoreFactory} if unspecified; or if no factory has been
      * specified, uses a default implementation (indexeddb in the browser,
      * in-memory otherwise).
