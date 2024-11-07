@@ -433,6 +433,8 @@ matrixClient.on(CryptoEvent.LegacyCryptoStoreMigrationProgress, (progress, total
 
 After the migration is finished, you can remove the legacy crypto store and the pickle key from the matrix client creation.
 
+The Rust crypto is not supported in a lot of deprecated methods of [`MatrixClient`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html). If you use them, you should migrate to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html). Also, the legacy `MatrixClient.crypto` object is not available anymore, you should use `MatrixClient.getCrypto()` instead.
+
 # Contributing
 
 _This section is for people who want to modify the SDK. If you just
