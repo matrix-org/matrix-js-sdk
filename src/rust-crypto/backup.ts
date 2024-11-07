@@ -502,12 +502,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Get information about the current key backup from the server
-     *
+     * Get information about a key backup from the server
+     * - If version is provided, get information about that backup version.
+     * - If no version is provided, get information about the latest backup.
+     * @param version - The version of the backup to get information about.
      * @returns Information object from API or null if there is no active backup.
      */
-    private async requestKeyBackupVersion(): Promise<KeyBackupInfo | null> {
-        return await requestKeyBackupVersion(this.http);
+    public async requestKeyBackupVersion(version?: string): Promise<KeyBackupInfo | null> {
+        return await requestKeyBackupVersion(this.http, version);
     }
 
     /**
@@ -798,11 +800,23 @@ export class RustBackupDecryptor implements BackupDecryptor {
     }
 }
 
+/**
+ * Fetch a key backup info from the server.
+ * - If `version` is provided call GET /room_keys/version/$version and get the backup info for that version.
+ * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keysversionversion
+ * - If not, call GET /room_keys/version and get the latest backup info.
+ * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keysversion
+ * @param http
+ * @param version - the specific version of the backup info to fetch
+ * @returns The key backup info or null if there is no backup.
+ */
 export async function requestKeyBackupVersion(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+    version?: string,
 ): Promise<KeyBackupInfo | null> {
     try {
-        return await http.authedRequest<KeyBackupInfo>(Method.Get, "/room_keys/version", undefined, undefined, {
+        const path = version ? encodeUri("/room_keys/version/$version", { $version: version }) : "/room_keys/version";
+        return await http.authedRequest<KeyBackupInfo>(Method.Get, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
     } catch (e) {

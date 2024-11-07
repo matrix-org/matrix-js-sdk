@@ -1182,6 +1182,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Fetch the backup version we have saved in our store.
+     * @returns the backup version, if any, or null
+     */
+    private async getSessionBackupVersion(): Promise<string | null> {
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        return backupKeys.backupVersion || null;
+    }
+
+    /**
      * Store the backup decryption key.
      *
      * Implementation of {@link CryptoApi#storeSessionBackupPrivateKey}.
@@ -1325,10 +1334,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#restoreKeyBackup}.
      */
     public async restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
+        // Get the decryption key from the cache
         const privateKeyFromCache = await this.getSessionBackupPrivateKey();
         if (!privateKeyFromCache) throw new Error("No decryption key found in cache");
 
-        const backupInfo = await this.backupManager.getServerBackupInfo();
+        // Get the backup version from the cache
+        const backupVersion = await this.getSessionBackupVersion();
+        if (!backupVersion) throw new Error("No backup version found in cache");
+
+        const backupInfo = await this.backupManager.requestKeyBackupVersion(backupVersion);
         if (!backupInfo?.version) throw new Error("Missing version in backup info");
 
         const backupDecryptor = await this.getBackupDecryptor(backupInfo, privateKeyFromCache);

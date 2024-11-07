@@ -317,6 +317,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         beforeEach(async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+            fetchMock.get(
+                `path:/_matrix/client/v3/room_keys/version/${testData.SIGNED_BACKUP_DATA.version}`,
+                testData.SIGNED_BACKUP_DATA,
+            );
 
             aliceClient = await initTestClient();
             aliceCrypto = aliceClient.getCrypto()!;
