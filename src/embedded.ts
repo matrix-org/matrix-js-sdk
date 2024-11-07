@@ -547,7 +547,9 @@ export class RoomWidgetClient extends MatrixClient {
 }
 
 function processAndThrow(error: unknown): never {
-    throw error instanceof WidgetApiResponseError && error.data.matrix_api_error
-        ? MatrixError.fromWidgetApiErrorData(error.data.matrix_api_error)
-        : error;
+    if (error instanceof WidgetApiResponseError && error.data.matrix_api_error) {
+        throw MatrixError.fromWidgetApiErrorData(error.data.matrix_api_error);
+    } else {
+        throw error;
+    }
 }
