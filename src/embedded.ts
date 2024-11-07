@@ -154,7 +154,10 @@ export class RoomWidgetClient extends MatrixClient {
         super(opts);
 
         const transportSend = this.widgetApi.transport.send.bind(this.widgetApi.transport);
-        this.widgetApi.transport.send = async <T extends IWidgetApiRequestData, R extends IWidgetApiResponseData = IWidgetApiAcknowledgeResponseData>(
+        this.widgetApi.transport.send = async <
+            T extends IWidgetApiRequestData,
+            R extends IWidgetApiResponseData = IWidgetApiAcknowledgeResponseData,
+        >(
             action: WidgetApiAction,
             data: T,
         ): Promise<R> => {
