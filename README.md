@@ -351,7 +351,7 @@ matrixClient.getCrypto().bootstrapSecretStorage({
     // If `setupNewSecretStorage` is `true`, you need to fill `createSecretStorageKey`
     setupNewSecretStorage: true,
     // This function will be called if a new secret storage key (aka recovery key) is needed.
-    // You should prompt the user to save the keu somewhere, because you will need it to unlock the secret storage.
+    // You should prompt the user to save the key somewhere, because you will need it to unlock the secret storage.
     createSecretStorageKey: async () => {
         return mySecretStorageKey;
     },
@@ -382,11 +382,11 @@ Once the key backup and the secret storage are set up, you don't need to set the
 
 ### Set up cross-signing
 
-To set up cross-signing to verify devices and other users, call [`CryptoApi.bootstrapCrossSigning`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapCrossSigning)):
+To set up cross-signing to verify devices and other users, call [`CryptoApi.bootstrapCrossSigning`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapCrossSigning):
 
 ```javascript
 matrixClient.getCrypto().bootstrapCrossSigning({
-    authUploadDeviceSigningKeys: (makeRequest) => {
+    authUploadDeviceSigningKeys: async (makeRequest) => {
         return makeRequest(authDict);
     },
 });
