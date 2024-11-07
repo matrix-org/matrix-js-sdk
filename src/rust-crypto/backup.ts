@@ -498,7 +498,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      */
     private keysCountInBatch(batch: RustSdkCryptoJs.KeysBackupRequest): number {
         const parsedBody: KeyBackup = JSON.parse(batch.body);
-        return countKeystInBackup(parsedBody);
+        return countKeysInBackup(parsedBody);
     }
 
     /**
@@ -656,7 +656,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         const CHUNK_SIZE = 200;
         // Get the total count as a first pass
-        const totalKeyCount = countKeystInBackup(keyBackup);
+        const totalKeyCount = countKeysInBackup(keyBackup);
         let totalImported = 0;
         let totalFailures = 0;
 
@@ -843,10 +843,9 @@ export function decryptionKeyMatchKeyBackupInfo(decryptionKey: Uint8Array, keyBa
 /**
  * Counts the total number of keys present in a key backup.
  * @param keyBackup - The key backup to count the keys from.
- *
  * @returns The total number of keys in the backup.
  */
-function countKeystInBackup(keyBackup: KeyBackup): number {
+function countKeysInBackup(keyBackup: KeyBackup): number {
     let count = 0;
     for (const { sessions } of Object.values(keyBackup.rooms)) {
         count += Object.keys(sessions).length;
