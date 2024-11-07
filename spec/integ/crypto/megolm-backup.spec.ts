@@ -660,8 +660,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             ).rejects.toThrow();
         });
 
-        newBackendOnly("Should throw an error if the decryption key is found in cache", async () => {
-            await expect(aliceCrypto.restoreKeyBackup()).rejects.toThrow("No decryption key found in cache");
+        newBackendOnly("Should throw an error if the decryption key is not found in cache", async () => {
+            await expect(aliceCrypto.restoreKeyBackup()).rejects.toThrow("No decryption key found in crypto store");
         });
     });
 

@@ -1182,15 +1182,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
-     * Fetch the backup version we have saved in our store.
-     * @returns the backup version, if any, or null
-     */
-    private async getSessionBackupVersion(): Promise<string | null> {
-        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
-        return backupKeys.backupVersion || null;
-    }
-
-    /**
      * Store the backup decryption key.
      *
      * Implementation of {@link CryptoApi#storeSessionBackupPrivateKey}.
@@ -1335,25 +1326,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#restoreKeyBackup}.
      */
     public async restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
-        // Get the decryption key from the cache
-        const privateKeyFromCache = await this.getSessionBackupPrivateKey();
-        if (!privateKeyFromCache) throw new Error("No decryption key found in cache");
+        // Get the decryption key from the crypto store
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        const { decryptionKey, backupVersion } = backupKeys;
+        if (!decryptionKey || !backupVersion) throw new Error("No decryption key found in crypto store");
 
-        // Get the backup version from the cache
-        const backupVersion = await this.getSessionBackupVersion();
-        if (!backupVersion) throw new Error("No backup version found in cache");
+        const decodedDecryptionKey = decodeBase64(decryptionKey.toBase64());
 
         const backupInfo = await this.backupManager.requestKeyBackupVersion(backupVersion);
-        if (!backupInfo?.version) throw new Error("Missing version in backup info");
+        if (!backupInfo) throw new Error(`Backup version to restore ${backupVersion} not found on server`);
 
-        const backupDecryptor = await this.getBackupDecryptor(backupInfo, privateKeyFromCache);
+        const backupDecryptor = await this.getBackupDecryptor(backupInfo, decodedDecryptionKey);
 
         try {
             opts?.progressCallback?.({
                 stage: "fetch",
             });
 
-            return await this.backupManager.restoreKeyBackup(backupInfo.version, backupDecryptor, opts);
+            return await this.backupManager.restoreKeyBackup(backupVersion, backupDecryptor, opts);
         } finally {
             // Free to avoid to keep in memory the decryption key stored in it. To avoid to exposing it to an attacker.
             backupDecryptor.free();
