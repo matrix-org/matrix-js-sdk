@@ -505,6 +505,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Get information about a key backup from the server
      * - If version is provided, get information about that backup version.
      * - If no version is provided, get information about the latest backup.
+     *
      * @param version - The version of the backup to get information about.
      * @returns Information object from API or null if there is no active backup.
      */
@@ -616,7 +617,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Call `/room_keys/keys` to download the key backup (room keys) for the given backup version.
-     * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keyskeys
+     * https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv3room_keyskeys
      *
      * @param backupVersion
      * @returns The key backup response.
@@ -635,7 +636,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Import the room keys from a `/room_keys/keys` call.
-     * Call the opts.progressCallback with the progress of the import.
+     * Calls the `opts.progressCallback` with the progress of the import.
      *
      * @param keyBackup - The response from the server containing the keys to import.
      * @param backupVersion - The version of the backup info.
@@ -802,10 +803,13 @@ export class RustBackupDecryptor implements BackupDecryptor {
 
 /**
  * Fetch a key backup info from the server.
- * - If `version` is provided call GET /room_keys/version/$version and get the backup info for that version.
- * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keysversionversion
- * - If not, call GET /room_keys/version and get the latest backup info.
- * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3room_keysversion
+ *
+ * If `version` is provided, calls `GET /room_keys/version/$version` and gets the backup info for that version.
+ * See https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv3room_keysversionversion.
+ *
+ * If not, calls `GET /room_keys/version` and get the latest backup info.
+ * See https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv3room_keysversion
+ *
  * @param http
  * @param version - the specific version of the backup info to fetch
  * @returns The key backup info or null if there is no backup.
@@ -830,11 +834,12 @@ export async function requestKeyBackupVersion(
 
 /**
  * Checks if the provided decryption key matches the public key of the key backup info.
+ *
  * @param decryptionKey - The decryption key to check.
  * @param keyBackupInfo - The key backup info to check against.
  * @returns `true` if the decryption key matches the key backup info, `false` otherwise.
  */
-export function decryptionKeyMatchKeyBackupInfo(decryptionKey: Uint8Array, keyBackupInfo: KeyBackupInfo): boolean {
+export function decryptionKeyMatchesKeyBackupInfo(decryptionKey: Uint8Array, keyBackupInfo: KeyBackupInfo): boolean {
     const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(decryptionKey));
     const authData = <Curve25519AuthData>keyBackupInfo.auth_data;
     return authData.public_key === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;

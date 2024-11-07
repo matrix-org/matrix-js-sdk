@@ -503,8 +503,14 @@ export interface CryptoApi {
     storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void>;
 
     /**
-     * Fetch the backup decryption key from the secret storage, fetch the backup info version.
-     * Store locally the key and the backup info version by calling {@link storeSessionBackupPrivateKey}.
+     * Attempt to fetch the backup decryption key from secret storage.
+     *
+     * If the key is found in secret storage, checks it against the latest backup on the server;
+     * if they match, stores the key in the crypto store by calling {@link storeSessionBackupPrivateKey},
+     * which enables automatic restore of individual keys when an Unable-to-decrypt error is encountered.
+     *
+     * if we are unable to fetch the key from secret storage, there is no backup on the server, or the key
+     * does not match, throws an exception.
      */
     loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
 
@@ -552,18 +558,28 @@ export interface CryptoApi {
     deleteKeyBackupVersion(version: string): Promise<void>;
 
     /**
-     * Download and restore the last key backup from the homeserver (endpoint GET /room_keys/keys/).
-     * The key backup is decrypted and imported by using the decryption key stored locally. The decryption key should be stored locally by using {@link CryptoApi#storeSessionBackupPrivateKey}.
+     * Download and restore the full key backup from the homeserver.
+     *
+     * Before calling this method, a decryption key, and the backup version to restore,
+     * must have been saved in the crypto store. This happens in one of the following ways:
+     *
+     * - When a new backup version is created with {@link CryptoApi.resetKeyBackup}, a new key is created and cached.
+     * - The key can be loaded from secret storage with {@link CryptoApi.loadSessionBackupPrivateKeyFromSecretStorage}.
+     * - The key can be received from another device via secret sharing, typically as part of the interactive verification flow.
+     * - The key and backup version can also be set explicitly via {@link CryptoApi.storeSessionBackupPrivateKey},
+     *   though this is not expected to be a common operation.
      *
      * Warning: the full key backup may be quite large, so this operation may take several hours to complete.
      * Use of {@link KeyBackupRestoreOpts.progressCallback} is recommended.
+     *
      * @param opts
      */
     restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     /**
      * Restores a key backup using a passphrase.
-     * The decoded key (derivated from the passphrase) is store locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
+     * The decoded key (derived from the passphrase) is stored locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
+     *
      * @param passphrase - The passphrase to use to restore the key backup.
      * @param opts
      *

@@ -77,7 +77,7 @@ import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } 
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { decryptionKeyMatchKeyBackupInfo, RustBackupManager } from "./backup.ts";
+import { decryptionKeyMatchesKeyBackupInfo, RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
@@ -338,7 +338,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error(`getBackupDecryptor: Unsupported algorithm ${backupInfo.algorithm}`);
         }
 
-        if (!decryptionKeyMatchKeyBackupInfo(privKey, backupInfo)) {
+        if (!decryptionKeyMatchesKeyBackupInfo(privKey, backupInfo)) {
             throw new Error(`getBackupDecryptor: key backup on server does not match the decryption key`);
         }
 
@@ -1226,7 +1226,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: unable to get backup version");
         }
 
-        if (!decryptionKeyMatchKeyBackupInfo(decodedKey, keyBackupInfo)) {
+        if (!decryptionKeyMatchesKeyBackupInfo(decodedKey, keyBackupInfo)) {
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info");
         }
 
