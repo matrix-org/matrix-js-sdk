@@ -331,7 +331,8 @@ To obtain a reference, call [`MatrixClient.getCrypto`](https://matrix-org.github
 
 ### Secret storage
 
-If your [secret storage](https://spec.matrix.org/v1.12/client-server-api/#secret-storage) is not set up, you need to bootstrap it before using the `CryptoApi`:
+You should set up the [secret storage](https://spec.matrix.org/v1.12/client-server-api/#secret-storage) before using the end-to-end encryption. To do this, you need to call [`CryptoApi.bootstrapSecretStorage`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapSecretStorage).
+`CryptoApi.bootstrapSecretStorage` can be called unconditionally, but it will only set up the secret storage if it is not already set up (unless you use the `setupNewSecretStorage` parameter).
 
 ```javascript
 const matrixClient = sdk.createClient({
@@ -350,26 +351,31 @@ matrixClient.getCrypto().bootstrapSecretStorage({
     // If `setupNewSecretStorage` is `true`, you need to fill `createSecretStorageKey`
     setupNewSecretStorage: true,
     // This function will be called if a new secret storage key (aka recovery key) is needed.
-    // You should remember the key you return here, because you will need it to unlock the secret storage.
+    // You should prompt the user to save the keu somewhere, because you will need it to unlock the secret storage.
     createSecretStorageKey: async () => {
         return mySecretStorageKey;
     },
 });
 ```
 
-In the example above, we are setting up a new secret storage. The secret storage data will be encrypted using the secret storage key returned in `createSecretStorageKey`.
-You should remember this key because when access to the secret storage is needed, the crypto moduel is expecting the `getSecretStorageKey` to return this key.
-
--   [CryptoCallbacks#getSecretStorageKey](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoCallbacks.html#getSecretStorageKey)
--   [CryptoApi#bootstrapSecretStorage](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapSecretStorage)
+In the example above, we are setting up a new secret storage. The secret storage data will be encrypted using the secret storage key returned in [`createSecretStorageKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CreateSecretStorageOpts.html#createSecretStorageKey).
+We recommend that you prompt the user to re-enter this key when [`CryptoCallbacks.getSecretStorageKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoCallbacks.html#getSecretStorageKey) is called (when the secret storage access is needed).
 
 Also, if you don't have a [key backup](https://spec.matrix.org/v1.12/client-server-api/#server-side-key-backups) you should create one:
 
 ```javascript
+// Check if we have a key backup.
+// checkKeyBackupAndEnable returns null, there is no key backup.
+const hasKeyBackup = await matrixClient.getCrypto().checkKeyBackupAndEnable() !== null
+
+// First option when setting up the secret storage
 matrixClient.getCrypto().bootstrapSecretStorage({
     ...,
-    setupNewKeyBackup: true,
+    setupNewKeyBackup: !hasKeyBackup,
 });
+
+// Second option
+matrixClient.getCrypto().resetKeyBackup();
 ```
 
 Once the key backup and the secret storage are set up, you don't need to set them up again for all your devices.
@@ -388,7 +394,6 @@ matrixClient.getCrypto().bootstrapCrossSigning({
 
 The [`authUploadDeviceSigningKeys`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.BootstrapCrossSigningOpts.html#authUploadDeviceSigningKeys) callback
 is required in order to upload newly-generated public cross-signing keys to the server.
-
 
 ### Verify a new device
 
