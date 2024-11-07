@@ -338,11 +338,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error(`getBackupDecryptor: Unsupported algorithm ${backupInfo.algorithm}`);
         }
 
-        if (!decryptionKeyMatchesKeyBackupInfo(privKey, backupInfo)) {
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
+        if (!decryptionKeyMatchesKeyBackupInfo(backupDecryptionKey, backupInfo)) {
             throw new Error(`getBackupDecryptor: key backup on server does not match the decryption key`);
         }
 
-        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
         return this.backupManager.createBackupDecryptor(backupDecryptionKey);
     }
 
@@ -1226,7 +1226,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: unable to get backup version");
         }
 
-        if (!decryptionKeyMatchesKeyBackupInfo(decodedKey, keyBackupInfo)) {
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(backupKey);
+        if (!decryptionKeyMatchesKeyBackupInfo(backupDecryptionKey, keyBackupInfo)) {
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info");
         }
 
