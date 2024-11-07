@@ -320,20 +320,14 @@ const matrixClient = sdk.createClient({
 });
 
 // Initialize to enable end-to-end encryption support.
-// This will use an in-memory store.
 await matrixClient.initRustCrypto();
 ```
 
-To persist the local data, you can use the indexedDB store:
+### Use the `CryptoApi`
 
-```javascript
-// If you not provide a storage key or a password (using a storage key is preferred), the indexedDB store will be uncrypted.
-// The storage key must be a 32 bytes long Uint8Array.
-await matrixClient.initRustCrypto({
-    useIndexedDB: true,
-    storageKey: my32BytesKey,
-});
-```
+The [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html) interface is the main entry point for end-to-end encryption.
+
+To obtain a reference, call [`MatrixClient.getCrypto`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#getCrypto).
 
 ### Secret storage
 
@@ -438,13 +432,6 @@ matrixClient.on(CryptoEvent.LegacyCryptoStoreMigrationProgress, (progress, total
 ```
 
 After the migration is finished, you can remove the legacy crypto store and the pickle key from the matrix client creation.
-
-## Use the `CryptoApi`
-
-The [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html) interface is the main entry point for end-to-end encryption.
-
-To obtain a reference, call [`MatrixClient.getCrypto`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#getCrypto).
-
 
 # Contributing
 
