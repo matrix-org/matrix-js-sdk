@@ -38,6 +38,7 @@ import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { encodeBase64 } from "../base64.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -811,6 +812,18 @@ export async function requestKeyBackupVersion(
             throw e;
         }
     }
+}
+
+/**
+ * Checks if the provided decryption key matches the public key of the key backup info.
+ * @param decryptionKey - The decryption key to check.
+ * @param keyBackupInfo - The key backup info to check against.
+ * @returns `true` if the decryption key matches the key backup info, `false` otherwise.
+ */
+export function decryptionKeyMatchKeyBackupInfo(decryptionKey: Uint8Array, keyBackupInfo: KeyBackupInfo): boolean {
+    const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(decryptionKey));
+    const authData = <Curve25519AuthData>keyBackupInfo.auth_data;
+    return authData.public_key === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
 }
 
 /**

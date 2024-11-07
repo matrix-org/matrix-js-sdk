@@ -46,7 +46,6 @@ import {
     CrossSigningStatus,
     CryptoApi,
     CryptoCallbacks,
-    Curve25519AuthData,
     DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
@@ -78,7 +77,7 @@ import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } 
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { RustBackupManager } from "./backup.ts";
+import { decryptionKeyMatchKeyBackupInfo, RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
@@ -339,13 +338,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error(`getBackupDecryptor: Unsupported algorithm ${backupInfo.algorithm}`);
         }
 
-        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
-
-        const authData = <Curve25519AuthData>backupInfo.auth_data;
-        if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
+        if (!decryptionKeyMatchKeyBackupInfo(privKey, backupInfo)) {
             throw new Error(`getBackupDecryptor: key backup on server does not match the decryption key`);
         }
 
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
         return this.backupManager.createBackupDecryptor(backupDecryptionKey);
     }
 
@@ -1218,6 +1215,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const keyBackupInfo = await this.backupManager.getServerBackupInfo();
         if (!keyBackupInfo) {
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: unable to get backup version");
+        }
+
+        if (!decryptionKeyMatchKeyBackupInfo(decodedKey, keyBackupInfo)) {
+            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info");
         }
 
         await this.storeSessionBackupPrivateKey(decodedKey, keyBackupInfo.version);
