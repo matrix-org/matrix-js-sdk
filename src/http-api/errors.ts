@@ -157,6 +157,10 @@ export class MatrixError extends HTTPError {
         };
     }
 
+    /**
+     * @returns a new {@link MatrixError} from a JSON payload
+     * received from Widget API error responses.
+     */
     public static fromWidgetApiErrorData(data: IWidgetMatrixError): MatrixError {
         return new MatrixError(data.response, data.http_status, data.url, undefined, new Headers(data.http_headers));
     }
