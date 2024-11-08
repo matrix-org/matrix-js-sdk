@@ -1373,6 +1373,93 @@ describe("MatrixClient syncing", () => {
                 expect(stateEventEmitCount).toEqual(2);
             });
         });
+
+        describe("msc4222", () => {
+            it("should ignore state events in timeline when state_after is present", async () => {
+                httpBackend!.when("GET", "/sync").respond(200, {
+                    rooms: {
+                        join: {
+                            [roomOne]: {
+                                "timeline": {
+                                    events: [
+                                        utils.mkMessage({
+                                            room: roomOne,
+                                            user: otherUserId,
+                                            msg: "hello",
+                                        }),
+                                    ],
+                                },
+                                "org.matrix.msc4222.state_after": {
+                                    events: [
+                                        utils.mkEvent({
+                                            type: "m.room.name",
+                                            room: roomOne,
+                                            user: otherUserId,
+                                            content: {
+                                                name: "Initial room name",
+                                            },
+                                        }),
+                                        utils.mkMembership({
+                                            room: roomOne,
+                                            mship: KnownMembership.Join,
+                                            user: otherUserId,
+                                        }),
+                                        utils.mkMembership({
+                                            room: roomOne,
+                                            mship: KnownMembership.Join,
+                                            user: selfUserId,
+                                        }),
+                                        utils.mkEvent({
+                                            type: "m.room.create",
+                                            room: roomOne,
+                                            user: selfUserId,
+                                            content: {},
+                                        }),
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                });
+                httpBackend!.when("GET", "/sync").respond(200, {
+                    rooms: {
+                        join: {
+                            [roomOne]: {
+                                "org.matrix.msc4222.state_after": {
+                                    events: [
+                                        utils.mkEvent({
+                                            type: "m.room.topic",
+                                            room: roomOne,
+                                            user: selfUserId,
+                                            content: { topic: "A new room topic" },
+                                        }),
+                                    ],
+                                },
+                                "state": {
+                                    events: [
+                                        utils.mkEvent({
+                                            type: "m.room.name",
+                                            room: roomOne,
+                                            user: selfUserId,
+                                            content: { name: "A new room name" },
+                                        }),
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                });
+
+                client!.startClient();
+                return Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(2)]).then(() => {
+                    const room = client!.getRoom(roomOne)!;
+                    expect(room.name).toEqual("Initial room name");
+                    expect(room.currentState.getStateEvents("m.room.topic", "")?.getContent().topic).toBe(
+                        "A new room topic",
+                    );
+                });
+            });
+        });
     });
 
     describe("timeline", () => {
