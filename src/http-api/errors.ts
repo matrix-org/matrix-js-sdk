@@ -151,7 +151,7 @@ export class MatrixError extends HTTPError {
             url: this.url ?? "",
             response: {
                 errcode: this.errcode ?? "M_UNKNOWN",
-                error: this.name,
+                error: this.data.error ?? "Unknown message",
                 ...this.data,
             },
         };
