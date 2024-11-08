@@ -3351,6 +3351,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * uploaded a key backup version using an algorithm I don't understand.
      *
      * @returns Information object from API, or null if no backup is present on the server.
+     *
+     * @deprecated Prefer {@link CryptoApi.getActiveSessionBackupVersion}.
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res: IKeyBackupInfo;
