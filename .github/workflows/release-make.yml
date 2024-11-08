@@ -158,11 +158,6 @@ jobs:
               env:
                   RELEASE_NOTES: ${{ steps.draft-release.outputs.body }}
 
-            - name: Run pre-release script to update package.json fields
-              run: |
-                  ./.action-repo/scripts/release/pre-release.sh
-                  git add package.json
-
             - name: Commit changes
               run: git commit -m "$VERSION"
 

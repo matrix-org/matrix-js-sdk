@@ -26,16 +26,6 @@ jobs:
             - name: Typecheck
               run: "yarn run lint:types"
 
-            - name: Switch js-sdk to release mode
-              run: |
-                  scripts/switch_package_to_release.js
-                  yarn install
-                  yarn run build:compile
-                  yarn run build:types
-
-            - name: Typecheck (release mode)
-              run: "yarn run lint:types"
-
     js_lint:
         name: "ESLint"
         runs-on: ubuntu-24.04

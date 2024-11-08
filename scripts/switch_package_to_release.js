@@ -1,1 +1,0 @@
-switch_package_to_release.cjs
