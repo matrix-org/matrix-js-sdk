@@ -377,26 +377,18 @@ export class SyncApi {
                     prev_batch: null,
                     events: [],
                 };
-                const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
-
-                const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
-                const stateAfterEvents = this.mapSyncEventsFormat(leaveObj["org.matrix.msc4222.state_after"], room);
 
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
                 room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
 
-                if ("org.matrix.msc4222.state_after" in leaveObj) {
-                    await this.injectRoomEvents(room, undefined, stateAfterEvents, events);
-                } else {
-                    await this.injectRoomEvents(room, stateEvents, undefined, events);
-                }
+                const { timelineEvents } = await this.mapAndInjectRoomEvents(leaveObj);
 
                 room.recalculate();
                 client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
 
-                this.processEventsForNotifs(room, events);
+                this.processEventsForNotifs(room, timelineEvents);
                 return room;
             }),
         );
@@ -1501,11 +1493,9 @@ export class SyncApi {
         // Handle leaves (e.g. kicked rooms)
         await promiseMapSeries(leaveRooms, async (leaveObj) => {
             const room = leaveObj.room;
-            const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
-            const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
+            const { timelineEvents, stateEvents, stateAfterEvents } = await this.mapAndInjectRoomEvents(leaveObj);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            await this.injectRoomEvents(room, stateEvents, undefined, events);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();
@@ -1514,12 +1504,15 @@ export class SyncApi {
                 client.emit(ClientEvent.Room, room);
             }
 
-            this.processEventsForNotifs(room, events);
+            this.processEventsForNotifs(room, timelineEvents);
 
-            stateEvents.forEach(function (e) {
+            stateEvents?.forEach(function (e) {
                 client.emit(ClientEvent.Event, e);
             });
-            events.forEach(function (e) {
+            stateAfterEvents?.forEach(function (e) {
+                client.emit(ClientEvent.Event, e);
+            });
+            timelineEvents.forEach(function (e) {
                 client.emit(ClientEvent.Event, e);
             });
             accountDataEvents.forEach(function (e) {
@@ -1773,6 +1766,27 @@ export class SyncApi {
         return room.hasEncryptionStateEvent() || !!this.findEncryptionEvent(eventsFormingFinalState);
     }
 
+    private async mapAndInjectRoomEvents(wrappedRoom: WrappedRoom<ILeftRoom>): Promise<{
+        timelineEvents: MatrixEvent[];
+        stateEvents?: MatrixEvent[];
+        stateAfterEvents?: MatrixEvent[];
+    }> {
+        const stateEvents = this.mapSyncEventsFormat(wrappedRoom.state, wrappedRoom.room);
+        const stateAfterEvents = this.mapSyncEventsFormat(
+            wrappedRoom["org.matrix.msc4222.state_after"],
+            wrappedRoom.room,
+        );
+        const timelineEvents = this.mapSyncEventsFormat(wrappedRoom.timeline, wrappedRoom.room);
+
+        if ("org.matrix.msc4222.state_after" in wrappedRoom) {
+            await this.injectRoomEvents(wrappedRoom.room, undefined, stateAfterEvents, timelineEvents);
+        } else {
+            await this.injectRoomEvents(wrappedRoom.room, stateEvents, undefined, timelineEvents);
+        }
+
+        return { timelineEvents, stateEvents, stateAfterEvents };
+    }
+
     /**
      * Injects events into a room's model.
      * @param stateEventList - A list of state events. This is the state
@@ -1828,7 +1842,7 @@ export class SyncApi {
             for (const ev of eitherStateEventList) {
                 this.client.getPushActionsForEvent(ev);
             }
-            liveTimeline.initialiseState(eitherStateEventList ?? [], {
+            liveTimeline.initialiseState(eitherStateEventList, {
                 timelineWasEmpty,
             });
         }

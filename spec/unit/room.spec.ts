@@ -3165,6 +3165,19 @@ describe("Room", function () {
             expect(thread).toHaveLength(0);
             expect(thread.replyToEvent!.getId()).toBe(threadRoot.getId());
         });
+
+        it("should add event to thread without server side support", async () => {
+            room.client.supportsThreads = () => true;
+            Thread.setServerSideSupport(FeatureSupport.None);
+
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot);
+            threadResponse1.getContent()["m.relates_to"]!.rel_type = "io.element.thread";
+
+            const thread = room.createThread(threadRoot.getId()!, threadRoot, [threadResponse1], false)!;
+
+            expect(thread.events).toContain(threadResponse1);
+        });
     });
 
     describe("eventShouldLiveIn", () => {
