@@ -208,10 +208,12 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     public static setServerSideSupport(status: FeatureSupport): void {
         Thread.hasServerSideSupport = status;
-        const preferUnstable = status !== FeatureSupport.Stable;
-        FILTER_RELATED_BY_SENDERS.setPreferUnstable(preferUnstable);
-        FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(preferUnstable);
-        THREAD_RELATION_TYPE.setPreferUnstable(preferUnstable);
+        // XXX: This global latching behaviour is really unexpected and means that you can't undo when moving to a server without support
+        if (status !== FeatureSupport.Stable) {
+            FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
+            FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
+            THREAD_RELATION_TYPE.setPreferUnstable(true);
+        }
     }
 
     public static setServerSideListSupport(status: FeatureSupport): void {

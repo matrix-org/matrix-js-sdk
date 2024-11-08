@@ -30,6 +30,8 @@ import {
     EventTimelineSet,
     EventType,
     Filter,
+    FILTER_RELATED_BY_REL_TYPES,
+    FILTER_RELATED_BY_SENDERS,
     IContent,
     IEvent,
     IRelationsRequestOpts,
@@ -3177,6 +3179,13 @@ describe("Room", function () {
             const thread = room.createThread(threadRoot.getId()!, threadRoot, [threadResponse1], false)!;
 
             expect(thread.events).toContain(threadResponse1);
+        });
+
+        afterAll(() => {
+            // Clear the latch created by `Thread.setServerSideSupport(FeatureSupport.None);`
+            FILTER_RELATED_BY_SENDERS.setPreferUnstable(false);
+            FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(false);
+            THREAD_RELATION_TYPE.setPreferUnstable(false);
         });
     });
 
