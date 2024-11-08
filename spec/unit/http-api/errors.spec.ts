@@ -25,8 +25,8 @@ describe("MatrixError", () => {
         headers = new Headers({ "Content-Type": "application/json" });
     });
 
-    function makeMatrixError(httpStatus: number, data: IErrorJson): MatrixError {
-        return new MatrixError(data, httpStatus, undefined, undefined, headers);
+    function makeMatrixError(httpStatus: number, data: IErrorJson, url?: string): MatrixError {
+        return new MatrixError(data, httpStatus, url, undefined, headers);
     }
 
     it("should accept absent retry time from rate-limit error", () => {
@@ -94,5 +94,96 @@ describe("MatrixError", () => {
         headers.set("Retry-After", "1" + Array(500).fill("0").join(""));
         const err = makeMatrixError(429, { errcode: "M_LIMIT_EXCEEDED" });
         expect(() => err.getRetryAfterMs()).toThrow("integer value is too large");
+    });
+
+    describe("can be converted to data compatible with the widget api", () => {
+        it("from default values", () => {
+            const matrixError = new MatrixError();
+
+            const widgetApiErrorData = {
+                http_status: 400,
+                http_headers: {},
+                url: "",
+                response: {
+                    errcode: "M_UNKNOWN",
+                    error: "Unknown message",
+                },
+            };
+
+            expect(matrixError.asWidgetApiErrorData()).toEqual(widgetApiErrorData);
+        });
+
+        it("from non-default values", () => {
+            headers.set("Retry-After", "120");
+            const statusCode = 429;
+            const data = {
+                errcode: "M_LIMIT_EXCEEDED",
+                error: "Request is rate-limited.",
+                retry_after_ms: 120000,
+            };
+            const url = "http://example.net";
+
+            const matrixError = makeMatrixError(statusCode, data, url);
+
+            const widgetApiErrorData = {
+                http_status: statusCode,
+                http_headers: {
+                    "content-type": "application/json",
+                    "retry-after": "120",
+                },
+                url,
+                response: data,
+            };
+
+            expect(matrixError.asWidgetApiErrorData()).toEqual(widgetApiErrorData);
+        });
+    });
+
+    describe("can be created from data received from the widget api", () => {
+        it("from minimal data", () => {
+            const statusCode = 400;
+            const data = {
+                errcode: "M_UNKNOWN",
+                error: "Something went wrong.",
+            };
+            const url = "";
+
+            const widgetApiErrorData = {
+                http_status: statusCode,
+                http_headers: {},
+                url,
+                response: data,
+            };
+
+            headers.delete("Content-Type");
+            const matrixError = makeMatrixError(statusCode, data, url);
+
+            expect(MatrixError.fromWidgetApiErrorData(widgetApiErrorData)).toEqual(matrixError);
+        });
+
+        it("from more data", () => {
+            const statusCode = 429;
+            const data = {
+                errcode: "M_LIMIT_EXCEEDED",
+                error: "Request is rate-limited.",
+                retry_after_ms: 120000,
+            };
+            const url = "http://example.net";
+
+            const widgetApiErrorData = {
+                http_status: statusCode,
+                http_headers: {
+                    "content-type": "application/json",
+                    "retry-after": "120",
+                },
+                url,
+                response: data,
+            };
+
+            headers.set("Retry-After", "120");
+            const matrixError = makeMatrixError(statusCode, data, url);
+
+            expect(MatrixError.fromWidgetApiErrorData(widgetApiErrorData)).toEqual(matrixError);
+        });
     });
 });
