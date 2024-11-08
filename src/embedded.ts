@@ -244,9 +244,9 @@ export class RoomWidgetClient extends MatrixClient {
                 const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
                 if (this.syncApi instanceof SyncApi) {
-                    await this.syncApi.injectRoomEvents(this.room!, undefined, events, []);
+                    await this.syncApi.injectRoomEvents(this.room!, undefined, events);
                 } else {
-                    await this.syncApi!.injectRoomEvents(this.room!, events, []);
+                    await this.syncApi!.injectRoomEvents(this.room!, events);
                 }
                 events.forEach((event) => {
                     this.emit(ClientEvent.Event, event);
