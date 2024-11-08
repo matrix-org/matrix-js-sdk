@@ -1908,7 +1908,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // see https://github.com/vector-im/vector-web/issues/2109
 
             unfilteredLiveTimeline.getEvents().forEach(function (event) {
-                timelineSet.addLiveEvent(event, { addToState: true });
+                timelineSet.addLiveEvent(event, { addToState: false }); // Filtered timeline sets should not track state
             });
 
             // find the earliest unfiltered timeline
@@ -1995,7 +1995,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 if (filterType !== ThreadFilterType.My || currentUserParticipated) {
                     timelineSet.getLiveTimeline().addEvent(thread.rootEvent!, {
                         toStartOfTimeline: false,
-                        addToState: true,
+                        addToState: false,
                     });
                 }
             });
@@ -2070,7 +2070,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 const opts = {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
-                    addToState: true,
+                    addToState: false,
                     roomState,
                 };
                 this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, opts);
@@ -2193,7 +2193,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 duplicateStrategy: DuplicateStrategy.Replace,
                 fromCache: false,
                 roomState,
-                addToState: true,
+                addToState: false,
             });
         }
     }
@@ -2385,12 +2385,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     duplicateStrategy: DuplicateStrategy.Replace,
                     fromCache: false,
                     roomState: this.currentState,
-                    addToState: true,
+                    addToState: false,
                 });
             } else {
                 timelineSet.addEventToTimeline(thread.rootEvent, timelineSet.getLiveTimeline(), {
                     toStartOfTimeline,
-                    addToState: true,
+                    addToState: false,
                 });
             }
         }
@@ -2640,13 +2640,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     if (timelineSet.getFilter()!.filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event, timelineSet.getLiveTimeline(), {
                             toStartOfTimeline: false,
-                            addToState: false,
+                            addToState: false, // We don't support localEcho of state events yet
                         });
                     }
                 } else {
                     timelineSet.addEventToTimeline(event, timelineSet.getLiveTimeline(), {
                         toStartOfTimeline: false,
-                        addToState: false,
+                        addToState: false, // We don't support localEcho of state events yet
                     });
                 }
             }

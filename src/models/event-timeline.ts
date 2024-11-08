@@ -422,14 +422,14 @@ export class EventTimeline {
      *
      * @internal
      */
-    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState): void {
+    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState, addToState: boolean): void {
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
             EventTimeline.setEventMetadata(event, roomState, false);
 
             // modify state but only on unfiltered timelineSets
-            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+            if (addToState && event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
                 roomState.setStateEvents([event], {});
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try

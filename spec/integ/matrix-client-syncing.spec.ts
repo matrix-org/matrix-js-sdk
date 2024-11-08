@@ -556,7 +556,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should resolve incoming invites from /sync", () => {
-            syncData.rooms.join[roomOne].state.events.push(
+            syncData.rooms.join[roomOne].state!.events.push(
                 utils.mkMembership({
                     room: roomOne,
                     mship: KnownMembership.Invite,
@@ -589,7 +589,7 @@ describe("MatrixClient syncing", () => {
                     name: "The Ghost",
                 }) as IMinimalEvent,
             ];
-            syncData.rooms.join[roomOne].state.events.push(
+            syncData.rooms.join[roomOne].state!.events.push(
                 utils.mkMembership({
                     room: roomOne,
                     mship: KnownMembership.Invite,
@@ -617,7 +617,7 @@ describe("MatrixClient syncing", () => {
                     name: "The Ghost",
                 }) as IMinimalEvent,
             ];
-            syncData.rooms.join[roomOne].state.events.push(
+            syncData.rooms.join[roomOne].state!.events.push(
                 utils.mkMembership({
                     room: roomOne,
                     mship: KnownMembership.Invite,
@@ -644,7 +644,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should no-op if resolveInvitesToProfiles is not set", () => {
-            syncData.rooms.join[roomOne].state.events.push(
+            syncData.rooms.join[roomOne].state!.events.push(
                 utils.mkMembership({
                     room: roomOne,
                     mship: KnownMembership.Invite,

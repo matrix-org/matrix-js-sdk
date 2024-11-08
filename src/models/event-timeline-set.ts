@@ -777,7 +777,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // If we got to the end of the loop, insertIndex points at the end of
         // the list.
 
-        timeline.insertEvent(event, insertIndex, roomState);
+        timeline.insertEvent(event, insertIndex, roomState, addToState);
         this._eventIdToTimeline.set(eventId, timeline);
 
         const data: IRoomTimelineData = {

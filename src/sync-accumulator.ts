@@ -77,7 +77,8 @@ export interface ITimeline {
 
 export interface IJoinedRoom {
     "summary": IRoomSummary;
-    "state": IState;
+    // One of `state` or `state_after` is required.
+    "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
@@ -107,7 +108,8 @@ export interface IInvitedRoom {
 }
 
 export interface ILeftRoom {
-    "state": IState;
+    // One of `state` or `state_after` is required.
+    "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState;
     "timeline": ITimeline;
     "account_data": IAccountData;
@@ -660,7 +662,7 @@ export class SyncAccumulator {
                     // Push to both fields to provide downgrade compatibility in the sync accumulator db
                     // the code will prefer `state_after` if it is present
                     roomJson["org.matrix.msc4222.state_after"]?.events.push(ev);
-                    roomJson.state.events.push(ev);
+                    roomJson.state?.events.push(ev);
                 });
             });
             data.join[roomId] = roomJson;

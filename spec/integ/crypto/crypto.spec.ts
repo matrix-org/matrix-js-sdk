@@ -1327,7 +1327,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
             // Every 2 messages in the room, the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_msgs: 2,
             };
@@ -1383,7 +1383,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const oneHourInMs = 60 * 60 * 1000;
 
             // Every 1h the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_ms: oneHourInMs,
             };

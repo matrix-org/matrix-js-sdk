@@ -1505,7 +1505,7 @@ export class SyncApi {
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            await this.injectRoomEvents(room, undefined, stateEvents, events);
+            await this.injectRoomEvents(room, stateEvents, undefined, events);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();

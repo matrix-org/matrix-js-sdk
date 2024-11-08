@@ -191,7 +191,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         this.events.member = event;
 
         const oldMembership = this.membership;
-        this.membership = event.getDirectionalContent().membership;
+        this.membership = event.getDirectionalContent().membership; // XXX debug?
         if (this.membership === undefined) {
             // logging to diagnose https://github.com/vector-im/element-web/issues/20962
             // (logs event content, although only of membership events)
