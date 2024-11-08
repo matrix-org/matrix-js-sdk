@@ -135,7 +135,7 @@ export class MatrixError extends HTTPError {
     }
 
     /**
-     * @returns this error expressed as a {@link IWidgetMatrixError}
+     * @returns this error expressed as a JSON payload
      * for use by Widget API error responses.
      */
     public asWidgetApiErrorData(): IWidgetMatrixError {
