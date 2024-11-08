@@ -29,6 +29,7 @@ import {
     EventStatus,
     EventTimelineSet,
     EventType,
+    Filter,
     IContent,
     IEvent,
     IRelationsRequestOpts,
@@ -4146,6 +4147,66 @@ describe("Room", function () {
                 urgent: false,
             });
             expect(client.fetchCapabilities).toHaveBeenCalled();
+        });
+    });
+
+    describe("getOrCreateFilteredTimelineSet", () => {
+        it("should locally filter events if prepopulateTimeline=true", () => {
+            room.addLiveEvents(
+                [
+                    utils.mkEvent(
+                        {
+                            event: true,
+                            type: EventType.RoomMessage,
+                            user: userA,
+                            room: roomId,
+                            content: {
+                                body: "ev1",
+                            },
+                        },
+                        room.client,
+                    ),
+                    utils.mkEvent(
+                        {
+                            event: true,
+                            type: "custom.event.type",
+                            user: userA,
+                            room: roomId,
+                            content: {
+                                body: "ev2",
+                            },
+                        },
+                        room.client,
+                    ),
+                    utils.mkEvent(
+                        {
+                            event: true,
+                            type: EventType.RoomMessage,
+                            user: userA,
+                            room: roomId,
+                            content: {
+                                body: "ev3",
+                            },
+                        },
+                        room.client,
+                    ),
+                ],
+                {
+                    addToState: false,
+                },
+            );
+
+            const filter = Filter.fromJson(room.client.getUserId(), "filterId", {
+                room: {
+                    timeline: {
+                        types: ["custom.event.type"],
+                    },
+                },
+            });
+            const timelineSet = room.getOrCreateFilteredTimelineSet(filter, { prepopulateTimeline: true });
+            const filteredEvents = timelineSet.getLiveTimeline().getEvents();
+            expect(filteredEvents).toHaveLength(1);
+            expect(filteredEvents[0].getContent().body).toEqual("ev2");
         });
     });
 });
