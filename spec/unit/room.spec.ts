@@ -3182,9 +3182,12 @@ describe("Room", function () {
 
     describe("eventShouldLiveIn", () => {
         const client = new TestClient(userA).client;
-        client.supportsThreads = () => true;
-        Thread.setServerSideSupport(FeatureSupport.Stable);
         const room = new Room(roomId, client, userA);
+
+        beforeEach(() => {
+            client.supportsThreads = () => true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+        });
 
         it("thread root and its relations&redactions should be in main timeline", () => {
             const randomMessage = mkMessage();

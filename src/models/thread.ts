@@ -208,11 +208,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     public static setServerSideSupport(status: FeatureSupport): void {
         Thread.hasServerSideSupport = status;
-        if (status !== FeatureSupport.Stable) {
-            FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
-            FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
-            THREAD_RELATION_TYPE.setPreferUnstable(true);
-        }
+        const preferUnstable = status !== FeatureSupport.Stable;
+        FILTER_RELATED_BY_SENDERS.setPreferUnstable(preferUnstable);
+        FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(preferUnstable);
+        THREAD_RELATION_TYPE.setPreferUnstable(preferUnstable);
     }
 
     public static setServerSideListSupport(status: FeatureSupport): void {
