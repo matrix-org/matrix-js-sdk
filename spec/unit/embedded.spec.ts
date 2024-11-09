@@ -643,6 +643,42 @@ describe("RoomWidgetClient", () => {
             await makeClient({});
             expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });
+
+        it("handles widget errors with generic error data", async () => {
+            const error = new Error("failed to get token");
+            widgetApi.transport.sendComplete.mockRejectedValue(error);
+
+            await makeClient({});
+            widgetApi.requestOpenIDConnectToken.mockImplementation(widgetApi.transport.sendComplete as any);
+
+            await expect(client.getOpenIdToken()).rejects.toThrow(error);
+        });
+
+        it("handles widget errors with Matrix API error response data", async () => {
+            const errorStatusCode = 400;
+            const errorUrl = "http://example.org";
+            const errorData = {
+                errcode: "M_UNKNOWN",
+                error: "Bad request",
+            };
+
+            const widgetError = new WidgetApiResponseError("failed to get token", {
+                matrix_api_error: {
+                    http_status: errorStatusCode,
+                    http_headers: {},
+                    url: errorUrl,
+                    response: errorData,
+                },
+            });
+            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl);
+
+            widgetApi.transport.sendComplete.mockRejectedValue(widgetError);
+
+            await makeClient({});
+            widgetApi.requestOpenIDConnectToken.mockImplementation(widgetApi.transport.sendComplete as any);
+
+            await expect(client.getOpenIdToken()).rejects.toThrow(matrixError);
+        });
     });
 
     it("gets TURN servers", async () => {
