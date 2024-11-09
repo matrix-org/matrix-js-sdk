@@ -17,12 +17,17 @@ limitations under the License.
 import {
     WidgetApi,
     WidgetApiToWidgetAction,
+    WidgetApiResponseError,
     MatrixCapabilities,
     IWidgetApiRequest,
     IWidgetApiAcknowledgeResponseData,
     ISendEventToWidgetActionRequest,
     ISendToDeviceToWidgetActionRequest,
     ISendEventFromWidgetResponseData,
+    IWidgetApiRequestData,
+    WidgetApiAction,
+    IWidgetApiResponse,
+    IWidgetApiResponseData,
 } from "matrix-widget-api";
 
 import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event.ts";
@@ -45,6 +50,7 @@ import {
 } from "./client.ts";
 import { SyncApi, SyncState } from "./sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
+import { MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
 import { Room } from "./models/room.ts";
 import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage.ts";
@@ -146,6 +152,33 @@ export class RoomWidgetClient extends MatrixClient {
         sendContentLoaded: boolean,
     ) {
         super(opts);
+
+        const transportSend = this.widgetApi.transport.send.bind(this.widgetApi.transport);
+        this.widgetApi.transport.send = async <
+            T extends IWidgetApiRequestData,
+            R extends IWidgetApiResponseData = IWidgetApiAcknowledgeResponseData,
+        >(
+            action: WidgetApiAction,
+            data: T,
+        ): Promise<R> => {
+            try {
+                return await transportSend<T, R>(action, data);
+            } catch (error) {
+                processAndThrow(error);
+            }
+        };
+
+        const transportSendComplete = this.widgetApi.transport.sendComplete.bind(this.widgetApi.transport);
+        this.widgetApi.transport.sendComplete = async <T extends IWidgetApiRequestData, R extends IWidgetApiResponse>(
+            action: WidgetApiAction,
+            data: T,
+        ): Promise<R> => {
+            try {
+                return await transportSendComplete<T, R>(action, data);
+            } catch (error) {
+                processAndThrow(error);
+            }
+        };
 
         this.widgetApiReady = new Promise<void>((resolve) => this.widgetApi.once("ready", resolve));
 
@@ -521,5 +554,13 @@ export class RoomWidgetClient extends MatrixClient {
         } finally {
             this.lifecycle!.signal.removeEventListener("abort", onClientStopped);
         }
+    }
+}
+
+function processAndThrow(error: unknown): never {
+    if (error instanceof WidgetApiResponseError && error.data.matrix_api_error) {
+        throw MatrixError.fromWidgetApiErrorData(error.data.matrix_api_error);
+    } else {
+        throw error;
     }
 }
