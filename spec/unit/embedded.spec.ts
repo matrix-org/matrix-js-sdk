@@ -201,7 +201,7 @@ describe("RoomWidgetClient", () => {
             widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send);
 
             await expect(
-                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 })
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
             ).rejects.toThrow(error);
         });
 
@@ -229,7 +229,7 @@ describe("RoomWidgetClient", () => {
             widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send);
 
             await expect(
-                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 })
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
             ).rejects.toThrow(matrixError);
         });
     });
