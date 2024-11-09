@@ -30,9 +30,10 @@ import {
     ITurnServer,
     IRoomEvent,
     IOpenIDCredentials,
+    WidgetApiResponseError,
 } from "matrix-widget-api";
 
-import { createRoomWidgetClient, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
+import { createRoomWidgetClient, MatrixError, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
 import { ICapabilities, RoomWidgetClient } from "../../src/embedded";
@@ -190,6 +191,46 @@ describe("RoomWidgetClient", () => {
                     .getEvents()
                     .map((e) => e.getEffectiveEvent()),
             ).toEqual([event]);
+        });
+
+        it("handles widget errors with generic error data", async () => {
+            const error = new Error("failed to send");
+            widgetApi.transport.send.mockRejectedValue(error);
+
+            await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
+            widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send);
+
+            await expect(
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 })
+            ).rejects.toThrow(error);
+        });
+
+        it("handles widget errors with Matrix API error response data", async () => {
+            const errorStatusCode = 400;
+            const errorUrl = "http://example.org";
+            const errorData = {
+                errcode: "M_BAD_JSON",
+                error: "Invalid body",
+            };
+
+            const widgetError = new WidgetApiResponseError("failed to send", {
+                matrix_api_error: {
+                    http_status: errorStatusCode,
+                    http_headers: {},
+                    url: errorUrl,
+                    response: errorData,
+                },
+            });
+            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl);
+
+            widgetApi.transport.send.mockRejectedValue(widgetError);
+
+            await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
+            widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send);
+
+            await expect(
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 })
+            ).rejects.toThrow(matrixError);
         });
     });
 
