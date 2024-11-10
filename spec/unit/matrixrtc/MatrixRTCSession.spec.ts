@@ -468,18 +468,29 @@ describe("MatrixRTCSession", () => {
         });
 
         describe("non-legacy calls", () => {
+            let scheduledDelayDisconnection: Promise<void>;
+
+            beforeEach(() => {
+                scheduledDelayDisconnection = new Promise((resolve) => {
+                    const originalFn: () => void = (sess as any).scheduleDelayDisconnection;
+                    (sess as any).scheduleDelayDisconnection = jest.fn(() => {
+                        originalFn.call(sess);
+                        resolve();
+                    });
+                });
+            });
+
             const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
 
             async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
-                const realSetTimeout = setTimeout;
                 if (useOwnedStateEvents) {
                     mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3779.default");
                 }
 
                 jest.useFakeTimers();
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
-                await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+                await sentStateEvent;
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     mockRoom!.roomId,
                     EventType.GroupCallMemberPrefix,
@@ -493,9 +504,11 @@ describe("MatrixRTCSession", () => {
                     } satisfies SessionMembershipData,
                     `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`,
                 );
-                await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+                await sentDelayedState;
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
 
+                // should have prepared the heartbeat to keep delaying the leave event while still connected
+                await scheduledDelayDisconnection;
                 // should have tried updating the delayed leave to test that it wasn't replaced by own state
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
                 // should update delayed disconnect
