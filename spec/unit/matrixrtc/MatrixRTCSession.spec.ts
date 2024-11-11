@@ -468,18 +468,6 @@ describe("MatrixRTCSession", () => {
         });
 
         describe("non-legacy calls", () => {
-            let scheduledDelayDisconnection: Promise<void>;
-
-            beforeEach(() => {
-                scheduledDelayDisconnection = new Promise((resolve) => {
-                    const originalFn: () => void = (sess as any).scheduleDelayDisconnection;
-                    (sess as any).scheduleDelayDisconnection = jest.fn(() => {
-                        originalFn.call(sess);
-                        resolve();
-                    });
-                });
-            });
-
             const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
 
@@ -489,6 +477,16 @@ describe("MatrixRTCSession", () => {
                 }
 
                 jest.useFakeTimers();
+
+                // needed to advance the mock timers properly
+                const scheduledDelayDisconnection = new Promise<void>((resolve) => {
+                    const originalFn: () => void = (sess as any).scheduleDelayDisconnection;
+                    (sess as any).scheduleDelayDisconnection = jest.fn(() => {
+                        originalFn.call(sess);
+                        resolve();
+                    });
+                });
+
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
                 await sentStateEvent;
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
