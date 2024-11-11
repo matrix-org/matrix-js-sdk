@@ -170,7 +170,7 @@ export class RoomWidgetClient extends MatrixClient {
             data: T,
         ): Promise<R> => {
             try {
-                return await transportSend<T, R>(action, data);
+                return await transportSend(action, data);
             } catch (error) {
                 processAndThrow(error);
             }
@@ -182,7 +182,7 @@ export class RoomWidgetClient extends MatrixClient {
             data: T,
         ): Promise<R> => {
             try {
-                return await transportSendComplete<T, R>(action, data);
+                return await transportSendComplete(action, data);
             } catch (error) {
                 processAndThrow(error);
             }

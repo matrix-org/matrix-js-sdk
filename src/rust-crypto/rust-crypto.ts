@@ -757,7 +757,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
-     * Implementation of {@link CryptoApi#boostrapCrossSigning}
+     * Implementation of {@link CryptoApi#bootstrapCrossSigning}
      */
     public async bootstrapCrossSigning(opts: BootstrapCrossSigningOpts): Promise<void> {
         await this.crossSigningIdentity.bootstrapCrossSigning(opts);
@@ -953,7 +953,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
-     * Implementation of {@link Crypto.CryptoApi.getEncryptionInfoForEvent}.
+     * Implementation of {@link CryptoApi#getEncryptionInfoForEvent}.
      */
     public async getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null> {
         return this.eventDecryptor.getEncryptionInfoForEvent(event);
@@ -1214,7 +1214,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Determine if a key backup can be trusted.
      *
-     * Implementation of {@link Crypto.CryptoApi.isKeyBackupTrusted}.
+     * Implementation of {@link CryptoApi#isKeyBackupTrusted}.
      */
     public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
         return await this.backupManager.isKeyBackupTrusted(info);
@@ -1223,7 +1223,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
      *
-     * Implementation of {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
+     * Implementation of {@link CryptoApi#checkKeyBackupAndEnable}.
      */
     public async checkKeyBackupAndEnable(): Promise<KeyBackupCheck | null> {
         return await this.backupManager.checkKeyBackupAndEnable(true);
