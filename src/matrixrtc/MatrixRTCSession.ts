@@ -772,6 +772,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (changed) {
             logger.info(`Memberships for call in room ${this.room.roomId} have changed: emitting`);
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+
+            if (this.isJoined() && !this.memberships.some(this.isMyMembership)) {
+                logger.warn("Missing own membership: force re-join");
+                // TODO: Should this be awaited? And is there anything to tell the focus?
+                this.triggerCallMembershipEventUpdate();
+            }
         }
 
         if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
@@ -942,6 +948,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private triggerCallMembershipEventUpdate = async (): Promise<void> => {
+        // TODO: Should this await on a shared promise?
         if (this.updateCallMembershipRunning) {
             this.needCallMembershipUpdate = true;
             return;
@@ -1030,7 +1037,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 const stateKey = this.makeMembershipStateKey(localUserId, localDeviceId);
                 const prepareDelayedDisconnection = async (): Promise<void> => {
                     try {
-                        // TODO: If delayed event times out, re-join!
                         const res = await resendIfRateLimited(() =>
                             this.client._unstable_sendDelayedStateEvent(
                                 this.room.roomId,
