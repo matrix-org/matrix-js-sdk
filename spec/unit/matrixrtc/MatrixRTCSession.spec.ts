@@ -511,7 +511,7 @@ describe("MatrixRTCSession", () => {
                 // preparing the delayed disconnect should handle the delay being too long
                 const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
                     const error = new MatrixError({
-                        errcode: "M_UNKNOWN",
+                        "errcode": "M_UNKNOWN",
                         "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
                         "org.matrix.msc4140.max_delay": 7500,
                     });
