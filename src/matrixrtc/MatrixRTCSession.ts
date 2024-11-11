@@ -192,8 +192,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
     private get membershipServerSideExpiryTimeout(): number {
         return (
-            this.joinConfig?.membershipServerSideExpiryTimeout ??
             this.membershipServerSideExpiryTimeoutOverride ??
+            this.joinConfig?.membershipServerSideExpiryTimeout ??
             8_000
         );
     }
