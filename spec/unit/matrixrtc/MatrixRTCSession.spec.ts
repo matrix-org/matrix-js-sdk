@@ -520,7 +520,6 @@ describe("MatrixRTCSession", () => {
                         return Promise.reject(error);
                     });
                 });
-                expect(sess).toHaveProperty("membershipServerSideExpiryTimeoutOverride", undefined);
 
                 // preparing the delayed disconnect should handle ratelimiting
                 const sendDelayedStateAttempt = new Promise<void>((resolve) => {
@@ -555,10 +554,14 @@ describe("MatrixRTCSession", () => {
                     });
                 });
 
-                sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
+                sess!.joinRoomSession([activeFocusConfig], activeFocus, {
+                    useLegacyMemberEvents: false,
+                    membershipServerSideExpiryTimeout: 9000,
+                });
 
+                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 9000);
                 await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
-                expect(sess).toHaveProperty("membershipServerSideExpiryTimeoutOverride", 7500);
+                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 7500);
 
                 await sendDelayedStateAttempt;
                 jest.advanceTimersByTime(5000);
