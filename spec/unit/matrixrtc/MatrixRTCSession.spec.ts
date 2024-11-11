@@ -472,14 +472,54 @@ describe("MatrixRTCSession", () => {
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
 
             async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
-                const realSetTimeout = setTimeout;
                 if (useOwnedStateEvents) {
-                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3779.default");
+                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
                 }
 
                 jest.useFakeTimers();
+
+                // preparing the delayed disconnect should handle ratelimiting
+                const sendDelayedStateAttempt = new Promise<void>((resolve) => {
+                    const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
+                    sendDelayedStateMock.mockImplementationOnce(() => {
+                        resolve();
+                        return Promise.reject(error);
+                    });
+                });
+
+                // setting the membership state should handle ratelimiting (also with a retry-after value)
+                const sendStateEventAttempt = new Promise<void>((resolve) => {
+                    const error = new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    );
+                    sendStateEventMock.mockImplementationOnce(() => {
+                        resolve();
+                        return Promise.reject(error);
+                    });
+                });
+
+                // needed to advance the mock timers properly
+                const scheduledDelayDisconnection = new Promise<void>((resolve) => {
+                    const originalFn: () => void = (sess as any).scheduleDelayDisconnection;
+                    (sess as any).scheduleDelayDisconnection = jest.fn(() => {
+                        originalFn.call(sess);
+                        resolve();
+                    });
+                });
+
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
-                await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+
+                await sendDelayedStateAttempt;
+                jest.advanceTimersByTime(5000);
+
+                await sendStateEventAttempt.then(); // needed to resolve after resendIfRateLimited catches
+                jest.advanceTimersByTime(1000);
+
+                await sentStateEvent;
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     mockRoom!.roomId,
                     EventType.GroupCallMemberPrefix,
@@ -493,9 +533,10 @@ describe("MatrixRTCSession", () => {
                     } satisfies SessionMembershipData,
                     `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`,
                 );
-                await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                await sentDelayedState;
 
+                // should have prepared the heartbeat to keep delaying the leave event while still connected
+                await scheduledDelayDisconnection;
                 // should have tried updating the delayed leave to test that it wasn't replaced by own state
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
                 // should update delayed disconnect
