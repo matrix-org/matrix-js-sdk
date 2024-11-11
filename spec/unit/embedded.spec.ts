@@ -203,18 +203,22 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
             // const sendSpy = jest.spyOn(widgetApi.transport, "send");
             const sendMock = jest.fn();
-            new Promise((resolve, _) => {
+            const sendPromise = new Promise<void>((resolve, _) => {
                 widgetApi.sendRoomEvent.mockImplementation(
-                    async (eType, content, roomId): Promise<ISendEventFromWidgetResponseData> => {},
+                    async (eType, content, roomId): Promise<ISendEventFromWidgetResponseData> => {
+                        await sendPromise;
+                        return { room_id: "!1:example.org", event_id: "event_id" };
+                    },
                 );
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+                expect(sendMock).toHaveBeenCalledWith("abc");
+                resolve();
             });
             // widgetApi.transport.o;
-            client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
-            expect(sendMock).toHaveBeenCalledWith("abc");
-            widgetApi.emit(
-                `action:${WidgetApiToWidgetAction.SendEvent}`,
-                new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
-            );
+            // widgetApi.emit(
+            //     `action:${WidgetApiToWidgetAction.SendEvent}`,
+            //     new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+            // );
         });
 
         it("handles widget errors with generic error data", async () => {

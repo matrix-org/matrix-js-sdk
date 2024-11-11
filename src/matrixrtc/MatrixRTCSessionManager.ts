@@ -56,7 +56,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
     public start(): void {
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
-        // returing nothing, and breaks tests if you change it to return an empty array :'(
+        // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
             const session = MatrixRTCSession.roomSessionForRoom(this.client, room);
             if (session.memberships.length > 0) {
