@@ -124,10 +124,10 @@ export interface ICapabilities {
     updateDelayedEvents?: boolean;
 }
 
-export enum PendingEvent {
+export enum RoomWidgetClientEvent {
     PendingEventsChanged = "PendingEvent.pendingEventsChanged",
 }
-export type PendingEventHandlerMap = { [PendingEvent.PendingEventsChanged]: () => void };
+export type EventHandlerMap = { [RoomWidgetClientEvent.PendingEventsChanged]: () => void };
 /**
  * A MatrixClient that routes its requests through the widget API instead of the
  * real CS API.
@@ -140,7 +140,7 @@ export class RoomWidgetClient extends MatrixClient {
     private syncState: SyncState | null = null;
 
     private pendingSendingEventsTxId: { type: string; id: string | undefined; txId: string }[] = [];
-    private pendingEventsEmitter = new TypedEventEmitter<PendingEvent.PendingEventsChanged, PendingEventHandlerMap>();
+    private eventEmitter = new TypedEventEmitter<keyof EventHandlerMap, EventHandlerMap>();
 
     /**
      *
@@ -370,7 +370,7 @@ export class RoomWidgetClient extends MatrixClient {
         this.pendingSendingEventsTxId.forEach((p) => {
             if (p.txId === txId) p.id = response.event_id;
         });
-        this.pendingEventsEmitter.emit(PendingEvent.PendingEventsChanged);
+        this.eventEmitter.emit(RoomWidgetClientEvent.PendingEventsChanged);
 
         return { event_id: response.event_id! };
     }
@@ -536,7 +536,7 @@ export class RoomWidgetClient extends MatrixClient {
             while (!matchingTxId && this.pendingSendingEventsTxId.length > 0) {
                 // Recheck whenever the PendingEventsChanged
                 await new Promise<void>((resolve) =>
-                    this.pendingEventsEmitter.once(PendingEvent.PendingEventsChanged, () => resolve()),
+                    this.eventEmitter.once(RoomWidgetClientEvent.PendingEventsChanged, () => resolve()),
                 );
                 matchingTxId = this.pendingSendingEventsTxId.find((p) => p.id === event.getId())?.txId;
             }
@@ -552,7 +552,7 @@ export class RoomWidgetClient extends MatrixClient {
             // awaited in the `while (!matchingTxId && this.pendingSendingEventsTxId.length > 0)` loop
             // but are not send by this client.
             if (this.pendingSendingEventsTxId.length === 0) {
-                this.pendingEventsEmitter.emit(PendingEvent.PendingEventsChanged);
+                this.eventEmitter.emit(RoomWidgetClientEvent.PendingEventsChanged);
             }
         }
     };
