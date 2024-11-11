@@ -47,6 +47,12 @@ const MEMBER_EVENT_CHECK_PERIOD = 2 * 60 * 1000; // How often we check to see if
 const CALL_MEMBER_EVENT_RETRY_DELAY_MIN = 3000;
 const UPDATE_ENCRYPTION_KEY_THROTTLE = 3000;
 
+// We send a delay event to disconnect a call.
+// Those two times control when the delayed disconnect times out and how often (in what interval)
+// we refresh it.
+const MEMBERSHIP_DELAY_REFRESH_TIME = 15_000;
+const MEMBERSHIP_DELAY_TIMEOUT_TIME = 5000;
+
 // A delay after a member leaves before we create and publish a new key, because people
 // tend to leave calls at the same time
 const MAKE_KEY_DELAY = 3000;
@@ -1034,7 +1040,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                         const res = await this.client._unstable_sendDelayedStateEvent(
                             this.room.roomId,
                             {
-                                delay: 8000,
+                                delay: MEMBERSHIP_DELAY_TIMEOUT_TIME,
                             },
                             EventType.GroupCallMemberPrefix,
                             {}, // leave event
@@ -1106,7 +1112,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     private scheduleDelayDisconnection(): void {
-        this.memberEventTimeout = setTimeout(this.delayDisconnection, 5000);
+        this.memberEventTimeout = setTimeout(this.delayDisconnection, MEMBERSHIP_DELAY_REFRESH_TIME);
     }
 
     private readonly delayDisconnection = async (): Promise<void> => {
