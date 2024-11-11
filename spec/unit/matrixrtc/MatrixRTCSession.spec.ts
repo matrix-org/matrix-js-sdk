@@ -485,7 +485,7 @@ describe("MatrixRTCSession", () => {
 
             async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
                 if (useOwnedStateEvents) {
-                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3779.default");
+                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
                 }
 
                 jest.useFakeTimers();
