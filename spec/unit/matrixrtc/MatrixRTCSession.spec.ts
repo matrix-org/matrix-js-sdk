@@ -467,6 +467,36 @@ describe("MatrixRTCSession", () => {
             jest.useRealTimers();
         });
 
+        it("uses membershipExpiryTimeout from join config", async () => {
+            const realSetTimeout = setTimeout;
+            jest.useFakeTimers();
+            sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60000 });
+            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                EventType.GroupCallMemberPrefix,
+                {
+                    memberships: [
+                        {
+                            application: "m.call",
+                            scope: "m.room",
+                            call_id: "",
+                            device_id: "AAAAAAA",
+                            expires: 60000,
+                            expires_ts: Date.now() + 60000,
+                            foci_active: [mockFocus],
+
+                            membershipID: expect.stringMatching(".*"),
+                        },
+                    ],
+                },
+                "@alice:example.org",
+            );
+            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(0);
+            jest.useRealTimers();
+        });
+
         describe("non-legacy calls", () => {
             const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
