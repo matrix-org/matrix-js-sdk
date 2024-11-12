@@ -1319,6 +1319,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link Crypto.CryptoApi#getKeyBackupInfo}.
+     */
+    public async getKeyBackupInfo(): Promise<KeyBackupInfo | null> {
+        throw new Error("Not implemented");
+    }
+
+    /**
      * Determine if a key backup can be trusted.
      *
      * Implementation of {@link Crypto.CryptoApi.isKeyBackupTrusted}.

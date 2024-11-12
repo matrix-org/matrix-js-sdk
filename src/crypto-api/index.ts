@@ -517,6 +517,14 @@ export interface CryptoApi {
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 
     /**
+     * Get information about the current key backup.
+     * Return null if there is no backup.
+     *
+     * @returns the key backup information
+     */
+    getKeyBackupInfo(): Promise<KeyBackupInfo | null>;
+
+    /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
      *
      * Fetches the current backup information from the server. If there is a backup, and it is trusted, starts

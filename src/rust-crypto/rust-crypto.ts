@@ -1212,6 +1212,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Implementation of {@link CryptoApi#getKeyBackupInfo}.
+     */
+    public async getKeyBackupInfo(): Promise<KeyBackupInfo | null> {
+        return (await this.backupManager.getServerBackupInfo()) || null;
+    }
+
+    /**
      * Determine if a key backup can be trusted.
      *
      * Implementation of {@link CryptoApi#isKeyBackupTrusted}.
