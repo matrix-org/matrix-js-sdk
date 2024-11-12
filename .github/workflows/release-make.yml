@@ -136,7 +136,9 @@ jobs:
                   done
 
             - name: Bump package.json version
-              run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
+              run: |
+                  yarn version --no-git-tag-version --new-version "${VERSION#v}"
+                  git add package.json
 
             - name: Add to CHANGELOG.md
               if: inputs.final

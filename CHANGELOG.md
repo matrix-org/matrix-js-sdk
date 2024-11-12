@@ -1,3 +1,13 @@
+Changes in [34.11.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.11.1) (2024-11-12)
+====================================================================================================
+# Security
+- Fixes for [CVE-2024-50336](https://nvd.nist.gov/vuln/detail/CVE-2024-50336) / [GHSA-xvg8-m4x3-w6xr](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-xvg8-m4x3-w6xr).
+
+Changes in [34.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.11.0) (2024-11-12)
+====================================================================================================
+# Security
+- Fixes for [CVE-2024-50336](https://nvd.nist.gov/vuln/detail/CVE-2024-50336) / [GHSA-xvg8-m4x3-w6xr](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-xvg8-m4x3-w6xr).
+
 Changes in [34.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.10.0) (2024-11-05)
 ====================================================================================================
 ## 🦖 Deprecations
