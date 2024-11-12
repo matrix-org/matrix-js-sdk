@@ -872,10 +872,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
 
             if (
-                this.isJoined() &&
-                oldMemberships.some(this.isMyMembership) &&
-                !this.memberships.some(this.isMyMembership)
+                this.isJoined() && // we mean to be joined
+                oldMemberships.some(this.isMyMembership) && // prior state says we were joined
+                !this.memberships.some(this.isMyMembership) // current says we are not joined
             ) {
+                // State says that we left, but we still mean to be joined
                 logger.warn("Missing own membership: force re-join");
                 // TODO: Should this be awaited? And is there anything to tell the focus?
                 this.triggerCallMembershipEventUpdate();
