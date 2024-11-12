@@ -577,7 +577,7 @@ describe("MatrixClient syncing", () => {
             return Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]).then(() => {
                 const member = client!.getRoom(roomOne)!.getMember(userC)!;
                 expect(member.name).toEqual("The Boss");
-                expect(member.getAvatarUrl("home.server.url", 1, 1, "", false, false)).toBeTruthy();
+                expect(member.getAvatarUrl("https://home.server.url", 1, 1, "", false, false)).toBeTruthy();
             });
         });
 
