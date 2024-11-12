@@ -485,13 +485,18 @@ export class SyncAccumulator {
         // Work out the current state. The deltas need to be applied in the order:
         // - existing state which didn't come down /sync.
         // - State events under the 'state' key.
-        // - State events in the 'timeline'.
+        // - State events under the 'state_after' key OR state events in the 'timeline' if 'state_after' is not present.
         data.state?.events?.forEach((e) => {
+            setState(currentData._currentState, e);
+        });
+        data["org.matrix.msc4222.state_after"]?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
         data.timeline?.events?.forEach((e, index) => {
             // this nops if 'e' isn't a state event
-            setState(currentData._currentState, e);
+            if (!data["org.matrix.msc4222.state_after"]) {
+                setState(currentData._currentState, e);
+            }
             // append the event to the timeline. The back-pagination token
             // corresponds to the first event in the timeline
             let transformedEvent: TaggedEvent;
