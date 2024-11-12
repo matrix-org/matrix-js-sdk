@@ -467,19 +467,109 @@ describe("MatrixRTCSession", () => {
             jest.useRealTimers();
         });
 
+        it("uses membershipExpiryTimeout from join config", async () => {
+            const realSetTimeout = setTimeout;
+            jest.useFakeTimers();
+            sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60000 });
+            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                EventType.GroupCallMemberPrefix,
+                {
+                    memberships: [
+                        {
+                            application: "m.call",
+                            scope: "m.room",
+                            call_id: "",
+                            device_id: "AAAAAAA",
+                            expires: 60000,
+                            expires_ts: Date.now() + 60000,
+                            foci_active: [mockFocus],
+
+                            membershipID: expect.stringMatching(".*"),
+                        },
+                    ],
+                },
+                "@alice:example.org",
+            );
+            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(0);
+            jest.useRealTimers();
+        });
+
         describe("non-legacy calls", () => {
             const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
 
             async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
-                const realSetTimeout = setTimeout;
                 if (useOwnedStateEvents) {
-                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3779.default");
+                    mockRoom.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
                 }
 
                 jest.useFakeTimers();
-                sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
-                await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+
+                // preparing the delayed disconnect should handle the delay being too long
+                const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
+                    const error = new MatrixError({
+                        "errcode": "M_UNKNOWN",
+                        "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
+                        "org.matrix.msc4140.max_delay": 7500,
+                    });
+                    sendDelayedStateMock.mockImplementationOnce(() => {
+                        resolve();
+                        return Promise.reject(error);
+                    });
+                });
+
+                // preparing the delayed disconnect should handle ratelimiting
+                const sendDelayedStateAttempt = new Promise<void>((resolve) => {
+                    const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
+                    sendDelayedStateMock.mockImplementationOnce(() => {
+                        resolve();
+                        return Promise.reject(error);
+                    });
+                });
+
+                // setting the membership state should handle ratelimiting (also with a retry-after value)
+                const sendStateEventAttempt = new Promise<void>((resolve) => {
+                    const error = new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    );
+                    sendStateEventMock.mockImplementationOnce(() => {
+                        resolve();
+                        return Promise.reject(error);
+                    });
+                });
+
+                // needed to advance the mock timers properly
+                const scheduledDelayDisconnection = new Promise<void>((resolve) => {
+                    const originalFn: () => void = (sess as any).scheduleDelayDisconnection;
+                    (sess as any).scheduleDelayDisconnection = jest.fn(() => {
+                        originalFn.call(sess);
+                        resolve();
+                    });
+                });
+
+                sess!.joinRoomSession([activeFocusConfig], activeFocus, {
+                    useLegacyMemberEvents: false,
+                    membershipServerSideExpiryTimeout: 9000,
+                });
+
+                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 9000);
+                await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
+                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 7500);
+
+                await sendDelayedStateAttempt;
+                jest.advanceTimersByTime(5000);
+
+                await sendStateEventAttempt.then(); // needed to resolve after resendIfRateLimited catches
+                jest.advanceTimersByTime(1000);
+
+                await sentStateEvent;
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     mockRoom!.roomId,
                     EventType.GroupCallMemberPrefix,
@@ -493,9 +583,10 @@ describe("MatrixRTCSession", () => {
                     } satisfies SessionMembershipData,
                     `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`,
                 );
-                await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                await sentDelayedState;
 
+                // should have prepared the heartbeat to keep delaying the leave event while still connected
+                await scheduledDelayDisconnection;
                 // should have tried updating the delayed leave to test that it wasn't replaced by own state
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
                 // should update delayed disconnect
