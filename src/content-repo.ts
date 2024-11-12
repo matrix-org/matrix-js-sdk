@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeParams } from "./utils.ts";
+// Validation based on https://spec.matrix.org/v1.12/appendices/#server-name
+// We do not use the validation described in https://spec.matrix.org/v1.12/client-server-api/#security-considerations-5
+// as it'd wrongly make all MXCs invalid due to not allowing `[].:` in server names.
+const serverNameRegex =
+    /^(?:(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})|(?:\[[\dA-Fa-f:.]{2,45}])|(?:[A-Za-z\d\-.]{1,255}))(?::\d{1,5})?$/;
+function validateServerName(serverName: string): boolean {
+    const matches = serverNameRegex.exec(serverName);
+    return matches?.[0] === serverName;
+}
+
+// Validation based on https://spec.matrix.org/v1.12/client-server-api/#security-considerations-5
+const mediaIdRegex = /^[\w-]+$/;
+function validateMediaId(mediaId: string): boolean {
+    const matches = mediaIdRegex.exec(mediaId);
+    return matches?.[0] === mediaId;
+}
 
 /**
  * Get the HTTP URL for an MXC URI.
@@ -36,7 +51,7 @@ import { encodeParams } from "./utils.ts";
  * for authenticated media will *not* be checked - it is the caller's responsibility
  * to do so before calling this function. Note also that `useAuthentication`
  * implies `allowRedirects`. Defaults to false (unauthenticated endpoints).
- * @returns The complete URL to the content.
+ * @returns The complete URL to the content, may be an empty string if the provided mxc is not valid.
  */
 export function getHttpUriForMxc(
     baseUrl: string,
@@ -51,12 +66,17 @@ export function getHttpUriForMxc(
     if (typeof mxc !== "string" || !mxc) {
         return "";
     }
-    if (mxc.indexOf("mxc://") !== 0) {
+    if (!mxc.startsWith("mxc://")) {
         if (allowDirectLinks) {
             return mxc;
         } else {
             return "";
         }
+    }
+
+    const [serverName, mediaId, ...rest] = mxc.slice(6).split("/");
+    if (rest.length > 0 || !validateServerName(serverName) || !validateMediaId(mediaId)) {
+        return "";
     }
 
     if (useAuthentication) {
@@ -67,46 +87,31 @@ export function getHttpUriForMxc(
         // callers, hopefully.
     }
 
-    let serverAndMediaId = mxc.slice(6); // strips mxc://
     let prefix: string;
+    const isThumbnailRequest = !!width || !!height || !!resizeMethod;
+    const verb = isThumbnailRequest ? "thumbnail" : "download";
     if (useAuthentication) {
-        prefix = "/_matrix/client/v1/media/download/";
+        prefix = `/_matrix/client/v1/media/${verb}`;
     } else {
-        prefix = "/_matrix/media/v3/download/";
+        prefix = `/_matrix/media/v3/${verb}`;
     }
-    const params: Record<string, string> = {};
+
+    const url = new URL(`${prefix}/${serverName}/${mediaId}`, baseUrl);
 
     if (width) {
-        params["width"] = Math.round(width).toString();
+        url.searchParams.set("width", Math.round(width).toString());
     }
     if (height) {
-        params["height"] = Math.round(height).toString();
+        url.searchParams.set("height", Math.round(height).toString());
     }
     if (resizeMethod) {
-        params["method"] = resizeMethod;
-    }
-    if (Object.keys(params).length > 0) {
-        // these are thumbnailing params so they probably want the
-        // thumbnailing API...
-        if (useAuthentication) {
-            prefix = "/_matrix/client/v1/media/thumbnail/";
-        } else {
-            prefix = "/_matrix/media/v3/thumbnail/";
-        }
+        url.searchParams.set("method", resizeMethod);
     }
 
     if (typeof allowRedirects === "boolean") {
         // We add this after, so we don't convert everything to a thumbnail request.
-        params["allow_redirect"] = JSON.stringify(allowRedirects);
+        url.searchParams.set("allow_redirect", JSON.stringify(allowRedirects));
     }
 
-    const fragmentOffset = serverAndMediaId.indexOf("#");
-    let fragment = "";
-    if (fragmentOffset >= 0) {
-        fragment = serverAndMediaId.slice(fragmentOffset);
-        serverAndMediaId = serverAndMediaId.slice(0, fragmentOffset);
-    }
-
-    const urlParams = Object.keys(params).length === 0 ? "" : "?" + encodeParams(params);
-    return baseUrl + prefix + serverAndMediaId + urlParams + fragment;
+    return url.href;
 }
