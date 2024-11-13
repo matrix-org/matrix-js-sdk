@@ -184,8 +184,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.joinConfig?.useKeyDelay ?? 5_000;
     }
 
+    /**
+     * If the server disallows the configured {@link membershipServerSideExpiryTimeout},
+     * this stores a delay that the server does allow.
+     */
+    private membershipServerSideExpiryTimeoutOverride?: number;
+
     private get membershipServerSideExpiryTimeout(): number {
-        return this.joinConfig?.membershipServerSideExpiryTimeout ?? 8_000;
+        return (
+            this.membershipServerSideExpiryTimeoutOverride ??
+            this.joinConfig?.membershipServerSideExpiryTimeout ??
+            8_000
+        );
     }
 
     private get membershipKeepAlivePeriod(): number {
@@ -1141,6 +1151,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                         );
                         this.disconnectDelayId = res.delay_id;
                     } catch (e) {
+                        if (
+                            e instanceof MatrixError &&
+                            e.errcode === "M_UNKNOWN" &&
+                            e.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
+                        ) {
+                            const maxDelayAllowed = e.data["org.matrix.msc4140.max_delay"];
+                            if (
+                                typeof maxDelayAllowed === "number" &&
+                                this.membershipServerSideExpiryTimeout > maxDelayAllowed
+                            ) {
+                                this.membershipServerSideExpiryTimeoutOverride = maxDelayAllowed;
+                                return prepareDelayedDisconnection();
+                            }
+                        }
                         logger.error("Failed to prepare delayed disconnection event:", e);
                     }
                 };

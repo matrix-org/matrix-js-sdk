@@ -39,6 +39,10 @@ jobs:
                   tag: next
                   ignore-scripts: false
 
+            - name: Check npm package was published
+              if: steps.npm-publish.outputs.id == ''
+              run: exit 1
+
             - name: 🎖️ Add `latest` dist-tag to final releases
               if: steps.npm-publish.outputs.id && !contains(steps.npm-publish.outputs.id, '-rc.')
               run: npm dist-tag add "$release" latest

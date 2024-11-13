@@ -46,7 +46,6 @@ import {
     CrossSigningStatus,
     CryptoApi,
     CryptoCallbacks,
-    Curve25519AuthData,
     DecryptionFailureCode,
     DeviceVerificationStatus,
     EventEncryptionInfo,
@@ -66,6 +65,8 @@ import {
     DeviceIsolationModeKind,
     CryptoEvent,
     CryptoEventHandlerMap,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -76,16 +77,17 @@ import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } 
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { RustBackupManager } from "./backup.ts";
+import { decryptionKeyMatchesKeyBackupInfo, RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
 import { ISignatures } from "../@types/signed.ts";
-import { encodeBase64 } from "../base64.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";
 import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
+import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -337,9 +339,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         }
 
         const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(encodeBase64(privKey));
-
-        const authData = <Curve25519AuthData>backupInfo.auth_data;
-        if (authData.public_key != backupDecryptionKey.megolmV1PublicKey.publicKeyBase64) {
+        if (!decryptionKeyMatchesKeyBackupInfo(backupDecryptionKey, backupInfo)) {
             throw new Error(`getBackupDecryptor: key backup on server does not match the decryption key`);
         }
 
@@ -1203,6 +1203,28 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Implementation of {@link CryptoApi#loadSessionBackupPrivateKeyFromSecretStorage}.
+     */
+    public async loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void> {
+        const backupKey = await this.secretStorage.get("m.megolm_backup.v1");
+        if (!backupKey) {
+            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: missing decryption key in secret storage");
+        }
+
+        const keyBackupInfo = await this.backupManager.getServerBackupInfo();
+        if (!keyBackupInfo || !keyBackupInfo.version) {
+            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: unable to get backup version");
+        }
+
+        const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(backupKey);
+        if (!decryptionKeyMatchesKeyBackupInfo(backupDecryptionKey, keyBackupInfo)) {
+            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info");
+        }
+
+        await this.backupManager.saveBackupDecryptionKey(backupDecryptionKey, keyBackupInfo.version);
+    }
+
+    /**
      * Get the current status of key backup.
      *
      * Implementation of {@link CryptoApi#getActiveSessionBackupVersion}.
@@ -1278,6 +1300,53 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         if (unsigned !== undefined) obj.unsigned = unsigned;
         obj.signatures = Object.fromEntries(sigs.entries());
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#restoreKeyBackupWithPassphrase}.
+     */
+    public async restoreKeyBackupWithPassphrase(
+        passphrase: string,
+        opts?: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
+        const backupInfo = await this.backupManager.getServerBackupInfo();
+        if (!backupInfo?.version) {
+            throw new Error("No backup info available");
+        }
+
+        const privateKey = await keyFromAuthData(backupInfo.auth_data, passphrase);
+
+        // Cache the key
+        await this.storeSessionBackupPrivateKey(privateKey, backupInfo.version);
+        return this.restoreKeyBackup(opts);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#restoreKeyBackup}.
+     */
+    public async restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
+        // Get the decryption key from the crypto store
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        const { decryptionKey, backupVersion } = backupKeys;
+        if (!decryptionKey || !backupVersion) throw new Error("No decryption key found in crypto store");
+
+        const decodedDecryptionKey = decodeBase64(decryptionKey.toBase64());
+
+        const backupInfo = await this.backupManager.requestKeyBackupVersion(backupVersion);
+        if (!backupInfo) throw new Error(`Backup version to restore ${backupVersion} not found on server`);
+
+        const backupDecryptor = await this.getBackupDecryptor(backupInfo, decodedDecryptionKey);
+
+        try {
+            opts?.progressCallback?.({
+                stage: "fetch",
+            });
+
+            return await this.backupManager.restoreKeyBackup(backupVersion, backupDecryptor, opts);
+        } finally {
+            // Free to avoid to keep in memory the decryption key stored in it. To avoid to exposing it to an attacker.
+            backupDecryptor.free();
+        }
     }
 
     /**

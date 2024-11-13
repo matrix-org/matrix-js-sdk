@@ -508,6 +508,19 @@ describe("MatrixRTCSession", () => {
 
                 jest.useFakeTimers();
 
+                // preparing the delayed disconnect should handle the delay being too long
+                const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
+                    const error = new MatrixError({
+                        "errcode": "M_UNKNOWN",
+                        "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
+                        "org.matrix.msc4140.max_delay": 7500,
+                    });
+                    sendDelayedStateMock.mockImplementationOnce(() => {
+                        resolve();
+                        return Promise.reject(error);
+                    });
+                });
+
                 // preparing the delayed disconnect should handle ratelimiting
                 const sendDelayedStateAttempt = new Promise<void>((resolve) => {
                     const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
@@ -541,7 +554,14 @@ describe("MatrixRTCSession", () => {
                     });
                 });
 
-                sess!.joinRoomSession([activeFocusConfig], activeFocus, { useLegacyMemberEvents: false });
+                sess!.joinRoomSession([activeFocusConfig], activeFocus, {
+                    useLegacyMemberEvents: false,
+                    membershipServerSideExpiryTimeout: 9000,
+                });
+
+                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 9000);
+                await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
+                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 7500);
 
                 await sendDelayedStateAttempt;
                 jest.advanceTimersByTime(5000);

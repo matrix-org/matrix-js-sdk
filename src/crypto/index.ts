@@ -102,6 +102,8 @@ import {
     OwnDeviceKeys,
     CryptoEvent as CryptoApiCryptoEvent,
     CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
+    KeyBackupRestoreResult,
+    KeyBackupRestoreOpts,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -1304,6 +1306,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
         });
+    }
+
+    /**
+     * Implementation of {@link Crypto.loadSessionBackupPrivateKeyFromSecretStorage}.
+     */
+    public loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void> {
+        throw new Error("Not implmeented");
     }
 
     /**
@@ -4306,6 +4315,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Stub function -- dehydration is not implemented here, so throw error
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackup is not implemented here, so throw error
+     */
+    public restoreKeyBackup(opts: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackupWithPassphrase is not implemented here, so throw error
+     */
+    public restoreKeyBackupWithPassphrase(
+        passphrase: string,
+        opts: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
     }
 }
