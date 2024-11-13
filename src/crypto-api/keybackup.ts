@@ -16,6 +16,7 @@ limitations under the License.
 
 import { ISigned } from "../@types/signed.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { ImportRoomKeyProgressData } from "./index.ts";
 
 export interface Curve25519AuthData {
     public_key: string;
@@ -86,4 +87,29 @@ export interface KeyBackupSession<T = Curve25519SessionData | AESEncryptedSecret
 
 export interface KeyBackupRoomSessions {
     [sessionId: string]: KeyBackupSession;
+}
+
+/**
+ * Extra parameters for {@link CryptoApi.restoreKeyBackup} and {@link CryptoApi.restoreKeyBackupWithPassphrase}.
+ */
+export interface KeyBackupRestoreOpts {
+    /**
+     * A callback which, if defined, will be called periodically to report ongoing progress of the backup restore process.
+     * @param progress
+     */
+    progressCallback?: (progress: ImportRoomKeyProgressData) => void;
+}
+
+/**
+ * The result of {@link CryptoApi.restoreKeyBackup}.
+ */
+export interface KeyBackupRestoreResult {
+    /**
+     * The total number of keys that were found in the backup.
+     */
+    total: number;
+    /**
+     * The number of keys that were imported.
+     */
+    imported: number;
 }
