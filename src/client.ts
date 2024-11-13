@@ -80,7 +80,6 @@ import {
     CryptoEventHandlerMap as LegacyCryptoEventHandlerMap,
     fixBackupKey,
     ICheckOwnCrossSigningTrustOpts,
-    ICryptoCallbacks,
     IRoomKeyRequestBody,
     isCryptoAvailable,
 } from "./crypto/index.ts";
@@ -229,6 +228,7 @@ import {
     ImportRoomKeysOpts,
     CryptoEvent,
     CryptoEventHandlerMap,
+    CryptoCallbacks,
 } from "./crypto-api/index.ts";
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
@@ -437,7 +437,7 @@ export interface ICreateClientOpts {
     /**
      * Crypto callbacks provided by the application
      */
-    cryptoCallbacks?: ICryptoCallbacks;
+    cryptoCallbacks?: CryptoCallbacks;
 
     /**
      * Method to generate room names for empty rooms and rooms names based on membership.
@@ -1253,7 +1253,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public crypto?: Crypto; // XXX: Intended private, used in code. Being replaced by cryptoBackend
 
     private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
-    public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
+    public cryptoCallbacks: CryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
