@@ -991,23 +991,41 @@ describe("RustCrypto", () => {
         });
 
         it.each([
-            [undefined, null],
-            ["Encrypted by an unverified user.", EventShieldReason.UNVERIFIED_IDENTITY],
-            ["Encrypted by a device not verified by its owner.", EventShieldReason.UNSIGNED_DEVICE],
+            [undefined, undefined, null],
+            [
+                "Encrypted by an unverified user.",
+                RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity,
+                EventShieldReason.UNVERIFIED_IDENTITY,
+            ],
+            [
+                "Encrypted by a device not verified by its owner.",
+                RustSdkCryptoJs.ShieldStateCode.UnsignedDevice,
+                EventShieldReason.UNSIGNED_DEVICE,
+            ],
             [
                 "The authenticity of this encrypted message can't be guaranteed on this device.",
+                RustSdkCryptoJs.ShieldStateCode.AuthenticityNotGuaranteed,
                 EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
             ],
-            ["Encrypted by an unknown or deleted device.", EventShieldReason.UNKNOWN_DEVICE],
-            ["bloop", EventShieldReason.UNKNOWN],
-        ])("gets the right shield reason (%s)", async (rustReason, expectedReason) => {
+            [
+                "Encrypted by an unknown or deleted device.",
+                RustSdkCryptoJs.ShieldStateCode.UnknownDevice,
+                EventShieldReason.UNKNOWN_DEVICE,
+            ],
+            ["Not encrypted.", RustSdkCryptoJs.ShieldStateCode.SentInClear, EventShieldReason.SENT_IN_CLEAR],
+            [
+                "Encrypted by a previously-verified user who is no longer verified.",
+                RustSdkCryptoJs.ShieldStateCode.PreviouslyVerified,
+                EventShieldReason.VERIFICATION_VIOLATION,
+            ],
+        ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {
             // suppress the warning from the unknown shield reason
             jest.spyOn(console, "warn").mockImplementation(() => {});
 
             const mockEncryptionInfo = {
                 shieldState: jest
                     .fn()
-                    .mockReturnValue({ color: RustSdkCryptoJs.ShieldColor.None, message: rustReason }),
+                    .mockReturnValue({ color: RustSdkCryptoJs.ShieldColor.None, code: rustCode, message: rustReason }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
             olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
 
