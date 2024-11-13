@@ -17,8 +17,10 @@ limitations under the License.
 
 import { ReceiptType } from "../../src/@types/read_receipts";
 import {
-    IJoinedRoom,
+    Category,
     IInvitedRoom,
+    IInviteState,
+    IJoinedRoom,
     IKnockedRoom,
     IKnockState,
     ILeftRoom,
@@ -27,7 +29,6 @@ import {
     IStrippedState,
     ISyncResponse,
     SyncAccumulator,
-    IInviteState,
 } from "../../src/sync-accumulator";
 import { IRoomSummary } from "../../src";
 import * as utils from "../test-utils/test-utils";
@@ -880,6 +881,105 @@ describe("SyncAccumulator", function () {
             expect(
                 output.roomsData.join["!foo:bar"].unread_thread_notifications!["$143273582443PhrSn:example.org"],
             ).not.toBeUndefined();
+        });
+    });
+
+    describe("msc4222", () => {
+        it("should accumulate state_after events", () => {
+            const initState = {
+                events: [member("alice", KnownMembership.Knock)],
+            };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": initState,
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
+
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 1",
+                                },
+                                skey: "",
+                            }) as IStateEvent,
+                        ],
+                    },
+                }),
+            );
+
+            expect(
+                sa.getJSON().roomsData[Category.Join]["!foo:bar"].state?.events.find((e) => e.type === "m.room.name")
+                    ?.content.name,
+            ).toEqual("Room 1");
+
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 2",
+                                },
+                                skey: "",
+                            }) as IStateEvent,
+                        ],
+                    },
+                }),
+            );
+
+            expect(
+                sa.getJSON().roomsData[Category.Join]["!foo:bar"].state?.events.find((e) => e.type === "m.room.name")
+                    ?.content.name,
+            ).toEqual("Room 2");
+        });
+
+        it("should ignore state events in timeline", () => {
+            const initState = {
+                events: [member("alice", KnownMembership.Knock)],
+            };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": initState,
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
+
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [],
+                    },
+                    "timeline": {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 1",
+                                },
+                                skey: "",
+                            }) as IStateEvent,
+                        ],
+                        prev_batch: "something",
+                    },
+                }),
+            );
+
+            expect(
+                sa.getJSON().roomsData[Category.Join]["!foo:bar"].state?.events.find((e) => e.type === "m.room.name")
+                    ?.content.name,
+            ).not.toEqual("Room 1");
         });
     });
 });

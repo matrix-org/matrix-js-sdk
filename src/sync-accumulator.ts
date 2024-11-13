@@ -493,8 +493,8 @@ export class SyncAccumulator {
             setState(currentData._currentState, e);
         });
         data.timeline?.events?.forEach((e, index) => {
-            // this nops if 'e' isn't a state event
             if (!data["org.matrix.msc4222.state_after"]) {
+                // this nops if 'e' isn't a state event
                 setState(currentData._currentState, e);
             }
             // append the event to the timeline. The back-pagination token
