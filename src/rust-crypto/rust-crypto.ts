@@ -1211,9 +1211,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: missing decryption key in secret storage");
         }
 
-        const decodedKey = decodeBase64(backupKey);
         const keyBackupInfo = await this.backupManager.getServerBackupInfo();
-        if (!keyBackupInfo) {
+        if (!keyBackupInfo || !keyBackupInfo.version) {
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: unable to get backup version");
         }
 
@@ -1222,7 +1221,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info");
         }
 
-        await this.storeSessionBackupPrivateKey(decodedKey, keyBackupInfo.version);
+        await this.backupManager.saveBackupDecryptionKey(backupDecryptionKey, keyBackupInfo.version);
     }
 
     /**

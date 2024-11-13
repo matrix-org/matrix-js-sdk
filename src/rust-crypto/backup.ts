@@ -635,7 +635,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Import the room keys from a `/room_keys/keys` call.
-     * Calls the `opts.progressCallback` with the progress of the import.
+     * Calls `opts.progressCallback` with the progress of the import.
      *
      * @param keyBackup - The response from the server containing the keys to import.
      * @param backupVersion - The version of the backup info.
@@ -806,7 +806,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
  * If `version` is provided, calls `GET /room_keys/version/$version` and gets the backup info for that version.
  * See https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv3room_keysversionversion.
  *
- * If not, calls `GET /room_keys/version` and get the latest backup info.
+ * If not, calls `GET /room_keys/version` and gets the latest backup info.
  * See https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv3room_keysversion
  *
  * @param http

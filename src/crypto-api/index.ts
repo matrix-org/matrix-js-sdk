@@ -509,7 +509,7 @@ export interface CryptoApi {
      * if they match, stores the key in the crypto store by calling {@link storeSessionBackupPrivateKey},
      * which enables automatic restore of individual keys when an Unable-to-decrypt error is encountered.
      *
-     * if we are unable to fetch the key from secret storage, there is no backup on the server, or the key
+     * If we are unable to fetch the key from secret storage, there is no backup on the server, or the key
      * does not match, throws an exception.
      */
     loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
