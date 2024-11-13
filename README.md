@@ -39,7 +39,7 @@ client.publicRooms(function (err, data) {
 ```
 
 See [below](#end-to-end-encryption-support) for how to enable end-to-end-encryption, or check
-[the Node.js terminal app](examples/node) for a more complex example.
+[the Node.js terminal app](https://github.com/matrix-org/matrix-js-sdk/tree/develop/examples/node) for a more complex example.
 
 To start the client:
 
