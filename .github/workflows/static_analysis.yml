@@ -120,7 +120,7 @@ jobs:
               run: "./scripts/layered.sh"
               env:
                   # tell layered.sh to check out the right sha of the JS-SDK
-                  JS_SDK_GITHUB_BASE_REF: ${{ github.ref }}
+                  JS_SDK_GITHUB_BASE_REF: ${{ github.sha }}
 
             - name: Typecheck
               run: "yarn run lint:types"
