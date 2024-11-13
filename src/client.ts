@@ -3157,6 +3157,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns true if the sender of this event has been verified using
      * {@link MatrixClient#setDeviceVerified}.
+     *
+     * @deprecated Not supported for Rust Cryptography.
      */
     public async isEventSenderVerified(event: MatrixEvent): Promise<boolean> {
         const device = await this.getEventSenderDeviceInfo(event);
