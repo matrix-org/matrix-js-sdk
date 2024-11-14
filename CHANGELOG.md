@@ -1,3 +1,83 @@
+Changes in [34.11.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.11.1) (2024-11-12)
+====================================================================================================
+# Security
+- Fixes for [CVE-2024-50336](https://nvd.nist.gov/vuln/detail/CVE-2024-50336) / [GHSA-xvg8-m4x3-w6xr](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-xvg8-m4x3-w6xr).
+
+Changes in [34.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.11.0) (2024-11-12)
+====================================================================================================
+# Security
+- Fixes for [CVE-2024-50336](https://nvd.nist.gov/vuln/detail/CVE-2024-50336) / [GHSA-xvg8-m4x3-w6xr](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-xvg8-m4x3-w6xr).
+
+Changes in [34.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.10.0) (2024-11-05)
+====================================================================================================
+## 🦖 Deprecations
+
+* Deprecate `CreateSecretStorageOpts.keyBackupInfo` used in `CryptoApi.bootstrapSecretStorage.` ([#4474](https://github.com/matrix-org/matrix-js-sdk/pull/4474)). Contributed by @florianduros.
+* Add CryptoApi.encryptToDeviceMessages() and deprecate Crypto.encryptAndSendToDevices() ([#4380](https://github.com/matrix-org/matrix-js-sdk/pull/4380)). Contributed by @hughns.
+* Remove abandoned MSC3886, MSC3903, MSC3906 experimental implementations ([#4469](https://github.com/matrix-org/matrix-js-sdk/pull/4469)). Contributed by @t3chguy.
+* Deprecate `MatrixClient.getDehydratedDevice` ([#4467](https://github.com/matrix-org/matrix-js-sdk/pull/4467)). Contributed by @florianduros.
+* Deprecate top level crypto events re-export ([#4444](https://github.com/matrix-org/matrix-js-sdk/pull/4444)). Contributed by @florianduros.
+
+## ✨ Features
+
+* Add CryptoApi.encryptToDeviceMessages() and deprecate Crypto.encryptAndSendToDevices() ([#4380](https://github.com/matrix-org/matrix-js-sdk/pull/4380)). Contributed by @hughns.
+* Do not rotate MatrixRTC media encryption key when a new member joins a session ([#4472](https://github.com/matrix-org/matrix-js-sdk/pull/4472)). Contributed by @hughns.
+* Avoid `<sender>|<session>` notation in log messages ([#4473](https://github.com/matrix-org/matrix-js-sdk/pull/4473)). Contributed by @richvdh.
+* Refactor/simplify Promises in MatrixRTCSession ([#4466](https://github.com/matrix-org/matrix-js-sdk/pull/4466)). Contributed by @AndrewFerr.
+* Prepare delayed call leave events more reliably ([#4447](https://github.com/matrix-org/matrix-js-sdk/pull/4447)). Contributed by @AndrewFerr.
+
+## 🐛 Bug Fixes
+
+* Fix DelayedEventInfo type ([#4446](https://github.com/matrix-org/matrix-js-sdk/pull/4446)). Contributed by @AndrewFerr.
+
+
+Changes in [34.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.9.0) (2024-10-22)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate the crypto events which are not used by the rust-crypto ([#4442](https://github.com/matrix-org/matrix-js-sdk/pull/4442)). Contributed by @florianduros.
+
+## 🐛 Bug Fixes
+
+* Fix the rust crypto import in esm environments. ([#4445](https://github.com/matrix-org/matrix-js-sdk/pull/4445)). Contributed by @saul-jb.
+* Fix MatrixRTC sender key wrapping ([#4441](https://github.com/matrix-org/matrix-js-sdk/pull/4441)). Contributed by @hughns.
+
+
+Changes in [34.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.8.0) (2024-10-15)
+==================================================================================================
+This release removes insecure functionality, resolving CVE-2024-47080 / GHSA-4jf8-g8wp-cx7c.
+
+Changes in [34.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.7.0) (2024-10-08)
+==================================================================================================
+## 🦖 Deprecations
+
+* RTCSession cleanup: deprecate getKeysForParticipant() and getEncryption(); add emitEncryptionKeys() ([#4427](https://github.com/matrix-org/matrix-js-sdk/pull/4427)). Contributed by @hughns.
+
+## ✨ Features
+
+* Bump matrix-rust-sdk to 9.1.0 ([#4435](https://github.com/matrix-org/matrix-js-sdk/pull/4435)). Contributed by @richvdh.
+* Rotate Matrix RTC media encryption key when a new member joins a call for Post Compromise Security ([#4422](https://github.com/matrix-org/matrix-js-sdk/pull/4422)). Contributed by @hughns.
+* Update media event content types to include captions ([#4403](https://github.com/matrix-org/matrix-js-sdk/pull/4403)). Contributed by @tulir.
+* Update OIDC registration types to match latest MSC2966 state ([#4432](https://github.com/matrix-org/matrix-js-sdk/pull/4432)). Contributed by @t3chguy.
+* Add `CryptoApi.pinCurrentUserIdentity` and `UserIdentity.needsUserApproval` ([#4415](https://github.com/matrix-org/matrix-js-sdk/pull/4415)). Contributed by @richvdh.
+
+
+Changes in [34.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.6.0) (2024-09-24)
+==================================================================================================
+## 🦖 Deprecations
+
+* Element-R: Mark unsupported MatrixClient methods as deprecated ([#4389](https://github.com/matrix-org/matrix-js-sdk/pull/4389)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Add crypto mode setting for invisible crypto, and apply it to decrypting events ([#4407](https://github.com/matrix-org/matrix-js-sdk/pull/4407)). Contributed by @uhoreg.
+* Don't share full key history for RTC per-participant encryption ([#4406](https://github.com/matrix-org/matrix-js-sdk/pull/4406)). Contributed by @hughns.
+* Export membership types ([#4405](https://github.com/matrix-org/matrix-js-sdk/pull/4405)). Contributed by @Johennes.
+* Fix sending redacts in embedded (widget) mode ([#4398](https://github.com/matrix-org/matrix-js-sdk/pull/4398)). Contributed by @toger5.
+* Expose the event ID of a call membership ([#4395](https://github.com/matrix-org/matrix-js-sdk/pull/4395)). Contributed by @robintown.
+* MSC4133 - Extended profiles ([#4391](https://github.com/matrix-org/matrix-js-sdk/pull/4391)). Contributed by @Half-Shot.
+
+
 Changes in [34.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.5.0) (2024-09-10)
 ==================================================================================================
 ## 🦖 Deprecations

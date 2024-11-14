@@ -65,7 +65,7 @@ export class TypedEventEmitter<
     SuperclassArguments extends ListenerMap<any> = Arguments,
 > extends EventEmitter {
     /**
-     * Alias for {@link TypedEventEmitter#on}.
+     * Alias for {@link on}.
      */
     public addListener<T extends Events | EventEmitterEvents>(
         event: T,
@@ -119,12 +119,12 @@ export class TypedEventEmitter<
     /**
      * Returns a copy of the array of listeners for the event named `event`.
      */
-    public listeners(event: Events | EventEmitterEvents): Function[] {
+    public listeners(event: Events | EventEmitterEvents): ReturnType<EventEmitter["listeners"]> {
         return super.listeners(event);
     }
 
     /**
-     * Alias for {@link TypedEventEmitter#removeListener}
+     * Alias for {@link removeListener}
      */
     public off<T extends Events | EventEmitterEvents>(event: T, listener: Listener<Events, Arguments, T>): this {
         return super.off(event, listener);
@@ -139,7 +139,7 @@ export class TypedEventEmitter<
      * being added, and called, multiple times.
      *
      * By default, event listeners are invoked in the order they are added. The
-     * {@link TypedEventEmitter#prependListener} method can be used as an alternative to add the
+     * {@link prependListener} method can be used as an alternative to add the
      * event listener to the beginning of the listeners array.
      *
      * @param event - The name of the event.
@@ -158,7 +158,7 @@ export class TypedEventEmitter<
      * Returns a reference to the `EventEmitter`, so that calls can be chained.
      *
      * By default, event listeners are invoked in the order they are added.
-     * The {@link TypedEventEmitter#prependOnceListener} method can be used as an alternative to add the
+     * The {@link prependOnceListener} method can be used as an alternative to add the
      * event listener to the beginning of the listeners array.
      *
      * @param event - The name of the event.
@@ -240,7 +240,7 @@ export class TypedEventEmitter<
      * Returns a copy of the array of listeners for the event named `eventName`,
      * including any wrappers (such as those created by `.once()`).
      */
-    public rawListeners(event: Events | EventEmitterEvents): Function[] {
+    public rawListeners(event: Events | EventEmitterEvents): ReturnType<EventEmitter["rawListeners"]> {
         return super.rawListeners(event);
     }
 }

@@ -22,7 +22,6 @@ import type { PkSigning } from "@matrix-org/olm";
 import { IObject, pkSign, pkVerify } from "./olmlib.ts";
 import { logger } from "../logger.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
-import { decryptAES, encryptAES } from "./aes.ts";
 import { DeviceInfo } from "./deviceinfo.ts";
 import { ISignedKey, MatrixClient } from "../client.ts";
 import { OlmDevice } from "./OlmDevice.ts";
@@ -36,6 +35,8 @@ import {
     UserVerificationStatus as UserTrustLevel,
 } from "../crypto-api/index.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 
 // backwards-compatibility re-exports
 export { UserTrustLevel };
@@ -124,7 +125,7 @@ export class CrossSigningInfo {
 
         function validateKey(key: Uint8Array | null): [string, PkSigning] | undefined {
             if (!key) return;
-            const signing = new global.Olm.PkSigning();
+            const signing = new globalThis.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(key);
             if (gotPubkey === expectedPubkey) {
                 return [gotPubkey, signing];
@@ -306,7 +307,7 @@ export class CrossSigningInfo {
 
         try {
             if (level & CrossSigningLevel.MASTER) {
-                masterSigning = new global.Olm.PkSigning();
+                masterSigning = new globalThis.Olm.PkSigning();
                 privateKeys.master = masterSigning.generate_seed();
                 masterPub = masterSigning.init_with_seed(privateKeys.master);
                 keys.master = {
@@ -321,7 +322,7 @@ export class CrossSigningInfo {
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
-                const sskSigning = new global.Olm.PkSigning();
+                const sskSigning = new globalThis.Olm.PkSigning();
                 try {
                     privateKeys.self_signing = sskSigning.generate_seed();
                     const sskPub = sskSigning.init_with_seed(privateKeys.self_signing);
@@ -339,7 +340,7 @@ export class CrossSigningInfo {
             }
 
             if (level & CrossSigningLevel.USER_SIGNING) {
-                const uskSigning = new global.Olm.PkSigning();
+                const uskSigning = new globalThis.Olm.PkSigning();
                 try {
                     privateKeys.user_signing = uskSigning.generate_seed();
                     const uskPub = uskSigning.init_with_seed(privateKeys.user_signing);
@@ -520,7 +521,7 @@ export class CrossSigningInfo {
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
-        } catch (e) {
+        } catch {
             userTrusted = false;
         }
         return new UserTrustLevel(userTrusted, userCrossSigning.crossSigningVerifiedBefore, userCrossSigning.firstUse);
@@ -559,7 +560,7 @@ export class CrossSigningInfo {
             pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId);
             // ...then we trust this device as much as far as we trust the user
             return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust, trustCrossSignedDevices);
-        } catch (e) {
+        } catch {
             return new DeviceTrustLevel(false, false, localTrust, trustCrossSignedDevices);
         }
     }
@@ -662,7 +663,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
 
             if (key && key.ciphertext) {
                 const pickleKey = Buffer.from(olmDevice.pickleKey);
-                const decrypted = await decryptAES(key, pickleKey, type);
+                const decrypted = await decryptAESSecretStorageItem(key, pickleKey, type);
                 return decodeBase64(decrypted);
             } else {
                 return key;
@@ -676,7 +677,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 throw new Error(`storeCrossSigningKeyCache expects Uint8Array, got ${key}`);
             }
             const pickleKey = Buffer.from(olmDevice.pickleKey);
-            const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, type);
             return store.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 store.storeSecretStorePrivateKey(txn, type, encryptedKey);
             });

@@ -36,7 +36,7 @@ export type AccessTokens = {
  */
 export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
 export interface IHttpOpts {
-    fetchFn?: typeof global.fetch;
+    fetchFn?: typeof globalThis.fetch;
 
     baseUrl: string;
     idBaseUrl?: string;

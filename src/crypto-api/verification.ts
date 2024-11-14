@@ -119,7 +119,7 @@ export interface VerificationRequest
      *
      * If a verifier has already been created for this request, returns that verifier.
      *
-     * This does *not* send the `m.key.verification.start` event - to do so, call {@link Crypto.Verifier#verify} on the
+     * This does *not* send the `m.key.verification.start` event - to do so, call {@link Verifier.verify} on the
      * returned verifier.
      *
      * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
@@ -281,7 +281,7 @@ export interface Verifier extends TypedEventEmitter<VerifierEvent, VerifierEvent
      * Cancel a verification.
      *
      * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
-     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
+     * will reject, and a {@link crypto-api.VerifierEvent.Cancel | VerifierEvent.Cancel} will be emitted.
      *
      * @param e - the reason for the cancellation.
      */

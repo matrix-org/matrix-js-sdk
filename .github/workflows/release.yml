@@ -28,13 +28,13 @@ jobs:
         with:
             final: ${{ inputs.mode == 'final' }}
             npm: ${{ inputs.npm }}
-            downstreams: '["element-hq/matrix-react-sdk", "element-hq/element-web"]'
+            downstreams: '["element-hq/element-web"]'
 
     docs:
         name: Publish Documentation
         needs: release
         if: inputs.docs
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🧮 Checkout code
               uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
         environment:
             name: github-pages
             url: ${{ steps.deployment.outputs.page_url }}
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         needs: docs
         # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
         permissions:

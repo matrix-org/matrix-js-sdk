@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 import { ISigned } from "../@types/signed.ts";
-import { IEncryptedPayload } from "../crypto/aes.ts";
+import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { ImportRoomKeyProgressData } from "./index.ts";
 
 export interface Curve25519AuthData {
     public_key: string;
@@ -35,7 +36,7 @@ export interface Aes256AuthData {
  * Information about a server-side key backup.
  *
  * Returned by [`GET /_matrix/client/v3/room_keys/version`](https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3room_keysversion)
- * and hence {@link MatrixClient#getKeyBackupVersion}.
+ * and hence {@link matrix.MatrixClient.getKeyBackupVersion}.
  */
 export interface KeyBackupInfo {
     algorithm: string;
@@ -63,7 +64,7 @@ export interface BackupTrustInfo {
 }
 
 /**
- * The result of {@link Crypto.CryptoApi.checkKeyBackupAndEnable}.
+ * The result of {@link CryptoApi.checkKeyBackupAndEnable}.
  */
 export interface KeyBackupCheck {
     backupInfo: KeyBackupInfo;
@@ -77,7 +78,7 @@ export interface Curve25519SessionData {
 }
 
 /* eslint-disable camelcase */
-export interface KeyBackupSession<T = Curve25519SessionData | IEncryptedPayload> {
+export interface KeyBackupSession<T = Curve25519SessionData | AESEncryptedSecretStoragePayload> {
     first_message_index: number;
     forwarded_count: number;
     is_verified: boolean;
@@ -86,4 +87,29 @@ export interface KeyBackupSession<T = Curve25519SessionData | IEncryptedPayload>
 
 export interface KeyBackupRoomSessions {
     [sessionId: string]: KeyBackupSession;
+}
+
+/**
+ * Extra parameters for {@link CryptoApi.restoreKeyBackup} and {@link CryptoApi.restoreKeyBackupWithPassphrase}.
+ */
+export interface KeyBackupRestoreOpts {
+    /**
+     * A callback which, if defined, will be called periodically to report ongoing progress of the backup restore process.
+     * @param progress
+     */
+    progressCallback?: (progress: ImportRoomKeyProgressData) => void;
+}
+
+/**
+ * The result of {@link CryptoApi.restoreKeyBackup}.
+ */
+export interface KeyBackupRestoreResult {
+    /**
+     * The total number of keys that were found in the backup.
+     */
+    total: number;
+    /**
+     * The number of keys that were imported.
+     */
+    imported: number;
 }

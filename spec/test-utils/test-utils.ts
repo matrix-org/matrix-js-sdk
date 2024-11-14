@@ -127,7 +127,7 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();
             }
-        } catch (ex) {
+        } catch {
             // Direct access to some non-function fields of DOM prototypes may
             // cause exceptions.
             // Overwriting will not work either in that case.
@@ -560,7 +560,7 @@ export const CRYPTO_BACKENDS: Record<string, InitCrypto> = {};
 export type InitCrypto = (_: MatrixClient) => Promise<void>;
 
 CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
-if (global.Olm) {
+if (globalThis.Olm) {
     CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
 }
 

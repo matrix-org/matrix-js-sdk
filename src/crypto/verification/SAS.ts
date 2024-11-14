@@ -242,8 +242,8 @@ export class SAS extends Base {
     }
 
     protected doVerification = async (): Promise<void> => {
-        await global.Olm.init();
-        olmutil = olmutil || new global.Olm.Utility();
+        await globalThis.Olm.init();
+        olmutil = olmutil || new globalThis.Olm.Utility();
 
         // make sure user's keys are downloaded
         await this.baseApis.downloadKeys([this.userId]);
@@ -369,7 +369,7 @@ export class SAS extends Base {
         const keyAgreement = content.key_agreement_protocol;
         const macMethod = content.message_authentication_code;
         const hashCommitment = content.commitment;
-        const olmSAS = new global.Olm.SAS();
+        const olmSAS = new globalThis.Olm.SAS();
         try {
             this.ourSASPubKey = olmSAS.get_pubkey();
             await this.send(EventType.KeyVerificationKey, {
@@ -411,7 +411,7 @@ export class SAS extends Base {
             throw newUnknownMethodError();
         }
 
-        const olmSAS = new global.Olm.SAS();
+        const olmSAS = new globalThis.Olm.SAS();
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
             await this.send(EventType.KeyVerificationAccept, {

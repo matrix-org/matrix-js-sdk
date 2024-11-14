@@ -30,7 +30,6 @@ import fetchMock from "fetch-mock-jest";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
-    CryptoEvent,
     Device,
     DeviceVerification,
     encodeBase64,
@@ -69,8 +68,9 @@ import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
+import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -425,7 +425,7 @@ describe("initRustCrypto", () => {
         }, 10000);
 
         async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
-            const encryptedKey = await encryptAES(encodeBase64(key), Buffer.from(pickleKey), type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), Buffer.from(pickleKey), type);
             store.storeSecretStorePrivateKey(undefined, type as keyof SecretStorePrivateKeys, encryptedKey);
         }
 
@@ -1362,13 +1362,52 @@ describe("RustCrypto", () => {
         });
 
         it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
-            olmMachine.getIdentity.mockResolvedValue({ free: jest.fn(), isVerified: jest.fn().mockReturnValue(true) });
+            olmMachine.getIdentity.mockResolvedValue({
+                free: jest.fn(),
+                isVerified: jest.fn().mockReturnValue(true),
+                wasPreviouslyVerified: jest.fn().mockReturnValue(true),
+            });
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
             expect(userVerificationStatus.isVerified()).toBeTruthy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
-            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeTruthy();
+        });
+    });
+
+    describe("pinCurrentIdentity", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getIdentity: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                logger,
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("throws an error for an unknown user", async () => {
+            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+                "Cannot pin identity of unknown user",
+            );
+        });
+
+        it("throws an error for our own user", async () => {
+            const ownIdentity = new RustSdkCryptoJs.OwnUserIdentity();
+            olmMachine.getIdentity.mockResolvedValue(ownIdentity);
+
+            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+                "Cannot pin identity of own user",
+            );
         });
     });
 
@@ -1552,6 +1591,124 @@ describe("RustCrypto", () => {
             };
             await rustCrypto.importSecretsBundle(bundle);
             await expect(rustCrypto.exportSecretsBundle()).resolves.toEqual(expect.objectContaining(bundle));
+        });
+    });
+
+    describe("encryptToDeviceMessages", () => {
+        let rustCrypto: RustCrypto;
+        let testOlmMachine: RustSdkCryptoJs.OlmMachine;
+
+        beforeEach(async () => {
+            testOlmMachine = await OlmMachine.initialize(
+                new RustSdkCryptoJs.UserId(testData.TEST_USER_ID),
+                new RustSdkCryptoJs.DeviceId(testData.TEST_DEVICE_ID),
+            );
+            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+            rustCrypto = await makeTestRustCrypto();
+            expect(OlmMachine.initFromStore).toHaveBeenCalled();
+        });
+
+        afterEach(() => {
+            testOlmMachine?.free();
+        });
+
+        const payload = { hello: "world" };
+
+        it("returns empty batch if devices not known", async () => {
+            const getMissingSessions = jest.spyOn(testOlmMachine, "getMissingSessions");
+            const getDevice = jest.spyOn(testOlmMachine, "getDevice");
+            const batch = await rustCrypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                ],
+                payload,
+            );
+            expect(getMissingSessions.mock.calls[0][0].length).toBe(2);
+            expect(getDevice).toHaveBeenCalledTimes(3);
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch).toEqual([]);
+        });
+
+        it("returns encrypted batch for known devices", async () => {
+            // Make m aware of another device, and get some OTK to be able to establish a session.
+            await testOlmMachine.markRequestAsSent(
+                "foo",
+                RustSdkCryptoJs.RequestType.KeysQuery,
+                JSON.stringify({
+                    device_keys: {
+                        "@example:localhost": {
+                            AFGUOBTZWM: {
+                                algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+                                device_id: "AFGUOBTZWM",
+                                keys: {
+                                    "curve25519:AFGUOBTZWM": "boYjDpaC+7NkECQEeMh5dC+I1+AfriX0VXG2UV7EUQo",
+                                    "ed25519:AFGUOBTZWM": "NayrMQ33ObqMRqz6R9GosmHdT6HQ6b/RX/3QlZ2yiec",
+                                },
+                                signatures: {
+                                    "@example:localhost": {
+                                        "ed25519:AFGUOBTZWM":
+                                            "RoSWvru1jj6fs2arnTedWsyIyBmKHMdOu7r9gDi0BZ61h9SbCK2zLXzuJ9ZFLao2VvA0yEd7CASCmDHDLYpXCA",
+                                    },
+                                },
+                                user_id: "@example:localhost",
+                                unsigned: {
+                                    device_display_name: "rust-sdk",
+                                },
+                            },
+                        },
+                    },
+                    failures: {},
+                }),
+            );
+
+            await testOlmMachine.markRequestAsSent(
+                "bar",
+                RustSdkCryptoJs.RequestType.KeysClaim,
+                JSON.stringify({
+                    one_time_keys: {
+                        "@example:localhost": {
+                            AFGUOBTZWM: {
+                                "signed_curve25519:AAAABQ": {
+                                    key: "9IGouMnkB6c6HOd4xUsNv4i3Dulb4IS96TzDordzOws",
+                                    signatures: {
+                                        "@example:localhost": {
+                                            "ed25519:AFGUOBTZWM":
+                                                "2bvUbbmJegrV0eVP/vcJKuIWC3kud+V8+C0dZtg4dVovOSJdTP/iF36tQn2bh5+rb9xLlSeztXBdhy4c+LiOAg",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    failures: {},
+                }),
+            );
+
+            const batch = await rustCrypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                    { deviceId: "AFGUOBTZWM", userId: "@example:localhost" },
+                ],
+                payload,
+            );
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch.length).toEqual(1);
+            expect(batch?.batch[0].deviceId).toEqual("AFGUOBTZWM");
+            expect(batch?.batch[0].userId).toEqual("@example:localhost");
+            expect(batch?.batch[0].payload).toEqual(
+                expect.objectContaining({
+                    "algorithm": "m.olm.v1.curve25519-aes-sha2",
+                    "ciphertext": expect.any(Object),
+                    "org.matrix.msgid": expect.any(String),
+                    "sender_key": expect.any(String),
+                }),
+            );
         });
     });
 });

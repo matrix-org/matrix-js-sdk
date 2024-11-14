@@ -694,7 +694,7 @@ export class SyncApi {
         this.running = true;
         this.abortController = new AbortController();
 
-        global.window?.addEventListener?.("online", this.onOnline, false);
+        globalThis.window?.addEventListener?.("online", this.onOnline, false);
 
         if (this.client.isGuest()) {
             // no push rules for guests, no access to POST filter for guests.
@@ -779,10 +779,10 @@ export class SyncApi {
     public stop(): void {
         debuglog("SyncApi.stop");
         // It is necessary to check for the existance of
-        // global.window AND global.window.removeEventListener.
-        // Some platforms (e.g. React Native) register global.window,
-        // but do not have global.window.removeEventListener.
-        global.window?.removeEventListener?.("online", this.onOnline, false);
+        // globalThis.window AND globalThis.window.removeEventListener.
+        // Some platforms (e.g. React Native) register globalThis.window,
+        // but do not have globalThis.window.removeEventListener.
+        globalThis.window?.removeEventListener?.("online", this.onOnline, false);
         this.running = false;
         this.abortController?.abort();
         if (this.keepAliveTimer) {

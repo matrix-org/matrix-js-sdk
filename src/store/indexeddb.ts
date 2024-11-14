@@ -24,7 +24,7 @@ import { logger } from "../logger.ts";
 import { ISavedSync } from "./index.ts";
 import { IIndexedDBBackend } from "./indexeddb-backend.ts";
 import { ISyncResponse } from "../sync-accumulator.ts";
-import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { IStateEventWithRoomId } from "../@types/search.ts";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 import { IStoredClientOpts } from "../client.ts";
@@ -118,7 +118,10 @@ export class IndexedDBStore extends MemoryStore {
         }
     }
 
-    public on = this.emitter.on.bind(this.emitter);
+    /** Re-exports `TypedEventEmitter.on` */
+    public on(event: EventEmitterEvents | "degraded" | "closed", handler: (...args: any[]) => void): void {
+        this.emitter.on(event, handler);
+    }
 
     /**
      * @returns Resolved when loaded from indexed db.
@@ -203,7 +206,7 @@ export class IndexedDBStore extends MemoryStore {
                 throw err;
             },
         );
-    });
+    }, null);
 
     /**
      * Whether this store would like to save its data
@@ -250,7 +253,7 @@ export class IndexedDBStore extends MemoryStore {
         }
 
         return this.backend.syncToDatabase(userTuples);
-    });
+    }, null);
 
     public setSyncData = this.degradable((syncData: ISyncResponse): Promise<void> => {
         return this.backend.setSyncData(syncData);
@@ -307,13 +310,13 @@ export class IndexedDBStore extends MemoryStore {
      * @param fallback - The method name for fallback.
      * @returns A wrapped member function.
      */
-    private degradable<A extends Array<any>, R = void>(
+    private degradable<A extends Array<any>, F extends keyof MemoryStore | null, R = void>(
         func: DegradableFn<A, R>,
-        fallback?: keyof MemoryStore,
-    ): DegradableFn<A, R> {
-        const fallbackFn = fallback ? (super[fallback] as Function) : null;
+        fallback: F,
+    ): DegradableFn<A, F extends string ? R : void> {
+        const fallbackFn = fallback ? (super[fallback] as (...args: A) => Promise<R>) : null;
 
-        return async (...args) => {
+        return (async (...args) => {
             try {
                 return await func.call(this, ...args);
             } catch (e) {
@@ -341,7 +344,7 @@ export class IndexedDBStore extends MemoryStore {
                     return fallbackFn.call(this, ...args);
                 }
             }
-        };
+        }) as DegradableFn<A, F extends string ? R : void>;
     }
 
     // XXX: ideally these would be stored in indexeddb as part of the room but,

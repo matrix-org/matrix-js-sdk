@@ -2024,7 +2024,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     lifetime: CALL_TIMEOUT_MS,
-                    description: this.peerConn!.localDescription?.toJSON(),
+                    description: this.peerConn!.localDescription?.toJSON() as RTCSessionDescription,
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
@@ -2152,9 +2152,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
-            content.offer = this.peerConn!.localDescription?.toJSON();
+            content.offer = this.peerConn!.localDescription?.toJSON() as RTCSessionDescription;
         } else {
-            content.description = this.peerConn!.localDescription?.toJSON();
+            content.description = this.peerConn!.localDescription?.toJSON() as RTCSessionDescription;
         }
 
         content.capabilities = {

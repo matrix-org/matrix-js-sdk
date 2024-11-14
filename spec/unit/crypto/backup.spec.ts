@@ -33,7 +33,7 @@ import { CryptoStore } from "../../../src/crypto/store/base";
 import { MegolmDecryption as MegolmDecryptionClass } from "../../../src/crypto/algorithms/megolm";
 import { IKeyBackupInfo } from "../../../src/crypto/keybackup";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 
@@ -155,7 +155,7 @@ function makeTestClient(cryptoStore: CryptoStore) {
 }
 
 describe("MegolmBackup", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
@@ -205,14 +205,14 @@ describe("MegolmBackup", function () {
             // clobber the setTimeout function to run 100x faster.
             // ideally we would use lolex, but we have no oportunity
             // to tick the clock between the first try and the retry.
-            const realSetTimeout = global.setTimeout;
-            jest.spyOn(global, "setTimeout").mockImplementation(function (f, n) {
+            const realSetTimeout = globalThis.setTimeout;
+            jest.spyOn(globalThis, "setTimeout").mockImplementation(function (f, n) {
                 return realSetTimeout(f!, n! / 100);
             });
         });
 
         afterEach(function () {
-            jest.spyOn(global, "setTimeout").mockRestore();
+            jest.spyOn(globalThis, "setTimeout").mockRestore();
         });
 
         test("fail if crypto not enabled", async () => {
