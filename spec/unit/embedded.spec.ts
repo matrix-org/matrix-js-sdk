@@ -30,6 +30,7 @@ import {
     ITurnServer,
     IRoomEvent,
     IOpenIDCredentials,
+    ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
 } from "matrix-widget-api";
 
@@ -40,6 +41,7 @@ import { ICapabilities, RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
 import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { sleep } from "../../src/utils";
 
 const testOIDCToken = {
     access_token: "12345678",
@@ -127,9 +129,16 @@ describe("RoomWidgetClient", () => {
     const makeClient = async (
         capabilities: ICapabilities,
         sendContentLoaded: boolean | undefined = undefined,
+        userId?: string,
     ): Promise<void> => {
         const baseUrl = "https://example.org";
-        client = createRoomWidgetClient(widgetApi, capabilities, "!1:example.org", { baseUrl }, sendContentLoaded);
+        client = createRoomWidgetClient(
+            widgetApi,
+            capabilities,
+            "!1:example.org",
+            { baseUrl, userId },
+            sendContentLoaded,
+        );
         expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
         widgetApi.emit("ready");
         await client.startClient();
@@ -191,6 +200,142 @@ describe("RoomWidgetClient", () => {
                     .getEvents()
                     .map((e) => e.getEffectiveEvent()),
             ).toEqual([event]);
+        });
+        describe("local echos", () => {
+            const setupRemoteEcho = () => {
+                makeClient(
+                    {
+                        receiveEvent: ["org.matrix.rageshake_request"],
+                        sendEvent: ["org.matrix.rageshake_request"],
+                    },
+                    undefined,
+                    "@me:example.org",
+                );
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
+                const injectSpy = jest.spyOn((client as any).syncApi, "injectRoomEvents");
+                const widgetSendEmitter = new EventEmitter();
+                const widgetSendPromise = new Promise<void>((resolve) =>
+                    widgetSendEmitter.once("send", () => resolve()),
+                );
+                const resolveWidgetSend = () => widgetSendEmitter.emit("send");
+                widgetApi.sendRoomEvent.mockImplementation(
+                    async (eType, content, roomId): Promise<ISendEventFromWidgetResponseData> => {
+                        await widgetSendPromise;
+                        return { room_id: "!1:example.org", event_id: "event_id" };
+                    },
+                );
+                return { injectSpy, resolveWidgetSend };
+            };
+            const remoteEchoEvent = new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, {
+                detail: {
+                    data: {
+                        type: "org.matrix.rageshake_request",
+
+                        room_id: "!1:example.org",
+                        event_id: "event_id",
+                        sender: "@me:example.org",
+                        state_key: "bar",
+                        content: { hello: "world" },
+                        unsigned: { transaction_id: "1234" },
+                    },
+                },
+                cancelable: true,
+            });
+            it("get response then local echo", async () => {
+                await sleep(600);
+                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+
+                // Begin by sending an event:
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+                // we do not expect it to be send -- until we call `resolveWidgetSend`
+                expect(injectSpy).not.toHaveBeenCalled();
+
+                // We first get the response from the widget
+                resolveWidgetSend();
+                // We then get the remote echo from the widget
+                widgetApi.emit(`action:${WidgetApiToWidgetAction.SendEvent}`, remoteEchoEvent);
+
+                // gets emitted after the event got injected
+                await new Promise<void>((resolve) => client.once(ClientEvent.Event, () => resolve()));
+                expect(injectSpy).toHaveBeenCalled();
+
+                const call = injectSpy.mock.calls[0] as any;
+                const injectedEv = call[2][0];
+                expect(injectedEv.getType()).toBe("org.matrix.rageshake_request");
+                expect(injectedEv.getUnsigned().transaction_id).toBe("widgetTxId");
+            });
+
+            it("get local echo then response", async () => {
+                await sleep(600);
+                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+
+                // Begin by sending an event:
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+                // we do not expect it to be send -- until we call `resolveWidgetSend`
+                expect(injectSpy).not.toHaveBeenCalled();
+
+                // We first get the remote echo from the widget
+                widgetApi.emit(`action:${WidgetApiToWidgetAction.SendEvent}`, remoteEchoEvent);
+                expect(injectSpy).not.toHaveBeenCalled();
+
+                // We then get the response from the widget
+                resolveWidgetSend();
+
+                // Gets emitted after the event got injected
+                await new Promise<void>((resolve) => client.once(ClientEvent.Event, () => resolve()));
+                expect(injectSpy).toHaveBeenCalled();
+
+                const call = injectSpy.mock.calls[0] as any;
+                const injectedEv = call[2][0];
+                expect(injectedEv.getType()).toBe("org.matrix.rageshake_request");
+                expect(injectedEv.getUnsigned().transaction_id).toBe("widgetTxId");
+            });
+            it("__ local echo then response", async () => {
+                await sleep(600);
+                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+
+                // Begin by sending an event:
+                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+                // we do not expect it to be send -- until we call `resolveWidgetSend`
+                expect(injectSpy).not.toHaveBeenCalled();
+
+                // We first get the remote echo from the widget
+                widgetApi.emit(`action:${WidgetApiToWidgetAction.SendEvent}`, remoteEchoEvent);
+                const otherRemoteEcho = new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, {
+                    detail: { data: { ...remoteEchoEvent.detail.data } },
+                });
+                otherRemoteEcho.detail.data.unsigned.transaction_id = "4567";
+                otherRemoteEcho.detail.data.event_id = "other_id";
+                widgetApi.emit(`action:${WidgetApiToWidgetAction.SendEvent}`, otherRemoteEcho);
+
+                // Simulate the wait time while the widget is waiting for a response
+                // after we already received the remote echo
+                await sleep(20);
+                // even after the wait we do not want any event to be injected.
+                // we do not know their event_id and cannot know if they are the remote echo
+                // where we need to update the txId because they are send by this client
+                expect(injectSpy).not.toHaveBeenCalled();
+                // We then get the response from the widget
+                resolveWidgetSend();
+
+                // Gets emitted after the event got injected
+                await new Promise<void>((resolve) => client.once(ClientEvent.Event, () => resolve()));
+                // Now we want both events to be injected since we know the txId - event_id match
+                expect(injectSpy).toHaveBeenCalled();
+
+                // it has been called with the event sent by ourselves
+                const call = injectSpy.mock.calls[0] as any;
+                const injectedEv = call[2][0];
+                expect(injectedEv.getType()).toBe("org.matrix.rageshake_request");
+                expect(injectedEv.getUnsigned().transaction_id).toBe("widgetTxId");
+
+                // It has been called by the event we blocked because of our send right afterwards
+                const call2 = injectSpy.mock.calls[1] as any;
+                const injectedEv2 = call2[2][0];
+                expect(injectedEv2.getType()).toBe("org.matrix.rageshake_request");
+                expect(injectedEv2.getUnsigned().transaction_id).toBe("4567");
+            });
         });
 
         it("handles widget errors with generic error data", async () => {
