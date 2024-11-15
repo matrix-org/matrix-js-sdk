@@ -194,22 +194,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * As the timeline might get reset while they are loading, this state needs to be inherited
      * and shared when the room state is cloned for the new timeline.
      * This should only be passed from clone.
-     * @param isStartTimelineState - Optional. This state is marked as a start state.
-     * This is used to skip state insertions that are
-     * in the wrong order. The order is determined by the `replaces_state` id.
-     *
-     * Example:
-     * A current state events `replaces_state` value is `1`.
-     * Trying to insert a state event with `event_id` `1` in its place would fail if isStartTimelineState = false.
-     *
-     * A current state events `event_id` is `2`.
-     * Trying to insert a state event where its `replaces_state` value is `2` would fail if isStartTimelineState = true.
      */
-
     public constructor(
         public readonly roomId: string,
         private oobMemberFlags = { status: OobStatus.NotStarted },
-        public readonly isStartTimelineState = false,
     ) {
         super();
         this.updateModifiedTime();
@@ -420,7 +408,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Fires {@link RoomStateEvent.Events}
      * Fires {@link RoomStateEvent.Marker}
      */
-    public setStateEvents(stateEvents: MatrixEvent[], options?: IMarkerFoundOptions): void {
+    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -432,22 +420,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
 
             const lastStateEvent = this.getStateEventMatching(event);
-
-            // Safety measure to not update the room (and emit the update) with older state.
-            // The sync loop really should not send old events but it does very regularly.
-            // Logging on return in those two conditions results in a large amount of logging. (on startup and when running element)
-            const lastReplaceId = lastStateEvent?.event.unsigned?.replaces_state;
-            const lastId = lastStateEvent?.event.event_id;
-            const newReplaceId = event.event.unsigned?.replaces_state;
-            const newId = event.event.event_id;
-            if (this.isStartTimelineState) {
-                // Add an event to the start of the timeline. Its replace id should not be the same as the one of the current/last start state event.
-                if (newReplaceId && lastId && newReplaceId === lastId) return;
-            } else {
-                // Add an event to the end of the timeline. It should not be the same as the one replaced by the current/last end state event.
-                if (lastReplaceId && newId && lastReplaceId === newId) return;
-            }
-
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
                 this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
@@ -504,7 +476,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
             } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
-                this.emit(RoomStateEvent.Marker, event, options);
+                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });
 
