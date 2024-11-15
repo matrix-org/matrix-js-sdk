@@ -132,7 +132,7 @@ export class EventTimeline {
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
-            this.startState = new RoomState(this.roomId, undefined, true);
+            this.startState = new RoomState(this.roomId);
             this.endState = new RoomState(this.roomId);
         }
 
