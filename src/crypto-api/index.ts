@@ -535,6 +535,18 @@ export interface CryptoApi {
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 
     /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This normally returns a cached value, but if we haven't yet made a request to the server, it will fire one off.
+     * It will always return the details of the active backup if key backup is enabled.
+     *
+     * Return null if there is no backup.
+     *
+     * @returns the key backup information
+     */
+    getKeyBackupInfo(): Promise<KeyBackupInfo | null>;
+
+    /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
      *
      * Fetches the current backup information from the server. If there is a backup, and it is trusted, starts

@@ -3359,7 +3359,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns Information object from API, or null if no backup is present on the server.
      *
-     * @deprecated Prefer {@link CryptoApi.getActiveSessionBackupVersion}.
+     * @deprecated Prefer {@link CryptoApi.getKeyBackupInfo}.
      */
     public async getKeyBackupVersion(): Promise<IKeyBackupInfo | null> {
         let res: IKeyBackupInfo;
