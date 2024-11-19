@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { isLivekitFocus, isLivekitFocusActive, isLivekitFocusConfig } from "../../../src/matrixrtc/LivekitFocus";
+import { isLivekitFocus, isLivekitFocusSelection, isLivekitFocusConfig } from "../../../src/matrixrtc/LivekitFocus";
 
 describe("LivekitFocus", () => {
     it("isLivekitFocus", () => {
@@ -38,13 +38,13 @@ describe("LivekitFocus", () => {
     });
     it("isLivekitFocusActive", () => {
         expect(
-            isLivekitFocusActive({
+            isLivekitFocusSelection({
                 type: "livekit",
                 focus_selection: "oldest_membership",
             }),
         ).toBeTruthy();
-        expect(isLivekitFocusActive({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitFocusActive({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitFocusSelection({ type: "livekit" })).toBeFalsy();
+        expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
     });
     it("isLivekitFocusConfig", () => {
         expect(

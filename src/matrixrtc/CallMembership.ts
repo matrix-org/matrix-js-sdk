@@ -17,7 +17,6 @@ limitations under the License.
 import { type MatrixEvent } from "../matrix.ts";
 import { deepCompare } from "../utils.ts";
 import { type Focus } from "./focus.ts";
-import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type SessionDescription } from "./MatrixRTCSession.ts";
 
 /**
@@ -61,7 +60,7 @@ export type SessionMembershipData = {
      * A list of possible foci this uses knows about. One of them might be used based on the focus_active
      * selection system.
      */
-    foci_preferred: Focus[];
+    foci_preferred?: Focus[];
 
     /**
      * Optional field that contains the creation of the session. If it is undefined the creation
@@ -195,13 +194,10 @@ export class CallMembership {
     }
 
     public getPreferredFoci(): Focus[] {
-        return this.membershipData.foci_preferred;
+        return this.membershipData.foci_preferred ?? [];
     }
 
-    public getFocusSelection(): string | undefined {
-        const focusActive = this.membershipData.focus_active;
-        if (isLivekitFocusActive(focusActive)) {
-            return focusActive.focus_selection;
-        }
+    public getFocusActive(): Focus {
+        return this.membershipData.focus_active;
     }
 }

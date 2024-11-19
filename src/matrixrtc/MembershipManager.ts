@@ -17,65 +17,18 @@ import { AbortError } from "p-retry";
 
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
-import { type MatrixClient } from "../client.ts";
-import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
+import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
-import { type Logger, logger as rootLogger } from "../logger.ts";
-import { type Room } from "../models/room.ts";
-import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
-import { type Focus } from "./focus.ts";
+import { Room } from "../models/room.ts";
+import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "./CallMembership.ts";
+import { Focus } from "./focus.ts";
+import { isLivekitFocusSelection } from "./LivekitFocus.ts";
+import { MembershipConfig, SessionDescription } from "./MatrixRTCSession.ts";
+import { TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "src/matrix.ts";
+import { IMembershipManager, MembershipManagerEvent, MembershipManagerEventHandlerMap } from "./IMembershipManager.ts";
+import { Logger, logger as rootLogger } from "src/logger.ts";
+import { ActionScheduler, ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { isMyMembership, Status } from "./types.ts";
-import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { type SessionDescription, type MembershipConfig } from "./MatrixRTCSession.ts";
-import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
-import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import {
-    MembershipManagerEvent,
-    type IMembershipManager,
-    type MembershipManagerEventHandlerMap,
-} from "./IMembershipManager.ts";
-
-/* MembershipActionTypes:
-                           
-On Join:  ───────────────┐   ┌───────────────(1)───────────┐
-                         ▼   ▼                             │
-                   ┌────────────────┐                      │
-                   │SendDelayedEvent│ ──────(2)───┐        │
-                   └────────────────┘             │        │ 
-                           │(3)                   │        │
-                           ▼                      │        │
-                    ┌─────────────┐               │        │
-       ┌──────(4)───│SendJoinEvent│────(4)─────┐  │        │
-       │            └─────────────┘            │  │        │
-       │  ┌─────┐                  ┌──────┐    │  │        │
-       ▼  ▼     │                  │      ▼    ▼  ▼        │
-┌────────────┐  │                  │ ┌───────────────────┐ │
-│UpdateExpiry│ (s)                (s)|RestartDelayedEvent│ │
-└────────────┘  │                  │ └───────────────────┘ │
-          │     │                  │      │        │       │       
-          └─────┘                  └──────┘        └───────┘ 
-     
-On Leave: ─────────  STOP ALL ABOVE
-                           ▼
-            ┌────────────────────────────────┐
-            │ SendScheduledDelayedLeaveEvent │
-            └────────────────────────────────┘
-                           │(5)
-                           ▼
-                    ┌──────────────┐
-                    │SendLeaveEvent│
-                    └──────────────┘
-(1) [Not found error] results in resending the delayed event
-(2) [hasMemberEvent = true] Sending the delayed event if we
-    already have a call member event results jumping to the
-    RestartDelayedEvent loop directly
-(3) [hasMemberEvent = false] if there is not call member event
-    sending it is the next step
-(4) Both (UpdateExpiry and RestartDelayedEvent) actions are
-    scheduled when successfully sending the state event
-(5) Only if delayed event sending failed (fallback)
-(s) Successful restart/resend
-*/
 
 /**
  * The different types of actions the MembershipManager can take.
@@ -262,22 +215,15 @@ export class MembershipManager
         return Promise.resolve();
     }
 
-    public getActiveFocus(): Focus | undefined {
-        if (this.focusActive) {
-            // A livekit active focus
-            if (isLivekitFocusActive(this.focusActive)) {
-                if (this.focusActive.focus_selection === "oldest_membership") {
-                    const oldestMembership = this.getOldestMembership();
-                    return oldestMembership?.getPreferredFoci()[0];
-                }
-            } else {
-                this.logger.warn("Unknown own ActiveFocus type. This makes it impossible to connect to an SFU.");
-            }
-        } else {
-            // We do not understand the membership format (could be legacy). We default to oldestMembership
-            // Once there are other methods this is a hard error!
+    public resolveActiveFocus(member: CallMembership): Focus | undefined {
+        const data = member.getFocusActive();
+        if (isLivekitFocusSelection(data) && data.focus_selection === "oldest_membership") {
             const oldestMembership = this.getOldestMembership();
-            return oldestMembership?.getPreferredFoci()[0];
+            if (member === oldestMembership) return member.getPreferredFoci()[0];
+            if (oldestMembership !== undefined) return this.resolveActiveFocus(oldestMembership);
+        } else {
+            // This is a fully resolved focus config
+            return data;
         }
     }
 
@@ -748,8 +694,12 @@ export class MembershipManager
             scope: "m.room",
             device_id: this.deviceId,
             expires,
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-            foci_preferred: this.fociPreferred ?? [],
+            ...(this.focusActive === undefined
+                ? {
+                      focus_active: { type: "livekit", focus_selection: "oldest_membership" } as const,
+                      foci_preferred: this.fociPreferred ?? [],
+                  }
+                : { focus_active: this.focusActive }),
         };
     }
 

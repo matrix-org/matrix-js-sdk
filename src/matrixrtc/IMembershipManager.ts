@@ -96,8 +96,7 @@ export interface IMembershipManager
      */
     onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
     /**
-     * The used active focus in the currently joined session.
-     * @returns the used active focus in the currently joined session or undefined if not joined.
+     * Determines the active focus used by the given session member, or undefined if not joined.
      */
-    getActiveFocus(): Focus | undefined;
+    resolveActiveFocus(member: CallMembership): Focus | undefined;
 }

@@ -31,9 +31,9 @@ export interface LivekitFocus extends LivekitFocusConfig {
 export const isLivekitFocus = (object: any): object is LivekitFocus =>
     isLivekitFocusConfig(object) && "livekit_alias" in object;
 
-export interface LivekitFocusActive extends Focus {
+export interface LivekitFocusSelection extends Focus {
     type: "livekit";
     focus_selection: "oldest_membership";
 }
-export const isLivekitFocusActive = (object: any): object is LivekitFocusActive =>
+export const isLivekitFocusSelection = (object: any): object is LivekitFocusSelection =>
     object.type === "livekit" && "focus_selection" in object;
