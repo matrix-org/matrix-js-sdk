@@ -101,3 +101,37 @@ jobs:
 
             - name: Run linter
               run: "yarn run lint:knip"
+
+    element-web:
+        name: Downstream tsc element-web
+        if: github.event_name == 'merge_group'
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: element-hq/element-web
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version: "lts/*"
+
+            - name: Install Dependencies
+              run: "./scripts/layered.sh"
+              env:
+                  # tell layered.sh to check out the right sha of the JS-SDK
+                  JS_SDK_GITHUB_BASE_REF: ${{ github.sha }}
+
+            - name: Typecheck
+              run: "yarn run lint:types"
+
+    # Hook for branch protection to skip downstream typechecking outside of merge queues
+    downstream:
+        name: Downstream Typescript Syntax Check
+        runs-on: ubuntu-24.04
+        if: always()
+        needs:
+            - element-web
+        steps:
+            - if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
+              run: exit 1

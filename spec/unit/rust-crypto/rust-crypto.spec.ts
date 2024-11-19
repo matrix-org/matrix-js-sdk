@@ -1526,6 +1526,20 @@ describe("RustCrypto", () => {
                 failures: 1,
             });
         });
+
+        describe("getKeyBackupInfo", () => {
+            it("should return the current key backup info", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+                const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+                await expect(rustCrypto.getKeyBackupInfo()).resolves.toStrictEqual(testData.SIGNED_BACKUP_DATA);
+            });
+
+            it("should return null if not available", async () => {
+                const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+                await expect(rustCrypto.getKeyBackupInfo()).resolves.toBeNull();
+            });
+        });
     });
 
     describe("device dehydration", () => {

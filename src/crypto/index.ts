@@ -102,6 +102,8 @@ import {
     OwnDeviceKeys,
     CryptoEvent as CryptoApiCryptoEvent,
     CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
+    KeyBackupRestoreResult,
+    KeyBackupRestoreOpts,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -1307,6 +1309,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link Crypto.loadSessionBackupPrivateKeyFromSecretStorage}.
+     */
+    public loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void> {
+        throw new Error("Not implmeented");
+    }
+
+    /**
      * Get the current status of key backup.
      *
      * Implementation of {@link Crypto.CryptoApi.getActiveSessionBackupVersion}.
@@ -1316,6 +1325,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return this.backupManager.version ?? null;
         }
         return null;
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#getKeyBackupInfo}.
+     */
+    public async getKeyBackupInfo(): Promise<KeyBackupInfo | null> {
+        throw new Error("Not implemented");
     }
 
     /**
@@ -4306,6 +4322,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Stub function -- dehydration is not implemented here, so throw error
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackup is not implemented here, so throw error
+     */
+    public restoreKeyBackup(opts: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackupWithPassphrase is not implemented here, so throw error
+     */
+    public restoreKeyBackupWithPassphrase(
+        passphrase: string,
+        opts: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
     }
 }

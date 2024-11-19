@@ -22,7 +22,13 @@ import { DeviceMap } from "../models/device.ts";
 import { UIAuthCallback } from "../interactive-auth.ts";
 import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage.ts";
 import { VerificationRequest } from "./verification.ts";
-import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup.ts";
+import {
+    BackupTrustInfo,
+    KeyBackupCheck,
+    KeyBackupInfo,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
+} from "./keybackup.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { MatrixEvent } from "../models/event.ts";
 
@@ -503,6 +509,18 @@ export interface CryptoApi {
     storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void>;
 
     /**
+     * Attempt to fetch the backup decryption key from secret storage.
+     *
+     * If the key is found in secret storage, checks it against the latest backup on the server;
+     * if they match, stores the key in the crypto store by calling {@link storeSessionBackupPrivateKey},
+     * which enables automatic restore of individual keys when an Unable-to-decrypt error is encountered.
+     *
+     * If we are unable to fetch the key from secret storage, there is no backup on the server, or the key
+     * does not match, throws an exception.
+     */
+    loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
+
+    /**
      * Get the current status of key backup.
      *
      * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
@@ -515,6 +533,18 @@ export interface CryptoApi {
      * @param info - key backup info dict from {@link matrix.MatrixClient.getKeyBackupVersion}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
+
+    /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This normally returns a cached value, but if we haven't yet made a request to the server, it will fire one off.
+     * It will always return the details of the active backup if key backup is enabled.
+     *
+     * Return null if there is no backup.
+     *
+     * @returns the key backup information
+     */
+    getKeyBackupInfo(): Promise<KeyBackupInfo | null>;
 
     /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
@@ -544,6 +574,36 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    /**
+     * Download and restore the full key backup from the homeserver.
+     *
+     * Before calling this method, a decryption key, and the backup version to restore,
+     * must have been saved in the crypto store. This happens in one of the following ways:
+     *
+     * - When a new backup version is created with {@link CryptoApi.resetKeyBackup}, a new key is created and cached.
+     * - The key can be loaded from secret storage with {@link CryptoApi.loadSessionBackupPrivateKeyFromSecretStorage}.
+     * - The key can be received from another device via secret sharing, typically as part of the interactive verification flow.
+     * - The key and backup version can also be set explicitly via {@link CryptoApi.storeSessionBackupPrivateKey},
+     *   though this is not expected to be a common operation.
+     *
+     * Warning: the full key backup may be quite large, so this operation may take several hours to complete.
+     * Use of {@link KeyBackupRestoreOpts.progressCallback} is recommended.
+     *
+     * @param opts
+     */
+    restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
+
+    /**
+     * Restores a key backup using a passphrase.
+     * The decoded key (derived from the passphrase) is stored locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
+     *
+     * @param passphrase - The passphrase to use to restore the key backup.
+     * @param opts
+     *
+     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/shared via 4S.
+     */
+    restoreKeyBackupWithPassphrase(passphrase: string, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -886,8 +946,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
- * Used when calling {@link CryptoApi#importRoomKeys} or
- * {@link CryptoApi#importRoomKeysAsJson} as the parameter of
+ * Used when calling {@link CryptoApi#importRoomKeys},
+ * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {

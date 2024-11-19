@@ -780,4 +780,12 @@ describe("MegolmBackup", function () {
             client.stopClient();
         });
     });
+
+    describe("getKeyBackupInfo", () => {
+        it("should return throw an `Not implemented`", async () => {
+            const client = makeTestClient(cryptoStore);
+            await client.initCrypto();
+            await expect(client.getCrypto()?.getKeyBackupInfo()).rejects.toThrow("Not implemented");
+        });
+    });
 });
