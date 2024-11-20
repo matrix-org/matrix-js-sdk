@@ -285,9 +285,11 @@ export class RoomWidgetClient extends MatrixClient {
                 const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
                 if (this.syncApi instanceof SyncApi) {
+                    // Passing undefined for `stateAfterEventList` allows will make `injectRoomEvents` run in legacy mode
+                    // -> state events in `timelineEventList` will update the state.
                     await this.syncApi.injectRoomEvents(this.room!, undefined, events);
                 } else {
-                    await this.syncApi!.injectRoomEvents(this.room!, events);
+                    await this.syncApi!.injectRoomEvents(this.room!, events); // Sliding Sync
                 }
                 events.forEach((event) => {
                     this.emit(ClientEvent.Event, event);
@@ -597,7 +599,7 @@ export class RoomWidgetClient extends MatrixClient {
                 //     this.injectRoomEvents(this.room!, params.addToState ? [event] : [], params.addToTimeline ? [event] : []);
                 // }
                 // ```
-                await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+                await this.syncApi!.injectRoomEvents(this.room!, [], [event]); // Sliding Sync
             }
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
