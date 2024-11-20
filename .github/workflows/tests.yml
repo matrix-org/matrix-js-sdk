@@ -85,6 +85,7 @@ jobs:
     complement-crypto:
         name: "Run Complement Crypto tests"
         if: github.event_name == 'merge_group'
+        permissions: read-all
         uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
         with:
             use_js_sdk: "."
