@@ -91,7 +91,7 @@ declare module "../@types/media" {
  * without notice.
  */
 export class MSC3089TreeSpace {
-    public readonly room!: Room;
+    public readonly room: Room;
 
     public constructor(
         private client: MatrixClient,
@@ -334,7 +334,7 @@ export class MSC3089TreeSpace {
 
     private getParentRoom(): Room {
         const parents = this.room.currentState.getStateEvents(EventType.SpaceParent);
-        const parent = parents[0] as MatrixEvent | undefined; // XXX: Wild assumption
+        const parent = parents[0]; // XXX: Wild assumption
         if (!parent) throw new Error("Expected to have a parent in a non-top level space");
 
         // XXX: We are assuming the parent is a valid tree space.
@@ -386,8 +386,8 @@ export class MSC3089TreeSpace {
             index++;
         }
 
-        const prev = ordered[movingUp ? index : index - 1] as (typeof ordered)[number] | undefined;
-        const next = ordered[movingUp ? index + 1 : index] as (typeof ordered)[number] | undefined;
+        const prev = ordered[movingUp ? index : index - 1];
+        const next = ordered[movingUp ? index + 1 : index];
 
         let newOrder = DEFAULT_ALPHABET[0];
         let ensureBeforeIsSane = false;
