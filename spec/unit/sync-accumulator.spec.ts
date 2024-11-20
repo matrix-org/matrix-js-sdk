@@ -981,6 +981,48 @@ describe("SyncAccumulator", function () {
                     ?.content.name,
             ).not.toEqual("Room 1");
         });
+
+        it("should not rewind state_after to start of timeline in toJSON", () => {
+            const initState = {
+                events: [member("alice", KnownMembership.Knock)],
+            };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": initState,
+                    "timeline": {
+                        events: initState.events,
+                        prev_batch: null,
+                    },
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
+
+            const joinEvent = member("alice", KnownMembership.Join);
+            joinEvent.unsigned = { prev_content: initState.events[0].content, prev_sender: initState.events[0].sender };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [joinEvent],
+                    },
+                    "timeline": {
+                        events: [joinEvent],
+                        prev_batch: "something",
+                    },
+                }),
+            );
+
+            const roomData = sa.getJSON().roomsData[Category.Join]["!foo:bar"];
+            expect(roomData.state?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
+                KnownMembership.Knock,
+            );
+            expect(
+                roomData["org.matrix.msc4222.state_after"]?.events.find((e) => e.type === "m.room.member")?.content
+                    .membership,
+            ).toEqual(KnownMembership.Join);
+            expect(roomData.timeline?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
+                KnownMembership.Join,
+            );
+        });
     });
 });
 
@@ -1061,5 +1103,6 @@ function member(localpart: string, membership: Membership) {
         state_key: "@" + localpart + ":localhost",
         sender: "@" + localpart + ":localhost",
         type: "m.room.member",
+        unsigned: {},
     };
 }
