@@ -8,6 +8,7 @@ on:
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
+permissions: {} # No permissions needed
 jobs:
     ts_lint:
         name: "Typescript Syntax Check"

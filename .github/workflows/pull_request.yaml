@@ -9,6 +9,7 @@ on:
             ELEMENT_BOT_TOKEN:
                 required: true
 concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
+permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     changelog:
         name: Preview Changelog
