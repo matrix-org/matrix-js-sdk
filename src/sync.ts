@@ -1807,8 +1807,8 @@ export class SyncApi {
             // XXX: As above, don't do this...
             //room.addLiveEvents(stateEventList || []);
             // Do this instead...
-            room.oldState.setStateEvents(stateEventList || []);
-            room.currentState.setStateEvents(stateEventList || []);
+            room.oldState.setStateEvents(stateEventList ?? []);
+            room.currentState.setStateEvents(stateEventList ?? []);
         }
 
         // Execute the timeline events. This will continue to diverge the current state

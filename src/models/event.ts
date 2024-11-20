@@ -881,7 +881,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return recipients;
     }
 
-    private async decryptionLoop(crypto: CryptoBackend | undefined, options: IDecryptOptions = {}): Promise<void> {
+    private async decryptionLoop(crypto: CryptoBackend, options: IDecryptOptions = {}): Promise<void> {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck

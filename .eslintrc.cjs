@@ -139,16 +139,6 @@ module.exports = {
                     },
                 ],
                 "no-extra-boolean-cast": "error",
-                "@typescript-eslint/strict-boolean-expressions": [
-                    "error",
-                    {
-                        allowNullableString: true,
-                        allowNullableNumber: true,
-                        allowNullableBoolean: true,
-                        allowNullableEnum: true,
-                        allowAny: true,
-                    },
-                ],
             },
         },
         {
