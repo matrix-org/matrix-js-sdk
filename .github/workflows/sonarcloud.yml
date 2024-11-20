@@ -21,6 +21,7 @@ jobs:
             github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.event != 'merge_group'
         permissions:
+            actions: read
             statuses: write
             id-token: write # sonar
         steps:
