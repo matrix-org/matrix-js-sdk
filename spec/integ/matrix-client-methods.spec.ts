@@ -1906,6 +1906,28 @@ describe("MatrixClient", function () {
             return prom;
         });
     });
+
+    describe("getDomain", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getDomain()).toBeNull();
+        });
+
+        it("should return the domain of the userId", () => {
+            expect(client.getDomain()).toBe("localhost");
+        });
+    });
+
+    describe("getUserIdLocalpart", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getUserIdLocalpart()).toBeNull();
+        });
+
+        it("should return the localpart of the userId", () => {
+            expect(client.getUserIdLocalpart()).toBe("alice");
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
