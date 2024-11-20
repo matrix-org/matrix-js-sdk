@@ -14,7 +14,50 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "../NamespacedValue";
+import { NamespacedValue, UnstableValue } from "../NamespacedValue.ts";
+import {
+    PolicyRuleEventContent,
+    RoomAvatarEventContent,
+    RoomCanonicalAliasEventContent,
+    RoomCreateEventContent,
+    RoomEncryptionEventContent,
+    RoomGuestAccessEventContent,
+    RoomHistoryVisibilityEventContent,
+    RoomJoinRulesEventContent,
+    RoomMemberEventContent,
+    RoomNameEventContent,
+    RoomPinnedEventsEventContent,
+    RoomPowerLevelsEventContent,
+    RoomServerAclEventContent,
+    RoomThirdPartyInviteEventContent,
+    RoomTombstoneEventContent,
+    RoomTopicEventContent,
+    SpaceChildEventContent,
+    SpaceParentEventContent,
+} from "./state_events.ts";
+import {
+    ExperimentalGroupCallRoomMemberState,
+    IGroupCallRoomMemberState,
+    IGroupCallRoomState,
+} from "../webrtc/groupCall.ts";
+import { MSC3089EventContent } from "../models/MSC3089Branch.ts";
+import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon.ts";
+import { XOR } from "./common.ts";
+import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events.ts";
+import {
+    MCallAnswer,
+    MCallBase,
+    MCallCandidates,
+    MCallHangupReject,
+    MCallInviteNegotiate,
+    MCallReplacesEvent,
+    MCallSelectAnswer,
+    SDPStreamMetadata,
+    SDPStreamMetadataKey,
+} from "../webrtc/callEventTypes.ts";
+import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types.ts";
+import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls.ts";
+import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum EventType {
     // Room state events
@@ -34,6 +77,11 @@ export enum EventType {
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
     RoomPredecessor = "org.matrix.msc3946.room_predecessor",
+
+    // Moderation policy lists
+    PolicyRuleUser = "m.policy.rule.user",
+    PolicyRuleRoom = "m.policy.rule.room",
+    PolicyRuleServer = "m.policy.rule.server",
 
     SpaceChild = "m.space.child",
     SpaceParent = "m.space.parent",
@@ -55,6 +103,7 @@ export enum EventType {
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
+    CallEncryptionKeysPrefix = "io.element.call.encryption_keys",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",
@@ -93,12 +142,19 @@ export enum EventType {
     // Group call events
     GroupCallPrefix = "org.matrix.msc3401.call",
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
+
+    // MatrixRTC events
+    CallNotify = "org.matrix.msc4075.call.notify",
 }
 
 export enum RelationType {
     Annotation = "m.annotation",
     Replace = "m.replace",
     Reference = "m.reference",
+
+    // Don't use this yet: it's only the stable version. The code still assumes we support the unstable prefix and,
+    // moreover, our tests currently use the unstable prefix. Use THREAD_RELATION_TYPE.name.
+    // Once we support *only* the stable prefix, THREAD_RELATION_TYPE can die and we can switch to this.
     Thread = "m.thread",
 }
 
@@ -168,11 +224,11 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
 export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.matrix.msc2716.marker");
 
 /**
- * Name of the "with_relations" request property for relation based redactions.
+ * Name of the request property for relation based redactions.
  * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
  */
 export const MSC3912_RELATION_BASED_REDACTIONS_PROP = new UnstableValue(
-    "with_relations",
+    "with_rel_types",
     "org.matrix.msc3912.with_relations",
 );
 
@@ -235,17 +291,80 @@ export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
     "org.matrix.msc3890.local_notification_settings",
 );
 
-export interface IEncryptedFile {
-    url: string;
-    mimetype?: string;
-    key: {
-        alg: string;
-        key_ops: string[]; // eslint-disable-line camelcase
-        kty: string;
-        k: string;
-        ext: boolean;
-    };
-    iv: string;
-    hashes: { [alg: string]: string };
-    v: string;
+/**
+ * https://github.com/matrix-org/matrix-doc/pull/4023
+ *
+ * @experimental
+ */
+export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matrix.msc4023.thread_id");
+
+/**
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4115
+ *
+ * @experimental
+ */
+export const UNSIGNED_MEMBERSHIP_FIELD = new NamespacedValue("membership", "io.element.msc4115.membership");
+
+/**
+ * Mapped type from event type to content type for all specified non-state room events.
+ */
+export interface TimelineEvents {
+    [EventType.RoomMessage]: RoomMessageEventContent;
+    [EventType.Sticker]: StickerEventContent;
+    [EventType.Reaction]: ReactionEventContent;
+    [EventType.CallReplaces]: MCallReplacesEvent;
+    [EventType.CallAnswer]: MCallAnswer;
+    [EventType.CallSelectAnswer]: MCallSelectAnswer;
+    [EventType.CallNegotiate]: Omit<MCallInviteNegotiate, "offer">;
+    [EventType.CallInvite]: MCallInviteNegotiate;
+    [EventType.CallCandidates]: MCallCandidates;
+    [EventType.CallHangup]: MCallHangupReject;
+    [EventType.CallReject]: MCallHangupReject;
+    [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase & { [SDPStreamMetadataKey]: SDPStreamMetadata };
+    [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
+    [EventType.CallNotify]: ICallNotifyContent;
+    [M_BEACON.name]: MBeaconEventContent;
+    [M_POLL_START.name]: PollStartEventContent;
+    [M_POLL_END.name]: PollEndEventContent;
+}
+
+/**
+ * Mapped type from event type to content type for all specified room state events.
+ */
+export interface StateEvents {
+    [EventType.RoomCanonicalAlias]: RoomCanonicalAliasEventContent;
+    [EventType.RoomCreate]: RoomCreateEventContent;
+    [EventType.RoomJoinRules]: RoomJoinRulesEventContent;
+    [EventType.RoomMember]: RoomMemberEventContent;
+    // XXX: Spec says this event has 3 required fields but kicking such an invitation requires sending `{}`
+    [EventType.RoomThirdPartyInvite]: XOR<RoomThirdPartyInviteEventContent, {}>;
+    [EventType.RoomPowerLevels]: RoomPowerLevelsEventContent;
+    [EventType.RoomName]: RoomNameEventContent;
+    [EventType.RoomTopic]: RoomTopicEventContent;
+    [EventType.RoomAvatar]: RoomAvatarEventContent;
+    [EventType.RoomPinnedEvents]: RoomPinnedEventsEventContent;
+    [EventType.RoomEncryption]: RoomEncryptionEventContent;
+    [EventType.RoomHistoryVisibility]: RoomHistoryVisibilityEventContent;
+    [EventType.RoomGuestAccess]: RoomGuestAccessEventContent;
+    [EventType.RoomServerAcl]: RoomServerAclEventContent;
+    [EventType.RoomTombstone]: RoomTombstoneEventContent;
+    [EventType.SpaceChild]: SpaceChildEventContent;
+    [EventType.SpaceParent]: SpaceParentEventContent;
+
+    [EventType.PolicyRuleUser]: XOR<PolicyRuleEventContent, {}>;
+    [EventType.PolicyRuleRoom]: XOR<PolicyRuleEventContent, {}>;
+    [EventType.PolicyRuleServer]: XOR<PolicyRuleEventContent, {}>;
+
+    // MSC3401
+    [EventType.GroupCallPrefix]: IGroupCallRoomState;
+    [EventType.GroupCallMemberPrefix]: XOR<
+        XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>,
+        XOR<SessionMembershipData, {}>
+    >;
+
+    // MSC3089
+    [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
+
+    // MSC3672
+    [M_BEACON_INFO.name]: MBeaconInfoEventContent;
 }

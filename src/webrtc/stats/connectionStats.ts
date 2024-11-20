@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TransportStats } from "./transportStats";
-import { Bitrate } from "./media/mediaTrackStats";
+import { TransportStats } from "./transportStats.ts";
+import { Bitrate } from "./media/mediaTrackStats.ts";
 
 export interface ConnectionStatsBandwidth {
     /**
@@ -33,7 +33,7 @@ export interface ConnectionStatsBitrate extends Bitrate {
     video?: Bitrate;
 }
 
-export interface PacketLoos {
+export interface PacketLoss {
     total: number;
     download: number;
     upload: number;
@@ -42,6 +42,6 @@ export interface PacketLoos {
 export class ConnectionStats {
     public bandwidth: ConnectionStatsBitrate = {} as ConnectionStatsBitrate;
     public bitrate: ConnectionStatsBitrate = {} as ConnectionStatsBitrate;
-    public packetLoss: PacketLoos = {} as PacketLoos;
+    public packetLoss: PacketLoss = {} as PacketLoss;
     public transport: TransportStats[] = [];
 }

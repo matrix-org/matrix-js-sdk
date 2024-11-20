@@ -23,14 +23,13 @@ export class MediaTrackHandler {
         const isNotNullAndKind = (track: MediaStreamTrack | null): boolean => {
             return track !== null && track.kind === kind;
         };
-        // @ts-ignore The linter don't get it
         return this.pc
             .getTransceivers()
             .filter((t) => t.currentDirection === "sendonly" || t.currentDirection === "sendrecv")
             .filter((t) => t.sender !== null)
             .map((t) => t.sender)
             .map((s) => s.track)
-            .filter(isNotNullAndKind);
+            .filter(isNotNullAndKind) as MediaStreamTrack[];
     }
 
     public getTackById(trackId: string): MediaStreamTrack | undefined {

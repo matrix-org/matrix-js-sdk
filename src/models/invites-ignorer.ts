@@ -16,12 +16,13 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { MatrixClient } from "../client";
-import { IContent, MatrixEvent } from "./event";
-import { EventTimeline } from "./event-timeline";
-import { Preset } from "../@types/partials";
-import { globToRegexp } from "../utils";
-import { Room } from "./room";
+import { MatrixClient } from "../client.ts";
+import { IContent, MatrixEvent } from "./event.ts";
+import { EventTimeline } from "./event-timeline.ts";
+import { Preset } from "../@types/partials.ts";
+import { globToRegexp } from "../utils.ts";
+import { Room } from "./room.ts";
+import { EventType, StateEvents } from "../@types/event.ts";
 
 /// The event type storing the user's individual policies.
 ///
@@ -37,7 +38,7 @@ export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(
 );
 
 /// The types of recommendations understood.
-enum PolicyRecommendation {
+export enum PolicyRecommendation {
     Ban = "m.ban",
 }
 
@@ -64,6 +65,12 @@ export enum PolicyScope {
     Server = "m.policy.server",
 }
 
+const scopeToEventTypeMap: Record<PolicyScope, keyof StateEvents> = {
+    [PolicyScope.User]: EventType.PolicyRuleUser,
+    [PolicyScope.Room]: EventType.PolicyRuleRoom,
+    [PolicyScope.Server]: EventType.PolicyRuleServer,
+};
+
 /**
  * A container for ignored invites.
  *
@@ -87,7 +94,7 @@ export class IgnoredInvites {
      */
     public async addRule(scope: PolicyScope, entity: string, reason: string): Promise<string> {
         const target = await this.getOrCreateTargetRoom();
-        const response = await this.client.sendStateEvent(target.roomId, scope, {
+        const response = await this.client.sendStateEvent(target.roomId, scopeToEventTypeMap[scope], {
             entity,
             reason,
             recommendation: PolicyRecommendation.Ban,
@@ -140,8 +147,9 @@ export class IgnoredInvites {
     /**
      * Find out whether an invite should be ignored.
      *
-     * @param sender - The user id for the user who issued the invite.
-     * @param roomId - The room to which the user is invited.
+     * @param params
+     * @param params.sender - The user id for the user who issued the invite.
+     * @param params.roomId - The room to which the user is invited.
      * @returns A rule matching the entity, if any was found, `null` otherwise.
      */
     public async getRuleForInvite({
@@ -172,7 +180,7 @@ export class IgnoredInvites {
                 { scope: PolicyScope.User, entities: [sender] },
                 { scope: PolicyScope.Server, entities: [senderServer, roomServer] },
             ]) {
-                const events = state.getStateEvents(scope);
+                const events = state.getStateEvents(scopeToEventTypeMap[scope]);
                 for (const event of events) {
                     const content = event.getContent();
                     if (content?.recommendation != PolicyRecommendation.Ban) {
@@ -186,8 +194,8 @@ export class IgnoredInvites {
                     }
                     let regexp: RegExp;
                     try {
-                        regexp = new RegExp(globToRegexp(glob, false));
-                    } catch (ex) {
+                        regexp = new RegExp(globToRegexp(glob));
+                    } catch {
                         // Assume invalid event.
                         continue;
                     }

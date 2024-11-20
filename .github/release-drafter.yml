@@ -1,0 +1,35 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+change-template: "* $TITLE ([#$NUMBER]($URL)). Contributed by @$AUTHOR."
+categories:
+    - title: "🚨 BREAKING CHANGES"
+      label: "X-Breaking-Change"
+    - title: "🦖 Deprecations"
+      label: "T-Deprecation"
+    - title: "✨ Features"
+      label: "T-Enhancement"
+    - title: "🐛 Bug Fixes"
+      label: "T-Defect"
+    - title: "🧰 Maintenance"
+      label: "Dependencies"
+      collapse-after: 5
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+version-resolver:
+    major:
+        labels:
+            - "X-Breaking-Change"
+    default: minor
+exclude-labels:
+    - "T-Task"
+    - "X-Reverted"
+    - "backport staging"
+exclude-contributors:
+    - "RiotRobot"
+template: |
+    $CHANGES
+#no-changes-template: ""
+prerelease: true
+prerelease-identifier: rc
+include-pre-releases: false
+stable-ref: master
+staging-ref: staging

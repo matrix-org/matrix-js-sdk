@@ -29,13 +29,13 @@ import { MatrixClient } from "../../../../src";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
 import { TestClient } from "../../../TestClient";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 let ALICE_DEVICES: Record<string, IDevice>;
 let BOB_DEVICES: Record<string, IDevice>;
 
 describe("SAS verification", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }
@@ -144,7 +144,7 @@ describe("SAS verification", function () {
                                 expect(e.sas).toEqual(aliceSasEvent.sas);
                                 e.confirm();
                                 aliceSasEvent.confirm();
-                            } catch (error) {
+                            } catch {
                                 e.mismatch();
                                 aliceSasEvent.mismatch();
                             }
@@ -169,7 +169,7 @@ describe("SAS verification", function () {
                         expect(e.sas).toEqual(bobSasEvent.sas);
                         e.confirm();
                         bobSasEvent.confirm();
-                    } catch (error) {
+                    } catch {
                         e.mismatch();
                         bobSasEvent.mismatch();
                     }
@@ -454,7 +454,7 @@ describe("SAS verification", function () {
         let bobSasEvent: ISasEvent | null;
         let aliceVerifier: SAS;
         let bobPromise: Promise<void>;
-        let clearTestClientTimeouts: Function;
+        let clearTestClientTimeouts: () => void;
 
         beforeEach(async function () {
             [[alice, bob], clearTestClientTimeouts] = await makeTestClients(
@@ -519,7 +519,7 @@ describe("SAS verification", function () {
                                 expect(e.sas).toEqual(aliceSasEvent.sas);
                                 e.confirm();
                                 aliceSasEvent.confirm();
-                            } catch (error) {
+                            } catch {
                                 e.mismatch();
                                 aliceSasEvent.mismatch();
                             }
@@ -543,7 +543,7 @@ describe("SAS verification", function () {
                         expect(e.sas).toEqual(bobSasEvent.sas);
                         e.confirm();
                         bobSasEvent.confirm();
-                    } catch (error) {
+                    } catch {
                         e.mismatch();
                         bobSasEvent.mismatch();
                     }

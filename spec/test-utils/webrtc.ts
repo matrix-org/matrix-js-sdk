@@ -147,10 +147,13 @@ export class MockRTCPeerConnection {
     }
 
     constructor() {
-        this.localDescription = {
+        const localDescriptionJSON = {
             sdp: DUMMY_SDP,
-            type: "offer",
-            toJSON: function () {},
+            type: "offer" as RTCSdpType,
+        };
+        this.localDescription = {
+            toJSON: () => localDescriptionJSON,
+            ...localDescriptionJSON,
         };
 
         this.readyToNegotiate = new Promise<void>((resolve) => {
@@ -239,6 +242,8 @@ export class MockRTCPeerConnection {
     public triggerIncomingDataChannel(): void {
         this.onDataChannelListener?.({ channel: {} } as RTCDataChannelEvent);
     }
+
+    public restartIce(): void {}
 }
 
 export class MockRTCRtpSender {
@@ -263,11 +268,15 @@ export class MockRTCRtpTransceiver {
         this.peerConn.needsNegotiation = true;
     }
 
-    public setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
+    public setCodecPreferences = jest.fn<void, RTCRtpCodec[]>();
 }
 
 export class MockMediaStreamTrack {
-    constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) {}
+    constructor(
+        public readonly id: string,
+        public readonly kind: "audio" | "video",
+        public enabled = true,
+    ) {}
 
     public stop = jest.fn<void, []>();
 
@@ -304,7 +313,10 @@ export class MockMediaStreamTrack {
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
 // implementation
 export class MockMediaStream {
-    constructor(public id: string, private tracks: MockMediaStreamTrack[] = []) {}
+    constructor(
+        public id: string,
+        private tracks: MockMediaStreamTrack[] = [],
+    ) {}
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -433,7 +445,11 @@ type EmittedEventMap = CallEventHandlerEventHandlerMap &
 export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, EmittedEventMap> {
     public mediaHandler = new MockMediaHandler();
 
-    constructor(public userId: string, public deviceId: string, public sessionId: string) {
+    constructor(
+        public userId: string,
+        public deviceId: string,
+        public sessionId: string,
+    ) {
         super();
     }
 
@@ -483,6 +499,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 
     public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
     public getRoom = jest.fn();
+    public getFoci = jest.fn();
 
     public supportsThreads(): boolean {
         return true;
@@ -499,7 +516,10 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 }
 
 export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
-    constructor(public roomId: string, public groupCallId?: string) {
+    constructor(
+        public roomId: string,
+        public groupCallId?: string,
+    ) {
         super();
     }
 
@@ -547,7 +567,11 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 }
 
 export class MockCallFeed {
-    constructor(public userId: string, public deviceId: string | undefined, public stream: MockMediaStream) {}
+    constructor(
+        public userId: string,
+        public deviceId: string | undefined,
+        public stream: MockMediaStream,
+    ) {}
 
     public measureVolumeActivity(val: boolean) {}
     public dispose() {}
@@ -558,11 +582,11 @@ export class MockCallFeed {
 }
 
 export function installWebRTCMocks() {
-    global.navigator = {
+    globalThis.navigator = {
         mediaDevices: new MockMediaDevices().typed(),
     } as unknown as Navigator;
 
-    global.window = {
+    globalThis.window = {
         // @ts-ignore Mock
         RTCPeerConnection: MockRTCPeerConnection,
         // @ts-ignore Mock
@@ -572,13 +596,13 @@ export function installWebRTCMocks() {
         getUserMedia: () => new MockMediaStream("local_stream"),
     };
     // @ts-ignore Mock
-    global.document = {};
+    globalThis.document = {};
 
     // @ts-ignore Mock
-    global.AudioContext = MockAudioContext;
+    globalThis.AudioContext = MockAudioContext;
 
     // @ts-ignore Mock
-    global.RTCRtpReceiver = {
+    globalThis.RTCRtpReceiver = {
         getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
@@ -586,7 +610,7 @@ export function installWebRTCMocks() {
     };
 
     // @ts-ignore Mock
-    global.RTCRtpSender = {
+    globalThis.RTCRtpSender = {
         getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
@@ -743,3 +767,78 @@ export const REMOTE_SFU_DESCRIPTION =
     "a=sctp-port:5000\n" +
     "a=ice-ufrag:obZwzAcRtxwuozPZ\n" +
     "a=ice-pwd:TWXNaPeyKTTvRLyIQhWHfHlZHJjtcoKs";
+
+export const groupCallParticipantsFourOtherDevices = new Map([
+    [
+        new RoomMember("roomId0", "user1"),
+        new Map([
+            [
+                "deviceId0",
+                {
+                    sessionId: "0",
+                    screensharing: false,
+                },
+            ],
+            [
+                "deviceId1",
+                {
+                    sessionId: "1",
+                    screensharing: false,
+                },
+            ],
+            [
+                "deviceId2",
+                {
+                    sessionId: "2",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+    [
+        new RoomMember("roomId0", "user2"),
+        new Map([
+            [
+                "deviceId3",
+                {
+                    sessionId: "0",
+                    screensharing: false,
+                },
+            ],
+            [
+                "deviceId4",
+                {
+                    sessionId: "1",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+]);
+
+export const groupCallParticipantsOneOtherDevice = new Map([
+    [
+        new RoomMember("roomId1", "thisMember"),
+        new Map([
+            [
+                "deviceId0",
+                {
+                    sessionId: "0",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+    [
+        new RoomMember("roomId1", "opponentMember"),
+        new Map([
+            [
+                "deviceId1",
+                {
+                    sessionId: "1",
+                    screensharing: false,
+                },
+            ],
+        ]),
+    ],
+]);

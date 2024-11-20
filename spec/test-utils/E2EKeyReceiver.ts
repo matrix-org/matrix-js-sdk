@@ -75,8 +75,6 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
             const listener = (url: string, options: RequestInit) =>
                 this.onKeyUploadRequest(resolveOneTimeKeys, options);
 
-            // catch both r0 and v3 variants
-            fetchMock.post(new URL("/_matrix/client/r0/keys/upload", homeserverUrl).toString(), listener);
             fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
         });
     }
@@ -143,6 +141,13 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
             throw new Error(`Expected exactly 1 curve25519 key uploaded, got ${keyIds}`);
         }
         return this.deviceKeys.keys[keyIds[0]];
+    }
+
+    /**
+     * If the device keys have already been uploaded, return them. Else return null.
+     */
+    public getUploadedDeviceKeys(): IDeviceKeys | null {
+        return this.deviceKeys;
     }
 
     /**

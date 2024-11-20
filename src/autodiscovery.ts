@@ -15,9 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IClientWellKnown, IWellKnownConfig } from "./client";
-import { logger } from "./logger";
-import { MatrixError, Method, timeoutSignal } from "./http-api";
+import { IClientWellKnown, IWellKnownConfig, IServerVersions } from "./client.ts";
+import { logger } from "./logger.ts";
+import { MatrixError, Method, timeoutSignal } from "./http-api/index.ts";
+import { SUPPORTED_MATRIX_VERSIONS } from "./version-support.ts";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -30,7 +31,7 @@ export enum AutoDiscoveryAction {
     FAIL_ERROR = "FAIL_ERROR",
 }
 
-enum AutoDiscoveryError {
+export enum AutoDiscoveryError {
     Invalid = "Invalid homeserver discovery response",
     GenericFailure = "Failed to get autodiscovery configuration from server",
     InvalidHsBaseUrl = "Invalid base_url for m.homeserver",
@@ -40,12 +41,17 @@ enum AutoDiscoveryError {
     InvalidIs = "Invalid identity server discovery response",
     MissingWellknown = "No .well-known JSON file found",
     InvalidJson = "Invalid JSON",
+    UnsupportedHomeserverSpecVersion = "The homeserver does not meet the version requirements",
+
+    // TODO: Implement when Sydent supports the `/versions` endpoint - https://github.com/matrix-org/sydent/issues/424
+    //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
 
-interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
+interface AutoDiscoveryState {
     state: AutoDiscoveryAction;
     error?: IWellKnownConfig["error"] | null;
 }
+interface WellKnownConfig extends Omit<IWellKnownConfig, "error">, AutoDiscoveryState {}
 
 export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
@@ -80,7 +86,10 @@ export class AutoDiscovery {
 
     public static readonly ERROR_INVALID_JSON = AutoDiscoveryError.InvalidJson;
 
-    public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError);
+    public static readonly ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION =
+        AutoDiscoveryError.UnsupportedHomeserverSpecVersion;
+
+    public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError) as AutoDiscoveryError[];
 
     /**
      * The auto discovery failed. The client is expected to communicate
@@ -170,10 +179,31 @@ export class AutoDiscovery {
         }
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
-        const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
-        if (!hsVersions?.raw?.["versions"]) {
+        const hsVersions = await this.fetchWellKnownObject<IServerVersions>(`${hsUrl}/_matrix/client/versions`);
+        if (!hsVersions || !Array.isArray(hsVersions.raw?.["versions"])) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
+
+            // Supply the base_url to the caller because they may be ignoring liveliness
+            // errors, like this one.
+            clientConfig["m.homeserver"].base_url = hsUrl;
+
+            return Promise.resolve(clientConfig);
+        }
+
+        // Step 3.1: Non-spec check to ensure the server will actually work for us. We need to check if
+        // any of the versions in `SUPPORTED_MATRIX_VERSIONS` are listed in the /versions response.
+        const hsVersionSet = new Set(hsVersions.raw!["versions"]);
+        let supportedVersionFound = false;
+        for (const version of SUPPORTED_MATRIX_VERSIONS) {
+            if (hsVersionSet.has(version)) {
+                supportedVersionFound = true;
+                break;
+            }
+        }
+        if (!supportedVersionFound) {
+            logger.error("Homeserver does not meet version requirements");
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION;
 
             // Supply the base_url to the caller because they may be ignoring liveliness
             // errors, like this one.
@@ -308,7 +338,8 @@ export class AutoDiscovery {
 
         // Step 1: Actually request the .well-known JSON file and make sure it
         // at least has a homeserver definition.
-        const wellknown = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
+        const domainWithProtocol = domain.includes("://") ? domain : `https://${domain}`;
+        const wellknown = await this.fetchWellKnownObject(`${domainWithProtocol}/.well-known/matrix/client`);
         if (!wellknown || wellknown.action !== AutoDiscoveryAction.SUCCESS) {
             logger.error("No response or error when parsing .well-known");
             if (wellknown.reason) logger.error(wellknown.reason);
@@ -345,7 +376,7 @@ export class AutoDiscovery {
 
         const response = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!response) return {};
-        return response.raw || {};
+        return response.raw ?? {};
     }
 
     /**
@@ -383,16 +414,16 @@ export class AutoDiscovery {
         }
     }
 
-    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
         if (this.fetchFn) {
             return this.fetchFn(resource, options);
         }
-        return global.fetch(resource, options);
+        return globalThis.fetch(resource, options);
     }
 
-    private static fetchFn?: typeof global.fetch;
+    private static fetchFn?: typeof globalThis.fetch;
 
-    public static setFetchFn(fetchFn: typeof global.fetch): void {
+    public static setFetchFn(fetchFn: typeof globalThis.fetch): void {
         AutoDiscovery.fetchFn = fetchFn;
     }
 
@@ -412,7 +443,9 @@ export class AutoDiscovery {
      * @returns Promise which resolves to the returned state.
      * @internal
      */
-    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+    private static async fetchWellKnownObject<T = IWellKnownConfig>(
+        url: string,
+    ): Promise<IWellKnownConfig<Partial<T>>> {
         let response: Response;
 
         try {

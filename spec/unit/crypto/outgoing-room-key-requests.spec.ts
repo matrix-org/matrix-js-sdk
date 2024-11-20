@@ -51,7 +51,7 @@ const requests = [
 ];
 
 describe.each([
-    ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
+    ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(globalThis.indexedDB, "tests")],
     ["LocalStorageCryptoStore", () => new LocalStorageCryptoStore(localStorage)],
     ["MemoryCryptoStore", () => new MemoryCryptoStore()],
 ])("Outgoing room key requests [%s]", function (name, dbFactory) {

@@ -21,18 +21,27 @@ limitations under the License.
 import anotherjson from "another-json";
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
-import { VerificationBase as Base, SwitchStartEventError, VerificationEventHandlerMap } from "./Base";
+import { VerificationBase as Base, SwitchStartEventError } from "./Base.ts";
 import {
     errorFactory,
     newInvalidMessageError,
     newKeyMismatchError,
     newUnknownMethodError,
     newUserCancelledError,
-} from "./Error";
-import { logger } from "../../logger";
-import { IContent, MatrixEvent } from "../../models/event";
-import { generateDecimalSas } from "./SASDecimal";
-import { EventType } from "../../@types/event";
+} from "./Error.ts";
+import { logger } from "../../logger.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { generateDecimalSas } from "./SASDecimal.ts";
+import { EventType } from "../../@types/event.ts";
+import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
+import { VerificationMethod } from "../../types.ts";
+
+// backwards-compatibility exports
+export type {
+    ShowSasCallbacks as ISasEvent,
+    GeneratedSas as IGeneratedSas,
+    EmojiMapping,
+} from "../../crypto-api/verification.ts";
 
 const START_TYPE = EventType.KeyVerificationStart;
 
@@ -44,19 +53,22 @@ const newMismatchedSASError = errorFactory("m.mismatched_sas", "Mismatched short
 
 const newMismatchedCommitmentError = errorFactory("m.mismatched_commitment", "Mismatched commitment");
 
-type EmojiMapping = [emoji: string, name: string];
-
+// This list was generated from the data in the Matrix specification [1] with the following command:
+//
+//    jq  -r '.[] |  "    [\"" + .emoji + "\", \"" + (.description|ascii_downcase) + "\"], // " + (.number|tostring)' sas-emoji.json
+//
+// [1]: https://github.com/matrix-org/matrix-spec/blob/main/data-definitions/sas-emoji.json
 const emojiMapping: EmojiMapping[] = [
-    ["🐶", "dog"], //  0
-    ["🐱", "cat"], //  1
-    ["🦁", "lion"], //  2
-    ["🐎", "horse"], //  3
-    ["🦄", "unicorn"], //  4
-    ["🐷", "pig"], //  5
-    ["🐘", "elephant"], //  6
-    ["🐰", "rabbit"], //  7
-    ["🐼", "panda"], //  8
-    ["🐓", "rooster"], //  9
+    ["🐶", "dog"], // 0
+    ["🐱", "cat"], // 1
+    ["🦁", "lion"], // 2
+    ["🐎", "horse"], // 3
+    ["🦄", "unicorn"], // 4
+    ["🐷", "pig"], // 5
+    ["🐘", "elephant"], // 6
+    ["🐰", "rabbit"], // 7
+    ["🐼", "panda"], // 8
+    ["🐓", "rooster"], // 9
     ["🐧", "penguin"], // 10
     ["🐢", "turtle"], // 11
     ["🐟", "fish"], // 12
@@ -77,7 +89,7 @@ const emojiMapping: EmojiMapping[] = [
     ["🍕", "pizza"], // 27
     ["🎂", "cake"], // 28
     ["❤️", "heart"], // 29
-    ["🙂", "smiley"], // 30
+    ["😀", "smiley"], // 30
     ["🤖", "robot"], // 31
     ["🎩", "hat"], // 32
     ["👓", "glasses"], // 33
@@ -107,7 +119,7 @@ const emojiMapping: EmojiMapping[] = [
     ["🎸", "guitar"], // 57
     ["🎺", "trumpet"], // 58
     ["🔔", "bell"], // 59
-    ["⚓️", "anchor"], // 60
+    ["⚓", "anchor"], // 60
     ["🎧", "headphones"], // 61
     ["📁", "folder"], // 62
     ["📌", "pin"], // 63
@@ -133,20 +145,8 @@ const sasGenerators = {
     emoji: generateEmojiSas,
 } as const;
 
-export interface IGeneratedSas {
-    decimal?: [number, number, number];
-    emoji?: EmojiMapping[];
-}
-
-export interface ISasEvent {
-    sas: IGeneratedSas;
-    confirm(): Promise<void>;
-    cancel(): void;
-    mismatch(): void;
-}
-
-function generateSas(sasBytes: Uint8Array, methods: string[]): IGeneratedSas {
-    const sas: IGeneratedSas = {};
+function generateSas(sasBytes: Uint8Array, methods: string[]): GeneratedSas {
+    const sas: GeneratedSas = {};
     for (const method of methods) {
         if (method in sasGenerators) {
             // @ts-ignore - ts doesn't like us mixing types like this
@@ -220,23 +220,21 @@ function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
     return Array.isArray(anArray) ? anArray.filter((x) => aSet.has(x)) : [];
 }
 
-export enum SasEvent {
-    ShowSas = "show_sas",
-}
+/** @deprecated use VerifierEvent */
+export type SasEvent = VerifierEvent;
+/** @deprecated use VerifierEvent */
+export const SasEvent = VerifierEvent;
 
-type EventHandlerMap = {
-    [SasEvent.ShowSas]: (sas: ISasEvent) => void;
-} & VerificationEventHandlerMap;
-
-export class SAS extends Base<SasEvent, EventHandlerMap> {
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
+export class SAS extends Base {
     private waitingForAccept?: boolean;
     public ourSASPubKey?: string;
     public theirSASPubKey?: string;
-    public sasEvent?: ISasEvent;
+    public sasEvent?: ShowSasCallbacks;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {
-        return "m.sas.v1";
+        return VerificationMethod.Sas;
     }
 
     public get events(): string[] {
@@ -244,8 +242,8 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
     }
 
     protected doVerification = async (): Promise<void> => {
-        await global.Olm.init();
-        olmutil = olmutil || new global.Olm.Utility();
+        await globalThis.Olm.init();
+        olmutil = olmutil || new globalThis.Olm.Utility();
 
         // make sure user's keys are downloaded
         await this.baseApis.downloadKeys([this.userId]);
@@ -310,8 +308,8 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
                         reject(err);
                     }
                 },
-                cancel: () => reject(newUserCancelledError()),
-                mismatch: () => reject(newMismatchedSASError()),
+                cancel: (): void => reject(newUserCancelledError()),
+                mismatch: (): void => reject(newMismatchedSASError()),
             };
             this.emit(SasEvent.ShowSas, this.sasEvent);
         });
@@ -371,7 +369,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         const keyAgreement = content.key_agreement_protocol;
         const macMethod = content.message_authentication_code;
         const hashCommitment = content.commitment;
-        const olmSAS = new global.Olm.SAS();
+        const olmSAS = new globalThis.Olm.SAS();
         try {
             this.ourSASPubKey = olmSAS.get_pubkey();
             await this.send(EventType.KeyVerificationKey, {
@@ -413,7 +411,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             throw newUnknownMethodError();
         }
 
-        const olmSAS = new global.Olm.SAS();
+        const olmSAS = new globalThis.Olm.SAS();
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
             await this.send(EventType.KeyVerificationAccept, {
@@ -488,5 +486,9 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
                 throw newKeyMismatchError();
             }
         });
+    }
+
+    public getShowSasCallbacks(): ShowSasCallbacks | null {
+        return this.sasEvent ?? null;
     }
 }

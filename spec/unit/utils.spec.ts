@@ -30,13 +30,13 @@ import {
     sortEventsByLatestContentTimestamp,
     safeSet,
     MapWithDefault,
+    globToRegexp,
+    escapeRegExp,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
 import { mkMessage } from "../test-utils/test-utils";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import { ReceiptType } from "../../src/@types/read_receipts";
-
-// TODO: Fix types throughout
 
 describe("utils", function () {
     describe("encodeParams", function () {
@@ -723,6 +723,21 @@ describe("utils", function () {
     describe("immediate", () => {
         it("resolves", async () => {
             await utils.immediate();
+        });
+    });
+
+    describe("escapeRegExp", () => {
+        it("should escape XYZ", () => {
+            expect(escapeRegExp("[FIT-Connect Zustelldienst \\(Testumgebung\\)]")).toMatchInlineSnapshot(
+                `"\\[FIT-Connect Zustelldienst \\\\\\(Testumgebung\\\\\\)\\]"`,
+            );
+        });
+    });
+
+    describe("globToRegexp", () => {
+        it("should not explode when given regexes as globs", () => {
+            const result = globToRegexp("[FIT-Connect Zustelldienst \\(Testumgebung\\)]");
+            expect(result).toMatchInlineSnapshot(`"\\[FIT-Connect Zustelldienst \\\\\\(Testumgebung\\\\\\)\\]"`);
         });
     });
 });

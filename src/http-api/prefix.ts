@@ -16,11 +16,7 @@ limitations under the License.
 
 export enum ClientPrefix {
     /**
-     * A constant representing the URI path for release 0 of the Client-Server HTTP API.
-     */
-    R0 = "/_matrix/client/r0",
-    /**
-     * A constant representing the URI path for the legacy release v1 of the Client-Server HTTP API.
+     * A constant representing the URI path for Client-Server API endpoints versioned at v1.
      */
     V1 = "/_matrix/client/v1",
     /**
@@ -42,7 +38,11 @@ export enum IdentityPrefix {
 
 export enum MediaPrefix {
     /**
-     * URI path for the media repo API
+     * A constant representing the URI path for Client-Server API Media endpoints versioned at v1.
      */
-    R0 = "/_matrix/media/r0",
+    V1 = "/_matrix/media/v1",
+    /**
+     * A constant representing the URI path for Client-Server API Media endpoints versioned at v3.
+     */
+    V3 = "/_matrix/media/v3",
 }

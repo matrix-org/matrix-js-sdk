@@ -14,9 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMock from "fetch-mock-jest";
+
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
-import { EventType, RoomState } from "../../src";
+import {
+    createClient,
+    EventType,
+    MatrixClient,
+    RoomState,
+    UNSTABLE_MSC2666_MUTUAL_ROOMS,
+    UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
+    UNSTABLE_MSC2666_SHARED_ROOMS,
+} from "../../src";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("RoomMember", function () {
     const roomId = "!foo:bar";
@@ -40,7 +51,7 @@ describe("RoomMember", function () {
                 room: roomId,
                 user: userA,
                 content: {
-                    membership: "join",
+                    membership: KnownMembership.Join,
                     avatar_url: "mxc://flibble/wibble",
                 },
             });
@@ -272,11 +283,11 @@ describe("RoomMember", function () {
     describe("isKicked", () => {
         it("should return false if membership is not `leave`", () => {
             const member1 = new RoomMember(roomId, userA);
-            member1.membership = "join";
+            member1.membership = KnownMembership.Join;
             expect(member1.isKicked()).toBeFalsy();
 
             const member2 = new RoomMember(roomId, userA);
-            member2.membership = "invite";
+            member2.membership = KnownMembership.Invite;
             expect(member2.isKicked()).toBeFalsy();
 
             const member3 = new RoomMember(roomId, userA);
@@ -285,17 +296,17 @@ describe("RoomMember", function () {
 
         it("should return false if the membership event is unknown", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "leave";
+            member.membership = KnownMembership.Leave;
             expect(member.isKicked()).toBeFalsy();
         });
 
         it("should return false if the member left of their own accord", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "leave";
+            member.membership = KnownMembership.Leave;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userA,
-                mship: "leave",
+                mship: KnownMembership.Leave,
                 skey: userA,
             });
             expect(member.isKicked()).toBeFalsy();
@@ -303,11 +314,11 @@ describe("RoomMember", function () {
 
         it("should return true if the member's leave was sent by another user", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "leave";
+            member.membership = KnownMembership.Leave;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userB,
-                mship: "leave",
+                mship: KnownMembership.Leave,
                 skey: userA,
             });
             expect(member.isKicked()).toBeTruthy();
@@ -317,11 +328,11 @@ describe("RoomMember", function () {
     describe("getDMInviter", () => {
         it("should return userId of the sender of the invite if is_direct=true", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "invite";
+            member.membership = KnownMembership.Invite;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userB,
-                mship: "invite",
+                mship: KnownMembership.Invite,
                 skey: userA,
             });
             member.events.member.event.content!.is_direct = true;
@@ -330,11 +341,11 @@ describe("RoomMember", function () {
 
         it("should not return userId of the sender of the invite if is_direct=false", () => {
             const member = new RoomMember(roomId, userA);
-            member.membership = "invite";
+            member.membership = KnownMembership.Invite;
             member.events.member = utils.mkMembership({
                 event: true,
                 sender: userB,
-                mship: "invite",
+                mship: KnownMembership.Invite,
                 skey: userA,
             });
             member.events.member.event.content!.is_direct = false;
@@ -345,7 +356,7 @@ describe("RoomMember", function () {
     describe("setMembershipEvent", function () {
         const joinEvent = utils.mkMembership({
             event: true,
-            mship: "join",
+            mship: KnownMembership.Join,
             user: userA,
             room: roomId,
             name: "Alice",
@@ -353,7 +364,7 @@ describe("RoomMember", function () {
 
         const inviteEvent = utils.mkMembership({
             event: true,
-            mship: "invite",
+            mship: KnownMembership.Invite,
             user: userB,
             skey: userA,
             room: roomId,
@@ -361,10 +372,10 @@ describe("RoomMember", function () {
 
         it("should set 'membership' and assign the event to 'events.member'.", function () {
             member.setMembershipEvent(inviteEvent);
-            expect(member.membership).toEqual("invite");
+            expect(member.membership).toEqual(KnownMembership.Invite);
             expect(member.events.member).toEqual(inviteEvent);
             member.setMembershipEvent(joinEvent);
-            expect(member.membership).toEqual("join");
+            expect(member.membership).toEqual(KnownMembership.Join);
             expect(member.events.member).toEqual(joinEvent);
         });
 
@@ -377,13 +388,13 @@ describe("RoomMember", function () {
                     return [
                         utils.mkMembership({
                             event: true,
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             room: roomId,
                             user: userB,
                         }),
                         utils.mkMembership({
                             event: true,
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             room: roomId,
                             user: userC,
                             name: "Alice",
@@ -433,7 +444,7 @@ describe("RoomMember", function () {
         it("should set 'name' to user_id if it is just whitespace", function () {
             const joinEvent = utils.mkMembership({
                 event: true,
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userA,
                 room: roomId,
                 name: " \u200b ",
@@ -447,7 +458,7 @@ describe("RoomMember", function () {
         it("should disambiguate users on a fuzzy displayname match", function () {
             const joinEvent = utils.mkMembership({
                 event: true,
-                mship: "join",
+                mship: KnownMembership.Join,
                 user: userA,
                 room: roomId,
                 name: "Alíce\u200b", // note diacritic and zero width char
@@ -461,7 +472,7 @@ describe("RoomMember", function () {
                     return [
                         utils.mkMembership({
                             event: true,
-                            mship: "join",
+                            mship: KnownMembership.Join,
                             room: roomId,
                             user: userC,
                             name: "Alice",
@@ -478,6 +489,128 @@ describe("RoomMember", function () {
             expect(member.name).not.toEqual("Alíce"); // it should disambig.
             // user_id should be there somewhere
             expect(member.name.indexOf(userA)).not.toEqual(-1);
+        });
+    });
+});
+
+describe("MutualRooms", () => {
+    let client: MatrixClient;
+    const HS_URL = "https://example.com";
+    const TEST_USER_ID = "@alice:localhost";
+    const TEST_DEVICE_ID = "xzcvb";
+    const QUERIED_USER = "@user:example.com";
+
+    beforeEach(async () => {
+        // anything that we don't have a specific matcher for silently returns a 404
+        fetchMock.catch(404);
+        fetchMock.config.warnOnFallback = true;
+
+        client = createClient({
+            baseUrl: HS_URL,
+            userId: TEST_USER_ID,
+            accessToken: "akjgkrgjs",
+            deviceId: TEST_DEVICE_ID,
+        });
+    });
+
+    afterEach(async () => {
+        await client.stopClient();
+        fetchMock.mockReset();
+    });
+
+    function enableFeature(feature: string) {
+        const mapping: Record<string, boolean> = {};
+
+        mapping[feature] = true;
+
+        fetchMock.get(`${HS_URL}/_matrix/client/versions`, {
+            unstable_features: mapping,
+            versions: ["v1.1"],
+        });
+    }
+
+    it("supports the initial MSC version (shared rooms)", async () => {
+        enableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
+
+        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/:user_id", (rawUrl) => {
+            const segments = rawUrl.split("/");
+            const lastSegment = decodeURIComponent(segments[segments.length - 1]);
+
+            expect(lastSegment).toEqual(QUERIED_USER);
+
+            return {
+                joined: ["!test:example.com"],
+            };
+        });
+
+        const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+        expect(rooms).toEqual(["!test:example.com"]);
+    });
+
+    it("supports the renaming MSC version (mutual rooms)", async () => {
+        enableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
+
+        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/:user_id", (rawUrl) => {
+            const segments = rawUrl.split("/");
+            const lastSegment = decodeURIComponent(segments[segments.length - 1]);
+
+            expect(lastSegment).toEqual(QUERIED_USER);
+
+            return {
+                joined: ["!test2:example.com"],
+            };
+        });
+
+        const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+        expect(rooms).toEqual(["!test2:example.com"]);
+    });
+
+    describe("can work the latest MSC version (query mutual rooms)", () => {
+        beforeEach(() => {
+            enableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS);
+        });
+
+        it("works with a simple response", async () => {
+            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (rawUrl) => {
+                const url = new URL(rawUrl);
+
+                expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
+
+                return {
+                    joined: ["!test3:example.com"],
+                };
+            });
+
+            const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+            expect(rooms).toEqual(["!test3:example.com"]);
+        });
+
+        it("works with a paginated response", async () => {
+            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (rawUrl) => {
+                const url = new URL(rawUrl);
+
+                expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
+
+                const token = url.searchParams.get("batch_token");
+
+                if (token == "yahaha") {
+                    return {
+                        joined: ["!korok:example.com"],
+                    };
+                } else {
+                    return {
+                        joined: ["!rock:example.com"],
+                        next_batch_token: "yahaha",
+                    };
+                }
+            });
+
+            const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+
+            expect(rooms).toEqual(["!rock:example.com", "!korok:example.com"]);
         });
     });
 });

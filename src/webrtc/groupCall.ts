@@ -1,6 +1,6 @@
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient, IMyDevice } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed.ts";
+import { MatrixClient, IMyDevice } from "../client.ts";
 import {
     CallErrorCode,
     CallEvent,
@@ -11,21 +11,31 @@ import {
     setTracksEnabled,
     createNewMatrixCall,
     CallError,
-} from "./call";
-import { RoomMember } from "../models/room-member";
-import { Room } from "../models/room";
-import { RoomStateEvent } from "../models/room-state";
-import { logger } from "../logger";
-import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { CallEventHandlerEvent } from "./callEventHandler";
-import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
-import { IScreensharingOpts } from "./mediaHandler";
-import { mapsEqual } from "../utils";
-import { GroupCallStats } from "./stats/groupCallStats";
-import { ByteSentStatsReport, ConnectionStatsReport, StatsReport, SummaryStatsReport } from "./stats/statsReport";
+} from "./call.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { Room } from "../models/room.ts";
+import { RoomStateEvent } from "../models/room-state.ts";
+import { logger } from "../logger.ts";
+import { ReEmitter } from "../ReEmitter.ts";
+import { SDPStreamMetadataPurpose } from "./callEventTypes.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType } from "../@types/event.ts";
+import { CallEventHandlerEvent } from "./callEventHandler.ts";
+import { GroupCallEventHandlerEvent } from "./groupCallEventHandler.ts";
+import { IScreensharingOpts } from "./mediaHandler.ts";
+import { mapsEqual } from "../utils.ts";
+import { GroupCallStats } from "./stats/groupCallStats.ts";
+import {
+    ByteSentStatsReport,
+    CallFeedReport,
+    ConnectionStatsReport,
+    StatsReport,
+    SummaryStatsReport,
+} from "./stats/statsReport.ts";
+import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.ts";
+import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { CallMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -81,7 +91,7 @@ export type GroupCallEventHandlerMap = {
      * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
      * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
      * to their audio/video hardware.
-     * @param err - The error raised by MatrixCall.
+     * @param error - The error raised by MatrixCall.
      * @example
      * ```
      * matrixCall.on("error", function(err){
@@ -96,12 +106,17 @@ export enum GroupCallStatsReportEvent {
     ConnectionStats = "GroupCall.connection_stats",
     ByteSentStats = "GroupCall.byte_sent_stats",
     SummaryStats = "GroupCall.summary_stats",
+    CallFeedStats = "GroupCall.call_feed_stats",
 }
 
+/**
+ * The final report-events that get consumed by client.
+ */
 export type GroupCallStatsReportEventHandlerMap = {
     [GroupCallStatsReportEvent.ConnectionStats]: (report: GroupCallStatsReport<ConnectionStatsReport>) => void;
     [GroupCallStatsReportEvent.ByteSentStats]: (report: GroupCallStatsReport<ByteSentStatsReport>) => void;
     [GroupCallStatsReportEvent.SummaryStats]: (report: GroupCallStatsReport<SummaryStatsReport>) => void;
+    [GroupCallStatsReportEvent.CallFeedStats]: (report: GroupCallStatsReport<CallFeedReport>) => void;
 };
 
 export enum GroupCallErrorCode {
@@ -110,7 +125,9 @@ export enum GroupCallErrorCode {
     PlaceCallFailed = "place_call_failed",
 }
 
-export interface GroupCallStatsReport<T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport> {
+export interface GroupCallStatsReport<
+    T extends ConnectionStatsReport | ByteSentStatsReport | SummaryStatsReport | CallFeedReport,
+> {
     report: T;
 }
 
@@ -151,10 +168,13 @@ export interface IGroupCallDataChannelOptions {
 export interface IGroupCallRoomState {
     "m.intent": GroupCallIntent;
     "m.type": GroupCallType;
+    "m.terminated"?: GroupCallTerminationReason;
     "io.element.ptt"?: boolean;
     // TODO: Specify data-channels
     "dataChannelsEnabled"?: boolean;
     "dataChannelOptions"?: IGroupCallDataChannelOptions;
+
+    "io.element.livekit_service_url"?: string;
 }
 
 export interface IGroupCallRoomMemberFeed {
@@ -176,6 +196,11 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
+}
+
+// XXX: this hasn't made it into the MSC yet
+export interface ExperimentalGroupCallRoomMemberState {
+    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {
@@ -235,8 +260,14 @@ export class GroupCall extends TypedEventEmitter<
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
+    private _livekitServiceURL?: string;
 
-    private readonly stats: GroupCallStats;
+    private stats: GroupCallStats | undefined;
+    /**
+     * Configure default webrtc stats collection interval in ms
+     * Disable collecting webrtc stats by setting interval to 0
+     */
+    private statsCollectIntervalTime = 0;
 
     public constructor(
         private client: MatrixClient,
@@ -248,10 +279,16 @@ export class GroupCall extends TypedEventEmitter<
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
         isCallWithoutVideoAndAudio?: boolean,
+        // this tells the js-sdk not to actually establish any calls to exchange media and just to
+        // create the group call signaling events, with the intention that the actual media will be
+        // handled using livekit. The js-sdk doesn't contain any code to do the actual livekit call though.
+        private useLivekit = false,
+        livekitServiceURL?: string,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId ?? genCallID();
+        this._livekitServiceURL = livekitServiceURL;
         this.creationTs =
             room.currentState.getStateEvents(EventType.GroupCallPrefix, this.groupCallId)?.getTs() ?? null;
         this.updateParticipants();
@@ -261,24 +298,38 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
         this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
-
-        const userID = this.client.getUserId() || "unknown";
-        this.stats = new GroupCallStats(this.groupCallId, userID);
-        this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
-        this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
-        this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
     }
 
     private onConnectionStats = (report: ConnectionStatsReport): void => {
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.ConnectionStats, { report });
     };
 
     private onByteSentStats = (report: ByteSentStatsReport): void => {
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.ByteSentStats, { report });
     };
 
     private onSummaryStats = (report: SummaryStatsReport): void => {
+        SummaryStatsReportGatherer.extendSummaryReport(report, this.participants);
+        // Final emit of the summary event, to be consumed by the client
         this.emit(GroupCallStatsReportEvent.SummaryStats, { report });
+    };
+
+    private onCallFeedReport = (report: CallFeedReport): void => {
+        if (this.localCallFeed) {
+            report = CallFeedStatsReporter.expandCallFeedReport(report, [this.localCallFeed], "from-local-feed");
+        }
+
+        const callFeeds: CallFeed[] = [];
+        this.forEachCall((call) => {
+            if (call.callId === report.callId) {
+                call.getFeeds().forEach((f) => callFeeds.push(f));
+            }
+        });
+
+        report = CallFeedStatsReporter.expandCallFeedReport(report, callFeeds, "from-call-feed");
+        this.emit(GroupCallStatsReportEvent.CallFeedStats, { report });
     };
 
     public async create(): Promise<GroupCall> {
@@ -286,6 +337,12 @@ export class GroupCall extends TypedEventEmitter<
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
         this.client.emit(GroupCallEventHandlerEvent.Outgoing, this);
 
+        await this.sendCallStateEvent();
+
+        return this;
+    }
+
+    private async sendCallStateEvent(): Promise<void> {
         const groupCallState: IGroupCallRoomState = {
             "m.intent": this.intent,
             "m.type": this.type,
@@ -294,10 +351,20 @@ export class GroupCall extends TypedEventEmitter<
             "dataChannelsEnabled": this.dataChannelsEnabled,
             "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
         };
+        if (this.livekitServiceURL) {
+            groupCallState["io.element.livekit_service_url"] = this.livekitServiceURL;
+        }
 
         await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallPrefix, groupCallState, this.groupCallId);
+    }
 
-        return this;
+    public get livekitServiceURL(): string | undefined {
+        return this._livekitServiceURL;
+    }
+
+    public updateLivekitServiceURL(newURL: string): Promise<void> {
+        this._livekitServiceURL = newURL;
+        return this.sendCallStateEvent();
     }
 
     private _state = GroupCallState.LocalCallFeedUninitialized;
@@ -408,6 +475,11 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async initLocalCallFeed(): Promise<void> {
+        if (this.useLivekit) {
+            logger.info("Livekit group call: not starting local call feed.");
+            return;
+        }
+
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
@@ -503,11 +575,13 @@ export class GroupCall extends TypedEventEmitter<
             this.onIncomingCall(call);
         }
 
-        this.retryCallLoopInterval = setInterval(this.onRetryCallLoop, this.retryCallInterval);
+        if (!this.useLivekit) {
+            this.retryCallLoopInterval = setInterval(this.onRetryCallLoop, this.retryCallInterval);
 
-        this.activeSpeaker = undefined;
-        this.onActiveSpeakerLoop();
-        this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
+            this.activeSpeaker = undefined;
+            this.onActiveSpeakerLoop();
+            this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
+        }
     }
 
     private dispose(): void {
@@ -553,7 +627,7 @@ export class GroupCall extends TypedEventEmitter<
         clearInterval(this.retryCallLoopInterval);
 
         this.client.removeListener(CallEventHandlerEvent.Incoming, this.onIncomingCall);
-        this.stats.stop();
+        this.stats?.stop();
     }
 
     public leave(): void {
@@ -656,27 +730,9 @@ export class GroupCall extends TypedEventEmitter<
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            // We needed this here to avoid an error in case user join a call without a device.
-            // I can not use .then .catch functions because linter :-(
-            try {
-                if (!muted) {
-                    const stream = await this.client
-                        .getMediaHandler()
-                        .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
-                    if (stream === null) {
-                        // if case permission denied to get a stream stop this here
-                        /* istanbul ignore next */
-                        logger.log(
-                            `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
-                        );
-                        return false;
-                    }
-                }
-            } catch (e) {
-                /* istanbul ignore next */
-                logger.log(
-                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
-                );
+            const hasPermission = await this.checkAudioPermissionIfNecessary(muted);
+
+            if (!hasPermission) {
                 return false;
             }
 
@@ -697,6 +753,42 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
+
+        return true;
+    }
+
+    /**
+     * If we allow entering a call without a camera and without video, it can happen that the access rights to the
+     * devices have not yet been queried. If a stream does not yet have an audio track, we assume that the rights have
+     * not yet been checked.
+     *
+     * `this.client.getMediaHandler().getUserMediaStream` clones the current stream, so it only wanted to be called when
+     * not Audio Track exists.
+     * As such, this is a compromise, because, the access rights should always be queried before the call.
+     */
+    private async checkAudioPermissionIfNecessary(muted: boolean): Promise<boolean> {
+        // We needed this here to avoid an error in case user join a call without a device.
+        try {
+            if (!muted && this.localCallFeed && !this.localCallFeed.hasAudioTrack) {
+                const stream = await this.client
+                    .getMediaHandler()
+                    .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
+                if (stream?.getTracks().length === 0) {
+                    // if case permission denied to get a stream stop this here
+                    /* istanbul ignore next */
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
+                    );
+                    return false;
+                }
+            }
+        } catch {
+            /* istanbul ignore next */
+            logger.log(
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+            );
+            return false;
+        }
 
         return true;
     }
@@ -725,7 +817,7 @@ export class GroupCall extends TypedEventEmitter<
                 await this.updateLocalUsermediaStream(stream);
                 this.localCallFeed.setAudioVideoMuted(null, muted);
                 setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
-            } catch (_) {
+            } catch {
                 // No permission to video device
                 /* istanbul ignore next */
                 logger.log(
@@ -871,6 +963,11 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
+        if (this.useLivekit) {
+            logger.info("Received incoming call whilst in signaling-only mode! Ignoring.");
+            return;
+        }
+
         const deviceMap = this.calls.get(opponentUserId) ?? new Map<string, MatrixCall>();
         const prevCall = deviceMap.get(newCall.getOpponentDeviceId()!);
 
@@ -881,6 +978,11 @@ export class GroupCall extends TypedEventEmitter<
         );
 
         if (prevCall) prevCall.hangup(CallErrorCode.Replaced, false);
+        // We must do this before we start initialising / answering the call as we
+        // need to know it is the active call for this user+deviceId and to not ignore
+        // events from it.
+        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
+        this.calls.set(opponentUserId, deviceMap);
 
         this.initCall(newCall);
 
@@ -895,8 +997,6 @@ export class GroupCall extends TypedEventEmitter<
         }
         newCall.answerWithCallFeeds(feeds);
 
-        deviceMap.set(newCall.getOpponentDeviceId()!, newCall);
-        this.calls.set(opponentUserId, deviceMap);
         this.emit(GroupCallEvent.CallsChanged, this.calls);
     };
 
@@ -1084,7 +1184,7 @@ export class GroupCall extends TypedEventEmitter<
 
         this.reEmitter.reEmit(call, Object.values(CallEvent));
 
-        call.initStats(this.stats);
+        call.initStats(this.getGroupCallStats());
 
         onCallFeedsChanged();
     }
@@ -1137,6 +1237,14 @@ export class GroupCall extends TypedEventEmitter<
         const currentUserMediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
         const remoteUsermediaFeed = call.remoteUsermediaFeed;
         const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
+
+        const deviceMap = this.calls.get(opponentMemberId);
+        const currentCallForUserDevice = deviceMap?.get(opponentDeviceId);
+        if (currentCallForUserDevice?.callId !== call.callId) {
+            // the call in question is not the current call for this user/deviceId
+            // so ignore feed events from it otherwise we'll remove our real feeds
+            return;
+        }
 
         if (remoteFeedChanged) {
             if (!currentUserMediaFeed && remoteUsermediaFeed) {
@@ -1385,7 +1493,7 @@ export class GroupCall extends TypedEventEmitter<
             }
 
             // Must have a connected device and be joined to the room
-            if (validDevices.length > 0 && member?.membership === "join") {
+            if (validDevices.length > 0 && member?.membership === KnownMembership.Join) {
                 const deviceMap = new Map<string, ParticipantState>();
                 participants.set(member, deviceMap);
 
@@ -1505,17 +1613,20 @@ export class GroupCall extends TypedEventEmitter<
             await this.addDeviceToMemberState();
 
             // Resend the state event every so often so it doesn't become stale
-            this.resendMemberStateTimer = setInterval(async () => {
-                logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
-                try {
-                    await this.addDeviceToMemberState();
-                } catch (e) {
-                    logger.error(
-                        `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
-                        e,
-                    );
-                }
-            }, (DEVICE_TIMEOUT * 3) / 4);
+            this.resendMemberStateTimer = setInterval(
+                async () => {
+                    logger.log(`GroupCall ${this.groupCallId} updateMemberState() resending call member state"`);
+                    try {
+                        await this.addDeviceToMemberState();
+                    } catch (e) {
+                        logger.error(
+                            `GroupCall ${this.groupCallId} updateMemberState() failed to resend call member state`,
+                            e,
+                        );
+                    }
+                },
+                (DEVICE_TIMEOUT * 3) / 4,
+            );
         } else {
             // Remove the local device
             await this.updateDevices(
@@ -1566,7 +1677,9 @@ export class GroupCall extends TypedEventEmitter<
             }
         });
 
-        if (this.state === GroupCallState.Entered) this.placeOutgoingCalls();
+        if (this.state === GroupCallState.Entered && !this.useLivekit) this.placeOutgoingCalls();
+
+        // Update the participants stored in the stats object
     };
 
     private onStateChanged = (newState: GroupCallState, oldState: GroupCallState): void => {
@@ -1598,6 +1711,25 @@ export class GroupCall extends TypedEventEmitter<
     };
 
     public getGroupCallStats(): GroupCallStats {
+        if (this.stats === undefined) {
+            const userID = this.client.getUserId() || "unknown";
+            this.stats = new GroupCallStats(this.groupCallId, userID, this.statsCollectIntervalTime);
+            this.stats.reports.on(StatsReport.CONNECTION_STATS, this.onConnectionStats);
+            this.stats.reports.on(StatsReport.BYTE_SENT_STATS, this.onByteSentStats);
+            this.stats.reports.on(StatsReport.SUMMARY_STATS, this.onSummaryStats);
+            this.stats.reports.on(StatsReport.CALL_FEED_REPORT, this.onCallFeedReport);
+        }
         return this.stats;
+    }
+
+    public setGroupCallStatsInterval(interval: number): void {
+        this.statsCollectIntervalTime = interval;
+        if (this.stats !== undefined) {
+            this.stats.stop();
+            this.stats.setInterval(interval);
+            if (interval > 0) {
+                this.stats.start();
+            }
+        }
     }
 }

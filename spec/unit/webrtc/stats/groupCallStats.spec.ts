@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { GroupCallStats } from "../../../../src/webrtc/stats/groupCallStats";
-import { SummaryStats } from "../../../../src/webrtc/stats/summaryStats";
+import { CallStatsReportSummary } from "../../../../src/webrtc/stats/callStatsReportSummary";
 
 const GROUP_CALL_ID = "GROUP_ID";
 const LOCAL_USER_ID = "LOCAL_USER_ID";
@@ -68,7 +68,7 @@ describe("GroupCallStats", () => {
             jest.useRealTimers();
         });
 
-        it("starting processing as well without stats collectors", async () => {
+        it("starting processing stats as well without stats collectors", async () => {
             // @ts-ignore
             stats.processStats = jest.fn();
             stats.start();
@@ -77,17 +77,42 @@ describe("GroupCallStats", () => {
             expect(stats.processStats).toHaveBeenCalled();
         });
 
+        it("not starting processing stats if interval 0", async () => {
+            const statsDisabled = new GroupCallStats(GROUP_CALL_ID, LOCAL_USER_ID, 0);
+            // @ts-ignore
+            statsDisabled.processStats = jest.fn();
+            statsDisabled.start();
+            jest.advanceTimersByTime(TIME_INTERVAL);
+            // @ts-ignore
+            expect(statsDisabled.processStats).not.toHaveBeenCalled();
+        });
+
         it("starting processing and calling the collectors", async () => {
             stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection());
             const collector = stats.getStatsReportGatherer("CALL_ID");
             stats.reports.emitSummaryStatsReport = jest.fn();
             const summaryStats = {
+                isFirstCollection: true,
                 receivedMedia: 0,
                 receivedAudioMedia: 0,
                 receivedVideoMedia: 0,
-                audioTrackSummary: { count: 0, muted: 0 },
-                videoTrackSummary: { count: 0, muted: 0 },
-            } as SummaryStats;
+                audioTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
+                },
+                videoTrackSummary: {
+                    count: 0,
+                    muted: 0,
+                    maxJitter: 0,
+                    maxPacketLoss: 0,
+                    concealedAudio: 0,
+                    totalAudio: 0,
+                },
+            } as CallStatsReportSummary;
             let processStatsSpy;
             if (collector) {
                 processStatsSpy = jest.spyOn(collector, "processStats").mockResolvedValue(summaryStats);
@@ -101,7 +126,7 @@ describe("GroupCallStats", () => {
 
         it("doing nothing if process already running", async () => {
             // @ts-ignore
-            jest.spyOn(global, "setInterval").mockReturnValue(22);
+            jest.spyOn(globalThis, "setInterval").mockReturnValue(22);
             stats.start();
             expect(setInterval).toHaveBeenCalledTimes(1);
             stats.start();
@@ -121,8 +146,8 @@ describe("GroupCallStats", () => {
         });
         it("finish stats process if was started", async () => {
             // @ts-ignore
-            jest.spyOn(global, "setInterval").mockReturnValue(22);
-            jest.spyOn(global, "clearInterval");
+            jest.spyOn(globalThis, "setInterval").mockReturnValue(22);
+            jest.spyOn(globalThis, "clearInterval");
             stats.start();
             expect(setInterval).toHaveBeenCalledTimes(1);
             stats.stop();
@@ -130,7 +155,7 @@ describe("GroupCallStats", () => {
         });
 
         it("do nothing if stats process was not started", async () => {
-            jest.spyOn(global, "clearInterval");
+            jest.spyOn(globalThis, "clearInterval");
             stats.stop();
             expect(clearInterval).not.toHaveBeenCalled();
         });

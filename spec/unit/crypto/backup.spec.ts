@@ -33,7 +33,7 @@ import { CryptoStore } from "../../../src/crypto/store/base";
 import { MegolmDecryption as MegolmDecryptionClass } from "../../../src/crypto/algorithms/megolm";
 import { IKeyBackupInfo } from "../../../src/crypto/keybackup";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 
@@ -155,7 +155,7 @@ function makeTestClient(cryptoStore: CryptoStore) {
 }
 
 describe("MegolmBackup", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
@@ -205,14 +205,44 @@ describe("MegolmBackup", function () {
             // clobber the setTimeout function to run 100x faster.
             // ideally we would use lolex, but we have no oportunity
             // to tick the clock between the first try and the retry.
-            const realSetTimeout = global.setTimeout;
-            jest.spyOn(global, "setTimeout").mockImplementation(function (f, n) {
+            const realSetTimeout = globalThis.setTimeout;
+            jest.spyOn(globalThis, "setTimeout").mockImplementation(function (f, n) {
                 return realSetTimeout(f!, n! / 100);
             });
         });
 
         afterEach(function () {
-            jest.spyOn(global, "setTimeout").mockRestore();
+            jest.spyOn(globalThis, "setTimeout").mockRestore();
+        });
+
+        test("fail if crypto not enabled", async () => {
+            const client = makeTestClient(cryptoStore);
+            const data = {
+                algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+                version: "1",
+                auth_data: {
+                    public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                },
+            };
+            await expect(client.restoreKeyBackupWithSecretStorage(data)).rejects.toThrow(
+                "End-to-end encryption disabled",
+            );
+        });
+
+        test("fail if given backup has no version", async () => {
+            const client = makeTestClient(cryptoStore);
+            await client.initCrypto();
+            const data = {
+                algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+                auth_data: {
+                    public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                },
+            };
+            const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
+            await client.getCrypto()!.storeSessionBackupPrivateKey(key, "1");
+            await expect(client.restoreKeyBackupWithCache(undefined, undefined, data)).rejects.toThrow(
+                "Backup version must be defined",
+            );
         });
 
         it("automatically calls the key back up", function () {
@@ -748,6 +778,14 @@ describe("MegolmBackup", function () {
             cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
             await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
             client.stopClient();
+        });
+    });
+
+    describe("getKeyBackupInfo", () => {
+        it("should return throw an `Not implemented`", async () => {
+            const client = makeTestClient(cryptoStore);
+            await client.initCrypto();
+            await expect(client.getCrypto()?.getKeyBackupInfo()).rejects.toThrow("Not implemented");
         });
     });
 });

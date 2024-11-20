@@ -1,41 +1,51 @@
-# Must only be called from `release#published` triggers
 name: Publish to npm
 on:
     workflow_call:
         secrets:
             NPM_TOKEN:
                 required: true
+        outputs:
+            id:
+                description: "The npm package@version string we published"
+                value: ${{ jobs.npm.outputs.id }}
 jobs:
     npm:
         name: Publish to npm
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
+        outputs:
+            id: ${{ steps.npm-publish.outputs.id }}
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
+              with:
+                  ref: staging
 
             - name: 🔧 Yarn cache
-              uses: actions/setup-node@v3
+              uses: actions/setup-node@v4
               with:
                   cache: "yarn"
                   registry-url: "https://registry.npmjs.org"
+                  node-version-file: package.json
 
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@0f451a94170d1699fd50710966d48fb26194d939 # v1
+              uses: JS-DevTools/npm-publish@19c28f1ef146469e409470805ea4279d47c3d35c # v3.1.1
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public
                   tag: next
+                  ignore-scripts: false
+
+            - name: Check npm package was published
+              if: steps.npm-publish.outputs.id == ''
+              run: exit 1
 
             - name: 🎖️ Add `latest` dist-tag to final releases
-              if: github.event.release.prerelease == false
-              run: |
-                  package=$(cat package.json | jq -er .name)
-                  npm dist-tag add "$package@$release" latest
+              if: steps.npm-publish.outputs.id && !contains(steps.npm-publish.outputs.id, '-rc.')
+              run: npm dist-tag add "$release" latest
               env:
-                  # JS-DevTools/npm-publish overrides `NODE_AUTH_TOKEN` with `INPUT_TOKEN` in .npmrc
-                  INPUT_TOKEN: ${{ secrets.NPM_TOKEN }}
-                  release: ${{ steps.npm-publish.outputs.version }}
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+                  release: ${{ steps.npm-publish.outputs.id }}

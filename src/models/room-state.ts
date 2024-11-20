@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RoomMember } from "./room-member";
-import { logger } from "../logger";
-import * as utils from "../utils";
-import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
-import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
-import { MatrixClient } from "../client";
-import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
-import { TypedReEmitter } from "../ReEmitter";
-import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+import { RoomMember } from "./room-member.ts";
+import { logger } from "../logger.ts";
+import { isNumber, removeHiddenChars } from "../utils.ts";
+import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event.ts";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./event.ts";
+import { MatrixClient } from "../client.ts";
+import { GuestAccess, HistoryVisibility, JoinRule } from "../@types/partials.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
+import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
+import { M_BEACON, M_BEACON_INFO } from "../@types/beacon.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { RoomJoinRulesEventContent } from "../@types/state_events.ts";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the
@@ -52,6 +54,7 @@ enum OobStatus {
 export interface IPowerLevelsContent {
     users?: Record<string, number>;
     events?: Record<string, number>;
+    notifications?: Partial<Record<"room", number>>;
     // eslint-disable-next-line camelcase
     users_default?: number;
     // eslint-disable-next-line camelcase
@@ -59,6 +62,7 @@ export interface IPowerLevelsContent {
     // eslint-disable-next-line camelcase
     state_default?: number;
     ban?: number;
+    invite?: number;
     kick?: number;
     redact?: number;
 }
@@ -75,6 +79,8 @@ export enum RoomStateEvent {
 export type RoomStateEventHandlerMap = {
     /**
      * Fires whenever the event dictionary in room state is updated.
+     * This does not guarantee that any related objects (like RoomMember) have been updated.
+     * Use RoomStateEvent.Update for that.
      * @param event - The matrix event which caused this event to fire.
      * @param state - The room state whose RoomState.events dictionary
      * was updated.
@@ -89,7 +95,7 @@ export type RoomStateEventHandlerMap = {
      * });
      * ```
      */
-    [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
+    [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null) => void;
     /**
      * Fires whenever a member in the members dictionary is updated in any way.
      * @param event - The matrix event which caused this event to fire.
@@ -128,6 +134,8 @@ export type RoomStateEventHandlerMap = {
 
 type EmittedEvents = RoomStateEvent | BeaconEvent;
 type EventHandlerMap = RoomStateEventHandlerMap & BeaconEventHandlerMap;
+
+type KeysMatching<T, V> = { [K in keyof T]-?: T[K] extends V ? K : never }[keyof T];
 
 export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
@@ -186,8 +194,23 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * As the timeline might get reset while they are loading, this state needs to be inherited
      * and shared when the room state is cloned for the new timeline.
      * This should only be passed from clone.
+     * @param isStartTimelineState - Optional. This state is marked as a start state.
+     * This is used to skip state insertions that are
+     * in the wrong order. The order is determined by the `replaces_state` id.
+     *
+     * Example:
+     * A current state events `replaces_state` value is `1`.
+     * Trying to insert a state event with `event_id` `1` in its place would fail if isStartTimelineState = false.
+     *
+     * A current state events `event_id` is `2`.
+     * Trying to insert a state event where its `replaces_state` value is `2` would fail if isStartTimelineState = true.
      */
-    public constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
+
+    public constructor(
+        public readonly roomId: string,
+        private oobMemberFlags = { status: OobStatus.NotStarted },
+        public readonly isStartTimelineState = false,
+    ) {
         super();
         this.updateModifiedTime();
     }
@@ -203,7 +226,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.joinedMemberCount === null) {
             this.joinedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === "join" ? count + 1 : count;
+                return m.membership === KnownMembership.Join ? count + 1 : count;
             }, 0);
         }
         return this.joinedMemberCount;
@@ -227,7 +250,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.invitedMemberCount === null) {
             this.invitedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === "invite" ? count + 1 : count;
+                return m.membership === KnownMembership.Invite ? count + 1 : count;
             }, 0);
         }
         return this.invitedMemberCount;
@@ -294,13 +317,15 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Get state events from the state of the room.
      * @param eventType - The event type of the state event.
-     * @param stateKey - Optional. The state_key of the state event. If
-     * this is `undefined` then all matching state events will be
-     * returned.
-     * @returns A list of events if state_key was
-     * `undefined`, else a single event (or null if no match found).
+     * @returns A list of events
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
+    /**
+     * Get state events from the state of the room.
+     * @param eventType - The event type of the state event.
+     * @param stateKey - The state_key of the state event.
+     * @returns A single event (or null if no match found).
+     */
     public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent | null;
     public getStateEvents(eventType: EventType | string, stateKey?: string): MatrixEvent[] | MatrixEvent | null {
         if (!this.events.has(eventType)) {
@@ -395,7 +420,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Fires {@link RoomStateEvent.Events}
      * Fires {@link RoomStateEvent.Marker}
      */
-    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
+    public setStateEvents(stateEvents: MatrixEvent[], options?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict
@@ -407,6 +432,22 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             }
 
             const lastStateEvent = this.getStateEventMatching(event);
+
+            // Safety measure to not update the room (and emit the update) with older state.
+            // The sync loop really should not send old events but it does very regularly.
+            // Logging on return in those two conditions results in a large amount of logging. (on startup and when running element)
+            const lastReplaceId = lastStateEvent?.event.unsigned?.replaces_state;
+            const lastId = lastStateEvent?.event.event_id;
+            const newReplaceId = event.event.unsigned?.replaces_state;
+            const newId = event.event.event_id;
+            if (this.isStartTimelineState) {
+                // Add an event to the start of the timeline. Its replace id should not be the same as the one of the current/last start state event.
+                if (newReplaceId && lastId && newReplaceId === lastId) return;
+            } else {
+                // Add an event to the end of the timeline. It should not be the same as the one replaced by the current/last end state event.
+                if (lastReplaceId && newId && lastReplaceId === newId) return;
+            }
+
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
                 this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
@@ -429,7 +470,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
                 // into the timeline
-                if (event.getContent().membership === "leave" || event.getContent().membership === "ban") {
+                if (
+                    event.getContent().membership === KnownMembership.Leave ||
+                    event.getContent().membership === KnownMembership.Ban
+                ) {
                     event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
                     event.getContent().displayname =
                         event.getContent().displayname || event.getPrevContent().displayname;
@@ -460,7 +504,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
             } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
-                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
+                this.emit(RoomStateEvent.Marker, event, options);
             }
         });
 
@@ -759,7 +803,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @returns An array of user IDs or an empty array.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds.get(utils.removeHiddenChars(displayName)) ?? [];
+        return this.displayNameToUserIds.get(removeHiddenChars(displayName)) ?? [];
     }
 
     /**
@@ -771,14 +815,16 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
         const member = this.getMember(userId);
-        if (!member || member.membership === "leave") return false;
+        if (!member || member.membership === KnownMembership.Leave) return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
         // The user may have been the sender, but they can't redact their own message
         // if redactions are blocked.
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
-        if (mxEvent.getSender() === userId) return canRedact;
+
+        if (!canRedact) return false;
+        if (mxEvent.getSender() === userId) return true;
 
         return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }
@@ -789,7 +835,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @param powerLevel - The power level of the member
      * @returns true if the given power level is sufficient
      */
-    public hasSufficientPowerLevelFor(action: "ban" | "kick" | "redact", powerLevel: number): boolean {
+    public hasSufficientPowerLevelFor(
+        action: KeysMatching<Required<IPowerLevelsContent>, number>,
+        powerLevel: number,
+    ): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let powerLevels: IPowerLevelsContent = {};
@@ -798,7 +847,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
 
         let requiredLevel = 50;
-        if (utils.isNumber(powerLevels[action])) {
+        if (isNumber(powerLevels[action])) {
             requiredLevel = powerLevels[action]!;
         }
 
@@ -928,7 +977,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             powerLevelsEvent &&
             powerLevelsEvent.getContent() &&
             powerLevelsEvent.getContent().notifications &&
-            utils.isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
+            isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
         ) {
             notifLevel = powerLevelsEvent.getContent().notifications[notifLevelKey];
         }
@@ -942,7 +991,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public getJoinRule(): JoinRule {
         const joinRuleEvent = this.getStateEvents(EventType.RoomJoinRules, "");
-        const joinRuleContent: Partial<IJoinRuleEventContent> = joinRuleEvent?.getContent() ?? {};
+        const joinRuleContent: Partial<RoomJoinRulesEventContent> = joinRuleEvent?.getContent() ?? {};
         return joinRuleContent["join_rule"] || JoinRule.Invite;
     }
 
@@ -1058,7 +1107,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // We clobber the user_id > name lookup but the name -> [user_id] lookup
             // means we need to remove that user ID from that array rather than nuking
             // the lot.
-            const strippedOldName = utils.removeHiddenChars(oldName);
+            const strippedOldName = removeHiddenChars(oldName);
 
             const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
             if (existingUserIds) {
@@ -1070,7 +1119,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         this.userIdsToDisplayNames[userId] = displayName;
 
-        const strippedDisplayname = displayName && utils.removeHiddenChars(displayName);
+        const strippedDisplayname = displayName && removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
             const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];

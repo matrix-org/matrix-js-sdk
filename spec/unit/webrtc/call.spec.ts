@@ -25,6 +25,7 @@ import {
     CallType,
     CallState,
     CallParty,
+    CallDirection,
 } from "../../../src/webrtc/call";
 import {
     MCallAnswer,
@@ -46,6 +47,7 @@ import {
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
+import { emitPromise } from "../../test-utils/test-utils";
 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
@@ -117,9 +119,9 @@ describe("Call", function () {
     const errorListener = () => {};
 
     beforeEach(function () {
-        prevNavigator = global.navigator;
-        prevDocument = global.document;
-        prevWindow = global.window;
+        prevNavigator = globalThis.navigator;
+        prevDocument = globalThis.document;
+        prevWindow = globalThis.window;
 
         installWebRTCMocks();
 
@@ -157,9 +159,9 @@ describe("Call", function () {
         call.hangup(CallErrorCode.UserHangup, true);
 
         client.stop();
-        global.navigator = prevNavigator;
-        global.window = prevWindow;
-        global.document = prevDocument;
+        globalThis.navigator = prevNavigator;
+        globalThis.window = prevWindow;
+        globalThis.document = prevDocument;
 
         jest.useRealTimers();
     });
@@ -786,17 +788,17 @@ describe("Call", function () {
         });
 
         it("should return false if window or document are undefined", () => {
-            global.window = undefined!;
+            globalThis.window = undefined!;
             expect(supportsMatrixCall()).toBe(false);
-            global.window = prevWindow;
-            global.document = undefined!;
+            globalThis.window = prevWindow;
+            globalThis.document = undefined!;
             expect(supportsMatrixCall()).toBe(false);
         });
 
         it("should return false if RTCPeerConnection throws", () => {
             // @ts-ignore - writing to window as we are simulating browser edge-cases
-            global.window = {};
-            Object.defineProperty(global.window, "RTCPeerConnection", {
+            globalThis.window = {};
+            Object.defineProperty(globalThis.window, "RTCPeerConnection", {
                 get: () => {
                     throw Error("Secure mode, naaah!");
                 },
@@ -808,11 +810,11 @@ describe("Call", function () {
             "should return false if RTCPeerConnection & RTCSessionDescription " +
                 "& RTCIceCandidate & mediaDevices are unavailable",
             () => {
-                global.window.RTCPeerConnection = undefined!;
-                global.window.RTCSessionDescription = undefined!;
-                global.window.RTCIceCandidate = undefined!;
+                globalThis.window.RTCPeerConnection = undefined!;
+                globalThis.window.RTCSessionDescription = undefined!;
+                globalThis.window.RTCIceCandidate = undefined!;
                 // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
-                global.navigator.mediaDevices = undefined;
+                globalThis.navigator.mediaDevices = undefined;
                 expect(supportsMatrixCall()).toBe(false);
             },
         );
@@ -1053,14 +1055,7 @@ describe("Call", function () {
 
             mockSendEvent.mockReset();
 
-            let caught = false;
-            try {
-                call.reject();
-            } catch (e) {
-                caught = true;
-            }
-
-            expect(caught).toEqual(true);
+            expect(() => call.reject()).toThrow();
             expect(client.client.sendEvent).not.toHaveBeenCalled();
 
             call.hangup(CallErrorCode.UserHangup, true);
@@ -1233,7 +1228,7 @@ describe("Call", function () {
     });
 
     describe("Screen sharing", () => {
-        const waitNegotiateFunc = (resolve: Function): void => {
+        const waitNegotiateFunc = (resolve: () => void): void => {
             mockSendEvent.mockImplementationOnce(() => {
                 // Note that the peer connection here is a dummy one and always returns
                 // dummy SDP, so there's not much point returning the content: the SDP will
@@ -1310,7 +1305,7 @@ describe("Call", function () {
         });
 
         it("removes RTX codec from screen sharing transcievers", async () => {
-            mocked(global.RTCRtpSender.getCapabilities).mockReturnValue({
+            mocked(globalThis.RTCRtpSender.getCapabilities).mockReturnValue({
                 codecs: [
                     { mimeType: "video/rtx", clockRate: 90000 },
                     { mimeType: "video/somethingelse", clockRate: 90000 },
@@ -1613,7 +1608,7 @@ describe("Call", function () {
     it("throws when there is no error listener", async () => {
         call.off(CallEvent.Error, errorListener);
 
-        expect(call.placeVoiceCall()).rejects.toThrow();
+        await expect(call.placeVoiceCall()).rejects.toThrow();
     });
 
     describe("hasPeerConnection()", () => {
@@ -1652,16 +1647,36 @@ describe("Call", function () {
         beforeEach(async () => {
             jest.useFakeTimers();
             jest.spyOn(call, "hangup");
-
             await fakeIncomingCall(client, call, "1");
 
             mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+
             mockPeerConn.iceConnectionState = "disconnected";
             mockPeerConn.iceConnectionStateChangeListener!();
+            jest.spyOn(mockPeerConn, "restartIce");
+        });
+
+        it("should restart ICE gathering after being disconnected for 2 seconds", () => {
+            jest.advanceTimersByTime(3 * 1000);
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
         });
 
         it("should hang up after being disconnected for 30 seconds", () => {
             jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
+        });
+
+        it("should restart ICE gathering once again after ICE being failed", () => {
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            expect(mockPeerConn.restartIce).toHaveBeenCalled();
+        });
+
+        it("should call hangup after ICE being failed and if there not exists a restartIce method", () => {
+            // @ts-ignore
+            mockPeerConn.restartIce = null;
+            mockPeerConn.iceConnectionState = "failed";
+            mockPeerConn.iceConnectionStateChangeListener!();
             expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
         });
 
@@ -1691,5 +1706,137 @@ describe("Call", function () {
 
             expect(onReplace).toHaveBeenCalled();
         });
+    });
+    describe("should handle glare in negotiation process", () => {
+        beforeEach(async () => {
+            // cut methods not want to test
+            call.hangup = () => null;
+            call.isLocalOnHold = () => true;
+            // @ts-ignore
+            call.updateRemoteSDPStreamMetadata = jest.fn();
+            // @ts-ignore
+            call.getRidOfRTXCodecs = jest.fn();
+            // @ts-ignore
+            call.createAnswer = jest.fn().mockResolvedValue({});
+            // @ts-ignore
+            call.sendVoipEvent = jest.fn();
+        });
+
+        it("and reject remote offer if not polite and have pending local offer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have already a local offer
+            // @ts-ignore
+            call.makingOffer = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).not.toHaveBeenCalled();
+        });
+
+        it("and not reject remote offer if not polite and do have pending answer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have not a local offer
+            // @ts-ignore
+            call.makingOffer = false;
+
+            // If we have a setRemoteDescription() answer operation pending, then
+            // we will be "stable" by the time the next setRemoteDescription() is
+            // executed, so we count this being readyForOffer when deciding whether to
+            // ignore the offer.
+            // @ts-ignore
+            call.isSettingRemoteAnswerPending = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+
+        it("and not reject remote offer if not polite and do not have pending local offer", async () => {
+            // not polite user == CallDirection.Outbound
+            call.direction = CallDirection.Outbound;
+            // have no local offer
+            // @ts-ignore
+            call.makingOffer = false;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "stable",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+
+        it("and if polite do rollback pending local offer", async () => {
+            // polite user == CallDirection.Inbound
+            call.direction = CallDirection.Inbound;
+            // have already a local offer
+            // @ts-ignore
+            call.makingOffer = true;
+            const offerEvent = makeMockEvent("@test:foo", {
+                description: {
+                    type: "offer",
+                    sdp: DUMMY_SDP,
+                },
+            });
+            // @ts-ignore
+            call.peerConn = {
+                signalingState: "have-local-offer",
+                setRemoteDescription: jest.fn(),
+            };
+            await call.onNegotiateReceived(offerEvent);
+            expect(call.peerConn?.setRemoteDescription).toHaveBeenCalled();
+        });
+    });
+
+    it("should emit IceFailed error on the successor call if RTCPeerConnection throws", async () => {
+        // @ts-ignore - writing to window as we are simulating browser edge-cases
+        globalThis.window = {};
+        Object.defineProperty(globalThis.window, "RTCPeerConnection", {
+            get: () => {
+                throw Error("Secure mode, naaah!");
+            },
+        });
+
+        const call = new MatrixCall({
+            client: client.client,
+            roomId: "!room_id",
+        });
+        const successor = new MatrixCall({
+            client: client.client,
+            roomId: "!room_id",
+        });
+        call.replacedBy(successor);
+
+        const prom = emitPromise(successor, CallEvent.Error);
+        call.placeCall(true, true);
+
+        const err = await prom;
+        expect(err.code).toBe(CallErrorCode.IceFailed);
     });
 });

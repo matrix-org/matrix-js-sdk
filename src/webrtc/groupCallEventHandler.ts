@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event";
-import { MatrixClient, ClientEvent } from "../client";
-import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall";
-import { Room } from "../models/room";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { RoomMember } from "../models/room-member";
-import { logger } from "../logger";
-import { EventType } from "../@types/event";
-import { SyncState } from "../sync";
+import { MatrixEvent } from "../models/event.ts";
+import { MatrixClient, ClientEvent } from "../client.ts";
+import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall.ts";
+import { Room } from "../models/room.ts";
+import { RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { logger } from "../logger.ts";
+import { EventType } from "../@types/event.ts";
+import { SyncState } from "../sync.ts";
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
@@ -84,6 +84,7 @@ export class GroupCallEventHandler {
     }
 
     public stop(): void {
+        this.client.removeListener(ClientEvent.Room, this.onRoomsChanged);
         this.client.removeListener(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 
@@ -132,7 +133,6 @@ export class GroupCallEventHandler {
             break;
         }
 
-        logger.info(`GroupCallEventHandler createGroupCallForRoom() processed room (roomId=${room.roomId})`);
         this.getRoomDeferred(room.roomId).resolve!();
     }
 
@@ -189,6 +189,8 @@ export class GroupCallEventHandler {
             content?.dataChannelsEnabled || this.client.isVoipWithNoMediaAllowed,
             dataChannelOptions,
             this.client.isVoipWithNoMediaAllowed,
+            this.client.useLivekitForGroupCalls,
+            content["io.element.livekit_service_url"],
         );
 
         this.groupCalls.set(room.roomId, groupCall);

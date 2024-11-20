@@ -1,5 +1,5 @@
 /*
-Copyright 2017 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2017 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link SyncAccumulator} for the public class.
  */
 
-import { logger } from "./logger";
-import { deepCopy, isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils";
-import { IContent, IUnsigned } from "./models/event";
-import { IRoomSummary } from "./models/room-summary";
-import { EventType } from "./@types/event";
-import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_receipts";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { logger } from "./logger.ts";
+import { deepCopy } from "./utils.ts";
+import { IContent, IUnsigned } from "./models/event.ts";
+import { IRoomSummary } from "./models/room-summary.ts";
+import { EventType } from "./@types/event.ts";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
+import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 
 interface IOpts {
     /**
@@ -40,6 +40,7 @@ interface IOpts {
 export interface IMinimalEvent {
     content: IContent;
     type: EventType | string;
+    room_id?: string;
     unsigned?: IUnsigned;
 }
 
@@ -57,8 +58,6 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
-    /** @deprecated - legacy field */
-    age?: number;
 }
 
 export interface IStateEvent extends IRoomEvent {
@@ -98,6 +97,10 @@ export interface IInviteState {
     events: IStrippedState[];
 }
 
+export interface IKnockState {
+    events: IStrippedState[];
+}
+
 export interface IInvitedRoom {
     invite_state: IInviteState;
 }
@@ -108,10 +111,15 @@ export interface ILeftRoom {
     account_data: IAccountData;
 }
 
+export interface IKnockedRoom {
+    knock_state: IKnockState;
+}
+
 export interface IRooms {
     [Category.Join]: Record<string, IJoinedRoom>;
     [Category.Invite]: Record<string, IInvitedRoom>;
     [Category.Leave]: Record<string, ILeftRoom>;
+    [Category.Knock]: Record<string, IKnockedRoom>;
 }
 
 interface IPresence {
@@ -155,6 +163,7 @@ export enum Category {
     Invite = "invite",
     Leave = "leave",
     Join = "join",
+    Knock = "knock",
 }
 
 interface IRoom {
@@ -167,22 +176,7 @@ interface IRoom {
     _accountData: { [eventType: string]: IMinimalEvent };
     _unreadNotifications: Partial<UnreadNotificationCounts>;
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
-    _readReceipts: {
-        [userId: string]: {
-            data: IMinimalEvent;
-            type: ReceiptType;
-            eventId: string;
-        };
-    };
-    _threadReadReceipts: {
-        [threadId: string]: {
-            [userId: string]: {
-                data: IMinimalEvent;
-                type: ReceiptType;
-                eventId: string;
-            };
-        };
-    };
+    _receipts: ReceiptAccumulator;
 }
 
 export interface ISyncData {
@@ -210,6 +204,7 @@ function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
 export class SyncAccumulator {
     private accountData: Record<string, IMinimalEvent> = {}; // $event_type: Object
     private inviteRooms: Record<string, IInvitedRoom> = {}; // $roomId: { ... sync 'invite' json data ... }
+    private knockRooms: Record<string, IKnockedRoom> = {}; // $roomId: { ... sync 'knock' json data ... }
     private joinRooms: { [roomId: string]: IRoom } = {};
     // the /sync token which corresponds to the last time rooms were
     // accumulated. We remember this so that any caller can obtain a
@@ -261,11 +256,17 @@ export class SyncAccumulator {
                 this.accumulateRoom(roomId, Category.Leave, syncResponse.rooms.leave[roomId], fromDatabase);
             });
         }
+        if (syncResponse.rooms.knock) {
+            Object.keys(syncResponse.rooms.knock).forEach((roomId) => {
+                this.accumulateRoom(roomId, Category.Knock, syncResponse.rooms.knock[roomId], fromDatabase);
+            });
+        }
     }
 
     private accumulateRoom(roomId: string, category: Category.Invite, data: IInvitedRoom, fromDatabase: boolean): void;
     private accumulateRoom(roomId: string, category: Category.Join, data: IJoinedRoom, fromDatabase: boolean): void;
     private accumulateRoom(roomId: string, category: Category.Leave, data: ILeftRoom, fromDatabase: boolean): void;
+    private accumulateRoom(roomId: string, category: Category.Knock, data: IKnockedRoom, fromDatabase: boolean): void;
     private accumulateRoom(roomId: string, category: Category, data: any, fromDatabase = false): void {
         // Valid /sync state transitions
         //       +--------+ <======+            1: Accept an invite
@@ -280,7 +281,15 @@ export class SyncAccumulator {
         // * equivalent to "no state"
         switch (category) {
             case Category.Invite: // (5)
+                if (this.knockRooms[roomId]) {
+                    // was previously knock, now invite, need to delete knock state
+                    delete this.knockRooms[roomId];
+                }
                 this.accumulateInviteState(roomId, data as IInvitedRoom);
+                break;
+
+            case Category.Knock:
+                this.accumulateKnockState(roomId, data as IKnockedRoom);
                 break;
 
             case Category.Join:
@@ -296,7 +305,10 @@ export class SyncAccumulator {
                 break;
 
             case Category.Leave:
-                if (this.inviteRooms[roomId]) {
+                if (this.knockRooms[roomId]) {
+                    // delete knock state on leave
+                    delete this.knockRooms[roomId];
+                } else if (this.inviteRooms[roomId]) {
                     // (4)
                     delete this.inviteRooms[roomId];
                 } else {
@@ -336,6 +348,36 @@ export class SyncAccumulator {
             }
             if (!hasAdded) {
                 currentData.invite_state.events.push(e);
+            }
+        });
+    }
+
+    private accumulateKnockState(roomId: string, data: IKnockedRoom): void {
+        if (!data.knock_state || !data.knock_state.events) {
+            // no new data
+            return;
+        }
+        if (!this.knockRooms[roomId]) {
+            this.knockRooms[roomId] = {
+                knock_state: data.knock_state,
+            };
+            return;
+        }
+        // accumulate extra keys
+        // clobber based on event type / state key
+        // We expect knock_state to be small, so just loop over the events
+        const currentData = this.knockRooms[roomId];
+        data.knock_state.events.forEach((e) => {
+            let hasAdded = false;
+            for (let i = 0; i < currentData.knock_state.events.length; i++) {
+                const current = currentData.knock_state.events[i];
+                if (current.type === e.type && current.state_key == e.state_key) {
+                    currentData.knock_state.events[i] = e; // update
+                    hasAdded = true;
+                }
+            }
+            if (!hasAdded) {
+                currentData.knock_state.events.push(e);
             }
         });
     }
@@ -387,8 +429,7 @@ export class SyncAccumulator {
                 _unreadNotifications: {},
                 _unreadThreadNotifications: {},
                 _summary: {},
-                _readReceipts: {},
-                _threadReadReceipts: {},
+                _receipts: new ReceiptAccumulator(),
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -414,63 +455,22 @@ export class SyncAccumulator {
 
             const acc = currentData._summary;
             const sum = data.summary;
-            acc[HEROES_KEY] = sum[HEROES_KEY] || acc[HEROES_KEY];
-            acc[JOINED_COUNT_KEY] = sum[JOINED_COUNT_KEY] || acc[JOINED_COUNT_KEY];
-            acc[INVITED_COUNT_KEY] = sum[INVITED_COUNT_KEY] || acc[INVITED_COUNT_KEY];
+            acc[HEROES_KEY] = sum[HEROES_KEY] ?? acc[HEROES_KEY];
+            acc[JOINED_COUNT_KEY] = sum[JOINED_COUNT_KEY] ?? acc[JOINED_COUNT_KEY];
+            acc[INVITED_COUNT_KEY] = sum[INVITED_COUNT_KEY] ?? acc[INVITED_COUNT_KEY];
         }
 
-        data.ephemeral?.events?.forEach((e) => {
-            // We purposefully do not persist m.typing events.
-            // Technically you could refresh a browser before the timer on a
-            // typing event is up, so it'll look like you aren't typing when
-            // you really still are. However, the alternative is worse. If
-            // we do persist typing events, it will look like people are
-            // typing forever until someone really does start typing (which
-            // will prompt Synapse to send down an actual m.typing event to
-            // clobber the one we persisted).
-            if (e.type !== EventType.Receipt || !e.content) {
-                // This means we'll drop unknown ephemeral events but that
-                // seems okay.
-                return;
-            }
-            // Handle m.receipt events. They clobber based on:
-            //   (user_id, receipt_type)
-            // but they are keyed in the event as:
-            //   content:{ $event_id: { $receipt_type: { $user_id: {json} }}}
-            // so store them in the former so we can accumulate receipt deltas
-            // quickly and efficiently (we expect a lot of them). Fold the
-            // receipt type into the key name since we only have 1 at the
-            // moment (m.read) and nested JSON objects are slower and more
-            // of a hassle to work with. We'll inflate this back out when
-            // getJSON() is called.
-            Object.keys(e.content).forEach((eventId) => {
-                Object.entries<ReceiptContent>(e.content[eventId]).forEach(([key, value]) => {
-                    if (!isSupportedReceiptType(key)) return;
+        // We purposefully do not persist m.typing events.
+        // Technically you could refresh a browser before the timer on a
+        // typing event is up, so it'll look like you aren't typing when
+        // you really still are. However, the alternative is worse. If
+        // we do persist typing events, it will look like people are
+        // typing forever until someone really does start typing (which
+        // will prompt Synapse to send down an actual m.typing event to
+        // clobber the one we persisted).
 
-                    for (const userId of Object.keys(value)) {
-                        const data = e.content[eventId][key][userId];
-
-                        const receipt = {
-                            data: e.content[eventId][key][userId],
-                            type: key as ReceiptType,
-                            eventId: eventId,
-                        };
-
-                        if (!data.thread_id || data.thread_id === MAIN_ROOM_TIMELINE) {
-                            currentData._readReceipts[userId] = receipt;
-                        } else {
-                            currentData._threadReadReceipts = {
-                                ...currentData._threadReadReceipts,
-                                [data.thread_id]: {
-                                    ...(currentData._threadReadReceipts[data.thread_id] ?? {}),
-                                    [userId]: receipt,
-                                },
-                            };
-                        }
-                    }
-                });
-            });
-        });
+        // Persist the receipts
+        currentData._receipts.consumeEphemeralEvents(data.ephemeral?.events);
 
         // if we got a limited sync, we need to remove all timeline entries or else
         // we will have gaps in the timeline.
@@ -496,7 +496,7 @@ export class SyncAccumulator {
                 if (transformedEvent.unsigned !== undefined) {
                     transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
                 }
-                const age = e.unsigned ? e.unsigned.age : e.age;
+                const age = e.unsigned?.age;
                 if (age !== undefined) transformedEvent._localTs = Date.now() - age;
             } else {
                 transformedEvent = e;
@@ -504,7 +504,7 @@ export class SyncAccumulator {
 
             currentData._timeline.push({
                 event: transformedEvent,
-                token: index === 0 ? data.timeline.prev_batch ?? null : null,
+                token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
         });
 
@@ -541,6 +541,7 @@ export class SyncAccumulator {
         const data: IRooms = {
             join: {},
             invite: {},
+            knock: {},
             // always empty. This is set by /sync when a room was previously
             // in 'invite' or 'join'. On fresh startup, the client won't know
             // about any previous room being in 'invite' or 'join' so we can
@@ -556,6 +557,9 @@ export class SyncAccumulator {
         };
         Object.keys(this.inviteRooms).forEach((roomId) => {
             data.invite[roomId] = this.inviteRooms[roomId];
+        });
+        Object.keys(this.knockRooms).forEach((roomId) => {
+            data.knock[roomId] = this.knockRooms[roomId];
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
@@ -576,41 +580,11 @@ export class SyncAccumulator {
                 roomJson.account_data.events.push(roomData._accountData[evType]);
             });
 
-            // Add receipt data
-            const receiptEvent = {
-                type: EventType.Receipt,
-                room_id: roomId,
-                content: {
-                    // $event_id: { "m.read": { $user_id: $json } }
-                } as IContent,
-            };
-
-            const receiptEventContent: MapWithDefault<
-                string,
-                MapWithDefault<ReceiptType, Map<string, object>>
-            > = new MapWithDefault(() => new MapWithDefault(() => new Map()));
-
-            for (const [userId, receiptData] of Object.entries(roomData._readReceipts)) {
-                receiptEventContent
-                    .getOrCreate(receiptData.eventId)
-                    .getOrCreate(receiptData.type)
-                    .set(userId, receiptData.data);
-            }
-
-            for (const threadReceipts of Object.values(roomData._threadReadReceipts)) {
-                for (const [userId, receiptData] of Object.entries(threadReceipts)) {
-                    receiptEventContent
-                        .getOrCreate(receiptData.eventId)
-                        .getOrCreate(receiptData.type)
-                        .set(userId, receiptData.data);
-                }
-            }
-
-            receiptEvent.content = recursiveMapToObject(receiptEventContent);
+            const receiptEvent = roomData._receipts.buildAccumulatedReceiptEvent(roomId);
 
             // add only if we have some receipt data
-            if (receiptEventContent.size > 0) {
-                roomJson.ephemeral.events.push(receiptEvent as IMinimalEvent);
+            if (receiptEvent) {
+                roomJson.ephemeral.events.push(receiptEvent);
             }
 
             // Add timeline data

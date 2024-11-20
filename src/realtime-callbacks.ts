@@ -24,7 +24,7 @@ limitations under the License.
  * it will instead fire as soon as possible after resume.
  */
 
-import { logger } from "./logger";
+import { logger } from "./logger.ts";
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
@@ -33,7 +33,7 @@ const TIMER_CHECK_PERIOD_MS = 1000;
 // counter, for making up ids to return from setTimeout
 let count = 0;
 
-// the key for our callback with the real global.setTimeout
+// the key for our callback with the real globalThis.setTimeout
 let realCallbackKey: NodeJS.Timeout | number;
 
 type Callback = {
@@ -114,10 +114,10 @@ export function clearTimeout(key: number): void {
     }
 }
 
-// use the real global.setTimeout to schedule a callback to runCallbacks.
+// use the real globalThis.setTimeout to schedule a callback to runCallbacks.
 function scheduleRealCallback(): void {
     if (realCallbackKey) {
-        global.clearTimeout(realCallbackKey as NodeJS.Timeout);
+        globalThis.clearTimeout(realCallbackKey as NodeJS.Timeout);
     }
 
     const first = callbackList[0];
@@ -131,7 +131,7 @@ function scheduleRealCallback(): void {
     const delayMs = Math.min(first.runAt - timestamp, TIMER_CHECK_PERIOD_MS);
 
     debuglog("scheduleRealCallback: now:", timestamp, "delay:", delayMs);
-    realCallbackKey = global.setTimeout(runCallbacks, delayMs);
+    realCallbackKey = globalThis.setTimeout(runCallbacks, delayMs);
 }
 
 function runCallbacks(): void {
@@ -158,7 +158,7 @@ function runCallbacks(): void {
 
     for (const cb of callbacksToRun) {
         try {
-            cb.func.apply(global, cb.params);
+            cb.func.apply(globalThis, cb.params);
         } catch (e) {
             logger.error("Uncaught exception in callback function", e);
         }

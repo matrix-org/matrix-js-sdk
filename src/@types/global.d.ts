@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// this is needed to tell TS about global.Olm
+// this is needed to tell TS about globalThis.Olm
 import "@matrix-org/olm";
 
 export {};
 
 declare global {
-    // use `number` as the return type in all cases for global.set{Interval,Timeout},
+    // use `number` as the return type in all cases for globalThis.set{Interval,Timeout},
     // so we don't accidentally use the methods on NodeJS.Timeout - they only exist in a subset of environments.
     // The overload for clear{Interval,Timeout} is resolved as expected.
     // We use `ReturnType<typeof setTimeout>` in the code to be agnostic of if this definition gets loaded.
@@ -29,18 +29,9 @@ declare global {
 
     namespace NodeJS {
         interface Global {
-            localStorage: Storage;
             // marker variable used to detect both the browser & node entrypoints being used at once
             __js_sdk_entrypoint: unknown;
         }
-    }
-
-    interface Window {
-        webkitAudioContext: typeof AudioContext;
-    }
-
-    interface Crypto {
-        webkitSubtle?: Window["crypto"]["subtle"];
     }
 
     interface MediaDevices {
@@ -75,25 +66,5 @@ declare global {
         // We check for the webkit-prefixed getUserMedia to detect if we're
         // on webkit: we should check if we still need to do this
         webkitGetUserMedia?: DummyInterfaceWeShouldntBeUsingThis;
-    }
-
-    export interface ISettledFulfilled<T> {
-        status: "fulfilled";
-        value: T;
-    }
-    export interface ISettledRejected {
-        status: "rejected";
-        reason: any;
-    }
-
-    interface PromiseConstructor {
-        allSettled<T>(promises: Promise<T>[]): Promise<Array<ISettledFulfilled<T> | ISettledRejected>>;
-    }
-
-    interface RTCRtpTransceiver {
-        // This has been removed from TS
-        // (https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1029),
-        // but we still need this for MatrixCall::getRidOfRTXCodecs()
-        setCodecPreferences(codecs: RTCRtpCodecCapability[]): void;
     }
 }

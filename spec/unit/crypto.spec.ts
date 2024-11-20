@@ -15,13 +15,20 @@ import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from "../../src/logger";
-import { MemoryStore } from "../../src";
+import { DeviceVerification, MemoryStore } from "../../src";
 import { RoomKeyRequestState } from "../../src/crypto/OutgoingRoomKeyRequestManager";
 import { RoomMember } from "../../src/models/room-member";
 import { IStore } from "../../src/store";
 import { IRoomEncryption, RoomList } from "../../src/crypto/RoomList";
+import { EventShieldColour, EventShieldReason } from "../../src/crypto-api";
+import { UserTrustLevel } from "../../src/crypto/CrossSigning";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { EventDecryptionResult } from "../../src/common-crypto/CryptoBackend";
+import * as testData from "../test-utils/test-data";
+import { KnownMembership } from "../../src/@types/membership";
+import type { DeviceInfoMap } from "../../src/crypto/DeviceList";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 function awaitEvent(emitter: EventEmitter, event: string): Promise<void> {
     return new Promise((resolve) => {
@@ -110,14 +117,25 @@ describe("Crypto", function () {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 
+    it("getVersion() should return the current version of the olm library", async () => {
+        const client = new TestClient("@alice:example.com", "deviceid").client;
+        await client.initCrypto();
+
+        const olmVersionTuple = Crypto.getOlmVersion();
+        expect(client.getCrypto()?.getVersion()).toBe(
+            `Olm ${olmVersionTuple[0]}.${olmVersionTuple[1]}.${olmVersionTuple[2]}`,
+        );
+    });
+
     describe("encrypted events", function () {
-        it("provides encryption information", async function () {
+        it("provides encryption information for events from unverified senders", async function () {
             const client = new TestClient("@alice:example.com", "deviceid").client;
             await client.initCrypto();
 
             // unencrypted event
             const event = {
                 getId: () => "$event_id",
+                getSender: () => "@bob:example.com",
                 getSenderKey: () => null,
                 getWireContent: () => {
                     return {};
@@ -126,6 +144,8 @@ describe("Crypto", function () {
 
             let encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeFalsy();
+
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toBe(null);
 
             // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
             event.getSenderKey = () => "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
@@ -141,6 +161,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.authenticated).toBeFalsy();
             expect(encryptionInfo.sender).toBeFalsy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            });
+
             // known sender, megolm key from backup
             event.getForwardingCurve25519KeyChain = () => [];
             event.isKeySourceUntrusted = () => true;
@@ -155,6 +180,11 @@ describe("Crypto", function () {
             expect(encryptionInfo.sender).toBeTruthy();
             expect(encryptionInfo.mismatchedSender).toBeFalsy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.GREY,
+                shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+            });
+
             // known sender, trusted megolm key, but bad ed25519key
             event.isKeySourceUntrusted = () => false;
             device.keys["ed25519:FLIBBLE"] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
@@ -165,7 +195,113 @@ describe("Crypto", function () {
             expect(encryptionInfo.sender).toBeTruthy();
             expect(encryptionInfo.mismatchedSender).toBeTruthy();
 
+            expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.MISMATCHED_SENDER_KEY,
+            });
+
             client.stopClient();
+        });
+
+        describe("provides encryption information for events from verified senders", function () {
+            const testDeviceId = testData.BOB_TEST_DEVICE_ID;
+            const testDevice = testData.BOB_SIGNED_TEST_DEVICE_DATA;
+
+            let client: MatrixClient;
+            beforeEach(async () => {
+                client = new TestClient("@alice:example.com", "deviceid").client;
+                await client.initCrypto();
+
+                // mock out the verification check
+                client.crypto!.checkUserTrust = (userId) => new UserTrustLevel(true, false, false);
+            });
+
+            afterEach(() => {
+                client.stopClient();
+            });
+
+            async function buildEncryptedEvent(
+                decryptionResult: Partial<EventDecryptionResult> = {},
+            ): Promise<MatrixEvent> {
+                const mockCryptoBackend = {
+                    decryptEvent: async (event: MatrixEvent): Promise<EventDecryptionResult> => {
+                        return {
+                            claimedEd25519Key: testDevice.keys["ed25519:" + testDeviceId],
+                            clearEvent: {
+                                room_id: "!room_id",
+                                type: "m.room.message",
+                                content: { body: "test" },
+                            },
+                            forwardingCurve25519KeyChain: [],
+                            senderCurve25519Key: testDevice.keys["curve25519:" + testDeviceId],
+                            ...decryptionResult,
+                        };
+                    },
+                } as unknown as CryptoBackend;
+
+                const event = new MatrixEvent({
+                    event_id: "$event_id",
+                    sender: testData.BOB_TEST_USER_ID,
+                    type: "m.room.encrypted",
+                    content: { algorithm: "m.megolm.v1.aes-sha2" },
+                });
+                await event.attemptDecryption(mockCryptoBackend);
+                return event;
+            }
+
+            it("unknown device", async () => {
+                const event = await buildEncryptedEvent();
+                expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                    shieldColour: EventShieldColour.GREY,
+                    shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                });
+            });
+
+            it("known but unsigned device", async () => {
+                client.crypto!.deviceList.storeDevicesForUser(testData.BOB_TEST_USER_ID, {
+                    [testDeviceId]: {
+                        keys: testDevice.keys,
+                        algorithms: testDevice.algorithms,
+                        verified: DeviceVerification.Unverified,
+                        known: true,
+                    },
+                });
+
+                const event = await buildEncryptedEvent();
+                expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                    shieldColour: EventShieldColour.RED,
+                    shieldReason: EventShieldReason.UNSIGNED_DEVICE,
+                });
+            });
+
+            describe("known and verified device", () => {
+                beforeEach(() => {
+                    client.crypto!.deviceList.storeDevicesForUser(testData.BOB_TEST_USER_ID, {
+                        [testDeviceId]: {
+                            keys: testDevice.keys,
+                            algorithms: testDevice.algorithms,
+                            verified: DeviceVerification.Verified,
+                            known: true,
+                        },
+                    });
+                });
+
+                it("regular key", async () => {
+                    const event = await buildEncryptedEvent();
+                    expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                        shieldColour: EventShieldColour.NONE,
+                        shieldReason: null,
+                    });
+                });
+
+                it("unauthenticated key", async () => {
+                    const event = await buildEncryptedEvent({ untrusted: true });
+                    expect(await client.getCrypto()!.getEncryptionInfoForEvent(event)).toEqual({
+                        shieldColour: EventShieldColour.GREY,
+                        shieldReason: EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
+                    });
+                });
+            });
         });
 
         it("doesn't throw an error when attempting to decrypt a redacted event", async () => {
@@ -222,7 +358,6 @@ describe("Crypto", function () {
 
         let crypto: Crypto;
         let mockBaseApis: MatrixClient;
-        let mockRoomList: RoomList;
 
         let fakeEmitter: EventEmitter;
 
@@ -256,19 +391,10 @@ describe("Crypto", function () {
                 isGuest: jest.fn(),
                 emit: jest.fn(),
             } as unknown as MatrixClient;
-            mockRoomList = {} as unknown as RoomList;
 
             fakeEmitter = new EventEmitter();
 
-            crypto = new Crypto(
-                mockBaseApis,
-                "@alice:home.server",
-                "FLIBBLE",
-                clientStore,
-                cryptoStore,
-                mockRoomList,
-                [],
-            );
+            crypto = new Crypto(mockBaseApis, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
             crypto.registerEventHandlers(fakeEmitter as any);
             await crypto.init();
         });
@@ -339,7 +465,7 @@ describe("Crypto", function () {
                     type: "m.room.member",
                     sender: "@alice:example.com",
                     room_id: roomId,
-                    content: { membership: "invite" },
+                    content: { membership: KnownMembership.Invite },
                     state_key: "@bob:example.com",
                 }),
             ]);
@@ -381,12 +507,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -487,7 +608,7 @@ describe("Crypto", function () {
             event.claimedEd25519Key = null;
             try {
                 await bobClient.crypto!.decryptEvent(event);
-            } catch (e) {
+            } catch {
                 // we expect this to fail because we don't have the
                 // decryption keys yet
             }
@@ -617,12 +738,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await secondAliceClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(secondAliceClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -681,7 +797,7 @@ describe("Crypto", function () {
                     type: "m.room.member",
                     sender: "@clara:example.com",
                     room_id: roomId,
-                    content: { membership: "invite" },
+                    content: { membership: KnownMembership.Invite },
                     state_key: "@bob:example.com",
                 }),
             ]);
@@ -725,12 +841,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -805,12 +916,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -897,12 +1003,7 @@ describe("Crypto", function () {
                     event.senderCurve25519Key = null;
                     // @ts-ignore private properties
                     event.claimedEd25519Key = null;
-                    try {
-                        await bobClient.crypto!.decryptEvent(event);
-                    } catch (e) {
-                        // we expect this to fail because we don't have the
-                        // decryption keys yet
-                    }
+                    await expect(bobClient.crypto!.decryptEvent(event)).rejects.toBeTruthy();
                 }),
             );
 
@@ -1007,7 +1108,7 @@ describe("Crypto", function () {
 
     describe("Secret storage", function () {
         it("creates secret storage even if there is no keyInfo", async function () {
-            jest.spyOn(logger, "log").mockImplementation(() => {});
+            jest.spyOn(logger, "debug").mockImplementation(() => {});
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
             await client.initCrypto();
@@ -1145,6 +1246,117 @@ describe("Crypto", function () {
         });
     });
 
+    describe("encryptToDeviceMessages", () => {
+        let client: TestClient;
+        let ensureOlmSessionsForDevices: jest.SpiedFunction<typeof olmlib.ensureOlmSessionsForDevices>;
+        let encryptMessageForDevice: jest.SpiedFunction<typeof olmlib.encryptMessageForDevice>;
+        const payload = { hello: "world" };
+        let encryptedPayload: object;
+        let crypto: Crypto;
+
+        beforeEach(async () => {
+            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices.mockResolvedValue(new Map());
+            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
+            });
+
+            client = new TestClient("@alice:example.org", "aliceweb");
+
+            // running initCrypto should trigger a key upload
+            client.httpBackend.when("POST", "/keys/upload").respond(200, {});
+            await Promise.all([client.client.initCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
+
+            encryptedPayload = {
+                algorithm: "m.olm.v1.curve25519-aes-sha2",
+                sender_key: client.client.crypto!.olmDevice.deviceCurve25519Key,
+                ciphertext: { plaintext: { type: 0, body: JSON.stringify(payload) } },
+            };
+
+            crypto = client.client.getCrypto() as Crypto;
+        });
+
+        afterEach(async () => {
+            ensureOlmSessionsForDevices.mockRestore();
+            encryptMessageForDevice.mockRestore();
+            await client.stop();
+        });
+
+        it("returns encrypted batch where devices known", async () => {
+            const deviceInfoMap: DeviceInfoMap = new Map([
+                [
+                    "@bob:example.org",
+                    new Map([
+                        ["bobweb", new DeviceInfo("bobweb")],
+                        ["bobmobile", new DeviceInfo("bobmobile")],
+                    ]),
+                ],
+                ["@carol:example.org", new Map([["caroldesktop", new DeviceInfo("caroldesktop")]])],
+            ]);
+            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(deviceInfoMap);
+            // const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
+
+            const batch = await client.client.getCrypto()?.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { userId: "@bob:example.org", deviceId: "bobweb" },
+                    { userId: "@bob:example.org", deviceId: "bobmobile" },
+                    { userId: "@carol:example.org", deviceId: "caroldesktop" },
+                    { userId: "@carol:example.org", deviceId: "carolmobile" }, // not known
+                ],
+                payload,
+            );
+            expect(crypto.deviceList.downloadKeys).toHaveBeenCalledWith(
+                ["@bob:example.org", "@carol:example.org"],
+                false,
+            );
+            expect(encryptMessageForDevice).toHaveBeenCalledTimes(3);
+            const expectedPayload = expect.objectContaining({
+                ...encryptedPayload,
+                "org.matrix.msgid": expect.any(String),
+                "sender_key": expect.any(String),
+            });
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch.length).toEqual(3);
+            expect(batch).toEqual({
+                eventType: "m.room.encrypted",
+                batch: expect.arrayContaining([
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "bobweb",
+                        payload: expectedPayload,
+                    },
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "bobmobile",
+                        payload: expectedPayload,
+                    },
+                    {
+                        userId: "@carol:example.org",
+                        deviceId: "caroldesktop",
+                        payload: expectedPayload,
+                    },
+                ]),
+            });
+        });
+
+        it("returns empty batch if no devices known", async () => {
+            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(new Map());
+            const batch = await crypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                ],
+                payload,
+            );
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch).toEqual([]);
+        });
+    });
+
     describe("checkSecretStoragePrivateKey", () => {
         let client: TestClient;
 
@@ -1164,7 +1376,7 @@ describe("Crypto", function () {
                     ({
                         init_with_private_key: jest.fn(),
                         free,
-                    } as unknown as PkDecryption),
+                    }) as unknown as PkDecryption,
             );
             client.client.checkSecretStoragePrivateKey(new Uint8Array(), "");
             expect(free).toHaveBeenCalled();
@@ -1190,7 +1402,7 @@ describe("Crypto", function () {
                     ({
                         init_with_seed: jest.fn(),
                         free,
-                    } as unknown as PkSigning),
+                    }) as unknown as PkSigning,
             );
             client.client.checkCrossSigningPrivateKey(new Uint8Array(), "");
             expect(free).toHaveBeenCalled();
@@ -1232,15 +1444,9 @@ describe("Crypto", function () {
                 setRoomEncryption: jest.fn().mockResolvedValue(undefined),
             } as unknown as RoomList;
 
-            crypto = new Crypto(
-                mockClient,
-                "@alice:home.server",
-                "FLIBBLE",
-                clientStore,
-                cryptoStore,
-                mockRoomList,
-                [],
-            );
+            crypto = new Crypto(mockClient, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
+            // @ts-ignore we are injecting a mock into a private property
+            crypto.roomList = mockRoomList;
         });
 
         it("should set the algorithm if called for a known room", async () => {

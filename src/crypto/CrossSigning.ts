@@ -18,24 +18,32 @@ limitations under the License.
  * Cross signing methods
  */
 
-import { PkSigning } from "@matrix-org/olm";
+import type { PkSigning } from "@matrix-org/olm";
+import { IObject, pkSign, pkVerify } from "./olmlib.ts";
+import { logger } from "../logger.ts";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
+import { DeviceInfo } from "./deviceinfo.ts";
+import { ISignedKey, MatrixClient } from "../client.ts";
+import { OlmDevice } from "./OlmDevice.ts";
+import { ICryptoCallbacks } from "./index.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { CryptoStore, SecretStorePrivateKeys } from "./store/base.ts";
+import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage.ts";
+import {
+    CrossSigningKeyInfo,
+    DeviceVerificationStatus,
+    UserVerificationStatus as UserTrustLevel,
+} from "../crypto-api/index.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 
-import { decodeBase64, encodeBase64, IObject, pkSign, pkVerify } from "./olmlib";
-import { logger } from "../logger";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, encryptAES } from "./aes";
-import { DeviceInfo } from "./deviceinfo";
-import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
-import { OlmDevice } from "./OlmDevice";
-import { ICryptoCallbacks } from ".";
-import { ISignatures } from "../@types/signed";
-import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
-import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage";
-import { DeviceVerificationStatus } from "../crypto-api";
+// backwards-compatibility re-exports
+export { UserTrustLevel };
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
 
-function publicKeyFromKeyInfo(keyInfo: ICrossSigningKey): string {
+function publicKeyFromKeyInfo(keyInfo: CrossSigningKeyInfo): string {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
     // We assume only a single key, and we want the bare form without type
     // prefix, so we select the values.
@@ -48,13 +56,13 @@ export interface ICacheCallbacks {
 }
 
 export interface ICrossSigningInfo {
-    keys: Record<string, ICrossSigningKey>;
+    keys: Record<string, CrossSigningKeyInfo>;
     firstUse: boolean;
     crossSigningVerifiedBefore: boolean;
 }
 
 export class CrossSigningInfo {
-    public keys: Record<string, ICrossSigningKey> = {};
+    public keys: Record<string, CrossSigningKeyInfo> = {};
     public firstUse = true;
     // This tracks whether we've ever verified this user with any identity.
     // When you verify a user, any devices online at the time that receive
@@ -117,7 +125,7 @@ export class CrossSigningInfo {
 
         function validateKey(key: Uint8Array | null): [string, PkSigning] | undefined {
             if (!key) return;
-            const signing = new global.Olm.PkSigning();
+            const signing = new globalThis.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(key);
             if (gotPubkey === expectedPubkey) {
                 return [gotPubkey, signing];
@@ -245,7 +253,7 @@ export class CrossSigningInfo {
      * @returns A map from key type (string) to private key (Uint8Array)
      */
     public async getCrossSigningKeysFromCache(): Promise<Map<string, Uint8Array>> {
-        const keys = new Map();
+        const keys = new Map<string, Uint8Array>();
         const cacheCallbacks = this.cacheCallbacks;
         if (!cacheCallbacks) return keys;
         for (const type of ["master", "self_signing", "user_signing"]) {
@@ -293,13 +301,13 @@ export class CrossSigningInfo {
         }
 
         const privateKeys: Record<string, Uint8Array> = {};
-        const keys: Record<string, ICrossSigningKey> = {};
-        let masterSigning;
-        let masterPub;
+        const keys: Record<string, CrossSigningKeyInfo> = {};
+        let masterSigning: PkSigning | undefined;
+        let masterPub: string | undefined;
 
         try {
             if (level & CrossSigningLevel.MASTER) {
-                masterSigning = new global.Olm.PkSigning();
+                masterSigning = new globalThis.Olm.PkSigning();
                 privateKeys.master = masterSigning.generate_seed();
                 masterPub = masterSigning.init_with_seed(privateKeys.master);
                 keys.master = {
@@ -314,7 +322,7 @@ export class CrossSigningInfo {
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
-                const sskSigning = new global.Olm.PkSigning();
+                const sskSigning = new globalThis.Olm.PkSigning();
                 try {
                     privateKeys.self_signing = sskSigning.generate_seed();
                     const sskPub = sskSigning.init_with_seed(privateKeys.self_signing);
@@ -332,7 +340,7 @@ export class CrossSigningInfo {
             }
 
             if (level & CrossSigningLevel.USER_SIGNING) {
-                const uskSigning = new global.Olm.PkSigning();
+                const uskSigning = new globalThis.Olm.PkSigning();
                 try {
                     privateKeys.user_signing = uskSigning.generate_seed();
                     const uskPub = uskSigning.init_with_seed(privateKeys.user_signing);
@@ -365,8 +373,8 @@ export class CrossSigningInfo {
         this.keys = {};
     }
 
-    public setKeys(keys: Record<string, ICrossSigningKey>): void {
-        const signingKeys: Record<string, ICrossSigningKey> = {};
+    public setKeys(keys: Record<string, CrossSigningKeyInfo>): void {
+        const signingKeys: Record<string, CrossSigningKeyInfo> = {};
         if (keys.master) {
             if (keys.master.user_id !== this.userId) {
                 const error = "Mismatched user ID " + keys.master.user_id + " in master key from " + this.userId;
@@ -454,7 +462,7 @@ export class CrossSigningInfo {
         }
     }
 
-    public async signUser(key: CrossSigningInfo): Promise<ICrossSigningKey | undefined> {
+    public async signUser(key: CrossSigningInfo): Promise<CrossSigningKeyInfo | undefined> {
         if (!this.keys.user_signing) {
             logger.info("No user signing key: not signing user");
             return;
@@ -513,7 +521,7 @@ export class CrossSigningInfo {
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
-        } catch (e) {
+        } catch {
             userTrusted = false;
         }
         return new UserTrustLevel(userTrusted, userCrossSigning.crossSigningVerifiedBefore, userCrossSigning.firstUse);
@@ -552,7 +560,7 @@ export class CrossSigningInfo {
             pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId);
             // ...then we trust this device as much as far as we trust the user
             return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust, trustCrossSignedDevices);
-        } catch (e) {
+        } catch {
             return new DeviceTrustLevel(false, false, localTrust, trustCrossSignedDevices);
         }
     }
@@ -589,46 +597,6 @@ export enum CrossSigningLevel {
 }
 
 /**
- * Represents the ways in which we trust a user
- */
-export class UserTrustLevel {
-    public constructor(
-        private readonly crossSigningVerified: boolean,
-        private readonly crossSigningVerifiedBefore: boolean,
-        private readonly tofu: boolean,
-    ) {}
-
-    /**
-     * @returns true if this user is verified via any means
-     */
-    public isVerified(): boolean {
-        return this.isCrossSigningVerified();
-    }
-
-    /**
-     * @returns true if this user is verified via cross signing
-     */
-    public isCrossSigningVerified(): boolean {
-        return this.crossSigningVerified;
-    }
-
-    /**
-     * @returns true if we ever verified this user before (at least for
-     * the history of verifications observed by this device).
-     */
-    public wasCrossSigningVerified(): boolean {
-        return this.crossSigningVerifiedBefore;
-    }
-
-    /**
-     * @returns true if this user's key is trusted on first use
-     */
-    public isTofu(): boolean {
-        return this.tofu;
-    }
-}
-
-/**
  * Represents the ways in which we trust a device.
  *
  * @deprecated Use {@link DeviceVerificationStatus}.
@@ -639,8 +607,9 @@ export class DeviceTrustLevel extends DeviceVerificationStatus {
         tofu: boolean,
         localVerified: boolean,
         trustCrossSignedDevices: boolean,
+        signedByOwner = false,
     ) {
-        super({ crossSigningVerified, tofu, localVerified, trustCrossSignedDevices });
+        super({ crossSigningVerified, tofu, localVerified, trustCrossSignedDevices, signedByOwner });
     }
 
     public static fromUserTrustLevel(
@@ -653,6 +622,7 @@ export class DeviceTrustLevel extends DeviceVerificationStatus {
             userTrustLevel.isTofu(),
             localVerified,
             trustCrossSignedDevices,
+            true,
         );
     }
 
@@ -686,14 +656,14 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
             _expectedPublicKey: string,
         ): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
-                return store.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                store.doTxn("readonly", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                     store.getSecretStorePrivateKey(txn, resolve, type);
                 });
             });
 
             if (key && key.ciphertext) {
                 const pickleKey = Buffer.from(olmDevice.pickleKey);
-                const decrypted = await decryptAES(key, pickleKey, type);
+                const decrypted = await decryptAESSecretStorageItem(key, pickleKey, type);
                 return decodeBase64(decrypted);
             } else {
                 return key;
@@ -707,7 +677,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 throw new Error(`storeCrossSigningKeyCache expects Uint8Array, got ${key}`);
             }
             const pickleKey = Buffer.from(olmDevice.pickleKey);
-            const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), pickleKey, type);
             return store.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 store.storeSecretStorePrivateKey(txn, type, encryptedKey);
             });
@@ -788,7 +758,7 @@ export async function requestKeysDuringVerification(
         })();
 
         // We call getCrossSigningKey() for its side-effects
-        return Promise.race<KeysDuringVerification | void>([
+        Promise.race<KeysDuringVerification | void>([
             Promise.all([
                 crossSigning.getCrossSigningKey("master"),
                 crossSigning.getCrossSigningKey("self_signing"),

@@ -7,6 +7,7 @@ import { MatrixClient } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { RoomMember } from "../../src/models/room-member";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("EventTimeline", function () {
     const roomId = "!foo:bar";
@@ -50,7 +51,7 @@ describe("EventTimeline", function () {
             const events = [
                 utils.mkMembership({
                     room: roomId,
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     user: userB,
                     skey: userA,
                     event: true,
@@ -87,7 +88,7 @@ describe("EventTimeline", function () {
             const state = [
                 utils.mkMembership({
                     room: roomId,
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     user: userB,
                     skey: userA,
                     event: true,
@@ -203,11 +204,11 @@ describe("EventTimeline", function () {
         it("should set event.sender for new and old events", function () {
             const sentinel = new RoomMember(roomId, userA);
             sentinel.name = "Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             const oldSentinel = new RoomMember(roomId, userA);
             sentinel.name = "Old Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
@@ -246,11 +247,11 @@ describe("EventTimeline", function () {
         it("should set event.target for new and old m.room.member events", function () {
             const sentinel = new RoomMember(roomId, userA);
             sentinel.name = "Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             const oldSentinel = new RoomMember(roomId, userA);
             sentinel.name = "Old Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
@@ -267,14 +268,14 @@ describe("EventTimeline", function () {
 
             const newEv = utils.mkMembership({
                 room: roomId,
-                mship: "invite",
+                mship: KnownMembership.Invite,
                 user: userB,
                 skey: userA,
                 event: true,
             });
             const oldEv = utils.mkMembership({
                 room: roomId,
-                mship: "ban",
+                mship: KnownMembership.Ban,
                 user: userB,
                 skey: userA,
                 event: true,
@@ -291,7 +292,7 @@ describe("EventTimeline", function () {
                 const events = [
                     utils.mkMembership({
                         room: roomId,
-                        mship: "invite",
+                        mship: KnownMembership.Invite,
                         user: userB,
                         skey: userA,
                         event: true,
@@ -330,7 +331,7 @@ describe("EventTimeline", function () {
                 const events = [
                     utils.mkMembership({
                         room: roomId,
-                        mship: "invite",
+                        mship: KnownMembership.Invite,
                         user: userB,
                         skey: userA,
                         event: true,

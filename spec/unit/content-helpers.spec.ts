@@ -29,10 +29,10 @@ describe("Beacon content helpers", () => {
     describe("makeBeaconInfoContent()", () => {
         const mockDateNow = 123456789;
         beforeEach(() => {
-            jest.spyOn(global.Date, "now").mockReturnValue(mockDateNow);
+            jest.spyOn(globalThis.Date, "now").mockReturnValue(mockDateNow);
         });
         afterAll(() => {
-            jest.spyOn(global.Date, "now").mockRestore();
+            jest.spyOn(globalThis.Date, "now").mockRestore();
         });
         it("create fully defined event content", () => {
             expect(makeBeaconInfoContent(1234, true, "nice beacon_info", LocationAssetType.Pin)).toEqual({

@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SDPStreamMetadataPurpose } from "./callEventTypes";
-import { acquireContext, releaseContext } from "./audioContext";
-import { MatrixClient } from "../client";
-import { RoomMember } from "../models/room-member";
-import { logger } from "../logger";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallEvent, CallState, MatrixCall } from "./call";
+import { SDPStreamMetadataPurpose } from "./callEventTypes.ts";
+import { acquireContext, releaseContext } from "./audioContext.ts";
+import { MatrixClient } from "../client.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { logger } from "../logger.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { CallEvent, CallState, MatrixCall } from "./call.ts";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
@@ -128,12 +128,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.emit(CallFeedEvent.ConnectedChanged, this.connected);
     }
 
-    private get hasAudioTrack(): boolean {
+    public get hasAudioTrack(): boolean {
         return this.stream.getAudioTracks().length > 0;
     }
 
     private updateStream(oldStream: MediaStream | null, newStream: MediaStream): void {
         if (newStream === oldStream) return;
+
+        const wasMeasuringVolumeActivity = this.measuringVolumeActivity;
 
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
@@ -145,6 +147,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
+            if (wasMeasuringVolumeActivity) this.measureVolumeActivity(true);
         } else {
             this.measureVolumeActivity(false);
         }

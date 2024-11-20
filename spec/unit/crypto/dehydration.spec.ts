@@ -19,16 +19,16 @@ import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";
 import { DEHYDRATION_ALGORITHM } from "../../../src/crypto/dehydration";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 describe("Dehydration", () => {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running dehydration unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should rehydrate a dehydrated device", async () => {

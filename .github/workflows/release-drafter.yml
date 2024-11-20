@@ -1,0 +1,13 @@
+# Generates the draft release for the js-sdk
+# Normally triggered whenever anything is merged to the staging branch, but
+# also has a workflow dispatch trigger in case it needs running manually due
+# to failures / workflow updates etc.
+name: Release Drafter
+on:
+    push:
+        branches: [staging]
+    workflow_dispatch: {}
+concurrency: ${{ github.workflow }}
+jobs:
+    draft:
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-drafter-workflow.yml@develop

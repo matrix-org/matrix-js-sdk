@@ -23,11 +23,12 @@ import HttpBackend from "matrix-mock-request";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixError } from "../../../src/http-api";
 import { logger } from "../../../src/logger";
-import { ICrossSigningKey, ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
-import { CryptoEvent, IBootstrapCrossSigningOpts } from "../../../src/crypto";
+import { ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
+import { CryptoEvent } from "../../../src/crypto";
 import { IDevice } from "../../../src/crypto/deviceinfo";
 import { TestClient } from "../../TestClient";
 import { resetCrossSigningKeys } from "./crypto-utils";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../../../src/crypto-api";
 
 const PUSH_RULES_RESPONSE: Response = {
     method: "GET",
@@ -83,13 +84,13 @@ async function makeTestClient(
 }
 
 describe("Cross Signing", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should sign the master key with the device key", async function () {
@@ -105,7 +106,7 @@ describe("Cross Signing", function () {
         });
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
-        alice.getAccountDataFromServer = async <T>() => ({} as T);
+        alice.getAccountDataFromServer = async <T>() => ({}) as T;
         // set Alice's cross-signing key
         await alice.bootstrapCrossSigning({
             authUploadDeviceSigningKeys: async (func) => {
@@ -139,14 +140,12 @@ describe("Cross Signing", function () {
                 });
             }
 
-            const error = new MatrixError(errorResponse);
-            error.httpStatus == 401;
-            throw error;
+            throw new MatrixError(errorResponse, 401);
         };
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
-        alice.getAccountDataFromServer = async <T extends { [k: string]: any }>(): Promise<T | null> => ({} as T);
-        const authUploadDeviceSigningKeys: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"] = async (func) => {
+        alice.getAccountDataFromServer = async <T extends { [k: string]: any }>(): Promise<T | null> => ({}) as T;
+        const authUploadDeviceSigningKeys: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"] = async (func) => {
             await func({});
         };
 
@@ -370,13 +369,13 @@ describe("Cross Signing", function () {
         // set Alice's cross-signing key
         await resetCrossSigningKeys(alice);
         // Alice downloads Bob's ssk and device key
-        const bobMasterSigning = new global.Olm.PkSigning();
+        const bobMasterSigning = new globalThis.Olm.PkSigning();
         const bobMasterPrivkey = bobMasterSigning.generate_seed();
         const bobMasterPubkey = bobMasterSigning.init_with_seed(bobMasterPrivkey);
-        const bobSigning = new global.Olm.PkSigning();
+        const bobSigning = new globalThis.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK: ICrossSigningKey = {
+        const bobSSK: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -489,7 +488,7 @@ describe("Cross Signing", function () {
         };
         await alice.crypto!.signObject(aliceDevice);
 
-        const bobOlmAccount = new global.Olm.Account();
+        const bobOlmAccount = new globalThis.Olm.Account();
         bobOlmAccount.create();
         const bobKeys = JSON.parse(bobOlmAccount.identity_keys());
         const bobDeviceUnsigned = {
@@ -514,7 +513,7 @@ describe("Cross Signing", function () {
         };
         olmlib.pkSign(bobDevice, selfSigningKey as unknown as PkSigning, "@bob:example.com", "");
 
-        const bobMaster: ICrossSigningKey = {
+        const bobMaster: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["master"],
             keys: {
@@ -623,13 +622,13 @@ describe("Cross Signing", function () {
         await resetCrossSigningKeys(alice);
         // Alice downloads Bob's ssk and device key
         // (NOTE: device key is not signed by ssk)
-        const bobMasterSigning = new global.Olm.PkSigning();
+        const bobMasterSigning = new globalThis.Olm.PkSigning();
         const bobMasterPrivkey = bobMasterSigning.generate_seed();
         const bobMasterPubkey = bobMasterSigning.init_with_seed(bobMasterPrivkey);
-        const bobSigning = new global.Olm.PkSigning();
+        const bobSigning = new globalThis.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK: ICrossSigningKey = {
+        const bobSSK: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -689,13 +688,13 @@ describe("Cross Signing", function () {
         alice.uploadKeySignatures = async () => ({ failures: {} });
         await resetCrossSigningKeys(alice);
         // Alice downloads Bob's keys
-        const bobMasterSigning = new global.Olm.PkSigning();
+        const bobMasterSigning = new globalThis.Olm.PkSigning();
         const bobMasterPrivkey = bobMasterSigning.generate_seed();
         const bobMasterPubkey = bobMasterSigning.init_with_seed(bobMasterPrivkey);
-        const bobSigning = new global.Olm.PkSigning();
+        const bobSigning = new globalThis.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
-        const bobSSK: ICrossSigningKey = {
+        const bobSSK: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -756,13 +755,13 @@ describe("Cross Signing", function () {
         expect(bobDeviceTrust.isTofu()).toBeTruthy();
 
         // Alice downloads new SSK for Bob
-        const bobMasterSigning2 = new global.Olm.PkSigning();
+        const bobMasterSigning2 = new globalThis.Olm.PkSigning();
         const bobMasterPrivkey2 = bobMasterSigning2.generate_seed();
         const bobMasterPubkey2 = bobMasterSigning2.init_with_seed(bobMasterPrivkey2);
-        const bobSigning2 = new global.Olm.PkSigning();
+        const bobSigning2 = new globalThis.Olm.PkSigning();
         const bobPrivkey2 = bobSigning2.generate_seed();
         const bobPubkey2 = bobSigning2.init_with_seed(bobPrivkey2);
-        const bobSSK2: ICrossSigningKey = {
+        const bobSSK2: CrossSigningKeyInfo = {
             user_id: "@bob:example.com",
             usage: ["self_signing"],
             keys: {
@@ -826,7 +825,7 @@ describe("Cross Signing", function () {
     });
 
     it("should offer to upgrade device verifications to cross-signing", async function () {
-        let upgradeResolveFunc: Function;
+        let upgradeResolveFunc: () => void;
 
         const { client: alice } = await makeTestClient(
             { userId: "@alice:example.com", deviceId: "Osborne2" },
@@ -865,7 +864,7 @@ describe("Cross Signing", function () {
         // cross-signing key is signed by his Dynabook, which alice has
         // verified, and ask if the device verification should be upgraded to a
         // cross-signing verification
-        let upgradePromise = new Promise((resolve) => {
+        let upgradePromise = new Promise<void>((resolve) => {
             upgradeResolveFunc = resolve;
         });
         await resetCrossSigningKeys(alice);
@@ -884,7 +883,7 @@ describe("Cross Signing", function () {
         expect(bobTrust2.isCrossSigningVerified()).toBeFalsy();
         expect(bobTrust2.isTofu()).toBeTruthy();
 
-        upgradePromise = new Promise((resolve) => {
+        upgradePromise = new Promise<void>((resolve) => {
             upgradeResolveFunc = resolve;
         });
         alice.crypto!.deviceList.emit(CryptoEvent.UserCrossSigningUpdated, "@bob:example.com");
@@ -906,13 +905,13 @@ describe("Cross Signing", function () {
         alice.uploadKeySignatures = async () => ({ failures: {} });
 
         // Generate Alice's SSK etc
-        const aliceMasterSigning = new global.Olm.PkSigning();
+        const aliceMasterSigning = new globalThis.Olm.PkSigning();
         const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
         const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
-        const aliceSigning = new global.Olm.PkSigning();
+        const aliceSigning = new globalThis.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK: ICrossSigningKey = {
+        const aliceSSK: CrossSigningKeyInfo = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {
@@ -981,13 +980,13 @@ describe("Cross Signing", function () {
         alice.uploadKeySignatures = async () => ({ failures: {} });
 
         // Generate Alice's SSK etc
-        const aliceMasterSigning = new global.Olm.PkSigning();
+        const aliceMasterSigning = new globalThis.Olm.PkSigning();
         const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
         const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
-        const aliceSigning = new global.Olm.PkSigning();
+        const aliceSigning = new globalThis.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK: ICrossSigningKey = {
+        const aliceSSK: CrossSigningKeyInfo = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {
@@ -1041,13 +1040,13 @@ describe("Cross Signing", function () {
         alice.uploadKeySignatures = async () => ({ failures: {} });
 
         // Generate Alice's SSK etc
-        const aliceMasterSigning = new global.Olm.PkSigning();
+        const aliceMasterSigning = new globalThis.Olm.PkSigning();
         const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
         const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
-        const aliceSigning = new global.Olm.PkSigning();
+        const aliceSigning = new globalThis.Olm.PkSigning();
         const alicePrivkey = aliceSigning.generate_seed();
         const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-        const aliceSSK: ICrossSigningKey = {
+        const aliceSSK: CrossSigningKeyInfo = {
             user_id: "@alice:example.com",
             usage: ["self_signing"],
             keys: {
@@ -1089,12 +1088,12 @@ describe("Cross Signing", function () {
 });
 
 describe("userHasCrossSigningKeys", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         return;
     }
 
     beforeAll(() => {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     let aliceClient: MatrixClient;

@@ -18,33 +18,28 @@ limitations under the License.
  * QR code key verification.
  */
 
-import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
-import { newKeyMismatchError, newUserCancelledError } from "./Error";
-import { decodeBase64, encodeUnpaddedBase64 } from "../olmlib";
-import { logger } from "../../logger";
-import { VerificationRequest } from "./request/VerificationRequest";
-import { MatrixClient } from "../../client";
-import { IVerificationChannel } from "./request/Channel";
-import { MatrixEvent } from "../../models/event";
+import { VerificationBase as Base } from "./Base.ts";
+import { newKeyMismatchError, newUserCancelledError } from "./Error.ts";
+import { decodeBase64, encodeUnpaddedBase64 } from "../../base64.ts";
+import { logger } from "../../logger.ts";
+import { VerificationRequest } from "./request/VerificationRequest.ts";
+import { MatrixClient } from "../../client.ts";
+import { IVerificationChannel } from "./request/Channel.ts";
+import { MatrixEvent } from "../../models/event.ts";
+import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
+import { VerificationMethod } from "../../types.ts";
 
-export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
-export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
+export const SHOW_QR_CODE_METHOD = VerificationMethod.ShowQrCode;
+export const SCAN_QR_CODE_METHOD = VerificationMethod.ScanQrCode;
 
-interface IReciprocateQr {
-    confirm(): void;
-    cancel(): void;
-}
+/** @deprecated use VerifierEvent */
+export type QrCodeEvent = VerifierEvent;
+/** @deprecated use VerifierEvent */
+export const QrCodeEvent = VerifierEvent;
 
-export enum QrCodeEvent {
-    ShowReciprocateQr = "show_reciprocate_qr",
-}
-
-type EventHandlerMap = {
-    [QrCodeEvent.ShowReciprocateQr]: (qr: IReciprocateQr) => void;
-} & VerificationEventHandlerMap;
-
-export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
-    public reciprocateQREvent?: IReciprocateQr;
+/** @deprecated Avoid referencing this class directly; instead use {@link Crypto.Verifier}. */
+export class ReciprocateQRCode extends Base {
+    public reciprocateQREvent?: ShowQrCodeCallbacks;
 
     public static factory(
         channel: IVerificationChannel,
@@ -78,7 +73,7 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
         await new Promise<void>((resolve, reject) => {
             this.reciprocateQREvent = {
                 confirm: resolve,
-                cancel: () => reject(newUserCancelledError()),
+                cancel: (): void => reject(newUserCancelledError()),
             };
             this.emit(QrCodeEvent.ShowReciprocateQr, this.reciprocateQREvent);
         });
@@ -126,6 +121,10 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
             }
         });
     };
+
+    public getReciprocateQrCodeCallbacks(): ShowQrCodeCallbacks | null {
+        return this.reciprocateQREvent ?? null;
+    }
 }
 
 const CODE_VERSION = 0x02; // the version of binary QR codes we support
@@ -202,7 +201,7 @@ export class QRCodeData {
 
     private static generateSharedSecret(): string {
         const secretBytes = new Uint8Array(11);
-        global.crypto.getRandomValues(secretBytes);
+        globalThis.crypto.getRandomValues(secretBytes);
         return encodeUnpaddedBase64(secretBytes);
     }
 

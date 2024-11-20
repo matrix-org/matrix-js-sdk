@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "./event";
-import { TypedEventEmitter } from "./typed-event-emitter";
+import { MatrixClient } from "../matrix.ts";
+import { MatrixEvent } from "./event.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
 
 export enum UserEvent {
     DisplayName = "User.displayName",
@@ -152,12 +153,32 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     /**
      * Construct a new User. A User must have an ID and can optionally have extra information associated with it.
      * @param userId - Required. The ID of this user.
+     * @deprecated use `User.createUser`
      */
     public constructor(public readonly userId: string) {
         super();
         this.displayName = userId;
         this.rawDisplayName = userId;
         this.updateModifiedTime();
+    }
+
+    /**
+     * Construct a new User whose events will also emit on MatrixClient.
+     * A User must have an ID and can optionally have extra information associated with it.
+     * @param userId - Required. The ID of this user.
+     * @param client - An instance of MatrixClient object
+     * @returns User object with reEmitter setup on client
+     */
+    public static createUser(userId: string, client: MatrixClient): User {
+        const user = new User(userId);
+        client.reEmitter.reEmit(user, [
+            UserEvent.AvatarUrl,
+            UserEvent.DisplayName,
+            UserEvent.Presence,
+            UserEvent.CurrentlyActive,
+            UserEvent.LastPresenceTs,
+        ]);
+        return user;
     }
 
     /**

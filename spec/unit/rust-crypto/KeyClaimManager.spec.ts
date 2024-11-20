@@ -14,15 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
 import { Mocked } from "jest-mock";
-import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-js";
+import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
+import { logger, LogSpan } from "../../../src/logger";
 
 afterEach(() => {
     fetchMock.mockReset();
@@ -93,10 +94,13 @@ describe("KeyClaimManager", () => {
         olmMachine.markRequestAsSent.mockResolvedValueOnce(undefined);
 
         // fire off the request
-        await keyClaimManager.ensureSessionsForUsers([u1, u2]);
+        await keyClaimManager.ensureSessionsForUsers(new LogSpan(logger, "test"), [u1, u2]);
 
         // check that all the calls were made
-        expect(olmMachine.getMissingSessions).toHaveBeenCalledWith([u1, u2]);
+        // We can't use directly toHaveBeenCalledWith because the UserId are cloned in the process.
+        const calledWith = olmMachine.getMissingSessions.mock.calls[0][0].map((u) => u.toString());
+        expect(calledWith).toEqual([u1.toString(), u2.toString()]);
+
         expect(fetchMock).toHaveFetched("https://example.com/_matrix/client/v3/keys/claim", {
             method: "POST",
             body: { k1: "v1" },
@@ -119,12 +123,13 @@ describe("KeyClaimManager", () => {
         let markRequestAsSentPromise = awaitCallToMarkRequestAsSent();
 
         // fire off two requests, and keep track of whether their promises resolve
+        const span = new LogSpan(logger, "test");
         let req1Resolved = false;
-        keyClaimManager.ensureSessionsForUsers([u1]).then(() => {
+        keyClaimManager.ensureSessionsForUsers(span, [u1]).then(() => {
             req1Resolved = true;
         });
         let req2Resolved = false;
-        const req2 = keyClaimManager.ensureSessionsForUsers([u2]).then(() => {
+        const req2 = keyClaimManager.ensureSessionsForUsers(span, [u2]).then(() => {
             req2Resolved = true;
         });
 
@@ -133,7 +138,10 @@ describe("KeyClaimManager", () => {
 
         // at this point, there should have been a single call to getMissingSessions, and a single fetch; and neither
         // call to ensureSessionsAsUsers should have completed
-        expect(olmMachine.getMissingSessions).toHaveBeenCalledWith([u1]);
+        // check that all the calls were made
+        // We can't use directly toHaveBeenCalledWith because the UserId are cloned in the process.
+        const calledWith = olmMachine.getMissingSessions.mock.calls[0][0].map((u) => u.toString());
+        expect(calledWith).toEqual([u1.toString()]);
         expect(olmMachine.getMissingSessions).toHaveBeenCalledTimes(1);
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(req1Resolved).toBe(false);
@@ -145,7 +153,9 @@ describe("KeyClaimManager", () => {
         resolveMarkRequestAsSentCallback = await markRequestAsSentPromise;
 
         // the first request should now have completed, and we should have more calls and fetches
-        expect(olmMachine.getMissingSessions).toHaveBeenCalledWith([u2]);
+        // We can't use directly toHaveBeenCalledWith because the UserId are cloned in the process.
+        const calledWith2 = olmMachine.getMissingSessions.mock.calls[1][0].map((u) => u.toString());
+        expect(calledWith2).toEqual([u2.toString()]);
         expect(olmMachine.getMissingSessions).toHaveBeenCalledTimes(2);
         expect(fetchMock).toHaveBeenCalledTimes(2);
         expect(req1Resolved).toBe(true);

@@ -17,10 +17,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
-import { logger } from "../logger";
-import { MatrixClient } from "../client";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { GroupCallType, GroupCallState } from "../webrtc/groupCall.ts";
+import { logger } from "../logger.ts";
+import { MatrixClient } from "../client.ts";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed",
@@ -31,6 +31,9 @@ export type MediaHandlerEventHandlerMap = {
 };
 
 export interface IScreensharingOpts {
+    /**
+     * sourceId for Electron DesktopCapturer
+     */
     desktopCapturerSourceId?: string;
     audio?: boolean;
     // For electron screen capture, there are very few options for detecting electron
@@ -334,12 +337,24 @@ export class MediaHandler extends TypedEventEmitter<
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
 
         if (this.localUserMediaStream === mediaStream) {
+            // if we have this stream cahced, remove it, because we've stopped it
             this.localUserMediaStream = undefined;
+        } else {
+            // If it's not the same stream. remove any tracks from the cached stream that
+            // we have just stopped, and if we do stop any, call the same method on the
+            // cached stream too in order to stop all its tracks (in case they are different)
+            // and un-cache it.
+            for (const track of mediaStream.getTracks()) {
+                if (this.localUserMediaStream?.getTrackById(track.id)) {
+                    this.stopUserMediaStream(this.localUserMediaStream);
+                    break;
+                }
+            }
         }
     }
 
     /**
-     * @param desktopCapturerSourceId - sourceId for Electron DesktopCapturer
+     * @param opts - screensharing stream options
      * @param reusable - is allowed to be reused by the MediaHandler
      * @returns based on passed parameters
      */

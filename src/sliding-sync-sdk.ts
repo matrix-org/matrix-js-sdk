@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
-import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { logger } from "./logger";
-import * as utils from "./utils";
-import { EventTimeline } from "./models/event-timeline";
-import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
+import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
+import { logger } from "./logger.ts";
+import { promiseMapSeries } from "./utils.ts";
+import { EventTimeline } from "./models/event-timeline.ts";
+import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client.ts";
 import {
     ISyncStateData,
     SyncState,
@@ -27,11 +27,12 @@ import {
     SyncApiOptions,
     defaultClientOpts,
     defaultSyncApiOpts,
-} from "./sync";
-import { MatrixEvent } from "./models/event";
-import { Crypto } from "./crypto";
-import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
-import { MatrixError } from "./http-api";
+    SetPresence,
+} from "./sync.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { Crypto } from "./crypto/index.ts";
+import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator.ts";
+import { MatrixError } from "./http-api/index.ts";
 import {
     Extension,
     ExtensionState,
@@ -40,11 +41,12 @@ import {
     SlidingSync,
     SlidingSyncEvent,
     SlidingSyncState,
-} from "./sliding-sync";
-import { EventType } from "./@types/event";
-import { IPushRules } from "./@types/PushRules";
-import { RoomStateEvent } from "./models/room-state";
-import { RoomMemberEvent } from "./models/room-member";
+} from "./sliding-sync.ts";
+import { EventType } from "./@types/event.ts";
+import { IPushRules } from "./@types/PushRules.ts";
+import { RoomStateEvent } from "./models/room-state.ts";
+import { RoomMemberEvent } from "./models/room-member.ts";
+import { KnownMembership } from "./@types/membership.ts";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -113,7 +115,10 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(private readonly client: MatrixClient, private readonly cryptoCallbacks?: SyncCryptoCallbacks) {}
+    public constructor(
+        private readonly client: MatrixClient,
+        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
+    ) {}
 
     public name(): string {
         return "to_device";
@@ -214,7 +219,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
         };
     }
 
-    public onResponse(data: ExtensionAccountDataResponse): void {
+    public async onResponse(data: ExtensionAccountDataResponse): Promise<void> {
         if (data.global && data.global.length > 0) {
             this.processGlobalAccountData(data.global);
         }
@@ -284,7 +289,7 @@ class ExtensionTyping implements Extension<ExtensionTypingRequest, ExtensionTypi
         };
     }
 
-    public onResponse(data: ExtensionTypingResponse): void {
+    public async onResponse(data: ExtensionTypingResponse): Promise<void> {
         if (!data?.rooms) {
             return;
         }
@@ -323,7 +328,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
         return undefined; // don't send a JSON object for subsequent requests, we don't need to.
     }
 
-    public onResponse(data: ExtensionReceiptsResponse): void {
+    public async onResponse(data: ExtensionReceiptsResponse): Promise<void> {
         if (!data?.rooms) {
             return;
         }
@@ -376,7 +381,7 @@ export class SlidingSyncSdk {
         });
     }
 
-    private onRoomData(roomId: string, roomData: MSC3575RoomData): void {
+    private async onRoomData(roomId: string, roomData: MSC3575RoomData): Promise<void> {
         let room = this.client.store.getRoom(roomId);
         if (!room) {
             if (!roomData.initial) {
@@ -385,7 +390,7 @@ export class SlidingSyncSdk {
             }
             room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
-        this.processRoomData(this.client, room, roomData);
+        await this.processRoomData(this.client, room!, roomData);
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {
@@ -451,7 +456,7 @@ export class SlidingSyncSdk {
      * @returns A promise which resolves once the room has been added to the
      * store.
      */
-    public async peek(_roomId: string): Promise<Room> {
+    public async peek(roomId: string): Promise<Room> {
         return null!; // TODO
     }
 
@@ -461,6 +466,14 @@ export class SlidingSyncSdk {
      */
     public stopPeeking(): void {
         // TODO
+    }
+
+    /**
+     * Specify the set_presence value to be used for subsequent calls to the Sync API.
+     * @param presence - the presence to specify to set_presence of sync calls
+     */
+    public setPresence(presence?: SetPresence): void {
+        // TODO not possible in sliding sync yet
     }
 
     /**
@@ -603,7 +616,7 @@ export class SlidingSyncSdk {
             }
         }
 
-        const encrypted = this.client.isRoomEncrypted(room.roomId);
+        const encrypted = room.hasEncryptionStateEvent();
         // we do this first so it's correct when any of the events fire
         if (roomData.notification_count != null) {
             room.setUnreadNotificationCount(NotificationCountType.Total, roomData.notification_count);
@@ -628,7 +641,7 @@ export class SlidingSyncSdk {
 
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
-            this.injectRoomEvents(room, inviteStateEvents);
+            await this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
                 this.client.store.storeRoom(room);
@@ -637,7 +650,7 @@ export class SlidingSyncSdk {
             inviteStateEvents.forEach((e) => {
                 this.client.emit(ClientEvent.Event, e);
             });
-            room.updateMyMembership("invite");
+            room.updateMyMembership(KnownMembership.Invite);
             return;
         }
 
@@ -700,14 +713,14 @@ export class SlidingSyncSdk {
             }
         } */
 
-        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
+        await this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
 
         // local fields must be set before any async calls because call site assumes
         // synchronous execution prior to emitting SlidingSyncState.Complete
-        room.updateMyMembership("join");
+        room.updateMyMembership(KnownMembership.Join);
 
         room.recalculate();
         if (roomData.initial) {
@@ -726,8 +739,8 @@ export class SlidingSyncSdk {
             }
         };
 
-        await utils.promiseMapSeries(stateEvents, processRoomEvent);
-        await utils.promiseMapSeries(timelineEvents, processRoomEvent);
+        await promiseMapSeries(stateEvents, processRoomEvent);
+        await promiseMapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function (e) {
             client.emit(ClientEvent.Event, e);
         });
@@ -747,12 +760,12 @@ export class SlidingSyncSdk {
      * @param numLive - the number of events in timelineEventList which just happened,
      * supplied from the server.
      */
-    public injectRoomEvents(
+    public async injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
         numLive?: number,
-    ): void {
+    ): Promise<void> {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
         numLive = numLive || 0;
@@ -811,11 +824,11 @@ export class SlidingSyncSdk {
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
-        room.addLiveEvents(timelineEventList, {
+        await room.addLiveEvents(timelineEventList, {
             fromCache: true,
         });
         if (liveTimelineEvents.length > 0) {
-            room.addLiveEvents(liveTimelineEvents, {
+            await room.addLiveEvents(liveTimelineEvents, {
                 fromCache: false,
             });
         }
@@ -833,7 +846,7 @@ export class SlidingSyncSdk {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function (member) {
+        room.getMembersWithMembership(KnownMembership.Invite).forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -853,7 +866,7 @@ export class SlidingSyncSdk {
                     // the code paths remain the same between invite/join display name stuff
                     // which is a worthy trade-off for some minor pollution.
                     const inviteEvent = member.events.member!;
-                    if (inviteEvent.getContent().membership !== "invite") {
+                    if (inviteEvent.getContent().membership !== KnownMembership.Invite) {
                         // between resolving and now they have since joined, so don't clobber
                         return;
                     }

@@ -17,14 +17,23 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
+import { AutoDiscoveryAction } from "../../src";
 import { AutoDiscovery } from "../../src/autodiscovery";
+
+// keep to reset the fetch function after using MockHttpBackend
+// @ts-ignore private property
+const realAutoDiscoveryFetch: typeof globalThis.fetch = AutoDiscovery.fetchFn;
 
 describe("AutoDiscovery", function () {
     const getHttpBackend = (): MockHttpBackend => {
         const httpBackend = new MockHttpBackend();
-        AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof global.fetch);
+        AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof globalThis.fetch);
         return httpBackend;
     };
+
+    afterAll(() => {
+        AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
+    });
 
     it("should throw an error when no domain is specified", function () {
         getHttpBackend();
@@ -339,7 +348,7 @@ describe("AutoDiscovery", function () {
         function () {
             const httpBackend = getHttpBackend();
             httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                not_matrix_versions: ["r0.0.1"],
+                not_matrix_versions: ["v1.5"],
             });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -368,7 +377,7 @@ describe("AutoDiscovery", function () {
         },
     );
 
-    it("should return SUCCESS when .well-known has a verifiably accurate base_url for " + "m.homeserver", function () {
+    it("should return SUCCESS when .well-known has a verifiably accurate base_url for m.homeserver", function () {
         const httpBackend = getHttpBackend();
         httpBackend
             .when("GET", "/_matrix/client/versions")
@@ -376,7 +385,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.5"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -412,7 +421,44 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.5"],
+            });
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                // Note: we also expect this test to trim the trailing slash
+                base_url: "https://chat.example.org/",
+            },
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "SUCCESS",
+                        error: null,
+                        base_url: "https://chat.example.org",
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should return SUCCESS with authentication error when authentication config is invalid", function () {
+        const httpBackend = getHttpBackend();
+        httpBackend
+            .when("GET", "/_matrix/client/versions")
+            .check((req) => {
+                expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
+            })
+            .respond(200, {
+                versions: ["v1.5"],
             });
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -451,7 +497,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -496,7 +542,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
@@ -542,7 +588,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/_matrix/identity/v2").respond(404, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -589,7 +635,7 @@ describe("AutoDiscovery", function () {
                     expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
                 })
                 .respond(200, {
-                    versions: ["r0.0.1"],
+                    versions: ["v1.5"],
                 });
             httpBackend.when("GET", "/_matrix/identity/v2").respond(500, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -625,7 +671,7 @@ describe("AutoDiscovery", function () {
         },
     );
 
-    it("should return SUCCESS when the identity server configuration is " + "verifiably accurate", function () {
+    it("should return SUCCESS when the identity server configuration is verifiably accurate", function () {
         const httpBackend = getHttpBackend();
         httpBackend
             .when("GET", "/_matrix/client/versions")
@@ -633,7 +679,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.5"],
             });
         httpBackend
             .when("GET", "/_matrix/identity/v2")
@@ -671,7 +717,7 @@ describe("AutoDiscovery", function () {
         ]);
     });
 
-    it("should return SUCCESS and preserve non-standard keys from the " + ".well-known response", function () {
+    it("should return SUCCESS and preserve non-standard keys from the .well-known response", function () {
         const httpBackend = getHttpBackend();
         httpBackend
             .when("GET", "/_matrix/client/versions")
@@ -679,7 +725,7 @@ describe("AutoDiscovery", function () {
                 expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
             })
             .respond(200, {
-                versions: ["r0.0.1"],
+                versions: ["v1.5"],
             });
         httpBackend
             .when("GET", "/_matrix/identity/v2")
@@ -782,6 +828,37 @@ describe("AutoDiscovery", function () {
                         state: "FAIL_PROMPT",
                         error: AutoDiscovery.ERROR_INVALID,
                         base_url: null,
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should FAIL_ERROR for unsupported Matrix version", () => {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                base_url: "https://example.org",
+            },
+        });
+        httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+            versions: ["r0.6.0"],
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: AutoDiscoveryAction.FAIL_ERROR,
+                        error: AutoDiscovery.ERROR_UNSUPPORTED_HOMESERVER_SPEC_VERSION,
+                        base_url: "https://example.org",
                     },
                     "m.identity_server": {
                         state: "PROMPT",

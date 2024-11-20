@@ -44,13 +44,13 @@ badKey[0] ^= 1;
 const masterKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
 describe("CrossSigningInfo.getCrossSigningKey", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should throw if no callback is provided", async () => {
@@ -80,7 +80,7 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
         expect(pubKey).toEqual(masterKeyPub);
         // check that the pkSigning object corresponds to the pubKey
         const signature = pkSigning.sign("message");
-        const util = new global.Olm.Utility();
+        const util = new globalThis.Olm.Utility();
         try {
             util.ed25519_verify(pubKey, "message", signature);
         } finally {
@@ -199,7 +199,7 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
  * it's not possible to get one in normal execution unless you hack as we do here.
  */
 describe.each([
-    ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
+    ["IndexedDBCryptoStore", () => new IndexedDBCryptoStore(globalThis.indexedDB, "tests")],
     ["LocalStorageCryptoStore", () => new IndexedDBCryptoStore(undefined!, "tests")],
     [
         "MemoryCryptoStore",

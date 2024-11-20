@@ -21,16 +21,16 @@ limitations under the License.
 import anotherjson from "another-json";
 
 import type { PkSigning } from "@matrix-org/olm";
-import type { IOneTimeKey } from "../@types/crypto";
-import { OlmDevice } from "./OlmDevice";
-import { DeviceInfo } from "./deviceinfo";
-import { logger } from "../logger";
-import { IClaimOTKsResult, MatrixClient } from "../client";
-import { ISignatures } from "../@types/signed";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { IMessage } from "./algorithms/olm";
-import { MapWithDefault } from "../utils";
+import type { IOneTimeKey } from "../@types/crypto.ts";
+import { OlmDevice } from "./OlmDevice.ts";
+import { DeviceInfo } from "./deviceinfo.ts";
+import { Logger, logger } from "../logger.ts";
+import { IClaimOTKsResult, MatrixClient } from "../client.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType } from "../@types/event.ts";
+import { IMessage } from "./algorithms/olm.ts";
+import { MapWithDefault } from "../utils.ts";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
@@ -215,7 +215,7 @@ export async function ensureOlmSessionsForDevices(
     force = false,
     otkTimeout?: number,
     failedServers?: string[],
-    log = logger,
+    log: Logger = logger,
 ): Promise<Map<string, Map<string, IOlmSessionResult>>> {
     const devicesWithoutSession: [string, string][] = [
         // [userId, deviceId], ...
@@ -319,7 +319,7 @@ export async function ensureOlmSessionsForDevices(
         for (const resolver of resolveSession.values()) {
             resolver();
         }
-        log.log(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
+        log.debug(`Failed to claim ${taskDetail}`, e, devicesWithoutSession);
         throw e;
     }
 
@@ -471,7 +471,7 @@ export async function verifySignature(
 export function pkSign(obj: object & IObject, key: Uint8Array | PkSigning, userId: string, pubKey: string): string {
     let createdKey = false;
     if (key instanceof Uint8Array) {
-        const keyObj = new global.Olm.PkSigning();
+        const keyObj = new globalThis.Olm.PkSigning();
         pubKey = keyObj.init_with_seed(key);
         key = keyObj;
         createdKey = true;
@@ -506,7 +506,7 @@ export function pkVerify(obj: IObject, pubKey: string, userId: string): void {
         throw new Error("No signature");
     }
     const signature = obj.signatures[userId][keyId];
-    const util = new global.Olm.Utility();
+    const util = new globalThis.Olm.Utility();
     const sigs = obj.signatures;
     delete obj.signatures;
     const unsigned = obj.unsigned;
@@ -536,31 +536,4 @@ export function isOlmEncrypted(event: MatrixEvent): boolean {
         return false;
     }
     return true;
-}
-
-/**
- * Encode a typed array of uint8 as base64.
- * @param uint8Array - The data to encode.
- * @returns The base64.
- */
-export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return Buffer.from(uint8Array).toString("base64");
-}
-
-/**
- * Encode a typed array of uint8 as unpadded base64.
- * @param uint8Array - The data to encode.
- * @returns The unpadded base64.
- */
-export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeBase64(uint8Array).replace(/=+$/g, "");
-}
-
-/**
- * Decode a base64 string to a typed array of uint8.
- * @param base64 - The base64 to decode.
- * @returns The decoded data.
- */
-export function decodeBase64(base64: string): Uint8Array {
-    return Buffer.from(base64, "base64");
 }

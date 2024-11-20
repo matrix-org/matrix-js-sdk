@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -86,13 +86,28 @@ describe("anySignal", () => {
 });
 
 describe("parseErrorResponse", () => {
+    let headers: Headers;
+    const xhrHeaderMethods = {
+        getResponseHeader: (name: string) => headers.get(name),
+        getAllResponseHeaders: () => {
+            let allHeaders = "";
+            headers.forEach((value, key) => {
+                allHeaders += `${key.toLowerCase()}: ${value}\r\n`;
+            });
+            return allHeaders;
+        },
+    };
+
+    beforeEach(() => {
+        headers = new Headers();
+    });
+
     it("should resolve Matrix Errors from XHR", () => {
+        headers.set("Content-Type", "application/json");
         expect(
             parseErrorResponse(
                 {
-                    getResponseHeader(name: string): string | null {
-                        return name === "Content-Type" ? "application/json" : null;
-                    },
+                    ...xhrHeaderMethods,
                     status: 500,
                 } as XMLHttpRequest,
                 '{"errcode": "TEST"}',
@@ -108,14 +123,11 @@ describe("parseErrorResponse", () => {
     });
 
     it("should resolve Matrix Errors from fetch", () => {
+        headers.set("Content-Type", "application/json");
         expect(
             parseErrorResponse(
                 {
-                    headers: {
-                        get(name: string): string | null {
-                            return name === "Content-Type" ? "application/json" : null;
-                        },
-                    },
+                    headers,
                     status: 500,
                 } as Response,
                 '{"errcode": "TEST"}',
@@ -131,13 +143,12 @@ describe("parseErrorResponse", () => {
     });
 
     it("should resolve Matrix Errors from XHR with urls", () => {
+        headers.set("Content-Type", "application/json");
         expect(
             parseErrorResponse(
                 {
                     responseURL: "https://example.com",
-                    getResponseHeader(name: string): string | null {
-                        return name === "Content-Type" ? "application/json" : null;
-                    },
+                    ...xhrHeaderMethods,
                     status: 500,
                 } as XMLHttpRequest,
                 '{"errcode": "TEST"}',
@@ -154,15 +165,12 @@ describe("parseErrorResponse", () => {
     });
 
     it("should resolve Matrix Errors from fetch with urls", () => {
+        headers.set("Content-Type", "application/json");
         expect(
             parseErrorResponse(
                 {
                     url: "https://example.com",
-                    headers: {
-                        get(name: string): string | null {
-                            return name === "Content-Type" ? "application/json" : null;
-                        },
-                    },
+                    headers,
                     status: 500,
                 } as Response,
                 '{"errcode": "TEST"}',
@@ -178,6 +186,66 @@ describe("parseErrorResponse", () => {
         );
     });
 
+    describe("with HTTP headers", () => {
+        function addHeaders(headers: Headers) {
+            headers.set("Age", "0");
+            headers.set("Date", "Thu, 01 Jan 1970 00:00:00 GMT"); // value contains colons
+            headers.set("x-empty", "");
+            headers.set("x-multi", "1");
+            headers.append("x-multi", "2");
+        }
+
+        function compareHeaders(expectedHeaders: Headers, otherHeaders: Headers | undefined) {
+            expect(new Map(otherHeaders)).toEqual(new Map(expectedHeaders));
+        }
+
+        it("should resolve HTTP Errors from XHR with headers", () => {
+            headers.set("Content-Type", "text/plain");
+            addHeaders(headers);
+            const err = parseErrorResponse({
+                ...xhrHeaderMethods,
+                status: 500,
+            } as XMLHttpRequest) as HTTPError;
+            compareHeaders(headers, err.httpHeaders);
+        });
+
+        it("should resolve HTTP Errors from fetch with headers", () => {
+            headers.set("Content-Type", "text/plain");
+            addHeaders(headers);
+            const err = parseErrorResponse({
+                headers,
+                status: 500,
+            } as Response) as HTTPError;
+            compareHeaders(headers, err.httpHeaders);
+        });
+
+        it("should resolve Matrix Errors from XHR with headers", () => {
+            headers.set("Content-Type", "application/json");
+            addHeaders(headers);
+            const err = parseErrorResponse(
+                {
+                    ...xhrHeaderMethods,
+                    status: 500,
+                } as XMLHttpRequest,
+                '{"errcode": "TEST"}',
+            ) as MatrixError;
+            compareHeaders(headers, err.httpHeaders);
+        });
+
+        it("should resolve Matrix Errors from fetch with headers", () => {
+            headers.set("Content-Type", "application/json");
+            addHeaders(headers);
+            const err = parseErrorResponse(
+                {
+                    headers,
+                    status: 500,
+                } as Response,
+                '{"errcode": "TEST"}',
+            ) as MatrixError;
+            compareHeaders(headers, err.httpHeaders);
+        });
+    });
+
     it("should set a sensible default error message on MatrixError", () => {
         let err = new MatrixError();
         expect(err.message).toEqual("MatrixError: Unknown message");
@@ -188,14 +256,11 @@ describe("parseErrorResponse", () => {
     });
 
     it("should handle no type gracefully", () => {
+        // No Content-Type header
         expect(
             parseErrorResponse(
                 {
-                    headers: {
-                        get(name: string): string | null {
-                            return null;
-                        },
-                    },
+                    headers,
                     status: 500,
                 } as Response,
                 '{"errcode": "TEST"}',
@@ -203,31 +268,38 @@ describe("parseErrorResponse", () => {
         ).toStrictEqual(new HTTPError("Server returned 500 error", 500));
     });
 
-    it("should handle invalid type gracefully", () => {
+    it("should handle empty type gracefully", () => {
+        headers.set("Content-Type", " ");
         expect(
             parseErrorResponse(
                 {
-                    headers: {
-                        get(name: string): string | null {
-                            return name === "Content-Type" ? " " : null;
-                        },
-                    },
+                    headers,
                     status: 500,
                 } as Response,
                 '{"errcode": "TEST"}',
             ),
-        ).toStrictEqual(new Error("Error parsing Content-Type ' ': TypeError: invalid media type"));
+        ).toStrictEqual(new Error("Error parsing Content-Type '': TypeError: argument string is required"));
     });
 
-    it("should handle plaintext errors", () => {
+    it("should handle invalid type gracefully", () => {
+        headers.set("Content-Type", "unknown");
         expect(
             parseErrorResponse(
                 {
-                    headers: {
-                        get(name: string): string | null {
-                            return name === "Content-Type" ? "text/plain" : null;
-                        },
-                    },
+                    headers,
+                    status: 500,
+                } as Response,
+                '{"errcode": "TEST"}',
+            ),
+        ).toStrictEqual(new Error("Error parsing Content-Type 'unknown': TypeError: invalid media type"));
+    });
+
+    it("should handle plaintext errors", () => {
+        headers.set("Content-Type", "text/plain");
+        expect(
+            parseErrorResponse(
+                {
+                    headers,
                     status: 418,
                 } as Response,
                 "I'm a teapot",

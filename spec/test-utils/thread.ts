@@ -18,7 +18,7 @@ import { RelationType } from "../../src/@types/event";
 import { MatrixClient } from "../../src/client";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
-import { Thread } from "../../src/models/thread";
+import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { mkMessage } from "./test-utils";
 
 export const makeThreadEvent = ({
@@ -34,7 +34,7 @@ export const makeThreadEvent = ({
         ...props,
         relatesTo: {
             event_id: rootEventId,
-            rel_type: "m.thread",
+            rel_type: THREAD_RELATION_TYPE.name,
             ["m.in_reply_to"]: {
                 event_id: replyToEventId,
             },
@@ -115,6 +115,26 @@ type MakeThreadProps = {
     ts?: number;
 };
 
+type MakeThreadResult = {
+    /**
+     * Thread model
+     */
+    thread: Thread;
+    /**
+     * Thread root event
+     */
+    rootEvent: MatrixEvent;
+    /**
+     * Events added to the thread
+     */
+    events: MatrixEvent[];
+};
+
+/**
+ * Starts a new thread in a room by creating a message as thread root.
+ * Also creates a Thread model and adds it to the room.
+ * Does not insert the messages into a timeline.
+ */
 export const mkThread = ({
     room,
     client,
@@ -122,7 +142,7 @@ export const mkThread = ({
     participantUserIds,
     length = 2,
     ts = 1,
-}: MakeThreadProps): { thread: Thread; rootEvent: MatrixEvent; events: MatrixEvent[] } => {
+}: MakeThreadProps): MakeThreadResult => {
     const { rootEvent, events } = makeThreadEvents({
         roomId: room.roomId,
         authorId,
@@ -137,7 +157,27 @@ export const mkThread = ({
         room?.reEmitter.reEmit(evt, [MatrixEventEvent.BeforeRedaction]);
     }
 
-    const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, events, true);
+    const thread = room.createThread(rootEvent.getId() ?? "", rootEvent, [rootEvent, ...events], true);
 
     return { thread, rootEvent, events };
+};
+
+/**
+ * Create a thread, and make sure the events are added to the thread and the
+ * room's timeline as if they came in via sync.
+ *
+ * Note that mkThread doesn't actually add the events properly to the room.
+ */
+export const populateThread = ({
+    room,
+    client,
+    authorId,
+    participantUserIds,
+    length = 2,
+    ts = 1,
+}: MakeThreadProps): MakeThreadResult => {
+    const ret = mkThread({ room, client, authorId, participantUserIds, length, ts });
+    ret.thread.initialEventsFetched = true;
+    room.addLiveEvents(ret.events);
+    return ret;
 };

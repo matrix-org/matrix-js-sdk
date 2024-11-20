@@ -18,8 +18,8 @@ limitations under the License.
  * Manages the list of encrypted rooms
  */
 
-import { CryptoStore } from "./store/base";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
+import { CryptoStore } from "./store/base.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
 
 /* eslint-disable camelcase */
 export interface IRoomEncryption {
@@ -29,6 +29,13 @@ export interface IRoomEncryption {
 }
 /* eslint-enable camelcase */
 
+/**
+ * Information about the encryption settings of rooms. Loads this information
+ * from the supplied crypto store when `init()` is called, and saves it to the
+ * crypto store whenever it is updated via `setRoomEncryption()`. Can supply
+ * full information about a room's encryption via `getRoomEncryption()`, or just
+ * answer whether or not a room has encryption via `isRoomEncrypted`.
+ */
 export class RoomList {
     // Object of roomId -> room e2e info object (body of the m.room.encryption event)
     private roomEncryption: Record<string, IRoomEncryption> = {};
@@ -43,8 +50,8 @@ export class RoomList {
         });
     }
 
-    public getRoomEncryption(roomId: string): IRoomEncryption | undefined {
-        return this.roomEncryption[roomId] ?? null;
+    public getRoomEncryption(roomId: string): IRoomEncryption | null {
+        return this.roomEncryption[roomId] || null;
     }
 
     public isRoomEncrypted(roomId: string): boolean {

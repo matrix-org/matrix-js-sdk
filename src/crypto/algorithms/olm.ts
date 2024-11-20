@@ -18,15 +18,17 @@ limitations under the License.
  * Defines m.olm encryption/decryption
  */
 
-import type { IEventDecryptionResult } from "../../@types/crypto";
-import { logger } from "../../logger";
-import * as olmlib from "../olmlib";
-import { DeviceInfo } from "../deviceinfo";
-import { DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm } from "./base";
-import { Room } from "../../models/room";
-import { IContent, MatrixEvent } from "../../models/event";
-import { IEncryptedContent, IOlmEncryptedContent } from "../index";
-import { IInboundSession } from "../OlmDevice";
+import type { IEventDecryptionResult } from "../../@types/crypto.ts";
+import { logger } from "../../logger.ts";
+import * as olmlib from "../olmlib.ts";
+import { DeviceInfo } from "../deviceinfo.ts";
+import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base.ts";
+import { Room } from "../../models/room.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { IEncryptedContent, IOlmEncryptedContent } from "../index.ts";
+import { IInboundSession } from "../OlmDevice.ts";
+import { DecryptionFailureCode } from "../../crypto-api/index.ts";
+import { DecryptionError } from "../../common-crypto/CryptoBackend.ts";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -159,11 +161,14 @@ class OlmDecryption extends DecryptionAlgorithm {
         const ciphertext = content.ciphertext;
 
         if (!ciphertext) {
-            throw new DecryptionError("OLM_MISSING_CIPHERTEXT", "Missing ciphertext");
+            throw new DecryptionError(DecryptionFailureCode.OLM_MISSING_CIPHERTEXT, "Missing ciphertext");
         }
 
         if (!(this.olmDevice.deviceCurve25519Key! in ciphertext)) {
-            throw new DecryptionError("OLM_NOT_INCLUDED_IN_RECIPIENTS", "Not included in recipients");
+            throw new DecryptionError(
+                DecryptionFailureCode.OLM_NOT_INCLUDED_IN_RECIPIENTS,
+                "Not included in recipients",
+            );
         }
         const message = ciphertext[this.olmDevice.deviceCurve25519Key!];
         let payloadString: string;
@@ -171,7 +176,7 @@ class OlmDecryption extends DecryptionAlgorithm {
         try {
             payloadString = await this.decryptMessage(deviceKey, message);
         } catch (e) {
-            throw new DecryptionError("OLM_BAD_ENCRYPTED_MESSAGE", "Bad Encrypted Message", {
+            throw new DecryptionError(DecryptionFailureCode.OLM_BAD_ENCRYPTED_MESSAGE, "Bad Encrypted Message", {
                 sender: deviceKey,
                 err: e as Error,
             });
@@ -182,28 +187,67 @@ class OlmDecryption extends DecryptionAlgorithm {
         // check that we were the intended recipient, to avoid unknown-key attack
         // https://github.com/vector-im/vector-web/issues/2483
         if (payload.recipient != this.userId) {
-            throw new DecryptionError("OLM_BAD_RECIPIENT", "Message was intented for " + payload.recipient);
+            throw new DecryptionError(
+                DecryptionFailureCode.OLM_BAD_RECIPIENT,
+                "Message was intended for " + payload.recipient,
+            );
         }
 
         if (payload.recipient_keys.ed25519 != this.olmDevice.deviceEd25519Key) {
-            throw new DecryptionError("OLM_BAD_RECIPIENT_KEY", "Message not intended for this device", {
-                intended: payload.recipient_keys.ed25519,
-                our_key: this.olmDevice.deviceEd25519Key!,
-            });
+            throw new DecryptionError(
+                DecryptionFailureCode.OLM_BAD_RECIPIENT_KEY,
+                "Message not intended for this device",
+                {
+                    intended: payload.recipient_keys.ed25519,
+                    our_key: this.olmDevice.deviceEd25519Key!,
+                },
+            );
         }
 
-        // check that the device that encrypted the event belongs to the user
-        // that the event claims it's from.  We need to make sure that our
-        // device list is up-to-date.  If the device is unknown, we can only
-        // assume that the device logged out.  Some event handlers, such as
-        // secret sharing, may be more strict and reject events that come from
+        // check that the device that encrypted the event belongs to the user that the event claims it's from.
+        //
+        // If the device is unknown then we check that we don't have any pending key-query requests for the sender. If
+        // after that the device is still unknown, then we can only assume that the device logged out and accept it
+        // anyway. Some event handlers, such as secret sharing, may be more strict and reject events that come from
         // unknown devices.
-        await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
-        const senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
-        if (senderKeyUser !== event.getSender() && senderKeyUser != undefined) {
-            throw new DecryptionError("OLM_BAD_SENDER", "Message claimed to be from " + event.getSender(), {
-                real_sender: senderKeyUser,
-            });
+        //
+        // This is a defence against the following scenario:
+        //
+        //   * Alice has verified Bob and Mallory.
+        //   * Mallory gets control of Alice's server, and sends a megolm session to Alice using her (Mallory's)
+        //     senderkey, but claiming to be from Bob.
+        //   * Mallory sends more events using that session, claiming to be from Bob.
+        //   * Alice sees that the senderkey is verified (since she verified Mallory) so marks events those events as
+        //     verified even though the sender is forged.
+        //
+        // In practice, it's not clear that the js-sdk would behave that way, so this may be only a defence in depth.
+
+        let senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
+        if (senderKeyUser === undefined || senderKeyUser === null) {
+            // Wait for any pending key query fetches for the user to complete before trying the lookup again.
+            try {
+                await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
+            } catch (e) {
+                throw new DecryptionError(
+                    DecryptionFailureCode.OLM_BAD_SENDER_CHECK_FAILED,
+                    "Could not verify sender identity",
+                    {
+                        sender: deviceKey,
+                        err: e as Error,
+                    },
+                );
+            }
+
+            senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, deviceKey);
+        }
+        if (senderKeyUser !== event.getSender() && senderKeyUser !== undefined && senderKeyUser !== null) {
+            throw new DecryptionError(
+                DecryptionFailureCode.OLM_BAD_SENDER,
+                "Message claimed to be from " + event.getSender(),
+                {
+                    real_sender: senderKeyUser,
+                },
+            );
         }
 
         // check that the original sender matches what the homeserver told us, to
@@ -211,16 +255,24 @@ class OlmDecryption extends DecryptionAlgorithm {
         // (this check is also provided via the sender's embedded ed25519 key,
         // which is checked elsewhere).
         if (payload.sender != event.getSender()) {
-            throw new DecryptionError("OLM_FORWARDED_MESSAGE", "Message forwarded from " + payload.sender, {
-                reported_sender: event.getSender()!,
-            });
+            throw new DecryptionError(
+                DecryptionFailureCode.OLM_FORWARDED_MESSAGE,
+                "Message forwarded from " + payload.sender,
+                {
+                    reported_sender: event.getSender()!,
+                },
+            );
         }
 
         // Olm events intended for a room have a room_id.
         if (payload.room_id !== event.getRoomId()) {
-            throw new DecryptionError("OLM_BAD_ROOM", "Message intended for room " + payload.room_id, {
-                reported_room: event.getRoomId() || "ROOM_ID_UNDEFINED",
-            });
+            throw new DecryptionError(
+                DecryptionFailureCode.OLM_BAD_ROOM,
+                "Message intended for room " + payload.room_id,
+                {
+                    reported_room: event.getRoomId() || "ROOM_ID_UNDEFINED",
+                },
+            );
         }
 
         const claimedKeys = payload.keys || {};

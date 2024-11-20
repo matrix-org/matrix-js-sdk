@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { IMarkerFoundOptions, RoomState } from "./room-state";
-import { EventTimelineSet } from "./event-timeline-set";
-import { MatrixEvent } from "./event";
-import { Filter } from "../filter";
-import { EventType } from "../@types/event";
+import { IMarkerFoundOptions, RoomState } from "./room-state.ts";
+import { EventTimelineSet } from "./event-timeline-set.ts";
+import { MatrixEvent } from "./event.ts";
+import { Filter } from "../filter.ts";
+import { EventType } from "../@types/event.ts";
 
 export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, "timelineWasEmpty"> {
     // This is a separate interface without any extra stuff currently added on
@@ -128,7 +127,7 @@ export class EventTimeline {
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
-            this.startState = new RoomState(this.roomId);
+            this.startState = new RoomState(this.roomId, undefined, true);
             this.endState = new RoomState(this.roomId);
         }
 
@@ -268,7 +267,7 @@ export class EventTimeline {
     /**
      * Get a pagination token
      *
-     * @param direction -   EventTimeline.BACKWARDS to get the pagination
+     * @param direction - EventTimeline.BACKWARDS to get the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to get the
      *   pagination token for going forwards in time.
      *
@@ -361,30 +360,10 @@ export class EventTimeline {
      * @param event - new event
      * @param options - addEvent options
      */
-    public addEvent(event: MatrixEvent, { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions): void;
-    /**
-     * @deprecated In favor of the overload with `IAddEventOptions`
-     */
-    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, roomState?: RoomState): void;
     public addEvent(
         event: MatrixEvent,
-        toStartOfTimelineOrOpts: boolean | IAddEventOptions,
-        roomState?: RoomState,
+        { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions = { toStartOfTimeline: false },
     ): void {
-        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean | undefined;
-        if (typeof toStartOfTimelineOrOpts === "object") {
-            ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
-        } else if (toStartOfTimelineOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` " +
-                    "is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`",
-            );
-        }
-
         if (!roomState) {
             roomState = toStartOfTimeline ? this.startState : this.endState;
         }
@@ -425,6 +404,45 @@ export class EventTimeline {
         if (toStartOfTimeline) {
             this.baseIndex++;
         }
+    }
+
+    /**
+     * Insert a new event into the timeline, and update the state.
+     *
+     * TEMPORARY: until we have recursive relations, we need this function
+     * to exist to allow us to insert events in timeline order, which is our
+     * best guess for Sync Order.
+     * This is a copy of addEvent above, modified to allow inserting an event at
+     * a specific index.
+     *
+     * @internal
+     */
+    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState): void {
+        const timelineSet = this.getTimelineSet();
+
+        if (timelineSet.room) {
+            EventTimeline.setEventMetadata(event, roomState, false);
+
+            // modify state but only on unfiltered timelineSets
+            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+                roomState.setStateEvents([event], {});
+                // it is possible that the act of setting the state event means we
+                // can set more metadata (specifically sender/target props), so try
+                // it again if the prop wasn't previously set. It may also mean that
+                // the sender/target is updated (if the event set was a room member event)
+                // so we want to use the *updated* member (new avatar/name) instead.
+                //
+                // However, we do NOT want to do this on member events if we're going
+                // back in time, else we'll set the .sender value for BEFORE the given
+                // member event, whereas we want to set the .sender value for the ACTUAL
+                // member event itself.
+                if (!event.sender || event.getType() === EventType.RoomMember) {
+                    EventTimeline.setEventMetadata(event, roomState, false);
+                }
+            }
+        }
+
+        this.events.splice(insertIndex, 0, event); // insert element
     }
 
     /**

@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { getHttpUriForMxc } from "../content-repo";
-import * as utils from "../utils";
-import { User } from "./user";
-import { MatrixEvent } from "./event";
-import { RoomState } from "./room-state";
-import { logger } from "../logger";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { EventType } from "../@types/event";
+import { getHttpUriForMxc } from "../content-repo.ts";
+import { removeDirectionOverrideChars, removeHiddenChars } from "../utils.ts";
+import { User } from "./user.ts";
+import { MatrixEvent } from "./event.ts";
+import { RoomState } from "./room-state.ts";
+import { logger } from "../logger.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
+import { EventType } from "../@types/event.ts";
+import { KnownMembership, Membership } from "../@types/membership.ts";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -119,7 +120,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * The membership state for this room member e.g. 'join'.
      */
-    public membership?: string;
+    public membership?: Membership;
     /**
      * True if the member's name is disambiguated.
      */
@@ -140,7 +141,10 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @param roomId - The room ID of the member.
      * @param userId - The user ID of the member.
      */
-    public constructor(public readonly roomId: string, public readonly userId: string) {
+    public constructor(
+        public readonly roomId: string,
+        public readonly userId: string,
+    ) {
         super();
 
         this.name = userId;
@@ -206,8 +210,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
         // not quite raw: we strip direction override chars so it can safely be inserted into
         // blocks of text without breaking the text direction
-        this.rawDisplayName = utils.removeDirectionOverrideChars(event.getDirectionalContent().displayname ?? "");
-        if (!this.rawDisplayName || !utils.removeHiddenChars(this.rawDisplayName)) {
+        this.rawDisplayName = removeDirectionOverrideChars(event.getDirectionalContent().displayname ?? "");
+        if (!this.rawDisplayName || !removeHiddenChars(this.rawDisplayName)) {
             this.rawDisplayName = this.userId;
         }
 
@@ -311,7 +315,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     public isKicked(): boolean {
         return (
-            this.membership === "leave" &&
+            this.membership === KnownMembership.Leave &&
             this.events.member !== undefined &&
             this.events.member.getSender() !== this.events.member.getStateKey()
         );
@@ -337,12 +341,12 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             let memberContent = memberEvent.getContent();
             let inviteSender: string | undefined = memberEvent.getSender();
 
-            if (memberContent.membership === "join") {
+            if (memberContent.membership === KnownMembership.Join) {
                 memberContent = memberEvent.getPrevContent();
                 inviteSender = memberEvent.getUnsigned().prev_sender;
             }
 
-            if (memberContent.membership === "invite" && memberContent.is_direct) {
+            if (memberContent.membership === KnownMembership.Invite && memberContent.is_direct) {
                 return inviteSender;
             }
         }
@@ -407,7 +411,7 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    if (!utils.removeHiddenChars(displayName)) return false;
+    if (!removeHiddenChars(displayName)) return false;
 
     if (!roomState) return false;
 
@@ -432,11 +436,11 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
 function calculateDisplayName(selfUserId: string, displayName: string | undefined, disambiguate: boolean): string {
     if (!displayName || displayName === selfUserId) return selfUserId;
 
-    if (disambiguate) return utils.removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
+    if (disambiguate) return removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    if (!utils.removeHiddenChars(displayName)) return selfUserId;
+    if (!removeHiddenChars(displayName)) return selfUserId;
 
     // We always strip the direction override characters (LRO and RLO).
     // These override the text direction for all subsequent characters
@@ -449,5 +453,5 @@ function calculateDisplayName(selfUserId: string, displayName: string | undefine
     // names should flip into the correct direction automatically based on
     // the characters, and you can still embed rtl in ltr or vice versa
     // with the embed chars or marker chars.
-    return utils.removeDirectionOverrideChars(displayName);
+    return removeDirectionOverrideChars(displayName);
 }

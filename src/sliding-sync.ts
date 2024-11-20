@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { IRoomEvent, IStateEvent } from "./sync-accumulator";
-import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { sleep, IDeferred, defer } from "./utils";
-import { HTTPError } from "./http-api";
+import { logger } from "./logger.ts";
+import { MatrixClient } from "./client.ts";
+import { IRoomEvent, IStateEvent } from "./sync-accumulator.ts";
+import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { sleep, IDeferred, defer } from "./utils.ts";
+import { HTTPError } from "./http-api/index.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -282,7 +282,7 @@ export interface Extension<Req extends {}, Res extends {}> {
      * A function which is called when there is response JSON under this extension.
      * @param data - The response JSON under the extension name.
      */
-    onResponse(data: Res): void;
+    onResponse(data: Res): Promise<void>;
     /**
      * Controls when onResponse should be called.
      * @returns The state when it should be called.
@@ -326,7 +326,7 @@ export enum SlidingSyncEvent {
 }
 
 export type SlidingSyncEventHandlerMap = {
-    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
+    [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => Promise<void> | void;
     [SlidingSyncEvent.Lifecycle]: (
         state: SlidingSyncState,
         resp: MSC3575SlidingSyncResponse | null,
@@ -546,20 +546,24 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         return ext;
     }
 
-    private onPreExtensionsResponse(ext: Record<string, object>): void {
-        Object.keys(ext).forEach((extName) => {
-            if (this.extensions[extName].when() == ExtensionState.PreProcess) {
-                this.extensions[extName].onResponse(ext[extName]);
-            }
-        });
+    private async onPreExtensionsResponse(ext: Record<string, object>): Promise<void> {
+        await Promise.all(
+            Object.keys(ext).map(async (extName) => {
+                if (this.extensions[extName].when() == ExtensionState.PreProcess) {
+                    await this.extensions[extName].onResponse(ext[extName]);
+                }
+            }),
+        );
     }
 
-    private onPostExtensionsResponse(ext: Record<string, object>): void {
-        Object.keys(ext).forEach((extName) => {
-            if (this.extensions[extName].when() == ExtensionState.PostProcess) {
-                this.extensions[extName].onResponse(ext[extName]);
-            }
-        });
+    private async onPostExtensionsResponse(ext: Record<string, object>): Promise<void> {
+        await Promise.all(
+            Object.keys(ext).map(async (extName) => {
+                if (this.extensions[extName].when() == ExtensionState.PostProcess) {
+                    await this.extensions[extName].onResponse(ext[extName]);
+                }
+            }),
+        );
     }
 
     /**
@@ -567,14 +571,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param roomId - The room which received some data.
      * @param roomData - The raw sliding sync response JSON.
      */
-    private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
+    private async invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): Promise<void> {
         if (!roomData.required_state) {
             roomData.required_state = [];
         }
         if (!roomData.timeline) {
             roomData.timeline = [];
         }
-        this.emit(SlidingSyncEvent.RoomData, roomId, roomData);
+        await this.emitPromised(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
     /**
@@ -921,11 +925,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             if (!resp) {
                 continue;
             }
-            this.onPreExtensionsResponse(resp.extensions);
+            await this.onPreExtensionsResponse(resp.extensions);
 
-            Object.keys(resp.rooms).forEach((roomId) => {
-                this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
-            });
+            for (const roomId in resp.rooms) {
+                await this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
+            }
 
             const listKeysWithUpdates: Set<string> = new Set();
             if (!doNotUpdateList) {
@@ -938,7 +942,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
             }
             this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);
-            this.onPostExtensionsResponse(resp.extensions);
+            await this.onPostExtensionsResponse(resp.extensions);
             listKeysWithUpdates.forEach((listKey: string) => {
                 const list = this.lists.get(listKey);
                 if (!list) {

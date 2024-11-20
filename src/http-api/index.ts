@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { FetchHttpApi } from "./fetch";
-import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface";
-import { MediaPrefix } from "./prefix";
-import * as utils from "../utils";
-import * as callbacks from "../realtime-callbacks";
-import { Method } from "./method";
-import { ConnectionError } from "./errors";
-import { parseErrorResponse } from "./utils";
+import { FetchHttpApi } from "./fetch.ts";
+import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface.ts";
+import { MediaPrefix } from "./prefix.ts";
+import { defer, QueryDict, removeElement } from "../utils.ts";
+import * as callbacks from "../realtime-callbacks.ts";
+import { Method } from "./method.ts";
+import { ConnectionError } from "./errors.ts";
+import { parseErrorResponse } from "./utils.ts";
 
-export * from "./interface";
-export * from "./prefix";
-export * from "./errors";
-export * from "./method";
-export * from "./utils";
+export * from "./interface.ts";
+export * from "./prefix.ts";
+export * from "./errors.ts";
+export * from "./method.ts";
+export * from "./utils.ts";
 
 export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     private uploads: Upload[] = [];
@@ -50,7 +50,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         const abortController = opts.abortController ?? new AbortController();
 
         // If the file doesn't have a mime type, use a default since the HS errors if we don't supply one.
-        const contentType = opts.type ?? (file as File).type ?? "application/octet-stream";
+        const contentType = (opts.type ?? (file as File).type) || "application/octet-stream";
         const fileName = opts.name ?? (file as File).name;
 
         const upload = {
@@ -58,14 +58,14 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             total: 0,
             abortController,
         } as Upload;
-        const defer = utils.defer<UploadResponse>();
+        const deferred = defer<UploadResponse>();
 
-        if (global.XMLHttpRequest) {
-            const xhr = new global.XMLHttpRequest();
+        if (globalThis.XMLHttpRequest) {
+            const xhr = new globalThis.XMLHttpRequest();
 
             const timeoutFn = function (): void {
                 xhr.abort();
-                defer.reject(new Error("Timeout"));
+                deferred.reject(new Error("Timeout"));
             };
 
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
@@ -73,7 +73,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
             xhr.onreadystatechange = function (): void {
                 switch (xhr.readyState) {
-                    case global.XMLHttpRequest.DONE:
+                    case globalThis.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(timeoutTimer);
                         try {
                             if (xhr.status === 0) {
@@ -84,16 +84,16 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                             }
 
                             if (xhr.status >= 400) {
-                                defer.reject(parseErrorResponse(xhr, xhr.responseText));
+                                deferred.reject(parseErrorResponse(xhr, xhr.responseText));
                             } else {
-                                defer.resolve(JSON.parse(xhr.responseText));
+                                deferred.resolve(JSON.parse(xhr.responseText));
                             }
                         } catch (err) {
                             if ((<Error>err).name === "AbortError") {
-                                defer.reject(err);
+                                deferred.reject(err);
                                 return;
                             }
-                            defer.reject(new ConnectionError("request failed", <Error>err));
+                            deferred.reject(new ConnectionError("request failed", <Error>err));
                         }
                         break;
                 }
@@ -110,7 +110,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 });
             };
 
-            const url = this.getUrl("/upload", undefined, MediaPrefix.R0);
+            const url = this.getUrl("/upload", undefined, MediaPrefix.V3);
 
             if (includeFilename && fileName) {
                 url.searchParams.set("filename", encodeURIComponent(fileName));
@@ -131,7 +131,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 xhr.abort();
             });
         } else {
-            const queryParams: utils.QueryDict = {};
+            const queryParams: QueryDict = {};
             if (includeFilename && fileName) {
                 queryParams.filename = fileName;
             }
@@ -139,23 +139,23 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             const headers: Record<string, string> = { "Content-Type": contentType };
 
             this.authedRequest<UploadResponse>(Method.Post, "/upload", queryParams, file, {
-                prefix: MediaPrefix.R0,
+                prefix: MediaPrefix.V3,
                 headers,
                 abortSignal: abortController.signal,
             })
                 .then((response) => {
                     return this.opts.onlyData ? <UploadResponse>response : response.json();
                 })
-                .then(defer.resolve, defer.reject);
+                .then(deferred.resolve, deferred.reject);
         }
 
         // remove the upload from the list on completion
-        upload.promise = defer.promise.finally(() => {
-            utils.removeElement(this.uploads, (elem) => elem === upload);
+        upload.promise = deferred.promise.finally(() => {
+            removeElement(this.uploads, (elem) => elem === upload);
         });
         abortController.signal.addEventListener("abort", () => {
-            utils.removeElement(this.uploads, (elem) => elem === upload);
-            defer.reject(new DOMException("Aborted", "AbortError"));
+            removeElement(this.uploads, (elem) => elem === upload);
+            deferred.reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
         return upload.promise;
@@ -182,7 +182,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     public getContentUri(): IContentUri {
         return {
             base: this.opts.baseUrl,
-            path: MediaPrefix.R0 + "/upload",
+            path: MediaPrefix.V3 + "/upload",
             params: {
                 access_token: this.opts.accessToken!,
             },

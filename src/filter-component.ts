@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RelationType } from "./@types/event";
-import { MatrixEvent } from "./models/event";
-import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread";
+import { RelationType } from "./@types/event.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread.ts";
 
 /**
  * Checks if a value matches a given field value, which may be a * terminated
@@ -62,7 +62,10 @@ export interface IFilterComponent {
  * 'Filters' are referred to as 'FilterCollections'.
  */
 export class FilterComponent {
-    public constructor(private filterJson: IFilterComponent, public readonly userId?: string | undefined | null) {}
+    public constructor(
+        private filterJson: IFilterComponent,
+        public readonly userId?: string | undefined | null,
+    ) {}
 
     /**
      * Checks with the filter component matches the given event

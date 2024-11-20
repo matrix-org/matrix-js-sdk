@@ -16,14 +16,15 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
-import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto";
-import { decodeBase64, encodeBase64 } from "./olmlib";
-import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
-import { decryptAES, encryptAES } from "./aes";
-import { logger } from "../logger";
-import { Crypto } from "./index";
-import { Method } from "../http-api";
-import { SecretStorageKeyDescription } from "../secret-storage";
+import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
+import { logger } from "../logger.ts";
+import { Crypto } from "./index.ts";
+import { Method } from "../http-api/index.ts";
+import { SecretStorageKeyDescription } from "../secret-storage.ts";
+import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
+import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 
 export interface IDehydratedDevice {
     device_id?: string; // eslint-disable-line camelcase
@@ -61,13 +62,13 @@ export class DehydrationManager {
                     if (result) {
                         const { key, keyInfo, deviceDisplayName, time } = result;
                         const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
-                        const decrypted = await decryptAES(key, pickleKey, DEHYDRATION_ALGORITHM);
+                        const decrypted = await decryptAESSecretStorageItem(key, pickleKey, DEHYDRATION_ALGORITHM);
                         this.key = decodeBase64(decrypted);
                         this.keyInfo = keyInfo;
                         this.deviceDisplayName = deviceDisplayName;
                         const now = Date.now();
                         const delay = Math.max(1, time + oneweek - now);
-                        this.timeoutId = global.setTimeout(this.dehydrateDevice.bind(this), delay);
+                        this.timeoutId = globalThis.setTimeout(this.dehydrateDevice.bind(this), delay);
                     }
                 },
                 "dehydration",
@@ -96,7 +97,7 @@ export class DehydrationManager {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
             if (this.timeoutId) {
-                global.clearTimeout(this.timeoutId);
+                globalThis.clearTimeout(this.timeoutId);
                 this.timeoutId = undefined;
             }
             // clear storage
@@ -134,14 +135,14 @@ export class DehydrationManager {
         }
         this.inProgress = true;
         if (this.timeoutId) {
-            global.clearTimeout(this.timeoutId);
+            globalThis.clearTimeout(this.timeoutId);
             this.timeoutId = undefined;
         }
         try {
             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
 
             // update the crypto store with the timestamp
-            const key = await encryptAES(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
+            const key = await encryptAESSecretStorageItem(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
             await this.crypto.cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
                 this.crypto.cryptoStore.storeSecretStorePrivateKey(txn, "dehydration", {
                     keyInfo: this.keyInfo,
@@ -154,7 +155,7 @@ export class DehydrationManager {
 
             logger.log("Creating account");
             // create the account and all the necessary keys
-            const account = new global.Olm.Account();
+            const account = new globalThis.Olm.Account();
             account.create();
             const e2eKeys = JSON.parse(account.identity_keys());
 
@@ -254,7 +255,7 @@ export class DehydrationManager {
             logger.log("Done dehydrating");
 
             // dehydrate again in a week
-            this.timeoutId = global.setTimeout(this.dehydrateDevice.bind(this), oneweek);
+            this.timeoutId = globalThis.setTimeout(this.dehydrateDevice.bind(this), oneweek);
 
             return deviceId;
         } finally {
@@ -264,7 +265,7 @@ export class DehydrationManager {
 
     public stop(): void {
         if (this.timeoutId) {
-            global.clearTimeout(this.timeoutId);
+            globalThis.clearTimeout(this.timeoutId);
             this.timeoutId = undefined;
         }
     }
