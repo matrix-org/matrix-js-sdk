@@ -34,7 +34,7 @@ const TIMER_CHECK_PERIOD_MS = 1000;
 let count = 0;
 
 // the key for our callback with the real globalThis.setTimeout
-let realCallbackKey: NodeJS.Timeout | number | undefined;
+let realCallbackKey: NodeJS.Timeout | number;
 
 type Callback = {
     runAt: number;
@@ -116,7 +116,7 @@ export function clearTimeout(key: number): void {
 
 // use the real globalThis.setTimeout to schedule a callback to runCallbacks.
 function scheduleRealCallback(): void {
-    if (realCallbackKey !== undefined) {
+    if (realCallbackKey) {
         globalThis.clearTimeout(realCallbackKey as NodeJS.Timeout);
     }
 
