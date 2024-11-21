@@ -78,6 +78,8 @@ jobs:
         name: Downstream test element-web
         if: github.event_name == 'merge_group'
         uses: element-hq/element-web/.github/workflows/tests.yml@develop
+        permissions:
+            statuses: write
         with:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
