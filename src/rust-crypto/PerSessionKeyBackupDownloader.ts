@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { CryptoEvent } from "../crypto-api/index.ts";
 import { Logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RustBackupManager } from "./backup.ts";
-import { CryptoEvent } from "../matrix.ts";
 import { encodeUri, sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 
@@ -241,7 +241,7 @@ export class PerSessionKeyBackupDownloader {
     private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
         try {
             return await this.olmMachine.getBackupKeys();
-        } catch (e) {
+        } catch {
             return null;
         }
     }
@@ -370,15 +370,17 @@ export class PerSessionKeyBackupDownloader {
                     // Notice that this request will be lost if instead the backup got out of sync (updated from other session).
                     throw new KeyDownloadError(KeyDownloadErrorCode.MISSING_DECRYPTION_KEY);
                 }
-                if (errCode == "M_LIMIT_EXCEEDED") {
-                    const waitTime = e.data.retry_after_ms;
-                    if (waitTime > 0) {
-                        this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
-                        throw new KeyDownloadRateLimitError(waitTime);
-                    } else {
-                        // apply the default backoff time
-                        throw new KeyDownloadRateLimitError(KEY_BACKUP_BACKOFF);
+                if (e.isRateLimitError()) {
+                    let waitTime: number | undefined;
+                    try {
+                        waitTime = e.getRetryAfterMs() ?? undefined;
+                    } catch (error) {
+                        this.logger.warn("Error while retrieving a rate-limit retry delay", error);
                     }
+                    if (waitTime && waitTime > 0) {
+                        this.logger.info(`Rate limited by server, waiting ${waitTime}ms`);
+                    }
+                    throw new KeyDownloadRateLimitError(waitTime ?? KEY_BACKUP_BACKOFF);
                 }
             }
             throw new KeyDownloadError(KeyDownloadErrorCode.NETWORK_ERROR);
@@ -466,8 +468,6 @@ export class PerSessionKeyBackupDownloader {
             return null;
         }
 
-        const authData = currentServerVersion.auth_data as Curve25519AuthData;
-
         const backupKeys = await this.getBackupDecryptionKey();
         if (!backupKeys?.decryptionKey) {
             this.logger.debug(`Not checking key backup for session (no decryption key)`);
@@ -483,8 +483,9 @@ export class PerSessionKeyBackupDownloader {
             return null;
         }
 
+        const authData = currentServerVersion.auth_data as Curve25519AuthData;
         if (authData.public_key != backupKeys.decryptionKey.megolmV1PublicKey.publicKeyBase64) {
-            this.logger.debug(`getBackupDecryptor key mismatch error`);
+            this.logger.debug(`Key backup on server does not match our decryption key`);
             this.hasConfigurationProblem = true;
             return null;
         }

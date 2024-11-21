@@ -20,7 +20,7 @@ import { IObject } from "../../../src/crypto/olmlib";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
 import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
@@ -69,20 +69,20 @@ function sign<T extends IObject | ICurve25519AuthData>(
 }
 
 describe("Secrets", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should store and retrieve a secret", async function () {
         const key = new Uint8Array(16);
         for (let i = 0; i < 16; i++) key[i] = i;
 
-        const signing = new global.Olm.PkSigning();
+        const signing = new globalThis.Olm.PkSigning();
         const signingKey = signing.generate_seed();
         const signingPubKey = signing.init_with_seed(signingKey);
 
@@ -332,7 +332,7 @@ describe("Secrets", function () {
         });
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
-            const decryption = new global.Olm.PkDecryption();
+            const decryption = new globalThis.Olm.PkDecryption();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(
@@ -612,7 +612,7 @@ describe("Secrets", function () {
                     type: "m.megolm_backup.v1",
                     content: {
                         encrypted: {
-                            key_id: await encryptAES(
+                            key_id: await encryptAESSecretStorageItem(
                                 "123,45,6,7,89,1,234,56,78,90,12,34,5,67,8,90",
                                 secretStorageKeys.key_id,
                                 "m.megolm_backup.v1",

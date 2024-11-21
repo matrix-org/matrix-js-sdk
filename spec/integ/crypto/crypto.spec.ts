@@ -83,12 +83,14 @@ import {
     CrossSigningKey,
     CryptoCallbacks,
     DecryptionFailureCode,
+    DeviceIsolationMode,
     EventShieldColour,
     EventShieldReason,
     KeyBackupInfo,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
     createOlmSession,
@@ -103,6 +105,7 @@ import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
+import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -133,7 +136,7 @@ async function expectSendRoomKey(
     recipientOlmAccount: Olm.Account,
     recipientOlmSession: Olm.Session | null = null,
 ): Promise<Olm.InboundGroupSession> {
-    const Olm = global.Olm;
+    const Olm = globalThis.Olm;
     const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
 
     function onSendRoomKey(content: any): Olm.InboundGroupSession {
@@ -216,7 +219,7 @@ async function expectSendMegolmMessage(
 }
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, initCrypto: InitCrypto) => {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
         return;
@@ -227,7 +230,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
     const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
-    const Olm = global.Olm;
+    const Olm = globalThis.Olm;
 
     let testOlmAccount = {} as unknown as Olm.Account;
     let testSenderKey = "";
@@ -744,6 +747,95 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
                 },
             );
+        });
+
+        describe("IsolationMode decryption tests", () => {
+            newBackendOnly(
+                "OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
+
+                    // It will error as an unknown device because we haven't fetched
+                    // the sender's device keys.
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(true);
+                    expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+                },
+            );
+
+            newBackendOnly(
+                "NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed",
+                async () => {
+                    const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
+
+                    expect(decryptedEvent.isDecryptionFailure()).toBe(false);
+
+                    expect(await aliceClient.getCrypto()!.getEncryptionInfoForEvent(decryptedEvent)).toEqual({
+                        shieldColour: EventShieldColour.RED,
+                        shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                    });
+                },
+            );
+
+            async function setUpTestAndDecrypt(isolationMode: DeviceIsolationMode): Promise<MatrixEvent> {
+                // This tests that a message will not be decrypted if the sender
+                // is not sufficiently trusted according to the selected crypto
+                // mode.
+                //
+                // This test is almost the same as the "Alice receives a megolm
+                // message" test, with the main difference that we set the
+                // crypto mode.
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+
+                // Start by using Invisible crypto mode
+                aliceClient.getCrypto()!.setDeviceIsolationMode(isolationMode);
+
+                await startClientAndAwaitFirstSync();
+
+                const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
+                const groupSession = new Olm.OutboundGroupSession();
+                groupSession.create();
+
+                // make the room_key event
+                const roomKeyEncrypted = encryptGroupSessionKey({
+                    recipient: aliceClient.getUserId()!,
+                    recipientCurve25519Key: keyReceiver.getDeviceKey(),
+                    recipientEd25519Key: keyReceiver.getSigningKey(),
+                    olmAccount: testOlmAccount,
+                    p2pSession: p2pSession,
+                    groupSession: groupSession,
+                    room_id: ROOM_ID,
+                });
+
+                // encrypt a message with the group session
+                const messageEncrypted = encryptMegolmEvent({
+                    senderKey: testSenderKey,
+                    groupSession: groupSession,
+                    room_id: ROOM_ID,
+                });
+
+                // Alice gets both the events in a single sync
+                const syncResponse = {
+                    next_batch: 1,
+                    to_device: {
+                        events: [roomKeyEncrypted],
+                    },
+                    rooms: {
+                        join: {
+                            [ROOM_ID]: { timeline: { events: [messageEncrypted] } },
+                        },
+                    },
+                };
+
+                syncResponder.sendOrQueueSyncResponse(syncResponse);
+                await syncPromise(aliceClient);
+
+                const room = aliceClient.getRoom(ROOM_ID)!;
+                const event = room.getLiveTimeline().getEvents()[0];
+                expect(event.isEncrypted()).toBe(true);
+
+                // it probably won't be decrypted yet, because it takes a while to process the olm keys
+                return await testUtils.awaitDecryption(event);
+            }
         });
 
         it("Decryption fails with Unable to decrypt for other errors", async () => {
@@ -1805,13 +1897,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
-        const p2pSession = new global.Olm.Session();
+        const p2pSession = new globalThis.Olm.Session();
         await beccaTestClient.client.crypto!.cryptoStore.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-                    const account = new global.Olm.Account();
+                    const account = new globalThis.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
@@ -1953,13 +2045,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
-        const p2pSession = new global.Olm.Session();
+        const p2pSession = new globalThis.Olm.Session();
         await beccaTestClient.client.crypto!.cryptoStore.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-                    const account = new global.Olm.Account();
+                    const account = new globalThis.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
@@ -3046,11 +3138,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Import a new key that should be uploaded
                 const newKey = testData.MEGOLM_SESSION_DATA;
 
-                const awaitKeyUploaded = new Promise<IKeyBackup>((resolve) => {
+                const awaitKeyUploaded = new Promise<KeyBackup>((resolve) => {
                     fetchMock.put(
                         "path:/_matrix/client/v3/room_keys/keys",
                         (url, request) => {
-                            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
                             resolve(uploadPayload);
                             return {
                                 status: 200,
@@ -3179,15 +3271,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
     });
 
-    describe("Check if the cross signing keys are available for a user", () => {
+    describe("User identity", () => {
+        let keyResponder: E2EKeyResponder;
         beforeEach(async () => {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-
-            const keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
+            keyResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
             keyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
-            keyResponder.addKeyReceiver(BOB_TEST_USER_ID, keyReceiver);
+            keyResponder.addKeyReceiver(TEST_USER_ID, keyReceiver);
             keyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             keyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
 
@@ -3203,6 +3293,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 .getCrypto()!
                 .userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are available for a tracked user", async () => {
@@ -3213,11 +3309,60 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // Alice is the local user and should be tracked !
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
         it("Cross signing keys are not available for an unknown user", async () => {
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
+
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.isVerified()).toBe(false);
+            expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+            expect(verificationStatus.needsUserApproval).toBe(false);
+        });
+
+        newBackendOnly("An unverified user changes identity", async () => {
+            // We have to be tracking Bob's keys, which means we need to share a room with him
+            syncResponder.sendOrQueueSyncResponse({
+                ...getSyncResponse([BOB_TEST_USER_ID]),
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID);
+            expect(hasCrossSigningKeysForUser).toBe(true);
+
+            // Bob changes his cross-signing keys
+            keyResponder.addCrossSigningData(testData.BOB_ALT_SIGNED_CROSS_SIGNING_KEYS_DATA);
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: "2",
+                device_lists: { changed: [BOB_TEST_USER_ID] },
+            });
+            await syncPromise(aliceClient);
+
+            await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID, true);
+
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.isVerified()).toBe(false);
+                expect(verificationStatus.isCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
+                expect(verificationStatus.needsUserApproval).toBe(true);
+            }
+
+            // Pinning the new identity should clear the needsUserApproval flag.
+            await aliceClient.getCrypto()!.pinCurrentUserIdentity(BOB_TEST_USER_ID);
+            {
+                const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.needsUserApproval).toBe(false);
+            }
         });
     });
 
@@ -3354,7 +3499,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             return client;
         }
 
-        function mkEncryptionEvent(content: Object) {
+        function mkEncryptionEvent(content: object) {
             return mkEventCustom({
                 sender: persistentStoreClient.getSafeUserId(),
                 type: "m.room.encryption",
@@ -3367,7 +3512,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          *
          * @param stateEvents - Additional state events for the test room
          */
-        function getSyncResponseWithState(stateEvents: Array<Object>) {
+        function getSyncResponseWithState(stateEvents: Array<object>) {
             const roomResponse = {
                 state: {
                     events: [

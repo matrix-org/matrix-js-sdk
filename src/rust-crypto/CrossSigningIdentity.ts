@@ -140,11 +140,11 @@ export class CrossSigningIdentity {
             // Update 4S before uploading cross-signing keys, to stay consistent with legacy that asks
             // 4S passphrase before asking for account password.
             // Ultimately should be made atomic and resistant to forgotten password/passphrase.
-            logger.log("resetCrossSigning: exporting to secret storage");
-
+            logger.log("resetCrossSigning: exporting private keys to secret storage");
             await this.exportCrossSigningKeysToStorage();
         }
-        logger.log("resetCrossSigning: publishing keys to server");
+
+        logger.log("resetCrossSigning: publishing public keys to server");
         for (const req of [
             outgoingRequests.uploadKeysRequest,
             outgoingRequests.uploadSigningKeysRequest,

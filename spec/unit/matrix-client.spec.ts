@@ -102,7 +102,7 @@ type HttpLookup = {
     error?: object;
     expectBody?: Record<string, any>;
     expectQueryParams?: QueryDict;
-    thenCall?: Function;
+    thenCall?: () => void;
 };
 
 interface Options extends ICreateRoomOpts {
@@ -403,7 +403,7 @@ describe("MatrixClient", function () {
         async function assertRequestsMade(
             responses: {
                 prefix?: string;
-                error?: { httpStatus: Number; errcode: string };
+                error?: { httpStatus: number; errcode: string };
                 data?: { event_id: string };
             }[],
             expectRejects = false,
@@ -1029,6 +1029,124 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("extended profiles", () => {
+        const unstableMSC4133Prefix = `${ClientPrefix.Unstable}/uk.tcpip.msc4133`;
+        const userId = "@profile_user:example.org";
+
+        beforeEach(() => {
+            unstableFeatures["uk.tcpip.msc4133"] = true;
+        });
+
+        it("throws when unsupported by server", async () => {
+            unstableFeatures["uk.tcpip.msc4133"] = false;
+            const errorMessage = "Server does not support extended profiles";
+
+            await expect(client.doesServerSupportExtendedProfiles()).resolves.toEqual(false);
+
+            await expect(client.getExtendedProfile(userId)).rejects.toThrow(errorMessage);
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).rejects.toThrow(errorMessage);
+            await expect(client.setExtendedProfileProperty("test_key", "foo")).rejects.toThrow(errorMessage);
+            await expect(client.deleteExtendedProfileProperty("test_key")).rejects.toThrow(errorMessage);
+            await expect(client.patchExtendedProfile({ test_key: "foo" })).rejects.toThrow(errorMessage);
+            await expect(client.setExtendedProfile({ test_key: "foo" })).rejects.toThrow(errorMessage);
+        });
+
+        it("can fetch a extended user profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId),
+                    data: testProfile,
+                },
+            ];
+            await expect(client.getExtendedProfile(userId)).resolves.toEqual(testProfile);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can fetch a property from a extended user profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: testProfile,
+                },
+            ];
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can set a property in our extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!) + "/test_key",
+                    expectBody: {
+                        test_key: "foo",
+                    },
+                },
+            ];
+            await expect(client.setExtendedProfileProperty("test_key", "foo")).resolves.toEqual(undefined);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can delete a property in our extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "DELETE",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!) + "/test_key",
+                },
+            ];
+            await expect(client.deleteExtendedProfileProperty("test_key")).resolves.toEqual(undefined);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can patch our extended profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            const patchedProfile = {
+                existing: "key",
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "PATCH",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!),
+                    data: patchedProfile,
+                    expectBody: testProfile,
+                },
+            ];
+            await expect(client.patchExtendedProfile(testProfile)).resolves.toEqual(patchedProfile);
+        });
+
+        it("can replace our extended profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            httpLookups = [
+                {
+                    method: "PUT",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(client.credentials.userId!),
+                    data: testProfile,
+                    expectBody: testProfile,
+                },
+            ];
+            await expect(client.setExtendedProfile(testProfile)).resolves.toEqual(undefined);
+        });
+    });
+
     it("should create (unstable) file trees", async () => {
         const userId = "@test:example.org";
         const roomId = "!room:example.org";
@@ -1397,7 +1515,7 @@ describe("MatrixClient", function () {
     });
 
     describe("emitted sync events", function () {
-        function syncChecker(expectedStates: [string, string | null][], done: Function) {
+        function syncChecker(expectedStates: [string, string | null][], done: () => void) {
             return function syncListener(state: SyncState, old: SyncState | null) {
                 const expected = expectedStates.shift();
                 logger.log("'sync' curr=%s old=%s EXPECT=%s", state, old, expected);
@@ -1419,7 +1537,7 @@ describe("MatrixClient", function () {
         it("should transition null -> PREPARED after the first /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1436,7 +1554,7 @@ describe("MatrixClient", function () {
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1476,7 +1594,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["CATCHUP", "ERROR"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1487,7 +1605,7 @@ describe("MatrixClient", function () {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1512,7 +1630,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1531,7 +1649,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["ERROR", "SYNCING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1546,7 +1664,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["SYNCING", "SYNCING"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();
@@ -1577,7 +1695,7 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
-            const didSyncPromise = new Promise((resolve) => {
+            const didSyncPromise = new Promise<void>((resolve) => {
                 client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
             });
             await client.startClient();

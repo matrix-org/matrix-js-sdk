@@ -9,12 +9,13 @@ on:
             ELEMENT_BOT_TOKEN:
                 required: true
 concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
+permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     changelog:
         name: Preview Changelog
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
-            - uses: mheap/github-action-required-labels@5847eef68201219cf0a4643ea7be61e77837bbce # v5
+            - uses: mheap/github-action-required-labels@d25134c992b943fb6ad00c25ea00eb5988c0a9dd # v5
               if: github.event_name != 'merge_group'
               with:
                   labels: |
@@ -29,7 +30,7 @@ jobs:
 
     prevent-blocked:
         name: Prevent Blocked
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             pull-requests: read
         steps:
@@ -42,7 +43,7 @@ jobs:
 
     community-prs:
         name: Label Community PRs
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: github.event.action == 'opened'
         steps:
             - name: Check membership
@@ -69,7 +70,7 @@ jobs:
 
     close-if-fork-develop:
         name: Forbid develop branch fork contributions
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: >
             github.event.action == 'opened' &&
             github.event.pull_request.head.ref == 'develop' &&

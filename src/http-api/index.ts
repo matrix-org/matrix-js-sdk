@@ -60,8 +60,8 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         } as Upload;
         const deferred = defer<UploadResponse>();
 
-        if (global.XMLHttpRequest) {
-            const xhr = new global.XMLHttpRequest();
+        if (globalThis.XMLHttpRequest) {
+            const xhr = new globalThis.XMLHttpRequest();
 
             const timeoutFn = function (): void {
                 xhr.abort();
@@ -73,7 +73,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
             xhr.onreadystatechange = function (): void {
                 switch (xhr.readyState) {
-                    case global.XMLHttpRequest.DONE:
+                    case globalThis.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(timeoutTimer);
                         try {
                             if (xhr.status === 0) {

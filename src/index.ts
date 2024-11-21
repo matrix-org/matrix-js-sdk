@@ -16,10 +16,10 @@ limitations under the License.
 
 import * as matrixcs from "./matrix.ts";
 
-if (global.__js_sdk_entrypoint) {
+if (globalThis.__js_sdk_entrypoint) {
     throw new Error("Multiple matrix-js-sdk entrypoints detected!");
 }
-global.__js_sdk_entrypoint = true;
+globalThis.__js_sdk_entrypoint = true;
 
 export * from "./matrix.ts";
 export default matrixcs;

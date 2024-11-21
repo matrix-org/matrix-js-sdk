@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,12 +41,13 @@ describe("MatrixHttpApi", () => {
             setRequestHeader: jest.fn(),
             onreadystatechange: undefined,
             getResponseHeader: jest.fn(),
+            getAllResponseHeaders: jest.fn(),
         } as unknown as XMLHttpRequest;
         // We stub out XHR here as it is not available in JSDOM
         // @ts-ignore
-        global.XMLHttpRequest = jest.fn().mockReturnValue(xhr);
+        globalThis.XMLHttpRequest = jest.fn().mockReturnValue(xhr);
         // @ts-ignore
-        global.XMLHttpRequest.DONE = DONE;
+        globalThis.XMLHttpRequest.DONE = DONE;
     });
 
     afterEach(() => {
@@ -59,7 +60,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should fall back to `fetch` where xhr is unavailable", () => {
-        global.XMLHttpRequest = undefined!;
+        globalThis.XMLHttpRequest = undefined!;
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
         upload = api.uploadContent({} as File);
@@ -171,7 +172,10 @@ describe("MatrixHttpApi", () => {
         xhr.readyState = DONE;
         xhr.responseText = '{"errcode": "M_NOT_FOUND", "error": "Not found"}';
         xhr.status = 404;
-        mocked(xhr.getResponseHeader).mockReturnValue("application/json");
+        mocked(xhr.getResponseHeader).mockImplementation((name) =>
+            name.toLowerCase() === "content-type" ? "application/json" : null,
+        );
+        mocked(xhr.getAllResponseHeaders).mockReturnValue("content-type: application/json\r\n");
         // @ts-ignore
         xhr.onreadystatechange?.(new Event("test"));
 

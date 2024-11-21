@@ -29,12 +29,12 @@ describe("sha256", () => {
     });
 
     it("throws if webcrypto is not available", async () => {
-        const oldCrypto = global.crypto;
+        const oldCrypto = globalThis.crypto;
         try {
-            global.crypto = {} as any;
+            globalThis.crypto = {} as any;
             await expect(sha256("test")).rejects.toThrow();
         } finally {
-            global.crypto = oldCrypto;
+            globalThis.crypto = oldCrypto;
         }
     });
 });

@@ -31,7 +31,7 @@ describe("Media Handler", function () {
     beforeEach(() => {
         mockMediaDevices = new MockMediaDevices();
 
-        global.navigator = {
+        globalThis.navigator = {
             mediaDevices: mockMediaDevices.typed(),
         } as unknown as Navigator;
 

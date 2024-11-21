@@ -8,6 +8,7 @@
 /spec/*/webrtc            @matrix-org/element-call-reviewers
 /spec/*/matrixrtc            @matrix-org/element-call-reviewers
 
+/src/crypto-api           @matrix-org/element-crypto-web-reviewers
 /src/crypto               @matrix-org/element-crypto-web-reviewers
 /src/rust-crypto          @matrix-org/element-crypto-web-reviewers
 /spec/integ/crypto        @matrix-org/element-crypto-web-reviewers

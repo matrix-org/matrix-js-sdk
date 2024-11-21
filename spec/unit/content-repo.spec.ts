@@ -63,20 +63,6 @@ describe("ContentRepo", function () {
             );
         });
 
-        it("should put fragments from mxc:// URIs after any query parameters", function () {
-            const mxcUri = "mxc://server.name/resourceid#automade";
-            expect(getHttpUriForMxc(baseUrl, mxcUri, 32)).toEqual(
-                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid" + "?width=32#automade",
-            );
-        });
-
-        it("should put fragments from mxc:// URIs at the end of the HTTP URI", function () {
-            const mxcUri = "mxc://server.name/resourceid#automade";
-            expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual(
-                baseUrl + "/_matrix/media/v3/download/server.name/resourceid#automade",
-            );
-        });
-
         it("should return an authenticated URL when requested", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, undefined, undefined, undefined, undefined, true, true)).toEqual(
@@ -97,6 +83,31 @@ describe("ContentRepo", function () {
                 baseUrl +
                     "/_matrix/client/v1/media/thumbnail/server.name/resourceid?width=64&height=64&method=scale&allow_redirect=true",
             );
+        });
+
+        it("should drop mxc urls with invalid server_name", () => {
+            const mxcUri = "mxc://server.name:test/foobar";
+            expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual("");
+        });
+
+        it("should drop mxc urls with invalid media_id", () => {
+            const mxcUri = "mxc://server.name/foobar:test";
+            expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual("");
+        });
+
+        it("should drop mxc urls attempting a path traversal attack", () => {
+            const mxcUri = "mxc://../../../../foo";
+            expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual("");
+        });
+
+        it("should drop mxc urls attempting to pass query parameters", () => {
+            const mxcUri = "mxc://server.name/foobar?bar=baz";
+            expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual("");
+        });
+
+        it("should drop mxc urls with too many parts", () => {
+            const mxcUri = "mxc://server.name/foo//bar";
+            expect(getHttpUriForMxc(baseUrl, mxcUri)).toEqual("");
         });
     });
 });

@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { parse as parseContentType, ParsedMediaType } from "content-type";
 
 import { logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
-import { ConnectionError, HTTPError, MatrixError } from "./errors.ts";
+import { ConnectionError, HTTPError, MatrixError, safeGetRetryAfterMs } from "./errors.ts";
 
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
@@ -72,24 +72,38 @@ export function anySignal(signals: AbortSignal[]): {
  * @returns
  */
 export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
+    const httpHeaders = isXhr(response)
+        ? new Headers(
+              response
+                  .getAllResponseHeaders()
+                  .trim()
+                  .split(/[\r\n]+/)
+                  .map((header): [string, string] => {
+                      const colonIdx = header.indexOf(":");
+                      return [header.substring(0, colonIdx), header.substring(colonIdx + 1)];
+                  }),
+          )
+        : response.headers;
+
     let contentType: ParsedMediaType | null;
     try {
-        contentType = getResponseContentType(response);
+        contentType = getResponseContentType(httpHeaders);
     } catch (e) {
         return <Error>e;
     }
-
     if (contentType?.type === "application/json" && body) {
         return new MatrixError(
             JSON.parse(body),
             response.status,
             isXhr(response) ? response.responseURL : response.url,
+            undefined,
+            httpHeaders,
         );
     }
     if (contentType?.type === "text/plain") {
-        return new HTTPError(`Server returned ${response.status} error: ${body}`, response.status);
+        return new HTTPError(`Server returned ${response.status} error: ${body}`, response.status, httpHeaders);
     }
-    return new HTTPError(`Server returned ${response.status} error`, response.status);
+    return new HTTPError(`Server returned ${response.status} error`, response.status, httpHeaders);
 }
 
 function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest {
@@ -97,7 +111,7 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
 }
 
 /**
- * extract the Content-Type header from the response object, and
+ * extract the Content-Type header from response headers, and
  * parse it to a `{type, parameters}` object.
  *
  * returns null if no content-type header could be found.
@@ -105,15 +119,9 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
  * @param response - response object
  * @returns parsed content-type header, or null if not found
  */
-function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
-    let contentType: string | null;
-    if (isXhr(response)) {
-        contentType = response.getResponseHeader("Content-Type");
-    } else {
-        contentType = response.headers.get("Content-Type");
-    }
-
-    if (!contentType) return null;
+function getResponseContentType(headers: Headers): ParsedMediaType | null {
+    const contentType = headers.get("Content-Type");
+    if (contentType === null) return null;
 
     try {
         return parseContentType(contentType);
@@ -188,12 +196,5 @@ export function calculateRetryBackoff(err: any, attempts: number, retryConnectio
         return -1;
     }
 
-    if (err.name === "M_LIMIT_EXCEEDED") {
-        const waitTime = err.data.retry_after_ms;
-        if (waitTime > 0) {
-            return waitTime;
-        }
-    }
-
-    return 1000 * Math.pow(2, attempts);
+    return safeGetRetryAfterMs(err, 1000 * Math.pow(2, attempts));
 }

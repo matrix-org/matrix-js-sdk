@@ -16,14 +16,30 @@ limitations under the License.
 
 import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IMegolmSessionData } from "../@types/crypto.ts";
+import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { Room } from "../models/room.ts";
 import { DeviceMap } from "../models/device.ts";
 import { UIAuthCallback } from "../interactive-auth.ts";
 import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage.ts";
 import { VerificationRequest } from "./verification.ts";
-import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup.ts";
+import {
+    BackupTrustInfo,
+    KeyBackupCheck,
+    KeyBackupInfo,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
+} from "./keybackup.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { MatrixEvent } from "../models/event.ts";
+
+/**
+ * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.
+ *
+ * The most important type is {@link CryptoApi}, an instance of which can be retrieved via
+ * {@link MatrixClient.getCrypto}.
+ *
+ * @packageDocumentation
+ */
 
 /**
  * Public interface to the cryptography parts of the js-sdk
@@ -39,6 +55,11 @@ export interface CryptoApi {
      * If true, all unverified devices will be blacklisted by default
      */
     globalBlacklistUnverifiedDevices: boolean;
+
+    /**
+     * The {@link DeviceIsolationMode} mode to use.
+     */
+    setDeviceIsolationMode(isolationMode: DeviceIsolationMode): void;
 
     /**
      * Return the current version of the crypto module.
@@ -176,7 +197,7 @@ export interface CryptoApi {
     /**
      * Return whether we trust other user's signatures of their devices.
      *
-     * @see {@link Crypto.CryptoApi#setTrustCrossSignedDevices}
+     * @see {@link CryptoApi.setTrustCrossSignedDevices}
      *
      * @returns `true` if we trust cross-signed devices, otherwise `false`.
      */
@@ -189,6 +210,16 @@ export interface CryptoApi {
      *
      */
     getUserVerificationStatus(userId: string): Promise<UserVerificationStatus>;
+
+    /**
+     * "Pin" the current identity of the given user, accepting it as genuine.
+     *
+     * This is useful if the user has changed identity since we first saw them (leading to
+     * {@link UserVerificationStatus.needsUserApproval}), and we are now accepting their new identity.
+     *
+     * Throws an error if called on our own user ID, or on a user ID that we don't have an identity for.
+     */
+    pinCurrentUserIdentity(userId: string): Promise<void>;
 
     /**
      * Get the verification status of a given device.
@@ -213,7 +244,7 @@ export interface CryptoApi {
      *
      * @throws an error if the device is unknown, or has not published any encryption keys.
      *
-     * @remarks Fires {@link CryptoEvent#DeviceVerificationChanged}
+     * @remarks Fires {@link matrix.CryptoEvent.DeviceVerificationChanged}
      */
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
 
@@ -244,12 +275,18 @@ export interface CryptoApi {
      *
      * @returns True if cross-signing is ready to be used on this device
      *
-     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
+     * @throws May throw {@link matrix.ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     isCrossSigningReady(): Promise<boolean>;
 
     /**
-     * Get the ID of one of the user's cross-signing keys.
+     * Get the ID of one of the user's cross-signing keys, if both private and matching
+     * public parts of that key are available (ie. cached in the local crypto store).
+     *
+     * The public part may not be available if a `/keys/query` request has not yet been
+     * performed, or if the device that created the keys failed to publish them.
+     *
+     * If either part of the keypair is not available, this will return `null`.
      *
      * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigningKey.SelfSigning`,
      *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
@@ -312,7 +349,7 @@ export interface CryptoApi {
      * @returns The current status of cross-signing keys: whether we have public and private keys cached locally, and
      * whether the private keys are in secret storage.
      *
-     * @throws May throw {@link ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
+     * @throws May throw {@link matrix.ClientStoppedError} if the `MatrixClient` is stopped before or during the call.
      */
     getCrossSigningStatus(): Promise<CrossSigningStatus>;
 
@@ -339,6 +376,22 @@ export interface CryptoApi {
      *      object with information about the encryption of the event.
      */
     getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
+
+    /**
+     * Encrypts a given payload object via Olm to-device messages to a given
+     * set of devices.
+     *
+     * @param eventType - the type of the event to send.
+     * @param devices - an array of devices to encrypt the payload for.
+     * @param payload - the payload to encrypt.
+     *
+     * @returns the batch of encrypted payloads which can then be sent via {@link matrix.MatrixClient#queueToDevice}.
+     */
+    encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -392,8 +445,8 @@ export interface CryptoApi {
      *
      * If an all-devices verification is already in flight, returns it. Otherwise, initiates a new one.
      *
-     * To control the methods offered, set {@link ICreateClientOpts.verificationMethods} when creating the
-     * MatrixClient.
+     * To control the methods offered, set {@link matrix.ICreateClientOpts.verificationMethods} when creating the
+     * `MatrixClient`.
      *
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
@@ -407,8 +460,8 @@ export interface CryptoApi {
      *
      * If a verification for this user/device is already in flight, returns it. Otherwise, initiates a new one.
      *
-     * To control the methods offered, set {@link ICreateClientOpts.verificationMethods} when creating the
-     * MatrixClient.
+     * To control the methods offered, set {@link  matrix.ICreateClientOpts.verificationMethods} when creating the
+     * `MatrixClient`.
      *
      * @param userId - ID of the owner of the device to verify
      * @param deviceId - ID of the device to verify
@@ -456,6 +509,18 @@ export interface CryptoApi {
     storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void>;
 
     /**
+     * Attempt to fetch the backup decryption key from secret storage.
+     *
+     * If the key is found in secret storage, checks it against the latest backup on the server;
+     * if they match, stores the key in the crypto store by calling {@link storeSessionBackupPrivateKey},
+     * which enables automatic restore of individual keys when an Unable-to-decrypt error is encountered.
+     *
+     * If we are unable to fetch the key from secret storage, there is no backup on the server, or the key
+     * does not match, throws an exception.
+     */
+    loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
+
+    /**
      * Get the current status of key backup.
      *
      * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
@@ -465,9 +530,21 @@ export interface CryptoApi {
     /**
      * Determine if a key backup can be trusted.
      *
-     * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
+     * @param info - key backup info dict from {@link matrix.MatrixClient.getKeyBackupVersion}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
+
+    /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This normally returns a cached value, but if we haven't yet made a request to the server, it will fire one off.
+     * It will always return the details of the active backup if key backup is enabled.
+     *
+     * Return null if there is no backup.
+     *
+     * @returns the key backup information
+     */
+    getKeyBackupInfo(): Promise<KeyBackupInfo | null>;
 
     /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
@@ -485,7 +562,7 @@ export interface CryptoApi {
      *
      * If there are existing backups they will be replaced.
      *
-     * The decryption key will be saved in Secret Storage (the {@link SecretStorageCallbacks.getSecretStorageKey} Crypto
+     * The decryption key will be saved in Secret Storage (the {@link matrix.SecretStorage.SecretStorageCallbacks.getSecretStorageKey} Crypto
      * callback will be called)
      * and the backup engine will be started.
      */
@@ -497,6 +574,36 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    /**
+     * Download and restore the full key backup from the homeserver.
+     *
+     * Before calling this method, a decryption key, and the backup version to restore,
+     * must have been saved in the crypto store. This happens in one of the following ways:
+     *
+     * - When a new backup version is created with {@link CryptoApi.resetKeyBackup}, a new key is created and cached.
+     * - The key can be loaded from secret storage with {@link CryptoApi.loadSessionBackupPrivateKeyFromSecretStorage}.
+     * - The key can be received from another device via secret sharing, typically as part of the interactive verification flow.
+     * - The key and backup version can also be set explicitly via {@link CryptoApi.storeSessionBackupPrivateKey},
+     *   though this is not expected to be a common operation.
+     *
+     * Warning: the full key backup may be quite large, so this operation may take several hours to complete.
+     * Use of {@link KeyBackupRestoreOpts.progressCallback} is recommended.
+     *
+     * @param opts
+     */
+    restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
+
+    /**
+     * Restores a key backup using a passphrase.
+     * The decoded key (derived from the passphrase) is stored locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
+     *
+     * @param passphrase - The passphrase to use to restore the key backup.
+     * @param opts
+     *
+     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/shared via 4S.
+     */
+    restoreKeyBackupWithPassphrase(passphrase: string, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -589,6 +696,23 @@ export enum DecryptionFailureCode {
      */
     HISTORICAL_MESSAGE_USER_NOT_JOINED = "HISTORICAL_MESSAGE_USER_NOT_JOINED",
 
+    /**
+     * The sender's identity is not verified, but was previously verified.
+     */
+    SENDER_IDENTITY_PREVIOUSLY_VERIFIED = "SENDER_IDENTITY_PREVIOUSLY_VERIFIED",
+
+    /**
+     * The sender device is not cross-signed.  This will only be used if the
+     * device isolation mode is set to `OnlySignedDevicesIsolationMode`.
+     */
+    UNSIGNED_SENDER_DEVICE = "UNSIGNED_SENDER_DEVICE",
+
+    /**
+     * We weren't able to link the message back to any known device.  This will
+     * only be used if the device isolation mode is set to `OnlySignedDevicesIsolationMode`.
+     */
+    UNKNOWN_SENDER_DEVICE = "UNKNOWN_SENDER_DEVICE",
+
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
 
@@ -632,6 +756,59 @@ export enum DecryptionFailureCode {
     UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
 }
 
+/** Base {@link DeviceIsolationMode} kind. */
+export enum DeviceIsolationModeKind {
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
+}
+
+/**
+ * A type of {@link DeviceIsolationMode}.
+ *
+ * Message encryption keys are shared with all devices in the room, except in case of
+ * verified user problems (see {@link errorOnVerifiedUserProblems}).
+ *
+ * Events from all senders are always decrypted (and should be decorated with message shields in case
+ * of authenticity warnings, see {@link EventEncryptionInfo}).
+ */
+export class AllDevicesIsolationMode {
+    public readonly kind = DeviceIsolationModeKind.AllDevicesIsolationMode;
+
+    /**
+     *
+     * @param errorOnVerifiedUserProblems - Behavior when sharing keys to remote devices.
+     *
+     * If set to `true`, sharing keys will fail (i.e. message sending will fail) with an error if:
+     *   - The user was previously verified but is not anymore, or:
+     *   - A verified user has some unverified devices (not cross-signed).
+     *
+     * If `false`, the keys will be distributed as usual. In this case, the client UX should display
+     * warnings to inform the user about problematic devices/users, and stop them hitting this case.
+     */
+    public constructor(public readonly errorOnVerifiedUserProblems: boolean) {}
+}
+
+/**
+ * A type of {@link DeviceIsolationMode}.
+ *
+ * Message encryption keys are only shared with devices that have been cross-signed by their owner.
+ * Encryption will throw an error if a verified user replaces their identity.
+ *
+ * Events are decrypted only if they come from a cross-signed device. Other events will result in a decryption
+ * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
+ */
+export class OnlySignedDevicesIsolationMode {
+    public readonly kind = DeviceIsolationModeKind.OnlySignedDevicesIsolationMode;
+}
+
+/**
+ * DeviceIsolationMode represents the mode of device isolation used when encrypting or decrypting messages.
+ * It can be one of two types: {@link AllDevicesIsolationMode} or {@link OnlySignedDevicesIsolationMode}.
+ *
+ * Only supported by rust Crypto.
+ */
+export type DeviceIsolationMode = AllDevicesIsolationMode | OnlySignedDevicesIsolationMode;
+
 /**
  * Options object for `CryptoApi.bootstrapCrossSigning`.
  */
@@ -650,11 +827,29 @@ export interface BootstrapCrossSigningOpts {
  * Represents the ways in which we trust a user
  */
 export class UserVerificationStatus {
+    /**
+     * Indicates if the identity has changed in a way that needs user approval.
+     *
+     * This happens if the identity has changed since we first saw it, *unless* the new identity has also been verified
+     * by our user (eg via an interactive verification).
+     *
+     * To rectify this, either:
+     *
+     *  * Conduct a verification of the new identity via {@link CryptoApi.requestVerificationDM}.
+     *  * Pin the new identity, via {@link CryptoApi.pinCurrentUserIdentity}.
+     *
+     * @returns true if the identity has changed in a way that needs user approval.
+     */
+    public readonly needsUserApproval: boolean;
+
     public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
         private readonly tofu: boolean,
-    ) {}
+        needsUserApproval: boolean = false,
+    ) {
+        this.needsUserApproval = needsUserApproval;
+    }
 
     /**
      * @returns true if this user is verified via any means
@@ -680,6 +875,8 @@ export class UserVerificationStatus {
 
     /**
      * @returns true if this user's key is trusted on first use
+     *
+     * @deprecated No longer supported, with the Rust crypto stack.
      */
     public isTofu(): boolean {
         return this.tofu;
@@ -736,9 +933,9 @@ export class DeviceVerificationStatus {
      * Check if we should consider this device "verified".
      *
      * A device is "verified" if either:
-     *  * it has been manually marked as such via {@link MatrixClient#setDeviceVerified}.
+     *  * it has been manually marked as such via {@link matrix.MatrixClient.setDeviceVerified}.
      *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
-     *    cross-signed devices via {@link Crypto.CryptoApi#setTrustCrossSignedDevices}.
+     *    cross-signed devices via {@link CryptoApi.setTrustCrossSignedDevices}.
      *
      * @returns true if this device is verified via any means.
      */
@@ -749,8 +946,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
- * Used when calling {@link CryptoApi#importRoomKeys} or
- * {@link CryptoApi#importRoomKeysAsJson} as the parameter of
+ * Used when calling {@link CryptoApi#importRoomKeys},
+ * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {
@@ -799,8 +996,11 @@ export interface CrossSigningStatus {
  * Crypto callbacks provided by the application
  */
 export interface CryptoCallbacks extends SecretStorageCallbacks {
+    /** @deprecated: unused with the Rust crypto stack. */
     getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    /** @deprecated: unused with the Rust crypto stack. */
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    /** @deprecated: unused with the Rust crypto stack. */
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
     /**
      * Called by {@link CryptoApi#bootstrapSecretStorage}
@@ -825,6 +1025,7 @@ export interface CryptoCallbacks extends SecretStorageCallbacks {
         checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
 
+    /** @deprecated: unused with the Rust crypto stack. */
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
@@ -843,6 +1044,7 @@ export interface CreateSecretStorageOpts {
     /**
      * The current key backup object. If passed,
      * the passphrase and recovery key from this backup will be used.
+     * @deprecated Not used by the Rust crypto stack.
      */
     keyBackupInfo?: KeyBackupInfo;
 
@@ -966,4 +1168,8 @@ export interface OwnDeviceKeys {
 }
 
 export * from "./verification.ts";
-export * from "./keybackup.ts";
+export type * from "./keybackup.ts";
+export * from "./recovery-key.ts";
+export * from "./key-passphrase.ts";
+export * from "./CryptoEvent.ts";
+export type * from "./CryptoEventHandlerMap.ts";

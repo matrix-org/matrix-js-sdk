@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// this is needed to tell TS about global.Olm
+// this is needed to tell TS about globalThis.Olm
 import "@matrix-org/olm";
 
 export {};
 
 declare global {
-    // use `number` as the return type in all cases for global.set{Interval,Timeout},
+    // use `number` as the return type in all cases for globalThis.set{Interval,Timeout},
     // so we don't accidentally use the methods on NodeJS.Timeout - they only exist in a subset of environments.
     // The overload for clear{Interval,Timeout} is resolved as expected.
     // We use `ReturnType<typeof setTimeout>` in the code to be agnostic of if this definition gets loaded.

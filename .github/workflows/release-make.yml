@@ -38,16 +38,19 @@ on:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
+permissions: {}
 jobs:
     release:
         name: Release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         environment: Release
+        permissions:
+            contents: write
         steps:
             - name: Load GPG key
               id: gpg
               if: inputs.gpg-fingerprint
-              uses: crazy-max/ghaction-import-gpg@01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6
+              uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5 # v6
               with:
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
                   passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -65,6 +68,7 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   ref: staging
+                  # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
@@ -136,7 +140,9 @@ jobs:
                   done
 
             - name: Bump package.json version
-              run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
+              run: |
+                  yarn version --no-git-tag-version --new-version "${VERSION#v}"
+                  git add package.json
 
             - name: Add to CHANGELOG.md
               if: inputs.final
@@ -157,11 +163,6 @@ jobs:
                   git add CHANGELOG.md
               env:
                   RELEASE_NOTES: ${{ steps.draft-release.outputs.body }}
-
-            - name: Run pre-release script to update package.json fields
-              run: |
-                  ./.action-repo/scripts/release/pre-release.sh
-                  git add package.json
 
             - name: Commit changes
               run: git commit -m "$VERSION"
@@ -276,7 +277,9 @@ jobs:
     post-release:
         name: Post release steps
         needs: release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
+        permissions:
+            issues: write
         steps:
             - id: repository
               run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
@@ -304,7 +307,7 @@ jobs:
     bump-downstreams:
         name: Update npm dependency in downstream projects
         needs: npm
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: inputs.downstreams
         strategy:
             matrix:
