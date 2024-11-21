@@ -3423,7 +3423,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Implementation of {@link CryptoApi#markAllTrackedUsersAsDirty}.
+     * Implementation of {@link Crypto.CryptoApi#markAllTrackedUsersAsDirty}.
      */
     public async markAllTrackedUsersAsDirty(): Promise<void> {
         // no op: we only expect rust crypto to be used in MSC4186.
