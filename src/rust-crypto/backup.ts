@@ -583,6 +583,11 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
+        // If the backup we are deleting is the active one, we need to disable the key backup and to have the local properties reset
+        if (this.activeBackupVersion === version) {
+            this.serverBackupInfo = null;
+            await this.disableKeyBackup();
+        }
     }
 
     /**
