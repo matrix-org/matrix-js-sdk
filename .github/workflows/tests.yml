@@ -10,6 +10,7 @@ concurrency:
     cancel-in-progress: true
 env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
+permissions: {} # No permissions required
 jobs:
     jest:
         name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
@@ -77,6 +78,8 @@ jobs:
         name: Downstream test element-web
         if: github.event_name == 'merge_group'
         uses: element-hq/element-web/.github/workflows/tests.yml@develop
+        permissions:
+            statuses: write
         with:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
@@ -84,6 +87,7 @@ jobs:
     complement-crypto:
         name: "Run Complement Crypto tests"
         if: github.event_name == 'merge_group'
+        permissions: read-all
         uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
         with:
             use_js_sdk: "."
@@ -107,6 +111,8 @@ jobs:
         if: always()
         needs:
             - element-web
+        permissions:
+            statuses: write
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'

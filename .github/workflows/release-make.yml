@@ -38,11 +38,14 @@ on:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
+permissions: {}
 jobs:
     release:
         name: Release
         runs-on: ubuntu-24.04
         environment: Release
+        permissions:
+            contents: write
         steps:
             - name: Load GPG key
               id: gpg
@@ -65,6 +68,7 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   ref: staging
+                  # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
@@ -274,6 +278,8 @@ jobs:
         name: Post release steps
         needs: release
         runs-on: ubuntu-24.04
+        permissions:
+            issues: write
         steps:
             - id: repository
               run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT

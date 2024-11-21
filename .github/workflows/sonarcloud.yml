@@ -5,19 +5,25 @@ on:
         secrets:
             SONAR_TOKEN:
                 required: true
+            # No longer used
             ELEMENT_BOT_TOKEN:
-                required: true
+                required: false
         inputs:
             sharded:
                 type: boolean
                 required: false
                 description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
+permissions: {}
 jobs:
     sonarqube:
         runs-on: ubuntu-24.04
         if: |
             github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.event != 'merge_group'
+        permissions:
+            actions: read
+            statuses: write
+            id-token: write # sonar
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
             # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
@@ -40,7 +46,6 @@ jobs:
               uses: actions/download-artifact@v4
               if: ${{ !inputs.sharded }}
               with:
-                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   name: coverage
                   path: coverage
@@ -48,7 +53,6 @@ jobs:
               uses: actions/download-artifact@v4
               if: inputs.sharded
               with:
-                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   pattern: coverage-*
                   path: coverage
