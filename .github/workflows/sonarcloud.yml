@@ -44,7 +44,6 @@ jobs:
 
             - name: 📥 Download artifact
               uses: actions/download-artifact@v4
-              id: download
               if: ${{ !inputs.sharded }}
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -53,7 +52,6 @@ jobs:
                   path: coverage
             - name: 📥 Download sharded artifacts
               uses: actions/download-artifact@v4
-              id: download
               if: inputs.sharded
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -61,11 +59,12 @@ jobs:
                   pattern: coverage-*
                   path: coverage
                   merge-multiple: true
-            - name: Fail if failed to download files
-              if: steps.download.outputs.download-path == ''
+            - name: Check coverage artifact
               run: |
-                  echo "Failed to download coverage artifact"
-                  exit 1
+                  if [ ! -d coverage ]; then
+                      echo "Coverage not found. Exiting with failure."
+                      exit 1
+                  fi
 
             - id: extra_args
               run: |
