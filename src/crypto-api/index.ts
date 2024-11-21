@@ -378,6 +378,12 @@ export interface CryptoApi {
     getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
 
     /**
+     * All users *whose device lists we are tracking* are flagged as needing a
+     * key query. Users whose devices we are not tracking are ignored.
+     */
+    markAllTrackedUsersAsDirty(): Promise<void>;
+
+    /**
      * Encrypts a given payload object via Olm to-device messages to a given
      * set of devices.
      *
