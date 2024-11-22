@@ -841,6 +841,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
         }
 
+        // likewise with the key backup key: if we have one, store it in secret storage (if it's not already there)
+        // also don't bother storing it if we're about to set up a new backup
+        if (!setupNewKeyBackup) {
+            const keyBackupKey = await this.getSessionBackupPrivateKey();
+
+            const keyBackupKeyInStorage = await secretStorageCanAccessSecrets(this.secretStorage, [
+                "m.megolm_backup.v1",
+            ]);
+
+            if (keyBackupKey && !keyBackupKeyInStorage) {
+                await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(keyBackupKey));
+            }
+        }
+
         if (setupNewKeyBackup) {
             await this.resetKeyBackup();
         }
