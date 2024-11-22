@@ -486,7 +486,7 @@ describe("RoomMember", function () {
             } as unknown as RoomState;
             expect(member.name).toEqual(userA); // default = user_id
             member.setMembershipEvent(joinEvent, roomState);
-            expect(member.name).not.toEqual("Alíce"); // it should disambig.
+            expect(member.name).toEqual("Alíce​ (@alice:bar)"); // it should disambig.
             // user_id should be there somewhere
             expect(member.name.indexOf(userA)).not.toEqual(-1);
         });
@@ -522,7 +522,7 @@ describe("RoomMember", function () {
             } as unknown as RoomState;
             expect(member.name).toEqual(userA); // default = user_id
             member.setMembershipEvent(joinEvent, roomState);
-            expect(member.name).not.toEqual("Alíce"); // it should disambig.
+            expect(member.name).toEqual("@clarissaઃbar (@alice:bar)"); // it should disambig.
             // user_id should be there somewhere
             expect(member.name.indexOf(userA)).not.toEqual(-1);
         });
