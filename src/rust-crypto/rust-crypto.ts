@@ -853,9 +853,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             if (keyBackupKey && !keyBackupKeyInStorage) {
                 await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(keyBackupKey));
             }
-        }
-
-        if (setupNewKeyBackup) {
+        } else {
             await this.resetKeyBackup();
         }
     }
