@@ -490,6 +490,42 @@ describe("RoomMember", function () {
             // user_id should be there somewhere
             expect(member.name.indexOf(userA)).not.toEqual(-1);
         });
+
+        it("should disambiguate a user when their displayname looks like an MXID which isn't theirs", function () {
+            const joinEvent = utils.mkMembership({
+                event: true,
+                mship: KnownMembership.Join,
+                user: userA,
+                room: roomId,
+                name: "@clarissa\u0a83bar",
+            });
+
+            const roomState = {
+                getStateEvents: function (type: string) {
+                    if (type !== "m.room.member") {
+                        return [];
+                    }
+                    return [
+                        utils.mkMembership({
+                            event: true,
+                            mship: KnownMembership.Join,
+                            room: roomId,
+                            user: userC,
+                            name: "Alice",
+                        }),
+                        joinEvent,
+                    ];
+                },
+                getUserIdsWithDisplayName: function (displayName: string) {
+                    return [userA, userC];
+                },
+            } as unknown as RoomState;
+            expect(member.name).toEqual(userA); // default = user_id
+            member.setMembershipEvent(joinEvent, roomState);
+            expect(member.name).not.toEqual("Alíce"); // it should disambig.
+            // user_id should be there somewhere
+            expect(member.name.indexOf(userA)).not.toEqual(-1);
+        });
     });
 });
 
