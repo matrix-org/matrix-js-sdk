@@ -844,14 +844,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         // likewise with the key backup key: if we have one, store it in secret storage (if it's not already there)
         // also don't bother storing it if we're about to set up a new backup
         if (!setupNewKeyBackup) {
-            const keyBackupKey = await this.getSessionBackupPrivateKey();
+            const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+            if (backupKeys.decryptionKey) {
+                const keyBackupKeyInStorage = await secretStorageCanAccessSecrets(this.secretStorage, [
+                    "m.megolm_backup.v1",
+                ]);
 
-            const keyBackupKeyInStorage = await secretStorageCanAccessSecrets(this.secretStorage, [
-                "m.megolm_backup.v1",
-            ]);
-
-            if (keyBackupKey && !keyBackupKeyInStorage) {
-                await this.secretStorage.store("m.megolm_backup.v1", encodeBase64(keyBackupKey));
+                if (!keyBackupKeyInStorage) {
+                    await this.secretStorage.store("m.megolm_backup.v1", backupKeys.decryptionKey.toBase64());
+                }
             }
         } else {
             await this.resetKeyBackup();
