@@ -49,7 +49,7 @@ jobs:
               with:
                   script: |
                       const { data } = await github.rest.search.issuesAndPullRequests({
-                          q: `repo:${context.repo.owner}/${context.repo.repo} label:Z-Labs`,
+                          q: `repo:${context.repo.owner}/${context.repo.repo} label:X-Release-Blocker is:open`,
                           per_page: 50,
                       });
 
