@@ -43,6 +43,9 @@ jobs:
     checks:
         name: Sanity checks
         runs-on: ubuntu-24.04
+        permissions:
+            issues: read
+            pull-requests: read
         steps:
             - name: Check for X-Release-Blocker label on any open issues or PRs
               uses: actions/github-script@v7
