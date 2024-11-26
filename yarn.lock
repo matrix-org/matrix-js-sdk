@@ -1649,11 +1649,11 @@
     p-map "^4.0.0"
 
 "@stylistic/eslint-plugin@^2.9.0":
-  version "2.10.1"
-  resolved "https://registry.yarnpkg.com/@stylistic/eslint-plugin/-/eslint-plugin-2.10.1.tgz#809924752a1a13ebff2b0b6d7884fd61d389a907"
-  integrity sha512-U+4yzNXElTf9q0kEfnloI9XbOyD4cnEQCxjUI94q0+W++0GAEQvJ/slwEj9lwjDHfGADRSr+Tco/z0XJvmDfCQ==
+  version "2.11.0"
+  resolved "https://registry.yarnpkg.com/@stylistic/eslint-plugin/-/eslint-plugin-2.11.0.tgz#50d0289f36f7201055b7fa1729fdc1d8c46e93fa"
+  integrity sha512-PNRHbydNG5EH8NK4c+izdJlxajIR6GxcUhzsYNRsn6Myep4dsZt0qFCz3rCPnkvgO5FYibDcMqgNHUT+zvjYZw==
   dependencies:
-    "@typescript-eslint/utils" "^8.12.2"
+    "@typescript-eslint/utils" "^8.13.0"
     eslint-visitor-keys "^4.2.0"
     espree "^10.3.0"
     estraverse "^5.3.0"
@@ -1965,7 +1965,7 @@
     semver "^7.6.0"
     ts-api-utils "^1.3.0"
 
-"@typescript-eslint/utils@8.16.0":
+"@typescript-eslint/utils@8.16.0", "@typescript-eslint/utils@^8.13.0":
   version "8.16.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/utils/-/utils-8.16.0.tgz#c71264c437157feaa97842809836254a6fc833c3"
   integrity sha512-C1zRy/mOL8Pj157GiX4kaw7iyRLKfJXBR3L82hk5kS/GyHcOFmy4YUq/zfZti72I9wnuQtA/+xzft4wCC8PJdA==
@@ -1975,7 +1975,7 @@
     "@typescript-eslint/types" "8.16.0"
     "@typescript-eslint/typescript-estree" "8.16.0"
 
-"@typescript-eslint/utils@^6.0.0 || ^7.0.0 || ^8.0.0", "@typescript-eslint/utils@^8.12.2":
+"@typescript-eslint/utils@^6.0.0 || ^7.0.0 || ^8.0.0":
   version "8.14.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/utils/-/utils-8.14.0.tgz#ac2506875e03aba24e602364e43b2dfa45529dbd"
   integrity sha512-OGqj6uB8THhrHj0Fk27DcHPojW7zKwKkPmHXHvQ58pLYp4hy8CSUdTKykKeh+5vFqTTVmjz0zCOOPKRovdsgHA==
