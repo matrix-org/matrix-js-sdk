@@ -713,15 +713,26 @@ describe("RustCrypto", () => {
         } as SecretStorageCallbacks;
         const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
 
-        const rustCrypto = await makeTestRustCrypto(
-            {
-                authedRequest: jest.fn().mockImplementation((method, query) => {
-                    if (query === "/room_keys/version") {
-                        return Promise.resolve({ version: 1, algorithm: "dummy", auth_data: {} });
+        let backupAuthData: any;
+        let backupAlg: string;
+
+        const fetchMock = {
+            authedRequest: jest.fn().mockImplementation((method, path, query, body) => {
+                if (path === "/room_keys/version") {
+                    if (method === "POST") {
+                        backupAuthData = body["auth_data"];
+                        backupAlg = body["algorithm"];
+                        return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    } else if (method === "GET" && backupAuthData) {
+                        return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
                     }
-                    return Promise.resolve({});
-                }),
-            } as unknown as MatrixHttpApi<any>,
+                }
+                return Promise.resolve({});
+            }),
+        };
+
+        const rustCrypto = await makeTestRustCrypto(
+            fetchMock as unknown as MatrixHttpApi<any>,
             testData.TEST_USER_ID,
             undefined,
             secretStorage,
@@ -734,7 +745,8 @@ describe("RustCrypto", () => {
             };
         }
 
-        jest.spyOn(rustCrypto, "getSessionBackupPrivateKey").mockResolvedValue(new Uint8Array(32));
+        await rustCrypto.resetKeyBackup();
+
         const storeSpy = jest.spyOn(secretStorage, "store");
 
         await rustCrypto.bootstrapSecretStorage({

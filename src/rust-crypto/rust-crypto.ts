@@ -844,7 +844,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         // likewise with the key backup key: if we have one, store it in secret storage (if it's not already there)
         // also don't bother storing it if we're about to set up a new backup
         if (!setupNewKeyBackup) {
-            this.saveBackupKeyToStorage();
+            await this.saveBackupKeyToStorage();
         } else {
             await this.resetKeyBackup();
         }
