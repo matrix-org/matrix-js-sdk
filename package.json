@@ -122,7 +122,7 @@
         "ts-node": "^10.9.2",
         "typedoc": "^0.26.0",
         "typedoc-plugin-coverage": "^3.0.0",
-        "typedoc-plugin-mdn-links": "^3.0.3",
+        "typedoc-plugin-mdn-links": "^4.0.0",
         "typedoc-plugin-missing-exports": "^3.0.0",
         "typescript": "^5.4.2"
     },
