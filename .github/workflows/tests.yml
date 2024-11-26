@@ -116,7 +116,7 @@ jobs:
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'
-              uses: guibranco/github-status-action-v2@1f26a0237cd1a57626fbb5a0eb2494c9b8797d07
+              uses: guibranco/github-status-action-v2@66088c44e212a906c32a047529a213d81809ec1c
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: success
