@@ -45,6 +45,8 @@ jobs:
         name: Label Community PRs
         runs-on: ubuntu-24.04
         if: github.event.action == 'opened'
+        permissions:
+            pull-requests: write
         steps:
             - name: Check membership
               if: github.event.pull_request.user.login != 'renovate[bot]'
