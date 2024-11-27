@@ -17,13 +17,13 @@ Warn when you initial sync if the room has any new undefined devices since you w
 
 Warn when the user tries to send a message:
 
--   If the room has unverified devices which the user has not yet been told about in the context of this room
-    ...or in the context of this user? currently all verification is per-user, not per-room.
-    ...this should be good enough.
+- If the room has unverified devices which the user has not yet been told about in the context of this room
+  ...or in the context of this user? currently all verification is per-user, not per-room.
+  ...this should be good enough.
 
--   so track whether we have warned the user or not about unverified devices - blocked, unverified, verified, unverified_warned.
-    throw an error when trying to encrypt if there are pure unverified devices there
-    app will have to search for the devices which are pure unverified to warn about them - have to do this from MembersList anyway?
-    -   or megolm could warn which devices are causing the problems.
+- so track whether we have warned the user or not about unverified devices - blocked, unverified, verified, unverified_warned.
+  throw an error when trying to encrypt if there are pure unverified devices there
+  app will have to search for the devices which are pure unverified to warn about them - have to do this from MembersList anyway?
+    - or megolm could warn which devices are causing the problems.
 
 Why do we wait to establish outbound sessions? It just makes a horrible pause when we first try to send a message... but could otherwise unnecessarily consume resources?

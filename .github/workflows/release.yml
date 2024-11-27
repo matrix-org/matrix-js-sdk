@@ -21,9 +21,14 @@ on:
                 type: boolean
                 default: true
 concurrency: ${{ github.workflow }}
+permissions: {} # No permissions required
 jobs:
     release:
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: read
         secrets: inherit
         with:
             final: ${{ inputs.mode == 'final' }}

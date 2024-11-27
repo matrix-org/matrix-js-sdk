@@ -8,9 +8,12 @@ on:
                 type: string
                 required: false
 concurrency: release-drafter-action
+permissions: {}
 jobs:
     draft:
         runs-on: ubuntu-24.04
+        permissions:
+            contents: write
         steps:
             - name: 🧮 Checkout code
               uses: actions/checkout@v4

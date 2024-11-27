@@ -9,6 +9,7 @@ on:
             ELEMENT_BOT_TOKEN:
                 required: true
 concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
+permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     changelog:
         name: Preview Changelog
@@ -44,6 +45,8 @@ jobs:
         name: Label Community PRs
         runs-on: ubuntu-24.04
         if: github.event.action == 'opened'
+        permissions:
+            pull-requests: write
         steps:
             - name: Check membership
               if: github.event.pull_request.user.login != 'renovate[bot]'

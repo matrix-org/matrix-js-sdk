@@ -13,12 +13,14 @@ on:
                 type: string
                 required: false
 concurrency: ${{ github.workflow }}
+permissions: {} # Uses ELEMENT_BOT_TOKEN
 jobs:
     merge:
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
               with:
+                  # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 

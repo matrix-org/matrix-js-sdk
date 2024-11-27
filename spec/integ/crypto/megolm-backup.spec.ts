@@ -22,7 +22,6 @@ import { Mocked } from "jest-mock";
 import {
     createClient,
     Crypto,
-    CryptoEvent,
     encodeBase64,
     ICreateClientOpts,
     IEvent,
@@ -45,7 +44,7 @@ import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
-import { decodeRecoveryKey, DecryptionFailureCode } from "../../../src/crypto-api";
+import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent } from "../../../src/crypto-api";
 import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
@@ -967,6 +966,40 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toStrictEqual(testData.SIGNED_BACKUP_DATA.version);
+    });
+
+    newBackendOnly("getKeyBackupInfo() should not return a backup if the active backup has been deleted", async () => {
+        // 404 means that there is no active backup
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", 404);
+        fetchMock.delete(`express:/_matrix/client/v3/room_keys/version/${testData.SIGNED_BACKUP_DATA.version}`, {});
+
+        aliceClient = await initTestClient();
+        const aliceCrypto = aliceClient.getCrypto()!;
+        await aliceClient.startClient();
+
+        // tell Alice to trust the dummy device that signed the backup
+        await waitForDeviceList();
+        await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+        await aliceCrypto.checkKeyBackupAndEnable();
+
+        // At this point there is no backup
+        expect(await aliceCrypto.getKeyBackupInfo()).toBeNull();
+
+        // Return now the backup
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+            overwriteRoutes: true,
+        });
+
+        expect(await aliceCrypto.getKeyBackupInfo()).toStrictEqual(testData.SIGNED_BACKUP_DATA);
+
+        // Delete the backup and we are expecting the key backup to be disabled
+        const keyBackupStatus = defer<boolean>();
+        aliceClient.once(CryptoEvent.KeyBackupStatus, (enabled) => keyBackupStatus.resolve(enabled));
+        await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version!);
+        expect(await keyBackupStatus.promise).toBe(false);
+
+        // The backup info should not be available anymore
+        expect(await aliceCrypto.getKeyBackupInfo()).toBeNull();
     });
 
     describe("isKeyBackupTrusted", () => {

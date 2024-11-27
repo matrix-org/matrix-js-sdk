@@ -5,16 +5,19 @@ on:
         workflows: ["Static Analysis"]
         types:
             - completed
-
+permissions: {}
 jobs:
     netlify:
         if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request'
         runs-on: ubuntu-24.04
+        permissions:
+            actions: read
+            deployments: write
         steps:
             - name: 📥 Download artifact
               uses: actions/download-artifact@v4
               with:
-                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   name: docs
                   path: docs
