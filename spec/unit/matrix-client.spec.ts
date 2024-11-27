@@ -2799,24 +2799,28 @@ describe("MatrixClient", function () {
                         roomCreateEvent(room1.roomId, replacedByCreate1.roomId),
                         predecessorEvent(room1.roomId, replacedByDynamicPredecessor1.roomId),
                     ],
-                    {},
+                    { addToState: true },
                 );
                 room2.addLiveEvents(
                     [
                         roomCreateEvent(room2.roomId, replacedByCreate2.roomId),
                         predecessorEvent(room2.roomId, replacedByDynamicPredecessor2.roomId),
                     ],
-                    {},
+                    { addToState: true },
                 );
-                replacedByCreate1.addLiveEvents([tombstoneEvent(room1.roomId, replacedByCreate1.roomId)], {});
-                replacedByCreate2.addLiveEvents([tombstoneEvent(room2.roomId, replacedByCreate2.roomId)], {});
+                replacedByCreate1.addLiveEvents([tombstoneEvent(room1.roomId, replacedByCreate1.roomId)], {
+                    addToState: true,
+                });
+                replacedByCreate2.addLiveEvents([tombstoneEvent(room2.roomId, replacedByCreate2.roomId)], {
+                    addToState: true,
+                });
                 replacedByDynamicPredecessor1.addLiveEvents(
                     [tombstoneEvent(room1.roomId, replacedByDynamicPredecessor1.roomId)],
-                    {},
+                    { addToState: true },
                 );
                 replacedByDynamicPredecessor2.addLiveEvents(
                     [tombstoneEvent(room2.roomId, replacedByDynamicPredecessor2.roomId)],
-                    {},
+                    { addToState: true },
                 );
 
                 return {
@@ -2854,10 +2858,10 @@ describe("MatrixClient", function () {
                 const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
                 client.store = new StubStore();
                 client.store.getRooms = () => [room1, replacedRoom1, replacedRoom2, room2];
-                room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], {});
-                room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], {});
-                replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], {});
-                replacedRoom2.addLiveEvents([tombstoneEvent(room2.roomId, replacedRoom2.roomId)], {});
+                room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], { addToState: true });
+                room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], { addToState: true });
+                replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], { addToState: true });
+                replacedRoom2.addLiveEvents([tombstoneEvent(room2.roomId, replacedRoom2.roomId)], { addToState: true });
 
                 // When we ask for the visible rooms
                 const rooms = client.getVisibleRooms();
@@ -2937,15 +2941,15 @@ describe("MatrixClient", function () {
                 const room4 = new Room("room4", client, "@michonne:hawthorne.example.com");
 
                 if (creates) {
-                    room2.addLiveEvents([roomCreateEvent(room2.roomId, room1.roomId)]);
-                    room3.addLiveEvents([roomCreateEvent(room3.roomId, room2.roomId)]);
-                    room4.addLiveEvents([roomCreateEvent(room4.roomId, room3.roomId)]);
+                    room2.addLiveEvents([roomCreateEvent(room2.roomId, room1.roomId)], { addToState: true });
+                    room3.addLiveEvents([roomCreateEvent(room3.roomId, room2.roomId)], { addToState: true });
+                    room4.addLiveEvents([roomCreateEvent(room4.roomId, room3.roomId)], { addToState: true });
                 }
 
                 if (tombstones) {
-                    room1.addLiveEvents([tombstoneEvent(room2.roomId, room1.roomId)], {});
-                    room2.addLiveEvents([tombstoneEvent(room3.roomId, room2.roomId)], {});
-                    room3.addLiveEvents([tombstoneEvent(room4.roomId, room3.roomId)], {});
+                    room1.addLiveEvents([tombstoneEvent(room2.roomId, room1.roomId)], { addToState: true });
+                    room2.addLiveEvents([tombstoneEvent(room3.roomId, room2.roomId)], { addToState: true });
+                    room3.addLiveEvents([tombstoneEvent(room4.roomId, room3.roomId)], { addToState: true });
                 }
 
                 mocked(store.getRoom).mockImplementation((roomId: string) => {
@@ -2980,17 +2984,17 @@ describe("MatrixClient", function () {
                 const dynRoom4 = new Room("dynRoom4", client, "@rick:grimes.example.com");
                 const dynRoom5 = new Room("dynRoom5", client, "@rick:grimes.example.com");
 
-                dynRoom1.addLiveEvents([tombstoneEvent(dynRoom2.roomId, dynRoom1.roomId)], {});
-                dynRoom2.addLiveEvents([predecessorEvent(dynRoom2.roomId, dynRoom1.roomId)]);
+                dynRoom1.addLiveEvents([tombstoneEvent(dynRoom2.roomId, dynRoom1.roomId)], { addToState: true });
+                dynRoom2.addLiveEvents([predecessorEvent(dynRoom2.roomId, dynRoom1.roomId)], { addToState: true });
 
-                dynRoom2.addLiveEvents([tombstoneEvent(room3.roomId, dynRoom2.roomId)], {});
-                room3.addLiveEvents([predecessorEvent(room3.roomId, dynRoom2.roomId)]);
+                dynRoom2.addLiveEvents([tombstoneEvent(room3.roomId, dynRoom2.roomId)], { addToState: true });
+                room3.addLiveEvents([predecessorEvent(room3.roomId, dynRoom2.roomId)], { addToState: true });
 
-                room3.addLiveEvents([tombstoneEvent(dynRoom4.roomId, room3.roomId)], {});
-                dynRoom4.addLiveEvents([predecessorEvent(dynRoom4.roomId, room3.roomId)]);
+                room3.addLiveEvents([tombstoneEvent(dynRoom4.roomId, room3.roomId)], { addToState: true });
+                dynRoom4.addLiveEvents([predecessorEvent(dynRoom4.roomId, room3.roomId)], { addToState: true });
 
-                dynRoom4.addLiveEvents([tombstoneEvent(dynRoom5.roomId, dynRoom4.roomId)], {});
-                dynRoom5.addLiveEvents([predecessorEvent(dynRoom5.roomId, dynRoom4.roomId)]);
+                dynRoom4.addLiveEvents([tombstoneEvent(dynRoom5.roomId, dynRoom4.roomId)], { addToState: true });
+                dynRoom5.addLiveEvents([predecessorEvent(dynRoom5.roomId, dynRoom4.roomId)], { addToState: true });
 
                 mocked(store.getRoom)
                     .mockClear()

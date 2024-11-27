@@ -284,7 +284,13 @@ export class RoomWidgetClient extends MatrixClient {
                 const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
                 const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
-                await this.syncApi!.injectRoomEvents(this.room!, [], events);
+                if (this.syncApi instanceof SyncApi) {
+                    // Passing undefined for `stateAfterEventList` allows will make `injectRoomEvents` run in legacy mode
+                    // -> state events in `timelineEventList` will update the state.
+                    await this.syncApi.injectRoomEvents(this.room!, undefined, events);
+                } else {
+                    await this.syncApi!.injectRoomEvents(this.room!, events); // Sliding Sync
+                }
                 events.forEach((event) => {
                     this.emit(ClientEvent.Event, event);
                     logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
@@ -567,7 +573,34 @@ export class RoomWidgetClient extends MatrixClient {
 
             // Only inject once we have update the txId
             await this.updateTxId(event);
-            await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+
+            // The widget API does not tell us whether a state event came from `state_after` or not so we assume legacy behaviour for now.
+            if (this.syncApi instanceof SyncApi) {
+                // The code will want to be something like:
+                // ```
+                // if (!params.addToTimeline && !params.addToState) {
+                // // Passing undefined for `stateAfterEventList` makes `injectRoomEvents` run in "legacy mode"
+                // // -> state events part of the `timelineEventList` parameter will update the state.
+                //     this.injectRoomEvents(this.room!, [], undefined, [event]);
+                // } else {
+                //     this.injectRoomEvents(this.room!, undefined, params.addToState ? [event] : [], params.addToTimeline ? [event] : []);
+                // }
+                // ```
+
+                // Passing undefined for `stateAfterEventList` allows will make `injectRoomEvents` run in legacy mode
+                // -> state events in `timelineEventList` will update the state.
+                await this.syncApi.injectRoomEvents(this.room!, [], undefined, [event]);
+            } else {
+                // The code will want to be something like:
+                // ```
+                // if (!params.addToTimeline && !params.addToState) {
+                //     this.injectRoomEvents(this.room!, [], [event]);
+                // } else {
+                //     this.injectRoomEvents(this.room!, params.addToState ? [event] : [], params.addToTimeline ? [event] : []);
+                // }
+                // ```
+                await this.syncApi!.injectRoomEvents(this.room!, [], [event]); // Sliding Sync
+            }
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);

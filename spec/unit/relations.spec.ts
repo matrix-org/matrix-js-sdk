@@ -198,8 +198,8 @@ describe("Relations", function () {
             });
 
             const timelineSet = new EventTimelineSet(room);
-            timelineSet.addLiveEvent(targetEvent);
-            timelineSet.addLiveEvent(relationEvent);
+            timelineSet.addLiveEvent(targetEvent, { addToState: false });
+            timelineSet.addLiveEvent(relationEvent, { addToState: false });
 
             await relationsCreated;
         }
@@ -212,8 +212,8 @@ describe("Relations", function () {
             });
 
             const timelineSet = new EventTimelineSet(room);
-            timelineSet.addLiveEvent(relationEvent);
-            timelineSet.addLiveEvent(targetEvent);
+            timelineSet.addLiveEvent(relationEvent, { addToState: false });
+            timelineSet.addLiveEvent(targetEvent, { addToState: false });
 
             await relationsCreated;
         }

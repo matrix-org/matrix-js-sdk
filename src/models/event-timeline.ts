@@ -35,6 +35,11 @@ export interface IAddEventOptions extends Pick<IMarkerFoundOptions, "timelineWas
     toStartOfTimeline: boolean;
     /** The state events to reconcile metadata from */
     roomState?: RoomState;
+    /** Whether to add timeline events to the state as was done in legacy sync v2.
+     * If true then timeline events will be added to the state.
+     * In sync v2 with org.matrix.msc4222.use_state_after and simplified sliding sync,
+     * all state arrives explicitly and timeline events should not be added. */
+    addToState: boolean;
 }
 
 export enum Direction {
@@ -362,7 +367,7 @@ export class EventTimeline {
      */
     public addEvent(
         event: MatrixEvent,
-        { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions = { toStartOfTimeline: false },
+        { toStartOfTimeline, roomState, timelineWasEmpty, addToState }: IAddEventOptions,
     ): void {
         if (!roomState) {
             roomState = toStartOfTimeline ? this.startState : this.endState;
@@ -374,7 +379,7 @@ export class EventTimeline {
             EventTimeline.setEventMetadata(event, roomState!, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
-            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+            if (addToState && event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
                 roomState?.setStateEvents([event], { timelineWasEmpty });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
@@ -417,14 +422,14 @@ export class EventTimeline {
      *
      * @internal
      */
-    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState): void {
+    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState, addToState: boolean): void {
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
             EventTimeline.setEventMetadata(event, roomState, false);
 
             // modify state but only on unfiltered timelineSets
-            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+            if (addToState && event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
                 roomState.setStateEvents([event], {});
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try

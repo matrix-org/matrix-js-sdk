@@ -168,14 +168,17 @@ describe("MatrixClient", function () {
                     type: "test",
                     content: {},
                 });
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: KnownMembership.Join,
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
 
@@ -188,14 +191,17 @@ describe("MatrixClient", function () {
             const roomId = "!roomId:server";
             const roomAlias = "#my-fancy-room:server";
             const room = new Room(roomId, client, userId);
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: KnownMembership.Join,
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             store.storeRoom(room);
 
             // The method makes a request to resolve the alias
@@ -275,14 +281,17 @@ describe("MatrixClient", function () {
                     content: {},
                 });
 
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: KnownMembership.Knock,
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Knock,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
 
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);

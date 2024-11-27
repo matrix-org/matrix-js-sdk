@@ -17,8 +17,10 @@ limitations under the License.
 
 import { ReceiptType } from "../../src/@types/read_receipts";
 import {
-    IJoinedRoom,
+    Category,
     IInvitedRoom,
+    IInviteState,
+    IJoinedRoom,
     IKnockedRoom,
     IKnockState,
     ILeftRoom,
@@ -27,7 +29,6 @@ import {
     IStrippedState,
     ISyncResponse,
     SyncAccumulator,
-    IInviteState,
 } from "../../src/sync-accumulator";
 import { IRoomSummary } from "../../src";
 import * as utils from "../test-utils/test-utils";
@@ -85,6 +86,7 @@ describe("SyncAccumulator", function () {
         // technically cheating since we also cheekily pre-populate keys we
         // know that the sync accumulator will pre-populate.
         // It isn't 100% transitive.
+        const events = [member("alice", KnownMembership.Join), member("bob", KnownMembership.Join)];
         const res = {
             next_batch: "abc",
             rooms: {
@@ -92,18 +94,17 @@ describe("SyncAccumulator", function () {
                 leave: {},
                 join: {
                     "!foo:bar": {
-                        account_data: { events: [] },
-                        ephemeral: { events: [] },
-                        unread_notifications: {},
-                        state: {
-                            events: [member("alice", KnownMembership.Join), member("bob", KnownMembership.Join)],
-                        },
-                        summary: {
+                        "account_data": { events: [] },
+                        "ephemeral": { events: [] },
+                        "unread_notifications": {},
+                        "org.matrix.msc4222.state_after": { events },
+                        "state": { events },
+                        "summary": {
                             "m.heroes": undefined,
                             "m.joined_member_count": undefined,
                             "m.invited_member_count": undefined,
                         },
-                        timeline: {
+                        "timeline": {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
                         },
@@ -882,6 +883,147 @@ describe("SyncAccumulator", function () {
             ).not.toBeUndefined();
         });
     });
+
+    describe("msc4222", () => {
+        it("should accumulate state_after events", () => {
+            const initState = {
+                events: [member("alice", KnownMembership.Knock)],
+            };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": initState,
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
+
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 1",
+                                },
+                                skey: "",
+                            }) as IStateEvent,
+                        ],
+                    },
+                }),
+            );
+
+            expect(
+                sa.getJSON().roomsData[Category.Join]["!foo:bar"].state?.events.find((e) => e.type === "m.room.name")
+                    ?.content.name,
+            ).toEqual("Room 1");
+
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 2",
+                                },
+                                skey: "",
+                            }) as IStateEvent,
+                        ],
+                    },
+                }),
+            );
+
+            expect(
+                sa.getJSON().roomsData[Category.Join]["!foo:bar"].state?.events.find((e) => e.type === "m.room.name")
+                    ?.content.name,
+            ).toEqual("Room 2");
+        });
+
+        it("should ignore state events in timeline", () => {
+            const initState = {
+                events: [member("alice", KnownMembership.Knock)],
+            };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": initState,
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
+
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [],
+                    },
+                    "timeline": {
+                        events: [
+                            utils.mkEvent({
+                                user: "alice",
+                                room: "!knock:bar",
+                                type: "m.room.name",
+                                content: {
+                                    name: "Room 1",
+                                },
+                                skey: "",
+                            }) as IStateEvent,
+                        ],
+                        prev_batch: "something",
+                    },
+                }),
+            );
+
+            expect(
+                sa.getJSON().roomsData[Category.Join]["!foo:bar"].state?.events.find((e) => e.type === "m.room.name")
+                    ?.content.name,
+            ).not.toEqual("Room 1");
+        });
+
+        it("should not rewind state_after to start of timeline in toJSON", () => {
+            const initState = {
+                events: [member("alice", KnownMembership.Knock)],
+            };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": initState,
+                    "timeline": {
+                        events: initState.events,
+                        prev_batch: null,
+                    },
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
+
+            const joinEvent = member("alice", KnownMembership.Join);
+            joinEvent.unsigned = { prev_content: initState.events[0].content, prev_sender: initState.events[0].sender };
+            sa.accumulate(
+                syncSkeleton({
+                    "org.matrix.msc4222.state_after": {
+                        events: [joinEvent],
+                    },
+                    "timeline": {
+                        events: [joinEvent],
+                        prev_batch: "something",
+                    },
+                }),
+            );
+
+            const roomData = sa.getJSON().roomsData[Category.Join]["!foo:bar"];
+            expect(roomData.state?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
+                KnownMembership.Knock,
+            );
+            expect(
+                roomData["org.matrix.msc4222.state_after"]?.events.find((e) => e.type === "m.room.member")?.content
+                    .membership,
+            ).toEqual(KnownMembership.Join);
+            expect(roomData.timeline?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
+                KnownMembership.Join,
+            );
+        });
+    });
 });
 
 function syncSkeleton(
@@ -961,5 +1103,6 @@ function member(localpart: string, membership: Membership) {
         state_key: "@" + localpart + ":localhost",
         sender: "@" + localpart + ":localhost",
         type: "m.room.member",
+        unsigned: {},
     };
 }
