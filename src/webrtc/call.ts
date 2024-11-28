@@ -631,19 +631,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!this.client.getUseE2eForGroupCall()) return;
         // It's possible to want E2EE and yet not have the means to manage E2EE
         // ourselves (for example if the client is a RoomWidgetClient)
-        if (!this.client.isCryptoEnabled()) {
+        if (!this.client.getCrypto()) {
             // All we know is the device ID
             this.opponentDeviceInfo = new DeviceInfo(this.opponentDeviceId);
             return;
         }
-        // if we've got to this point, we do want to init crypto, so throw if we can't
-        if (!this.client.crypto) throw new Error("Crypto is not initialised.");
-
         const userId = this.invitee || this.getOpponentMember()?.userId;
 
         if (!userId) throw new Error("Couldn't find opponent user ID to init crypto");
 
-        const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
+        // Here we were calling `MatrixClient.crypto.deviceList.downloadKeys` which is not supported by the rust cryptography.
+        const deviceInfoMap = new Map();
         this.opponentDeviceInfo = deviceInfoMap.get(userId)?.get(this.opponentDeviceId);
         if (this.opponentDeviceInfo === undefined) {
             throw new GroupCallUnknownDeviceError(userId);
@@ -2516,18 +2514,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     return;
                 }
 
-                await this.client.encryptAndSendToDevices(
-                    [
-                        {
-                            userId,
-                            deviceInfo: this.opponentDeviceInfo,
-                        },
-                    ],
-                    {
-                        type: eventType,
-                        content,
-                    },
-                );
+                // Here we were calling `MatrixClient.encryptAndSendToDevices` which is not supported by the rust cryptography.
             } else {
                 await this.client.sendToDevice(
                     eventType,
