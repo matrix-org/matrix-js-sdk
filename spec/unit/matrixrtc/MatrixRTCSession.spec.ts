@@ -864,7 +864,64 @@ describe("MatrixRTCSession", () => {
                 expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
             });
 
-            it("Re-sends key if a new member joins", async () => {
+            it("re-sends key if a new member joins even if a key rotation is in progress", async () => {
+                jest.useFakeTimers();
+                try {
+                    // session with two members
+                    const member2 = Object.assign({}, membershipTemplate, {
+                        device_id: "BBBBBBB",
+                    });
+                    const mockRoom = makeMockRoom([membershipTemplate, member2]);
+                    sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+                    // joining will trigger an initial key send
+                    const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                    });
+                    sess.joinRoomSession([mockFocus], mockFocus, {
+                        manageMediaKeys: true,
+                        updateEncryptionKeyThrottle: 1000,
+                        makeKeyDelay: 3000,
+                    });
+                    await keysSentPromise1;
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
+
+                    // member2 leaves triggering key rotation
+                    mockRoom.getLiveTimeline().getState = jest
+                        .fn()
+                        .mockReturnValue(makeMockRoomState([membershipTemplate], mockRoom.roomId));
+                    sess.onMembershipUpdate();
+
+                    // member2 re-joins which should trigger an immediate re-send
+                    const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                    });
+                    mockRoom.getLiveTimeline().getState = jest
+                        .fn()
+                        .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId));
+                    sess.onMembershipUpdate();
+                    // but, that immediate resend is throttled so we need to wait a bit
+                    jest.advanceTimersByTime(1000);
+                    const { keys } = await keysSentPromise2;
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
+                    // key index should still be the original: 0
+                    expect(keys[0].index).toEqual(0);
+
+                    // check that the key rotation actually happens
+                    const keysSentPromise3 = new Promise<EncryptionKeysEventContent>((resolve) => {
+                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                    });
+                    jest.advanceTimersByTime(2000);
+                    const { keys: rotatedKeys } = await keysSentPromise3;
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(3);
+                    // key index should now be the rotated one: 1
+                    expect(rotatedKeys[0].index).toEqual(1);
+                } finally {
+                    jest.useRealTimers();
+                }
+            });
+
+            it("re-sends key if a new member joins", async () => {
                 jest.useFakeTimers();
                 try {
                     const mockRoom = makeMockRoom([membershipTemplate]);
