@@ -46,7 +46,6 @@ import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./u
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.ts";
-import * as olmlib from "./crypto/olmlib.ts";
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
 import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
@@ -10120,7 +10119,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     type: EventType.RoomEncryption,
                     state_key: "",
                     content: {
-                        algorithm: olmlib.MEGOLM_ALGORITHM,
+                        algorithm: "m.megolm.v1.aes-sha2",
                     },
                 },
             ],
