@@ -78,6 +78,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * Get information about the encryption of an event
      *
      * @param event - event to be checked
+     * @deprecated
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
 
