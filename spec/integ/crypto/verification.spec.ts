@@ -82,6 +82,8 @@ import {
 } from "./olm-utils";
 import { KeyBackupInfo } from "../../../src/crypto-api";
 import { encodeBase64 } from "../../../src/base64";
+import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
+import type { IDeviceKeys } from "../../../src/@types/crypto";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
@@ -990,6 +992,31 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             aliceClient.setGlobalErrorOnUnknownDevices(false);
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
             await syncPromise(aliceClient);
+            const crypto = aliceClient.getCrypto()!;
+            if (crypto instanceof RustCrypto) {
+                // Rust crypto requires the sender's device keys before it accepts
+                // a verification request.
+                const bobIdentityKeys = JSON.parse(testOlmAccount.identity_keys());
+                const bobDeviceKeys: IDeviceKeys = {
+                    user_id: "@bob:xyz",
+                    device_id: "BobDevice",
+                    algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+                    keys: {
+                        "curve25519:BobDevice": bobIdentityKeys.curve25519,
+                        "ed25519:BobDevice": bobIdentityKeys.ed25519,
+                    },
+                };
+                const signature = testOlmAccount.sign(anotherjson.stringify(bobDeviceKeys));
+                bobDeviceKeys.signatures = {
+                    "@bob:xyz": {
+                        "ed25519:BobDevice": signature,
+                    },
+                };
+                e2eKeyResponder.addDeviceKeys(bobDeviceKeys);
+                await crypto.processDeviceLists({ changed: ["@bob:xyz"] });
+                crypto.onSyncCompleted({});
+                await crypto.getUserDeviceInfo(["@bob:xyz"]);
+            }
         });
 
         /**
