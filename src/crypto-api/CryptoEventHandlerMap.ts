@@ -29,4 +29,5 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.KeysChanged]: (data: {}) => void;
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
+    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 } & RustBackupCryptoEventMap;
