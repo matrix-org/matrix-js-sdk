@@ -46,7 +46,6 @@ import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./u
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.ts";
-import * as olmlib from "./crypto/olmlib.ts";
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
 import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
@@ -252,6 +251,9 @@ export type Store = IStore;
 export type ResetTimelineCallback = (roomId: string) => boolean;
 
 const SCROLLBACK_DELAY_MS = 3000;
+/**
+ * @deprecated Not supported for Rust Cryptography.
+ */
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
@@ -2424,6 +2426,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @remarks
      * Fires {@link CryptoEvent#DeviceVerificationChanged}
+     *
+     * @deprecated Not supported for Rust Cryptography.
      */
     public setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         const prom = this.setDeviceVerification(userId, deviceId, verified, null, null);
@@ -6130,7 +6134,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
-                    room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
+                    room.addEventsToTimeline(timelineEvents, true, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
                     unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
@@ -6242,7 +6246,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
-        timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
+        timelineSet.addEventsToTimeline(timelineEvents, true, false, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
@@ -6336,10 +6340,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     timeline.initialiseState(res.state.map(mapper));
                 }
 
-                timelineSet.addEventsToTimeline(events, true, timeline, resNewer.next_batch);
+                timelineSet.addEventsToTimeline(events, true, false, timeline, resNewer.next_batch);
                 if (!resOlder.next_batch) {
                     const originalEvent = await this.fetchRoomEvent(timelineSet.room.roomId, thread.id);
-                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, timeline, null);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, false, timeline, null);
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
@@ -6393,10 +6397,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const timeline = timelineSet.getLiveTimeline();
                 timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
 
-                timelineSet.addEventsToTimeline(events, true, timeline, null);
+                timelineSet.addEventsToTimeline(events, true, false, timeline, null);
                 if (!resOlder.next_batch) {
                     const originalEvent = await this.fetchRoomEvent(timelineSet.room.roomId, thread.id);
-                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, timeline, null);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, false, timeline, null);
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(null, Direction.Forward);
@@ -6659,7 +6663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // No need to partition events for threads here, everything lives
                     // in the notification timeline set
                     const timelineSet = eventTimeline.getTimelineSet();
-                    timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                    timelineSet.addEventsToTimeline(matrixEvents, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
@@ -6702,7 +6706,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                    timelineSet.addEventsToTimeline(matrixEvents, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, matrixEvents);
                     this.processThreadRoots(room, matrixEvents, backwards);
 
@@ -6750,12 +6754,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const newToken = res.next_batch;
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, newToken ?? null);
+                    timelineSet.addEventsToTimeline(matrixEvents, backwards, false, eventTimeline, newToken ?? null);
                     if (!newToken && backwards) {
                         const originalEvent =
                             thread.rootEvent ??
                             mapper(await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id));
-                        timelineSet.addEventsToTimeline([originalEvent], true, eventTimeline, null);
+                        timelineSet.addEventsToTimeline([originalEvent], true, false, eventTimeline, null);
                     }
                     this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
@@ -6794,7 +6798,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
-                    timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                    timelineSet.addEventsToTimeline(timelineEvents, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
@@ -10109,7 +10113,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     type: EventType.RoomEncryption,
                     state_key: "",
                     content: {
-                        algorithm: olmlib.MEGOLM_ALGORITHM,
+                        algorithm: "m.megolm.v1.aes-sha2",
                     },
                 },
             ],

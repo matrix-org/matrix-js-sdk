@@ -126,26 +126,26 @@ const img = await fetch(downloadUrl, {
 This SDK provides a full object model around the Matrix Client-Server API and emits
 events for incoming data and state changes. Aside from wrapping the HTTP API, it:
 
--   Handles syncing (via `/sync`)
--   Handles the generation of "friendly" room and member names.
--   Handles historical `RoomMember` information (e.g. display names).
--   Manages room member state across multiple events (e.g. it handles typing, power
-    levels and membership changes).
--   Exposes high-level objects like `Rooms`, `RoomState`, `RoomMembers` and `Users`
-    which can be listened to for things like name changes, new messages, membership
-    changes, presence changes, and more.
--   Handle "local echo" of messages sent using the SDK. This means that messages
-    that have just been sent will appear in the timeline as 'sending', until it
-    completes. This is beneficial because it prevents there being a gap between
-    hitting the send button and having the "remote echo" arrive.
--   Mark messages which failed to send as not sent.
--   Automatically retry requests to send messages due to network errors.
--   Automatically retry requests to send messages due to rate limiting errors.
--   Handle queueing of messages.
--   Handles pagination.
--   Handle assigning push actions for events.
--   Handles room initial sync on accepting invites.
--   Handles WebRTC calling.
+- Handles syncing (via `/sync`)
+- Handles the generation of "friendly" room and member names.
+- Handles historical `RoomMember` information (e.g. display names).
+- Manages room member state across multiple events (e.g. it handles typing, power
+  levels and membership changes).
+- Exposes high-level objects like `Rooms`, `RoomState`, `RoomMembers` and `Users`
+  which can be listened to for things like name changes, new messages, membership
+  changes, presence changes, and more.
+- Handle "local echo" of messages sent using the SDK. This means that messages
+  that have just been sent will appear in the timeline as 'sending', until it
+  completes. This is beneficial because it prevents there being a gap between
+  hitting the send button and having the "remote echo" arrive.
+- Mark messages which failed to send as not sent.
+- Automatically retry requests to send messages due to network errors.
+- Automatically retry requests to send messages due to rate limiting errors.
+- Handle queueing of messages.
+- Handles pagination.
+- Handle assigning push actions for events.
+- Handles room initial sync on accepting invites.
+- Handles WebRTC calling.
 
 # Usage
 

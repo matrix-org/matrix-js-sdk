@@ -601,13 +601,13 @@ describe("SlidingSyncSdk", () => {
             mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
                 initial: true,
                 name: "Room with Invite",
-                required_state: [],
-                timeline: [
+                required_state: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Invite }, invitee),
                 ],
+                timeline: [],
             });
             await httpBackend!.flush("/profile", 1, 1000);
             await emitPromise(client!, RoomMemberEvent.Name);
@@ -921,13 +921,12 @@ describe("SlidingSyncSdk", () => {
             const roomId = "!room:id";
             mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
                 name: "Room with typing",
-                required_state: [],
-                timeline: [
+                required_state: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
                 ],
+                timeline: [mkOwnEvent(EventType.RoomMessage, { body: "hello" })],
                 initial: true,
             });
             await emitPromise(client!, ClientEvent.Room);
@@ -962,13 +961,12 @@ describe("SlidingSyncSdk", () => {
             const roomId = "!room:id";
             mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
                 name: "Room with typing",
-                required_state: [],
-                timeline: [
+                required_state: [
                     mkOwnStateEvent(EventType.RoomCreate, {}, ""),
                     mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
                     mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
-                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
                 ],
+                timeline: [mkOwnEvent(EventType.RoomMessage, { body: "hello" })],
                 initial: true,
             });
             const room = client!.getRoom(roomId)!;

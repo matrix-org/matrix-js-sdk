@@ -408,17 +408,18 @@ const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
 
 function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?: RoomState): boolean {
     if (!displayName || displayName === selfUserId) return false;
+    if (!roomState) return false;
+
+    const strippedDisplayName = removeHiddenChars(displayName);
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    if (!removeHiddenChars(displayName)) return false;
-
-    if (!roomState) return false;
+    if (!strippedDisplayName) return false;
 
     // Next check if the name contains something that look like a mxid
     // If it does, it may be someone trying to impersonate someone else
     // Show full mxid in this case
-    if (MXID_PATTERN.test(displayName)) return true;
+    if (MXID_PATTERN.test(strippedDisplayName)) return true;
 
     // Also show mxid if the display name contains any LTR/RTL characters as these
     // make it very difficult for us to find similar *looking* display names

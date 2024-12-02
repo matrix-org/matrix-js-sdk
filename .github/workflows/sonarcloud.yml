@@ -5,23 +5,29 @@ on:
         secrets:
             SONAR_TOKEN:
                 required: true
+            # No longer used
             ELEMENT_BOT_TOKEN:
-                required: true
+                required: false
         inputs:
             sharded:
                 type: boolean
                 required: false
                 description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
+permissions: {}
 jobs:
     sonarqube:
         runs-on: ubuntu-24.04
         if: |
             github.event.workflow_run.conclusion == 'success' &&
             github.event.workflow_run.event != 'merge_group'
+        permissions:
+            actions: read
+            statuses: write
+            id-token: write # sonar
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
             # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
-            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+            - uses: guibranco/github-status-action-v2@66088c44e212a906c32a047529a213d81809ec1c
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: pending
@@ -40,7 +46,7 @@ jobs:
               uses: actions/download-artifact@v4
               if: ${{ !inputs.sharded }}
               with:
-                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   name: coverage
                   path: coverage
@@ -48,11 +54,17 @@ jobs:
               uses: actions/download-artifact@v4
               if: inputs.sharded
               with:
-                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   pattern: coverage-*
                   path: coverage
                   merge-multiple: true
+            - name: Check coverage artifact
+              run: |
+                  if [ ! -d coverage ]; then
+                      echo "Coverage not found. Exiting with failure."
+                      exit 1
+                  fi
 
             - id: extra_args
               run: |
@@ -75,7 +87,7 @@ jobs:
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
 
-            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+            - uses: guibranco/github-status-action-v2@66088c44e212a906c32a047529a213d81809ec1c
               if: always()
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}

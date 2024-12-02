@@ -77,7 +77,9 @@ export interface ITimeline {
 
 export interface IJoinedRoom {
     "summary": IRoomSummary;
-    "state": IState;
+    // One of `state` or `state_after` is required.
+    "state"?: IState;
+    "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -106,9 +108,11 @@ export interface IInvitedRoom {
 }
 
 export interface ILeftRoom {
-    state: IState;
-    timeline: ITimeline;
-    account_data: IAccountData;
+    // One of `state` or `state_after` is required.
+    "state"?: IState;
+    "org.matrix.msc4222.state_after"?: IState;
+    "timeline": ITimeline;
+    "account_data": IAccountData;
 }
 
 export interface IKnockedRoom {
@@ -481,13 +485,18 @@ export class SyncAccumulator {
         // Work out the current state. The deltas need to be applied in the order:
         // - existing state which didn't come down /sync.
         // - State events under the 'state' key.
-        // - State events in the 'timeline'.
+        // - State events under the 'state_after' key OR state events in the 'timeline' if 'state_after' is not present.
         data.state?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
-        data.timeline?.events?.forEach((e, index) => {
-            // this nops if 'e' isn't a state event
+        data["org.matrix.msc4222.state_after"]?.events?.forEach((e) => {
             setState(currentData._currentState, e);
+        });
+        data.timeline?.events?.forEach((e, index) => {
+            if (!data["org.matrix.msc4222.state_after"]) {
+                // this nops if 'e' isn't a state event
+                setState(currentData._currentState, e);
+            }
             // append the event to the timeline. The back-pagination token
             // corresponds to the first event in the timeline
             let transformedEvent: TaggedEvent;
@@ -563,17 +572,22 @@ export class SyncAccumulator {
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
-            const roomJson: IJoinedRoom = {
-                ephemeral: { events: [] },
-                account_data: { events: [] },
-                state: { events: [] },
-                timeline: {
+            const roomJson: IJoinedRoom & {
+                // We track both `state` and `state_after` for downgrade compatibility
+                "state": IState;
+                "org.matrix.msc4222.state_after": IState;
+            } = {
+                "ephemeral": { events: [] },
+                "account_data": { events: [] },
+                "state": { events: [] },
+                "org.matrix.msc4222.state_after": { events: [] },
+                "timeline": {
                     events: [],
                     prev_batch: null,
                 },
-                unread_notifications: roomData._unreadNotifications,
-                unread_thread_notifications: roomData._unreadThreadNotifications,
-                summary: roomData._summary as IRoomSummary,
+                "unread_notifications": roomData._unreadNotifications,
+                "unread_thread_notifications": roomData._unreadThreadNotifications,
+                "summary": roomData._summary as IRoomSummary,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -650,8 +664,11 @@ export class SyncAccumulator {
             Object.keys(roomData._currentState).forEach((evType) => {
                 Object.keys(roomData._currentState[evType]).forEach((stateKey) => {
                     let ev = roomData._currentState[evType][stateKey];
+                    // Push to both fields to provide downgrade compatibility in the sync accumulator db
+                    // the code will prefer `state_after` if it is present
+                    roomJson["org.matrix.msc4222.state_after"].events.push(ev);
+                    // Roll the state back to the value at the start of the timeline if it was changed
                     if (rollBackState[evType] && rollBackState[evType][stateKey]) {
-                        // use the reverse clobbered event instead.
                         ev = rollBackState[evType][stateKey];
                     }
                     roomJson.state.events.push(ev);

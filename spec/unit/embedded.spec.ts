@@ -261,7 +261,7 @@ describe("RoomWidgetClient", () => {
                 expect(injectSpy).toHaveBeenCalled();
 
                 const call = injectSpy.mock.calls[0] as any;
-                const injectedEv = call[2][0];
+                const injectedEv = call[3][0];
                 expect(injectedEv.getType()).toBe("org.matrix.rageshake_request");
                 expect(injectedEv.getUnsigned().transaction_id).toBe("widgetTxId");
             });
@@ -287,7 +287,7 @@ describe("RoomWidgetClient", () => {
                 expect(injectSpy).toHaveBeenCalled();
 
                 const call = injectSpy.mock.calls[0] as any;
-                const injectedEv = call[2][0];
+                const injectedEv = call[3][0];
                 expect(injectedEv.getType()).toBe("org.matrix.rageshake_request");
                 expect(injectedEv.getUnsigned().transaction_id).toBe("widgetTxId");
             });
@@ -326,13 +326,13 @@ describe("RoomWidgetClient", () => {
 
                 // it has been called with the event sent by ourselves
                 const call = injectSpy.mock.calls[0] as any;
-                const injectedEv = call[2][0];
+                const injectedEv = call[3][0];
                 expect(injectedEv.getType()).toBe("org.matrix.rageshake_request");
                 expect(injectedEv.getUnsigned().transaction_id).toBe("widgetTxId");
 
                 // It has been called by the event we blocked because of our send right afterwards
                 const call2 = injectSpy.mock.calls[1] as any;
-                const injectedEv2 = call2[2][0];
+                const injectedEv2 = call2[3][0];
                 expect(injectedEv2.getType()).toBe("org.matrix.rageshake_request");
                 expect(injectedEv2.getUnsigned().transaction_id).toBe("4567");
             });

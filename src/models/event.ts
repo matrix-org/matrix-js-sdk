@@ -1250,7 +1250,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const timeline = room.getLiveTimeline();
         // We use insertEventIntoTimeline to insert it in timestamp order,
         // because we don't know where it should go (until we have MSC4033).
-        timeline.getTimelineSet().insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
+        timeline
+            .getTimelineSet()
+            .insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!, false);
     }
 
     /**

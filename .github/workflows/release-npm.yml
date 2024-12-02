@@ -8,6 +8,7 @@ on:
             id:
                 description: "The npm package@version string we published"
                 value: ${{ jobs.npm.outputs.id }}
+permissions: {} # No permissions required
 jobs:
     npm:
         name: Publish to npm
