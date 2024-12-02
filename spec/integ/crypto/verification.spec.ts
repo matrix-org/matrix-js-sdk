@@ -992,10 +992,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             aliceClient.setGlobalErrorOnUnknownDevices(false);
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
             await syncPromise(aliceClient);
-            const crypto = aliceClient.getCrypto()!;
-            if (crypto instanceof RustCrypto) {
-                // Rust crypto requires the sender's device keys before it accepts
-                // a verification request.
+
+            // Rust crypto requires the sender's device keys before it accepts a
+            // verification request.
+            if (backend === "rust-sdk") {
+                // Cast to a RustCrypto object, since we call some
+                // RustCrypto-specific functions
+                const crypto = aliceClient.getCrypto()!;
+                expect(crypto).toBeInstanceOf(RustCrypto);
+                const rustCrypto = crypto as RustCrypto;
+
                 const bobIdentityKeys = JSON.parse(testOlmAccount.identity_keys());
                 const bobDeviceKeys: IDeviceKeys = {
                     user_id: "@bob:xyz",
@@ -1013,9 +1019,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                     },
                 };
                 e2eKeyResponder.addDeviceKeys(bobDeviceKeys);
-                await crypto.processDeviceLists({ changed: ["@bob:xyz"] });
-                crypto.onSyncCompleted({});
-                await crypto.getUserDeviceInfo(["@bob:xyz"]);
+                await rustCrypto.processDeviceLists({ changed: ["@bob:xyz"] });
+                rustCrypto.onSyncCompleted({});
+                await rustCrypto.getUserDeviceInfo(["@bob:xyz"]);
             }
         });
 
