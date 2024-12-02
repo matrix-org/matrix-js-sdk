@@ -26,6 +26,7 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked, Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
+import { sign } from "crypto";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
@@ -705,13 +706,13 @@ describe("RustCrypto", () => {
         expect(resetKeyBackup.mock.calls).toHaveLength(2);
     });
 
-    it("bootstrapSecretStorage saves megolm backup key if already cached", async () => {
+    describe("upload existing key backup key to new 4S store", () => {
         const secretStorageCallbacks = {
             getSecretStorageKey: async (keys: any, name: string) => {
                 return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
             },
         } as SecretStorageCallbacks;
-        const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+        let secretStorage: ServerSideSecretStorageImpl;
 
         let backupAuthData: any;
         let backupAlg: string;
@@ -731,31 +732,91 @@ describe("RustCrypto", () => {
             }),
         };
 
-        const rustCrypto = await makeTestRustCrypto(
-            fetchMock as unknown as MatrixHttpApi<any>,
-            testData.TEST_USER_ID,
-            undefined,
-            secretStorage,
-        );
+        beforeEach(() => {
+            backupAuthData = undefined;
+            backupAlg = "";
 
-        async function createSecretStorageKey() {
-            return {
-                keyInfo: {} as AddSecretStorageKeyOpts,
-                privateKey: new Uint8Array(32),
-            };
-        }
-
-        await rustCrypto.resetKeyBackup();
-
-        const storeSpy = jest.spyOn(secretStorage, "store");
-
-        await rustCrypto.bootstrapSecretStorage({
-            createSecretStorageKey,
-            setupNewSecretStorage: true,
-            setupNewKeyBackup: false,
+            secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
         });
 
-        expect(storeSpy).toHaveBeenCalledWith("m.megolm_backup.v1", expect.anything());
+        it("bootstrapSecretStorage saves megolm backup key if already cached", async () => {
+            const rustCrypto = await makeTestRustCrypto(
+                fetchMock as unknown as MatrixHttpApi<any>,
+                testData.TEST_USER_ID,
+                undefined,
+                secretStorage,
+            );
+
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+
+            await rustCrypto.resetKeyBackup();
+
+            const storeSpy = jest.spyOn(secretStorage, "store");
+
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            expect(storeSpy).toHaveBeenCalledWith("m.megolm_backup.v1", expect.anything());
+        });
+
+        it("bootstrapSecretStorage doesn't try to save megolm backup key not in cache", async () => {
+            const mockOlmMachine = {
+                isBackupEnabled: jest.fn().mockResolvedValue(false),
+                sign: jest.fn().mockResolvedValue({
+                    asJSON: jest.fn().mockReturnValue("{}"),
+                }),
+                saveBackupDecryptionKey: jest.fn(),
+                crossSigningStatus: jest.fn().mockResolvedValue({
+                    hasMaster: true,
+                    hasSelfSigning: true,
+                    hasUserSigning: true,
+                }),
+                exportCrossSigningKeys: jest.fn().mockResolvedValue({
+                    masterKey: "sosecret",
+                    userSigningKey: "secrets",
+                    self_signing_key: "ssshhh",
+                }),
+                getBackupKeys: jest.fn().mockResolvedValue({}),
+                verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
+            } as unknown as OlmMachine;
+
+            const rustCrypto = new RustCrypto(
+                logger,
+                mockOlmMachine,
+                fetchMock as unknown as MatrixHttpApi<any>,
+                TEST_USER,
+                TEST_DEVICE_ID,
+                secretStorage,
+                {} as CryptoCallbacks,
+            );
+
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+
+            await rustCrypto.resetKeyBackup();
+
+            const storeSpy = jest.spyOn(secretStorage, "store");
+
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            expect(storeSpy).not.toHaveBeenCalledWith("m.megolm_backup.v1", expect.anything());
+        });
     });
 
     it("isSecretStorageReady", async () => {
