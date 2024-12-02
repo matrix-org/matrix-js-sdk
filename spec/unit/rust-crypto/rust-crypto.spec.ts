@@ -26,7 +26,6 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked, Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
-import { sign } from "crypto";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
