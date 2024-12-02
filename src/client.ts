@@ -1832,10 +1832,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns MXID for the logged-in user, or null if not logged in
      */
     public getUserId(): string | null {
-        if (this.credentials && this.credentials.userId) {
-            return this.credentials.userId;
-        }
-        return null;
+        return this.credentials?.userId ?? null;
     }
 
     /**
@@ -1857,7 +1854,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Domain of this MXID
      */
     public getDomain(): string | null {
-        if (this.credentials && this.credentials.userId) {
+        if (this.credentials?.userId) {
             return this.credentials.userId.replace(/^.*?:/, "");
         }
         return null;
@@ -1868,10 +1865,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The user ID localpart or null.
      */
     public getUserIdLocalpart(): string | null {
-        if (this.credentials && this.credentials.userId) {
-            return this.credentials.userId.split(":")[0].substring(1);
-        }
-        return null;
+        return this.credentials?.userId?.split(":")[0].substring(1) ?? null;
     }
 
     /**
@@ -4313,7 +4307,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getIgnoredUsers(): string[] {
         const event = this.getAccountData("m.ignored_user_list");
-        if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return [];
+        if (!event?.getContent()["ignored_users"]) return [];
         return Object.keys(event.getContent()["ignored_users"]);
     }
 
