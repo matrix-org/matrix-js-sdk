@@ -46,10 +46,6 @@ jobs:
             issues: read
             pull-requests: read
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-checks.yml@develop
-        secrets:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-            repository: ${{ github.repository }}
 
     release:
         name: Release

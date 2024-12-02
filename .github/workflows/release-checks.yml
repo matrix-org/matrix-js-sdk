@@ -2,12 +2,13 @@ name: Release Sanity checks
 on:
     workflow_call:
         secrets:
-            GITHUB_TOKEN:
-                required: true
+            ELEMENT_BOT_TOKEN:
+                required: false
         inputs:
             repository:
                 type: string
-                required: true
+                required: false
+                default: ${{ github.repository }}
                 description: "The repository (in form owner/repo) to check for release blockers"
 
 permissions: {}
@@ -21,7 +22,7 @@ jobs:
               env:
                   REPO: ${{ inputs.repository }}
               with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
                   script: |
                       const { REPO } = process.env;
                       const { data } = await github.rest.search.issuesAndPullRequests({
