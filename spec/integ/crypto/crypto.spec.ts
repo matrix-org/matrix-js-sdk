@@ -3121,6 +3121,32 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master)!;
                 expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
             });
+
+            newBackendOnly("should upload existing megolm backup key to a new 4S store", async () => {
+                const backupKeyTo4SPromise = awaitMegolmBackupKeyUpload();
+
+                // we need these to set up the mocks but we don't actually care whether they
+                // resolve because we're not testing those things in this test.
+                awaitCrossSigningKeyUpload("master");
+                awaitCrossSigningKeyUpload("user_signing");
+                awaitCrossSigningKeyUpload("self_signing");
+                awaitSecretStorageKeyStoredInAccountData();
+
+                mockSetupCrossSigningRequests();
+                mockSetupMegolmBackupRequests("1");
+
+                await aliceClient.getCrypto()!.bootstrapCrossSigning({});
+                await aliceClient.getCrypto()!.resetKeyBackup();
+
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({
+                    setupNewSecretStorage: true,
+                    createSecretStorageKey,
+                    setupNewKeyBackup: false,
+                });
+
+                await backupKeyTo4SPromise;
+                expect(accountDataAccumulator.accountDataEvents.get("m.megolm_backup.v1")).toBeDefined();
+            });
         });
 
         describe("Manage Key Backup", () => {
