@@ -120,7 +120,7 @@
         "prettier": "3.4.1",
         "rimraf": "^6.0.0",
         "ts-node": "^10.9.2",
-        "typedoc": "^0.26.0",
+        "typedoc": "^0.27.0",
         "typedoc-plugin-coverage": "^3.0.0",
         "typedoc-plugin-mdn-links": "^4.0.0",
         "typedoc-plugin-missing-exports": "^3.0.0",
