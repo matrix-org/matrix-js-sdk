@@ -1445,7 +1445,7 @@ export class GroupCall extends TypedEventEmitter<
      * Recalculates and updates the participant map to match the room state.
      */
     private updateParticipants(): void {
-        const localMember = this.room.getMember(this.client.getUserId()!)!;
+        const localMember = this.room.getMember(this.client.getSafeUserId());
         if (!localMember) {
             // The client hasn't fetched enough of the room state to get our own member
             // event. This probably shouldn't happen, but sanity check & exit for now.

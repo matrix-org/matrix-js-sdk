@@ -46,7 +46,6 @@ import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./u
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.ts";
-import * as olmlib from "./crypto/olmlib.ts";
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
 import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
@@ -252,6 +251,9 @@ export type Store = IStore;
 export type ResetTimelineCallback = (roomId: string) => boolean;
 
 const SCROLLBACK_DELAY_MS = 3000;
+/**
+ * @deprecated Not supported for Rust Cryptography.
+ */
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
@@ -1830,10 +1832,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns MXID for the logged-in user, or null if not logged in
      */
     public getUserId(): string | null {
-        if (this.credentials && this.credentials.userId) {
-            return this.credentials.userId;
-        }
-        return null;
+        return this.credentials?.userId ?? null;
     }
 
     /**
@@ -1855,7 +1854,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Domain of this MXID
      */
     public getDomain(): string | null {
-        if (this.credentials && this.credentials.userId) {
+        if (this.credentials?.userId) {
             return this.credentials.userId.replace(/^.*?:/, "");
         }
         return null;
@@ -1866,10 +1865,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The user ID localpart or null.
      */
     public getUserIdLocalpart(): string | null {
-        if (this.credentials && this.credentials.userId) {
-            return this.credentials.userId.split(":")[0].substring(1);
-        }
-        return null;
+        return this.credentials?.userId?.split(":")[0].substring(1) ?? null;
     }
 
     /**
@@ -2430,6 +2426,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @remarks
      * Fires {@link CryptoEvent#DeviceVerificationChanged}
+     *
+     * @deprecated Not supported for Rust Cryptography.
      */
     public setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         const prom = this.setDeviceVerification(userId, deviceId, verified, null, null);
@@ -4309,7 +4307,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getIgnoredUsers(): string[] {
         const event = this.getAccountData("m.ignored_user_list");
-        if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return [];
+        if (!event?.getContent()["ignored_users"]) return [];
         return Object.keys(event.getContent()["ignored_users"]);
     }
 
@@ -10115,7 +10113,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     type: EventType.RoomEncryption,
                     state_key: "",
                     content: {
-                        algorithm: olmlib.MEGOLM_ALGORITHM,
+                        algorithm: "m.megolm.v1.aes-sha2",
                     },
                 },
             ],

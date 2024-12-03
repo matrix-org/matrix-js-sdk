@@ -42,26 +42,10 @@ permissions: {}
 jobs:
     checks:
         name: Sanity checks
-        runs-on: ubuntu-24.04
         permissions:
             issues: read
             pull-requests: read
-        steps:
-            - name: Check for X-Release-Blocker label on any open issues or PRs
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const { data } = await github.rest.search.issuesAndPullRequests({
-                          q: `repo:${context.repo.owner}/${context.repo.repo} label:X-Release-Blocker is:open`,
-                          per_page: 50,
-                      });
-
-                      if (data.total_count) {
-                          data.items.forEach(item => {
-                              core.error(`Release blocker: ${item.html_url}`);
-                          });
-                          core.setFailed(`Found release blockers!`);
-                      }
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-checks.yml@develop
 
     release:
         name: Release

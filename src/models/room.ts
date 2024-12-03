@@ -545,7 +545,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns Signals when all events have been decrypted
      */
     public async decryptCriticalEvents(): Promise<void> {
-        if (!this.client.isCryptoEnabled()) return;
+        if (!this.client.getCrypto()) return;
 
         const readReceiptEventId = this.getEventReadUpTo(this.client.getUserId()!, true);
         const events = this.getLiveTimeline().getEvents();
@@ -567,7 +567,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns Signals when all events have been decrypted
      */
     public async decryptAllEvents(): Promise<void> {
-        if (!this.client.isCryptoEnabled()) return;
+        if (!this.client.getCrypto()) return;
 
         const decryptionPromises = this.getUnfilteredTimelineSet()
             .getLiveTimeline()

@@ -326,8 +326,6 @@ export type CryptoEventHandlerMap = CryptoApiCryptoEventHandlerMap & {
      */
     [CryptoEvent.Warning]: (type: string) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
-
-    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {

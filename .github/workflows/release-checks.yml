@@ -1,0 +1,38 @@
+name: Release Sanity checks
+on:
+    workflow_call:
+        secrets:
+            ELEMENT_BOT_TOKEN:
+                required: false
+        inputs:
+            repository:
+                type: string
+                required: false
+                default: ${{ github.repository }}
+                description: "The repository (in form owner/repo) to check for release blockers"
+
+permissions: {}
+jobs:
+    checks:
+        name: Sanity checks
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Check for X-Release-Blocker label on any open issues or PRs
+              uses: actions/github-script@v7
+              env:
+                  REPO: ${{ inputs.repository }}
+              with:
+                  github-token: ${{ secrets.ELEMENT_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+                  script: |
+                      const { REPO } = process.env;
+                      const { data } = await github.rest.search.issuesAndPullRequests({
+                          q: `repo:${REPO} label:X-Release-Blocker is:open`,
+                          per_page: 50,
+                      });
+
+                      if (data.total_count) {
+                          data.items.forEach(item => {
+                              core.error(`Release blocker: ${item.html_url}`);
+                          });
+                          core.setFailed(`Found release blockers!`);
+                      }

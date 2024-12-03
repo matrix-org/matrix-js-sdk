@@ -559,9 +559,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             return {} as T;
         }
         if (this.clearEvent) {
-            return (this.clearEvent.content || {}) as T;
+            return (this.clearEvent.content ?? {}) as T;
         }
-        return (this.event.content || {}) as T;
+        return (this.event.content ?? {}) as T;
     }
 
     /**
@@ -575,7 +575,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (this._localRedactionEvent) {
             return {} as T;
         } else if (this._replacingEvent) {
-            return this._replacingEvent.getContent()["m.new_content"] || {};
+            return this._replacingEvent.getContent()["m.new_content"] ?? {};
         } else {
             return this.getOriginalContent();
         }
@@ -1633,7 +1633,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param otherEvent - The other event to check against.
      * @returns True if the events are the same, false otherwise.
      */
-    public isEquivalentTo(otherEvent: MatrixEvent): boolean {
+    public isEquivalentTo(otherEvent?: MatrixEvent): boolean {
         if (!otherEvent) return false;
         if (otherEvent === this) return true;
         const myProps = deepSortedObjectEntries(this.event);

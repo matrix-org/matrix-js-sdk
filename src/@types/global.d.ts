@@ -65,6 +65,6 @@ declare global {
     interface Navigator {
         // We check for the webkit-prefixed getUserMedia to detect if we're
         // on webkit: we should check if we still need to do this
-        webkitGetUserMedia: DummyInterfaceWeShouldntBeUsingThis;
+        webkitGetUserMedia?: DummyInterfaceWeShouldntBeUsingThis;
     }
 }
