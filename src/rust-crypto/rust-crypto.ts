@@ -329,7 +329,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
             throw new Error(`getBackupDecryptor: expects Uint8Array`);
         }
@@ -1178,7 +1178,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
         if (!backupKeys.decryptionKey) return null;
-        return Buffer.from(backupKeys.decryptionKey.toBase64(), "base64");
+        return decodeBase64(backupKeys.decryptionKey.toBase64());
     }
 
     /**
