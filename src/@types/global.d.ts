@@ -68,10 +68,8 @@ declare global {
         webkitGetUserMedia?: DummyInterfaceWeShouldntBeUsingThis;
     }
 
-    type Base64Alphabet = "base64" | "base64url";
-
     export interface Uint8ArrayToBase64Options {
-        alphabet?: Base64Alphabet;
+        alphabet?: "base64" | "base64url";
         omitPadding?: boolean;
     }
 
@@ -81,7 +79,7 @@ declare global {
     }
 
     export interface Uint8ArrayFromBase64Options {
-        alphabet?: Base64Alphabet;
+        alphabet?: "base64" | "base64url";
         lastChunkHandling?: "loose" | "strict" | "stop-before-partial";
     }
 
