@@ -477,13 +477,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(rawQrCodeBuffer).toBeTruthy();
             const qrCodeBuffer = new Uint8Array(rawQrCodeBuffer);
 
-            const decoder = new TextDecoder();
+            const textDecoder = new TextDecoder();
             // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
-            expect(decoder.decode(qrCodeBuffer.slice(0, 6))).toEqual("MATRIX");
+            expect(textDecoder.decode(qrCodeBuffer.slice(0, 6))).toEqual("MATRIX");
             expect(qrCodeBuffer[6]).toEqual(0x02); // version
             expect(qrCodeBuffer[7]).toEqual(0x02); // mode
             const txnIdLen = (qrCodeBuffer[8] << 8) + qrCodeBuffer[9];
-            expect(decoder.decode(qrCodeBuffer.slice(10, 10 + txnIdLen))).toEqual(transactionId);
+            expect(textDecoder.decode(qrCodeBuffer.slice(10, 10 + txnIdLen))).toEqual(transactionId);
             // Alice's device's public key comes next, but we have nothing to do with it here.
             // const aliceDevicePubKey = qrCodeBuffer.slice(10 + txnIdLen, 32 + 10 + txnIdLen);
             expect(encodeUnpaddedBase64(qrCodeBuffer.slice(42 + txnIdLen, 32 + 42 + txnIdLen))).toEqual(

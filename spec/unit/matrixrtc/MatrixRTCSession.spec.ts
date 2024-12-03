@@ -38,6 +38,8 @@ const membershipTemplate: CallMembershipData = {
 
 const mockFocus = { type: "mock" };
 
+const textEncoder = new TextEncoder();
+
 describe("MatrixRTCSession", () => {
     let client: MatrixClient;
     let sess: MatrixRTCSession | undefined;
@@ -1345,7 +1347,7 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("this is the key", "utf-8"),
+                    textEncoder.encode("this is the key"),
                     0,
                     "@bob:example.org:bobsphone",
                 );
@@ -1377,7 +1379,7 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("this is the key", "utf-8"),
+                    textEncoder.encode("this is the key"),
                     4,
                     "@bob:example.org:bobsphone",
                 );
@@ -1409,7 +1411,7 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("this is the key", "utf-8"),
+                    textEncoder.encode("this is the key"),
                     0,
                     "@bob:example.org:bobsphone",
                 );
@@ -1436,12 +1438,12 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("this is the key", "utf-8"),
+                    textEncoder.encode("this is the key"),
                     0,
                     "@bob:example.org:bobsphone",
                 );
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("this is the key", "utf-8"),
+                    textEncoder.encode("this is the key"),
                     4,
                     "@bob:example.org:bobsphone",
                 );
@@ -1489,7 +1491,7 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("newer key", "utf-8"),
+                    textEncoder.encode("newer key"),
                     0,
                     "@bob:example.org:bobsphone",
                 );
@@ -1537,7 +1539,7 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    Buffer.from("second key", "utf-8"),
+                    textEncoder.encode("second key"),
                     0,
                     "@bob:example.org:bobsphone",
                 );
