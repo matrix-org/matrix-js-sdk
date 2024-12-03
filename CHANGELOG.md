@@ -1,3 +1,22 @@
+Changes in [34.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.13.0) (2024-12-03)
+====================================================================================================
+## 🦖 Deprecations
+
+* Deprecate `MatrixClient.isEventSenderVerified` ([#4527](https://github.com/matrix-org/matrix-js-sdk/pull/4527)). Contributed by @florianduros.
+* Add `restoreKeybackup` to `CryptoApi`. ([#4476](https://github.com/matrix-org/matrix-js-sdk/pull/4476)). Contributed by @florianduros.
+
+## ✨ Features
+
+* Ensure we disambiguate display names which look like MXIDs ([#4540](https://github.com/matrix-org/matrix-js-sdk/pull/4540)). Contributed by @t3chguy.
+* Add `CryptoApi.getBackupInfo` ([#4512](https://github.com/matrix-org/matrix-js-sdk/pull/4512)). Contributed by @florianduros.
+* Fix local echo in embedded mode ([#4498](https://github.com/matrix-org/matrix-js-sdk/pull/4498)). Contributed by @toger5.
+* Add `restoreKeybackup` to `CryptoApi`. ([#4476](https://github.com/matrix-org/matrix-js-sdk/pull/4476)). Contributed by @florianduros.
+
+## 🐛 Bug Fixes
+
+* Fix `RustBackupManager` remaining values after current backup removal ([#4537](https://github.com/matrix-org/matrix-js-sdk/pull/4537)). Contributed by @florianduros.
+
+
 Changes in [34.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.12.0) (2024-11-19)
 ====================================================================================================
 ## 🦖 Deprecations
