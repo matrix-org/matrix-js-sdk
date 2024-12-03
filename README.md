@@ -307,7 +307,7 @@ Then visit `http://localhost:8005` to see the API docs.
 
 ## Initialization
 
-**Do not use `matrixClient.initCrypto()`. This method is deprecated and no longer maintained.**
+**Do not use `matrixClient.initLegacyCrypto()`. This method is deprecated and no longer maintained.**
 
 To initialize the end-to-end encryption support in the matrix client:
 
@@ -396,10 +396,10 @@ Once the cross-signing is set up on one of your devices, you can verify another 
 
 ## Migrating from the legacy crypto stack to Rust crypto
 
-If your application previously used the legacy crypto stack, (i.e, it called `MatrixClient.initCrypto()`), you will
+If your application previously used the legacy crypto stack, (i.e, it called `MatrixClient.initLegacyCrypto()`), you will
 need to migrate existing devices to the Rust crypto stack.
 
-This migration happens automatically when you call `initRustCrypto()` instead of `initCrypto()`,
+This migration happens automatically when you call `initRustCrypto()` instead of `initLegacyCrypto()`,
 but you need to provide the legacy [`cryptoStore`](https://matrix-org.github.io/matrix-js-sdk/interfaces/matrix.ICreateClientOpts.html#cryptoStore) and [`pickleKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/matrix.ICreateClientOpts.html#pickleKey) to [`createClient`](https://matrix-org.github.io/matrix-js-sdk/functions/matrix.createClient.html):
 
 ```javascript

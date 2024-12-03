@@ -112,7 +112,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should emit RoomEvent.MyMembership for invite->leave->invite cycles", async () => {
-            await client!.initCrypto();
+            await client!.initLegacyCrypto();
 
             const roomId = "!cycles:example.org";
 
@@ -227,7 +227,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should emit RoomEvent.MyMembership for knock->leave->knock cycles", async () => {
-            await client!.initCrypto();
+            await client!.initLegacyCrypto();
 
             const roomId = "!cycles:example.org";
 
@@ -2573,7 +2573,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         idbHttpBackend.when("GET", "/pushrules/").respond(200, {});
         idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
 
-        await idbClient.initCrypto();
+        await idbClient.initLegacyCrypto();
 
         const roomId = "!invite:example.org";
 
