@@ -30,7 +30,6 @@ import {
     SetPresence,
 } from "./sync.ts";
 import { MatrixEvent } from "./models/event.ts";
-import { Crypto } from "./crypto/index.ts";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -52,54 +51,6 @@ import { KnownMembership } from "./@types/membership.ts";
 // to RECONNECTING. This is needed to inform the client of server issues when the
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
-
-type ExtensionE2EERequest = {
-    enabled: boolean;
-};
-
-type ExtensionE2EEResponse = Pick<
-    ISyncResponse,
-    | "device_lists"
-    | "device_one_time_keys_count"
-    | "device_unused_fallback_key_types"
-    | "org.matrix.msc2732.device_unused_fallback_key_types"
->;
-
-class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
-    public constructor(private readonly crypto: Crypto) {}
-
-    public name(): string {
-        return "e2ee";
-    }
-
-    public when(): ExtensionState {
-        return ExtensionState.PreProcess;
-    }
-
-    public onRequest(isInitial: boolean): ExtensionE2EERequest | undefined {
-        if (!isInitial) {
-            return undefined;
-        }
-        return {
-            enabled: true, // this is sticky so only send it on the initial request
-        };
-    }
-
-    public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
-        // Handle device list updates
-        if (data.device_lists) {
-            await this.crypto.processDeviceLists(data.device_lists);
-        }
-
-        // Handle one_time_keys_count and unused_fallback_key_types
-        await this.crypto.processKeyCounts(
-            data.device_one_time_keys_count,
-            data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"],
-        );
-
-        this.crypto.onSyncCompleted({});
-    }
-}
 
 type ExtensionToDeviceRequest = {
     since?: string;
@@ -373,9 +324,6 @@ export class SlidingSyncSdk {
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
         ];
-        if (this.syncOpts.crypto) {
-            extensions.push(new ExtensionE2EE(this.syncOpts.crypto));
-        }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
         });
