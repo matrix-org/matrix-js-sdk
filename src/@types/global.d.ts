@@ -79,8 +79,8 @@ declare global {
     }
 
     export interface Uint8ArrayFromBase64Options {
-        alphabet?: "base64" | "base64url";
-        lastChunkHandling?: "loose" | "strict" | "stop-before-partial";
+        alphabet?: "base64"; // Our fallback code only handles base64.
+        lastChunkHandling?: "loose"; // Our fallback code doesn't support other handling at this time.
     }
 
     interface Uint8ArrayConstructor {

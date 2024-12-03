@@ -72,17 +72,7 @@ function fromBase64(base64: string, options: Uint8ArrayFromBase64Options): Uint8
         return Uint8Array.fromBase64(base64, options);
     }
 
-    if (options.lastChunkHandling !== "loose") {
-        throw new Error("Unsupported last chunk handling");
-    }
-
-    const decoded = atob(base64);
-    const itFunc = function* (): Generator<number> {
-        for (let i = 0; i < decoded.length; ++i) {
-            yield decoded.charCodeAt(i);
-        }
-    };
-    return Uint8Array.from(itFunc());
+    return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 }
 
 /**
