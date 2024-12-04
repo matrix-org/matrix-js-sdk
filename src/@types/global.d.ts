@@ -67,4 +67,24 @@ declare global {
         // on webkit: we should check if we still need to do this
         webkitGetUserMedia?: DummyInterfaceWeShouldntBeUsingThis;
     }
+
+    export interface Uint8ArrayToBase64Options {
+        alphabet?: "base64" | "base64url";
+        omitPadding?: boolean;
+    }
+
+    interface Uint8Array {
+        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tobase64
+        toBase64?(options?: Uint8ArrayToBase64Options): string;
+    }
+
+    export interface Uint8ArrayFromBase64Options {
+        alphabet?: "base64"; // Our fallback code only handles base64.
+        lastChunkHandling?: "loose"; // Our fallback code doesn't support other handling at this time.
+    }
+
+    interface Uint8ArrayConstructor {
+        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.frombase64
+        fromBase64?(base64: string, options?: Uint8ArrayFromBase64Options): Uint8Array;
+    }
 }

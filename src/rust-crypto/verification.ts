@@ -381,8 +381,8 @@ export class RustVerificationRequest
      * @param qrCodeData - the decoded QR code.
      * @returns A verifier; call `.verify()` on it to wait for the other side to complete the verification flow.
      */
-    public async scanQRCode(uint8Array: Uint8Array): Promise<Verifier> {
-        const scan = RustSdkCryptoJs.QrCodeScan.fromBytes(new Uint8ClampedArray(uint8Array));
+    public async scanQRCode(uint8Array: Uint8ClampedArray): Promise<Verifier> {
+        const scan = RustSdkCryptoJs.QrCodeScan.fromBytes(uint8Array);
         const verifier: RustSdkCryptoJs.Qr = await this.inner.scanQrCode(scan);
 
         // this should have triggered the onChange callback, and we should now have a verifier
@@ -416,7 +416,7 @@ export class RustVerificationRequest
     /**
      * Stub implementation of {@link Crypto.VerificationRequest#getQRCodeBytes}.
      */
-    public getQRCodeBytes(): Buffer | undefined {
+    public getQRCodeBytes(): Uint8ClampedArray | undefined {
         throw new Error("getQRCodeBytes() unsupported in Rust Crypto; use generateQRCode() instead.");
     }
 
@@ -425,7 +425,7 @@ export class RustVerificationRequest
      *
      * Implementation of {@link Crypto.VerificationRequest#generateQRCode}.
      */
-    public async generateQRCode(): Promise<Buffer | undefined> {
+    public async generateQRCode(): Promise<Uint8ClampedArray | undefined> {
         // make sure that we have a list of the other user's devices (workaround https://github.com/matrix-org/matrix-rust-sdk/issues/2896)
         if (!(await this.getOtherDevice())) {
             throw new Error("generateQRCode(): other device is unknown");
@@ -435,7 +435,7 @@ export class RustVerificationRequest
         // If we are unable to generate a QRCode, we return undefined
         if (!innerVerifier) return;
 
-        return Buffer.from(innerVerifier.toBytes());
+        return innerVerifier.toBytes();
     }
 
     /**

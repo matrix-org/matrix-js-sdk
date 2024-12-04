@@ -108,7 +108,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param backupInfo - The backup information
      * @param privKey - The private decryption key.
      */
-    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
+    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor>;
 
     /**
      * Import a list of room keys restored from backup

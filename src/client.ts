@@ -3899,28 +3899,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: undefined,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: string,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: string | undefined,
         targetSessionId: string | undefined,
         backupInfo: IKeyBackupInfo,
