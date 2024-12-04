@@ -2222,6 +2222,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * An alternative to {@link initCrypto}.
      *
+     * **WARNING**: the cryptography stack is not thread-safe. Having multiple `MatrixClient` instances connected to
+     * the same Indexed DB will cause data corruption and decryption failures. The application layer is responsible for
+     * ensuring that only one `MatrixClient` issue is instantiated at a time.
+     *
      * @param args.useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
      * @param args.storageKey - A key with which to encrypt the indexeddb store. If provided, it must be exactly
      *    32 bytes of data, and must be the same each time the client is initialised for a given device.
