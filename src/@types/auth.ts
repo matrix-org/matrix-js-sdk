@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "../NamespacedValue";
-import { IClientWellKnown } from "../client";
+import { UnstableValue } from "../NamespacedValue.ts";
+import { IClientWellKnown } from "../client.ts";
 
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
@@ -148,11 +148,6 @@ export interface LoginRequest {
      */
     type: "m.login.password" | "m.login.token" | string;
     /**
-     * Third-party identifier for the user.
-     * @deprecated in favour of `identifier`.
-     */
-    address?: string;
-    /**
      * ID of the client device.
      * If this does not correspond to a known client device, a new device will be created.
      * The given device ID must not be the same as a cross-signing key ID.
@@ -243,21 +238,13 @@ export interface LoginResponse {
 }
 
 /**
- * The result of a successful [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882)
- * `m.login.token` issuance request.
- * Note that this is UNSTABLE and subject to breaking changes without notice.
+ * The result of a successful `m.login.token` issuance request as per https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv1loginget_token
  */
 export interface LoginTokenPostResponse {
     /**
      * The token to use with `m.login.token` to authenticate.
      */
     login_token: string;
-    /**
-     * Expiration in seconds.
-     *
-     * @deprecated this is only provided for compatibility with original revision of the MSC.
-     */
-    expires_in: number;
     /**
      * Expiration in milliseconds.
      */

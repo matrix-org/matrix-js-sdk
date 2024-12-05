@@ -14,32 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IEncryptedPayload } from "./aes";
-
-export interface Curve25519SessionData {
-    ciphertext: string;
-    ephemeral: string;
-    mac: string;
-}
-
-/* eslint-disable camelcase */
-export interface IKeyBackupSession<T = Curve25519SessionData | IEncryptedPayload> {
-    first_message_index: number;
-    forwarded_count: number;
-    is_verified: boolean;
-    session_data: T;
-}
-
-export interface IKeyBackupRoomSessions {
-    [sessionId: string]: IKeyBackupSession;
-}
-
 // Export for backward compatibility
+import { ImportRoomKeyProgressData } from "../crypto-api/index.ts";
+
 export type {
     Curve25519AuthData as ICurve25519AuthData,
     Aes256AuthData as IAes256AuthData,
     KeyBackupInfo as IKeyBackupInfo,
-} from "../crypto-api/keybackup";
+    Curve25519SessionData,
+    KeyBackupSession as IKeyBackupSession,
+    KeyBackupRoomSessions as IKeyBackupRoomSessions,
+} from "../crypto-api/keybackup.ts";
 
 /* eslint-enable camelcase */
 
@@ -58,5 +43,5 @@ export interface IKeyBackupRestoreResult {
 
 export interface IKeyBackupRestoreOpts {
     cacheCompleteCallback?: () => void;
-    progressCallback?: (progress: { stage: string }) => void;
+    progressCallback?: (progress: ImportRoomKeyProgressData) => void;
 }

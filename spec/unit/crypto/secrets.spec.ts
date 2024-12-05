@@ -20,14 +20,16 @@ import { IObject } from "../../../src/crypto/olmlib";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
-import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from "../../../src/client";
+import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { ISignatures } from "../../../src/@types/signed";
 import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { decodeBase64 } from "../../../src/base64";
+import { CrossSigningKeyInfo } from "../../../src/crypto-api";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -67,20 +69,20 @@ function sign<T extends IObject | ICurve25519AuthData>(
 }
 
 describe("Secrets", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should store and retrieve a secret", async function () {
         const key = new Uint8Array(16);
         for (let i = 0; i < 16; i++) key[i] = i;
 
-        const signing = new global.Olm.PkSigning();
+        const signing = new globalThis.Olm.PkSigning();
         const signingKey = signing.generate_seed();
         const signingPubKey = signing.init_with_seed(signingKey);
 
@@ -189,10 +191,7 @@ describe("Secrets", function () {
         };
         resetCrossSigningKeys(alice);
 
-        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, {
-            pubkey: undefined,
-            key: undefined,
-        });
+        const { keyId: newKeyId } = await alice.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1_AES, { key });
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
         alice.setDefaultSecretStorageKeyId(newKeyId);
@@ -275,13 +274,13 @@ describe("Secrets", function () {
 
     describe("bootstrap", function () {
         // keys used in some of the tests
-        const XSK = new Uint8Array(olmlib.decodeBase64("3lo2YdJugHjfE+Or7KJ47NuKbhE7AAGLgQ/dc19913Q="));
+        const XSK = new Uint8Array(decodeBase64("3lo2YdJugHjfE+Or7KJ47NuKbhE7AAGLgQ/dc19913Q="));
         const XSPubKey = "DRb8pFVJyEJ9OWvXeUoM0jq/C2Wt+NxzBZVuk2nRb+0";
-        const USK = new Uint8Array(olmlib.decodeBase64("lKWi3hJGUie5xxHgySoz8PHFnZv6wvNaud/p2shN9VU="));
+        const USK = new Uint8Array(decodeBase64("lKWi3hJGUie5xxHgySoz8PHFnZv6wvNaud/p2shN9VU="));
         const USPubKey = "CUpoiTtHiyXpUmd+3ohb7JVxAlUaOG1NYs9Jlx8soQU";
-        const SSK = new Uint8Array(olmlib.decodeBase64("1R6JVlXX99UcfUZzKuCDGQgJTw8ur1/ofgPD8pp+96M="));
+        const SSK = new Uint8Array(decodeBase64("1R6JVlXX99UcfUZzKuCDGQgJTw8ur1/ofgPD8pp+96M="));
         const SSPubKey = "0DfNsRDzEvkCLA0gD3m7VAGJ5VClhjEsewI35xq873Q";
-        const SSSSKey = new Uint8Array(olmlib.decodeBase64("XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0="));
+        const SSSSKey = new Uint8Array(decodeBase64("XrmITOOdBhw6yY5Bh7trb/bgp1FRdIGyCUxxMP873R0="));
 
         it("bootstraps when no storage or cross-signing keys locally", async function () {
             const key = new Uint8Array(16);
@@ -312,6 +311,7 @@ describe("Secrets", function () {
                 this.emit(ClientEvent.AccountData, event);
                 return {};
             };
+            bob.getKeyBackupVersion = jest.fn().mockResolvedValue(null);
 
             await bob.bootstrapCrossSigning({
                 authUploadDeviceSigningKeys: async (func) => {
@@ -332,8 +332,7 @@ describe("Secrets", function () {
         });
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
-            const decryption = new global.Olm.PkDecryption();
-            const storagePublicKey = decryption.generate_key();
+            const decryption = new globalThis.Olm.PkDecryption();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(
@@ -376,8 +375,6 @@ describe("Secrets", function () {
             });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey: async () => ({
-                    // `pubkey` not used anymore with symmetric 4S
-                    keyInfo: { pubkey: storagePublicKey },
                     privateKey: storagePrivateKey,
                 }),
             });
@@ -479,7 +476,7 @@ describe("Secrets", function () {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign<ICrossSigningKey>(
+                    self_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["self_signing"],
@@ -490,7 +487,7 @@ describe("Secrets", function () {
                         XSK,
                         "@alice:example.com",
                     ),
-                    user_signing: sign<ICrossSigningKey>(
+                    user_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["user_signing"],
@@ -615,7 +612,7 @@ describe("Secrets", function () {
                     type: "m.megolm_backup.v1",
                     content: {
                         encrypted: {
-                            key_id: await encryptAES(
+                            key_id: await encryptAESSecretStorageItem(
                                 "123,45,6,7,89,1,234,56,78,90,12,34,5,67,8,90",
                                 secretStorageKeys.key_id,
                                 "m.megolm_backup.v1",
@@ -635,7 +632,7 @@ describe("Secrets", function () {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign<ICrossSigningKey>(
+                    self_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["self_signing"],
@@ -646,7 +643,7 @@ describe("Secrets", function () {
                         XSK,
                         "@alice:example.com",
                     ),
-                    user_signing: sign<ICrossSigningKey>(
+                    user_signing: sign<CrossSigningKeyInfo>(
                         {
                             user_id: "@alice:example.com",
                             usage: ["user_signing"],

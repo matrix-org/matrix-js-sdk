@@ -14,23 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType } from "../@types/event";
-import { Room } from "../models/room";
-import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
-import { Filter } from "../filter";
-import { RoomSummary } from "../models/room-summary";
-import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
-import { IStartClientOpts } from "../client";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
-import { EventEmitterEvents } from "../models/typed-event-emitter";
+import { EventType } from "../@types/event.ts";
+import { Room } from "../models/room.ts";
+import { User } from "../models/user.ts";
+import { IEvent, MatrixEvent } from "../models/event.ts";
+import { Filter } from "../filter.ts";
+import { RoomSummary } from "../models/room-summary.ts";
+import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator.ts";
+import { IStartClientOpts } from "../client.ts";
+import { IStateEventWithRoomId } from "../@types/search.ts";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { EventEmitterEvents } from "../models/typed-event-emitter.ts";
 
 export interface ISavedSync {
     nextBatch: string;
     roomsData: IRooms;
     accountData: IMinimalEvent[];
 }
+
+export type UserCreator = (userId: string) => User;
 
 /**
  * A store for most of the data js-sdk needs to store, apart from crypto data
@@ -61,6 +63,12 @@ export interface IStore {
      * @param room - The room to be stored. All properties must be stored.
      */
     storeRoom(room: Room): void;
+
+    /**
+     * Set the user creator which is used for creating User objects
+     * @param creator - A callback that accepts an user-id and returns an User object
+     */
+    setUserCreator(creator: UserCreator): void;
 
     /**
      * Retrieve a room by its' room ID.

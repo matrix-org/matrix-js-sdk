@@ -1,52 +1,108 @@
 name: Release Process
 on:
-    release:
-        types: [published]
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+    workflow_dispatch:
+        inputs:
+            mode:
+                description: What type of release
+                required: true
+                default: rc
+                type: choice
+                options:
+                    - rc
+                    - final
+            docs:
+                description: Publish docs
+                required: true
+                type: boolean
+                default: true
+            npm:
+                description: Publish to npm
+                required: true
+                type: boolean
+                default: true
+concurrency: ${{ github.workflow }}
+permissions: {} # No permissions required
 jobs:
-    jsdoc:
-        name: Publish Documentation
-        runs-on: ubuntu-latest
+    release:
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: read
+        secrets: inherit
+        with:
+            final: ${{ inputs.mode == 'final' }}
+            npm: ${{ inputs.npm }}
+
+    bump-downstreams:
+        name: Update npm dependency in downstream projects
+        needs: release
+        runs-on: ubuntu-24.04
+        strategy:
+            matrix:
+                repo:
+                    - element-hq/element-web
         steps:
-            - name: 🧮 Checkout code
-              uses: actions/checkout@v3
-
-            - name: 🧮 Checkout gh-pages
-              uses: actions/checkout@v3
+            - uses: actions/checkout@v4
               with:
-                  ref: gh-pages
-                  path: _docs
+                  repository: ${{ matrix.repo }}
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
 
-            - name: 🔧 Yarn cache
-              uses: actions/setup-node@v3
+            - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version: "lts/*"
+
+            - name: Bump dependency
+              env:
+                  DEPENDENCY: ${{ needs.release.outputs.npm-id }}
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  yarn upgrade "$DEPENDENCY" --exact
+                  git add package.json yarn.lock
+                  git commit -am"Upgrade dependency to $DEPENDENCY"
+                  git push origin staging
+
+    docs:
+        name: Publish Documentation
+        needs: release
+        if: inputs.docs
+        runs-on: ubuntu-24.04
+        steps:
+            - name: 🧮 Checkout code
+              uses: actions/checkout@v4
+
+            - name: 🔧 Yarn cache
+              uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version-file: package.json
 
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: 🔨 Install symlinks
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y symlinks
-
             - name: 📖 Generate docs
-              run: |
-                  yarn tpv purge --yes --out _docs --stale --major 10
-                  yarn gendoc
-                  symlinks -rc _docs
+              run: yarn gendoc
 
-            - name: 🚀 Deploy
-              run: |
-                  git config --global user.email "releases@riot.im"
-                  git config --global user.name "RiotRobot"
-                  git add . --all
-                  git commit -m "Update docs"
-                  git push
-              working-directory: _docs
+            - name: Upload artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: _docs
 
-    npm:
-        name: Publish
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
-        secrets:
-            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    docs-deploy:
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        runs-on: ubuntu-24.04
+        needs: docs
+        # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+        permissions:
+            contents: read
+            pages: write
+            id-token: write
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4

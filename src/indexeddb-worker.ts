@@ -21,4 +21,4 @@ limitations under the License.
  */
 
 /** The {@link IndexedDBStoreWorker} class. */
-export { IndexedDBStoreWorker } from "./store/indexeddb-store-worker";
+export { IndexedDBStoreWorker } from "./store/indexeddb-store-worker.ts";

@@ -7,6 +7,7 @@ import { MatrixClient } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { RoomMember } from "../../src/models/room-member";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("EventTimeline", function () {
     const roomId = "!foo:bar";
@@ -50,7 +51,7 @@ describe("EventTimeline", function () {
             const events = [
                 utils.mkMembership({
                     room: roomId,
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     user: userB,
                     skey: userA,
                     event: true,
@@ -87,7 +88,7 @@ describe("EventTimeline", function () {
             const state = [
                 utils.mkMembership({
                     room: roomId,
-                    mship: "invite",
+                    mship: KnownMembership.Invite,
                     user: userB,
                     skey: userA,
                     event: true,
@@ -97,7 +98,7 @@ describe("EventTimeline", function () {
             expect(function () {
                 timeline.initialiseState(state);
             }).not.toThrow();
-            timeline.addEvent(event, { toStartOfTimeline: false });
+            timeline.addEvent(event, { toStartOfTimeline: false, addToState: false });
             expect(function () {
                 timeline.initialiseState(state);
             }).toThrow();
@@ -181,9 +182,9 @@ describe("EventTimeline", function () {
         ];
 
         it("should be able to add events to the end", function () {
-            timeline.addEvent(events[0], { toStartOfTimeline: false });
+            timeline.addEvent(events[0], { toStartOfTimeline: false, addToState: false });
             const initialIndex = timeline.getBaseIndex();
-            timeline.addEvent(events[1], { toStartOfTimeline: false });
+            timeline.addEvent(events[1], { toStartOfTimeline: false, addToState: false });
             expect(timeline.getBaseIndex()).toEqual(initialIndex);
             expect(timeline.getEvents().length).toEqual(2);
             expect(timeline.getEvents()[0]).toEqual(events[0]);
@@ -191,9 +192,9 @@ describe("EventTimeline", function () {
         });
 
         it("should be able to add events to the start", function () {
-            timeline.addEvent(events[0], { toStartOfTimeline: true });
+            timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: false });
             const initialIndex = timeline.getBaseIndex();
-            timeline.addEvent(events[1], { toStartOfTimeline: true });
+            timeline.addEvent(events[1], { toStartOfTimeline: true, addToState: false });
             expect(timeline.getBaseIndex()).toEqual(initialIndex + 1);
             expect(timeline.getEvents().length).toEqual(2);
             expect(timeline.getEvents()[0]).toEqual(events[1]);
@@ -203,11 +204,11 @@ describe("EventTimeline", function () {
         it("should set event.sender for new and old events", function () {
             const sentinel = new RoomMember(roomId, userA);
             sentinel.name = "Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             const oldSentinel = new RoomMember(roomId, userA);
             sentinel.name = "Old Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
@@ -237,20 +238,20 @@ describe("EventTimeline", function () {
                 content: { name: "Old Room Name" },
             });
 
-            timeline.addEvent(newEv, { toStartOfTimeline: false });
+            timeline.addEvent(newEv, { toStartOfTimeline: false, addToState: false });
             expect(newEv.sender).toEqual(sentinel);
-            timeline.addEvent(oldEv, { toStartOfTimeline: true });
+            timeline.addEvent(oldEv, { toStartOfTimeline: true, addToState: false });
             expect(oldEv.sender).toEqual(oldSentinel);
         });
 
         it("should set event.target for new and old m.room.member events", function () {
             const sentinel = new RoomMember(roomId, userA);
             sentinel.name = "Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             const oldSentinel = new RoomMember(roomId, userA);
             sentinel.name = "Old Alice";
-            sentinel.membership = "join";
+            sentinel.membership = KnownMembership.Join;
 
             mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
@@ -267,21 +268,21 @@ describe("EventTimeline", function () {
 
             const newEv = utils.mkMembership({
                 room: roomId,
-                mship: "invite",
+                mship: KnownMembership.Invite,
                 user: userB,
                 skey: userA,
                 event: true,
             });
             const oldEv = utils.mkMembership({
                 room: roomId,
-                mship: "ban",
+                mship: KnownMembership.Ban,
                 user: userB,
                 skey: userA,
                 event: true,
             });
-            timeline.addEvent(newEv, { toStartOfTimeline: false });
+            timeline.addEvent(newEv, { toStartOfTimeline: false, addToState: false });
             expect(newEv.target).toEqual(sentinel);
-            timeline.addEvent(oldEv, { toStartOfTimeline: true });
+            timeline.addEvent(oldEv, { toStartOfTimeline: true, addToState: false });
             expect(oldEv.target).toEqual(oldSentinel);
         });
 
@@ -291,7 +292,7 @@ describe("EventTimeline", function () {
                 const events = [
                     utils.mkMembership({
                         room: roomId,
-                        mship: "invite",
+                        mship: KnownMembership.Invite,
                         user: userB,
                         skey: userA,
                         event: true,
@@ -307,8 +308,8 @@ describe("EventTimeline", function () {
                     }),
                 ];
 
-                timeline.addEvent(events[0], { toStartOfTimeline: false });
-                timeline.addEvent(events[1], { toStartOfTimeline: false });
+                timeline.addEvent(events[0], { toStartOfTimeline: false, addToState: true });
+                timeline.addEvent(events[1], { toStartOfTimeline: false, addToState: true });
 
                 expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
                     timelineWasEmpty: undefined,
@@ -330,7 +331,7 @@ describe("EventTimeline", function () {
                 const events = [
                     utils.mkMembership({
                         room: roomId,
-                        mship: "invite",
+                        mship: KnownMembership.Invite,
                         user: userB,
                         skey: userA,
                         event: true,
@@ -346,8 +347,8 @@ describe("EventTimeline", function () {
                     }),
                 ];
 
-                timeline.addEvent(events[0], { toStartOfTimeline: true });
-                timeline.addEvent(events[1], { toStartOfTimeline: true });
+                timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: true });
+                timeline.addEvent(events[1], { toStartOfTimeline: true, addToState: true });
 
                 expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
                     timelineWasEmpty: undefined,
@@ -364,11 +365,15 @@ describe("EventTimeline", function () {
         );
 
         it("Make sure legacy overload passing options directly as parameters still works", () => {
-            expect(() => timeline.addEvent(events[0], { toStartOfTimeline: true })).not.toThrow();
+            expect(() => timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: false })).not.toThrow();
             // @ts-ignore stateContext is not a valid param
             expect(() => timeline.addEvent(events[0], { stateContext: new RoomState(roomId) })).not.toThrow();
             expect(() =>
-                timeline.addEvent(events[0], { toStartOfTimeline: false, roomState: new RoomState(roomId) }),
+                timeline.addEvent(events[0], {
+                    toStartOfTimeline: false,
+                    addToState: false,
+                    roomState: new RoomState(roomId),
+                }),
             ).not.toThrow();
         });
     });
@@ -396,8 +401,8 @@ describe("EventTimeline", function () {
         ];
 
         it("should remove events", function () {
-            timeline.addEvent(events[0], { toStartOfTimeline: false });
-            timeline.addEvent(events[1], { toStartOfTimeline: false });
+            timeline.addEvent(events[0], { toStartOfTimeline: false, addToState: false });
+            timeline.addEvent(events[1], { toStartOfTimeline: false, addToState: false });
             expect(timeline.getEvents().length).toEqual(2);
 
             let ev = timeline.removeEvent(events[0].getId()!);
@@ -410,9 +415,9 @@ describe("EventTimeline", function () {
         });
 
         it("should update baseIndex", function () {
-            timeline.addEvent(events[0], { toStartOfTimeline: false });
-            timeline.addEvent(events[1], { toStartOfTimeline: true });
-            timeline.addEvent(events[2], { toStartOfTimeline: false });
+            timeline.addEvent(events[0], { toStartOfTimeline: false, addToState: false });
+            timeline.addEvent(events[1], { toStartOfTimeline: true, addToState: false });
+            timeline.addEvent(events[2], { toStartOfTimeline: false, addToState: false });
             expect(timeline.getEvents().length).toEqual(3);
             expect(timeline.getBaseIndex()).toEqual(1);
 
@@ -429,11 +434,11 @@ describe("EventTimeline", function () {
         // - removing the last event got baseIndex into such a state that
         // further addEvent(ev, false) calls made the index increase.
         it("should not make baseIndex assplode when removing the last event", function () {
-            timeline.addEvent(events[0], { toStartOfTimeline: true });
+            timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: false });
             timeline.removeEvent(events[0].getId()!);
             const initialIndex = timeline.getBaseIndex();
-            timeline.addEvent(events[1], { toStartOfTimeline: false });
-            timeline.addEvent(events[2], { toStartOfTimeline: false });
+            timeline.addEvent(events[1], { toStartOfTimeline: false, addToState: false });
+            timeline.addEvent(events[2], { toStartOfTimeline: false, addToState: false });
             expect(timeline.getBaseIndex()).toEqual(initialIndex);
             expect(timeline.getEvents().length).toEqual(2);
         });

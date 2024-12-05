@@ -18,13 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link SyncAccumulator} for the public class.
  */
 
-import { logger } from "./logger";
-import { deepCopy } from "./utils";
-import { IContent, IUnsigned } from "./models/event";
-import { IRoomSummary } from "./models/room-summary";
-import { EventType } from "./@types/event";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
-import { ReceiptAccumulator } from "./receipt-accumulator";
+import { logger } from "./logger.ts";
+import { deepCopy } from "./utils.ts";
+import { IContent, IUnsigned } from "./models/event.ts";
+import { IRoomSummary } from "./models/room-summary.ts";
+import { EventType } from "./@types/event.ts";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
+import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 
 interface IOpts {
     /**
@@ -58,8 +58,6 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
-    /** @deprecated - legacy field */
-    age?: number;
 }
 
 export interface IStateEvent extends IRoomEvent {
@@ -79,7 +77,9 @@ export interface ITimeline {
 
 export interface IJoinedRoom {
     "summary": IRoomSummary;
-    "state": IState;
+    // One of `state` or `state_after` is required.
+    "state"?: IState;
+    "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -99,20 +99,31 @@ export interface IInviteState {
     events: IStrippedState[];
 }
 
+export interface IKnockState {
+    events: IStrippedState[];
+}
+
 export interface IInvitedRoom {
     invite_state: IInviteState;
 }
 
 export interface ILeftRoom {
-    state: IState;
-    timeline: ITimeline;
-    account_data: IAccountData;
+    // One of `state` or `state_after` is required.
+    "state"?: IState;
+    "org.matrix.msc4222.state_after"?: IState;
+    "timeline": ITimeline;
+    "account_data": IAccountData;
+}
+
+export interface IKnockedRoom {
+    knock_state: IKnockState;
 }
 
 export interface IRooms {
     [Category.Join]: Record<string, IJoinedRoom>;
     [Category.Invite]: Record<string, IInvitedRoom>;
     [Category.Leave]: Record<string, ILeftRoom>;
+    [Category.Knock]: Record<string, IKnockedRoom>;
 }
 
 interface IPresence {
@@ -156,6 +167,7 @@ export enum Category {
     Invite = "invite",
     Leave = "leave",
     Join = "join",
+    Knock = "knock",
 }
 
 interface IRoom {
@@ -196,6 +208,7 @@ function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
 export class SyncAccumulator {
     private accountData: Record<string, IMinimalEvent> = {}; // $event_type: Object
     private inviteRooms: Record<string, IInvitedRoom> = {}; // $roomId: { ... sync 'invite' json data ... }
+    private knockRooms: Record<string, IKnockedRoom> = {}; // $roomId: { ... sync 'knock' json data ... }
     private joinRooms: { [roomId: string]: IRoom } = {};
     // the /sync token which corresponds to the last time rooms were
     // accumulated. We remember this so that any caller can obtain a
@@ -247,11 +260,17 @@ export class SyncAccumulator {
                 this.accumulateRoom(roomId, Category.Leave, syncResponse.rooms.leave[roomId], fromDatabase);
             });
         }
+        if (syncResponse.rooms.knock) {
+            Object.keys(syncResponse.rooms.knock).forEach((roomId) => {
+                this.accumulateRoom(roomId, Category.Knock, syncResponse.rooms.knock[roomId], fromDatabase);
+            });
+        }
     }
 
     private accumulateRoom(roomId: string, category: Category.Invite, data: IInvitedRoom, fromDatabase: boolean): void;
     private accumulateRoom(roomId: string, category: Category.Join, data: IJoinedRoom, fromDatabase: boolean): void;
     private accumulateRoom(roomId: string, category: Category.Leave, data: ILeftRoom, fromDatabase: boolean): void;
+    private accumulateRoom(roomId: string, category: Category.Knock, data: IKnockedRoom, fromDatabase: boolean): void;
     private accumulateRoom(roomId: string, category: Category, data: any, fromDatabase = false): void {
         // Valid /sync state transitions
         //       +--------+ <======+            1: Accept an invite
@@ -266,7 +285,15 @@ export class SyncAccumulator {
         // * equivalent to "no state"
         switch (category) {
             case Category.Invite: // (5)
+                if (this.knockRooms[roomId]) {
+                    // was previously knock, now invite, need to delete knock state
+                    delete this.knockRooms[roomId];
+                }
                 this.accumulateInviteState(roomId, data as IInvitedRoom);
+                break;
+
+            case Category.Knock:
+                this.accumulateKnockState(roomId, data as IKnockedRoom);
                 break;
 
             case Category.Join:
@@ -282,7 +309,10 @@ export class SyncAccumulator {
                 break;
 
             case Category.Leave:
-                if (this.inviteRooms[roomId]) {
+                if (this.knockRooms[roomId]) {
+                    // delete knock state on leave
+                    delete this.knockRooms[roomId];
+                } else if (this.inviteRooms[roomId]) {
                     // (4)
                     delete this.inviteRooms[roomId];
                 } else {
@@ -322,6 +352,36 @@ export class SyncAccumulator {
             }
             if (!hasAdded) {
                 currentData.invite_state.events.push(e);
+            }
+        });
+    }
+
+    private accumulateKnockState(roomId: string, data: IKnockedRoom): void {
+        if (!data.knock_state || !data.knock_state.events) {
+            // no new data
+            return;
+        }
+        if (!this.knockRooms[roomId]) {
+            this.knockRooms[roomId] = {
+                knock_state: data.knock_state,
+            };
+            return;
+        }
+        // accumulate extra keys
+        // clobber based on event type / state key
+        // We expect knock_state to be small, so just loop over the events
+        const currentData = this.knockRooms[roomId];
+        data.knock_state.events.forEach((e) => {
+            let hasAdded = false;
+            for (let i = 0; i < currentData.knock_state.events.length; i++) {
+                const current = currentData.knock_state.events[i];
+                if (current.type === e.type && current.state_key == e.state_key) {
+                    currentData.knock_state.events[i] = e; // update
+                    hasAdded = true;
+                }
+            }
+            if (!hasAdded) {
+                currentData.knock_state.events.push(e);
             }
         });
     }
@@ -425,13 +485,18 @@ export class SyncAccumulator {
         // Work out the current state. The deltas need to be applied in the order:
         // - existing state which didn't come down /sync.
         // - State events under the 'state' key.
-        // - State events in the 'timeline'.
+        // - State events under the 'state_after' key OR state events in the 'timeline' if 'state_after' is not present.
         data.state?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
-        data.timeline?.events?.forEach((e, index) => {
-            // this nops if 'e' isn't a state event
+        data["org.matrix.msc4222.state_after"]?.events?.forEach((e) => {
             setState(currentData._currentState, e);
+        });
+        data.timeline?.events?.forEach((e, index) => {
+            if (!data["org.matrix.msc4222.state_after"]) {
+                // this nops if 'e' isn't a state event
+                setState(currentData._currentState, e);
+            }
             // append the event to the timeline. The back-pagination token
             // corresponds to the first event in the timeline
             let transformedEvent: TaggedEvent;
@@ -440,7 +505,7 @@ export class SyncAccumulator {
                 if (transformedEvent.unsigned !== undefined) {
                     transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
                 }
-                const age = e.unsigned ? e.unsigned.age : e.age;
+                const age = e.unsigned?.age;
                 if (age !== undefined) transformedEvent._localTs = Date.now() - age;
             } else {
                 transformedEvent = e;
@@ -448,7 +513,7 @@ export class SyncAccumulator {
 
             currentData._timeline.push({
                 event: transformedEvent,
-                token: index === 0 ? data.timeline.prev_batch ?? null : null,
+                token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
         });
 
@@ -485,6 +550,7 @@ export class SyncAccumulator {
         const data: IRooms = {
             join: {},
             invite: {},
+            knock: {},
             // always empty. This is set by /sync when a room was previously
             // in 'invite' or 'join'. On fresh startup, the client won't know
             // about any previous room being in 'invite' or 'join' so we can
@@ -501,19 +567,27 @@ export class SyncAccumulator {
         Object.keys(this.inviteRooms).forEach((roomId) => {
             data.invite[roomId] = this.inviteRooms[roomId];
         });
+        Object.keys(this.knockRooms).forEach((roomId) => {
+            data.knock[roomId] = this.knockRooms[roomId];
+        });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
-            const roomJson: IJoinedRoom = {
-                ephemeral: { events: [] },
-                account_data: { events: [] },
-                state: { events: [] },
-                timeline: {
+            const roomJson: IJoinedRoom & {
+                // We track both `state` and `state_after` for downgrade compatibility
+                "state": IState;
+                "org.matrix.msc4222.state_after": IState;
+            } = {
+                "ephemeral": { events: [] },
+                "account_data": { events: [] },
+                "state": { events: [] },
+                "org.matrix.msc4222.state_after": { events: [] },
+                "timeline": {
                     events: [],
                     prev_batch: null,
                 },
-                unread_notifications: roomData._unreadNotifications,
-                unread_thread_notifications: roomData._unreadThreadNotifications,
-                summary: roomData._summary as IRoomSummary,
+                "unread_notifications": roomData._unreadNotifications,
+                "unread_thread_notifications": roomData._unreadThreadNotifications,
+                "summary": roomData._summary as IRoomSummary,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -590,8 +664,11 @@ export class SyncAccumulator {
             Object.keys(roomData._currentState).forEach((evType) => {
                 Object.keys(roomData._currentState[evType]).forEach((stateKey) => {
                     let ev = roomData._currentState[evType][stateKey];
+                    // Push to both fields to provide downgrade compatibility in the sync accumulator db
+                    // the code will prefer `state_after` if it is present
+                    roomJson["org.matrix.msc4222.state_after"].events.push(ev);
+                    // Roll the state back to the value at the start of the timeline if it was changed
                     if (rollBackState[evType] && rollBackState[evType][stateKey]) {
-                        // use the reverse clobbered event instead.
                         ev = rollBackState[evType][stateKey];
                     }
                     roomJson.state.events.push(ev);

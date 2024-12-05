@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
+import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
-import { IDelegatedAuthConfig } from "../client";
-import { subtleCrypto, TextEncoder } from "../crypto/crypto";
-import { logger } from "../logger";
-import { randomString } from "../randomstring";
-import { OidcError } from "./error";
+import { logger } from "../logger.ts";
+import { randomString } from "../randomstring.ts";
+import { OidcError } from "./error.ts";
 import {
-    validateIdToken,
-    ValidatedIssuerMetadata,
-    validateStoredUserState,
-    UserState,
     BearerTokenResponse,
+    UserState,
     validateBearerTokenResponse,
-} from "./validate";
+    ValidatedIssuerMetadata,
+    validateIdToken,
+    validateStoredUserState,
+} from "./validate.ts";
+import { sha256 } from "../digest.ts";
+import { encodeUnpaddedBase64Url } from "../base64.ts";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
@@ -51,26 +51,21 @@ export type AuthorizationParams = {
  * Generate the scope used in authorization request with OIDC OP
  * @returns scope
  */
-const generateScope = (): string => {
-    const deviceId = randomString(10);
-    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
+export const generateScope = (deviceId?: string): string => {
+    const safeDeviceId = deviceId ?? randomString(10);
+    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
 };
 
 // https://www.rfc-editor.org/rfc/rfc7636
 const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
-    if (!subtleCrypto) {
+    if (!globalThis.crypto.subtle) {
         // @TODO(kerrya) should this be allowed? configurable?
         logger.warn("A secure context is required to generate code challenge. Using plain text code challenge");
         return codeVerifier;
     }
-    const utf8 = new TextEncoder().encode(codeVerifier);
 
-    const digest = await subtleCrypto.digest("SHA-256", utf8);
-
-    return btoa(String.fromCharCode(...new Uint8Array(digest)))
-        .replace(/=/g, "")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
+    const hashBuffer = await sha256(codeVerifier);
+    return encodeUnpaddedBase64Url(hashBuffer);
 };
 
 /**
@@ -122,8 +117,14 @@ export const generateAuthorizationUrl = async (
  * @experimental
  * Generate a URL to attempt authorization with the OP
  * See https://openid.net/specs/openid-connect-basic-1_0.html#CodeRequest
- * @param oidcClientSettings - oidc configuration
- * @param homeserverName - used as state
+ * @param metadata - validated metadata from OP discovery
+ * @param clientId - this client's id as registered with the OP
+ * @param homeserverUrl - used to establish the session on return from the OP
+ * @param identityServerUrl - used to establish the session on return from the OP
+ * @param nonce - state
+ * @param prompt - indicates to the OP which flow the user should see - eg login or registration
+ *          See https://openid.net/specs/openid-connect-prompt-create-1_0.html#name-prompt-parameter
+ * @param urlState - value to append to the opaque state identifier to uniquely identify the callback
  * @returns a Promise with the url as a string
  */
 export const generateOidcAuthorizationUrl = async ({
@@ -133,6 +134,8 @@ export const generateOidcAuthorizationUrl = async ({
     homeserverUrl,
     identityServerUrl,
     nonce,
+    prompt,
+    urlState,
 }: {
     clientId: string;
     metadata: ValidatedIssuerMetadata;
@@ -140,8 +143,10 @@ export const generateOidcAuthorizationUrl = async ({
     identityServerUrl?: string;
     redirectUri: string;
     nonce: string;
+    prompt?: string;
+    urlState?: string;
 }): Promise<string> => {
-    const scope = await generateScope();
+    const scope = generateScope();
     const oidcClient = new OidcClient({
         ...metadata,
         client_id: clientId,
@@ -156,6 +161,8 @@ export const generateOidcAuthorizationUrl = async ({
     const request = await oidcClient.createSigninRequest({
         state: userState,
         nonce,
+        prompt,
+        url_state: urlState,
     });
 
     return request.url;
@@ -178,7 +185,7 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
         refresh_token: response.refresh_token,
         access_token: response.access_token,
         token_type: "Bearer",
-    } as BearerTokenResponse);
+    }) as BearerTokenResponse;
 
 /**
  * @experimental
@@ -190,15 +197,17 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
  * @param code - authorization code as returned by OP during authorization
  * @param storedAuthorizationParams - stored params from start of oidc login flow
  * @returns valid bearer token response
- * @throws when request fails, or returned token response is invalid
+ * @throws An `Error` with `message` set to an entry in {@link OidcError},
+ *      when the request fails, or the returned token response is invalid.
  */
 export const completeAuthorizationCodeGrant = async (
     code: string,
     state: string,
 ): Promise<{
-    oidcClientSettings: IDelegatedAuthConfig & { clientId: string };
+    oidcClientSettings: { clientId: string; issuer: string };
     tokenResponse: BearerTokenResponse;
     homeserverUrl: string;
+    idTokenClaims: IdTokenClaims;
     identityServerUrl?: string;
 }> => {
     /**
@@ -225,7 +234,7 @@ export const completeAuthorizationCodeGrant = async (
 
         // hydrate the sign in state and create a client
         // the stored sign in state includes oidc configuration we set at the start of the oidc login flow
-        const signInState = SigninState.fromStorageString(stateString);
+        const signInState = await SigninState.fromStorageString(stateString);
         const client = new OidcClient({ ...signInState, stateStore });
 
         // validate the code and state, and attempt to swap the code for tokens
@@ -250,6 +259,7 @@ export const completeAuthorizationCodeGrant = async (
             tokenResponse: normalizedTokenResponse,
             homeserverUrl: userState.homeserverUrl,
             identityServerUrl: userState.identityServerUrl,
+            idTokenClaims: signinResponse.profile,
         };
     } catch (error) {
         logger.error("Oidc login failed", error);

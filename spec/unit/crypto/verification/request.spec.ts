@@ -20,12 +20,12 @@ import { logger } from "../../../../src/logger";
 import { SAS } from "../../../../src/crypto/verification/SAS";
 import { makeTestClients } from "./util";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 jest.useFakeTimers();
 
 describe("verification request integration tests with crypto layer", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }

@@ -28,31 +28,70 @@ import {
     NotificationCountType,
     RelationType,
     Room,
+    fixNotificationCountOnDecryption,
 } from "../../src";
 import { TestClient } from "../TestClient";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { mkThread } from "../test-utils/thread";
 import { SyncState } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
+
+const userA = "@alice:localhost";
+const userB = "@bob:localhost";
+const selfUserId = userA;
+const selfAccessToken = "aseukfgwef";
+
+function setupTestClient(): [MatrixClient, HttpBackend] {
+    const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
+    const httpBackend = testClient.httpBackend;
+    const client = testClient.client;
+    httpBackend!.when("GET", "/versions").respond(200, {});
+    httpBackend!.when("GET", "/pushrules").respond(200, {});
+    httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+    return [client, httpBackend];
+}
+
+describe("Notification count fixing", () => {
+    let client: MatrixClient | undefined;
+
+    beforeEach(() => {
+        [client] = setupTestClient();
+    });
+
+    it("doesn't increment notification count for events that can't be found in a room", async () => {
+        const roomId = "!room:localhost";
+
+        client!.startClient({ threadSupport: true });
+        const room = new Room(roomId, client!, selfUserId);
+        jest.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
+
+        const event = new MatrixEvent({
+            room_id: roomId,
+            type: "m.reaction",
+            event_id: "$foo",
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Annotation,
+                    event_id: "$foo",
+                    key: "x",
+                },
+            },
+        });
+
+        jest.spyOn(event, "getPushActions").mockReturnValue({
+            notify: true,
+            tweaks: {},
+        });
+
+        fixNotificationCountOnDecryption(client!, event);
+
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
+    });
+});
 
 describe("MatrixClient syncing", () => {
-    const userA = "@alice:localhost";
-    const userB = "@bob:localhost";
-
-    const selfUserId = userA;
-    const selfAccessToken = "aseukfgwef";
-
     let client: MatrixClient | undefined;
     let httpBackend: HttpBackend | undefined;
-
-    const setupTestClient = (): [MatrixClient, HttpBackend] => {
-        const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
-        const httpBackend = testClient.httpBackend;
-        const client = testClient.client;
-        httpBackend!.when("GET", "/versions").respond(200, {});
-        httpBackend!.when("GET", "/pushrules").respond(200, {});
-        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
-        return [client, httpBackend];
-    };
 
     beforeEach(() => {
         [client, httpBackend] = setupTestClient();
@@ -89,7 +128,7 @@ describe("MatrixClient syncing", () => {
 
         const thread = mkThread({ room, client: client!, authorId: selfUserId, participantUserIds: [selfUserId] });
         const threadReply = thread.events.at(-1)!;
-        await room.addLiveEvents([thread.rootEvent]);
+        await room.addLiveEvents([thread.rootEvent], { addToState: false });
 
         // Initialize read receipt datastructure before testing the reaction
         room.addReceiptToStructure(thread.rootEvent.getId()!, ReceiptType.Read, selfUserId, { ts: 1 }, false);
@@ -113,7 +152,7 @@ describe("MatrixClient syncing", () => {
         await client!.sendEvent(roomId, EventType.Reaction, {
             "m.relates_to": {
                 rel_type: RelationType.Annotation,
-                event_id: threadReply.getId(),
+                event_id: threadReply.getId()!,
                 key: "",
             },
         });
@@ -179,7 +218,6 @@ describe("MatrixClient syncing", () => {
                             events: [
                                 {
                                     content: {
-                                        creator: userB,
                                         room_version: "9",
                                     },
                                     origin_server_ts: 1,
@@ -192,7 +230,7 @@ describe("MatrixClient syncing", () => {
                                     content: {
                                         avatar_url: "",
                                         displayname: userB,
-                                        membership: "join",
+                                        membership: KnownMembership.Join,
                                     },
                                     origin_server_ts: 2,
                                     sender: userB,
@@ -233,7 +271,7 @@ describe("MatrixClient syncing", () => {
                                 },
                                 {
                                     content: {
-                                        join_rule: "invite",
+                                        join_rule: KnownMembership.Invite,
                                     },
                                     origin_server_ts: 4,
                                     sender: userB,
@@ -279,7 +317,7 @@ describe("MatrixClient syncing", () => {
                                         avatar_url: "",
                                         displayname: userA,
                                         is_direct: true,
-                                        membership: "invite",
+                                        membership: KnownMembership.Invite,
                                     },
                                     origin_server_ts: 8,
                                     sender: userB,
@@ -301,7 +339,7 @@ describe("MatrixClient syncing", () => {
                                     content: {
                                         avatar_url: "",
                                         displayname: userA,
-                                        membership: "join",
+                                        membership: KnownMembership.Join,
                                     },
                                     origin_server_ts: 10,
                                     sender: userA,
@@ -377,6 +415,7 @@ describe("MatrixClient syncing", () => {
                 },
                 [Category.Leave]: {},
                 [Category.Invite]: {},
+                [Category.Knock]: {},
             },
         };
     }

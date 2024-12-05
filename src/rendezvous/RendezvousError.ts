@@ -14,10 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousFailureReason } from ".";
+import { RendezvousFailureReason } from "./index.ts";
 
 export class RendezvousError extends Error {
-    public constructor(message: string, public readonly code: RendezvousFailureReason) {
+    public constructor(
+        message: string,
+        public readonly code: RendezvousFailureReason,
+    ) {
         super(message);
     }
 }

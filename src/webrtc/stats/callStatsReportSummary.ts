@@ -17,7 +17,7 @@ export interface CallStatsReportSummary {
     audioTrackSummary: TrackSummary;
     videoTrackSummary: TrackSummary;
 
-    isFirstCollection: Boolean;
+    isFirstCollection: boolean;
 }
 
 export interface TrackSummary {

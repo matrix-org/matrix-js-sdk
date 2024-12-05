@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import { MatrixEvent } from "../models/event";
-import { Room } from "../models/room";
-import { CryptoApi } from "../crypto-api";
-import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
-import { IEncryptedEventInfo } from "../crypto/api";
-import { IEventDecryptionResult } from "../@types/crypto";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
+import { IClearEvent, MatrixEvent } from "../models/event.ts";
+import { Room } from "../models/room.ts";
+import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning.ts";
+import { IEncryptedEventInfo } from "../crypto/api.ts";
+import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { IMegolmSessionData } from "../@types/crypto.ts";
 
 /**
  * Common interface for the crypto implementations
@@ -34,8 +35,8 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
      * no room-level equivalent for this setting.
      *
-     * @remarks this is here, rather than in `CryptoApi`, because I don't think we're
-     * going to support it in the rust crypto implementation.
+     * @remarks This has no effect in Rust Crypto; it exists only for the sake of
+     * the accessors in MatrixClient.
      */
     globalErrorOnUnknownDevices: boolean;
 
@@ -47,9 +48,9 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     /**
      * Get the verification level for a given user
      *
-     * TODO: define this better
-     *
      * @param userId - user to be checked
+     *
+     * @deprecated Superceded by {@link CryptoApi#getUserVerificationStatus}.
      */
     checkUserTrust(userId: string): UserTrustLevel;
 
@@ -71,12 +72,13 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @returns a promise which resolves once we have finished decrypting.
      * Rejects with an error if there is a problem decrypting the event.
      */
-    decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
+    decryptEvent(event: MatrixEvent): Promise<EventDecryptionResult>;
 
     /**
      * Get information about the encryption of an event
      *
      * @param event - event to be checked
+     * @deprecated Use {@link CryptoApi#getEncryptionInfoForEvent} instead
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
 
@@ -88,6 +90,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param userId - the user ID to get the cross-signing info for.
      *
      * @returns the cross signing information for the user.
+     * @deprecated Prefer {@link CryptoApi#userHasCrossSigningKeys}
      */
     getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
 
@@ -99,6 +102,23 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @deprecated Unneeded for the new crypto
      */
     checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
+
+    /**
+     * Get a backup decryptor capable of decrypting megolm session data encrypted with the given backup information.
+     * @param backupInfo - The backup information
+     * @param privKey - The private decryption key.
+     */
+    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor>;
+
+    /**
+     * Import a list of room keys restored from backup
+     *
+     * @param keys - a list of session export objects
+     * @param backupVersion - the version of the backup these keys came from.
+     * @param opts - options object
+     * @returns a promise which resolves once the keys have been imported
+     */
+    importBackedUpRoomKeys(keys: IMegolmSessionData[], backupVersion: string, opts?: ImportRoomKeysOpts): Promise<void>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -180,4 +200,104 @@ export interface OnSyncCompletedData {
  */
 export interface CheckOwnCrossSigningTrustOpts {
     allowPrivateKeyRequests?: boolean;
+}
+
+/**
+ * The result of a (successful) call to {@link CryptoBackend.decryptEvent}
+ */
+export interface EventDecryptionResult {
+    /**
+     * The plaintext payload for the event (typically containing <tt>type</tt> and <tt>content</tt> fields).
+     */
+    clearEvent: IClearEvent;
+    /**
+     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
+     */
+    forwardingCurve25519KeyChain?: string[];
+    /**
+     * Key owned by the sender of this event.  See {@link MatrixEvent#getSenderKey}.
+     */
+    senderCurve25519Key?: string;
+    /**
+     * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
+     */
+    claimedEd25519Key?: string;
+    /**
+     * Whether the keys for this event have been received via an unauthenticated source (eg via key forwards, or
+     * restored from backup)
+     */
+    untrusted?: boolean;
+}
+
+/**
+ * Responsible for decrypting megolm session data retrieved from a remote backup.
+ * The result of {@link CryptoBackend#getBackupDecryptor}.
+ */
+export interface BackupDecryptor {
+    /**
+     * Whether keys retrieved from this backup can be trusted.
+     *
+     * Depending on the backup algorithm, keys retrieved from the backup can be trusted or not.
+     * If false, keys retrieved from the backup  must be considered unsafe (authenticity cannot be guaranteed).
+     * It could be by design (deniability) or for some technical reason (eg asymmetric encryption).
+     */
+    readonly sourceTrusted: boolean;
+
+    /**
+     *
+     * Decrypt megolm session data retrieved from backup.
+     *
+     * @param ciphertexts - a Record of sessionId to session data.
+     *
+     * @returns An array of decrypted `IMegolmSessionData`
+     */
+    decryptSessions(ciphertexts: Record<string, KeyBackupSession>): Promise<IMegolmSessionData[]>;
+
+    /**
+     * Free any resources held by this decryptor.
+     *
+     * Should be called once the decryptor is no longer needed.
+     */
+    free(): void;
+}
+
+/**
+ * Exception thrown when decryption fails
+ *
+ * @param code - Reason code for the failure.
+ *
+ * @param msg - user-visible message describing the problem
+ *
+ * @param details - key/value pairs reported in the logs but not shown
+ *   to the user.
+ */
+export class DecryptionError extends Error {
+    public readonly detailedString: string;
+
+    public constructor(
+        public readonly code: DecryptionFailureCode,
+        msg: string,
+        details?: Record<string, string | Error>,
+    ) {
+        super(msg);
+        this.name = "DecryptionError";
+        this.detailedString = detailedStringForDecryptionError(this, details);
+    }
+}
+
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
+    let result = err.name + "[msg: " + err.message;
+
+    if (details) {
+        result +=
+            ", " +
+            Object.keys(details)
+                .map((k) => k + ": " + details[k])
+                .join(", ");
+    }
+
+    result += "]";
+
+    return result;
 }

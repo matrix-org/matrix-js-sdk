@@ -6,9 +6,20 @@ import "../olm-loader";
 
 import { logger } from "../../src/logger";
 import { IContent, IEvent, IEventRelation, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, IPusher, MatrixClient, MsgType, RelationType } from "../../src";
+import {
+    ClientEvent,
+    EventType,
+    IJoinedRoom,
+    IPusher,
+    ISyncResponse,
+    MatrixClient,
+    MsgType,
+    RelationType,
+} from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
+import { TEST_ROOM_ID } from "./test-data";
+import { KnownMembership, Membership } from "../../src/@types/membership";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -40,6 +51,62 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
 }
 
 /**
+ * Return a sync response which contains a single room (by default TEST_ROOM_ID), with the members given
+ * @param roomMembers
+ * @param roomId
+ *
+ * @returns the sync response
+ */
+export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): ISyncResponse {
+    const roomResponse: IJoinedRoom = {
+        summary: {
+            "m.heroes": [],
+            "m.joined_member_count": roomMembers.length,
+            "m.invited_member_count": roomMembers.length,
+        },
+        state: {
+            events: [
+                mkEventCustom({
+                    sender: roomMembers[0],
+                    type: "m.room.encryption",
+                    state_key: "",
+                    content: {
+                        algorithm: "m.megolm.v1.aes-sha2",
+                    },
+                }),
+            ],
+        },
+        timeline: {
+            events: [],
+            prev_batch: "",
+        },
+        ephemeral: { events: [] },
+        account_data: { events: [] },
+        unread_notifications: {},
+    };
+
+    for (let i = 0; i < roomMembers.length; i++) {
+        roomResponse.state!.events.push(
+            mkMembershipCustom({
+                membership: KnownMembership.Join,
+                sender: roomMembers[i],
+            }),
+        );
+    }
+
+    return {
+        next_batch: "1",
+        rooms: {
+            join: { [roomId]: roomResponse },
+            invite: {},
+            leave: {},
+            knock: {},
+        },
+        account_data: { events: [] },
+    };
+}
+
+/**
  * Create a spy for an object and automatically spy its methods.
  * @param constr - The class constructor (used with 'new')
  * @param name - The name of the class
@@ -60,7 +127,7 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();
             }
-        } catch (ex) {
+        } catch {
             // Direct access to some non-function fields of DOM prototypes may
             // cause exceptions.
             // Overwriting will not work either in that case.
@@ -106,8 +173,10 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
-        prev_content: opts.prev_content,
-        unsigned: opts.unsigned || {},
+        unsigned: {
+            ...opts.unsigned,
+            prev_content: opts.prev_content,
+        },
         event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),
         redacts: opts.redacts,
@@ -185,7 +254,7 @@ export function mkPresence(opts: IPresenceOpts & { event?: boolean }): Partial<I
 
 interface IMembershipOpts {
     room?: string;
-    mship: string;
+    mship: Membership;
     sender?: string;
     user?: string;
     skey?: string;
@@ -231,7 +300,7 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Parti
 }
 
 export function mkMembershipCustom<T>(
-    base: T & { membership: string; sender: string; content?: IContent },
+    base: T & { membership: Membership; sender: string; content?: IContent },
 ): T & { type: EventType; sender: string; state_key: string; content: IContent } & GeneratedMetadata {
     const content = base.content || {};
     return mkEventCustom({
@@ -249,6 +318,7 @@ export interface IMessageOpts {
     event?: boolean;
     relatesTo?: IEventRelation;
     ts?: number;
+    unsigned?: IUnsigned;
 }
 
 /**
@@ -455,14 +525,21 @@ export async function awaitDecryption(
     }
 
     return new Promise((resolve) => {
-        event.once(MatrixEventEvent.Decrypted, (ev, err) => {
-            logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
-            resolve(ev);
-        });
+        if (waitOnDecryptionFailure) {
+            event.on(MatrixEventEvent.Decrypted, (ev, err) => {
+                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                if (!err) {
+                    resolve(ev);
+                }
+            });
+        } else {
+            event.once(MatrixEventEvent.Decrypted, (ev, err) => {
+                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                resolve(ev);
+            });
+        }
     });
 }
-
-export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
 
 export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
     app_display_name: "app",
@@ -483,6 +560,28 @@ export const CRYPTO_BACKENDS: Record<string, InitCrypto> = {};
 export type InitCrypto = (_: MatrixClient) => Promise<void>;
 
 CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
-if (global.Olm) {
+if (globalThis.Olm) {
     CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
+}
+
+export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
+
+/**
+ * Advance the fake timers in a loop until the given promise resolves or rejects.
+ *
+ * Returns the result of the promise.
+ *
+ * This can be useful when there are multiple steps in the code which require an iteration of the event loop.
+ */
+export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
+    let resolved = false;
+    promise.finally(() => {
+        resolved = true;
+    });
+
+    while (!resolved) {
+        await jest.advanceTimersByTimeAsync(1);
+    }
+
+    return await promise;
 }

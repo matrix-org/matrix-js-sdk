@@ -18,20 +18,21 @@ limitations under the License.
  * This is an internal module. See {@link MemoryStore} for the public class.
  */
 
-import { EventType } from "../@types/event";
-import { Room } from "../models/room";
-import { User } from "../models/user";
-import { IEvent, MatrixEvent } from "../models/event";
-import { RoomState, RoomStateEvent } from "../models/room-state";
-import { RoomMember } from "../models/room-member";
-import { Filter } from "../filter";
-import { ISavedSync, IStore } from "./index";
-import { RoomSummary } from "../models/room-summary";
-import { ISyncResponse } from "../sync-accumulator";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
-import { IStoredClientOpts } from "../client";
-import { MapWithDefault } from "../utils";
+import { EventType } from "../@types/event.ts";
+import { Room } from "../models/room.ts";
+import { User } from "../models/user.ts";
+import { IEvent, MatrixEvent } from "../models/event.ts";
+import { RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { Filter } from "../filter.ts";
+import { ISavedSync, IStore, UserCreator } from "./index.ts";
+import { RoomSummary } from "../models/room-summary.ts";
+import { ISyncResponse } from "../sync-accumulator.ts";
+import { IStateEventWithRoomId } from "../@types/search.ts";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { IStoredClientOpts } from "../client.ts";
+import { MapWithDefault } from "../utils.ts";
+import { KnownMembership } from "../@types/membership.ts";
 
 function isValidFilterId(filterId?: string | number | null): boolean {
     const isValidStr =
@@ -63,6 +64,7 @@ export class MemoryStore implements IStore {
     private clientOptions?: IStoredClientOpts;
     private pendingToDeviceBatches: IndexedToDeviceBatch[] = [];
     private nextToDeviceBatchId = 0;
+    protected createUser?: UserCreator;
 
     /**
      * Construct a new in-memory data store for the Matrix Client.
@@ -108,18 +110,22 @@ export class MemoryStore implements IStore {
         });
     }
 
+    public setUserCreator(creator: UserCreator): void {
+        this.createUser = creator;
+    }
+
     /**
      * Called when a room member in a room being tracked by this store has been
      * updated.
      */
     private onRoomMember = (event: MatrixEvent | null, state: RoomState, member: RoomMember): void => {
-        if (member.membership === "invite") {
+        if (member.membership === KnownMembership.Invite) {
             // We do NOT add invited members because people love to typo user IDs
             // which would then show up in these lists (!)
             return;
         }
 
-        const user = this.users[member.userId] || new User(member.userId);
+        const user = this.users[member.userId] || this.createUser?.(member.userId);
         if (member.name) {
             user.setDisplayName(member.name);
             if (member.events.member) {
@@ -252,7 +258,7 @@ export class MemoryStore implements IStore {
             if (isValidFilterId(value)) {
                 return value;
             }
-        } catch (e) {}
+        } catch {}
         return null;
     }
 
@@ -270,7 +276,7 @@ export class MemoryStore implements IStore {
             } else {
                 this.localStorage.removeItem(key);
             }
-        } catch (e) {}
+        } catch {}
     }
 
     /**

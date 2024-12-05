@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, IAddEventOptions } from "./event-timeline";
-import { MatrixEvent } from "./event";
-import { logger } from "../logger";
-import { Room, RoomEvent } from "./room";
-import { Filter } from "../filter";
-import { RoomState } from "./room-state";
-import { TypedEventEmitter } from "./typed-event-emitter";
-import { RelationsContainer } from "./relations-container";
-import { MatrixClient } from "../client";
-import { Thread, ThreadFilterType } from "./thread";
+import { EventTimeline, IAddEventOptions } from "./event-timeline.ts";
+import { MatrixEvent } from "./event.ts";
+import { logger } from "../logger.ts";
+import { Room, RoomEvent } from "./room.ts";
+import { Filter } from "../filter.ts";
+import { RoomState } from "./room-state.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
+import { RelationsContainer } from "./relations-container.ts";
+import { MatrixClient } from "../client.ts";
+import { Thread, ThreadFilterType } from "./thread.ts";
 
 const DEBUG = true;
 
@@ -58,13 +58,13 @@ export interface IRoomTimelineData {
 }
 
 export interface IAddEventToTimelineOptions
-    extends Pick<IAddEventOptions, "toStartOfTimeline" | "roomState" | "timelineWasEmpty"> {
+    extends Pick<IAddEventOptions, "toStartOfTimeline" | "roomState" | "timelineWasEmpty" | "addToState"> {
     /** Whether the sync response came from cache */
     fromCache?: boolean;
 }
 
 export interface IAddLiveEventOptions
-    extends Pick<IAddEventToTimelineOptions, "fromCache" | "roomState" | "timelineWasEmpty"> {
+    extends Pick<IAddEventToTimelineOptions, "fromCache" | "roomState" | "timelineWasEmpty" | "addToState"> {
     /** Applies to events in the timeline only. If this is 'replace' then if a
      * duplicate is encountered, the event passed to this function will replace
      * the existing event in the timeline. If this is not specified, or is
@@ -118,7 +118,7 @@ export type EventTimelineSetHandlerMap = {
      */
     [RoomEvent.TimelineReset]: (
         room: Room | undefined,
-        eventTimelineSet: EventTimelineSet,
+        timelineSet: EventTimelineSet,
         resetAllTimelines: boolean,
     ) => void;
 };
@@ -159,7 +159,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param client - the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param thread - the thread to which this timeline set relates.
-     * @param isThreadTimeline - Whether this timeline set relates to a thread list timeline
+     * @param threadListType - the type of thread list represented, if any
      * (e.g., All threads or My threads)
      */
     public constructor(
@@ -391,6 +391,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventsToTimeline(
         events: MatrixEvent[],
         toStartOfTimeline: boolean,
+        addToState: boolean,
         timeline: EventTimeline,
         paginationToken?: string | null,
     ): void {
@@ -495,6 +496,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 // we don't know about this event yet. Just add it to the timeline.
                 this.addEventToTimeline(event, timeline, {
                     toStartOfTimeline,
+                    addToState,
                 });
                 lastEventWasNew = true;
                 didUpdate = true;
@@ -592,43 +594,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      */
     public addLiveEvent(
         event: MatrixEvent,
-        { duplicateStrategy, fromCache, roomState, timelineWasEmpty }: IAddLiveEventOptions,
-    ): void;
-    /**
-     * @deprecated In favor of the overload with `IAddLiveEventOptions`
-     */
-    public addLiveEvent(
-        event: MatrixEvent,
-        duplicateStrategy?: DuplicateStrategy,
-        fromCache?: boolean,
-        roomState?: RoomState,
-    ): void;
-    public addLiveEvent(
-        event: MatrixEvent,
-        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
-        fromCache = false,
-        roomState?: RoomState,
+        { duplicateStrategy, fromCache, roomState, timelineWasEmpty, addToState }: IAddLiveEventOptions,
     ): void {
-        let duplicateStrategy = (duplicateStrategyOrOpts as DuplicateStrategy) || DuplicateStrategy.Ignore;
-        let timelineWasEmpty: boolean | undefined;
-        if (typeof duplicateStrategyOrOpts === "object") {
-            ({
-                duplicateStrategy = DuplicateStrategy.Ignore,
-                fromCache = false,
-                roomState,
-                timelineWasEmpty,
-            } = duplicateStrategyOrOpts);
-        } else if (duplicateStrategyOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimelineSet.addLiveEvent(event, duplicateStrategy?, fromCache?, roomState?)` " +
-                    "is deprecated in favor of the overload with " +
-                    "`EventTimelineSet.addLiveEvent(event, IAddLiveEventOptions)`",
-            );
-        }
-
         if (this.filter) {
             const events = this.filter.filterRoomTimeline([event]);
             if (!events.length) {
@@ -665,6 +632,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             fromCache,
             roomState,
             timelineWasEmpty,
+            addToState,
         });
     }
 
@@ -674,6 +642,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
+     * @param event - the event to add
+     * @param timeline - the timeline onto which to add it
      * @param options - addEventToTimeline options
      *
      * @remarks
@@ -682,40 +652,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        { toStartOfTimeline, fromCache, roomState, timelineWasEmpty }: IAddEventToTimelineOptions,
-    ): void;
-    /**
-     * @deprecated In favor of the overload with `IAddEventToTimelineOptions`
-     */
-    public addEventToTimeline(
-        event: MatrixEvent,
-        timeline: EventTimeline,
-        toStartOfTimeline: boolean,
-        fromCache?: boolean,
-        roomState?: RoomState,
-    ): void;
-    public addEventToTimeline(
-        event: MatrixEvent,
-        timeline: EventTimeline,
-        toStartOfTimelineOrOpts: boolean | IAddEventToTimelineOptions,
-        fromCache = false,
-        roomState?: RoomState,
+        { toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty, addToState }: IAddEventToTimelineOptions,
     ): void {
-        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean | undefined;
-        if (typeof toStartOfTimelineOrOpts === "object") {
-            ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
-        } else if (toStartOfTimelineOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimelineSet.addEventToTimeline(event, timeline, toStartOfTimeline, fromCache?, roomState?)` " +
-                    "is deprecated in favor of the overload with " +
-                    "`EventTimelineSet.addEventToTimeline(event, timeline, IAddEventToTimelineOptions)`",
-            );
-        }
-
         if (timeline.getTimelineSet() !== this) {
             throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " +
                 "in timelineSet(threadId=${this.thread?.id})`);
@@ -746,6 +684,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             toStartOfTimeline,
             roomState,
             timelineWasEmpty,
+            addToState,
         });
         this._eventIdToTimeline.set(eventId, timeline);
 
@@ -771,12 +710,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @internal
      *
-     * @param options - addEventToTimeline options
-     *
      * @remarks
      * Fires {@link RoomEvent.Timeline}
      */
-    public insertEventIntoTimeline(event: MatrixEvent, timeline: EventTimeline, roomState: RoomState): void {
+    public insertEventIntoTimeline(
+        event: MatrixEvent,
+        timeline: EventTimeline,
+        roomState: RoomState,
+        addToState: boolean,
+    ): void {
         if (timeline.getTimelineSet() !== this) {
             throw new Error(`EventTimelineSet.insertEventIntoTimeline: Timeline=${timeline.toString()} does not belong " +
                 "in timelineSet(threadId=${this.thread?.id})`);
@@ -812,6 +754,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 fromCache: false,
                 timelineWasEmpty: false,
                 roomState,
+                addToState,
             });
             return;
         }
@@ -834,12 +777,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // If we got to the end of the loop, insertIndex points at the end of
         // the list.
 
-        timeline.insertEvent(event, insertIndex, roomState);
+        timeline.insertEvent(event, insertIndex, roomState, addToState);
         this._eventIdToTimeline.set(eventId, timeline);
 
         const data: IRoomTimelineData = {
             timeline: timeline,
-            liveEvent: timeline == this.liveTimeline,
+            // The purpose of this method is inserting events in the middle of the
+            // timeline, so the events are, by definition, not live (whether or not
+            // we're adding them to the live timeline).
+            liveEvent: false,
         };
         this.emit(RoomEvent.Timeline, event, this.room, false, false, data);
     }
@@ -864,6 +810,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         } else if (!this.filter || this.filter.filterRoomTimeline([localEvent]).length) {
             this.addEventToTimeline(localEvent, this.liveTimeline, {
                 toStartOfTimeline: false,
+                addToState: false,
             });
         }
     }
@@ -899,11 +846,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param eventId1 -   The id of the first event
      * @param eventId2 -   The id of the second event
 
-     * @returns a number less than zero if eventId1 precedes eventId2, and
-     *    greater than zero if eventId1 succeeds eventId2. zero if they are the
-     *    same event; null if we can't tell (either because we don't know about one
-     *    of the events, or because they are in separate timelines which don't join
-     *    up).
+     * @returns -1 if eventId1 precedes eventId2, and +1 eventId1 succeeds
+     * eventId2. 0 if they are the same event; null if we can't tell (either
+     * because we don't know about one of the events, or because they are in
+     * separate timelines which don't join up).
      */
     public compareEventOrdering(eventId1: string, eventId2: string): number | null {
         if (eventId1 == eventId2) {
@@ -935,7 +881,16 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     idx2 = idx;
                 }
             }
-            return idx1! - idx2!;
+            const difference = idx1! - idx2!;
+
+            // Return the sign of difference.
+            if (difference < 0) {
+                return -1;
+            } else if (difference > 0) {
+                return 1;
+            } else {
+                return 0;
+            }
         }
 
         // the events are in different timelines. Iterate through the

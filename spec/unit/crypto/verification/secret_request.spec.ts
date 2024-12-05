@@ -16,7 +16,7 @@ limitations under the License.
 
 import "../../../olm-loader";
 import { MatrixClient, MatrixEvent } from "../../../../src/matrix";
-import { encodeBase64 } from "../../../../src/crypto/olmlib";
+import { encodeBase64 } from "../../../../src/base64";
 import "../../../../src/crypto"; // import this to cycle-break
 import { CrossSigningInfo } from "../../../../src/crypto/CrossSigning";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
@@ -34,7 +34,7 @@ const testKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
 describe("self-verifications", () => {
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("triggers a request for key sharing upon completion", async () => {

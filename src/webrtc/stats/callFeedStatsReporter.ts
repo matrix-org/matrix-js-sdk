@@ -13,8 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { CallFeedReport, CallFeedStats, TrackStats, TransceiverStats } from "./statsReport";
-import { CallFeed } from "../callFeed";
+import { CallFeedReport, CallFeedStats, TrackStats, TransceiverStats } from "./statsReport.ts";
+import { CallFeed } from "../callFeed.ts";
 
 export class CallFeedStatsReporter {
     public static buildCallFeedReport(callId: string, opponentMemberId: string, pc: RTCPeerConnection): CallFeedReport {
@@ -49,8 +49,8 @@ export class CallFeedStatsReporter {
         return {
             id: track.id,
             kind: track.kind,
-            settingDeviceId: settingDeviceId ? settingDeviceId : "unknown",
-            constrainDeviceId: constrainDeviceId ? constrainDeviceId : "unknown",
+            settingDeviceId: settingDeviceId ?? "unknown",
+            constrainDeviceId: constrainDeviceId ?? "unknown",
             muted: track.muted,
             enabled: track.enabled,
             readyState: track.readyState,
@@ -63,9 +63,6 @@ export class CallFeedStatsReporter {
         callFeeds: CallFeed[],
         prefix = "unknown",
     ): CallFeedReport {
-        if (!report.callFeeds) {
-            report.callFeeds = [];
-        }
         callFeeds.forEach((feed) => {
             const audioTracks = feed.stream.getAudioTracks();
             const videoTracks = feed.stream.getVideoTracks();

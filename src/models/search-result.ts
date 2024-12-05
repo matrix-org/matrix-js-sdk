@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventContext } from "./event-context";
-import { EventMapper } from "../event-mapper";
-import { IResultContext, ISearchResult } from "../@types/search";
+import { EventContext } from "./event-context.ts";
+import { EventMapper } from "../event-mapper.ts";
+import { IResultContext, ISearchResult } from "../@types/search.ts";
 
 export class SearchResult {
     /**
@@ -50,5 +50,8 @@ export class SearchResult {
      * @param context -  the matching event and its
      *    context
      */
-    public constructor(public readonly rank: number, public readonly context: EventContext) {}
+    public constructor(
+        public readonly rank: number,
+        public readonly context: EventContext,
+    ) {}
 }

@@ -16,11 +16,12 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { Direction, EventTimeline } from "./models/event-timeline";
-import { logger } from "./logger";
-import { MatrixClient } from "./client";
-import { EventTimelineSet } from "./models/event-timeline-set";
-import { MatrixEvent } from "./models/event";
+import { Direction, EventTimeline } from "./models/event-timeline.ts";
+import { logger } from "./logger.ts";
+import { MatrixClient } from "./client.ts";
+import { EventTimelineSet } from "./models/event-timeline-set.ts";
+import { MatrixEvent } from "./models/event.ts";
+import { Room, RoomEvent } from "./models/room.ts";
 
 /**
  * @internal
@@ -35,10 +36,13 @@ const debuglog = DEBUG ? logger.log.bind(logger) : function (): void {};
 
 /**
  * the number of times we ask the server for more events before giving up
+ * this is currently higher than it needs to be to workaround lack of a filter
+ * for excluding thread responses from main timeline pagination which can cause
+ * giving up incorrectly - https://github.com/matrix-org/matrix-spec-proposals/pull/3874
  *
  * @internal
  */
-const DEFAULT_PAGINATE_LOOP_LIMIT = 5;
+const DEFAULT_PAGINATE_LOOP_LIMIT = 10;
 
 interface IOpts {
     /**
@@ -71,6 +75,10 @@ export class TimelineWindow {
      * are received from /sync; you should arrange to call {@link TimelineWindow#paginate}
      * on {@link RoomEvent.Timeline} events.
      *
+     * <p>Note that constructing an instance of this class for a room adds a
+     * listener for RoomEvent.Timeline events which is never removed. In theory
+     * this should not cause a leak since the EventEmitter uses weak mappings.
+     *
      * @param client -   MatrixClient to be used for context/pagination
      *   requests.
      *
@@ -84,6 +92,7 @@ export class TimelineWindow {
         opts: IOpts = {},
     ) {
         this.windowLimit = opts.windowLimit || 1000;
+        timelineSet.room?.on(RoomEvent.Timeline, this.onTimelineEvent.bind(this));
     }
 
     /**
@@ -188,6 +197,23 @@ export class TimelineWindow {
         }
 
         return false;
+    }
+
+    private onTimelineEvent(_event?: MatrixEvent, _room?: Room, _atStart?: boolean, removed?: boolean): void {
+        if (removed) {
+            this.onEventRemoved();
+        }
+    }
+
+    /**
+     * If an event was removed, meaning this window is longer than the timeline,
+     * shorten the window.
+     */
+    private onEventRemoved(): void {
+        const events = this.getEvents();
+        if (events.length > 0 && events[events.length - 1] === undefined && this.end) {
+            this.end.index--;
+        }
     }
 
     /**
@@ -415,7 +441,10 @@ export class TimelineIndex {
     public pendingPaginate?: Promise<boolean>;
 
     // index: the indexes are relative to BaseIndex, so could well be negative.
-    public constructor(public timeline: EventTimeline, public index: number) {}
+    public constructor(
+        public timeline: EventTimeline,
+        public index: number,
+    ) {}
 
     /**
      * @returns the minimum possible value for the index in the current

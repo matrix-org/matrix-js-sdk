@@ -18,14 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { checkObjectHasKeys, encodeParams } from "../utils";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Method } from "./method";
-import { ConnectionError, MatrixError } from "./errors";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface";
-import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
-import { QueryDict } from "../utils";
-import { logger } from "../logger";
+import { checkObjectHasKeys, encodeParams } from "../utils.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { Method } from "./method.ts";
+import { ConnectionError, MatrixError } from "./errors.ts";
+import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface.ts";
+import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
+import { QueryDict } from "../utils.ts";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
@@ -34,8 +33,8 @@ interface TypedResponse<T> extends Response {
 export type ResponseType<T, O extends IHttpOpts> = O extends undefined
     ? T
     : O extends { onlyData: true }
-    ? T
-    : TypedResponse<T>;
+      ? T
+      : TypedResponse<T>;
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
@@ -54,11 +53,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
         this.abortController = new AbortController();
     }
 
-    public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+    public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
         if (this.opts.fetchFn) {
             return this.opts.fetchFn(resource, options);
         }
-        return global.fetch(resource, options);
+        return globalThis.fetch(resource, options);
     }
 
     /**
@@ -112,8 +111,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param body - The HTTP JSON body.
      *
-     * @param opts - additional options. If a number is specified,
-     * this is treated as `opts.localTimeoutMs`.
+     * @param paramOpts - additional options.
+     * When `paramOpts.doNotAttemptTokenRefresh` is true, token refresh will not be attempted
+     * when an expired token is encountered. Used to only attempt token refresh once.
      *
      * @returns Promise which resolves to
      * ```
@@ -127,14 +127,17 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
      */
-    public authedRequest<T>(
+    public async authedRequest<T>(
         method: Method,
         path: string,
         queryParams?: QueryDict,
         body?: Body,
-        opts: IRequestOpts = {},
+        paramOpts: IRequestOpts & { doNotAttemptTokenRefresh?: boolean } = {},
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
+
+        // avoid mutating paramOpts so they can be used on retry
+        const opts = { ...paramOpts };
 
         if (this.opts.accessToken) {
             if (this.opts.useAuthorizationHeader) {
@@ -152,19 +155,53 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
         }
 
-        const requestPromise = this.request<T>(method, path, queryParams, body, opts);
+        try {
+            const response = await this.request<T>(method, path, queryParams, body, opts);
+            return response;
+        } catch (error) {
+            const err = error as MatrixError;
 
-        requestPromise.catch((err: MatrixError) => {
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
+                const shouldRetry = await this.tryRefreshToken();
+                // if we got a new token retry the request
+                if (shouldRetry) {
+                    return this.authedRequest(method, path, queryParams, body, {
+                        ...paramOpts,
+                        doNotAttemptTokenRefresh: true,
+                    });
+                }
+            }
+            // otherwise continue with error handling
             if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
             } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
-        });
 
-        // return the original promise, otherwise tests break due to it having to
-        // go around the event loop one more time to process the result of the request
-        return requestPromise;
+            throw err;
+        }
+    }
+
+    /**
+     * Attempt to refresh access tokens.
+     * On success, sets new access and refresh tokens in opts.
+     * @returns Promise that resolves to a boolean - true when token was refreshed successfully
+     */
+    private async tryRefreshToken(): Promise<boolean> {
+        if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
+            return false;
+        }
+
+        try {
+            const { accessToken, refreshToken } = await this.opts.tokenRefreshFunction(this.opts.refreshToken);
+            this.opts.accessToken = accessToken;
+            this.opts.refreshToken = refreshToken;
+            // successfully got new tokens
+            return true;
+        } catch (error) {
+            this.opts.logger?.warn("Failed to refresh token", error);
+            return false;
+        }
     }
 
     /**
@@ -225,7 +262,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
-        logger.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
+        this.opts.logger?.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -279,9 +316,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 priority: opts.priority,
             });
 
-            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
+            this.opts.logger?.debug(
+                `FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`,
+            );
         } catch (e) {
-            logger.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
+            this.opts.logger?.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
             if ((<Error>e).name === "AbortError") {
                 throw e;
             }
@@ -317,7 +356,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
 
             return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
-        } catch (error) {
+        } catch {
             // defensive coding for malformed url
             return "??";
         }

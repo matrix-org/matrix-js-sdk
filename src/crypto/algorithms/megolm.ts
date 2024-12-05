@@ -20,30 +20,32 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto";
-import { logger, PrefixedLogger } from "../../logger";
-import * as olmlib from "../olmlib";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto.ts";
+import { logger, Logger } from "../../logger.ts";
+import * as olmlib from "../olmlib.ts";
 import {
     DecryptionAlgorithm,
     DecryptionClassParams,
-    DecryptionError,
     EncryptionAlgorithm,
     IParams,
     registerAlgorithm,
     UnknownDeviceError,
-} from "./base";
-import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice";
-import { Room } from "../../models/room";
-import { DeviceInfo } from "../deviceinfo";
-import { IOlmSessionResult } from "../olmlib";
-import { DeviceInfoMap } from "../DeviceList";
-import { IContent, MatrixEvent } from "../../models/event";
-import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event";
-import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { OlmGroupSessionExtraData } from "../../@types/crypto";
-import { MatrixError } from "../../http-api";
-import { immediate, MapWithDefault } from "../../utils";
+} from "./base.ts";
+import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice.ts";
+import { Room } from "../../models/room.ts";
+import { DeviceInfo } from "../deviceinfo.ts";
+import { IOlmSessionResult } from "../olmlib.ts";
+import { DeviceInfoMap } from "../DeviceList.ts";
+import { IContent, MatrixEvent } from "../../models/event.ts";
+import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event.ts";
+import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index.ts";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
+import { OlmGroupSessionExtraData } from "../../@types/crypto.ts";
+import { MatrixError } from "../../http-api/index.ts";
+import { immediate, MapWithDefault } from "../../utils.ts";
+import { KnownMembership } from "../../@types/membership.ts";
+import { DecryptionFailureCode } from "../../crypto-api/index.ts";
+import { DecryptionError } from "../../common-crypto/CryptoBackend.ts";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -164,7 +166,10 @@ class OutboundSessionInfo {
      * @param sharedHistory - whether the session can be freely shared with
      *    other group members, according to the room history visibility settings
      */
-    public constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
+    public constructor(
+        public readonly sessionId: string,
+        public readonly sharedHistory = false,
+    ) {
         this.creationTime = new Date().getTime();
     }
 
@@ -246,12 +251,12 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     };
 
     protected readonly roomId: string;
-    private readonly prefixedLogger: PrefixedLogger;
+    private readonly prefixedLogger: Logger;
 
     public constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
         super(params);
         this.roomId = params.roomId;
-        this.prefixedLogger = logger.withPrefix(`[${this.roomId} encryption]`);
+        this.prefixedLogger = logger.getChild(`[${this.roomId} encryption]`);
 
         this.sessionRotationPeriodMsgs = params.config?.rotation_period_msgs ?? 100;
         this.sessionRotationPeriodMs = params.config?.rotation_period_ms ?? 7 * 24 * 3600 * 1000;
@@ -333,7 +338,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
 
         // need to make a brand new session?
         if (session?.needsRotation(this.sessionRotationPeriodMsgs, this.sessionRotationPeriodMs)) {
-            this.prefixedLogger.log("Starting new megolm session because we need to rotate.");
+            this.prefixedLogger.debug("Starting new megolm session because we need to rotate.");
             session = null;
         }
 
@@ -343,9 +348,9 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         }
 
         if (!session) {
-            this.prefixedLogger.log("Starting new megolm session");
+            this.prefixedLogger.debug("Starting new megolm session");
             session = await this.prepareNewSession(sharedHistory);
-            this.prefixedLogger.log(`Started new megolm session ${session.sessionId}`);
+            this.prefixedLogger.debug(`Started new megolm session ${session.sessionId}`);
             this.outboundSessions[session.sessionId] = session;
         }
 
@@ -968,12 +973,12 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         for (let i = 0; i < userDeviceMaps.length; i++) {
             try {
                 await this.sendBlockedNotificationsToDevices(session, userDeviceMaps[i], payload);
-                this.prefixedLogger.log(
+                this.prefixedLogger.debug(
                     `Completed blacklist notification for ${session.sessionId} ` +
                         `(slice ${i + 1}/${userDeviceMaps.length})`,
                 );
             } catch (e) {
-                this.prefixedLogger.log(
+                this.prefixedLogger.debug(
                     `blacklist notification for ${session.sessionId} ` +
                         `(slice ${i + 1}/${userDeviceMaps.length}) failed`,
                 );
@@ -1054,7 +1059,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * @returns Promise which resolves to the new event body
      */
     public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IMegolmEncryptedContent> {
-        this.prefixedLogger.log("Starting to encrypt event");
+        this.prefixedLogger.debug("Starting to encrypt event");
 
         if (this.encryptionPreparation != null) {
             // If we started sending keys, wait for it to be done.
@@ -1062,7 +1067,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
             // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
             try {
                 await this.encryptionPreparation.promise;
-            } catch (e) {
+            } catch {
                 // ignore any errors -- if the preparation failed, we'll just
                 // restart everything here
             }
@@ -1291,12 +1296,12 @@ export class MegolmDecryption extends DecryptionAlgorithm {
     private olmlib = olmlib;
 
     protected readonly roomId: string;
-    private readonly prefixedLogger: PrefixedLogger;
+    private readonly prefixedLogger: Logger;
 
     public constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
         super(params);
         this.roomId = params.roomId;
-        this.prefixedLogger = logger.withPrefix(`[${this.roomId} decryption]`);
+        this.prefixedLogger = logger.getChild(`[${this.roomId} decryption]`);
     }
 
     /**
@@ -1309,7 +1314,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const content = event.getWireContent();
 
         if (!content.sender_key || !content.session_id || !content.ciphertext) {
-            throw new DecryptionError("MEGOLM_MISSING_FIELDS", "Missing fields in input");
+            throw new DecryptionError(DecryptionFailureCode.MEGOLM_MISSING_FIELDS, "Missing fields in input");
         }
 
         // we add the event to the pending list *before* we start decryption.
@@ -1335,12 +1340,12 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 throw e;
             }
 
-            let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
+            let errorCode = DecryptionFailureCode.OLM_DECRYPT_GROUP_MESSAGE_ERROR;
 
             if ((<MatrixError>e)?.message === "OLM.UNKNOWN_MESSAGE_INDEX") {
                 this.requestKeysForEvent(event);
 
-                errorCode = "OLM_UNKNOWN_MESSAGE_INDEX";
+                errorCode = DecryptionFailureCode.OLM_UNKNOWN_MESSAGE_INDEX;
             }
 
             throw new DecryptionError(errorCode, e instanceof Error ? e.message : "Unknown Error: Error is undefined", {
@@ -1373,13 +1378,13 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 if (problem.fixed) {
                     problemDescription += " Trying to create a new secure channel and re-requesting the keys.";
                 }
-                throw new DecryptionError("MEGOLM_UNKNOWN_INBOUND_SESSION_ID", problemDescription, {
+                throw new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, problemDescription, {
                     session: content.sender_key + "|" + content.session_id,
                 });
             }
 
             throw new DecryptionError(
-                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
                 "The sender's device has not sent us the keys for this message.",
                 {
                     session: content.sender_key + "|" + content.session_id,
@@ -1401,7 +1406,10 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         // (this is somewhat redundant, since the megolm session is scoped to the
         // room, so neither the sender nor a MITM can lie about the room_id).
         if (payload.room_id !== event.getRoomId()) {
-            throw new DecryptionError("MEGOLM_BAD_ROOM", "Message intended for room " + payload.room_id);
+            throw new DecryptionError(
+                DecryptionFailureCode.MEGOLM_BAD_ROOM,
+                "Message intended for room " + payload.room_id,
+            );
         }
 
         return {
@@ -1677,7 +1685,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const fromInviter =
             memberEvent?.getSender() === senderKeyUser ||
             (memberEvent?.getUnsigned()?.prev_sender === senderKeyUser &&
-                memberEvent?.getPrevContent()?.membership === "invite");
+                memberEvent?.getPrevContent()?.membership === KnownMembership.Invite);
 
         if (room && fromInviter) {
             return true;
@@ -1740,7 +1748,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             "readwrite",
             ["parked_shared_history"],
             (txn) => this.crypto.cryptoStore.addParkedSharedHistory(roomKey.roomId, parkedData, txn),
-            logger.withPrefix("[addParkedSharedHistory]"),
+            logger.getChild("[addParkedSharedHistory]"),
         );
     }
 
@@ -1955,7 +1963,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     return null;
                 }
 
-                this.prefixedLogger.log(
+                this.prefixedLogger.debug(
                     "sharing keys for session " +
                         body.sender_key +
                         "|" +
@@ -2051,7 +2059,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     this.crypto.backupManager.backupGroupSession(session.sender_key, session.session_id).catch((e) => {
                         // This throws if the upload failed, but this is fine
                         // since it will have written it to the db and will retry.
-                        this.prefixedLogger.log("Failed to back up megolm session", e);
+                        this.prefixedLogger.debug("Failed to back up megolm session", e);
                     });
                 }
                 // have another go at decrypting events sent with this session.
@@ -2095,7 +2103,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             pendingList.map(async (ev) => {
                 try {
                     await ev.attemptDecryption(this.crypto, { isRetry: true, forceRedecryptIfUntrusted });
-                } catch (e) {
+                } catch {
                     // don't die if something goes wrong
                 }
             }),
@@ -2120,7 +2128,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                     [...pending].map(async (ev) => {
                         try {
                             await ev.attemptDecryption(this.crypto);
-                        } catch (e) {
+                        } catch {
                             // don't die if something goes wrong
                         }
                     }),
@@ -2135,7 +2143,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
 
         const sharedHistorySessions = await this.olmDevice.getSharedHistoryInboundGroupSessions(this.roomId);
-        this.prefixedLogger.log(
+        this.prefixedLogger.debug(
             `Sharing history in with users ${Array.from(devicesByUser.keys())}`,
             sharedHistorySessions.map(([senderKey, sessionId]) => `${senderKey}|${sessionId}`),
         );
@@ -2178,20 +2186,20 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             for (const [userId, deviceMessages] of contentMap) {
                 for (const [deviceId, content] of deviceMessages) {
                     if (!hasCiphertext(content)) {
-                        this.prefixedLogger.log("No ciphertext for device " + userId + ":" + deviceId + ": pruning");
+                        this.prefixedLogger.debug("No ciphertext for device " + userId + ":" + deviceId + ": pruning");
                         deviceMessages.delete(deviceId);
                     }
                 }
                 // No devices left for that user? Strip that too.
                 if (deviceMessages.size === 0) {
-                    this.prefixedLogger.log("Pruned all devices for user " + userId);
+                    this.prefixedLogger.debug("Pruned all devices for user " + userId);
                     contentMap.delete(userId);
                 }
             }
 
             // Is there anything left?
             if (contentMap.size === 0) {
-                this.prefixedLogger.log("No users left to send to: aborting");
+                this.prefixedLogger.debug("No users left to send to: aborting");
                 return;
             }
 

@@ -19,7 +19,16 @@ import { Mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
+import {
+    Filter,
+    JoinRule,
+    KnockRoomOpts,
+    MemoryStore,
+    Method,
+    Room,
+    RoomSummary,
+    SERVICE_TYPES,
+} from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -27,6 +36,7 @@ import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -73,7 +83,7 @@ describe("MatrixClient", function () {
 
         it("should upload the file", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     expect(req.queryParams?.filename).toEqual("hi.txt");
@@ -108,7 +118,7 @@ describe("MatrixClient", function () {
 
         it("should parse errors into a MatrixError", function () {
             httpBackend
-                .when("POST", "/_matrix/media/r0/upload")
+                .when("POST", "/_matrix/media/v3/upload")
                 .check(function (req) {
                     expect(req.rawData).toEqual(buf);
                     // @ts-ignore private property
@@ -150,7 +160,7 @@ describe("MatrixClient", function () {
     });
 
     describe("joinRoom", function () {
-        it("should no-op if you've already joined a room", function () {
+        it("should no-op given the ID of a room you've already joined", async () => {
             const roomId = "!foo:bar";
             const room = new Room(roomId, client, userId);
             client.fetchRoomEvent = () =>
@@ -158,18 +168,48 @@ describe("MatrixClient", function () {
                     type: "test",
                     content: {},
                 });
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: "join",
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
-            client.joinRoom(roomId);
+
+            const joinPromise = client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
+            expect(await joinPromise).toBe(room);
+        });
+
+        it("should no-op given the alias of a room you've already joined", async () => {
+            const roomId = "!roomId:server";
+            const roomAlias = "#my-fancy-room:server";
+            const room = new Room(roomId, client, userId);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
+            store.storeRoom(room);
+
+            // The method makes a request to resolve the alias
+            httpBackend.when("POST", "/join/" + encodeURIComponent(roomAlias)).respond(200, { room_id: roomId });
+
+            const joinPromise = client.joinRoom(roomAlias);
+            await httpBackend.flushAllExpected();
+            expect(await joinPromise).toBe(room);
         });
 
         it("should send request to inviteSignUrl if specified", async () => {
@@ -202,6 +242,87 @@ describe("MatrixClient", function () {
             });
             await httpBackend.flushAllExpected();
             expect((await prom).roomId).toBe(roomId);
+        });
+    });
+
+    describe("knockRoom", function () {
+        const roomId = "!some-room-id:example.org";
+        const reason = "some reason";
+        const viaServers = "example.com";
+
+        type TestCase = [string, KnockRoomOpts];
+        const testCases: TestCase[] = [
+            ["should knock a room", {}],
+            ["should knock a room for a reason", { reason }],
+            ["should knock a room via given servers", { viaServers }],
+            ["should knock a room for a reason via given servers", { reason, viaServers }],
+        ];
+
+        it.each(testCases)("%s", async (_, opts) => {
+            httpBackend
+                .when("POST", "/knock/" + encodeURIComponent(roomId))
+                .check((request) => {
+                    expect(request.data).toEqual({ reason: opts.reason });
+                    expect(request.queryParams).toEqual({ server_name: opts.viaServers, via: opts.viaServers });
+                })
+                .respond(200, { room_id: roomId });
+
+            const prom = client.knockRoom(roomId, opts);
+            await httpBackend.flushAllExpected();
+            expect((await prom).room_id).toBe(roomId);
+        });
+
+        it("should no-op if you've already knocked a room", function () {
+            const room = new Room(roomId, client, userId);
+
+            client.fetchRoomEvent = () =>
+                Promise.resolve({
+                    type: "test",
+                    content: {},
+                });
+
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Knock,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
+
+            httpBackend.verifyNoOutstandingRequests();
+            store.storeRoom(room);
+            client.knockRoom(roomId);
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        describe("errors", function () {
+            type TestCase = [number, { errcode: string; error?: string }, string];
+            const testCases: TestCase[] = [
+                [
+                    403,
+                    { errcode: "M_FORBIDDEN", error: "You don't have permission to knock" },
+                    "[M_FORBIDDEN: MatrixError: [403] You don't have permission to knock]",
+                ],
+                [
+                    500,
+                    { errcode: "INTERNAL_SERVER_ERROR" },
+                    "[INTERNAL_SERVER_ERROR: MatrixError: [500] Unknown message]",
+                ],
+            ];
+
+            it.each(testCases)("should handle %s error", async (code, { errcode, error }, snapshot) => {
+                httpBackend.when("POST", "/knock/" + encodeURIComponent(roomId)).respond(code, { errcode, error });
+
+                const prom = client.knockRoom(roomId);
+                await Promise.all([
+                    httpBackend.flushAllExpected(),
+                    expect(prom).rejects.toMatchInlineSnapshot(snapshot),
+                ]);
+            });
         });
     });
 
@@ -630,7 +751,7 @@ describe("MatrixClient", function () {
         const auth = { identifier: 1 };
         it("should pass through an auth dict", function () {
             httpBackend
-                .when("DELETE", "/_matrix/client/r0/devices/my_device")
+                .when("DELETE", "/_matrix/client/v3/devices/my_device")
                 .check(function (req) {
                     expect(req.data).toEqual({ auth: auth });
                 })
@@ -1024,10 +1145,6 @@ describe("MatrixClient", function () {
                 submit_url: "https://foobar.matrix/_matrix/matrix",
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             const prom = client.requestRegisterEmailToken("bob@email", "secret", 1);
             httpBackend
                 .when("POST", "/register/email/requestToken")
@@ -1047,10 +1164,6 @@ describe("MatrixClient", function () {
     describe("inviteByThreePid", () => {
         it("should supply an id_access_token", async () => {
             const targetEmail = "gerald@example.org";
-
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
 
             httpBackend
                 .when("POST", "/invite")
@@ -1087,10 +1200,6 @@ describe("MatrixClient", function () {
                 ],
             };
 
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
-                versions: ["r0.6.0"],
-            });
-
             httpBackend
                 .when("POST", "/createRoom")
                 .check((req) => {
@@ -1114,51 +1223,20 @@ describe("MatrixClient", function () {
 
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = {};
             const uiaData = {};
             const prom = client.requestLoginToken(uiaData);
-            httpBackend
-                .when("POST", "/unstable/org.matrix.msc3882/login/get_token", { auth: uiaData })
-                .respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", { auth: uiaData }).respond(200, response);
             await httpBackend.flush("");
             expect(await prom).toStrictEqual(response);
         });
 
         it("should hit the expected API endpoint without UIA", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: true } } });
             const response = { login_token: "xyz", expires_in_ms: 5000 };
             const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
+            httpBackend.when("POST", "/v1/login/get_token", {}).respond(200, response);
             await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r0
-            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
-        });
-
-        it("should hit the r1 endpoint when capability is disabled", async () => {
-            httpBackend
-                .when("GET", "/capabilities")
-                .respond(200, { capabilities: { "org.matrix.msc3882.get_login_token": { enabled: false } } });
-            const response = { login_token: "xyz", expires_in_ms: 5000 };
-            const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/get_token", {}).respond(200, response);
-            await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r0
-            expect(await prom).toStrictEqual({ ...response, expires_in: 5 });
-        });
-
-        it("should hit the r0 endpoint for fallback", async () => {
-            httpBackend.when("GET", "/capabilities").respond(200, {});
-            const response = { login_token: "xyz", expires_in: 5 };
-            const prom = client.requestLoginToken();
-            httpBackend.when("POST", "/unstable/org.matrix.msc3882/login/token", {}).respond(200, response);
-            await httpBackend.flush("");
-            // check that expires_in has been populated for compatibility with r1
-            expect(await prom).toStrictEqual({ ...response, expires_in_ms: 5000 });
+            expect(await prom).toStrictEqual(response);
         });
     });
 
@@ -1224,18 +1302,109 @@ describe("MatrixClient", function () {
     });
 
     describe("getCapabilities", () => {
-        it("should cache by default", async () => {
+        it("should return cached capabilities if present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
             httpBackend.when("GET", "/capabilities").respond(200, {
-                capabilities: {
-                    "m.change_password": false,
-                },
+                capabilities: capsObject,
             });
-            const prom = httpBackend.flushAllExpected();
-            const capabilities1 = await client.getCapabilities();
-            const capabilities2 = await client.getCapabilities();
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(await client.getCapabilities()).toEqual(capsObject);
+        });
+
+        it("should fetch capabilities if cache not present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            const capsPromise = client.getCapabilities();
+            await httpBackend!.flushAllExpected();
+
+            expect(await capsPromise).toEqual(capsObject);
+        });
+    });
+
+    describe("getCachedCapabilities", () => {
+        it("should return cached capabilities or undefined", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            expect(client.getCachedCapabilities()).toBeUndefined();
+
+            client.startClient();
+
+            await httpBackend!.flushAllExpected();
+
+            expect(client.getCachedCapabilities()).toEqual(capsObject);
+        });
+    });
+
+    describe("fetchCapabilities", () => {
+        const capsObject = {
+            "m.change_password": false,
+        };
+
+        beforeEach(() => {
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("should always fetch capabilities and then cache", async () => {
+            const prom = client.fetchCapabilities();
+            await httpBackend.flushAllExpected();
+            const caps = await prom;
+
+            expect(caps).toEqual(capsObject);
+        });
+
+        it("should write-through the cache", async () => {
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(client.getCachedCapabilities()).toEqual(capsObject);
+
+            const newCapsObject = {
+                "m.change_password": true,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: newCapsObject,
+            });
+
+            const prom = client.fetchCapabilities();
+            await httpBackend.flushAllExpected();
             await prom;
 
-            expect(capabilities1).toStrictEqual(capabilities2);
+            expect(client.getCachedCapabilities()).toEqual(newCapsObject);
         });
     });
 
@@ -1574,6 +1743,200 @@ describe("MatrixClient", function () {
             ]);
         });
     });
+
+    describe("getFallbackAuthUrl", () => {
+        it("should return fallback url", () => {
+            expect(client.getFallbackAuthUrl("loginType", "authSessionId")).toMatchInlineSnapshot(
+                `"http://alice.localhost.test.server/_matrix/client/v3/auth/loginType/fallback/web?session=authSessionId"`,
+            );
+        });
+    });
+
+    describe("addThreePidOnly", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/add")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.addThreePidOnly({
+                    client_secret: "secret",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("bindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/bind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        client_secret: "secret",
+                        id_server: "server",
+                        id_access_token: "token",
+                        sid: "sid",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.bindThreePid({
+                    client_secret: "secret",
+                    id_server: "server",
+                    id_access_token: "token",
+                    sid: "sid",
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("unbindThreePid", () => {
+        it("should make expected POST request", async () => {
+            httpBackend
+                .when("POST", "/_matrix/client/v3/account/3pid/unbind")
+                .check(function (req) {
+                    expect(req.data).toEqual({
+                        medium: "email",
+                        address: "alice@server.com",
+                        id_server: "identity.localhost",
+                    });
+                    expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
+                })
+                .respond(200, {});
+
+            await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
+        });
+    });
+
+    describe("getRoomSummary", () => {
+        const roomId = "!foo:bar";
+        const encodedRoomId = encodeURIComponent(roomId);
+
+        const roomSummary: RoomSummary = {
+            "room_id": roomId,
+            "name": "My Room",
+            "avatar_url": "",
+            "topic": "My room topic",
+            "world_readable": false,
+            "guest_can_join": false,
+            "num_joined_members": 1,
+            "room_type": "",
+            "join_rule": JoinRule.Public,
+            "membership": "leave",
+            "im.nheko.summary.room_version": "6",
+            "im.nheko.summary.encryption": "algo",
+        };
+
+        const prefix = "/_matrix/client/unstable/im.nheko.summary/";
+        const suffix = `summary/${encodedRoomId}`;
+        const deprecatedSuffix = `rooms/${encodedRoomId}/summary`;
+
+        const errorUnrecogStatus = 404;
+        const errorUnrecogBody = {
+            errcode: "M_UNRECOGNIZED",
+            error: "Unsupported endpoint",
+        };
+
+        const errorBadreqStatus = 400;
+        const errorBadreqBody = {
+            errcode: "M_UNKNOWN",
+            error: "Invalid request",
+        };
+
+        it("should respond with a valid room summary object", () => {
+            httpBackend.when("GET", prefix + suffix).respond(200, roomSummary);
+
+            const prom = client.getRoomSummary(roomId).then((response) => {
+                expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should allow fallback to the deprecated endpoint", () => {
+            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(200, roomSummary);
+
+            const prom = client.getRoomSummary(roomId).then((response) => {
+                expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should respond to unsupported path with error", () => {
+            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
+
+            const prom = client.getRoomSummary(roomId).then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorUnrecogStatus);
+                    expect(error.errcode).toEqual(errorUnrecogBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorUnrecogStatus}] ${errorUnrecogBody.error}`);
+                },
+            );
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should respond to invalid path arguments with error", () => {
+            httpBackend.when("GET", prefix).respond(errorBadreqStatus, errorBadreqBody);
+
+            const prom = client.getRoomSummary("notAroom").then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorBadreqStatus);
+                    expect(error.errcode).toEqual(errorBadreqBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorBadreqStatus}] ${errorBadreqBody.error}`);
+                },
+            );
+
+            httpBackend.flush("");
+            return prom;
+        });
+    });
+
+    describe("getDomain", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getDomain()).toBeNull();
+        });
+
+        it("should return the domain of the userId", () => {
+            expect(client.getDomain()).toBe("localhost");
+        });
+    });
+
+    describe("getUserIdLocalpart", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getUserIdLocalpart()).toBeNull();
+        });
+
+        it("should return the localpart of the userId", () => {
+            expect(client.getUserIdLocalpart()).toBe("alice");
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
@@ -1584,7 +1947,6 @@ function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
 
 const buildEventMessageInThread = (root: MatrixEvent) =>
     new MatrixEvent({
-        age: 80098509,
         content: {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": "ENCRYPTEDSTUFF",
@@ -1605,12 +1967,10 @@ const buildEventMessageInThread = (root: MatrixEvent) =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80098509 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventPollResponseReference = () =>
     new MatrixEvent({
-        age: 80098509,
         content: {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": "ENCRYPTEDSTUFF",
@@ -1628,7 +1988,6 @@ const buildEventPollResponseReference = () =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80106237 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventReaction = (event: MatrixEvent) =>
@@ -1668,7 +2027,6 @@ const buildEventRedaction = (event: MatrixEvent) =>
 
 const buildEventPollStartThreadRoot = () =>
     new MatrixEvent({
-        age: 80108647,
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
             ciphertext: "ENCRYPTEDSTUFF",
@@ -1682,12 +2040,10 @@ const buildEventPollStartThreadRoot = () =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80108647 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventReply = (target: MatrixEvent) =>
     new MatrixEvent({
-        age: 80098509,
         content: {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": "ENCRYPTEDSTUFF",
@@ -1706,12 +2062,10 @@ const buildEventReply = (target: MatrixEvent) =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80098509 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventRoomName = () =>
     new MatrixEvent({
-        age: 80123249,
         content: {
             name: "1 poll, 1 vote, 1 thread",
         },
@@ -1722,12 +2076,10 @@ const buildEventRoomName = () =>
         state_key: "",
         type: "m.room.name",
         unsigned: { age: 80123249 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventEncryption = () =>
     new MatrixEvent({
-        age: 80123383,
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
         },
@@ -1738,12 +2090,10 @@ const buildEventEncryption = () =>
         state_key: "",
         type: "m.room.encryption",
         unsigned: { age: 80123383 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventGuestAccess = () =>
     new MatrixEvent({
-        age: 80123473,
         content: {
             guest_access: "can_join",
         },
@@ -1754,12 +2104,10 @@ const buildEventGuestAccess = () =>
         state_key: "",
         type: "m.room.guest_access",
         unsigned: { age: 80123473 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventHistoryVisibility = () =>
     new MatrixEvent({
-        age: 80123556,
         content: {
             history_visibility: "shared",
         },
@@ -1770,14 +2118,12 @@ const buildEventHistoryVisibility = () =>
         state_key: "",
         type: "m.room.history_visibility",
         unsigned: { age: 80123556 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventJoinRules = () =>
     new MatrixEvent({
-        age: 80123696,
         content: {
-            join_rule: "invite",
+            join_rule: KnownMembership.Invite,
         },
         event_id: "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
         origin_server_ts: 1643815441191,
@@ -1786,12 +2132,10 @@ const buildEventJoinRules = () =>
         state_key: "",
         type: "m.room.join_rules",
         unsigned: { age: 80123696 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventPowerLevels = () =>
     new MatrixEvent({
-        age: 80124105,
         content: {
             ban: 50,
             events: {
@@ -1822,16 +2166,14 @@ const buildEventPowerLevels = () =>
         state_key: "",
         type: "m.room.power_levels",
         unsigned: { age: 80124105 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventMember = () =>
     new MatrixEvent({
-        age: 80125279,
         content: {
             avatar_url: "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
             displayname: "andybalaam-test1",
-            membership: "join",
+            membership: KnownMembership.Join,
         },
         event_id: "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
         origin_server_ts: 1643815439608,
@@ -1840,14 +2182,11 @@ const buildEventMember = () =>
         state_key: "@andybalaam-test1:matrix.org",
         type: "m.room.member",
         unsigned: { age: 80125279 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventCreate = () =>
     new MatrixEvent({
-        age: 80126105,
         content: {
-            creator: "@andybalaam-test1:matrix.org",
             room_version: "6",
         },
         event_id: "$e7j2Gt37k5NPwB6lz2N3V9lO5pUdNK8Ai7i2FPEK-oI",
@@ -1857,7 +2196,6 @@ const buildEventCreate = () =>
         state_key: "",
         type: "m.room.create",
         unsigned: { age: 80126105 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 function assertObjectContains(obj: Record<string, any>, expected: any): void {

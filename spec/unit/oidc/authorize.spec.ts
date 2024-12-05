@@ -20,10 +20,12 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 import { mocked } from "jest-mock";
-import jwtDecode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
+import { Crypto } from "@peculiar/webcrypto";
+import { getRandomValues } from "node:crypto";
+import { TextEncoder } from "node:util";
 
 import { Method } from "../../../src";
-import * as crypto from "../../../src/crypto/crypto";
 import { logger } from "../../../src/logger";
 import {
     completeAuthorizationCodeGrant,
@@ -36,13 +38,10 @@ import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-uti
 
 jest.mock("jwt-decode");
 
-// save for resetting mocks
-const realSubtleCrypto = crypto.subtleCrypto;
-
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
-    const authorizationEndpoint = delegatedAuthConfig.metadata.authorization_endpoint;
-    const tokenEndpoint = delegatedAuthConfig.metadata.token_endpoint;
+    const authorizationEndpoint = delegatedAuthConfig.authorizationEndpoint;
+    const tokenEndpoint = delegatedAuthConfig.tokenEndpoint;
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 
@@ -53,12 +52,22 @@ describe("oidc authorization", () => {
         jest.spyOn(logger, "warn");
         jest.setSystemTime(now);
 
-        fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
+        fetchMock.get(
+            delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
+            mockOpenIdConfiguration(),
+        );
+        globalThis.TextEncoder = TextEncoder;
     });
 
-    afterEach(() => {
-        // @ts-ignore reset any ugly mocking we did
-        crypto.subtleCrypto = realSubtleCrypto;
+    beforeEach(() => {
+        const webCrypto = new Crypto();
+        Object.defineProperty(window, "crypto", {
+            value: {
+                getRandomValues,
+                randomUUID: jest.fn().mockReturnValue("not-random-uuid"),
+                subtle: webCrypto.subtle,
+            },
+        });
     });
 
     it("should generate authorization params", () => {
@@ -80,11 +89,8 @@ describe("oidc authorization", () => {
 
     describe("generateAuthorizationUrl()", () => {
         it("should generate url with correct parameters", async () => {
-            // test the no crypto case here
-            // @ts-ignore mocking
-            crypto.subtleCrypto = undefined;
-
             const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
+            authorizationParams.codeVerifier = "test-code-verifier";
             const authUrl = new URL(
                 await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
             );
@@ -96,6 +102,18 @@ describe("oidc authorization", () => {
             expect(authUrl.searchParams.get("scope")).toEqual(authorizationParams.scope);
             expect(authUrl.searchParams.get("state")).toEqual(authorizationParams.state);
             expect(authUrl.searchParams.get("nonce")).toEqual(authorizationParams.nonce);
+            expect(authUrl.searchParams.get("code_challenge")).toEqual("0FLIKahrX7kqxncwhV5WD82lu_wi5GA8FsRSLubaOpU");
+        });
+
+        it("should log a warning if crypto is not available", async () => {
+            // test the no crypto case here
+            // @ts-ignore mocking
+            globalThis.crypto.subtle = undefined;
+
+            const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
+            const authUrl = new URL(
+                await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
+            );
 
             // crypto not available, plain text code_challenge is used
             expect(authUrl.searchParams.get("code_challenge")).toEqual(authorizationParams.codeVerifier);
@@ -134,6 +152,25 @@ describe("oidc authorization", () => {
 
             expect(authUrl.searchParams.get("code_challenge")).toBeTruthy();
         });
+
+        it("should generate url with create prompt", async () => {
+            const nonce = "abc123";
+
+            const metadata = delegatedAuthConfig.metadata;
+
+            const authUrl = new URL(
+                await generateOidcAuthorizationUrl({
+                    metadata,
+                    homeserverUrl: baseUrl,
+                    clientId,
+                    redirectUri: baseUrl,
+                    nonce,
+                    prompt: "create",
+                }),
+            );
+
+            expect(authUrl.searchParams.get("prompt")).toEqual("create");
+        });
     });
 
     describe("completeAuthorizationCodeGrant", () => {
@@ -146,7 +183,8 @@ describe("oidc authorization", () => {
             token_type: "Bearer",
             access_token: "test_access_token",
             refresh_token: "test_refresh_token",
-            id_token: "valid.id.token",
+            id_token:
+                "eyJhbGciOiJSUzI1NiIsImtpZCI6Imh4ZEhXb0Y5bW4ifQ.eyJleHAiOjE3MDgzNTY3NjcsInN1YiI6IjAxSFBQMkZTQllERTlQOUVNTThERDdXWkhSIiwiYXVkIjoiMDFIUTBXSDUyV0paV1JSU1k5V0VFUTVUMlEiLCJub25jZSI6ImhScEI2cGtFMDYiLCJhdXRoX3RpbWUiOjE3MDc5OTAzMTIsImlhdCI6MTcwODM1MzE2NywiYXRfaGFzaCI6Il9HSEU4cDhocHFnMW1ac041YUlycVEiLCJpc3MiOiJodHRwczovL2F1dGgtb2lkYy5sYWIuZWxlbWVudC5kZXYvIiwiY19oYXNoIjoib2hJRmNuaUZWd3pGSzVJdXlsX1RlQSJ9.SGUG78dCC3sTWgQBDTicKwamKiPpb6REiz79CM2ml_kVJCoS7gT0TlztC4h25FKi3c9aB3XCVn9J8UzvJgvG8Rt_oS--FIuhK6oRm7NdcN0bCkbG7iZEWGxx-kQnifcCFHyZ6T1CxR8X00Uvc6_lRfBZVlTyuuQaJ_PHiiKMlV93FbxvQUIq6FTkQP2Z56p4JIXIzjOONzA91skTqQGycl5f9Vhp6cqXFzl6ARK30M7A-8UI5qCxClUJ7kD9KgN5YZ7uivLp1x01WBnik2DXH0eSwXcTX2WLkYtMXgMxylJhIiO586apIC5nr7sfip-Y_4PgBlSjRRgrmOGC-VUFCA",
             expires_in: 300,
         };
 
@@ -284,6 +322,7 @@ describe("oidc authorization", () => {
                     expires_at: result.tokenResponse.expires_at,
                     scope,
                 },
+                idTokenClaims: result.idTokenClaims,
             });
         });
 
@@ -325,6 +364,7 @@ describe("oidc authorization", () => {
                     expires_at: result.tokenResponse.expires_at,
                     scope,
                 },
+                idTokenClaims: result.idTokenClaims,
             });
 
             expect(result.tokenResponse.token_type).toEqual("Bearer");

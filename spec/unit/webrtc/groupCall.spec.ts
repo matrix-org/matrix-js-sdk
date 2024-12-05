@@ -47,6 +47,7 @@ import { flushPromises } from "../../test-utils/flushPromises";
 import { CallFeedReport } from "../../../src/webrtc/stats/statsReport";
 import { CallFeedStatsReporter } from "../../../src/webrtc/stats/callFeedStatsReporter";
 import { StatsReportEmitter } from "../../../src/webrtc/stats/statsReportEmitter";
+import { KnownMembership } from "../../../src/@types/membership";
 
 const FAKE_STATE_EVENTS = [
     {
@@ -104,7 +105,7 @@ const mockGetStateEvents =
     (events: MatrixEvent[] = FAKE_STATE_EVENTS as MatrixEvent[]) =>
     (type: EventType, userId?: string): MatrixEvent[] | MatrixEvent | null => {
         if (type === EventType.GroupCallMemberPrefix) {
-            return userId === undefined ? events : events.find((e) => e.getStateKey() === userId) ?? null;
+            return userId === undefined ? events : (events.find((e) => e.getStateKey() === userId) ?? null);
         } else {
             const fakeEvent = { getContent: () => ({}), getTs: () => 0 } as MatrixEvent;
             return userId === undefined ? [fakeEvent] : fakeEvent;
@@ -143,7 +144,7 @@ describe("Group Call", function () {
             groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
         });
 
@@ -651,11 +652,11 @@ describe("Group Call", function () {
 
             client1Room.currentState.members[FAKE_USER_ID_1] = client2Room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             client1Room.currentState.members[FAKE_USER_ID_2] = client2Room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
 
             groupCall1 = new GroupCall(
@@ -831,11 +832,11 @@ describe("Group Call", function () {
             room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
         });
 
@@ -954,7 +955,7 @@ describe("Group Call", function () {
                             },
                         },
                     }),
-                } as MatrixEvent);
+                }) as MatrixEvent;
 
             it("should mute remote feed's audio after receiving metadata with video audio", async () => {
                 const metadataEvent = getMetadataEvent(true, false);
@@ -965,7 +966,7 @@ describe("Group Call", function () {
 
                 // @ts-ignore
                 const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
-                call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -992,7 +993,7 @@ describe("Group Call", function () {
 
                 // @ts-ignore
                 const call = groupCall.calls.get(FAKE_USER_ID_2).get(FAKE_DEVICE_ID_2)!;
-                call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -1026,11 +1027,11 @@ describe("Group Call", function () {
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_2);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
 
             groupCall = await createAndEnterGroupCall(mockClient, room);
@@ -1260,11 +1261,11 @@ describe("Group Call", function () {
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
 
@@ -1310,7 +1311,7 @@ describe("Group Call", function () {
 
             // @ts-ignore
             const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
-            call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+            call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
             call.onNegotiateReceived({
                 getContent: () => ({
                     [SDPStreamMetadataKey]: {
@@ -1429,7 +1430,7 @@ describe("Group Call", function () {
         let client: MatrixClient;
 
         beforeEach(() => {
-            client = new MatrixClient({ baseUrl: "base_url" });
+            client = new MatrixClient({ baseUrl: "base_url", userId: "my_user_id" });
 
             jest.spyOn(client, "sendStateEvent").mockResolvedValue({} as any);
         });
@@ -1565,16 +1566,19 @@ describe("Group Call", function () {
                 async (roomId, eventType, content, stateKey) => {
                     const eventId = `$${Math.random()}`;
                     if (roomId === room.roomId) {
-                        room.addLiveEvents([
-                            new MatrixEvent({
-                                event_id: eventId,
-                                type: eventType,
-                                room_id: roomId,
-                                sender: FAKE_USER_ID_2,
-                                content,
-                                state_key: stateKey,
-                            }),
-                        ]);
+                        room.addLiveEvents(
+                            [
+                                new MatrixEvent({
+                                    event_id: eventId,
+                                    type: eventType,
+                                    room_id: roomId,
+                                    sender: FAKE_USER_ID_2,
+                                    content,
+                                    state_key: stateKey,
+                                }),
+                            ],
+                            { addToState: true },
+                        );
                     }
                     return { event_id: eventId };
                 },
@@ -1741,11 +1745,11 @@ describe("Group Call", function () {
             const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.members[FAKE_USER_ID_2] = {
                 userId: FAKE_USER_ID_2,
-                membership: "join",
+                membership: KnownMembership.Join,
             } as unknown as RoomMember;
             room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents());
             groupCall = await createAndEnterGroupCall(mockClient, room);

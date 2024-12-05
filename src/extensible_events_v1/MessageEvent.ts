@@ -16,7 +16,7 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { ExtensibleEvent } from "./ExtensibleEvent";
+import { ExtensibleEvent } from "./ExtensibleEvent.ts";
 import {
     ExtensibleEventType,
     IMessageRendering,
@@ -26,9 +26,9 @@ import {
     M_MESSAGE,
     ExtensibleAnyMessageEventContent,
     M_TEXT,
-} from "../@types/extensible_events";
-import { isOptionalAString, isProvided } from "./utilities";
-import { InvalidEventError } from "./InvalidEventError";
+} from "../@types/extensible_events.ts";
+import { isOptionalAString, isProvided } from "./utilities.ts";
+import { InvalidEventError } from "./InvalidEventError.ts";
 
 /**
  * Represents a message event. Message events are the simplest form of event with

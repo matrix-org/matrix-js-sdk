@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { FetchHttpApi } from "./fetch";
-import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface";
-import { MediaPrefix } from "./prefix";
-import { defer, QueryDict, removeElement } from "../utils";
-import * as callbacks from "../realtime-callbacks";
-import { Method } from "./method";
-import { ConnectionError } from "./errors";
-import { parseErrorResponse } from "./utils";
+import { FetchHttpApi } from "./fetch.ts";
+import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface.ts";
+import { MediaPrefix } from "./prefix.ts";
+import { defer, QueryDict, removeElement } from "../utils.ts";
+import * as callbacks from "../realtime-callbacks.ts";
+import { Method } from "./method.ts";
+import { ConnectionError } from "./errors.ts";
+import { parseErrorResponse } from "./utils.ts";
 
-export * from "./interface";
-export * from "./prefix";
-export * from "./errors";
-export * from "./method";
-export * from "./utils";
+export * from "./interface.ts";
+export * from "./prefix.ts";
+export * from "./errors.ts";
+export * from "./method.ts";
+export * from "./utils.ts";
 
 export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     private uploads: Upload[] = [];
@@ -50,7 +50,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         const abortController = opts.abortController ?? new AbortController();
 
         // If the file doesn't have a mime type, use a default since the HS errors if we don't supply one.
-        const contentType = opts.type ?? (file as File).type ?? "application/octet-stream";
+        const contentType = (opts.type ?? (file as File).type) || "application/octet-stream";
         const fileName = opts.name ?? (file as File).name;
 
         const upload = {
@@ -60,8 +60,8 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         } as Upload;
         const deferred = defer<UploadResponse>();
 
-        if (global.XMLHttpRequest) {
-            const xhr = new global.XMLHttpRequest();
+        if (globalThis.XMLHttpRequest) {
+            const xhr = new globalThis.XMLHttpRequest();
 
             const timeoutFn = function (): void {
                 xhr.abort();
@@ -73,7 +73,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
             xhr.onreadystatechange = function (): void {
                 switch (xhr.readyState) {
-                    case global.XMLHttpRequest.DONE:
+                    case globalThis.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(timeoutTimer);
                         try {
                             if (xhr.status === 0) {
@@ -110,7 +110,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 });
             };
 
-            const url = this.getUrl("/upload", undefined, MediaPrefix.R0);
+            const url = this.getUrl("/upload", undefined, MediaPrefix.V3);
 
             if (includeFilename && fileName) {
                 url.searchParams.set("filename", encodeURIComponent(fileName));
@@ -139,7 +139,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             const headers: Record<string, string> = { "Content-Type": contentType };
 
             this.authedRequest<UploadResponse>(Method.Post, "/upload", queryParams, file, {
-                prefix: MediaPrefix.R0,
+                prefix: MediaPrefix.V3,
                 headers,
                 abortSignal: abortController.signal,
             })
@@ -182,7 +182,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     public getContentUri(): IContentUri {
         return {
             base: this.opts.baseUrl,
-            path: MediaPrefix.R0 + "/upload",
+            path: MediaPrefix.V3 + "/upload",
             params: {
                 access_token: this.opts.accessToken!,
             },
