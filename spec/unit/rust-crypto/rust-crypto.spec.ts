@@ -572,15 +572,37 @@ describe("RustCrypto", () => {
         });
 
         it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+            );
+
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: {
+                        [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+            });
+
+            // wait until we know about the other device
+            rustCrypto.onSyncCompleted({});
+            await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+
             const toDeviceEvent = {
                 type: "m.key.verification.request",
                 content: {
-                    from_device: "testDeviceId",
+                    from_device: testData.TEST_DEVICE_ID,
                     methods: ["m.sas.v1"],
                     transaction_id: "testTxn",
                     timestamp: Date.now() - 1000,
                 },
-                sender: "@user:id",
+                sender: testData.TEST_USER_ID,
             };
 
             const onEvent = jest.fn();
@@ -1015,7 +1037,7 @@ describe("RustCrypto", () => {
             ["Not encrypted.", RustSdkCryptoJs.ShieldStateCode.SentInClear, EventShieldReason.SENT_IN_CLEAR],
             [
                 "Encrypted by a previously-verified user who is no longer verified.",
-                RustSdkCryptoJs.ShieldStateCode.PreviouslyVerified,
+                RustSdkCryptoJs.ShieldStateCode.VerificationViolation,
                 EventShieldReason.VERIFICATION_VIOLATION,
             ],
         ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {

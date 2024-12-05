@@ -653,7 +653,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#getUserVerificationStatus}.
      */
     public async getUserVerificationStatus(userId: string): Promise<UserVerificationStatus> {
-        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
             await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
@@ -662,7 +662,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const verified = userIdentity.isVerified();
         const wasVerified = userIdentity.wasPreviouslyVerified();
         const needsUserApproval =
-            userIdentity instanceof RustSdkCryptoJs.UserIdentity ? userIdentity.identityNeedsUserApproval() : false;
+            userIdentity instanceof RustSdkCryptoJs.OtherUserIdentity
+                ? userIdentity.identityNeedsUserApproval()
+                : false;
         userIdentity.free();
         return new UserVerificationStatus(verified, wasVerified, false, needsUserApproval);
     }
@@ -671,7 +673,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#pinCurrentUserIdentity}.
      */
     public async pinCurrentUserIdentity(userId: string): Promise<void> {
-        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
             await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
 
         if (userIdentity === undefined) {
@@ -1020,7 +1022,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#requestVerificationDM}
      */
     public async requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
-        const userIdentity: RustSdkCryptoJs.UserIdentity | undefined = await this.olmMachine.getIdentity(
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | undefined = await this.olmMachine.getIdentity(
             new RustSdkCryptoJs.UserId(userId),
         );
 
@@ -2035,7 +2037,7 @@ class EventDecryptor {
                     errorDetails,
                 );
 
-            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityPreviouslyVerified:
+            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityVerificationViolation:
                 // We're refusing to decrypt due to not trusting the sender,
                 // rather than failing to decrypt due to lack of keys, so we
                 // don't need to keep it on the pending list.
@@ -2200,7 +2202,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
         case RustSdkCryptoJs.ShieldStateCode.SentInClear:
             shieldReason = EventShieldReason.SENT_IN_CLEAR;
             break;
-        case RustSdkCryptoJs.ShieldStateCode.PreviouslyVerified:
+        case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
             break;
     }
