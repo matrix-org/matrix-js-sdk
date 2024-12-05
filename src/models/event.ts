@@ -1396,7 +1396,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
         }
 
-        this.localTimestamp = Date.now() - this.getAge()!;
+        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
     }
 
     /**
