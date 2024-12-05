@@ -610,7 +610,11 @@ describe("MegolmDecryption", function () {
         const aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
         const bobClient1 = new TestClient("@bob:example.com", "bobdevice1").client;
         const bobClient2 = new TestClient("@bob:example.com", "bobdevice2").client;
-        await Promise.all([aliceClient.initCrypto(), bobClient1.initCrypto(), bobClient2.initCrypto()]);
+        await Promise.all([
+            aliceClient.initLegacyCrypto(),
+            bobClient1.initLegacyCrypto(),
+            bobClient2.initLegacyCrypto(),
+        ]);
         const aliceDevice = aliceClient.crypto!.olmDevice;
         const bobDevice1 = bobClient1.crypto!.olmDevice;
         const bobDevice2 = bobClient2.crypto!.olmDevice;
@@ -704,7 +708,7 @@ describe("MegolmDecryption", function () {
     it("does not block unverified devices when sending verification events", async function () {
         const aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
         const bobClient = new TestClient("@bob:example.com", "bobdevice").client;
-        await Promise.all([aliceClient.initCrypto(), bobClient.initCrypto()]);
+        await Promise.all([aliceClient.initLegacyCrypto(), bobClient.initLegacyCrypto()]);
         const bobDevice = bobClient.crypto!.olmDevice;
 
         const encryptionCfg = {
@@ -789,7 +793,7 @@ describe("MegolmDecryption", function () {
     it("notifies devices when unable to create olm session", async function () {
         const aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
         const bobClient = new TestClient("@bob:example.com", "bobdevice").client;
-        await Promise.all([aliceClient.initCrypto(), bobClient.initCrypto()]);
+        await Promise.all([aliceClient.initLegacyCrypto(), bobClient.initLegacyCrypto()]);
         const aliceDevice = aliceClient.crypto!.olmDevice;
         const bobDevice = bobClient.crypto!.olmDevice;
 
@@ -873,7 +877,7 @@ describe("MegolmDecryption", function () {
     it("throws an error describing why it doesn't have a key", async function () {
         const aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
         const bobClient = new TestClient("@bob:example.com", "bobdevice").client;
-        await Promise.all([aliceClient.initCrypto(), bobClient.initCrypto()]);
+        await Promise.all([aliceClient.initLegacyCrypto(), bobClient.initLegacyCrypto()]);
         const bobDevice = bobClient.crypto!.olmDevice;
 
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
@@ -955,7 +959,7 @@ describe("MegolmDecryption", function () {
     it("throws an error describing the lack of an olm session", async function () {
         const aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
         const bobClient = new TestClient("@bob:example.com", "bobdevice").client;
-        await Promise.all([aliceClient.initCrypto(), bobClient.initCrypto()]);
+        await Promise.all([aliceClient.initLegacyCrypto(), bobClient.initLegacyCrypto()]);
 
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
         aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
@@ -1051,7 +1055,7 @@ describe("MegolmDecryption", function () {
     it("throws an error to indicate a wedged olm session", async function () {
         const aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
         const bobClient = new TestClient("@bob:example.com", "bobdevice").client;
-        await Promise.all([aliceClient.initCrypto(), bobClient.initCrypto()]);
+        await Promise.all([aliceClient.initLegacyCrypto(), bobClient.initLegacyCrypto()]);
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
         aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 

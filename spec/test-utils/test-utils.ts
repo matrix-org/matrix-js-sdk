@@ -561,7 +561,7 @@ export type InitCrypto = (_: MatrixClient) => Promise<void>;
 
 CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
 if (globalThis.Olm) {
-    CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
+    CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initLegacyCrypto();
 }
 
 export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));

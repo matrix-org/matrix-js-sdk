@@ -294,7 +294,7 @@ export interface ICreateClientOpts {
      * specified, uses a default implementation (indexeddb in the browser,
      * in-memory otherwise).
      *
-     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initCrypto}),
+     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initLegacyCrypto}),
      * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
      * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
      * data can be migrated from the legacy store.
@@ -389,7 +389,7 @@ export interface ICreateClientOpts {
      *
      * This must be set to the same value every time the client is initialised for the same device.
      *
-     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initCrypto}),
+     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initLegacyCrypto}),
      * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
      * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
      * data can be migrated from the legacy store.
@@ -1222,7 +1222,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private readonly logger: Logger;
 
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
-    public olmVersion: [number, number, number] | null = null; // populated after initCrypto
+    public olmVersion: [number, number, number] | null = null; // populated after initLegacyCrypto
     public usingExternalCrypto = false;
     private _store!: Store;
     public deviceId: string | null;
@@ -1605,7 +1605,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Try to rehydrate a device if available.  The client must have been
      * initialized with a `cryptoCallback.getDehydrationKey` option, and this
-     * function must be called before initCrypto and startClient are called.
+     * function must be called before initLegacyCrypto and startClient are called.
      *
      * @returns Promise which resolves to undefined if a device could not be dehydrated, or
      *     to the new device ID if the dehydration was successful.
@@ -2147,7 +2147,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @deprecated libolm is deprecated. Prefer {@link initRustCrypto}.
      */
-    public async initCrypto(): Promise<void> {
+    public async initLegacyCrypto(): Promise<void> {
         if (!isCryptoAvailable()) {
             throw new Error(
                 `End-to-end encryption not supported in this js-sdk build: did ` +
@@ -2220,7 +2220,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Initialise support for end-to-end encryption in this client, using the rust matrix-sdk-crypto.
      *
-     * An alternative to {@link initCrypto}.
+     * An alternative to {@link initLegacyCrypto}.
      *
      * **WARNING**: the cryptography stack is not thread-safe. Having multiple `MatrixClient` instances connected to
      * the same Indexed DB will cause data corruption and decryption failures. The application layer is responsible for
@@ -2321,7 +2321,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Access the crypto API for this client.
      *
-     * If end-to-end encryption has been enabled for this client (via {@link initCrypto} or {@link initRustCrypto}),
+     * If end-to-end encryption has been enabled for this client (via {@link initLegacyCrypto} or {@link initRustCrypto}),
      * returns an object giving access to the crypto API. Otherwise, returns `undefined`.
      */
     public getCrypto(): CryptoApi | undefined {
