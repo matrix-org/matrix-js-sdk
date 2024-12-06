@@ -2514,7 +2514,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     return;
                 }
 
-                // Here we were calling `MatrixClient.encryptAndSendToDevices` which is not supported by the rust cryptography.
+                // TODO: Here we were sending the event to the opponent's device as a to-device message with MatrixClient.encryptAndSendToDevices.
+                // However due to the switch to Rust cryptography we need to migrate to the new encryptToDeviceMessages API.
+                throw new Error("Unimplemented");
             } else {
                 await this.client.sendToDevice(
                     eventType,
