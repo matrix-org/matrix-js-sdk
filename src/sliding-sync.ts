@@ -196,8 +196,8 @@ class SlidingList {
      * @param list - The new list parameters
      */
     public replaceList(list: MSC3575List): void {
-        list.filters = list.filters || {};
-        list.ranges = list.ranges || [];
+        list.filters = list.filters ?? {};
+        list.ranges = list.ranges ?? [];
         this.list = JSON.parse(JSON.stringify(list));
         this.isModified = true;
 
@@ -894,9 +894,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     l.setModified(false);
                 });
                 // set default empty values so we don't need to null check
-                resp.lists = resp.lists || {};
-                resp.rooms = resp.rooms || {};
-                resp.extensions = resp.extensions || {};
+                resp.lists = resp.lists ?? {};
+                resp.rooms = resp.rooms ?? {};
+                resp.extensions = resp.extensions ?? {};
                 Object.keys(resp.lists).forEach((key: string) => {
                     const list = this.lists.get(key);
                     if (!list || !resp) {
@@ -934,7 +934,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             const listKeysWithUpdates: Set<string> = new Set();
             if (!doNotUpdateList) {
                 for (const [key, list] of Object.entries(resp.lists)) {
-                    list.ops = list.ops || [];
+                    list.ops = list.ops ?? [];
                     if (list.ops.length > 0) {
                         listKeysWithUpdates.add(key);
                     }

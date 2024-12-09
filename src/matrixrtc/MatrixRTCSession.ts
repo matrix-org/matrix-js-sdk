@@ -878,7 +878,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
 
-        if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
+        if (this.manageMediaKeys && this.isJoined()) {
             const oldMembershipIds = new Set(
                 oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
@@ -896,8 +896,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.storeLastMembershipFingerprints();
 
             if (anyLeft) {
-                logger.debug(`Member(s) have left: queueing sender key rotation`);
-                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, this.makeKeyDelay);
+                if (this.makeNewKeyTimeout) {
+                    // existing rotation in progress, so let it complete
+                } else {
+                    logger.debug(`Member(s) have left: queueing sender key rotation`);
+                    this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, this.makeKeyDelay);
+                }
             } else if (anyJoined) {
                 logger.debug(`New member(s) have joined: re-sending keys`);
                 this.requestSendCurrentKey();

@@ -3016,9 +3016,9 @@ export function supportsMatrixCall(): boolean {
     // is that the browser throwing a SecurityError will brick the client creation process.
     try {
         const supported = Boolean(
-            window.RTCPeerConnection ||
-                window.RTCSessionDescription ||
-                window.RTCIceCandidate ||
+            window.RTCPeerConnection ??
+                window.RTCSessionDescription ??
+                window.RTCIceCandidate ??
                 navigator.mediaDevices,
         );
         if (!supported) {

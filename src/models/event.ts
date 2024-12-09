@@ -559,9 +559,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             return {} as T;
         }
         if (this.clearEvent) {
-            return (this.clearEvent.content || {}) as T;
+            return (this.clearEvent.content ?? {}) as T;
         }
-        return (this.event.content || {}) as T;
+        return (this.event.content ?? {}) as T;
     }
 
     /**
@@ -575,7 +575,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (this._localRedactionEvent) {
             return {} as T;
         } else if (this._replacingEvent) {
-            return this._replacingEvent.getContent()["m.new_content"] || {};
+            return this._replacingEvent.getContent()["m.new_content"] ?? {};
         } else {
             return this.getOriginalContent();
         }
@@ -1250,7 +1250,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const timeline = room.getLiveTimeline();
         // We use insertEventIntoTimeline to insert it in timestamp order,
         // because we don't know where it should go (until we have MSC4033).
-        timeline.getTimelineSet().insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!);
+        timeline
+            .getTimelineSet()
+            .insertEventIntoTimeline(this, timeline, timeline.getState(EventTimeline.FORWARDS)!, false);
     }
 
     /**
@@ -1394,7 +1396,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
         }
 
-        this.localTimestamp = Date.now() - this.getAge()!;
+        this.localTimestamp = Date.now() - (this.getAge() ?? 0);
     }
 
     /**
@@ -1631,7 +1633,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param otherEvent - The other event to check against.
      * @returns True if the events are the same, false otherwise.
      */
-    public isEquivalentTo(otherEvent: MatrixEvent): boolean {
+    public isEquivalentTo(otherEvent?: MatrixEvent): boolean {
         if (!otherEvent) return false;
         if (otherEvent === this) return true;
         const myProps = deepSortedObjectEntries(this.event);

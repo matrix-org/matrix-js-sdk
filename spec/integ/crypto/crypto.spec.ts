@@ -1327,7 +1327,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
             // Every 2 messages in the room, the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_msgs: 2,
             };
@@ -1383,7 +1383,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const oneHourInMs = 60 * 60 * 1000;
 
             // Every 1h the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_ms: oneHourInMs,
             };
@@ -1741,7 +1741,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             groupSession: groupSession,
             room_id: ROOM_ID,
         });
-        await testClient.client.initCrypto();
+        await testClient.client.initLegacyCrypto();
         const keys = [
             {
                 room_id: ROOM_ID,
@@ -1853,7 +1853,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives shared history before being invited to a room by the sharer", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
-        await beccaTestClient.client.initCrypto();
+        await beccaTestClient.client.initLegacyCrypto();
 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
@@ -2007,7 +2007,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives shared history before being invited to a room by someone else", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
-        await beccaTestClient.client.initCrypto();
+        await beccaTestClient.client.initLegacyCrypto();
 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();

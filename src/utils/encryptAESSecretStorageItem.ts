@@ -67,7 +67,7 @@ export default async function encryptAESSecretStorageItem(
 
     return {
         iv: encodeBase64(iv),
-        ciphertext: encodeBase64(ciphertext),
-        mac: encodeBase64(hmac),
+        ciphertext: encodeBase64(new Uint8Array(ciphertext)),
+        mac: encodeBase64(new Uint8Array(hmac)),
     };
 }

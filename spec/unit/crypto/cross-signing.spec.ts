@@ -78,7 +78,7 @@ async function makeTestClient(
     const testClient = new TestClient(userInfo.userId, userInfo.deviceId, undefined, undefined, options);
     const client = testClient.client;
 
-    await client.initCrypto();
+    await client.initLegacyCrypto();
 
     return { client, httpBackend: testClient.httpBackend };
 }

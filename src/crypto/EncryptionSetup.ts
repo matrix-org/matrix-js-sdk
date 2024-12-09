@@ -106,7 +106,7 @@ export class EncryptionSetupBuilder {
         if (!this.keySignatures) {
             this.keySignatures = {};
         }
-        const userSignatures = this.keySignatures[userId] || {};
+        const userSignatures = this.keySignatures[userId] ?? {};
         this.keySignatures[userId] = userSignatures;
         userSignatures[deviceId] = signature;
     }

@@ -46,7 +46,6 @@ import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./u
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.ts";
-import * as olmlib from "./crypto/olmlib.ts";
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
 import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
@@ -252,6 +251,9 @@ export type Store = IStore;
 export type ResetTimelineCallback = (roomId: string) => boolean;
 
 const SCROLLBACK_DELAY_MS = 3000;
+/**
+ * @deprecated Not supported for Rust Cryptography.
+ */
 export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
@@ -292,7 +294,7 @@ export interface ICreateClientOpts {
      * specified, uses a default implementation (indexeddb in the browser,
      * in-memory otherwise).
      *
-     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initCrypto}),
+     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initLegacyCrypto}),
      * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
      * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
      * data can be migrated from the legacy store.
@@ -387,7 +389,7 @@ export interface ICreateClientOpts {
      *
      * This must be set to the same value every time the client is initialised for the same device.
      *
-     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initCrypto}),
+     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initLegacyCrypto}),
      * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
      * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
      * data can be migrated from the legacy store.
@@ -1220,7 +1222,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private readonly logger: Logger;
 
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
-    public olmVersion: [number, number, number] | null = null; // populated after initCrypto
+    public olmVersion: [number, number, number] | null = null; // populated after initLegacyCrypto
     public usingExternalCrypto = false;
     private _store!: Store;
     public deviceId: string | null;
@@ -1603,7 +1605,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Try to rehydrate a device if available.  The client must have been
      * initialized with a `cryptoCallback.getDehydrationKey` option, and this
-     * function must be called before initCrypto and startClient are called.
+     * function must be called before initLegacyCrypto and startClient are called.
      *
      * @returns Promise which resolves to undefined if a device could not be dehydrated, or
      *     to the new device ID if the dehydration was successful.
@@ -1830,10 +1832,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns MXID for the logged-in user, or null if not logged in
      */
     public getUserId(): string | null {
-        if (this.credentials && this.credentials.userId) {
-            return this.credentials.userId;
-        }
-        return null;
+        return this.credentials?.userId ?? null;
     }
 
     /**
@@ -1855,7 +1854,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Domain of this MXID
      */
     public getDomain(): string | null {
-        if (this.credentials && this.credentials.userId) {
+        if (this.credentials?.userId) {
             return this.credentials.userId.replace(/^.*?:/, "");
         }
         return null;
@@ -1866,10 +1865,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The user ID localpart or null.
      */
     public getUserIdLocalpart(): string | null {
-        if (this.credentials && this.credentials.userId) {
-            return this.credentials.userId.split(":")[0].substring(1);
-        }
-        return null;
+        return this.credentials?.userId?.split(":")[0].substring(1) ?? null;
     }
 
     /**
@@ -2151,7 +2147,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @deprecated libolm is deprecated. Prefer {@link initRustCrypto}.
      */
-    public async initCrypto(): Promise<void> {
+    public async initLegacyCrypto(): Promise<void> {
         if (!isCryptoAvailable()) {
             throw new Error(
                 `End-to-end encryption not supported in this js-sdk build: did ` +
@@ -2224,7 +2220,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Initialise support for end-to-end encryption in this client, using the rust matrix-sdk-crypto.
      *
-     * An alternative to {@link initCrypto}.
+     * An alternative to {@link initLegacyCrypto}.
+     *
+     * **WARNING**: the cryptography stack is not thread-safe. Having multiple `MatrixClient` instances connected to
+     * the same Indexed DB will cause data corruption and decryption failures. The application layer is responsible for
+     * ensuring that only one `MatrixClient` issue is instantiated at a time.
      *
      * @param args.useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
      * @param args.storageKey - A key with which to encrypt the indexeddb store. If provided, it must be exactly
@@ -2321,7 +2321,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Access the crypto API for this client.
      *
-     * If end-to-end encryption has been enabled for this client (via {@link initCrypto} or {@link initRustCrypto}),
+     * If end-to-end encryption has been enabled for this client (via {@link initLegacyCrypto} or {@link initRustCrypto}),
      * returns an object giving access to the crypto API. Otherwise, returns `undefined`.
      */
     public getCrypto(): CryptoApi | undefined {
@@ -2430,6 +2430,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @remarks
      * Fires {@link CryptoEvent#DeviceVerificationChanged}
+     *
+     * @deprecated Not supported for Rust Cryptography.
      */
     public setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         const prom = this.setDeviceVerification(userId, deviceId, verified, null, null);
@@ -3897,28 +3899,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: undefined,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: string,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupInfo,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     private async restoreKeyBackup(
-        privKey: ArrayLike<number>,
+        privKey: Uint8Array,
         targetRoomId: string | undefined,
         targetSessionId: string | undefined,
         backupInfo: IKeyBackupInfo,
@@ -4309,7 +4311,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getIgnoredUsers(): string[] {
         const event = this.getAccountData("m.ignored_user_list");
-        if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return [];
+        if (!event?.getContent()["ignored_users"]) return [];
         return Object.keys(event.getContent()["ignored_users"]);
     }
 
@@ -6136,7 +6138,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         room.partitionThreadedEvents(matrixEvents);
 
                     this.processAggregatedTimelineEvents(room, timelineEvents);
-                    room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
+                    room.addEventsToTimeline(timelineEvents, true, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
                     unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
 
@@ -6248,7 +6250,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
-        timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
+        timelineSet.addEventsToTimeline(timelineEvents, true, false, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
         this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
@@ -6342,10 +6344,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     timeline.initialiseState(res.state.map(mapper));
                 }
 
-                timelineSet.addEventsToTimeline(events, true, timeline, resNewer.next_batch);
+                timelineSet.addEventsToTimeline(events, true, false, timeline, resNewer.next_batch);
                 if (!resOlder.next_batch) {
                     const originalEvent = await this.fetchRoomEvent(timelineSet.room.roomId, thread.id);
-                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, timeline, null);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, false, timeline, null);
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
@@ -6399,10 +6401,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const timeline = timelineSet.getLiveTimeline();
                 timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
 
-                timelineSet.addEventsToTimeline(events, true, timeline, null);
+                timelineSet.addEventsToTimeline(events, true, false, timeline, null);
                 if (!resOlder.next_batch) {
                     const originalEvent = await this.fetchRoomEvent(timelineSet.room.roomId, thread.id);
-                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, timeline, null);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, false, timeline, null);
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(null, Direction.Forward);
@@ -6665,7 +6667,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // No need to partition events for threads here, everything lives
                     // in the notification timeline set
                     const timelineSet = eventTimeline.getTimelineSet();
-                    timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                    timelineSet.addEventsToTimeline(matrixEvents, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
@@ -6708,7 +6710,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
+                    timelineSet.addEventsToTimeline(matrixEvents, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, matrixEvents);
                     this.processThreadRoots(room, matrixEvents, backwards);
 
@@ -6756,12 +6758,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const newToken = res.next_batch;
 
                     const timelineSet = eventTimeline.getTimelineSet();
-                    timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, newToken ?? null);
+                    timelineSet.addEventsToTimeline(matrixEvents, backwards, false, eventTimeline, newToken ?? null);
                     if (!newToken && backwards) {
                         const originalEvent =
                             thread.rootEvent ??
                             mapper(await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id));
-                        timelineSet.addEventsToTimeline([originalEvent], true, eventTimeline, null);
+                        timelineSet.addEventsToTimeline([originalEvent], true, false, eventTimeline, null);
                     }
                     this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
@@ -6800,7 +6802,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
-                    timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
+                    timelineSet.addEventsToTimeline(timelineEvents, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
@@ -10115,7 +10117,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     type: EventType.RoomEncryption,
                     state_key: "",
                     content: {
-                        algorithm: olmlib.MEGOLM_ALGORITHM,
+                        algorithm: "m.megolm.v1.aes-sha2",
                     },
                 },
             ],

@@ -68,7 +68,7 @@ describe("Dehydration", () => {
             },
         });
 
-        await alice.client.initCrypto();
+        await alice.client.initLegacyCrypto();
 
         alice.httpBackend.when("GET", "/room_keys/version").respond(404, {
             errcode: "M_NOT_FOUND",

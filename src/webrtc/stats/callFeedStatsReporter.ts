@@ -49,8 +49,8 @@ export class CallFeedStatsReporter {
         return {
             id: track.id,
             kind: track.kind,
-            settingDeviceId: settingDeviceId ? settingDeviceId : "unknown",
-            constrainDeviceId: constrainDeviceId ? constrainDeviceId : "unknown",
+            settingDeviceId: settingDeviceId ?? "unknown",
+            constrainDeviceId: constrainDeviceId ?? "unknown",
             muted: track.muted,
             enabled: track.enabled,
             readyState: track.readyState,
@@ -63,9 +63,6 @@ export class CallFeedStatsReporter {
         callFeeds: CallFeed[],
         prefix = "unknown",
     ): CallFeedReport {
-        if (!report.callFeeds) {
-            report.callFeeds = [];
-        }
         callFeeds.forEach((feed) => {
             const audioTracks = feed.stream.getAudioTracks();
             const videoTracks = feed.stream.getVideoTracks();

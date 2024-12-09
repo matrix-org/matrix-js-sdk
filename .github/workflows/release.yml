@@ -25,11 +25,45 @@ permissions: {} # No permissions required
 jobs:
     release:
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: read
         secrets: inherit
         with:
             final: ${{ inputs.mode == 'final' }}
             npm: ${{ inputs.npm }}
-            downstreams: '["element-hq/element-web"]'
+
+    bump-downstreams:
+        name: Update npm dependency in downstream projects
+        needs: release
+        runs-on: ubuntu-24.04
+        strategy:
+            matrix:
+                repo:
+                    - element-hq/element-web
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: ${{ matrix.repo }}
+                  ref: staging
+                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version: "lts/*"
+
+            - name: Bump dependency
+              env:
+                  DEPENDENCY: ${{ needs.release.outputs.npm-id }}
+              run: |
+                  git config --global user.email "releases@riot.im"
+                  git config --global user.name "RiotRobot"
+                  yarn upgrade "$DEPENDENCY" --exact
+                  git add package.json yarn.lock
+                  git commit -am"Upgrade dependency to $DEPENDENCY"
+                  git push origin staging
 
     docs:
         name: Publish Documentation

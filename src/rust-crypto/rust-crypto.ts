@@ -329,7 +329,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
             throw new Error(`getBackupDecryptor: expects Uint8Array`);
         }
@@ -1213,7 +1213,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
         if (!backupKeys.decryptionKey) return null;
-        return Buffer.from(backupKeys.decryptionKey.toBase64(), "base64");
+        return decodeBase64(backupKeys.decryptionKey.toBase64());
     }
 
     /**
@@ -2215,22 +2215,29 @@ function rustEncryptionInfoToJsEncryptionInfo(
     }
 
     let shieldReason: EventShieldReason | null;
-    if (shieldState.message === undefined) {
-        shieldReason = null;
-    } else if (shieldState.message === "Encrypted by an unverified user.") {
-        // this case isn't actually used with lax shield semantics.
-        shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
-    } else if (shieldState.message === "Encrypted by a device not verified by its owner.") {
-        shieldReason = EventShieldReason.UNSIGNED_DEVICE;
-    } else if (
-        shieldState.message === "The authenticity of this encrypted message can't be guaranteed on this device."
-    ) {
-        shieldReason = EventShieldReason.AUTHENTICITY_NOT_GUARANTEED;
-    } else if (shieldState.message === "Encrypted by an unknown or deleted device.") {
-        shieldReason = EventShieldReason.UNKNOWN_DEVICE;
-    } else {
-        logger.warn(`Unknown shield state message '${shieldState.message}'`);
-        shieldReason = EventShieldReason.UNKNOWN;
+    switch (shieldState.code) {
+        case undefined:
+        case null:
+            shieldReason = null;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.AuthenticityNotGuaranteed:
+            shieldReason = EventShieldReason.AUTHENTICITY_NOT_GUARANTEED;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.UnknownDevice:
+            shieldReason = EventShieldReason.UNKNOWN_DEVICE;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.UnsignedDevice:
+            shieldReason = EventShieldReason.UNSIGNED_DEVICE;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity:
+            shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.SentInClear:
+            shieldReason = EventShieldReason.SENT_IN_CLEAR;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.PreviouslyVerified:
+            shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
+            break;
     }
 
     return { shieldColour, shieldReason };
