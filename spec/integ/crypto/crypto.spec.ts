@@ -3142,7 +3142,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     fetchMock.put(
                         "path:/_matrix/client/v3/room_keys/keys",
                         (url, request) => {
-                            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            const uploadPayload: KeyBackup = JSON.parse((request.body as string) ?? "{}");
                             resolve(uploadPayload);
                             return {
                                 status: 200,
@@ -3209,7 +3209,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.post(
                     "path:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
-                        const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+                        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
                         backupData.version = newVersion;
                         backupData.count = 0;
                         backupData.etag = "zer";
