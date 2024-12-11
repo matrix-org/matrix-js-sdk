@@ -170,6 +170,14 @@ describe("validateIdToken()", () => {
         expect(logger.error).toHaveBeenCalledWith("Invalid ID token", new Error("Invalid audience"));
     });
 
+    it("should not throw for a list of trusted audiences", () => {
+        mocked(jwtDecode).mockReturnValue({
+            ...validDecodedIdToken,
+            aud: [clientId],
+        });
+        expect(() => validateIdToken(idToken, issuer, clientId, nonce)).not.toThrow();
+    });
+
     it("should throw when nonce does not match", () => {
         mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
