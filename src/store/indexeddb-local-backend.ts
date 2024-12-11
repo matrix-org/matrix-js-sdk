@@ -71,7 +71,7 @@ function selectQuery<T>(
     return new Promise((resolve, reject) => {
         const results: T[] = [];
         query.onerror = (): void => {
-            reject(new Error("Query failed: " + query.error));
+            reject(new Error("Query failed: " + query.error?.name));
         };
         // collect results
         query.onsuccess = (): void => {
@@ -360,7 +360,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 // in firefox, with indexedDB disabled, this fails with a
                 // DOMError. We treat this as non-fatal, so that we can still
                 // use the app.
-                logger.warn(`unable to delete js-sdk store indexeddb: ${req.error}`);
+                logger.warn(`unable to delete js-sdk store indexeddb: ${req.error?.name}`);
                 resolve();
             };
 

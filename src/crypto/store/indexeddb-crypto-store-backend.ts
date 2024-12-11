@@ -776,7 +776,7 @@ export class Backend implements CryptoStore {
                 ev.preventDefault();
                 logger.log("Ignoring duplicate inbound group session: " + senderCurve25519Key + " / " + sessionId);
             } else {
-                abortWithException(txn, new Error("Failed to add inbound group session: " + addReq.error));
+                abortWithException(txn, new Error("Failed to add inbound group session: " + addReq.error?.name));
             }
         };
     }
