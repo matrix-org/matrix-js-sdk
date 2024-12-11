@@ -155,7 +155,7 @@ describe("validateIdToken()", () => {
     it("should throw when audience does not include clientId", () => {
         mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
-            aud: "qwerty,uiop,asdf",
+            aud: "qwerty-uiop-asdf",
         });
         expect(() => validateIdToken(idToken, issuer, clientId, nonce)).toThrow(new Error(OidcError.InvalidIdToken));
         expect(logger.error).toHaveBeenCalledWith("Invalid ID token", new Error("Invalid audience"));
@@ -164,7 +164,7 @@ describe("validateIdToken()", () => {
     it("should throw when audience includes clientId and other audiences", () => {
         mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
-            aud: `${clientId},uiop,asdf`,
+            aud: `${clientId}-uiop-asdf`,
         });
         expect(() => validateIdToken(idToken, issuer, clientId, nonce)).toThrow(new Error(OidcError.InvalidIdToken));
         expect(logger.error).toHaveBeenCalledWith("Invalid ID token", new Error("Invalid audience"));
@@ -181,7 +181,7 @@ describe("validateIdToken()", () => {
     it("should throw when audience is an array that does not include clientId", () => {
         mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
-            aud: [`${clientId},uiop`, "asdf"],
+            aud: ["qwerty-uiop-asdf", "asdf"],
         });
         expect(() => validateIdToken(idToken, issuer, clientId, nonce)).toThrow(new Error(OidcError.InvalidIdToken));
         expect(logger.error).toHaveBeenCalledWith("Invalid ID token", new Error("Invalid audience"));
