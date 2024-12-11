@@ -1182,13 +1182,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 if (this.disconnectDelayId !== undefined) {
                     try {
                         const knownDisconnectDelayId = this.disconnectDelayId;
-                        await resendIfRateLimited(
-                            () =>
-                                this.client._unstable_updateDelayedEvent(
-                                    knownDisconnectDelayId,
-                                    UpdateDelayedEventAction.Restart,
-                                ),
-                            10,
+                        await resendIfRateLimited(() =>
+                            this.client._unstable_updateDelayedEvent(
+                                knownDisconnectDelayId,
+                                UpdateDelayedEventAction.Restart,
+                            ),
                         );
                     } catch (e) {
                         if (e instanceof MatrixError && e.errcode === "M_NOT_FOUND") {
