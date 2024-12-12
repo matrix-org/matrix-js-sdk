@@ -869,6 +869,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         if (!decryptionKeyMatchesKeyBackupInfo(backupKeys.decryptionKey, keyBackupInfo)) {
             logger.info("Not saving backup key to secret storage: decryption key does not match backup info");
+            return;
         }
 
         const backupKeyFromStorage = await this.secretStorage.get("m.megolm_backup.v1");
