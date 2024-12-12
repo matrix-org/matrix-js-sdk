@@ -861,6 +861,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             return;
         }
 
+        const activeBackupVersion = await this.backupManager.getActiveBackupVersion();
+        if (!activeBackupVersion || activeBackupVersion !== keyBackupInfo.version) {
+            logger.info("Not saving backup key to secret storage: backup keys do not match active backup version");
+            return;
+        }
+
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
         if (!backupKeys.decryptionKey) {
             logger.info("Not saving backup key to secret storage: no backup key");
