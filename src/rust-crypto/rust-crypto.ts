@@ -843,8 +843,50 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
         }
 
-        if (setupNewKeyBackup) {
+        // likewise with the key backup key: if we have one, store it in secret storage (if it's not already there)
+        // also don't bother storing it if we're about to set up a new backup
+        if (!setupNewKeyBackup) {
+            await this.saveBackupKeyToStorage();
+        } else {
             await this.resetKeyBackup();
+        }
+    }
+
+    /**
+     * If we have a backup key for the current, trusted backup in cache,
+     * and we have secret storage active, save it to secret storage.
+     */
+    private async saveBackupKeyToStorage(): Promise<void> {
+        const keyBackupInfo = await this.backupManager.getServerBackupInfo();
+        if (!keyBackupInfo || !keyBackupInfo.version) {
+            logger.info("Not saving backup key to secret storage: no backup info");
+            return;
+        }
+
+        const activeBackupVersion = await this.backupManager.getActiveBackupVersion();
+        if (!activeBackupVersion || activeBackupVersion !== keyBackupInfo.version) {
+            logger.info("Not saving backup key to secret storage: backup keys do not match active backup version");
+            return;
+        }
+
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        if (!backupKeys.decryptionKey) {
+            logger.info("Not saving backup key to secret storage: no backup key");
+            return;
+        }
+
+        if (!decryptionKeyMatchesKeyBackupInfo(backupKeys.decryptionKey, keyBackupInfo)) {
+            logger.info("Not saving backup key to secret storage: decryption key does not match backup info");
+            return;
+        }
+
+        const backupKeyFromStorage = await this.secretStorage.get("m.megolm_backup.v1");
+        const backupKeyBase64 = backupKeys.decryptionKey.toBase64();
+
+        // The backup version that the key corresponds to isn't saved in 4S so if it's different, we must assume
+        // it's stale and overwrite.
+        if (backupKeyFromStorage !== backupKeyBase64) {
+            await this.secretStorage.store("m.megolm_backup.v1", backupKeyBase64);
         }
     }
 
