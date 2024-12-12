@@ -1189,9 +1189,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                             ),
                         );
                     } catch (e) {
-                        logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
-                        this.disconnectDelayId = undefined;
-                        await prepareDelayedDisconnection();
+                        if (e instanceof MatrixError && e.errcode === "M_NOT_FOUND") {
+                            // If we get a M_NOT_FOUND we prepare a new delayed event.
+                            // In other error cases we do not want to prepare anything since we do not have the guarantee, that the
+                            // future is not still running.
+                            logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
+                            this.disconnectDelayId = undefined;
+                            await prepareDelayedDisconnection();
+                        }
                     }
                 }
                 if (this.disconnectDelayId !== undefined) {
