@@ -1050,8 +1050,8 @@ export interface CryptoCallbacks {
              * For secret retrieval, `keys` may contain several entries, and the application can return
              * any one of the requested keys. Unless your application specifically wants to offer the
              * user the ability to have more than one secret storage key active at a time, it is recommended
-             * to call {@link matrix.SecretStorage.getDefaultKeyId} to figure out which is the current default key, and
-             * to return `null` if the default key is not listed in `keys`.
+             * to call {@link matrix.SecretStorage.ServerSideSecretStorage.getDefaultKeyId | ServerSideSecretStorage.getDefaultKeyId}
+             * to figure out which is the current default key, and to return `null` if the default key is not listed in `keys`.
              */
             keys: Record<string, SecretStorageKeyDescription>;
         },
