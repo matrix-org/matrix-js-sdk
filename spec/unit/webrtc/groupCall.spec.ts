@@ -1430,7 +1430,7 @@ describe("Group Call", function () {
         let client: MatrixClient;
 
         beforeEach(() => {
-            client = new MatrixClient({ baseUrl: "base_url" });
+            client = new MatrixClient({ baseUrl: "base_url", userId: "my_user_id" });
 
             jest.spyOn(client, "sendStateEvent").mockResolvedValue({} as any);
         });
@@ -1566,16 +1566,19 @@ describe("Group Call", function () {
                 async (roomId, eventType, content, stateKey) => {
                     const eventId = `$${Math.random()}`;
                     if (roomId === room.roomId) {
-                        room.addLiveEvents([
-                            new MatrixEvent({
-                                event_id: eventId,
-                                type: eventType,
-                                room_id: roomId,
-                                sender: FAKE_USER_ID_2,
-                                content,
-                                state_key: stateKey,
-                            }),
-                        ]);
+                        room.addLiveEvents(
+                            [
+                                new MatrixEvent({
+                                    event_id: eventId,
+                                    type: eventType,
+                                    room_id: roomId,
+                                    sender: FAKE_USER_ID_2,
+                                    content,
+                                    state_key: stateKey,
+                                }),
+                            ],
+                            { addToState: true },
+                        );
                     }
                     return { event_id: eventId };
                 },

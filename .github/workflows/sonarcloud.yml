@@ -27,7 +27,7 @@ jobs:
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
             # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
-            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+            - uses: guibranco/github-status-action-v2@d469d49426f5a7b8a1fbcac20ad274d3e4892321
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: pending
@@ -46,6 +46,7 @@ jobs:
               uses: actions/download-artifact@v4
               if: ${{ !inputs.sharded }}
               with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   name: coverage
                   path: coverage
@@ -53,10 +54,17 @@ jobs:
               uses: actions/download-artifact@v4
               if: inputs.sharded
               with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
                   run-id: ${{ github.event.workflow_run.id }}
                   pattern: coverage-*
                   path: coverage
                   merge-multiple: true
+            - name: Check coverage artifact
+              run: |
+                  if [ ! -d coverage ]; then
+                      echo "Coverage not found. Exiting with failure."
+                      exit 1
+                  fi
 
             - id: extra_args
               run: |
@@ -79,7 +87,7 @@ jobs:
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
 
-            - uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+            - uses: guibranco/github-status-action-v2@d469d49426f5a7b8a1fbcac20ad274d3e4892321
               if: always()
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}

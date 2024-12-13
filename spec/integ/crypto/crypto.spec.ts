@@ -1327,7 +1327,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
             // Every 2 messages in the room, the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_msgs: 2,
             };
@@ -1383,7 +1383,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const oneHourInMs = 60 * 60 * 1000;
 
             // Every 1h the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_ms: oneHourInMs,
             };
@@ -1741,7 +1741,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             groupSession: groupSession,
             room_id: ROOM_ID,
         });
-        await testClient.client.initCrypto();
+        await testClient.client.initLegacyCrypto();
         const keys = [
             {
                 room_id: ROOM_ID,
@@ -1853,7 +1853,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives shared history before being invited to a room by the sharer", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
-        await beccaTestClient.client.initCrypto();
+        await beccaTestClient.client.initLegacyCrypto();
 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
@@ -2007,7 +2007,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives shared history before being invited to a room by someone else", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
-        await beccaTestClient.client.initCrypto();
+        await beccaTestClient.client.initLegacyCrypto();
 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
@@ -3121,6 +3121,32 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master)!;
                 expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
             });
+
+            newBackendOnly("should upload existing megolm backup key to a new 4S store", async () => {
+                const backupKeyTo4SPromise = awaitMegolmBackupKeyUpload();
+
+                // we need these to set up the mocks but we don't actually care whether they
+                // resolve because we're not testing those things in this test.
+                awaitCrossSigningKeyUpload("master");
+                awaitCrossSigningKeyUpload("user_signing");
+                awaitCrossSigningKeyUpload("self_signing");
+                awaitSecretStorageKeyStoredInAccountData();
+
+                mockSetupCrossSigningRequests();
+                mockSetupMegolmBackupRequests("1");
+
+                await aliceClient.getCrypto()!.bootstrapCrossSigning({});
+                await aliceClient.getCrypto()!.resetKeyBackup();
+
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({
+                    setupNewSecretStorage: true,
+                    createSecretStorageKey,
+                    setupNewKeyBackup: false,
+                });
+
+                await backupKeyTo4SPromise;
+                expect(accountDataAccumulator.accountDataEvents.get("m.megolm_backup.v1")).toBeDefined();
+            });
         });
 
         describe("Manage Key Backup", () => {
@@ -3142,7 +3168,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     fetchMock.put(
                         "path:/_matrix/client/v3/room_keys/keys",
                         (url, request) => {
-                            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            const uploadPayload: KeyBackup = JSON.parse((request.body as string) ?? "{}");
                             resolve(uploadPayload);
                             return {
                                 status: 200,
@@ -3209,7 +3235,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.post(
                     "path:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
-                        const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+                        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
                         backupData.version = newVersion;
                         backupData.count = 0;
                         backupData.etag = "zer";

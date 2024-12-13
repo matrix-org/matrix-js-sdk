@@ -878,7 +878,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
 
-        if (this.manageMediaKeys && this.isJoined() && this.makeNewKeyTimeout === undefined) {
+        if (this.manageMediaKeys && this.isJoined()) {
             const oldMembershipIds = new Set(
                 oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
@@ -896,8 +896,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.storeLastMembershipFingerprints();
 
             if (anyLeft) {
-                logger.debug(`Member(s) have left: queueing sender key rotation`);
-                this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, this.makeKeyDelay);
+                if (this.makeNewKeyTimeout) {
+                    // existing rotation in progress, so let it complete
+                } else {
+                    logger.debug(`Member(s) have left: queueing sender key rotation`);
+                    this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, this.makeKeyDelay);
+                }
             } else if (anyJoined) {
                 logger.debug(`New member(s) have joined: re-sending keys`);
                 this.requestSendCurrentKey();
@@ -1185,9 +1189,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                             ),
                         );
                     } catch (e) {
-                        logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
-                        this.disconnectDelayId = undefined;
-                        await prepareDelayedDisconnection();
+                        if (e instanceof MatrixError && e.errcode === "M_NOT_FOUND") {
+                            // If we get a M_NOT_FOUND we prepare a new delayed event.
+                            // In other error cases we do not want to prepare anything since we do not have the guarantee, that the
+                            // future is not still running.
+                            logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
+                            this.disconnectDelayId = undefined;
+                            await prepareDelayedDisconnection();
+                        }
                     }
                 }
                 if (this.disconnectDelayId !== undefined) {

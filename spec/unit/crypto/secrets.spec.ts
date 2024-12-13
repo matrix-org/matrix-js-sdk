@@ -43,7 +43,7 @@ async function makeTestClient(
         return true;
     };
 
-    await client.initCrypto();
+    await client.initLegacyCrypto();
 
     // No need to download keys for these tests
     jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());

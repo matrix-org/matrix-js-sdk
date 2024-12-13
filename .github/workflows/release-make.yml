@@ -20,10 +20,6 @@ on:
                 description: Publish to npm
                 type: boolean
                 default: false
-            downstreams:
-                description: List of github projects (owner/repo) which should have their dependency bumped to the newly released version (in JSON string array string syntax)
-                type: string
-                required: false
             gpg-fingerprint:
                 description: Fingerprint of the GPG key to use for signing the git tag and assets, if any.
                 type: string
@@ -38,12 +34,24 @@ on:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
+        outputs:
+            npm-id:
+                description: "The npm package@version string we published"
+                value: ${{ jobs.npm.outputs.id }}
 permissions: {}
 jobs:
+    checks:
+        name: Sanity checks
+        permissions:
+            issues: read
+            pull-requests: read
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-checks.yml@develop
+
     release:
         name: Release
         runs-on: ubuntu-24.04
         environment: Release
+        needs: checks
         permissions:
             contents: write
         steps:
@@ -303,34 +311,3 @@ jobs:
     #                  wait-interval: 10
     #                  check-name: merge
     #                  allowed-conclusions: success
-
-    bump-downstreams:
-        name: Update npm dependency in downstream projects
-        needs: npm
-        runs-on: ubuntu-24.04
-        if: inputs.downstreams
-        strategy:
-            matrix:
-                repo: ${{ fromJSON(inputs.downstreams) }}
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  repository: ${{ matrix.repo }}
-                  ref: staging
-                  token: ${{ secrets.ELEMENT_BOT_TOKEN }}
-
-            - uses: actions/setup-node@v4
-              with:
-                  cache: "yarn"
-                  node-version: "lts/*"
-
-            - name: Bump dependency
-              env:
-                  DEPENDENCY: ${{ needs.npm.outputs.id }}
-              run: |
-                  git config --global user.email "releases@riot.im"
-                  git config --global user.name "RiotRobot"
-                  yarn upgrade "$DEPENDENCY" --exact
-                  git add package.json yarn.lock
-                  git commit -am"Upgrade dependency to $DEPENDENCY"
-                  git push origin staging

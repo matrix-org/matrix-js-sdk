@@ -99,7 +99,7 @@ describe("MatrixEvent", () => {
             const room = new Room("!roomid:e.xyz", mockClient, "myname");
             const ev = createEvent("$event1:server");
 
-            await room.addLiveEvents([ev]);
+            await room.addLiveEvents([ev], { addToState: false });
             await room.createThreadsTimelineSets();
             expect(ev.threadRootId).toBeUndefined();
             expect(mainTimelineLiveEventIds(room)).toEqual([ev.getId()]);
@@ -120,7 +120,7 @@ describe("MatrixEvent", () => {
             const threadRoot = createEvent("$threadroot:server");
             const ev = createThreadedEvent("$event1:server", threadRoot.getId()!);
 
-            await room.addLiveEvents([threadRoot, ev]);
+            await room.addLiveEvents([threadRoot, ev], { addToState: false });
             await room.createThreadsTimelineSets();
             expect(threadRoot.threadRootId).toEqual(threadRoot.getId());
             expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);
@@ -143,7 +143,7 @@ describe("MatrixEvent", () => {
             const threadRoot = createEvent("$threadroot:server");
             const ev = createThreadedEvent("$event1:server", threadRoot.getId()!);
 
-            await room.addLiveEvents([threadRoot, ev]);
+            await room.addLiveEvents([threadRoot, ev], { addToState: false });
             await room.createThreadsTimelineSets();
             expect(ev.threadRootId).toEqual(threadRoot.getId());
             expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);
@@ -167,7 +167,7 @@ describe("MatrixEvent", () => {
             const ev = createThreadedEvent("$event1:server", threadRoot.getId()!);
             const reaction = createReactionEvent("$reaction:server", ev.getId()!);
 
-            await room.addLiveEvents([threadRoot, ev, reaction]);
+            await room.addLiveEvents([threadRoot, ev, reaction], { addToState: false });
             await room.createThreadsTimelineSets();
             expect(reaction.threadRootId).toEqual(threadRoot.getId());
             expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);
@@ -191,7 +191,7 @@ describe("MatrixEvent", () => {
             const ev = createThreadedEvent("$event1:server", threadRoot.getId()!);
             const edit = createEditEvent("$edit:server", ev.getId()!);
 
-            await room.addLiveEvents([threadRoot, ev, edit]);
+            await room.addLiveEvents([threadRoot, ev, edit], { addToState: false });
             await room.createThreadsTimelineSets();
             expect(edit.threadRootId).toEqual(threadRoot.getId());
             expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);
@@ -217,7 +217,7 @@ describe("MatrixEvent", () => {
             const reply2 = createReplyEvent("$reply2:server", reply1.getId()!);
             const reaction = createReactionEvent("$reaction:server", reply2.getId()!);
 
-            await room.addLiveEvents([threadRoot, ev, reply1, reply2, reaction]);
+            await room.addLiveEvents([threadRoot, ev, reply1, reply2, reaction], { addToState: false });
             await room.createThreadsTimelineSets();
             expect(reaction.threadRootId).toEqual(threadRoot.getId());
             expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId()]);

@@ -1163,6 +1163,16 @@ export enum EventShieldReason {
      * decryption keys.
      */
     MISMATCHED_SENDER_KEY,
+
+    /**
+     * The event was sent unencrypted in an encrypted room.
+     */
+    SENT_IN_CLEAR,
+
+    /**
+     * The sender was previously verified but changed their identity.
+     */
+    VERIFICATION_VIOLATION,
 }
 
 /** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */

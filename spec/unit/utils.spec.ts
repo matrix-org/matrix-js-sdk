@@ -32,6 +32,7 @@ import {
     MapWithDefault,
     globToRegexp,
     escapeRegExp,
+    removeHiddenChars,
 } from "../../src/utils";
 import { logger } from "../../src/logger";
 import { mkMessage } from "../test-utils/test-utils";
@@ -738,6 +739,21 @@ describe("utils", function () {
         it("should not explode when given regexes as globs", () => {
             const result = globToRegexp("[FIT-Connect Zustelldienst \\(Testumgebung\\)]");
             expect(result).toMatchInlineSnapshot(`"\\[FIT-Connect Zustelldienst \\\\\\(Testumgebung\\\\\\)\\]"`);
+        });
+    });
+
+    describe("removeHiddenChars", () => {
+        it.each([
+            ["various width spaces U+2000 - U+200D", "\u2000\u200D", ""],
+            ["LTR and RTL marks U+200E and U+200F", "\u200E\u200F", ""],
+            ["LTR/RTL and other directional formatting marks U+202A - U+202F", "\u202A\u202F", ""],
+            ["Arabic Letter RTL mark U+061C", "\u061C", ""],
+            ["Combining characters U+0300 - U+036F", "\u3000\u036F", ""],
+            ["Zero width no-break space (BOM) U+FEFF", "\uFEFF", ""],
+            ["Blank/invisible characters (U2800, U2062-U2063)", "\u2800\u2062\u2063", ""],
+            ["Zero Width Non Joiner", "‌", ""],
+        ])("should strip invisible characters: %s", (_, input, expected) => {
+            expect(removeHiddenChars(input)).toBe(expected);
         });
     });
 });
