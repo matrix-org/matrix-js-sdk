@@ -328,7 +328,7 @@ export interface CryptoApi {
 
     /**
      * Bootstrap the secret storage by creating a new secret storage key, add it in the secret storage and
-     * store the cross signing keys in the secret storage.
+     * store the cross signing and room key backup key in the secret storage.
      *
      * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
      *   Only if `setupNewSecretStorage` is set or if there is no AES key in the secret storage
