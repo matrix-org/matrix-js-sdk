@@ -327,8 +327,7 @@ export interface CryptoApi {
     isSecretStorageReady(): Promise<boolean>;
 
     /**
-     * Bootstrap the secret storage by creating a new secret storage key, add it in the secret storage and
-     * store the cross signing keys in the secret storage.
+     * Bootstrap [secret storage](https://spec.matrix.org/v1.12/client-server-api/#storage).
      *
      * - If secret storage is not already set up, or {@link CreateSecretStorageOpts.setupNewSecretStorage} is set:
      *   * Calls {@link CreateSecretStorageOpts.createSecretStorageKey} to generate a new key.
@@ -1017,7 +1016,7 @@ export interface CryptoCallbacks {
      *
      * Secret storage can be set up by calling {@link CryptoApi.bootstrapSecretStorage}. Having done so, when
      * the crypto stack needs to access secret storage (for example, when setting up a new device, or to
-     * store newly-generated secrets), it will use this callback.
+     * store newly-generated secrets), it will use this callback (`getSecretStorageKey`).
      *
      * Note that the secret storage key may be needed several times in quick succession: it is recommended
      * that applications use a temporary cache to avoid prompting the user multiple times for the key. See
@@ -1029,7 +1028,7 @@ export interface CryptoCallbacks {
      * @param opts - An options object.
      *
      * @param name - the name of the *secret* (NB: not the encryption key) being stored or retrieved.
-     *    This is the "event type" stored in account data.
+     *    When the item is stored in account data, it will have this `type`.
      *
      * @returns a pair [`keyId`, `privateKey`], where `keyId` is one of the keys from the `keys` parameter,
      *    and `privateKey` is the raw private encryption key, as appropriate for the encryption algorithm.
@@ -1037,7 +1036,7 @@ export interface CryptoCallbacks {
      *    [specification](https://spec.matrix.org/v1.6/client-server-api/#msecret_storagev1aes-hmac-sha2).)
      *
      *    Alternatively, if none of the keys are known, may return `null` — in which case the original
-     *    storage/retrieval operation will fail with an exception.
+     *     operation that requires access to a secret in secret storage may fail with an exception.
      */
     getSecretStorageKey?: (
         opts: {
