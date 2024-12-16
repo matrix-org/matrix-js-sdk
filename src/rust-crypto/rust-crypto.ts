@@ -854,7 +854,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
     /**
      * If we have a backup key for the current, trusted backup in cache,
-     * and we have secret storage active, save it to secret storage.
+     * save it to secret storage.
      */
     private async saveBackupKeyToStorage(): Promise<void> {
         const keyBackupInfo = await this.backupManager.getServerBackupInfo();
