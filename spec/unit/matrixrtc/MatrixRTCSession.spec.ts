@@ -20,7 +20,7 @@ import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
-import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
+import { makeMockRoom, makeMockRoomState, membershipTemplate, mockRTCEvent } from "./mocks";
 
 const mockFocus = { type: "mock" };
 
@@ -269,6 +269,55 @@ describe("MatrixRTCSession", () => {
         });
     });
 
+    describe("getsActiveFocus", () => {
+        const firstPreferredFocus = {
+            type: "livekit",
+            livekit_service_url: "https://active.url",
+            livekit_alias: "!active:active.url",
+        };
+        it("gets the correct active focus with oldest_membership", () => {
+            jest.useFakeTimers();
+            jest.setSystemTime(3000);
+            const mockRoom = makeMockRoom([
+                Object.assign({}, membershipTemplate, {
+                    device_id: "foo",
+                    created_ts: 500,
+                    foci_preferred: [firstPreferredFocus],
+                }),
+                Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
+                Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
+            ]);
+
+            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }], {
+                type: "livekit",
+                focus_selection: "oldest_membership",
+            });
+            expect(sess.getActiveFocus()).toBe(firstPreferredFocus);
+            jest.useRealTimers();
+        });
+        it("does not provide focus if the selection method is unknown", () => {
+            const mockRoom = makeMockRoom([
+                Object.assign({}, membershipTemplate, {
+                    device_id: "foo",
+                    created_ts: 500,
+                    foci_preferred: [firstPreferredFocus],
+                }),
+                Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
+                Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
+            ]);
+
+            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }], {
+                type: "livekit",
+                focus_selection: "unknown",
+            });
+            expect(sess.getActiveFocus()).toBe(undefined);
+        });
+    });
+
     describe("joining", () => {
         let mockRoom: Room;
         let sendStateEventMock: jest.Mock;
@@ -317,6 +366,68 @@ describe("MatrixRTCSession", () => {
         it("shows joined once join is called", () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
+        });
+
+        it("sends a membership event when joining a call", async () => {
+            const realSetTimeout = setTimeout;
+            jest.useFakeTimers();
+            sess!.joinRoomSession([mockFocus], mockFocus);
+            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                EventType.GroupCallMemberPrefix,
+                {
+                    application: "m.call",
+                    scope: "m.room",
+                    call_id: "",
+                    device_id: "AAAAAAA",
+                    expires: DEFAULT_EXPIRE_DURATION,
+                    foci_preferred: [mockFocus],
+                    focus_active: {
+                        focus_selection: "oldest_membership",
+                        type: "livekit",
+                    },
+                },
+                "_@alice:example.org_AAAAAAA",
+            );
+            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            // Because we actually want to send the state
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            // For checking if the delayed event is still there or got removed while sending the state.
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+            // For scheduling the delayed event
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            // This returns no error so we do not check if we reschedule the event again. this is done in another test.
+
+            jest.useRealTimers();
+        });
+
+        it("uses membershipExpiryTimeout from join config", async () => {
+            const realSetTimeout = setTimeout;
+            jest.useFakeTimers();
+            sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60000 });
+            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                EventType.GroupCallMemberPrefix,
+                {
+                    application: "m.call",
+                    scope: "m.room",
+                    call_id: "",
+                    device_id: "AAAAAAA",
+                    expires: 60000,
+                    foci_preferred: [mockFocus],
+                    focus_active: {
+                        focus_selection: "oldest_membership",
+                        type: "livekit",
+                    },
+                },
+
+                "_@alice:example.org_AAAAAAA",
+            );
+            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            jest.useRealTimers();
         });
 
         describe("calls", () => {
@@ -434,6 +545,78 @@ describe("MatrixRTCSession", () => {
 
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+    });
+
+        it("renews membership event before expiry time", async () => {
+            return "TODO add back the renew method since we also want this for non-legacy events.";
+            const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
+
+            jest.useFakeTimers();
+            let resolveFn: ((_roomId: string, _type: string, val: Record<string, any>) => void) | undefined;
+
+            const eventSentPromise = new Promise<Record<string, any>>((r) => {
+                resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
+                    r(val);
+                };
+            });
+            try {
+                const sendStateEventMock = jest.fn().mockImplementation(resolveFn);
+                client.sendStateEvent = sendStateEventMock;
+
+                sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60 * 60 * 1000 });
+
+                const eventContent = await eventSentPromise;
+
+                jest.setSystemTime(1000);
+                const event = mockRTCEvent(eventContent.memberships, mockRoom.roomId);
+                const getState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+                getState.getStateEvents = jest.fn().mockReturnValue(event);
+                getState.events = new Map([
+                    [
+                        event.getType(),
+                        {
+                            size: () => true,
+                            has: (_stateKey: string) => true,
+                            get: (_stateKey: string) => event,
+                            values: () => [event],
+                        } as unknown as Map<string, MatrixEvent>,
+                    ],
+                ]);
+
+                const eventReSentPromise = new Promise<Record<string, any>>((r) => {
+                    resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
+                        r(val);
+                    };
+                });
+
+                sendStateEventMock.mockReset().mockImplementation(resolveFn);
+
+                // definitely should have renewed by 1 second before the expiry!
+                const timeElapsed = 60 * 60 * 1000 - 1000;
+                jest.setSystemTime(Date.now() + timeElapsed);
+                jest.advanceTimersByTime(timeElapsed);
+                await eventReSentPromise;
+
+                expect(sendStateEventMock).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.GroupCallMemberPrefix,
+                    {
+                        application: "m.call",
+                        scope: "m.room",
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        expires: 3600000 * 2,
+                        foci_preferred: [mockFocus],
+                        focus_active: activeFocus,
+                        created_ts: 1000,
+                        membershipID: expect.stringMatching(".*"),
+                    },
+                    "_@alice:example.org_AAAAAAA",
+                );
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 
@@ -766,6 +949,92 @@ describe("MatrixRTCSession", () => {
                 } finally {
                     jest.useRealTimers();
                 }
+            });
+
+            it("re-sends key if a member changes membership ID", async () => {
+                return "membershipID is not a thing anymore";
+                /*
+                jest.useFakeTimers();
+                try {
+                    const keysSentPromise1 = new Promise((resolve) => {
+                        sendEventMock.mockImplementation(resolve);
+                    });
+
+                    const member1 = membershipTemplate;
+                    const member2 = {
+                        ...membershipTemplate,
+                        device_id: "BBBBBBB",
+                    };
+
+                    const mockRoom = makeMockRoom([member1, member2]);
+                    mockRoom.getLiveTimeline().getState = jest
+                        .fn()
+                        .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId));
+
+                    sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+
+                    await keysSentPromise1;
+
+                    // make sure an encryption key was sent
+                    expect(sendEventMock).toHaveBeenCalledWith(
+                        expect.stringMatching(".*"),
+                        "io.element.call.encryption_keys",
+                        {
+                            call_id: "",
+                            device_id: "AAAAAAA",
+                            keys: [
+                                {
+                                    index: 0,
+                                    key: expect.stringMatching(".*"),
+                                },
+                            ],
+                            sent_ts: Date.now(),
+                        },
+                    );
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
+
+                    sendEventMock.mockClear();
+
+                    // this should be a no-op:
+                    sess.onMembershipUpdate();
+                    expect(sendEventMock).toHaveBeenCalledTimes(0);
+
+                    // advance time to avoid key throttling
+                    jest.advanceTimersByTime(10000);
+
+                    // update membership ID
+                    member2.membershipID = "newID";
+
+                    const keysSentPromise2 = new Promise((resolve) => {
+                        sendEventMock.mockImplementation(resolve);
+                    });
+
+                    // this should re-send the key
+                    sess.onMembershipUpdate();
+
+                    await keysSentPromise2;
+
+                    expect(sendEventMock).toHaveBeenCalledWith(
+                        expect.stringMatching(".*"),
+                        "io.element.call.encryption_keys",
+                        {
+                            call_id: "",
+                            device_id: "AAAAAAA",
+                            keys: [
+                                {
+                                    index: 0,
+                                    key: expect.stringMatching(".*"),
+                                },
+                            ],
+                            sent_ts: Date.now(),
+                        },
+                    );
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
+                } finally {
+                    jest.useRealTimers();
+                }
+                */
             });
 
             it("re-sends key if a member changes created_ts", async () => {

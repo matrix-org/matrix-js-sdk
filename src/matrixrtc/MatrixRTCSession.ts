@@ -911,6 +911,31 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         };
     }
 
+    /**
+     * Returns true if our membership event needs to be updated
+     */
+    // private membershipEventNeedsUpdate(
+    //     myPrevMembershipData?: SessionMembershipData,
+    //     myPrevMembership?: CallMembership,
+    // ): boolean {
+    //     if (myPrevMembership && myPrevMembership.getMsUntilExpiry() === undefined) return false;
+
+    //     // Need to update if there's a membership for us but we're not joined (valid or otherwise)
+    //     if (!this.isJoined()) return !!myPrevMembershipData;
+
+    //     // ...or if we are joined, but there's no valid membership event
+    //     if (!myPrevMembership) return true;
+
+    //     const expiryTime = myPrevMembership.getMsUntilExpiry();
+    //     if (expiryTime !== undefined && expiryTime < this.membershipExpiryTimeout / 2) {
+    //         // ...or if the expiry time needs bumping
+    //         this.relativeExpiry! += this.membershipExpiryTimeout;
+    //         return true;
+    //     }
+
+    //     return false;
+    // }
+
     private makeNewMembership(deviceId: string): SessionMembershipData | {} {
         // If we're joined, add our own
         if (this.isJoined()) {

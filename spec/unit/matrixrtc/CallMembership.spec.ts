@@ -75,6 +75,18 @@ describe("CallMembership", () => {
             expect(membership.createdTs()).toEqual(67890);
         });
 
+        it("considers memberships unexpired if local age low enough", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
+            expect(new CallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(false);
+        });
+
+        it("considers memberships expired if local age large enough", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
+            expect(new CallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(true);
+        });
+
         it("returns preferred foci", () => {
             const fakeEvent = makeMockEvent();
             const mockFocus = { type: "this_is_a_mock_focus" };
