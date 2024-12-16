@@ -179,7 +179,7 @@ export const validateIdToken = (
          * The ID Token MUST be rejected if the ID Token does not list the Client as a valid audience, or if it contains additional audiences not trusted by the Client.
          * EW: Don't accept tokens with other untrusted audiences
          * */
-        const sanitisedAuds = typeof claims.aud === 'string' ? [claims.aud] : claims.aud;
+        const sanitisedAuds = typeof claims.aud === "string" ? [claims.aud] : claims.aud;
         if (!sanitisedAuds.includes(clientId)) {
             throw new Error("Invalid audience");
         }
