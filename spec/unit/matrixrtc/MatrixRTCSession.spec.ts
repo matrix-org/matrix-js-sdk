@@ -16,11 +16,11 @@ limitations under the License.
 
 import { encodeBase64, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
-import { makeMockRoom, makeMockRoomState, membershipTemplate, mockRTCEvent } from "./mocks";
+import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 
 const mockFocus = { type: "mock" };
 
@@ -548,78 +548,6 @@ describe("MatrixRTCSession", () => {
         });
     });
 
-        it("renews membership event before expiry time", async () => {
-            return "TODO add back the renew method since we also want this for non-legacy events.";
-            const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
-
-            jest.useFakeTimers();
-            let resolveFn: ((_roomId: string, _type: string, val: Record<string, any>) => void) | undefined;
-
-            const eventSentPromise = new Promise<Record<string, any>>((r) => {
-                resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
-                    r(val);
-                };
-            });
-            try {
-                const sendStateEventMock = jest.fn().mockImplementation(resolveFn);
-                client.sendStateEvent = sendStateEventMock;
-
-                sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60 * 60 * 1000 });
-
-                const eventContent = await eventSentPromise;
-
-                jest.setSystemTime(1000);
-                const event = mockRTCEvent(eventContent.memberships, mockRoom.roomId);
-                const getState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-                getState.getStateEvents = jest.fn().mockReturnValue(event);
-                getState.events = new Map([
-                    [
-                        event.getType(),
-                        {
-                            size: () => true,
-                            has: (_stateKey: string) => true,
-                            get: (_stateKey: string) => event,
-                            values: () => [event],
-                        } as unknown as Map<string, MatrixEvent>,
-                    ],
-                ]);
-
-                const eventReSentPromise = new Promise<Record<string, any>>((r) => {
-                    resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
-                        r(val);
-                    };
-                });
-
-                sendStateEventMock.mockReset().mockImplementation(resolveFn);
-
-                // definitely should have renewed by 1 second before the expiry!
-                const timeElapsed = 60 * 60 * 1000 - 1000;
-                jest.setSystemTime(Date.now() + timeElapsed);
-                jest.advanceTimersByTime(timeElapsed);
-                await eventReSentPromise;
-
-                expect(sendStateEventMock).toHaveBeenCalledWith(
-                    mockRoom.roomId,
-                    EventType.GroupCallMemberPrefix,
-                    {
-                        application: "m.call",
-                        scope: "m.room",
-                        call_id: "",
-                        device_id: "AAAAAAA",
-                        expires: 3600000 * 2,
-                        foci_preferred: [mockFocus],
-                        focus_active: activeFocus,
-                        created_ts: 1000,
-                        membershipID: expect.stringMatching(".*"),
-                    },
-                    "_@alice:example.org_AAAAAAA",
-                );
-            } finally {
-                jest.useRealTimers();
-            }
-        });
-    });
-
     describe("onMembershipsChanged", () => {
         it("does not emit if no membership changes", () => {
             const mockRoom = makeMockRoom(membershipTemplate);
@@ -949,92 +877,6 @@ describe("MatrixRTCSession", () => {
                 } finally {
                     jest.useRealTimers();
                 }
-            });
-
-            it("re-sends key if a member changes membership ID", async () => {
-                return "membershipID is not a thing anymore";
-                /*
-                jest.useFakeTimers();
-                try {
-                    const keysSentPromise1 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    const member1 = membershipTemplate;
-                    const member2 = {
-                        ...membershipTemplate,
-                        device_id: "BBBBBBB",
-                    };
-
-                    const mockRoom = makeMockRoom([member1, member2]);
-                    mockRoom.getLiveTimeline().getState = jest
-                        .fn()
-                        .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId));
-
-                    sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-
-                    await keysSentPromise1;
-
-                    // make sure an encryption key was sent
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    sendEventMock.mockClear();
-
-                    // this should be a no-op:
-                    sess.onMembershipUpdate();
-                    expect(sendEventMock).toHaveBeenCalledTimes(0);
-
-                    // advance time to avoid key throttling
-                    jest.advanceTimersByTime(10000);
-
-                    // update membership ID
-                    member2.membershipID = "newID";
-
-                    const keysSentPromise2 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    // this should re-send the key
-                    sess.onMembershipUpdate();
-
-                    await keysSentPromise2;
-
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                } finally {
-                    jest.useRealTimers();
-                }
-                */
             });
 
             it("re-sends key if a member changes created_ts", async () => {
