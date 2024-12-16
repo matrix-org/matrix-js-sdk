@@ -16,24 +16,19 @@ limitations under the License.
 
 import { encodeBase64, EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import {
-    CallMembershipData,
-    CallMembershipDataLegacy,
-    SessionMembershipData,
-} from "../../../src/matrixrtc/CallMembership";
+import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
 import { makeMockRoom, makeMockRoomState, mockRTCEvent } from "./mocks";
 
-const membershipTemplate: CallMembershipData = {
+const membershipTemplate: SessionMembershipData = {
     call_id: "",
     scope: "m.room",
     application: "m.call",
     device_id: "AAAAAAA",
-    expires: 60 * 60 * 1000,
-    membershipID: "bloop",
-    foci_active: [{ type: "livekit", livekit_service_url: "https://lk.url" }],
+    focus_active: { type: "livekit", livekit_service_url: "https://lk.url" },
+    foci_preferred: [{ type: "livekit", livekit_service_url: "https://lk.url" }],
 };
 
 const mockFocus = { type: "mock" };
@@ -59,31 +54,21 @@ describe("MatrixRTCSession", () => {
 
     describe("roomSessionForRoom", () => {
         it("creates a room-scoped session from room state", () => {
+            jest.useFakeTimers();
             const mockRoom = makeMockRoom([membershipTemplate]);
 
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].callId).toEqual("");
-            expect(sess?.memberships[0].scope).toEqual("m.room");
-            expect(sess?.memberships[0].application).toEqual("m.call");
-            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            expect(sess?.memberships[0].membershipID).toEqual("bloop");
-            expect(sess?.memberships[0].isExpired()).toEqual(false);
-            expect(sess?.callId).toEqual("");
-        });
-
-        it("ignores expired memberships events", () => {
-            jest.useFakeTimers();
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.expires = 1000;
-            expiredMembership.device_id = "EXPIRED";
-            const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
-
-            jest.advanceTimersByTime(2000);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            jest.useRealTimers();
+            try {
+                sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+                expect(sess?.memberships.length).toEqual(1);
+                expect(sess?.memberships[0].callId).toEqual("");
+                expect(sess?.memberships[0].scope).toEqual("m.room");
+                expect(sess?.memberships[0].application).toEqual("m.call");
+                expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+                expect(sess?.memberships[0].membershipID).toEqual(Date.now().toString());
+                expect(sess?.callId).toEqual("");
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it("ignores memberships events of members not in the room", () => {
@@ -91,18 +76,6 @@ describe("MatrixRTCSession", () => {
             mockRoom.hasMembershipState = (state) => state === KnownMembership.Join;
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             expect(sess?.memberships.length).toEqual(0);
-        });
-
-        it("honours created_ts", () => {
-            jest.useFakeTimers();
-            jest.setSystemTime(500);
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.created_ts = 500;
-            expiredMembership.expires = 1000;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
-            jest.useRealTimers();
         });
 
         it("returns empty session if no membership events are present", () => {
@@ -181,14 +154,6 @@ describe("MatrixRTCSession", () => {
             expect(sess.memberships).toHaveLength(0);
         });
 
-        it("ignores memberships with no expires_ts", () => {
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            (expiredMembership.expires as number | undefined) = undefined;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess.memberships).toHaveLength(0);
-        });
-
         it("ignores memberships with no device_id", () => {
             const testMembership = Object.assign({}, membershipTemplate);
             (testMembership.device_id as string | undefined) = undefined;
@@ -224,23 +189,7 @@ describe("MatrixRTCSession", () => {
 
     describe("updateCallMembershipEvent", () => {
         const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
-        const joinSessionConfig = { useLegacyMemberEvents: false };
-
-        const legacyMembershipData: CallMembershipDataLegacy = {
-            call_id: "",
-            scope: "m.room",
-            application: "m.call",
-            device_id: "AAAAAAA_legacy",
-            expires: 60 * 60 * 1000,
-            membershipID: "bloop",
-            foci_active: [mockFocus],
-        };
-
-        const expiredLegacyMembershipData: CallMembershipDataLegacy = {
-            ...legacyMembershipData,
-            device_id: "AAAAAAA_legacy_expired",
-            expires: 0,
-        };
+        const joinSessionConfig = {};
 
         const sessionMembershipData: SessionMembershipData = {
             call_id: "",
@@ -273,39 +222,21 @@ describe("MatrixRTCSession", () => {
             client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
         });
 
-        async function testSession(
-            membershipData: CallMembershipData[] | SessionMembershipData,
-            shouldUseLegacy: boolean,
-        ): Promise<void> {
+        async function testSession(membershipData: SessionMembershipData): Promise<void> {
             sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
 
-            const makeNewLegacyMembershipsMock = jest.spyOn(sess as any, "makeNewLegacyMemberships");
             const makeNewMembershipMock = jest.spyOn(sess as any, "makeNewMembership");
 
             sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
 
-            expect(makeNewLegacyMembershipsMock).toHaveBeenCalledTimes(shouldUseLegacy ? 1 : 0);
-            expect(makeNewMembershipMock).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+            expect(makeNewMembershipMock).toHaveBeenCalledTimes(1);
 
             await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
         }
-
-        it("uses legacy events if there are any active legacy calls", async () => {
-            await testSession([expiredLegacyMembershipData, legacyMembershipData, sessionMembershipData], true);
-        });
-
-        it('uses legacy events if a non-legacy call is in a "memberships" array', async () => {
-            await testSession([sessionMembershipData], true);
-        });
-
-        it("uses non-legacy events if all legacy calls are expired", async () => {
-            await testSession([expiredLegacyMembershipData], false);
-        });
-
         it("uses non-legacy events if there are only non-legacy calls", async () => {
-            await testSession(sessionMembershipData, false);
+            await testSession(sessionMembershipData);
         });
     });
 
@@ -334,7 +265,7 @@ describe("MatrixRTCSession", () => {
                 Object.assign({}, membershipTemplate, {
                     device_id: "foo",
                     created_ts: 500,
-                    foci_active: [activeFociConfig],
+                    focus_preferred: [activeFociConfig],
                 }),
                 Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
                 Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
@@ -456,7 +387,8 @@ describe("MatrixRTCSession", () => {
                             device_id: "AAAAAAA",
                             expires: 3600000,
                             expires_ts: Date.now() + 3600000,
-                            foci_active: [mockFocus],
+                            focus_active: mockFocus,
+                            foci_preferred: [mockFocus],
 
                             membershipID: expect.stringMatching(".*"),
                         },
@@ -1067,7 +999,7 @@ describe("MatrixRTCSession", () => {
                     jest.advanceTimersByTime(10000);
 
                     // update membership ID
-                    member2.membershipID = "newID";
+                    member2.created_ts = Date.now();
 
                     const keysSentPromise2 = new Promise((resolve) => {
                         sendEventMock.mockImplementation(resolve);
@@ -1240,7 +1172,7 @@ describe("MatrixRTCSession", () => {
             it("wraps key index around to 0 when it reaches the maximum", async () => {
                 // this should give us keys with index [0...255, 0, 1]
                 const membersToTest = 258;
-                const members: CallMembershipData[] = [];
+                const members: SessionMembershipData[] = [];
                 for (let i = 0; i < membersToTest; i++) {
                     members.push(Object.assign({}, membershipTemplate, { device_id: `DEVICE${i}` }));
                 }

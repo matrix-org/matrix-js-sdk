@@ -24,18 +24,17 @@ import {
     RoomEvent,
 } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
-import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
 import { makeMockRoom } from "./mocks";
+import { SessionMembershipData } from "../../../src/matrixrtc";
 
-const membershipTemplate: CallMembershipData = {
+const membershipTemplate: SessionMembershipData = {
     call_id: "",
     scope: "m.room",
     application: "m.call",
     device_id: "AAAAAAA",
-    expires: 60 * 60 * 1000,
-    membershipID: "bloop",
-    foci_active: [{ type: "test" }],
+    focus_active: { type: "test" },
+    foci_preferred: [{ type: "test" }],
 };
 
 describe("MatrixRTCSessionManager", () => {
