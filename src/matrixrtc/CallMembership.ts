@@ -39,8 +39,10 @@ export type SessionMembershipData = {
     // Application specific data
     scope?: CallScope;
 
-    // Optionally we allow to define a delta to the created_ts when it expires. This should be set to multiple hours.
-    // The only reason it exist is if delayed events fail. (for example because if a homeserver crashes)
+    /**
+     * Optionally we allow to define a delta to the created_ts when it expires. This should be set to multiple hours.
+     * The only reason it exist is if delayed events fail. (for example because if a homeserver crashes)
+     **/
     expires?: number;
 };
 
@@ -103,10 +105,6 @@ export class CallMembership {
         return this.membershipData.scope;
     }
 
-    public get expires(): number {
-        return this.membershipData.expires ?? DEFAULT_EXPIRE_DURATION;
-    }
-
     public get membershipID(): string {
         // the createdTs behaves equivalent to the membershipID.
         // we only need the field for the legacy member envents where we needed to update them
@@ -123,7 +121,8 @@ export class CallMembership {
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
     public getAbsoluteExpiry(): number | undefined {
-        return this.createdTs() + this.expires;
+        // TODO: calculate this from the MatrixRTCSession join configuration directly
+        return this.createdTs() + (this.membershipData.expires ?? DEFAULT_EXPIRE_DURATION);
     }
 
     /**
