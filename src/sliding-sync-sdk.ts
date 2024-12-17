@@ -651,7 +651,6 @@ export class SlidingSyncSdk {
             inviteStateEvents.forEach((e) => {
                 this.client.emit(ClientEvent.Event, e);
             });
-            room.updateMyMembership(KnownMembership.Invite);
             return;
         }
 
