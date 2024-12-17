@@ -194,7 +194,7 @@ export class EncryptionSetupOperation {
         // set account data
         if (this.accountData) {
             for (const [type, content] of this.accountData) {
-                await baseApis.setAccountData(type, content);
+                await baseApis.setAccountData(type, content.getContent());
             }
         }
         // upload first cross-signing signatures with the new key
