@@ -61,7 +61,7 @@ import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 import { LocalNotificationSettings } from "./local_notifications.ts";
 import { IPushRules } from "./PushRules.ts";
 import { SecretInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
-import { POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer.ts";
+import { POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
 
 export enum EventType {
     // Room state events
