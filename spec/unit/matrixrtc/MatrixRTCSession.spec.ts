@@ -248,7 +248,7 @@ describe("MatrixRTCSession", () => {
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
         }
 
-        it("uses non-legacy events if there are only non-legacy calls", async () => {
+        it("sends events", async () => {
             await testSession(sessionMembershipData);
         });
     });
@@ -418,7 +418,7 @@ describe("MatrixRTCSession", () => {
                 jest.useRealTimers();
             }
 
-            it("sends a membership event with session payload when joining a non-legacy call", async () => {
+            it("sends a membership event with session payload when joining a call", async () => {
                 await testJoin(false);
             });
 
