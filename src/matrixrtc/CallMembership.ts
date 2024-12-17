@@ -128,19 +128,6 @@ export class CallMembership {
     }
 
     /**
-     * Gets the expiry time of the event, converted into the device's local time.
-     * @deprecated This function has been observed returning bad data and is no longer used by MatrixRTC.
-     * @returns The local expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
-     */
-    public getLocalExpiry(): number | undefined {
-        const relativeCreationTime = this.parentEvent.getTs() - this.createdTs();
-
-        const localCreationTs = this.parentEvent.localTimestamp - relativeCreationTime;
-
-        return localCreationTs + this.expires;
-    }
-
-    /**
      * @returns The number of milliseconds until the membership expires or undefined if applicable
      */
     public getMsUntilExpiry(): number | undefined {
