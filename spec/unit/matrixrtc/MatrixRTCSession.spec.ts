@@ -20,7 +20,17 @@ import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
-import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
+import { makeMockRoom, makeMockRoomState } from "./mocks";
+
+const membershipTemplate: SessionMembershipData = {
+    call_id: "",
+    scope: "m.room",
+    application: "m.call",
+    device_id: "AAAAAAA",
+    expires: 60 * 60 * 1000,
+    focus_active: { type: "livekit", livekit_service_url: "https://lk.url" },
+    foci_preferred: [{ type: "livekit", livekit_service_url: "https://lk.url" }],
+};
 
 const mockFocus = { type: "mock" };
 

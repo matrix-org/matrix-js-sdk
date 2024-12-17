@@ -15,8 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../../../src";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { membershipTemplate } from "./mocks";
+import { CallMembership, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
@@ -89,6 +88,15 @@ describe("CallMembership", () => {
     describe("expiry calculation", () => {
         let fakeEvent: MatrixEvent;
         let membership: CallMembership;
+        const membershipTemplate: SessionMembershipData = {
+            call_id: "",
+            scope: "m.room",
+            application: "m.call",
+            device_id: "AAAAAAA",
+            expires: 5000,
+            focus_active: { type: "livekit" },
+            foci_preferred: [{ type: "livekit" }],
+        };
 
         beforeEach(() => {
             // server origin timestamp for this event is 1000
@@ -105,7 +113,7 @@ describe("CallMembership", () => {
         it("calculates time until expiry", () => {
             jest.setSystemTime(2000);
             // should be using absolute expiry time
-            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+            expect(membership.getMsUntilExpiry()).toEqual(4000);
         });
     });
 });

@@ -20,26 +20,6 @@ import { randomString } from "../../../src/randomstring";
 
 type MembershipData = SessionMembershipData[] | SessionMembershipData | {};
 
-export const membershipTemplate: SessionMembershipData = {
-    application: "m.call",
-    call_id: "",
-    device_id: "AAAAAAA",
-    scope: "m.room",
-    focus_active: { type: "livekit", livekit_service_url: "https://lk.url" },
-    foci_preferred: [
-        {
-            livekit_alias: "!alias:something.org",
-            livekit_service_url: "https://livekit-jwt.something.io",
-            type: "livekit",
-        },
-        {
-            livekit_alias: "!alias:something.org",
-            livekit_service_url: "https://livekit-jwt.something.dev",
-            type: "livekit",
-        },
-    ],
-};
-
 export function makeMockRoom(membershipData: MembershipData): Room {
     const roomId = randomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`

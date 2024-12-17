@@ -27,7 +27,18 @@ import {
 } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
-import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
+import { makeMockRoom, makeMockRoomState } from "./mocks";
+import { SessionMembershipData } from "../../../src/matrixrtc";
+
+const membershipTemplate: SessionMembershipData = {
+    call_id: "",
+    scope: "m.room",
+    application: "m.call",
+    device_id: "AAAAAAA",
+    expires: 60 * 60 * 1000,
+    focus_active: { type: "test" },
+    foci_preferred: [{ type: "test" }],
+};
 
 describe("MatrixRTCSessionManager", () => {
     let client: MatrixClient;
