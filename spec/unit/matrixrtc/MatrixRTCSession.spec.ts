@@ -398,7 +398,7 @@ describe("MatrixRTCSession", () => {
                         application: "m.call",
                         scope: "m.room",
                         call_id: "",
-                        expires: 2400000,
+                        expires: 14400000,
                         device_id: "AAAAAAA",
                         foci_preferred: [activeFocusConfig],
                         focus_active: activeFocus,

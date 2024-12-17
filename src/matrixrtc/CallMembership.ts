@@ -19,7 +19,7 @@ import { deepCompare } from "../utils.ts";
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 
-export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 10 * 4; // 4 hours
+export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4; // 4 hours
 
 type CallScope = "m.room" | "m.user";
 
