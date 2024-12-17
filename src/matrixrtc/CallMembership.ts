@@ -117,10 +117,10 @@ export class CallMembership {
     }
 
     /**
-     * Gets the absolute expiry time of the membership if applicable to this membership type.
+     * Gets the absolute expiry timestamp of the membership.
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
-    public getAbsoluteExpiry(): number | undefined {
+    public getAbsoluteExpiry(): number {
         // TODO: calculate this from the MatrixRTCSession join configuration directly
         return this.createdTs() + (this.membershipData.expires ?? DEFAULT_EXPIRE_DURATION);
     }
@@ -128,18 +128,18 @@ export class CallMembership {
     /**
      * @returns The number of milliseconds until the membership expires or undefined if applicable
      */
-    public getMsUntilExpiry(): number | undefined {
+    public getMsUntilExpiry(): number {
         // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
         // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
         // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-        return this.getAbsoluteExpiry()! - Date.now();
+        return this.getAbsoluteExpiry() - Date.now();
     }
 
     /**
      * @returns true if the membership has expired, otherwise false
      */
     public isExpired(): boolean {
-        return this.getMsUntilExpiry()! <= 0;
+        return this.getMsUntilExpiry() <= 0;
     }
 
     public getPreferredFoci(): Focus[] {
