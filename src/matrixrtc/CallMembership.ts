@@ -22,12 +22,11 @@ import { isLivekitFocusActive } from "./LivekitFocus.ts";
 export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 10 * 4; // 4 hours
 
 type CallScope = "m.room" | "m.user";
-// Represents an entry in the memberships section of an m.call.member event as it is on the wire
 
-// There are two different data interfaces. One for the Legacy types and one compliant with MSC4143
-
-// MSC4143 (MatrixRTC) session membership data
-
+/**
+ * MSC4143 (MatrixRTC) session membership data.
+ * Represents an entry in the memberships section of an m.call.member event as it is on the wire.
+ **/
 export type SessionMembershipData = {
     application: string;
     call_id: string;
