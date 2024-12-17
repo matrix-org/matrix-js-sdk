@@ -27,6 +27,13 @@ import {
     trimTrailingEquals,
 } from "../../src/secret-storage";
 import { randomString } from "../../src/randomstring";
+import { SecretInfo } from "../../src/secret-storage.ts";
+
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        mysecret: SecretInfo;
+    }
+}
 
 describe("ServerSideSecretStorageImpl", function () {
     describe(".addKey", function () {

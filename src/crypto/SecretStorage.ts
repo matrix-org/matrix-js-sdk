@@ -25,12 +25,12 @@ import {
     AccountDataClient,
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
+    SecretInfoKey,
 } from "../secret-storage.ts";
 import { ISecretRequest, SecretSharing } from "./SecretSharing.ts";
 
 /* re-exports for backwards compatibility */
 export type {
-    AccountDataClient as IAccountDataClient,
     SecretStorageKeyTuple,
     SecretStorageKeyObject,
     SECRET_STORAGE_ALGORITHM_V1_AES,
@@ -101,21 +101,21 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> im
     /**
      * Store an encrypted secret on the server
      */
-    public store(name: string, secret: string, keys?: string[] | null): Promise<void> {
+    public store(name: SecretInfoKey, secret: string, keys?: string[] | null): Promise<void> {
         return this.storageImpl.store(name, secret, keys);
     }
 
     /**
      * Get a secret from storage.
      */
-    public get(name: string): Promise<string | undefined> {
+    public get(name: SecretInfoKey): Promise<string | undefined> {
         return this.storageImpl.get(name);
     }
 
     /**
      * Check if a secret is stored on the server.
      */
-    public async isStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
+    public async isStored(name: SecretInfoKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.storageImpl.isStored(name);
     }
 

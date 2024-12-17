@@ -58,6 +58,10 @@ import {
 import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types.ts";
 import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls.ts";
 import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
+import { LocalNotificationSettings } from "./local_notifications.ts";
+import { IPushRules } from "./PushRules.ts";
+import { SecretInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer.ts";
 
 export enum EventType {
     // Room state events
@@ -367,4 +371,16 @@ export interface StateEvents {
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+}
+
+export interface AccountDataEvents {
+    [EventType.PushRules]: IPushRules;
+    [EventType.Direct]: { [userId: string]: string[] };
+    [EventType.IgnoredUserList]: { [userId: string]: {} };
+    "m.secret_storage.default_key": { key: string };
+    [POLICIES_ACCOUNT_EVENT_TYPE.name]: { [key: string]: any };
+    "m.identity_server": { base_url: string | null };
+    [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
+    [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
+    "m.megolm_backup.v1": SecretInfo;
 }

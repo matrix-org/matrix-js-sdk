@@ -136,6 +136,7 @@ import {
     UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
+    AccountDataEvents,
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
     MSC3912_RELATION_BASED_REDACTIONS_PROP,
@@ -4236,7 +4237,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
      */
-    public setAccountData(eventType: EventType | string, content: IContent): Promise<{}> {
+    public setAccountData<K extends keyof AccountDataEvents>(
+        eventType: K,
+        content: AccountDataEvents[K] | {},
+    ): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
             $type: eventType,
@@ -4287,7 +4291,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    public async deleteAccountData(eventType: string): Promise<void> {
+    public async deleteAccountData(eventType: keyof AccountDataEvents): Promise<void> {
         const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
         // if deletion is not supported overwrite with empty content
         if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
@@ -4326,7 +4330,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         userIds.forEach((u) => {
             content.ignored_users[u] = {};
         });
-        return this.setAccountData("m.ignored_user_list", content);
+        return this.setAccountData(EventType.IgnoredUserList, content);
     }
 
     /**
@@ -9264,7 +9268,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         deviceId: string,
         notificationSettings: LocalNotificationSettings,
     ): Promise<{}> {
-        const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}`;
+        const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}` as const;
         return this.setAccountData(key, notificationSettings);
     }
 
