@@ -78,19 +78,20 @@ export type SessionMembershipData = {
     expires?: number;
 };
 
-const checkSessionsMembershipData = (data: any, errors: string[]): data is SessionMembershipData => {
+export const checkSessionsMembershipData = (data: any, errors?: string[]): data is SessionMembershipData => {
+    const errList = errors ?? [];
     const prefix = "Malformed session membership event: ";
-    if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
-    if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
-    if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
-    if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
-    if (!Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
+    if (typeof data.device_id !== "string") errList.push(prefix + "device_id must be string");
+    if (typeof data.call_id !== "string") errList.push(prefix + "call_id must be string");
+    if (typeof data.application !== "string") errList.push(prefix + "application must be a string");
+    if (typeof data.focus_active?.type !== "string") errList.push(prefix + "focus_active.type must be a string");
+    if (!Array.isArray(data.foci_preferred)) errList.push(prefix + "foci_preferred must be an array");
     // optional parameters
-    if (data.created_ts && typeof data.created_ts !== "number") errors.push(prefix + "created_ts must be number");
+    if (data.created_ts && typeof data.created_ts !== "number") errList.push(prefix + "created_ts must be number");
 
     // application specific data (we first need to check if they exist)
-    if (data.scope && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
-    return errors.length === 0;
+    if (data.scope && typeof data.scope !== "string") errList.push(prefix + "scope must be string");
+    return errList.length === 0;
 };
 
 export class CallMembership {
