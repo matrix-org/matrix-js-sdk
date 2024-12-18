@@ -35,7 +35,6 @@ import {
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.ts";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { CallMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -196,11 +195,6 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
-}
-
-// XXX: this hasn't made it into the MSC yet
-export interface ExperimentalGroupCallRoomMemberState {
-    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {
