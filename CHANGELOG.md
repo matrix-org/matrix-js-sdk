@@ -1,3 +1,12 @@
+Changes in [35.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v35.1.0) (2024-12-18)
+==================================================================================================
+This release updates matrix-sdk-crypto-wasm to fix a bug which could prevent loading stored crypto state from storage.
+
+## 🐛 Bug Fixes
+
+* Upgrade matrix-sdk-crypto-wasm to 1.11.0 ([#4593](https://github.com/matrix-org/matrix-js-sdk/pull/4593)).
+
+
 Changes in [35.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v35.0.0) (2024-12-17)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
