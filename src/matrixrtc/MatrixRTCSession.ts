@@ -20,18 +20,18 @@ import { EventTimeline } from "../models/event-timeline.ts";
 import { Room } from "../models/room.ts";
 import { MatrixClient } from "../client.ts";
 import { EventType } from "../@types/event.ts";
-import { UpdateDelayedEventAction } from "../@types/requests.ts";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "./CallMembership.ts";
+import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { Focus } from "./focus.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
 import { EncryptionKeysEventContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { HTTPError, MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
+import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { sleep } from "../utils.ts";
+import { MatrixRTCSessionMemberMachine } from "./MatrixRTCSessionMemberMachine.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -67,14 +67,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
 };
 
-export interface JoinSessionConfig {
-    /**
-     *  If true, generate and share a media key for this participant,
-     *  and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
-     *  media keys for other participants become available.
-     */
-    manageMediaKeys?: boolean;
-
+export interface JoinSessionMemberConfig {
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
@@ -94,24 +87,33 @@ export interface JoinSessionConfig {
     callMemberEventRetryDelayMinimum?: number;
 
     /**
-     * The jitter (in milliseconds) which is added to callMemberEventRetryDelayMinimum before retrying
-     * sending the membership event. e.g. if this is set to 1000, then a random delay of between 0 and 1000
-     * milliseconds will be added.
+     * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
+     * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
-    callMemberEventRetryJitter?: number;
+    membershipServerSideExpiryTimeout?: number;
 
+    /**
+     * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
+     */
+    membershipKeepAlivePeriod?: number;
+}
+export interface JoinSessionEncryptionConfig {
+    /**
+     *  If true, generate and share a media key for this participant,
+     *  and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
+     *  media keys for other participants become available.
+     */
+    manageMediaKeys?: boolean;
     /**
      * The minimum time (in milliseconds) between each attempt to send encryption key(s).
      * e.g. if this is set to 1000, then we will send at most one key event every second.
      */
     updateEncryptionKeyThrottle?: number;
-
     /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
      * tend to leave calls at the same time.
      */
     makeKeyDelay?: number;
-
     /**
      * The delay (in milliseconds) between creating and sending a new key and starting to encrypt with it. This
      * gives other a chance to receive the new key to minimise the chance they don't get media they can't decrypt.
@@ -119,39 +121,22 @@ export interface JoinSessionConfig {
      * makeKeyDelay + useKeyDelay
      */
     useKeyDelay?: number;
-
-    /**
-     * The timeout (in milliseconds) after which the server will consider the membership to have expired if it
-     * has not received a keep-alive from the client.
-     */
-    membershipServerSideExpiryTimeout?: number;
-
-    /**
-     * The period (in milliseconds) that the client will send membership keep-alives to the server.
-     */
-    membershipKeepAlivePeriod?: number;
 }
+export type JoinSessionConfig = JoinSessionMemberConfig & JoinSessionEncryptionConfig;
 
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
+    // create the two machines that make up the matrixRTC session
+    private memberMachine: MatrixRTCSessionMemberMachine | undefined;
+
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
 
-    private relativeExpiry: number | undefined;
-
     // undefined means not yet joined
     private joinConfig?: JoinSessionConfig;
-
-    private get membershipExpiryTimeout(): number {
-        return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
-    }
-
-    private get callMemberEventRetryDelayMinimum(): number {
-        return this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
-    }
 
     private get updateEncryptionKeyThrottle(): number {
         return this.joinConfig?.updateEncryptionKeyThrottle ?? 3_000;
@@ -165,54 +150,31 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.joinConfig?.useKeyDelay ?? 5_000;
     }
 
-    /**
-     * If the server disallows the configured {@link membershipServerSideExpiryTimeout},
-     * this stores a delay that the server does allow.
-     */
-    private membershipServerSideExpiryTimeoutOverride?: number;
-
-    private get membershipServerSideExpiryTimeout(): number {
-        return (
-            this.membershipServerSideExpiryTimeoutOverride ??
-            this.joinConfig?.membershipServerSideExpiryTimeout ??
-            8_000
-        );
-    }
-
-    private get membershipKeepAlivePeriod(): number {
-        return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
-    }
-
-    private get callMemberEventRetryJitter(): number {
-        return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
-    }
-
     private memberEventTimeout?: ReturnType<typeof setTimeout>;
     private expiryTimeout?: ReturnType<typeof setTimeout>;
     private keysEventUpdateTimeout?: ReturnType<typeof setTimeout>;
     private makeNewKeyTimeout?: ReturnType<typeof setTimeout>;
     private setNewKeyTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    // This is a Focus with the specified fields for an ActiveFocus (e.g. LivekitFocusActive for type="livekit")
-    private ownFocusActive?: Focus;
-    // This is a Foci array that contains the Focus objects this user is aware of and proposes to use.
-    private ownFociPreferred?: Focus[];
-
-    private updateCallMembershipRunning = false;
-    private needCallMembershipUpdate = false;
-
     private manageMediaKeys = false;
     // userId:deviceId => array of (key, timestamp)
     private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
     private lastEncryptionKeyUpdateRequest?: number;
-
-    private disconnectDelayId: string | undefined;
 
     // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
     private currentEncryptionKeyIndex = -1;
+
+    /**
+     * Return the MatrixRTC session for the room, whether there are currently active members or not
+     */
+    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
+        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
+
+        return new MatrixRTCSession(client, room, callMemberships);
+    }
 
     /**
      * The statistics for this session.
@@ -238,18 +200,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     };
 
     /**
-     * The callId (sessionId) of the call.
-     *
-     * It can be undefined since the callId is only known once the first membership joins.
-     * The callId is the property that, per definition, groups memberships into one call.
-     */
-    public get callId(): string | undefined {
-        return this._callId;
-    }
-    /**
      * Returns all the call memberships for a room, oldest first
      */
-    public static callMembershipsForRoom(room: Room): CallMembership[] {
+    private static callMembershipsForRoom(room: Room): CallMembership[] {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
@@ -312,15 +265,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return callMemberships;
     }
 
-    /**
-     * Return the MatrixRTC session for the room, whether there are currently active members or not
-     */
-    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
-
-        return new MatrixRTCSession(client, room, callMemberships);
-    }
-
     private constructor(
         private readonly client: MatrixClient,
         public readonly room: Room,
@@ -333,12 +277,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this.setExpiryTimer();
     }
 
-    /*
-     * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
+    /**
+     * The callId (sessionId) of the call.
+     *
+     * It can be undefined since the callId is only known once the first membership joins.
+     * The callId is the property that, per definition, groups memberships into one call.
      */
-    public isJoined(): boolean {
-        return this.relativeExpiry !== undefined;
+    public get callId(): string | undefined {
+        return this._callId;
     }
 
     /**
@@ -366,22 +312,22 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * desired.
      * This method will return immediately and the session will be joined in the background.
      *
-     * @param fociActive - The object representing the active focus. (This depends on the focus type.)
+     * @param focusActive - The object representing the active focus. (This depends on the focus type.)
      * @param fociPreferred - The list of preferred foci this member proposes to use/knows/has access to.
      *                        For the livekit case this is a list of foci generated from the homeserver well-known, the current rtc session,
      *                        or optionally other room members homeserver well known.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
-        if (this.isJoined()) {
+    public joinRoomSession(fociPreferred: Focus[], focusActive?: Focus, joinConfig?: JoinSessionConfig): void {
+        if (this.memberMachine?.running) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         }
 
-        this.ownFocusActive = fociActive;
-        this.ownFociPreferred = fociPreferred;
+        this.memberMachine = new MatrixRTCSessionMemberMachine(this.room, joinConfig, fociPreferred, focusActive);
+        this.memberMachine.start();
+
         this.joinConfig = joinConfig;
-        this.relativeExpiry = this.membershipExpiryTimeout;
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
 
         logger.info(`Joining call session in room ${this.room.roomId} with manageMediaKeys=${this.manageMediaKeys}`);
@@ -391,7 +337,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
-        this.triggerCallMembershipEventUpdate();
+        // this.triggerCallMembershipEventUpdate();
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
@@ -406,7 +352,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @returns Whether the membership update was attempted and did not time out.
      */
     public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
-        if (!this.isJoined()) {
+        if (!this.memberMachine?.running) {
             logger.info(`Not joined to session in room ${this.room.roomId}: ignoring leave call`);
             return false;
         }
@@ -433,36 +379,82 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.joinConfig = undefined;
-        this.relativeExpiry = undefined;
-        this.ownFocusActive = undefined;
         this.manageMediaKeys = false;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         if (timeout) {
             // The sleep promise returns the string 'timeout' and the membership update void
             // A success implies that the membership update was quicker then the timeout.
-            const raceResult = await Promise.race([this.triggerCallMembershipEventUpdate(), sleep(timeout, "timeout")]);
+            const raceResult = await Promise.race([this.memberMachine?.stop(), sleep(timeout, "timeout")]);
             return raceResult !== "timeout";
         } else {
-            await this.triggerCallMembershipEventUpdate();
+            await this.memberMachine?.stop();
             return true;
         }
     }
 
     public getActiveFocus(): Focus | undefined {
-        if (this.ownFocusActive && isLivekitFocusActive(this.ownFocusActive)) {
+        if (this.memberMachine?.ownFocusActive && isLivekitFocusActive(this.memberMachine.ownFocusActive)) {
             // A livekit active focus
-            if (this.ownFocusActive.focus_selection === "oldest_membership") {
+            if (this.memberMachine.ownFocusActive.focus_selection === "oldest_membership") {
                 const oldestMembership = this.getOldestMembership();
                 return oldestMembership?.getPreferredFoci()[0];
             }
         } else {
+            // We do not have our own membership created yet (there is no running memberMachine)
+            // So we return the active focus of the oldest member.
+            const oldestMembership = this.getOldestMembership();
+            if (oldestMembership?.getFocusSelection() === "oldest_membership") {
+                return oldestMembership.getPreferredFoci()[0];
+            }
             // We do not understand the membership format (could be legacy). We default to oldestMembership
             // Once there are other methods this is a hard error!
-            const oldestMembership = this.getOldestMembership();
             return oldestMembership?.getPreferredFoci()[0];
         }
     }
+
+    public getOldestMembership(): CallMembership | undefined {
+        return this.memberships[0];
+    }
+
+    /**
+     *
+     * @deprecated This behaves the same as getActiveFocus. Having both is confusing.
+     */
+    public getFocusInUse(): Focus | undefined {
+        const oldestMembership = this.getOldestMembership();
+        if (oldestMembership?.getFocusSelection() === "oldest_membership") {
+            return oldestMembership.getPreferredFoci()[0];
+        }
+    }
+
+    // OTHER MEMBERSHIPS
+
+    /**
+     * Sets a timer for the soonest membership expiry
+     */
+    private setExpiryTimer(): void {
+        if (this.expiryTimeout) {
+            clearTimeout(this.expiryTimeout);
+            this.expiryTimeout = undefined;
+        }
+
+        let soonestExpiry;
+        for (const membership of this.memberships) {
+            const thisExpiry = membership.getMsUntilExpiry();
+            // If getMsUntilExpiry is undefined we have a MSC4143 (MatrixRTC) compliant event - it never expires
+            // but will be reliably resent on disconnect.
+            if (thisExpiry !== undefined && (soonestExpiry === undefined || thisExpiry < soonestExpiry)) {
+                soonestExpiry = thisExpiry;
+            }
+        }
+
+        if (soonestExpiry != undefined) {
+            this.expiryTimeout = setTimeout(this.onMembershipUpdate, soonestExpiry);
+        }
+    }
+
+    /// ENCRYPTION!!!
 
     /**
      * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
@@ -638,7 +630,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
         this.lastEncryptionKeyUpdateRequest = Date.now();
 
-        if (!this.isJoined()) return;
+        if (!this.memberMachine?.running) return;
 
         logger.info(`Sending encryption keys event. indexToSend=${indexToSend}`);
 
@@ -700,41 +692,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
         }
     };
-
-    /**
-     * Sets a timer for the soonest membership expiry
-     */
-    private setExpiryTimer(): void {
-        if (this.expiryTimeout) {
-            clearTimeout(this.expiryTimeout);
-            this.expiryTimeout = undefined;
-        }
-
-        let soonestExpiry;
-        for (const membership of this.memberships) {
-            const thisExpiry = membership.getMsUntilExpiry();
-            // If getMsUntilExpiry is undefined we have a MSC4143 (MatrixRTC) compliant event - it never expires
-            // but will be reliably resent on disconnect.
-            if (thisExpiry !== undefined && (soonestExpiry === undefined || thisExpiry < soonestExpiry)) {
-                soonestExpiry = thisExpiry;
-            }
-        }
-
-        if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.onMembershipUpdate, soonestExpiry);
-        }
-    }
-
-    public getOldestMembership(): CallMembership | undefined {
-        return this.memberships[0];
-    }
-
-    public getFocusInUse(): Focus | undefined {
-        const oldestMembership = this.getOldestMembership();
-        if (oldestMembership?.getFocusSelection() === "oldest_membership") {
-            return oldestMembership.getPreferredFoci()[0];
-        }
-    }
 
     /**
      * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
@@ -821,7 +778,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    public onMembershipUpdate = (): void => {
+    public onMembershipUpdate = async (): Promise<void> => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
@@ -835,14 +792,16 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Memberships for call in room ${this.room.roomId} have changed: emitting`);
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
 
-            if (this.isJoined() && !this.memberships.some(this.isMyMembership)) {
+            if (this.memberMachine?.running && !this.memberships.some(this.isMyMembership)) {
                 logger.warn("Missing own membership: force re-join");
                 // TODO: Should this be awaited? And is there anything to tell the focus?
-                this.triggerCallMembershipEventUpdate();
+                // this.triggerCallMembershipEventUpdate();
+                await this.memberMachine?.stop();
+                await this.memberMachine?.start();
             }
         }
 
-        if (this.manageMediaKeys && this.isJoined()) {
+        if (this.manageMediaKeys && this.memberMachine?.running) {
             const oldMembershipIds = new Set(
                 oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
             );
@@ -896,195 +855,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         );
     }
 
-    /**
-     * Constructs our own membership
-     */
-    private makeMyMembership(deviceId: string): SessionMembershipData {
-        return {
-            call_id: "",
-            scope: "m.room",
-            application: "m.call",
-            device_id: deviceId,
-            expires: this.relativeExpiry,
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-            foci_preferred: this.ownFociPreferred ?? [],
-        };
-    }
-
-    private makeNewMembership(deviceId: string): SessionMembershipData | {} {
-        // If we're joined, add our own
-        if (this.isJoined()) {
-            return this.makeMyMembership(deviceId);
-        }
-        return {};
-    }
-
-    private triggerCallMembershipEventUpdate = async (): Promise<void> => {
-        // TODO: Should this await on a shared promise?
-        if (this.updateCallMembershipRunning) {
-            this.needCallMembershipUpdate = true;
-            return;
-        }
-
-        this.updateCallMembershipRunning = true;
-        try {
-            // if anything triggers an update while the update is running, do another update afterwards
-            do {
-                this.needCallMembershipUpdate = false;
-                await this.updateCallMembershipEvent();
-            } while (this.needCallMembershipUpdate);
-        } finally {
-            this.updateCallMembershipRunning = false;
-        }
-    };
-
-    private async updateCallMembershipEvent(): Promise<void> {
-        if (this.memberEventTimeout) {
-            clearTimeout(this.memberEventTimeout);
-            this.memberEventTimeout = undefined;
-        }
-
-        const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        if (!roomState) throw new Error("Couldn't get room state for room " + this.room.roomId);
-
-        const localUserId = this.client.getUserId();
-        const localDeviceId = this.client.getDeviceId();
-        if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
-
-        let newContent: {} | SessionMembershipData = {};
-        // TODO: add back expiary logic to non-legacy events
-        // previously we checked here if the event is timed out and scheduled a check if not.
-        // maybe there is a better way.
-        newContent = this.makeNewMembership(localDeviceId);
-
-        try {
-            if (this.isJoined()) {
-                const stateKey = this.makeMembershipStateKey(localUserId, localDeviceId);
-                const prepareDelayedDisconnection = async (): Promise<void> => {
-                    try {
-                        const res = await resendIfRateLimited(() =>
-                            this.client._unstable_sendDelayedStateEvent(
-                                this.room.roomId,
-                                {
-                                    delay: this.membershipServerSideExpiryTimeout,
-                                },
-                                EventType.GroupCallMemberPrefix,
-                                {}, // leave event
-                                stateKey,
-                            ),
-                        );
-                        this.disconnectDelayId = res.delay_id;
-                    } catch (e) {
-                        if (
-                            e instanceof MatrixError &&
-                            e.errcode === "M_UNKNOWN" &&
-                            e.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
-                        ) {
-                            const maxDelayAllowed = e.data["org.matrix.msc4140.max_delay"];
-                            if (
-                                typeof maxDelayAllowed === "number" &&
-                                this.membershipServerSideExpiryTimeout > maxDelayAllowed
-                            ) {
-                                this.membershipServerSideExpiryTimeoutOverride = maxDelayAllowed;
-                                return prepareDelayedDisconnection();
-                            }
-                        }
-                        logger.error("Failed to prepare delayed disconnection event:", e);
-                    }
-                };
-                await prepareDelayedDisconnection();
-                // Send join event _after_ preparing the delayed disconnection event
-                await resendIfRateLimited(() =>
-                    this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, newContent, stateKey),
-                );
-                // If sending state cancels your own delayed state, prepare another delayed state
-                // TODO: Remove this once MSC4140 is stable & doesn't cancel own delayed state
-                if (this.disconnectDelayId !== undefined) {
-                    try {
-                        const knownDisconnectDelayId = this.disconnectDelayId;
-                        await resendIfRateLimited(() =>
-                            this.client._unstable_updateDelayedEvent(
-                                knownDisconnectDelayId,
-                                UpdateDelayedEventAction.Restart,
-                            ),
-                        );
-                    } catch (e) {
-                        if (e instanceof MatrixError && e.errcode === "M_NOT_FOUND") {
-                            // If we get a M_NOT_FOUND we prepare a new delayed event.
-                            // In other error cases we do not want to prepare anything since we do not have the guarantee, that the
-                            // future is not still running.
-                            logger.warn("Failed to update delayed disconnection event, prepare it again:", e);
-                            this.disconnectDelayId = undefined;
-                            await prepareDelayedDisconnection();
-                        }
-                    }
-                }
-                if (this.disconnectDelayId !== undefined) {
-                    this.scheduleDelayDisconnection();
-                }
-            } else {
-                // Not joined
-                let sentDelayedDisconnect = false;
-                if (this.disconnectDelayId !== undefined) {
-                    try {
-                        const knownDisconnectDelayId = this.disconnectDelayId;
-                        await resendIfRateLimited(() =>
-                            this.client._unstable_updateDelayedEvent(
-                                knownDisconnectDelayId,
-                                UpdateDelayedEventAction.Send,
-                            ),
-                        );
-                        sentDelayedDisconnect = true;
-                    } catch (e) {
-                        logger.error("Failed to send our delayed disconnection event:", e);
-                    }
-                    this.disconnectDelayId = undefined;
-                }
-                if (!sentDelayedDisconnect) {
-                    await resendIfRateLimited(() =>
-                        this.client.sendStateEvent(
-                            this.room.roomId,
-                            EventType.GroupCallMemberPrefix,
-                            {},
-                            this.makeMembershipStateKey(localUserId, localDeviceId),
-                        ),
-                    );
-                }
-            }
-            logger.info("Sent updated call member event.");
-        } catch (e) {
-            const resendDelay = this.callMemberEventRetryDelayMinimum + Math.random() * this.callMemberEventRetryJitter;
-            logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
-            await sleep(resendDelay);
-            await this.triggerCallMembershipEventUpdate();
-        }
-    }
-
-    private scheduleDelayDisconnection(): void {
-        this.memberEventTimeout = setTimeout(this.delayDisconnection, this.membershipKeepAlivePeriod);
-    }
-
-    private readonly delayDisconnection = async (): Promise<void> => {
-        try {
-            const knownDisconnectDelayId = this.disconnectDelayId!;
-            await resendIfRateLimited(() =>
-                this.client._unstable_updateDelayedEvent(knownDisconnectDelayId, UpdateDelayedEventAction.Restart),
-            );
-            this.scheduleDelayDisconnection();
-        } catch (e) {
-            logger.error("Failed to delay our disconnection event:", e);
-        }
-    };
-
-    private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
-        const stateKey = `${localUserId}_${localDeviceId}`;
-        if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
-            return stateKey;
-        } else {
-            return `_${stateKey}`;
-        }
-    }
-
     private onRotateKeyTimeout = (): void => {
         if (!this.manageMediaKeys) return;
 
@@ -1095,32 +865,4 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         // important we get it out to others as soon as we can.
         this.sendEncryptionKeysEvent(newKeyIndex);
     };
-}
-
-async function resendIfRateLimited<T>(func: () => Promise<T>, numRetriesAllowed: number = 1): Promise<T> {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-        try {
-            return await func();
-        } catch (e) {
-            if (numRetriesAllowed > 0 && e instanceof HTTPError && e.isRateLimitError()) {
-                numRetriesAllowed--;
-                let resendDelay: number;
-                const defaultMs = 5000;
-                try {
-                    resendDelay = e.getRetryAfterMs() ?? defaultMs;
-                    logger.info(`Rate limited by server, retrying in ${resendDelay}ms`);
-                } catch (e) {
-                    logger.warn(
-                        `Error while retrieving a rate-limit retry delay, retrying after default delay of ${defaultMs}`,
-                        e,
-                    );
-                    resendDelay = defaultMs;
-                }
-                await sleep(resendDelay);
-            } else {
-                throw e;
-            }
-        }
-    }
 }
