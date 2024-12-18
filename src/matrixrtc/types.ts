@@ -26,6 +26,11 @@ export interface EncryptionKeysEventContent {
     sent_ts?: number;
 }
 
+export interface EncryptionKeysToDeviceContent extends EncryptionKeysEventContent {
+    room_id?: string;
+    sent_ts: number;
+}
+
 export type CallNotifyType = "ring" | "notify";
 
 export interface ICallNotifyContent {
