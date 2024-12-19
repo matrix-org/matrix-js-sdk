@@ -4256,7 +4256,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The event type
      * @returns The contents of the given account data event
      */
-    public getAccountData(eventType: string): MatrixEvent | undefined {
+    public getAccountData<K extends keyof AccountDataEvents>(eventType: K): MatrixEvent | undefined {
         return this.store.getAccountData(eventType);
     }
 
@@ -4268,7 +4268,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: The contents of the given account data event.
      * @returns Rejects: with an error response.
      */
-    public async getAccountDataFromServer<T extends { [k: string]: any }>(eventType: string): Promise<T | null> {
+    public async getAccountDataFromServer<K extends keyof AccountDataEvents>(
+        eventType: K,
+    ): Promise<AccountDataEvents[K] | null> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -4276,7 +4278,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             // The network version below returns just the content, so this branch
             // does the same to match.
-            return event.getContent<T>();
+            return event.getContent<AccountDataEvents[K]>();
         }
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
@@ -4315,7 +4317,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The array of users that are ignored (empty if none)
      */
     public getIgnoredUsers(): string[] {
-        const event = this.getAccountData("m.ignored_user_list");
+        const event = this.getAccountData(EventType.IgnoredUserList);
         if (!event?.getContent()["ignored_users"]) return [];
         return Object.keys(event.getContent()["ignored_users"]);
     }
