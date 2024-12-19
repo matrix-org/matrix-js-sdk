@@ -22,9 +22,9 @@ export type XOR<T, U> = T | U extends object ? (Without<T, U> & U) | (Without<U,
 export type Writeable<T> = { -readonly [P in keyof T]: T[P] };
 
 /**
- * Returns a union type of the keys of the input object type whose values are assignable to the given type.
+ * Returns a union type of the keys of the input Object type whose values are assignable to the given Item type.
  * Based on https://stackoverflow.com/a/57862073
  */
-export type Assignable<Obj, Item> = {
-    [Key in keyof Obj]: Obj[Key] extends Item ? Key : never;
-}[keyof Obj];
+export type Assignable<Object, Item> = {
+    [Key in keyof Object]: Object[Key] extends Item ? Key : never;
+}[keyof Object];
