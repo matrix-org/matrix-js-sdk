@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import promiseRetry from "p-retry";
+import { AbortError } from "p-retry";
 
 import { MatrixClient } from "../client.ts";
 import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event.ts";
@@ -150,7 +150,7 @@ export class MSC3089TreeSpace {
             await this.client.invite(this.roomId, userId).catch((e) => {
                 // We don't want to retry permission errors forever...
                 if (e?.errcode === "M_FORBIDDEN") {
-                    throw new promiseRetry.AbortError(e);
+                    throw new AbortError(e);
                 }
                 throw e;
             });
