@@ -299,7 +299,10 @@ export class IgnoredInvites {
         const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
         cb(ignoreInvitesPolicies);
         policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;
-        await this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name, policies);
+        await this.client.setAccountData(
+            POLICIES_ACCOUNT_EVENT_TYPE.name,
+            policies as IgnoreInvitesContent & UnstableIgnoreInvitesContent,
+        );
     }
 
     /**

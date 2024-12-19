@@ -4240,7 +4240,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setAccountData<K extends keyof AccountDataEvents>(
         eventType: K,
-        content: AccountDataEvents[K] | {},
+        content: AccountDataEvents[K] | Record<string, never>,
     ): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
