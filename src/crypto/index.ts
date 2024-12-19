@@ -77,7 +77,7 @@ import {
     AddSecretStorageKeyOpts,
     calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
-    SecretInfoKey,
+    SecretStorageKey,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
@@ -1195,21 +1195,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#store}.
      */
-    public storeSecret(name: SecretInfoKey, secret: string, keys?: string[]): Promise<void> {
+    public storeSecret(name: SecretStorageKey, secret: string, keys?: string[]): Promise<void> {
         return this.secretStorage.store(name, secret, keys);
     }
 
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#get}.
      */
-    public getSecret(name: SecretInfoKey): Promise<string | undefined> {
+    public getSecret(name: SecretStorageKey): Promise<string | undefined> {
         return this.secretStorage.get(name);
     }
 
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
      */
-    public isSecretStored(name: SecretInfoKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
+    public isSecretStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 

@@ -202,8 +202,14 @@ export interface SecretStorageCallbacks {
     ) => Promise<[string, Uint8Array] | null>;
 }
 
-export type SecretInfoKey = Assignable<AccountDataEvents, SecretInfo>;
+/**
+ * Account Data event types which can store secret-storage-encrypted information.
+ */
+export type SecretStorageKey = Assignable<AccountDataEvents, SecretInfo>;
 
+/**
+ * Account Data event content type for storing secret-storage-encrypted information.
+ */
 export interface SecretInfo {
     encrypted: {
         [keyId: string]: AESEncryptedSecretStoragePayload;
@@ -297,7 +303,7 @@ export interface ServerSideSecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    isStored(name: string): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null>;
+    isStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null>;
 
     /**
      * Get the current default key ID for encrypting secrets.
@@ -488,7 +494,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @param secret - The secret contents.
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
-    public async store(name: SecretInfoKey, secret: string, keys?: string[] | null): Promise<void> {
+    public async store(name: SecretStorageKey, secret: string, keys?: string[] | null): Promise<void> {
         const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {
@@ -536,7 +542,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @returns the decrypted contents of the secret, or "undefined" if `name` is not found in
      *    the user's account data.
      */
-    public async get(name: SecretInfoKey): Promise<string | undefined> {
+    public async get(name: SecretStorageKey): Promise<string | undefined> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
         if (!secretInfo) {
             return;
@@ -582,7 +588,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: SecretInfoKey): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null> {
+    public async isStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null> {
         // check if secret exists
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
         if (!secretInfo?.encrypted) return null;

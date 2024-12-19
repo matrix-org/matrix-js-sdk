@@ -233,6 +233,7 @@ import {
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
     AddSecretStorageKeyOpts,
+    SecretStorageKey,
     SecretStorageKeyDescription,
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
@@ -3071,7 +3072,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
      */
-    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
+    public isSecretStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 

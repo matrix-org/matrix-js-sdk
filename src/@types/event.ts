@@ -373,6 +373,9 @@ export interface StateEvents {
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
 }
 
+/**
+ * Mapped type from event type to content type for all specified global account_data events.
+ */
 export interface AccountDataEvents {
     [EventType.PushRules]: IPushRules;
     [EventType.Direct]: { [userId: string]: string[] };
@@ -383,4 +386,8 @@ export interface AccountDataEvents {
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
     [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
     "m.megolm_backup.v1": SecretInfo;
+    "m.cross_signing.master": SecretInfo;
+    "m.cross_signing.self_signing": SecretInfo;
+    "m.cross_signing.user_signing": SecretInfo;
+    "org.matrix.msc3814": SecretInfo;
 }
