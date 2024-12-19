@@ -70,7 +70,7 @@ function sign<T extends IObject | ICurve25519AuthData>(
 }
 
 declare module "../../../src/@types/event" {
-    interface AccountDataEvents {
+    interface SecretStorageAccountDataEvents {
         foo: SecretInfo;
     }
 }

@@ -20,11 +20,3 @@ export type NonEmptyArray<T> = [T, ...T[]];
 export type Without<T, U> = { [P in Exclude<keyof T, keyof U>]?: never };
 export type XOR<T, U> = T | U extends object ? (Without<T, U> & U) | (Without<U, T> & T) : T | U;
 export type Writeable<T> = { -readonly [P in keyof T]: T[P] };
-
-/**
- * Returns a union type of the keys of the input Object type whose values are assignable to the given Item type.
- * Based on https://stackoverflow.com/a/57862073
- */
-export type Assignable<Object, Item> = {
-    [Key in keyof Object]: Object[Key] extends Item ? Key : never;
-}[keyof Object];

@@ -29,19 +29,6 @@ export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(
     "org.matrix.msc3847.ignore.invites",
 );
 
-export interface Policies {
-    target?: string;
-    sources?: string[];
-}
-
-export interface IgnoreInvitesContent {
-    "m.ignore.invites": Policies;
-}
-
-export interface UnstableIgnoreInvitesContent {
-    "org.matrix.msc3847.ignore.invites": Policies;
-}
-
 /// The types of recommendations understood.
 export enum PolicyRecommendation {
     Ban = "m.ban",

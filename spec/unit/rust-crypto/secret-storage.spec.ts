@@ -22,7 +22,7 @@ import { ServerSideSecretStorage } from "../../../src/secret-storage";
 import { SecretInfo } from "../../../src/secret-storage.ts";
 
 declare module "../../../src/@types/event" {
-    interface AccountDataEvents {
+    interface SecretStorageAccountDataEvents {
         secretA: SecretInfo;
         secretB: SecretInfo;
         secretC: SecretInfo;

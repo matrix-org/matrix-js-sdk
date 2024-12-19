@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { MatrixClient } from "../client.ts";
-import { MatrixEvent } from "./event.ts";
+import { IContent, MatrixEvent } from "./event.ts";
 import { EventTimeline } from "./event-timeline.ts";
 import { Preset } from "../@types/partials.ts";
 import { globToRegexp } from "../utils.ts";
@@ -23,12 +23,9 @@ import { Room } from "./room.ts";
 import { EventType, StateEvents } from "../@types/event.ts";
 import {
     IGNORE_INVITES_ACCOUNT_EVENT_KEY,
-    IgnoreInvitesContent,
-    Policies,
     POLICIES_ACCOUNT_EVENT_TYPE,
     PolicyRecommendation,
     PolicyScope,
-    UnstableIgnoreInvitesContent,
 } from "./invites-ignorer-types.ts";
 
 export { IGNORE_INVITES_ACCOUNT_EVENT_KEY, POLICIES_ACCOUNT_EVENT_TYPE, PolicyRecommendation, PolicyScope };
@@ -299,10 +296,7 @@ export class IgnoredInvites {
         const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
         cb(ignoreInvitesPolicies);
         policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;
-        await this.client.setAccountData(
-            POLICIES_ACCOUNT_EVENT_TYPE.name,
-            policies as IgnoreInvitesContent & UnstableIgnoreInvitesContent,
-        );
+        await this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name, policies);
     }
 
     /**
@@ -310,24 +304,22 @@ export class IgnoredInvites {
      * object.
      */
     private getPoliciesAndIgnoreInvitesPolicies(): {
-        policies: Partial<IgnoreInvitesContent & UnstableIgnoreInvitesContent>;
-        ignoreInvitesPolicies: Policies;
+        policies: { [key: string]: any };
+        ignoreInvitesPolicies: { [key: string]: any };
     } {
-        let policies: Partial<IgnoreInvitesContent & UnstableIgnoreInvitesContent> = {};
+        let policies: IContent = {};
         for (const key of [POLICIES_ACCOUNT_EVENT_TYPE.name, POLICIES_ACCOUNT_EVENT_TYPE.altName]) {
             if (!key) {
                 continue;
             }
-            const value = this.client
-                .getAccountData(key)
-                ?.getContent<IgnoreInvitesContent | UnstableIgnoreInvitesContent>();
+            const value = this.client.getAccountData(key)?.getContent();
             if (value) {
                 policies = value;
                 break;
             }
         }
 
-        let ignoreInvitesPolicies: Policies = {};
+        let ignoreInvitesPolicies = {};
         let hasIgnoreInvitesPolicies = false;
         for (const key of [IGNORE_INVITES_ACCOUNT_EVENT_KEY.name, IGNORE_INVITES_ACCOUNT_EVENT_KEY.altName]) {
             if (!key) {

@@ -61,11 +61,7 @@ import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 import { LocalNotificationSettings } from "./local_notifications.ts";
 import { IPushRules } from "./PushRules.ts";
 import { SecretInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
-import {
-    IgnoreInvitesContent,
-    POLICIES_ACCOUNT_EVENT_TYPE,
-    UnstableIgnoreInvitesContent,
-} from "../models/invites-ignorer-types.ts";
+import { POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
 
 export enum EventType {
     // Room state events
@@ -380,7 +376,7 @@ export interface StateEvents {
 /**
  * Mapped type from event type to content type for all specified global account_data events.
  */
-export interface AccountDataEvents {
+export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [EventType.PushRules]: IPushRules;
     [EventType.Direct]: { [userId: string]: string[] };
     [EventType.IgnoredUserList]: { [userId: string]: {} };
@@ -388,13 +384,21 @@ export interface AccountDataEvents {
     "m.identity_server": { base_url: string | null };
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
     [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
+
+    // Invites-ignorer events
+    [POLICIES_ACCOUNT_EVENT_TYPE.name]: { [key: string]: any };
+    [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
+}
+
+/**
+ * Mapped type from event type to content type for all specified global events encrypted by secret storage.
+ *
+ * See https://spec.matrix.org/v1.13/client-server-api/#msecret_storagev1aes-hmac-sha2-1
+ */
+export interface SecretStorageAccountDataEvents {
     "m.megolm_backup.v1": SecretInfo;
     "m.cross_signing.master": SecretInfo;
     "m.cross_signing.self_signing": SecretInfo;
     "m.cross_signing.user_signing": SecretInfo;
     "org.matrix.msc3814": SecretInfo;
-
-    // Invites-ignorer events
-    [POLICIES_ACCOUNT_EVENT_TYPE.name]: UnstableIgnoreInvitesContent;
-    [POLICIES_ACCOUNT_EVENT_TYPE.altName]: IgnoreInvitesContent;
 }

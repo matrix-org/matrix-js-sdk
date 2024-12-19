@@ -31,7 +31,7 @@ import { SecretInfo } from "../../src/secret-storage.ts";
 import { AccountDataEvents } from "../../src";
 
 declare module "../../src/@types/event" {
-    interface AccountDataEvents {
+    interface SecretStorageAccountDataEvents {
         mysecret: SecretInfo;
     }
 }

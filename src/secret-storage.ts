@@ -28,8 +28,7 @@ import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
-import { AccountDataEvents } from "./@types/event.ts";
-import { Assignable } from "./@types/common.ts";
+import { AccountDataEvents, SecretStorageAccountDataEvents } from "./@types/event.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -205,7 +204,7 @@ export interface SecretStorageCallbacks {
 /**
  * Account Data event types which can store secret-storage-encrypted information.
  */
-export type SecretStorageKey = Assignable<AccountDataEvents, SecretInfo>;
+export type SecretStorageKey = keyof SecretStorageAccountDataEvents;
 
 /**
  * Account Data event content type for storing secret-storage-encrypted information.
