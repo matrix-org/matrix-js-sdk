@@ -184,7 +184,7 @@ export class CrossSigningInfo {
                 }
             }
         }
-        for (const type of ["self_signing", "user_signing"]) {
+        for (const type of ["self_signing", "user_signing"] as const) {
             intersect((await secretStorage.isStored(`m.cross_signing.${type}`)) || {});
         }
         return Object.keys(stored).length ? stored : null;

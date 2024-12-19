@@ -94,6 +94,12 @@ function convertQueryDictToMap(queryDict?: QueryDict): Map<string, string> {
     return new Map(Object.entries(queryDict).map(([k, v]) => [k, String(v)]));
 }
 
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        "im.vector.test": {};
+    }
+}
+
 type HttpLookup = {
     method: string;
     path: string;

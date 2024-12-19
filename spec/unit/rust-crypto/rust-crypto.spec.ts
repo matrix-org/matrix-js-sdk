@@ -30,6 +30,7 @@ import fetchMock from "fetch-mock-jest";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
+    AccountDataEvents,
     Device,
     DeviceVerification,
     encodeBase64,
@@ -1924,11 +1925,13 @@ class DummyAccountDataClient
         super();
     }
 
-    public async getAccountDataFromServer<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+    public async getAccountDataFromServer<K extends keyof AccountDataEvents>(
+        eventType: K,
+    ): Promise<AccountDataEvents[K] | null> {
         const ret = this.storage.get(eventType);
 
         if (eventType) {
-            return ret as T;
+            return ret;
         } else {
             return null;
         }

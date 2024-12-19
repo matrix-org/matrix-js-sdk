@@ -71,7 +71,7 @@ import {
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
 import { Device, DeviceMap } from "../models/device.ts";
-import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage.ts";
+import { SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorageKey, ServerSideSecretStorage } from "../secret-storage.ts";
 import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
@@ -770,7 +770,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     public async isSecretStorageReady(): Promise<boolean> {
         // make sure that the cross-signing keys are stored
-        const secretsToCheck = [
+        const secretsToCheck: SecretStorageKey[] = [
             "m.cross_signing.master",
             "m.cross_signing.user_signing",
             "m.cross_signing.self_signing",

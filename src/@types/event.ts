@@ -58,6 +58,14 @@ import {
 import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types.ts";
 import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls.ts";
 import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
+import { LocalNotificationSettings } from "./local_notifications.ts";
+import { IPushRules } from "./PushRules.ts";
+import { SecretInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
+import {
+    IgnoreInvitesContent,
+    POLICIES_ACCOUNT_EVENT_TYPE,
+    UnstableIgnoreInvitesContent,
+} from "../models/invites-ignorer-types.ts";
 
 export enum EventType {
     // Room state events
@@ -367,4 +375,26 @@ export interface StateEvents {
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+}
+
+/**
+ * Mapped type from event type to content type for all specified global account_data events.
+ */
+export interface AccountDataEvents {
+    [EventType.PushRules]: IPushRules;
+    [EventType.Direct]: { [userId: string]: string[] };
+    [EventType.IgnoredUserList]: { [userId: string]: {} };
+    "m.secret_storage.default_key": { key: string };
+    "m.identity_server": { base_url: string | null };
+    [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
+    [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
+    "m.megolm_backup.v1": SecretInfo;
+    "m.cross_signing.master": SecretInfo;
+    "m.cross_signing.self_signing": SecretInfo;
+    "m.cross_signing.user_signing": SecretInfo;
+    "org.matrix.msc3814": SecretInfo;
+
+    // Invites-ignorer events
+    [POLICIES_ACCOUNT_EVENT_TYPE.name]: UnstableIgnoreInvitesContent;
+    [POLICIES_ACCOUNT_EVENT_TYPE.altName]: IgnoreInvitesContent;
 }
