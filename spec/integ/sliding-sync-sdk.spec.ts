@@ -50,6 +50,10 @@ declare module "../../src/@types/event" {
         global_test: {};
         tester: {};
     }
+
+    interface RoomAccountDataEvents {
+        test: {};
+    }
 }
 
 describe("SlidingSyncSdk", () => {

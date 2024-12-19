@@ -143,6 +143,7 @@ import {
     MsgType,
     PUSHER_ENABLED,
     RelationType,
+    RoomAccountDataEvents,
     RoomCreateTypeField,
     RoomType,
     StateEvents,
@@ -4532,12 +4533,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * @param roomId - the id of the room to set the account data in
      * @param eventType - event type to be set
      * @param content - event content
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<{}> {
+    public setRoomAccountData<K extends keyof RoomAccountDataEvents>(
+        roomId: string,
+        eventType: K,
+        content: RoomAccountDataEvents[K] | Record<string, never>,
+    ): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId!,
             $roomId: roomId,

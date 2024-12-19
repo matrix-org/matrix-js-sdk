@@ -398,3 +398,12 @@ export interface AccountDataEvents {
     [POLICIES_ACCOUNT_EVENT_TYPE.name]: UnstableIgnoreInvitesContent;
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: IgnoreInvitesContent;
 }
+
+/**
+ * Mapped type from event type to content type for all specified room-scoped account_data events.
+ */
+export interface RoomAccountDataEvents {
+    [EventType.FullyRead]: { event_id: string };
+    [EventType.Tag]: { [tag: string]: { order: number } };
+    [EventType.SpaceOrder]: { order: string };
+}

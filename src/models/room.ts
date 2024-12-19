@@ -40,6 +40,7 @@ import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
     UNSIGNED_THREAD_ID_FIELD,
+    RoomAccountDataEvents,
 } from "../@types/event.ts";
 import { MatrixClient, PendingEventOrdering } from "../client.ts";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials.ts";
@@ -3247,7 +3248,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param type - the type of account_data event to be accessed
      * @returns the account_data event in question
      */
-    public getAccountData(type: EventType | string): MatrixEvent | undefined {
+    public getAccountData<K extends keyof RoomAccountDataEvents>(type: K): MatrixEvent | undefined {
         return this.accountData.get(type);
     }
 
