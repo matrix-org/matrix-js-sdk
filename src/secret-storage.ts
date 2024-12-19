@@ -209,6 +209,8 @@ export type SecretStorageKey = Assignable<AccountDataEvents, SecretInfo>;
 
 /**
  * Account Data event content type for storing secret-storage-encrypted information.
+ *
+ * See https://spec.matrix.org/v1.13/client-server-api/#msecret_storagev1aes-hmac-sha2-1 
  */
 export interface SecretInfo {
     encrypted: {
