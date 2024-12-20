@@ -59,7 +59,6 @@ import { BeaconEvent } from "./models/beacon.ts";
 import { IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
-import { Crypto } from "./crypto/index.ts";
 import { KnownMembership } from "./@types/membership.ts";
 
 const DEBUG = true;
@@ -116,13 +115,6 @@ function debuglog(...params: any[]): void {
  * Options passed into the constructor of SyncApi by MatrixClient
  */
 export interface SyncApiOptions {
-    /**
-     * Crypto manager
-     *
-     * @deprecated in favour of cryptoCallbacks
-     */
-    crypto?: Crypto;
-
     /**
      * If crypto is enabled on our client, callbacks into the crypto module
      */
@@ -642,9 +634,6 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
-        if (this.opts.lazyLoadMembers) {
-            this.syncOpts.crypto?.enableLazyLoading();
-        }
     };
 
     private storeClientOptions = async (): Promise<void> => {
@@ -880,12 +869,6 @@ export class SyncApi {
                 catchingUp: this.catchingUp,
             };
 
-            if (this.syncOpts.crypto) {
-                // tell the crypto module we're about to process a sync
-                // response
-                await this.syncOpts.crypto.onSyncWillProcess(syncEventData);
-            }
-
             try {
                 await this.processSyncResponse(syncEventData, data);
             } catch (e) {
@@ -920,15 +903,6 @@ export class SyncApi {
             this.updateSyncState(SyncState.Syncing, syncEventData);
 
             if (this.client.store.wantsSave()) {
-                // We always save the device list (if it's dirty) before saving the sync data:
-                // this means we know the saved device list data is at least as fresh as the
-                // stored sync data which means we don't have to worry that we may have missed
-                // device changes. We can also skip the delay since we're not calling this very
-                // frequently (and we don't really want to delay the sync for it).
-                if (this.syncOpts.crypto) {
-                    await this.syncOpts.crypto.saveDeviceList(0);
-                }
-
                 // tell databases that everything is now in a consistent state and can be saved.
                 await this.client.store.save();
             }
