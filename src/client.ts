@@ -6217,7 +6217,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         let params: Record<string, string | string[]> | undefined = undefined;
         if (this.clientOpts?.lazyLoadMembers) {
-            params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
+            params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER) };
         }
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
@@ -6295,7 +6295,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             limit: "0",
         };
         if (this.clientOpts?.lazyLoadMembers) {
-            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER);
         }
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
@@ -6475,7 +6475,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 dir: "b",
             };
             if (this.clientOpts?.lazyLoadMembers) {
-                params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+                params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER);
             }
 
             const res = await this.http.authedRequest<IMessagesResponse>(Method.Get, messagesPath, params);
@@ -6520,7 +6520,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.clientOpts?.lazyLoadMembers) {
             // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
             // so the timelineFilter doesn't get written into it below
-            filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
+            filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER);
         }
         if (timelineFilter) {
             // XXX: it's horrific that /messages' filter parameter doesn't match
@@ -6566,10 +6566,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         let filter: IRoomEventFilter = {};
         if (this.clientOpts?.lazyLoadMembers) {
-            // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
+            // create a shallow copy of LAZY_LOADING_MESSAGES_REDUNDANT_FILTER,
             // so the timelineFilter doesn't get written into it below
             filter = {
-                ...Filter.LAZY_LOADING_MESSAGES_FILTER,
+                ...Filter.LAZY_LOADING_MESSAGES_REDUNDANT_FILTER,
             };
         }
         if (timelineFilter) {
