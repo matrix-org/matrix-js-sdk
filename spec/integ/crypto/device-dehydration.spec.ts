@@ -17,11 +17,12 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
 
-import { createClient, ClientEvent, MatrixClient, MatrixEvent } from "../../../src";
+import { ClientEvent, createClient, MatrixClient, MatrixEvent } from "../../../src";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { DehydratedDevicesEvents } from "../../../src/crypto-api";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
@@ -39,6 +40,29 @@ describe("Device dehydration", () => {
         });
 
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
+
+        const dehydratedDevices = matrixClient.getCrypto()!.dehydratedDevices();
+        let creationEventCount = 0;
+        let pickleKeyCachedEventCount = 0;
+        let rehydrationStartedCount = 0;
+        let rehydrationEndedCount = 0;
+        let rehydrationProgressEvent = 0;
+
+        dehydratedDevices.on(DehydratedDevicesEvents.DeviceCreated, () => {
+            creationEventCount++;
+        });
+        dehydratedDevices.on(DehydratedDevicesEvents.PickleKeyCached, () => {
+            pickleKeyCachedEventCount++;
+        });
+        dehydratedDevices.on(DehydratedDevicesEvents.RehydrationStarted, () => {
+            rehydrationStartedCount++;
+        });
+        dehydratedDevices.on(DehydratedDevicesEvents.RehydrationEnded, () => {
+            rehydrationEndedCount++;
+        });
+        dehydratedDevices.on(DehydratedDevicesEvents.RehydrationProgress, (roomKeyCount, toDeviceCount) => {
+            rehydrationProgressEvent++;
+        });
 
         // count the number of times the dehydration key gets set
         let setDehydrationCount = 0;
@@ -74,6 +98,8 @@ describe("Device dehydration", () => {
         await crypto.startDehydration();
 
         expect(dehydrationCount).toEqual(1);
+        expect(creationEventCount).toEqual(1);
+        expect(pickleKeyCachedEventCount).toEqual(1);
 
         // a week later, we should have created another dehydrated device
         const dehydrationPromise = new Promise<void>((resolve, reject) => {
@@ -81,7 +107,10 @@ describe("Device dehydration", () => {
         });
         jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
+
+        expect(pickleKeyCachedEventCount).toEqual(1);
         expect(dehydrationCount).toEqual(2);
+        expect(creationEventCount).toEqual(2);
 
         // restart dehydration -- rehydrate the device that we created above,
         // and create a new dehydrated device.  We also set `createNewKey`, so
@@ -112,6 +141,12 @@ describe("Device dehydration", () => {
 
         expect(setDehydrationCount).toEqual(2);
         expect(eventsResponse.mock.calls).toHaveLength(2);
+
+        expect(rehydrationStartedCount).toEqual(1);
+        expect(rehydrationEndedCount).toEqual(1);
+        expect(creationEventCount).toEqual(3);
+        expect(rehydrationProgressEvent).toEqual(1);
+        expect(pickleKeyCachedEventCount).toEqual(2);
 
         matrixClient.stopClient();
     });

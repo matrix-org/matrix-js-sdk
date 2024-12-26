@@ -31,6 +31,7 @@ import {
 } from "./keybackup.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { MatrixEvent } from "../models/event.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 /**
  * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.
@@ -616,11 +617,17 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * Get the API object for interacting with dehydrated devices.
+     */
+    dehydratedDevices(): DehydratedDevicesAPI;
+
+    /**
      * Returns whether MSC3814 dehydrated devices are supported by the crypto
      * backend and by the server.
      *
      * This should be called before calling `startDehydration`, and if this
      * returns `false`, `startDehydration` should not be called.
+     *
      */
     isDehydrationSupported(): Promise<boolean>;
 
@@ -1241,6 +1248,45 @@ export interface OwnDeviceKeys {
     ed25519: string;
     /** Public part of the Curve25519 identity key for the current device, base64 encoded. */
     curve25519: string;
+}
+
+export enum DehydratedDevicesEvents {
+    /** Emitted when a new dehydrated device is created locally */
+    DeviceCreated = "DeviceCreated",
+    /** Emitted when a new dehydrated device is successfully uploaded to the server */
+    DeviceUploaded = "DeviceUploaded",
+    /** Emitted when rehydration has started */
+    RehydrationStarted = "RehydrationStarted",
+    /** Emitted when rehydration has finished */
+    RehydrationEnded = "RehydrationEnded",
+    /** Emitted during rehydration, signalling the current `roomKeyCount` and `toDeviceCount` */
+    RehydrationProgress = "RehydrationProgress",
+    /** Emitted when a dehydrated device key has been cached */
+    PickleKeyCached = "PickleKeyCached",
+    /** Emitted when an error occurred during rotation of the dehydrated device */
+    SchedulingError = "SchedulingError",
+}
+
+export type DehydratedDevicesEventsMap = {
+    [DehydratedDevicesEvents.DeviceCreated]: () => void;
+    [DehydratedDevicesEvents.DeviceUploaded]: () => void;
+    [DehydratedDevicesEvents.RehydrationStarted]: () => void;
+    [DehydratedDevicesEvents.RehydrationEnded]: () => void;
+    [DehydratedDevicesEvents.RehydrationProgress]: (roomKeyCount: number, toDeviceCount: number) => void;
+    [DehydratedDevicesEvents.PickleKeyCached]: () => void;
+    [DehydratedDevicesEvents.SchedulingError]: (msg: string) => void;
+};
+
+export abstract class DehydratedDevicesAPI extends TypedEventEmitter<
+    DehydratedDevicesEvents,
+    DehydratedDevicesEventsMap
+> {
+    protected constructor() {
+        super();
+    }
+
+    public abstract isSupported(): Promise<boolean>;
+    public abstract start(createNewKey?: boolean): Promise<void>;
 }
 
 export * from "./verification.ts";

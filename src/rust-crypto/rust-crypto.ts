@@ -67,6 +67,7 @@ import {
     CryptoEventHandlerMap,
     KeyBackupRestoreOpts,
     KeyBackupRestoreResult,
+    DehydratedDevicesAPI,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -1404,6 +1405,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("Device dehydration requires cross-signing and secret storage to be set up");
         }
         return await this.dehydratedDeviceManager.start(createNewKey);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#dehydratedDevices}.
+     */
+    public dehydratedDevices(): DehydratedDevicesAPI {
+        return this.dehydratedDeviceManager;
     }
 
     /**
