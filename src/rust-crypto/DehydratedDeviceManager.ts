@@ -68,8 +68,6 @@ const DEHYDRATION_INTERVAL = 7 * 24 * 60 * 60 * 1000;
  * @internal
  */
 export class DehydratedDeviceManager {
-    /** the secret key used for dehydrating and rehydrating */
-    private key?: Uint8Array;
     /** the ID of the interval for periodically replacing the dehydrated device */
     private intervalId?: ReturnType<typeof setInterval>;
 
@@ -81,6 +79,14 @@ export class DehydratedDeviceManager {
         private readonly secretStorage: ServerSideSecretStorage,
     ) {}
 
+    private async getCachedKey(): Promise<RustSdkCryptoJs.DehydratedDeviceKey | undefined> {
+        return await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey();
+    }
+
+    private async cacheKey(key: RustSdkCryptoJs.DehydratedDeviceKey): Promise<void> {
+        await this.olmMachine.dehydratedDevices().saveDehydratedDeviceKey(key);
+        this.emit(DehydratedDevicesEvents.PickleKeyCached);
+    }
     /**
      * Return whether the server supports dehydrated devices.
      */
@@ -153,10 +159,10 @@ export class DehydratedDeviceManager {
      * Creates a new key and stores it in secret storage.
      */
     public async resetKey(): Promise<void> {
-        const key = new Uint8Array(32);
-        globalThis.crypto.getRandomValues(key);
-        await this.secretStorage.store(SECRET_STORAGE_NAME, encodeUnpaddedBase64(key));
-        this.key = key;
+        const key = RustSdkCryptoJs.DehydratedDeviceKey.createRandomKey();
+        await this.secretStorage.store(SECRET_STORAGE_NAME, key.toBase64());
+        // also cache it
+        await this.cacheKey(key);
     }
 
     /**
@@ -166,8 +172,9 @@ export class DehydratedDeviceManager {
      *
      * @returns the key, if available, or `null` if no key is available
      */
-    private async getKey(create: boolean): Promise<Uint8Array | null> {
-        if (this.key === undefined) {
+    private async getKey(create: boolean): Promise<RustSdkCryptoJs.DehydratedDeviceKey | null> {
+        const cachedKey = await this.getCachedKey();
+        if (!cachedKey) {
             const keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME);
             if (keyB64 === undefined) {
                 if (!create) {
@@ -175,10 +182,12 @@ export class DehydratedDeviceManager {
                 }
                 await this.resetKey();
             } else {
-                this.key = decodeBase64(keyB64);
+                const bytes = decodeBase64(keyB64);
+                const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
+                await this.cacheKey(key);
             }
         }
-        return this.key!;
+        return (await this.getCachedKey())!;
     }
 
     /**
@@ -190,7 +199,7 @@ export class DehydratedDeviceManager {
      * Returns whether or not a dehydrated device was found.
      */
     public async rehydrateDeviceIfAvailable(): Promise<boolean> {
-        const key = await this.getKey(false);
+        const key = (await this.getCachedKey()) || (await this.getKey(false));
         if (!key) {
             return false;
         }
@@ -267,7 +276,7 @@ export class DehydratedDeviceManager {
      * Creates and stores a new key in secret storage if none is available.
      */
     public async createAndUploadDehydratedDevice(): Promise<void> {
-        const key = (await this.getKey(true))!;
+        const key = ((await this.getCachedKey()) || (await this.getKey(true)))!;
 
         const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
         const request = await dehydratedDevice.keysForUpload("Dehydrated device", key);
