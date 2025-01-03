@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
-import { deepCopy, promiseTry } from "../utils";
-import { exists as idbExists } from "../indexeddb-helpers";
-import { logger } from "../logger";
-import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix";
-import { ISavedSync } from "./index";
-import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator.ts";
+import { deepCopy, promiseTry } from "../utils.ts";
+import { exists as idbExists } from "../indexeddb-helpers.ts";
+import { logger } from "../logger.ts";
+import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix.ts";
+import { ISavedSync } from "./index.ts";
+import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend.ts";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 
 type DbMigration = (db: IDBDatabase) => void;
 const DB_MIGRATIONS: DbMigration[] = [
@@ -71,7 +71,7 @@ function selectQuery<T>(
     return new Promise((resolve, reject) => {
         const results: T[] = [];
         query.onerror = (): void => {
-            reject(new Error("Query failed: " + query.error));
+            reject(new Error("Query failed: " + query.error?.name));
         };
         // collect results
         query.onsuccess = (): void => {
@@ -360,7 +360,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 // in firefox, with indexedDB disabled, this fails with a
                 // DOMError. We treat this as non-fatal, so that we can still
                 // use the app.
-                logger.warn(`unable to delete js-sdk store indexeddb: ${req.error}`);
+                logger.warn(`unable to delete js-sdk store indexeddb: ${req.error?.name}`);
                 resolve();
             };
 

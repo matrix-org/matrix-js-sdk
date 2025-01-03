@@ -16,8 +16,8 @@ limitations under the License.
 
 import { OlmMachine, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { LogSpan } from "../logger";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { LogSpan } from "../logger.ts";
 
 /**
  * KeyClaimManager: linearises calls to OlmMachine.getMissingSessions to avoid races
@@ -50,7 +50,7 @@ export class KeyClaimManager {
      * Given a list of users, attempt to ensure that we have Olm Sessions active with each of their devices
      *
      * If we don't have an active olm session, we will claim a one-time key and start one.
-     *
+     * @param logger - logger to use
      * @param userList - list of userIDs to claim
      */
     public ensureSessionsForUsers(logger: LogSpan, userList: Array<UserId>): Promise<void> {
@@ -73,7 +73,10 @@ export class KeyClaimManager {
             throw new Error(`Cannot ensure Olm sessions: shutting down`);
         }
         logger.info("Checking for missing Olm sessions");
-        const claimRequest = await this.olmMachine.getMissingSessions(userList);
+        // By passing the userId array to rust we transfer ownership of the items to rust, causing
+        // them to be invalidated on the JS side as soon as the method is called.
+        // As we haven't created the `userList` let's clone the users, to not break the caller from re-using it.
+        const claimRequest = await this.olmMachine.getMissingSessions(userList.map((u) => u.clone()));
         if (claimRequest) {
             logger.info("Making /keys/claim request");
             await this.outgoingRequestProcessor.makeOutgoingRequest(claimRequest);

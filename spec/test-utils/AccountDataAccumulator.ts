@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import fetchMock from "fetch-mock-jest";
-import { MockOptionsMethodPut } from "fetch-mock";
 
 import { ISyncResponder } from "./SyncResponder";
 
@@ -28,7 +27,7 @@ export class AccountDataAccumulator {
      * Will be updated when fetchMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
      * Will be used by `sendSyncResponseWithUpdatedAccountData`
      */
-    public accountDataEvents: Map<String, any> = new Map();
+    public accountDataEvents: Map<string, any> = new Map();
 
     /**
      * Intercept requests to set a particular type of account data.
@@ -40,7 +39,10 @@ export class AccountDataAccumulator {
      * @param opts - options to pass to fetchMock
      * @returns a Promise which will resolve (with the content of the account data) once it is set.
      */
-    public interceptSetAccountData(accountDataType: string, opts?: MockOptionsMethodPut): Promise<any> {
+    public interceptSetAccountData(
+        accountDataType: string,
+        opts?: Parameters<(typeof fetchMock)["put"]>[2],
+    ): Promise<any> {
         return new Promise((resolve) => {
             // Called when the cross signing key is uploaded
             fetchMock.put(
@@ -99,7 +101,7 @@ export class AccountDataAccumulator {
                     })),
                 },
             });
-        } catch (err) {
+        } catch {
             // Might fail with "Cannot queue more than one /sync response" if called too often.
             // It's ok if it fails here, the sync response is cumulative and will contain
             // the latest account data.

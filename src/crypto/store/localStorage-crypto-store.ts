@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../logger";
-import { MemoryCryptoStore } from "./memory-crypto-store";
+import { logger } from "../../logger.ts";
+import { MemoryCryptoStore } from "./memory-crypto-store.ts";
 import {
     CryptoStore,
     IDeviceData,
@@ -28,12 +28,12 @@ import {
     Mode,
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
-} from "./base";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { ICrossSigningKey } from "../../client";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { safeSet } from "../../utils";
+} from "./base.ts";
+import { IOlmDevice } from "../algorithms/megolm.ts";
+import { IRoomEncryption } from "../RoomList.ts";
+import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { safeSet } from "../../utils.ts";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -162,7 +162,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         func: (session: ISessionInfo) => void,
     ): void {
         const sessions = this._getEndToEndSessions(deviceKey);
-        func(sessions[sessionId] || {});
+        func(sessions[sessionId] ?? {});
     }
 
     public getEndToEndSessions(
@@ -170,7 +170,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void {
-        func(this._getEndToEndSessions(deviceKey) || {});
+        func(this._getEndToEndSessions(deviceKey) ?? {});
     }
 
     public getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo) => void): void {
@@ -531,8 +531,8 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         setJsonItem(this.store, KEY_END_TO_END_ACCOUNT, accountPickle);
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
-        const keys = getJsonItem<Record<string, ICrossSigningKey>>(this.store, KEY_CROSS_SIGNING_KEYS);
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void {
+        const keys = getJsonItem<Record<string, CrossSigningKeyInfo>>(this.store, KEY_CROSS_SIGNING_KEYS);
         func(keys);
     }
 
@@ -545,7 +545,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         func(key);
     }
 
-    public storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void {
         setJsonItem(this.store, KEY_CROSS_SIGNING_KEYS, keys);
     }
 

@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ConnectionStats } from "./connectionStats";
-import { StatsReportEmitter } from "./statsReportEmitter";
-import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport";
-import { ConnectionStatsBuilder } from "./connectionStatsBuilder";
-import { TransportStatsBuilder } from "./transportStatsBuilder";
-import { MediaSsrcHandler } from "./media/mediaSsrcHandler";
-import { MediaTrackHandler } from "./media/mediaTrackHandler";
-import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler";
-import { TrackStatsBuilder } from "./trackStatsBuilder";
-import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder";
-import { ValueFormatter } from "./valueFormatter";
-import { CallStatsReportSummary } from "./callStatsReportSummary";
-import { logger } from "../../logger";
-import { CallFeedStatsReporter } from "./callFeedStatsReporter";
+import { ConnectionStats } from "./connectionStats.ts";
+import { StatsReportEmitter } from "./statsReportEmitter.ts";
+import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport.ts";
+import { ConnectionStatsBuilder } from "./connectionStatsBuilder.ts";
+import { TransportStatsBuilder } from "./transportStatsBuilder.ts";
+import { MediaSsrcHandler } from "./media/mediaSsrcHandler.ts";
+import { MediaTrackHandler } from "./media/mediaTrackHandler.ts";
+import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler.ts";
+import { TrackStatsBuilder } from "./trackStatsBuilder.ts";
+import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder.ts";
+import { ValueFormatter } from "./valueFormatter.ts";
+import { CallStatsReportSummary } from "./callStatsReportSummary.ts";
+import { logger } from "../../logger.ts";
+import { CallFeedStatsReporter } from "./callFeedStatsReporter.ts";
 
 export class CallStatsReportGatherer {
     private isActive = true;

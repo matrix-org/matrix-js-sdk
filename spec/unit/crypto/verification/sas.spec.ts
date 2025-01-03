@@ -29,13 +29,13 @@ import { MatrixClient } from "../../../../src";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
 import { TestClient } from "../../../TestClient";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 let ALICE_DEVICES: Record<string, IDevice>;
 let BOB_DEVICES: Record<string, IDevice>;
 
 describe("SAS verification", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }
@@ -189,10 +189,12 @@ describe("SAS verification", function () {
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = async (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map.get(alice.client.getUserId()!)?.get(alice.client.deviceId!)
-                        ?.message_authentication_code;
-                    keyAgreement = map.get(alice.client.getUserId()!)?.get(alice.client.deviceId!)
-                        ?.key_agreement_protocol;
+                    macMethod = map
+                        .get(alice.client.getUserId()!)
+                        ?.get(alice.client.deviceId!)?.message_authentication_code;
+                    keyAgreement = map
+                        .get(alice.client.getUserId()!)
+                        ?.get(alice.client.deviceId!)?.key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
             };
@@ -452,7 +454,7 @@ describe("SAS verification", function () {
         let bobSasEvent: ISasEvent | null;
         let aliceVerifier: SAS;
         let bobPromise: Promise<void>;
-        let clearTestClientTimeouts: Function;
+        let clearTestClientTimeouts: () => void;
 
         beforeEach(async function () {
             [[alice, bob], clearTestClientTimeouts] = await makeTestClients(

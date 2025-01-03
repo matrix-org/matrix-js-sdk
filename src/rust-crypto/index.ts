@@ -17,13 +17,17 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RustCrypto } from "./rust-crypto";
-import { IHttpOpts, MatrixHttpApi } from "../http-api";
-import { ServerSideSecretStorage } from "../secret-storage";
-import { ICryptoCallbacks } from "../crypto";
-import { Logger } from "../logger";
-import { CryptoStore } from "../crypto/store/base";
-import { migrateFromLegacyCrypto } from "./libolm_migration";
+import { RustCrypto } from "./rust-crypto.ts";
+import { IHttpOpts, MatrixHttpApi } from "../http-api/index.ts";
+import { ServerSideSecretStorage } from "../secret-storage.ts";
+import { Logger } from "../logger.ts";
+import { CryptoStore, MigrationState } from "../crypto/store/base.ts";
+import {
+    migrateFromLegacyCrypto,
+    migrateLegacyLocalTrustIfNeeded,
+    migrateRoomSettingsFromLegacyCrypto,
+} from "./libolm_migration.ts";
+import { CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
  * Create a new `RustCrypto` implementation
@@ -51,7 +55,7 @@ export async function initRustCrypto(args: {
     secretStorage: ServerSideSecretStorage;
 
     /** Crypto callbacks provided by the application. */
-    cryptoCallbacks: ICryptoCallbacks;
+    cryptoCallbacks: CryptoCallbacks;
 
     /**
      * The prefix to use on the indexeddbs created by rust-crypto.
@@ -60,12 +64,20 @@ export async function initRustCrypto(args: {
     storePrefix: string | null;
 
     /**
-     * A passphrase to use to encrypt the indexeddbs created by rust-crypto.
+     * A passphrase to use to encrypt the indexeddb created by rust-crypto.
      *
-     * Ignored if `storePrefix` is null. If this is `undefined` (and `storePrefix` is not null), the indexeddbs
-     * will be unencrypted.
+     * Ignored if `storePrefix` is null, or `storeKey` is set.  If neither this nor `storeKey` is set
+     * (and `storePrefix` is not null), the indexeddb will be unencrypted.
      */
     storePassphrase?: string;
+
+    /**
+     * A key to use to encrypt the indexeddb created by rust-crypto.
+     *
+     * Ignored if `storePrefix` is null. Otherwise, if it is set, it must be a 32-byte cryptographic key, which
+     * will be used to encrypt the indexeddb. See also `storePassphrase`.
+     */
+    storeKey?: Uint8Array;
 
     /** If defined, we will check if any data needs migrating from this store to the rust store. */
     legacyCryptoStore?: CryptoStore;
@@ -90,10 +102,16 @@ export async function initRustCrypto(args: {
     new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
 
     logger.debug("Opening Rust CryptoStore");
-    const storeHandle: StoreHandle = await StoreHandle.open(
-        args.storePrefix ?? undefined,
-        (args.storePrefix && args.storePassphrase) ?? undefined,
-    );
+    let storeHandle;
+    if (args.storePrefix) {
+        if (args.storeKey) {
+            storeHandle = await StoreHandle.openWithKey(args.storePrefix, args.storeKey);
+        } else {
+            storeHandle = await StoreHandle.open(args.storePrefix, args.storePassphrase);
+        }
+    } else {
+        storeHandle = await StoreHandle.open();
+    }
 
     if (args.legacyCryptoStore) {
         // We have a legacy crypto store, which we may need to migrate from.
@@ -112,6 +130,7 @@ export async function initRustCrypto(args: {
         args.secretStorage,
         args.cryptoCallbacks,
         storeHandle,
+        args.legacyCryptoStore,
     );
 
     storeHandle.free();
@@ -126,27 +145,42 @@ async function initOlmMachine(
     userId: string,
     deviceId: string,
     secretStorage: ServerSideSecretStorage,
-    cryptoCallbacks: ICryptoCallbacks,
+    cryptoCallbacks: CryptoCallbacks,
     storeHandle: StoreHandle,
+    legacyCryptoStore?: CryptoStore,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
-    const olmMachine = await RustSdkCryptoJs.OlmMachine.init_from_store(
+    const olmMachine = await RustSdkCryptoJs.OlmMachine.initFromStore(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
     );
 
+    // A final migration step, now that we have an OlmMachine.
+    if (legacyCryptoStore) {
+        await migrateRoomSettingsFromLegacyCrypto({
+            logger,
+            legacyStore: legacyCryptoStore,
+            olmMachine,
+        });
+    }
+
     // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.
     olmMachine.roomKeyRequestsEnabled = false;
 
     const rustCrypto = new RustCrypto(logger, olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
+
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
+    );
+    await olmMachine.registerRoomKeysWithheldCallback((withheld: RustSdkCryptoJs.RoomKeyWithheldInfo[]) =>
+        rustCrypto.onRoomKeysWithheld(withheld),
     );
     await olmMachine.registerUserIdentityUpdatedCallback((userId: RustSdkCryptoJs.UserId) =>
         rustCrypto.onUserIdentityUpdated(userId),
     );
+    await olmMachine.registerDevicesUpdatedCallback((userIds: string[]) => rustCrypto.onDevicesUpdated(userIds));
 
     // Check if there are any key backup secrets pending processing. There may be multiple secrets to process if several devices have gossiped them.
     // The `registerReceiveSecretCallback` function will only be triggered for new secrets. If the client is restarted before processing them, the secrets will need to be manually handled.
@@ -169,6 +203,35 @@ async function initOlmMachine(
     //
     // XXX: find a less hacky way to do this.
     await olmMachine.outgoingRequests();
+
+    if (legacyCryptoStore && (await legacyCryptoStore.containsData())) {
+        const migrationState = await legacyCryptoStore.getMigrationState();
+        if (migrationState < MigrationState.INITIAL_OWN_KEY_QUERY_DONE) {
+            logger.debug(`Performing initial key query after migration`);
+            // We need to do an initial keys query so that the rust stack can properly update trust of
+            // the user device and identity from the migrated private keys.
+            // If not done, there is a short period where the own device/identity trust will be undefined after migration.
+            let initialKeyQueryDone = false;
+            while (!initialKeyQueryDone) {
+                try {
+                    await rustCrypto.userHasCrossSigningKeys(userId);
+                    initialKeyQueryDone = true;
+                } catch (e) {
+                    // If the initial key query fails, we retry until it succeeds.
+                    logger.error("Failed to check for cross-signing keys after migration, retrying", e);
+                }
+            }
+
+            // If the private master cross-signing key was not cached in the legacy store, the rust session
+            // will not be able to establish the trust of the user identity.
+            // That means that after migration the session could revert to unverified.
+            // In order to avoid asking the users to re-verify their sessions, we need to migrate the legacy local trust
+            // (if the legacy session was already verified) to the new session.
+            await migrateLegacyLocalTrustIfNeeded({ legacyCryptoStore, rustCrypto, logger });
+
+            await legacyCryptoStore.setMigrationState(MigrationState.INITIAL_OWN_KEY_QUERY_DONE);
+        }
+    }
 
     return rustCrypto;
 }

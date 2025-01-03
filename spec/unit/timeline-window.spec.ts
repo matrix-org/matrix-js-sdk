@@ -62,7 +62,7 @@ function addEventsToTimeline(timeline: EventTimeline, numEvents: number, toStart
                 user: USER_ID,
                 event: true,
             }),
-            { toStartOfTimeline },
+            { toStartOfTimeline, addToState: false },
         );
     }
 }
@@ -434,7 +434,7 @@ describe("TimelineWindow", function () {
     });
 
     function idsOf(events: Array<MatrixEvent>): Array<string> {
-        return events.map((e) => (e ? e.getId() ?? "MISSING_ID" : "MISSING_EVENT"));
+        return events.map((e) => (e ? (e.getId() ?? "MISSING_ID") : "MISSING_EVENT"));
     }
 
     describe("removing events", () => {
@@ -451,8 +451,8 @@ describe("TimelineWindow", function () {
             const liveEvents = createEvents(5);
             const [, , e3, e4, e5] = oldEvents;
             const [, e7, e8, e9, e10] = liveEvents;
-            room.addLiveEvents(liveEvents);
-            room.addEventsToTimeline(oldEvents, true, oldTimeline);
+            room.addLiveEvents(liveEvents, { addToState: false });
+            room.addEventsToTimeline(oldEvents, true, false, oldTimeline);
 
             // And 2 windows over the timelines in this room
             const oldWindow = new TimelineWindow(mockClient, timelineSet);

@@ -21,16 +21,16 @@ limitations under the License.
 import anotherjson from "another-json";
 
 import type { PkSigning } from "@matrix-org/olm";
-import type { IOneTimeKey } from "../@types/crypto";
-import { OlmDevice } from "./OlmDevice";
-import { DeviceInfo } from "./deviceinfo";
-import { Logger, logger } from "../logger";
-import { IClaimOTKsResult, MatrixClient } from "../client";
-import { ISignatures } from "../@types/signed";
-import { MatrixEvent } from "../models/event";
-import { EventType } from "../@types/event";
-import { IMessage } from "./algorithms/olm";
-import { MapWithDefault } from "../utils";
+import type { IOneTimeKey } from "../@types/crypto.ts";
+import { OlmDevice } from "./OlmDevice.ts";
+import { DeviceInfo } from "./deviceinfo.ts";
+import { Logger, logger } from "../logger.ts";
+import { IClaimOTKsResult, MatrixClient } from "../client.ts";
+import { ISignatures } from "../@types/signed.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType } from "../@types/event.ts";
+import { IMessage } from "./algorithms/olm.ts";
+import { MapWithDefault } from "../utils.ts";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
@@ -471,7 +471,7 @@ export async function verifySignature(
 export function pkSign(obj: object & IObject, key: Uint8Array | PkSigning, userId: string, pubKey: string): string {
     let createdKey = false;
     if (key instanceof Uint8Array) {
-        const keyObj = new global.Olm.PkSigning();
+        const keyObj = new globalThis.Olm.PkSigning();
         pubKey = keyObj.init_with_seed(key);
         key = keyObj;
         createdKey = true;
@@ -506,7 +506,7 @@ export function pkVerify(obj: IObject, pubKey: string, userId: string): void {
         throw new Error("No signature");
     }
     const signature = obj.signatures[userId][keyId];
-    const util = new global.Olm.Utility();
+    const util = new globalThis.Olm.Utility();
     const sigs = obj.signatures;
     delete obj.signatures;
     const unsigned = obj.unsigned;

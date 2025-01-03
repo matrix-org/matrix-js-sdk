@@ -17,11 +17,11 @@ limitations under the License.
 import { OlmMachine, CrossSigningStatus, CrossSigningBootstrapRequests } from "@matrix-org/matrix-sdk-crypto-wasm";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { BootstrapCrossSigningOpts } from "../crypto-api";
-import { logger } from "../logger";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
-import { UIAuthCallback } from "../interactive-auth";
-import { ServerSideSecretStorage } from "../secret-storage";
+import { BootstrapCrossSigningOpts } from "../crypto-api/index.ts";
+import { logger } from "../logger.ts";
+import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { UIAuthCallback } from "../interactive-auth.ts";
+import { ServerSideSecretStorage } from "../secret-storage.ts";
 
 /** Manages the cross-signing keys for our own user.
  *
@@ -140,11 +140,11 @@ export class CrossSigningIdentity {
             // Update 4S before uploading cross-signing keys, to stay consistent with legacy that asks
             // 4S passphrase before asking for account password.
             // Ultimately should be made atomic and resistant to forgotten password/passphrase.
-            logger.log("resetCrossSigning: exporting to secret storage");
-
+            logger.log("resetCrossSigning: exporting private keys to secret storage");
             await this.exportCrossSigningKeysToStorage();
         }
-        logger.log("resetCrossSigning: publishing keys to server");
+
+        logger.log("resetCrossSigning: publishing public keys to server");
         for (const req of [
             outgoingRequests.uploadKeysRequest,
             outgoingRequests.uploadSigningKeysRequest,

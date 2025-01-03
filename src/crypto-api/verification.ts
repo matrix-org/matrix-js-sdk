@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { MatrixEvent } from "../models/event.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -119,7 +119,7 @@ export interface VerificationRequest
      *
      * If a verifier has already been created for this request, returns that verifier.
      *
-     * This does *not* send the `m.key.verification.start` event - to do so, call {@link Crypto.Verifier#verify} on the
+     * This does *not* send the `m.key.verification.start` event - to do so, call {@link Verifier.verify} on the
      * returned verifier.
      *
      * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
@@ -155,7 +155,7 @@ export interface VerificationRequest
      * @param qrCodeData - the decoded QR code.
      * @returns A verifier; call `.verify()` on it to wait for the other side to complete the verification flow.
      */
-    scanQRCode(qrCodeData: Uint8Array): Promise<Verifier>;
+    scanQRCode(qrCodeData: Uint8ClampedArray): Promise<Verifier>;
 
     /**
      * The verifier which is doing the actual verification, once the method has been established.
@@ -170,7 +170,7 @@ export interface VerificationRequest
      *
      * @deprecated Not supported in Rust Crypto. Use {@link VerificationRequest#generateQRCode} instead.
      */
-    getQRCodeBytes(): Buffer | undefined;
+    getQRCodeBytes(): Uint8ClampedArray | undefined;
 
     /**
      * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
@@ -178,7 +178,7 @@ export interface VerificationRequest
      * Only returns data once `phase` is {@link VerificationPhase.Ready} and the other party can scan a QR code;
      * otherwise returns `undefined`.
      */
-    generateQRCode(): Promise<Buffer | undefined>;
+    generateQRCode(): Promise<Uint8ClampedArray | undefined>;
 
     /**
      * If this request has been cancelled, the cancellation code (e.g `m.user`) which is responsible for cancelling
@@ -281,7 +281,7 @@ export interface Verifier extends TypedEventEmitter<VerifierEvent, VerifierEvent
      * Cancel a verification.
      *
      * We will send an `m.key.verification.cancel` if the verification is still in flight. The verification promise
-     * will reject, and a {@link Crypto.VerifierEvent#Cancel} will be emitted.
+     * will reject, and a {@link crypto-api.VerifierEvent.Cancel | VerifierEvent.Cancel} will be emitted.
      *
      * @param e - the reason for the cancellation.
      */

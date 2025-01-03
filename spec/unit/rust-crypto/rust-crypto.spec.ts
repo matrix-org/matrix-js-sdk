@@ -30,7 +30,7 @@ import fetchMock from "fetch-mock-jest";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
-    CryptoEvent,
+    AccountDataEvents,
     Device,
     DeviceVerification,
     encodeBase64,
@@ -46,7 +46,7 @@ import {
 } from "../../../src";
 import { mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
-import { IEventDecryptionResult } from "../../../src/@types/crypto";
+import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import {
     AccountDataClient,
@@ -69,11 +69,18 @@ import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
 import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
+import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
+
+beforeAll(async () => {
+    // Load the WASM upfront, before any of the tests. This can take some time, and doing it here means that it gets
+    // a separate timeout.
+    await RustSdkCryptoJs.initAsync();
+}, 15000);
 
 afterEach(() => {
     fetchMock.reset();
@@ -88,19 +95,23 @@ describe("initRustCrypto", () => {
             getSecretsFromInbox: jest.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: jest.fn(),
             registerReceiveSecretCallback: jest.fn(),
+            registerDevicesUpdatedCallback: jest.fn(),
+            registerRoomKeysWithheldCallback: jest.fn(),
             outgoingRequests: jest.fn(),
             isBackupEnabled: jest.fn().mockResolvedValue(false),
             verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
             getBackupKeys: jest.fn(),
+            getIdentity: jest.fn().mockResolvedValue(null),
+            trackedUsers: jest.fn(),
         } as unknown as Mocked<OlmMachine>;
     }
 
-    it("passes through the store params", async () => {
+    it("passes through the store params (passphrase)", async () => {
         const mockStore = { free: jest.fn() } as unknown as StoreHandle;
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -114,15 +125,38 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase");
-        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
-    it("suppresses the storePassphrase if storePrefix is unset", async () => {
+    it("passes through the store params (key)", async () => {
+        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
+        jest.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
+
+        const testOlmMachine = makeTestOlmMachine();
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+
+        const storeKey = new Uint8Array(32);
+        await initRustCrypto({
+            logger,
+            http: {} as MatrixClient["http"],
+            userId: TEST_USER,
+            deviceId: TEST_DEVICE_ID,
+            secretStorage: {} as ServerSideSecretStorage,
+            cryptoCallbacks: {} as CryptoCallbacks,
+            storePrefix: "storePrefix",
+            storeKey: storeKey,
+        });
+
+        expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+    });
+
+    it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
         const mockStore = { free: jest.fn() } as unknown as StoreHandle;
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -132,11 +166,12 @@ describe("initRustCrypto", () => {
             secretStorage: {} as ServerSideSecretStorage,
             cryptoCallbacks: {} as CryptoCallbacks,
             storePrefix: null,
+            storeKey: new Uint8Array(),
             storePassphrase: "storePassphrase",
         });
 
-        expect(StoreHandle.open).toHaveBeenCalledWith(undefined, undefined);
-        expect(OlmMachine.init_from_store).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(StoreHandle.open).toHaveBeenCalledWith();
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
     });
 
     it("Should get secrets from inbox on start", async () => {
@@ -144,7 +179,7 @@ describe("initRustCrypto", () => {
         jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
+        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -161,6 +196,22 @@ describe("initRustCrypto", () => {
     });
 
     describe("libolm migration", () => {
+        let mockStore: RustSdkCryptoJs.StoreHandle;
+
+        beforeEach(() => {
+            // Stub out a bunch of stuff in the Rust library
+            mockStore = { free: jest.fn() } as unknown as StoreHandle;
+            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+
+            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
+            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
+            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
+
+            const testOlmMachine = makeTestOlmMachine();
+            testOlmMachine.trackedUsers.mockResolvedValue([]);
+            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        });
+
         it("migrates data from a legacy crypto store", async () => {
             const PICKLE_KEY = "pickle1234";
             const legacyStore = new MemoryCryptoStore();
@@ -180,18 +231,20 @@ describe("initRustCrypto", () => {
             createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
             await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
 
-            // Stub out a bunch of stuff in the Rust library
-            const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
-
-            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
-
-            const testOlmMachine = makeTestOlmMachine();
-            jest.spyOn(OlmMachine, "init_from_store").mockResolvedValue(testOlmMachine);
-
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", { version: "45" });
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                auth_data: {
+                    public_key: "backup_key_public",
+                },
+                version: "45",
+                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+            });
+            // The cached key should be valid for the backup
+            const mockBackupDecryptionKey: any = {
+                megolmV1PublicKey: {
+                    publicKeyBase64: "backup_key_public",
+                },
+            };
+            jest.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
 
             function legacyMigrationProgressListener(progress: number, total: number): void {
                 logger.log(`migrated ${progress} of ${total}`);
@@ -269,14 +322,111 @@ describe("initRustCrypto", () => {
                     expect(session.senderKey).toEqual(pad43(`device${i}`));
                     expect(session.pickle).toEqual("sessionPickle");
                     expect(session.roomId!.toString()).toEqual("!room:id");
+                    expect(session.senderSigningKey).toEqual("sender_signing_key");
+
                     // only one of the sessions needs backing up
                     expect(session.backedUp).toEqual(i !== 5 || j !== 5);
                 }
             }
         }, 10000);
 
+        it("migrates data from a legacy crypto store when secret are not encrypted", async () => {
+            const PICKLE_KEY = "pickle1234";
+            const legacyStore = new MemoryCryptoStore();
+
+            // It's possible for old sessions to directly store the secrets as raw UInt8Array,
+            // so we need to support that in the migration code.
+            // See https://github.com/matrix-org/matrix-js-sdk/commit/c81f11df0afd4d0da3b088892745ae2f8ba1c4a7
+            async function storeSecretKeyInClear(type: string, key: Uint8Array, store: CryptoStore) {
+                // @ts-ignore The API to store raw UInt8Array does not exist anymore, so we need that for this test.
+                store.privateKeys[type as keyof SecretStorePrivateKeys] = key;
+            }
+
+            // Populate the legacy store with some test data
+            const storeSecretKey = (type: string, key: string) =>
+                storeSecretKeyInClear(type, new TextEncoder().encode(key), legacyStore);
+
+            await legacyStore.storeAccount({}, "not a real account");
+            await storeSecretKey("master", "master key");
+            await storeSecretKey("self_signing", "ssk");
+            await storeSecretKey("user_signing", "usk");
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", 404);
+
+            function legacyMigrationProgressListener(progress: number, total: number): void {
+                logger.log(`migrated ${progress} of ${total}`);
+            }
+
+            await initRustCrypto({
+                logger,
+                http: makeMatrixHttpApi(),
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                storePassphrase: "storePassphrase",
+                legacyCryptoStore: legacyStore,
+                legacyPickleKey: PICKLE_KEY,
+                legacyMigrationProgressListener,
+            });
+
+            const data = mocked(Migration.migrateBaseData).mock.calls[0][0];
+            expect(data.pickledAccount).toEqual("not a real account");
+            expect(data.userId!.toString()).toEqual(TEST_USER);
+            expect(data.deviceId!.toString()).toEqual(TEST_DEVICE_ID);
+            expect(atob(data.privateCrossSigningMasterKey!)).toEqual("master key");
+            expect(atob(data.privateCrossSigningUserSigningKey!)).toEqual("usk");
+            expect(atob(data.privateCrossSigningSelfSigningKey!)).toEqual("ssk");
+        });
+
+        it("handles megolm sessions with no `keysClaimed`", async () => {
+            const legacyStore = new MemoryCryptoStore();
+            legacyStore.storeAccount({}, "not a real account");
+
+            legacyStore.storeEndToEndInboundGroupSession(
+                pad43(`device1`),
+                `session1`,
+                {
+                    forwardingCurve25519KeyChain: [],
+                    room_id: "!room:id",
+                    session: "sessionPickle",
+                },
+                undefined,
+            );
+
+            const PICKLE_KEY = "pickle1234";
+            await initRustCrypto({
+                logger,
+                http: makeMatrixHttpApi(),
+                userId: TEST_USER,
+                deviceId: TEST_DEVICE_ID,
+                secretStorage: {} as ServerSideSecretStorage,
+                cryptoCallbacks: {} as CryptoCallbacks,
+                storePrefix: "storePrefix",
+                storePassphrase: "storePassphrase",
+                legacyCryptoStore: legacyStore,
+                legacyPickleKey: PICKLE_KEY,
+            });
+
+            expect(Migration.migrateMegolmSessions).toHaveBeenCalledTimes(1);
+            expect(Migration.migrateMegolmSessions).toHaveBeenCalledWith(
+                expect.any(Array),
+                new Uint8Array(Buffer.from(PICKLE_KEY)),
+                mockStore,
+            );
+            const megolmSessions: PickledInboundGroupSession[] = mocked(Migration.migrateMegolmSessions).mock
+                .calls[0][0];
+            expect(megolmSessions.length).toEqual(1);
+            const session = megolmSessions[0];
+            expect(session.senderKey).toEqual(pad43(`device1`));
+            expect(session.pickle).toEqual("sessionPickle");
+            expect(session.roomId!.toString()).toEqual("!room:id");
+            expect(session.senderSigningKey).toBe(undefined);
+        }, 10000);
+
         async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
-            const encryptedKey = await encryptAES(encodeBase64(key), Buffer.from(pickleKey), type);
+            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), Buffer.from(pickleKey), type);
             store.storeSecretStorePrivateKey(undefined, type as keyof SecretStorePrivateKeys, encryptedKey);
         }
 
@@ -325,7 +475,7 @@ describe("RustCrypto", () => {
         );
     });
 
-    describe(".importRoomKeys and .exportRoomKeys", () => {
+    describe("importing and exporting room keys", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(
@@ -349,6 +499,29 @@ describe("RustCrypto", () => {
             expect(importTotal).toBe(someRoomKeys.length);
 
             const keys = await rustCrypto.exportRoomKeys();
+            expect(Array.isArray(keys)).toBeTruthy();
+            expect(keys.length).toBe(someRoomKeys.length);
+
+            const aSession = someRoomKeys[0];
+
+            const exportedKey = keys.find((k) => k.session_id == aSession.session_id);
+
+            expect(aSession).toStrictEqual(exportedKey);
+        });
+
+        it("should import and export keys as JSON", async () => {
+            const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
+            let importTotal = 0;
+            const opt: ImportRoomKeysOpts = {
+                progressCallback: (stage) => {
+                    importTotal = stage.total ?? 0;
+                },
+            };
+            await rustCrypto.importRoomKeysAsJson(JSON.stringify(someRoomKeys), opt);
+
+            expect(importTotal).toBe(someRoomKeys.length);
+
+            const keys: Array<IMegolmSessionData> = JSON.parse(await rustCrypto.exportRoomKeysAsJson());
             expect(Array.isArray(keys)).toBeTruthy();
             expect(keys.length).toBe(someRoomKeys.length);
 
@@ -400,15 +573,37 @@ describe("RustCrypto", () => {
         });
 
         it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+            );
+
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/query", {
+                device_keys: {
+                    [testData.TEST_USER_ID]: {
+                        [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                    },
+                },
+            });
+
+            // wait until we know about the other device
+            rustCrypto.onSyncCompleted({});
+            await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+
             const toDeviceEvent = {
                 type: "m.key.verification.request",
                 content: {
-                    from_device: "testDeviceId",
+                    from_device: testData.TEST_DEVICE_ID,
                     methods: ["m.sas.v1"],
                     transaction_id: "testTxn",
                     timestamp: Date.now() - 1000,
                 },
-                sender: "@user:id",
+                sender: testData.TEST_USER_ID,
             };
 
             const onEvent = jest.fn();
@@ -533,6 +728,119 @@ describe("RustCrypto", () => {
         expect(resetKeyBackup.mock.calls).toHaveLength(2);
     });
 
+    describe("upload existing key backup key to new 4S store", () => {
+        const secretStorageCallbacks = {
+            getSecretStorageKey: async (keys: any, name: string) => {
+                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+            },
+        } as SecretStorageCallbacks;
+        let secretStorage: ServerSideSecretStorageImpl;
+
+        let backupAuthData: any;
+        let backupAlg: string;
+
+        const fetchMock = {
+            authedRequest: jest.fn().mockImplementation((method, path, query, body) => {
+                if (path === "/room_keys/version") {
+                    if (method === "POST") {
+                        backupAuthData = body["auth_data"];
+                        backupAlg = body["algorithm"];
+                        return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    } else if (method === "GET" && backupAuthData) {
+                        return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    }
+                }
+                return Promise.resolve({});
+            }),
+        };
+
+        beforeEach(() => {
+            backupAuthData = undefined;
+            backupAlg = "";
+
+            secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+        });
+
+        it("bootstrapSecretStorage saves megolm backup key if already cached", async () => {
+            const rustCrypto = await makeTestRustCrypto(
+                fetchMock as unknown as MatrixHttpApi<any>,
+                testData.TEST_USER_ID,
+                undefined,
+                secretStorage,
+            );
+
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+
+            await rustCrypto.resetKeyBackup();
+
+            const storeSpy = jest.spyOn(secretStorage, "store");
+
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            expect(storeSpy).toHaveBeenCalledWith("m.megolm_backup.v1", expect.anything());
+        });
+
+        it("bootstrapSecretStorage doesn't try to save megolm backup key not in cache", async () => {
+            const mockOlmMachine = {
+                isBackupEnabled: jest.fn().mockResolvedValue(false),
+                sign: jest.fn().mockResolvedValue({
+                    asJSON: jest.fn().mockReturnValue("{}"),
+                }),
+                saveBackupDecryptionKey: jest.fn(),
+                crossSigningStatus: jest.fn().mockResolvedValue({
+                    hasMaster: true,
+                    hasSelfSigning: true,
+                    hasUserSigning: true,
+                }),
+                exportCrossSigningKeys: jest.fn().mockResolvedValue({
+                    masterKey: "sosecret",
+                    userSigningKey: "secrets",
+                    self_signing_key: "ssshhh",
+                }),
+                getBackupKeys: jest.fn().mockResolvedValue({}),
+                verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
+            } as unknown as OlmMachine;
+
+            const rustCrypto = new RustCrypto(
+                logger,
+                mockOlmMachine,
+                fetchMock as unknown as MatrixHttpApi<any>,
+                TEST_USER,
+                TEST_DEVICE_ID,
+                secretStorage,
+                {} as CryptoCallbacks,
+            );
+
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+
+            await rustCrypto.resetKeyBackup();
+
+            const storeSpy = jest.spyOn(secretStorage, "store");
+
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            expect(storeSpy).not.toHaveBeenCalledWith("m.megolm_backup.v1", expect.anything());
+        });
+    });
+
     it("isSecretStorageReady", async () => {
         const mockSecretStorage = {
             getDefaultKeyId: jest.fn().mockResolvedValue(null),
@@ -638,6 +946,61 @@ describe("RustCrypto", () => {
             firstOutgoingRequestsDefer.resolve([]);
             await awaitCallToMakeOutgoingRequest();
             expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
+        });
+
+        it("should encode outgoing requests properly", async () => {
+            // we need a real OlmMachine, so replace the one created by beforeEach
+            rustCrypto = await makeTestRustCrypto();
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+
+            const outgoingRequestProcessor = {} as unknown as OutgoingRequestProcessor;
+            rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
+            const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
+            rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
+
+            // The second time we do a /keys/upload, the `device_keys` property
+            // should be absent from the request body
+            // cf. https://github.com/matrix-org/matrix-rust-sdk-crypto-wasm/issues/57
+            //
+            // On the first upload, we pretend that there are no OTKs, so it will
+            // try to upload more keys
+            let keysUploadCount = 0;
+            let deviceKeys: object;
+            let deviceKeysAbsent = false;
+            outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (request, uiaCallback?) => {
+                let resp: any = {};
+                if (request instanceof RustSdkCryptoJs.KeysUploadRequest) {
+                    if (keysUploadCount == 0) {
+                        deviceKeys = JSON.parse(request.body).device_keys;
+                        resp = { one_time_key_counts: { signed_curve25519: 0 } };
+                    } else {
+                        deviceKeysAbsent = !("device_keys" in JSON.parse(request.body));
+                        resp = { one_time_key_counts: { signed_curve25519: 50 } };
+                    }
+                    keysUploadCount++;
+                } else if (request instanceof RustSdkCryptoJs.KeysQueryRequest) {
+                    resp = {
+                        device_keys: {
+                            [TEST_USER]: {
+                                [TEST_DEVICE_ID]: deviceKeys,
+                            },
+                        },
+                    };
+                } else if (
+                    request instanceof RustSdkCryptoJs.UploadSigningKeysRequest ||
+                    request instanceof RustSdkCryptoJs.PutDehydratedDeviceRequest
+                ) {
+                    // These request types do not implement OutgoingRequest and do not need to be marked as sent.
+                    return;
+                }
+                if (request.id) {
+                    olmMachine.markRequestAsSent(request.id, request.type, JSON.stringify(resp));
+                }
+            });
+            await outgoingRequestsManager.doProcessOutgoingRequests();
+            await outgoingRequestsManager.doProcessOutgoingRequests();
+
+            expect(deviceKeysAbsent).toBe(true);
         });
     });
 
@@ -764,23 +1127,41 @@ describe("RustCrypto", () => {
         });
 
         it.each([
-            [undefined, null],
-            ["Encrypted by an unverified user.", EventShieldReason.UNVERIFIED_IDENTITY],
-            ["Encrypted by a device not verified by its owner.", EventShieldReason.UNSIGNED_DEVICE],
+            [undefined, undefined, null],
+            [
+                "Encrypted by an unverified user.",
+                RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity,
+                EventShieldReason.UNVERIFIED_IDENTITY,
+            ],
+            [
+                "Encrypted by a device not verified by its owner.",
+                RustSdkCryptoJs.ShieldStateCode.UnsignedDevice,
+                EventShieldReason.UNSIGNED_DEVICE,
+            ],
             [
                 "The authenticity of this encrypted message can't be guaranteed on this device.",
+                RustSdkCryptoJs.ShieldStateCode.AuthenticityNotGuaranteed,
                 EventShieldReason.AUTHENTICITY_NOT_GUARANTEED,
             ],
-            ["Encrypted by an unknown or deleted device.", EventShieldReason.UNKNOWN_DEVICE],
-            ["bloop", EventShieldReason.UNKNOWN],
-        ])("gets the right shield reason (%s)", async (rustReason, expectedReason) => {
+            [
+                "Encrypted by an unknown or deleted device.",
+                RustSdkCryptoJs.ShieldStateCode.UnknownDevice,
+                EventShieldReason.UNKNOWN_DEVICE,
+            ],
+            ["Not encrypted.", RustSdkCryptoJs.ShieldStateCode.SentInClear, EventShieldReason.SENT_IN_CLEAR],
+            [
+                "Encrypted by a previously-verified user who is no longer verified.",
+                RustSdkCryptoJs.ShieldStateCode.VerificationViolation,
+                EventShieldReason.VERIFICATION_VIOLATION,
+            ],
+        ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {
             // suppress the warning from the unknown shield reason
             jest.spyOn(console, "warn").mockImplementation(() => {});
 
             const mockEncryptionInfo = {
                 shieldState: jest
                     .fn()
-                    .mockReturnValue({ color: RustSdkCryptoJs.ShieldColor.None, message: rustReason }),
+                    .mockReturnValue({ color: RustSdkCryptoJs.ShieldColor.None, code: rustCode, message: rustReason }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
             olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
 
@@ -997,7 +1378,8 @@ describe("RustCrypto", () => {
     });
 
     it("should wait for a keys/query before returning devices", async () => {
-        jest.useFakeTimers();
+        // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
@@ -1019,6 +1401,33 @@ describe("RustCrypto", () => {
         const deviceMap = (await devicesPromise).get(testData.TEST_USER_ID)!;
         expect(deviceMap.has(TEST_DEVICE_ID)).toBe(true);
         expect(deviceMap.has(testData.TEST_DEVICE_ID)).toBe(true);
+        rustCrypto.stop();
+    });
+
+    it("should emit events on device changes", async () => {
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+
+        const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
+        const willUpdateCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.WillUpdateDevices, willUpdateCallback);
+        const devicesUpdatedCallback = jest.fn();
+        rustCrypto.on(CryptoEvent.DevicesUpdated, devicesUpdatedCallback);
+
+        rustCrypto.onSyncCompleted({});
+
+        // wait for the devices to be updated
+        await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+        expect(willUpdateCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
+        expect(devicesUpdatedCallback).toHaveBeenCalledWith([testData.TEST_USER_ID], false);
         rustCrypto.stop();
     });
 
@@ -1107,13 +1516,52 @@ describe("RustCrypto", () => {
         });
 
         it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
-            olmMachine.getIdentity.mockResolvedValue({ free: jest.fn(), isVerified: jest.fn().mockReturnValue(true) });
+            olmMachine.getIdentity.mockResolvedValue({
+                free: jest.fn(),
+                isVerified: jest.fn().mockReturnValue(true),
+                wasPreviouslyVerified: jest.fn().mockReturnValue(true),
+            });
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
             expect(userVerificationStatus.isVerified()).toBeTruthy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
-            expect(userVerificationStatus.wasCrossSigningVerified()).toBeFalsy();
+            expect(userVerificationStatus.wasCrossSigningVerified()).toBeTruthy();
+        });
+    });
+
+    describe("pinCurrentIdentity", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                getIdentity: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                logger,
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("throws an error for an unknown user", async () => {
+            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+                "Cannot pin identity of unknown user",
+            );
+        });
+
+        it("throws an error for our own user", async () => {
+            const ownIdentity = new RustSdkCryptoJs.OwnUserIdentity();
+            olmMachine.getIdentity.mockResolvedValue(ownIdentity);
+
+            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+                "Cannot pin identity of own user",
+            );
         });
     });
 
@@ -1165,14 +1613,15 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
-                testData.SIGNED_BACKUP_DATA.version!,
+                backupVersion,
             );
 
             // we import two keys: one "from backup", and one "from export"
             const [backedUpRoomKey, exportedRoomKey] = testData.MEGOLM_SESSION_DATA_ARRAY;
-            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey]);
+            await rustCrypto.importBackedUpRoomKeys([backedUpRoomKey], backupVersion);
             await rustCrypto.importRoomKeys([exportedRoomKey]);
 
             // we ask for the keys that should be backed up
@@ -1201,6 +1650,233 @@ describe("RustCrypto", () => {
                     },
                 },
             });
+        });
+
+        it("ignores invalid keys when restoring from backup", async () => {
+            const rustCrypto = await makeTestRustCrypto();
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            await olmMachine.enableBackupV1(
+                (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
+                backupVersion,
+            );
+
+            const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
+            // in addition to correct keys, we restore an invalid key
+            backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
+            const progressCallback = jest.fn();
+            await rustCrypto.importBackedUpRoomKeys(backup, backupVersion, { progressCallback });
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: 3,
+                successes: 0,
+                stage: "load_keys",
+                failures: 1,
+            });
+            expect(progressCallback).toHaveBeenCalledWith({
+                total: 3,
+                successes: 1,
+                stage: "load_keys",
+                failures: 1,
+            });
+        });
+
+        describe("getKeyBackupInfo", () => {
+            it("should return the current key backup info", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+                const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+                await expect(rustCrypto.getKeyBackupInfo()).resolves.toStrictEqual(testData.SIGNED_BACKUP_DATA);
+            });
+
+            it("should return null if not available", async () => {
+                const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+                await expect(rustCrypto.getKeyBackupInfo()).resolves.toBeNull();
+            });
+        });
+    });
+
+    describe("device dehydration", () => {
+        it("should detect if dehydration is supported", async () => {
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+            fetchMock.config.overwriteRoutes = true;
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_UNRECOGNIZED",
+                    error: "Unknown endpoint",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(false);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                device_id: "DEVICE_ID",
+                device_data: "data",
+            });
+            expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+        });
+    });
+
+    describe("import & export secrets bundle", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
+                testData.TEST_USER_ID,
+            );
+        });
+
+        it("should throw an error if there is nothing to export", async () => {
+            await expect(rustCrypto.exportSecretsBundle()).rejects.toThrow(
+                "The store doesn't contain any cross-signing keys",
+            );
+        });
+
+        it("should correctly import & export a secrets bundle", async () => {
+            const bundle = {
+                cross_signing: {
+                    master_key: "bMnVpkHI4S2wXRxy+IpaKM5PIAUUkl6DE+n0YLIW/qs",
+                    user_signing_key: "8tlgLjUrrb/zGJo4YKGhDTIDCEjtJTAS/Sh2AGNLuIo",
+                    self_signing_key: "pfDknmP5a0fVVRE54zhkUgJfzbNmvKcNfIWEW796bQs",
+                },
+                backup: {
+                    algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
+                    key: "bYYv3aFLQ49jMNcOjuTtBY9EKDby2x1m3gfX81nIKRQ",
+                    backup_version: "9",
+                },
+            };
+            await rustCrypto.importSecretsBundle(bundle);
+            await expect(rustCrypto.exportSecretsBundle()).resolves.toEqual(expect.objectContaining(bundle));
+        });
+    });
+
+    describe("encryptToDeviceMessages", () => {
+        let rustCrypto: RustCrypto;
+        let testOlmMachine: RustSdkCryptoJs.OlmMachine;
+
+        beforeEach(async () => {
+            testOlmMachine = await OlmMachine.initialize(
+                new RustSdkCryptoJs.UserId(testData.TEST_USER_ID),
+                new RustSdkCryptoJs.DeviceId(testData.TEST_DEVICE_ID),
+            );
+            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+            rustCrypto = await makeTestRustCrypto();
+            expect(OlmMachine.initFromStore).toHaveBeenCalled();
+        });
+
+        afterEach(() => {
+            testOlmMachine?.free();
+        });
+
+        const payload = { hello: "world" };
+
+        it("returns empty batch if devices not known", async () => {
+            const getMissingSessions = jest.spyOn(testOlmMachine, "getMissingSessions");
+            const getDevice = jest.spyOn(testOlmMachine, "getDevice");
+            const batch = await rustCrypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                ],
+                payload,
+            );
+            expect(getMissingSessions.mock.calls[0][0].length).toBe(2);
+            expect(getDevice).toHaveBeenCalledTimes(3);
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch).toEqual([]);
+        });
+
+        it("returns encrypted batch for known devices", async () => {
+            // Make m aware of another device, and get some OTK to be able to establish a session.
+            await testOlmMachine.markRequestAsSent(
+                "foo",
+                RustSdkCryptoJs.RequestType.KeysQuery,
+                JSON.stringify({
+                    device_keys: {
+                        "@example:localhost": {
+                            AFGUOBTZWM: {
+                                algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+                                device_id: "AFGUOBTZWM",
+                                keys: {
+                                    "curve25519:AFGUOBTZWM": "boYjDpaC+7NkECQEeMh5dC+I1+AfriX0VXG2UV7EUQo",
+                                    "ed25519:AFGUOBTZWM": "NayrMQ33ObqMRqz6R9GosmHdT6HQ6b/RX/3QlZ2yiec",
+                                },
+                                signatures: {
+                                    "@example:localhost": {
+                                        "ed25519:AFGUOBTZWM":
+                                            "RoSWvru1jj6fs2arnTedWsyIyBmKHMdOu7r9gDi0BZ61h9SbCK2zLXzuJ9ZFLao2VvA0yEd7CASCmDHDLYpXCA",
+                                    },
+                                },
+                                user_id: "@example:localhost",
+                                unsigned: {
+                                    device_display_name: "rust-sdk",
+                                },
+                            },
+                        },
+                    },
+                    failures: {},
+                }),
+            );
+
+            await testOlmMachine.markRequestAsSent(
+                "bar",
+                RustSdkCryptoJs.RequestType.KeysClaim,
+                JSON.stringify({
+                    one_time_keys: {
+                        "@example:localhost": {
+                            AFGUOBTZWM: {
+                                "signed_curve25519:AAAABQ": {
+                                    key: "9IGouMnkB6c6HOd4xUsNv4i3Dulb4IS96TzDordzOws",
+                                    signatures: {
+                                        "@example:localhost": {
+                                            "ed25519:AFGUOBTZWM":
+                                                "2bvUbbmJegrV0eVP/vcJKuIWC3kud+V8+C0dZtg4dVovOSJdTP/iF36tQn2bh5+rb9xLlSeztXBdhy4c+LiOAg",
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    failures: {},
+                }),
+            );
+
+            const batch = await rustCrypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                    { deviceId: "AFGUOBTZWM", userId: "@example:localhost" },
+                ],
+                payload,
+            );
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch.length).toEqual(1);
+            expect(batch?.batch[0].deviceId).toEqual("AFGUOBTZWM");
+            expect(batch?.batch[0].userId).toEqual("@example:localhost");
+            expect(batch?.batch[0].payload).toEqual(
+                expect.objectContaining({
+                    "algorithm": "m.olm.v1.curve25519-aes-sha2",
+                    "ciphertext": expect.any(Object),
+                    "org.matrix.msgid": expect.any(String),
+                    "sender_key": expect.any(String),
+                }),
+            );
         });
     });
 });
@@ -1249,11 +1925,13 @@ class DummyAccountDataClient
         super();
     }
 
-    public async getAccountDataFromServer<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+    public async getAccountDataFromServer<K extends keyof AccountDataEvents>(
+        eventType: K,
+    ): Promise<AccountDataEvents[K] | null> {
         const ret = this.storage.get(eventType);
 
         if (eventType) {
-            return ret as T;
+            return ret;
         } else {
             return null;
         }

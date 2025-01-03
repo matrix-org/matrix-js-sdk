@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { IMentions } from "../matrix";
+import { IMentions } from "../matrix.ts";
 export interface EncryptionKeyEntry {
     index: number;
     key: string;
@@ -23,6 +23,7 @@ export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];
     device_id: string;
     call_id: string;
+    sent_ts?: number;
 }
 
 export type CallNotifyType = "ring" | "notify";

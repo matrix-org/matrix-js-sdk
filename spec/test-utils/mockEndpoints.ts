@@ -24,11 +24,21 @@ import { KeyBackupInfo } from "../../src/crypto-api";
  * @param homeserverUrl - the homeserver url for the client under test
  */
 export function mockInitialApiRequests(homeserverUrl: string) {
-    fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["v1.1"] });
-    fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {});
-    fetchMock.postOnce(new URL("/_matrix/client/v3/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(), {
-        filter_id: "fid",
-    });
+    fetchMock.getOnce(
+        new URL("/_matrix/client/versions", homeserverUrl).toString(),
+        { versions: ["v1.1"] },
+        { overwriteRoutes: true },
+    );
+    fetchMock.getOnce(
+        new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(),
+        {},
+        { overwriteRoutes: true },
+    );
+    fetchMock.postOnce(
+        new URL("/_matrix/client/v3/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(),
+        { filter_id: "fid" },
+        { overwriteRoutes: true },
+    );
 }
 
 /**
@@ -78,7 +88,7 @@ export function mockSetupMegolmBackupRequests(backupVersion: string): void {
     });
 
     fetchMock.post("path:/_matrix/client/v3/room_keys/version", (url, request) => {
-        const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
         backupData.version = backupVersion;
         backupData.count = 0;
         backupData.etag = "zer";

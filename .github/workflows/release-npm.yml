@@ -4,10 +4,17 @@ on:
         secrets:
             NPM_TOKEN:
                 required: true
+        outputs:
+            id:
+                description: "The npm package@version string we published"
+                value: ${{ jobs.npm.outputs.id }}
+permissions: {} # No permissions required
 jobs:
     npm:
         name: Publish to npm
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
+        outputs:
+            id: ${{ steps.npm-publish.outputs.id }}
         steps:
             - name: 🧮 Checkout code
               uses: actions/checkout@v4
@@ -19,18 +26,23 @@ jobs:
               with:
                   cache: "yarn"
                   registry-url: "https://registry.npmjs.org"
+                  node-version-file: package.json
 
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
 
             - name: 🚀 Publish to npm
               id: npm-publish
-              uses: JS-DevTools/npm-publish@4b07b26a2f6e0a51846e1870223e545bae91c552 # v3.0.1
+              uses: JS-DevTools/npm-publish@19c28f1ef146469e409470805ea4279d47c3d35c # v3.1.1
               with:
                   token: ${{ secrets.NPM_TOKEN }}
                   access: public
                   tag: next
                   ignore-scripts: false
+
+            - name: Check npm package was published
+              if: steps.npm-publish.outputs.id == ''
+              run: exit 1
 
             - name: 🎖️ Add `latest` dist-tag to final releases
               if: steps.npm-publish.outputs.id && !contains(steps.npm-publish.outputs.id, '-rc.')

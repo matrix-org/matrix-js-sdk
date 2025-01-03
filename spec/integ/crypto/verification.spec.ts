@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
-import { MockResponse } from "fetch-mock";
+import FetchMock from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
@@ -78,6 +78,7 @@ import {
     encryptGroupSessionKey,
     encryptMegolmEvent,
     encryptSecretSend,
+    getTestOlmAccountKeys,
     ToDeviceEvent,
 } from "./olm-utils";
 import { KeyBackupInfo } from "../../../src/crypto-api";
@@ -85,15 +86,17 @@ import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
-jest.useFakeTimers();
+// But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
-    await global.Olm.init();
+    await globalThis.Olm.init();
 });
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
@@ -262,7 +265,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
             // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
-            const olmSAS = new global.Olm.SAS();
+            const olmSAS = new globalThis.Olm.SAS();
             returnToDeviceMessageFromSync(buildSasKeyMessage(transactionId, olmSAS.get_pubkey()));
 
             // alice responds with a 'key' ...
@@ -356,7 +359,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // The dummy device makes up a curve25519 keypair and uses the hash in an 'm.key.verification.accept'
             // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
-            const olmSAS = new global.Olm.SAS();
+            const olmSAS = new globalThis.Olm.SAS();
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(toDeviceMessage);
 
             sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.key");
@@ -471,21 +474,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(VerificationPhase.Ready);
 
             // we should now have QR data we can display
-            const qrCodeBuffer = (await request.generateQRCode())!;
-            expect(qrCodeBuffer).toBeTruthy();
+            const rawQrCodeBuffer = (await request.generateQRCode())!;
+            expect(rawQrCodeBuffer).toBeTruthy();
+            const qrCodeBuffer = new Uint8Array(rawQrCodeBuffer);
 
+            const textDecoder = new TextDecoder();
             // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
-            expect(qrCodeBuffer.subarray(0, 6).toString("latin1")).toEqual("MATRIX");
-            expect(qrCodeBuffer.readUint8(6)).toEqual(0x02); // version
-            expect(qrCodeBuffer.readUint8(7)).toEqual(0x02); // mode
-            const txnIdLen = qrCodeBuffer.readUint16BE(8);
-            expect(qrCodeBuffer.subarray(10, 10 + txnIdLen).toString("utf-8")).toEqual(transactionId);
+            expect(textDecoder.decode(qrCodeBuffer.slice(0, 6))).toEqual("MATRIX");
+            expect(qrCodeBuffer[6]).toEqual(0x02); // version
+            expect(qrCodeBuffer[7]).toEqual(0x02); // mode
+            const txnIdLen = (qrCodeBuffer[8] << 8) + qrCodeBuffer[9];
+            expect(textDecoder.decode(qrCodeBuffer.slice(10, 10 + txnIdLen))).toEqual(transactionId);
             // Alice's device's public key comes next, but we have nothing to do with it here.
-            // const aliceDevicePubKey = qrCodeBuffer.subarray(10 + txnIdLen, 32 + 10 + txnIdLen);
-            expect(qrCodeBuffer.subarray(42 + txnIdLen, 32 + 42 + txnIdLen)).toEqual(
-                Buffer.from(MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64, "base64"),
+            // const aliceDevicePubKey = qrCodeBuffer.slice(10 + txnIdLen, 32 + 10 + txnIdLen);
+            expect(encodeUnpaddedBase64(qrCodeBuffer.slice(42 + txnIdLen, 32 + 42 + txnIdLen))).toEqual(
+                MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
             );
-            const sharedSecret = qrCodeBuffer.subarray(74 + txnIdLen);
+            const sharedSecret = qrCodeBuffer.slice(74 + txnIdLen);
 
             // we should still be "Ready" and have no verifier
             expect(request.phase).toEqual(VerificationPhase.Ready);
@@ -743,6 +748,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             expect(toDeviceMessage.code).toEqual("m.user");
             expect(request.phase).toEqual(VerificationPhase.Cancelled);
+            expect(request.cancellationCode).toEqual("m.user");
+            expect(request.cancellingUserId).toEqual("@alice:localhost");
         });
 
         it("can cancel during the SAS phase", async () => {
@@ -801,7 +808,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // we should now have QR data we can display
             const qrCodeBuffer = (await request.generateQRCode())!;
             expect(qrCodeBuffer).toBeTruthy();
-            const sharedSecret = qrCodeBuffer.subarray(74 + transactionId.length);
+            const sharedSecret = qrCodeBuffer.slice(74 + transactionId.length);
 
             // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
             returnToDeviceMessageFromSync(buildReciprocateStartMessage(transactionId, sharedSecret));
@@ -986,6 +993,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             aliceClient.setGlobalErrorOnUnknownDevices(false);
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
             await syncPromise(aliceClient);
+
+            // Rust crypto requires the sender's device keys before it accepts a
+            // verification request.
+            if (backend === "rust-sdk") {
+                const crypto = aliceClient.getCrypto()!;
+
+                const bobDeviceKeys = getTestOlmAccountKeys(testOlmAccount, BOB_TEST_USER_ID, "BobDevice");
+                e2eKeyResponder.addDeviceKeys(bobDeviceKeys);
+                syncResponder.sendOrQueueSyncResponse({ device_lists: { changed: [BOB_TEST_USER_ID] } });
+                await syncPromise(aliceClient);
+                await crypto.getUserDeviceInfo([BOB_TEST_USER_ID]);
+            }
         });
 
         /**
@@ -1285,7 +1304,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1309,7 +1328,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1334,7 +1353,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1355,7 +1374,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers();
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1508,7 +1527,7 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     return new Promise((resolve) => {
         fetchMock.putOnce(
             new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp(msgtype)}`),
-            (url: string, opts: RequestInit): MockResponse => {
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
                 resolve(JSON.parse(opts.body as string));
                 return {};
             },
@@ -1532,7 +1551,7 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
 
     fetchMock.put(
         new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
-        (url: string, opts: RequestInit): MockResponse => {
+        (url: string, opts: RequestInit): FetchMock.MockResponse => {
             const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
             // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
             const content = Object.values(messages)[0] as any;
@@ -1623,7 +1642,7 @@ function buildReadyMessage(
 }
 
 /** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
-function buildReciprocateStartMessage(transactionId: string, sharedSecret: Uint8Array) {
+function buildReciprocateStartMessage(transactionId: string, sharedSecret: ArrayBuffer) {
     return {
         type: "m.key.verification.start",
         content: {
@@ -1719,7 +1738,7 @@ function buildQRCode(
     key2Base64: string,
     sharedSecret: string,
     mode = 0x02,
-): Uint8Array {
+): Uint8ClampedArray {
     // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
 
     const qrCodeBuffer = Buffer.alloc(150); // oversize
@@ -1735,5 +1754,5 @@ function buildQRCode(
     idx += qrCodeBuffer.write(sharedSecret, idx);
 
     // truncate to the right length
-    return qrCodeBuffer.subarray(0, idx);
+    return new Uint8ClampedArray(qrCodeBuffer.subarray(0, idx));
 }

@@ -178,6 +178,6 @@ export const populateThread = ({
 }: MakeThreadProps): MakeThreadResult => {
     const ret = mkThread({ room, client, authorId, participantUserIds, length, ts });
     ret.thread.initialEventsFetched = true;
-    room.addLiveEvents(ret.events);
+    room.addLiveEvents(ret.events, { addToState: false });
     return ret;
 };

@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator";
-import { IClearEvent, MatrixEvent } from "../models/event";
-import { Room } from "../models/room";
-import { CryptoApi, ImportRoomKeysOpts } from "../crypto-api";
-import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning";
-import { IEncryptedEventInfo } from "../crypto/api";
-import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup";
-import { IMegolmSessionData } from "../@types/crypto";
+import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
+import { IClearEvent, MatrixEvent } from "../models/event.ts";
+import { Room } from "../models/room.ts";
+import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning.ts";
+import { IEncryptedEventInfo } from "../crypto/api.ts";
+import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { IMegolmSessionData } from "../@types/crypto.ts";
 
 /**
  * Common interface for the crypto implementations
@@ -78,6 +78,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * Get information about the encryption of an event
      *
      * @param event - event to be checked
+     * @deprecated Use {@link CryptoApi#getEncryptionInfoForEvent} instead
      */
     getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
 
@@ -107,16 +108,17 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @param backupInfo - The backup information
      * @param privKey - The private decryption key.
      */
-    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor>;
+    getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor>;
 
     /**
      * Import a list of room keys restored from backup
      *
      * @param keys - a list of session export objects
+     * @param backupVersion - the version of the backup these keys came from.
      * @param opts - options object
      * @returns a promise which resolves once the keys have been imported
      */
-    importBackedUpRoomKeys(keys: IMegolmSessionData[], opts?: ImportRoomKeysOpts): Promise<void>;
+    importBackedUpRoomKeys(keys: IMegolmSessionData[], backupVersion: string, opts?: ImportRoomKeysOpts): Promise<void>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -226,10 +228,6 @@ export interface EventDecryptionResult {
      * restored from backup)
      */
     untrusted?: boolean;
-    /**
-     * The sender doesn't authorize the unverified devices to decrypt his messages
-     */
-    encryptedDisabledForUnverifiedDevices?: boolean;
 }
 
 /**
@@ -262,4 +260,44 @@ export interface BackupDecryptor {
      * Should be called once the decryptor is no longer needed.
      */
     free(): void;
+}
+
+/**
+ * Exception thrown when decryption fails
+ *
+ * @param code - Reason code for the failure.
+ *
+ * @param msg - user-visible message describing the problem
+ *
+ * @param details - key/value pairs reported in the logs but not shown
+ *   to the user.
+ */
+export class DecryptionError extends Error {
+    public readonly detailedString: string;
+
+    public constructor(
+        public readonly code: DecryptionFailureCode,
+        msg: string,
+        details?: Record<string, string | Error>,
+    ) {
+        super(msg);
+        this.name = "DecryptionError";
+        this.detailedString = detailedStringForDecryptionError(this, details);
+    }
+}
+
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
+    let result = err.name + "[msg: " + err.message;
+
+    if (details) {
+        result +=
+            ", " +
+            Object.keys(details)
+                .map((k) => k + ": " + details[k])
+                .join(", ");
+    }
+
+    result += "]";
+
+    return result;
 }

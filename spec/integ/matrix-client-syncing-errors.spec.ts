@@ -105,13 +105,13 @@ describe("MatrixClient syncing errors", () => {
 
         await client!.startClient();
         expect(await syncEvents[0].promise).toBe(SyncState.Error);
-        jest.runAllTimers(); // this will skip forward to trigger the keepAlive/sync
+        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[1].promise).toBe(SyncState.Error);
-        jest.runAllTimers(); // this will skip forward to trigger the keepAlive/sync
+        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[2].promise).toBe(SyncState.Prepared);
-        jest.runAllTimers(); // this will skip forward to trigger the keepAlive/sync
+        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[3].promise).toBe(SyncState.Syncing);
-        jest.runAllTimers(); // this will skip forward to trigger the keepAlive/sync
+        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[4].promise).toBe(SyncState.Syncing);
     });
 
@@ -119,6 +119,7 @@ describe("MatrixClient syncing errors", () => {
         jest.useFakeTimers();
         fetchMock.config.overwriteRoutes = false;
         fetchMock
+            .get("end:capabilities", {})
             .getOnce("end:versions", {}) // first version check without credentials needs to succeed
             .get("end:versions", unknownTokenErrorData) // further version checks fails with 401
             .get("end:pushrules/", 401) // fails with 401 without an error. This does happen in practice e.g. with Synapse

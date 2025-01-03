@@ -21,17 +21,17 @@ import {
     DuplicateStrategy,
     IAddLiveEventOptions,
     EventTimelineSetHandlerMap,
-} from "./event-timeline-set";
-import { Direction, EventTimeline } from "./event-timeline";
-import { getHttpUriForMxc } from "../content-repo";
-import { compare, removeElement } from "../utils";
-import { normalize, noUnsafeEventProps } from "../utils";
-import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
-import { EventStatus } from "./event-status";
-import { RoomMember } from "./room-member";
-import { IRoomSummary, RoomSummary } from "./room-summary";
-import { logger } from "../logger";
-import { TypedReEmitter } from "../ReEmitter";
+} from "./event-timeline-set.ts";
+import { Direction, EventTimeline } from "./event-timeline.ts";
+import { getHttpUriForMxc } from "../content-repo.ts";
+import { removeElement } from "../utils.ts";
+import { normalize, noUnsafeEventProps } from "../utils.ts";
+import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event.ts";
+import { EventStatus } from "./event-status.ts";
+import { RoomMember } from "./room-member.ts";
+import { IRoomSummary, RoomSummary } from "./room-summary.ts";
+import { logger } from "../logger.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
 import {
     EventType,
     RoomCreateTypeField,
@@ -40,12 +40,12 @@ import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
     UNSIGNED_THREAD_ID_FIELD,
-} from "../@types/event";
-import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
-import { Filter, IFilterDefinition } from "../filter";
-import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
-import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
+} from "../@types/event.ts";
+import { MatrixClient, PendingEventOrdering } from "../client.ts";
+import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials.ts";
+import { Filter, IFilterDefinition } from "../filter.ts";
+import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state.ts";
+import { BeaconEvent, BeaconEventHandlerMap } from "./beacon.ts";
 import {
     Thread,
     ThreadEvent,
@@ -54,20 +54,23 @@ import {
     THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
-} from "./thread";
+} from "./thread.ts";
 import {
     CachedReceiptStructure,
     MAIN_ROOM_TIMELINE,
     Receipt,
     ReceiptContent,
     ReceiptType,
-} from "../@types/read_receipts";
-import { IStateEventWithRoomId } from "../@types/search";
-import { RelationsContainer } from "./relations-container";
-import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
-import { isPollEvent, Poll, PollEvent } from "./poll";
-import { RoomReceipts } from "./room-receipts";
-import { compareEventOrdering } from "./compare-event-ordering";
+} from "../@types/read_receipts.ts";
+import { IStateEventWithRoomId } from "../@types/search.ts";
+import { RelationsContainer } from "./relations-container.ts";
+import { ReadReceipt, synthesizeReceipt } from "./read-receipt.ts";
+import { isPollEvent, Poll, PollEvent } from "./poll.ts";
+import { RoomReceipts } from "./room-receipts.ts";
+import { compareEventOrdering } from "./compare-event-ordering.ts";
+import * as utils from "../utils.ts";
+import { KnownMembership, Membership } from "../@types/membership.ts";
+import { Capabilities, IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -177,7 +180,7 @@ export type RoomEventHandlerMap = {
      * @param membership - The new membership value
      * @param prevMembership - The previous membership value
      */
-    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    [RoomEvent.MyMembership]: (room: Room, membership: Membership, prevMembership?: Membership) => void;
     /**
      * Fires whenever a room's tags are updated.
      * @param event - The tags event
@@ -206,7 +209,7 @@ export type RoomEventHandlerMap = {
      * });
      * ```
      */
-    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
+    [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, prevEvent?: MatrixEvent) => void;
     /**
      * Fires whenever a receipt is received for a room
      * @param event - The receipt event
@@ -351,7 +354,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
-    private selfMembership?: string;
+    private selfMembership?: Membership;
     private summaryHeroes: string[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
@@ -382,13 +385,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public summary: RoomSummary | null = null;
     /**
-     * The live event timeline for this room, with the oldest event at index 0.
-     *
-     * @deprecated Present for backwards compatibility.
-     *             Use getLiveTimeline().getEvents() instead
-     */
-    public timeline!: MatrixEvent[];
-    /**
      * oldState The state of the room at the time of the oldest event in the live timeline.
      *
      * @deprecated Present for backwards compatibility.
@@ -402,19 +398,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
      */
     public currentState!: RoomState;
-    public readonly relations = new RelationsContainer(this.client, this);
+
+    public readonly relations;
 
     /**
      * A collection of events known by the client
      * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
-
-    /**
-     * @deprecated This value is unreliable. It may not contain the last thread.
-     *             Use {@link Room.getLastThread} instead.
-     */
-    public lastThread?: Thread;
 
     /**
      * A mapping of eventId to all visibility changes to apply
@@ -470,6 +461,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         private readonly opts: IOpts = {},
     ) {
         super();
+
         // In some cases, we add listeners for every displayed Matrix event, so it's
         // common to have quite a few more than the default limit.
         this.setMaxListeners(100);
@@ -479,6 +471,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.name = roomId;
         this.normalizedName = roomId;
+
+        this.relations = new RelationsContainer(this.client, this);
+
+        // Listen to our own receipt event as a more modular way of processing our own
+        // receipts. No need to remove the listener: it's on ourself anyway.
+        this.on(RoomEvent.Receipt, this.onReceipt);
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
@@ -527,7 +525,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 this.threadsTimelineSets[0] = timelineSets[0];
                 this.threadsTimelineSets[1] = timelineSets[1];
                 return timelineSets;
-            } catch (e) {
+            } catch {
                 this.threadTimelineSetsPromise = null;
                 return null;
             }
@@ -547,7 +545,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns Signals when all events have been decrypted
      */
     public async decryptCriticalEvents(): Promise<void> {
-        if (!this.client.isCryptoEnabled()) return;
+        if (!this.client.getCrypto()) return;
 
         const readReceiptEventId = this.getEventReadUpTo(this.client.getUserId()!, true);
         const events = this.getLiveTimeline().getEvents();
@@ -569,7 +567,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns Signals when all events have been decrypted
      */
     public async decryptAllEvents(): Promise<void> {
-        if (!this.client.isCryptoEnabled()) return;
+        if (!this.client.getCrypto()) return;
 
         const decryptionPromises = this.getUnfilteredTimelineSet()
             .getLiveTimeline()
@@ -607,27 +605,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Determines whether this room needs to be upgraded to a new version
-     * @returns What version the room should be upgraded to, or null if
-     *     the room does not require upgrading at this time.
-     * @deprecated Use #getRecommendedVersion() instead
-     */
-    public shouldUpgradeToVersion(): string | null {
-        // TODO: Remove this function.
-        // This makes assumptions about which versions are safe, and can easily
-        // be wrong. Instead, people are encouraged to use getRecommendedVersion
-        // which determines a safer value. This function doesn't use that function
-        // because this is not async-capable, and to avoid breaking the contract
-        // we're deprecating this.
-
-        if (!SAFE_ROOM_VERSIONS.includes(this.getVersion())) {
-            return KNOWN_SAFE_ROOM_VERSION;
-        }
-
-        return null;
-    }
-
-    /**
      * Determines the recommended room version for the room. This returns an
      * object with 3 properties: `version` as the new version the
      * room should be upgraded to (may be the same as the current version);
@@ -639,7 +616,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Resolves to the version the room should be upgraded to.
      */
     public async getRecommendedVersion(): Promise<IRecommendedVersion> {
-        const capabilities = await this.client.getCapabilities();
+        let capabilities: Capabilities = {};
+        try {
+            capabilities = await this.client.getCapabilities();
+        } catch {}
         let versionCap = capabilities["m.room_versions"];
         if (!versionCap) {
             versionCap = {
@@ -664,8 +644,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     "to be supporting a newer room version we don't know about.",
             );
 
-            const caps = await this.client.getCapabilities(true);
-            versionCap = caps["m.room_versions"];
+            try {
+                capabilities = await this.client.fetchCapabilities();
+            } catch (e) {
+                logger.warn("Failed to refresh room version capabilities", e);
+            }
+            versionCap = capabilities["m.room_versions"];
             if (!versionCap) {
                 logger.warn("No room version capability - assuming upgrade required.");
                 return result;
@@ -794,6 +778,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * The live event timeline for this room, with the oldest event at index 0.
+     *
+     * @deprecated Present for backwards compatibility.
+     *             Use getLiveTimeline().getEvents() instead
+     */
+    public get timeline(): MatrixEvent[] {
+        return this.getLiveTimeline().getEvents();
+    }
+
+    /**
      * Get the timestamp of the last message in the room
      *
      * @returns the timestamp of the last message in the room
@@ -860,8 +854,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * @returns the membership type (join | leave | invite | knock) for the logged in user
      */
-    public getMyMembership(): string {
-        return this.selfMembership ?? "leave";
+    public getMyMembership(): Membership {
+        return this.selfMembership ?? KnownMembership.Leave;
     }
 
     /**
@@ -875,7 +869,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return me.getDMInviter();
         }
 
-        if (this.selfMembership === "invite") {
+        if (this.selfMembership === KnownMembership.Invite) {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
             if (memberCount === 2) {
@@ -911,37 +905,69 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.myUserId;
     }
 
-    public getAvatarFallbackMember(): RoomMember | undefined {
-        const memberCount = this.getInvitedAndJoinedMemberCount();
-        if (memberCount > 2) {
-            return;
+    /**
+     * Gets the "functional members" in this room.
+     *
+     * Returns the list of userIDs from the `io.element.functional_members` event. Does not consider the
+     * current membership states of those users.
+     *
+     * @see https://github.com/element-hq/element-meta/blob/develop/spec/functional_members.md.
+     */
+    private getFunctionalMembers(): string[] {
+        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
+        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
+            return mFunctionalMembers!.getContent().service_members;
         }
-        const hasHeroes = Array.isArray(this.summaryHeroes) && this.summaryHeroes.length;
+        return [];
+    }
+
+    public getAvatarFallbackMember(): RoomMember | undefined {
+        const functionalMembers = this.getFunctionalMembers();
+
+        // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
+        let nonFunctionalMemberCount = 0;
+        this.getMembers()!.forEach((m) => {
+            if (m.membership !== "join" && m.membership !== "invite") return;
+            if (functionalMembers.includes(m.userId)) return;
+            nonFunctionalMemberCount++;
+        });
+        if (nonFunctionalMemberCount > 2) return;
+
+        // Prefer the list of heroes, if present. It should only include the single other user in the DM.
+        const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
+        const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
-            const availableMember = this.summaryHeroes!.map((userId) => {
-                return this.getMember(userId);
-            }).find((member) => !!member);
+            const availableMember = nonFunctionalHeroes
+                .map((userId) => {
+                    return this.getMember(userId);
+                })
+                .find((member) => !!member);
             if (availableMember) {
                 return availableMember;
             }
         }
-        const members = this.currentState.getMembers();
-        // could be different than memberCount
-        // as this includes left members
-        if (members.length <= 2) {
-            const availableMember = members.find((m) => {
+
+        // Consider *all*, including previous, members, to generate the avatar for DMs where the other user left.
+        // Needed to generate a matching avatar for rooms named "Empty Room (was Alice)".
+        const members = this.getMembers();
+        const nonFunctionalMembers = members?.filter((m) => !functionalMembers.includes(m.userId));
+        if (nonFunctionalMembers.length <= 2) {
+            const availableMember = nonFunctionalMembers.find((m) => {
                 return m.userId !== this.myUserId;
             });
             if (availableMember) {
                 return availableMember;
             }
         }
-        // if all else fails, try falling back to a user,
-        // and create a one-off member for it
+
+        // If all else failed, but the homeserver gave us heroes that previously could not be found in the room members,
+        // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
-            const availableUser = this.summaryHeroes!.map((userId) => {
-                return this.client.getUser(userId);
-            }).find((user) => !!user);
+            const availableUser = nonFunctionalHeroes
+                .map((userId) => {
+                    return this.client.getUser(userId);
+                })
+                .find((user) => !!user);
             if (availableUser) {
                 const member = new RoomMember(this.roomId, availableUser.userId);
                 member.user = availableUser;
@@ -954,11 +980,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Sets the membership this room was received as during sync
      * @param membership - join | leave | invite
      */
-    public updateMyMembership(membership: string): void {
+    public updateMyMembership(membership: Membership): void {
         const prevMembership = this.selfMembership;
         this.selfMembership = membership;
         if (prevMembership !== membership) {
-            if (membership === "leave") {
+            if (membership === KnownMembership.Leave) {
                 this.cleanupAfterLeaving();
             }
             this.emit(RoomEvent.MyMembership, this, membership, prevMembership);
@@ -967,7 +993,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     private async loadMembersFromServer(): Promise<IStateEventWithRoomId[]> {
         const lastSyncToken = this.client.store.getSyncToken();
-        const response = await this.client.members(this.roomId, undefined, "leave", lastSyncToken ?? undefined);
+        const response = await this.client.members(
+            this.roomId,
+            undefined,
+            KnownMembership.Leave,
+            lastSyncToken ?? undefined,
+        );
         return response.chunk;
     }
 
@@ -980,7 +1011,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // that this function is only called once (unless loading the members
         // fails), since loadMembersIfNeeded always returns this.membersPromise
         // if set, which will be the result of the first (successful) call.
-        if (rawMembersEvents === null || (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))) {
+        if (rawMembersEvents === null || this.hasEncryptionStateEvent()) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
             logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
@@ -1221,11 +1252,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const previousOldState = this.oldState;
         const previousCurrentState = this.currentState;
 
-        // maintain this.timeline as a reference to the live timeline,
-        // and this.oldState and this.currentState as references to the
+        // maintain this.oldState and this.currentState as references to the
         // state at the start and end of that timeline. These are more
         // for backwards-compatibility than anything else.
-        this.timeline = this.getLiveTimeline().getEvents();
         this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
         this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
 
@@ -1267,27 +1296,96 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    /**
-     * Returns whether there are any devices in the room that are unverified
-     *
-     * Note: Callers should first check if crypto is enabled on this device. If it is
-     * disabled, then we aren't tracking room devices at all, so we can't answer this, and an
-     * error will be thrown.
-     *
-     * @returns the result
-     */
-    public async hasUnverifiedDevices(): Promise<boolean> {
-        if (!this.client.isRoomEncrypted(this.roomId)) {
-            return false;
+    private onReceipt(event: MatrixEvent): void {
+        if (this.hasEncryptionStateEvent()) {
+            this.clearNotificationsOnReceipt(event);
         }
-        const e2eMembers = await this.getEncryptionTargetMembers();
-        for (const member of e2eMembers) {
-            const devices = this.client.getStoredDevicesForUser(member.userId);
-            if (devices.some((device) => device.isUnverified())) {
-                return true;
+    }
+
+    private clearNotificationsOnReceipt(event: MatrixEvent): void {
+        // Like above, we have to listen for read receipts from ourselves in order to
+        // correctly handle notification counts on encrypted rooms.
+        // This fixes https://github.com/vector-im/element-web/issues/9421
+
+        // Figure out if we've read something or if it's just informational
+        // We need to work out what threads we've just recieved receipts for, so we
+        // know which ones to update. If we've received an unthreaded receipt, we'll
+        // need to update all threads.
+        let threadIds: string[] = [];
+        let hasUnthreadedReceipt = false;
+
+        const content = event.getContent();
+
+        for (const receiptGroup of Object.values(content)) {
+            for (const [receiptType, userReceipt] of Object.entries(receiptGroup)) {
+                if (!utils.isSupportedReceiptType(receiptType)) continue;
+                if (!userReceipt) continue;
+
+                for (const [userId, singleReceipt] of Object.entries(userReceipt)) {
+                    if (!singleReceipt || typeof singleReceipt !== "object") continue;
+                    const typedSingleReceipt = singleReceipt as Record<string, any>;
+                    if (userId !== this.client.getUserId()) continue;
+                    if (typedSingleReceipt.thread_id === undefined) {
+                        hasUnthreadedReceipt = true;
+                    } else if (typeof typedSingleReceipt.thread_id === "string") {
+                        threadIds.push(typedSingleReceipt.thread_id);
+                    }
+                }
             }
         }
-        return false;
+
+        if (hasUnthreadedReceipt) {
+            // If we have an unthreaded receipt, we need to update any threads that have a notification
+            // in them (because we know the receipt can't go backwards so we don't need to check any with
+            // no notifications: the number can only decrease from a receipt).
+            threadIds = this.getThreads()
+                .filter(
+                    (thread) =>
+                        this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Total) > 0 ||
+                        this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Highlight) > 0,
+                )
+                .map((thread) => thread.id);
+            threadIds.push("main");
+        }
+
+        for (const threadId of threadIds) {
+            // Work backwards to determine how many events are unread. We also set
+            // a limit for how back we'll look to avoid spinning CPU for too long.
+            // If we hit the limit, we assume the count is unchanged.
+            const maxHistory = 20;
+            const timeline = threadId === "main" ? this.getLiveTimeline() : this.getThread(threadId)?.liveTimeline;
+
+            if (!timeline) {
+                logger.warn(`Couldn't find timeline for thread ID ${threadId} in room ${this.roomId}`);
+                continue;
+            }
+
+            const events = timeline.getEvents();
+
+            let highlightCount = 0;
+
+            for (let i = events.length - 1; i >= 0; i--) {
+                if (i === events.length - maxHistory) return; // limit reached
+
+                const event = events[i];
+
+                if (this.hasUserReadEvent(this.client.getUserId()!, event.getId()!)) {
+                    // If the user has read the event, then the counting is done.
+                    break;
+                }
+
+                const pushActions = this.client.getPushActionsForEvent(event);
+                highlightCount += pushActions?.tweaks?.highlight ? 1 : 0;
+            }
+
+            // Note: we don't need to handle 'total' notifications because the counts
+            // will come from the server.
+            if (threadId === "main") {
+                this.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
+            } else {
+                this.setThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight, highlightCount);
+            }
+        }
     }
 
     /**
@@ -1470,18 +1568,31 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Resets the thread notifications for this room
+     * Resets the total thread notifications for all threads in this room to zero,
+     * excluding any threads whose IDs are given in `exceptThreadIds`.
+     *
+     * If the room is not encrypted, also resets the highlight notification count to zero
+     * for the same set of threads.
+     *
+     * This is intended for use from the sync code since we calculate highlight notification
+     * counts locally from decrypted messages. We want to partially trust the total from the
+     * server such that we clear notifications when read receipts arrive. The weird name is
+     * intended to reflect this. You probably do not want to use this.
+     *
+     * @param exceptThreadIds - The thread IDs to exclude from the reset.
      */
-    public resetThreadUnreadNotificationCount(notificationsToKeep?: string[]): void {
-        if (notificationsToKeep) {
-            for (const [threadId] of this.threadNotifications) {
-                if (!notificationsToKeep.includes(threadId)) {
-                    this.threadNotifications.delete(threadId);
+    public resetThreadUnreadNotificationCountFromSync(exceptThreadIds: string[] = []): void {
+        const isEncrypted = this.hasEncryptionStateEvent();
+
+        for (const [threadId, notifs] of this.threadNotifications) {
+            if (!exceptThreadIds.includes(threadId)) {
+                notifs.total = 0;
+                if (!isEncrypted) {
+                    notifs.highlight = 0;
                 }
             }
-        } else {
-            this.threadNotifications.clear();
         }
+
         this.emit(RoomEvent.UnreadNotifications);
     }
 
@@ -1628,10 +1739,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public addEventsToTimeline(
         events: MatrixEvent[],
         toStartOfTimeline: boolean,
+        addToState: boolean,
         timeline: EventTimeline,
         paginationToken?: string,
     ): void {
-        timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, timeline, paginationToken);
+        timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, addToState, timeline, paginationToken);
     }
 
     /**
@@ -1673,7 +1785,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns A list of currently joined members.
      */
     public getJoinedMembers(): RoomMember[] {
-        return this.getMembersWithMembership("join");
+        return this.getMembersWithMembership(KnownMembership.Join);
     }
 
     /**
@@ -1708,7 +1820,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param membership - The membership state.
      * @returns A list of members with the given membership state.
      */
-    public getMembersWithMembership(membership: string): RoomMember[] {
+    public getMembersWithMembership(membership: Membership): RoomMember[] {
         return this.currentState.getMembers().filter(function (m) {
             return m.membership === membership;
         });
@@ -1721,9 +1833,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public async getEncryptionTargetMembers(): Promise<RoomMember[]> {
         await this.loadMembersIfNeeded();
-        let members = this.getMembersWithMembership("join");
+        let members = this.getMembersWithMembership(KnownMembership.Join);
         if (this.shouldEncryptForInvitedMembers()) {
-            members = members.concat(this.getMembersWithMembership("invite"));
+            members = members.concat(this.getMembersWithMembership(KnownMembership.Invite));
         }
         return members;
     }
@@ -1754,7 +1866,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param membership - The membership e.g. `'join'`
      * @returns True if this user_id has the given membership state.
      */
-    public hasMembershipState(userId: string, membership: string): boolean {
+    public hasMembershipState(userId: string, membership: Membership): boolean {
         const member = this.getMember(userId);
         if (!member) {
             return false;
@@ -1796,7 +1908,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // see https://github.com/vector-im/vector-web/issues/2109
 
             unfilteredLiveTimeline.getEvents().forEach(function (event) {
-                timelineSet.addLiveEvent(event);
+                timelineSet.addLiveEvent(event, { addToState: false }); // Filtered timeline sets should not track state
             });
 
             // find the earliest unfiltered timeline
@@ -1883,6 +1995,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 if (filterType !== ThreadFilterType.My || currentUserParticipated) {
                     timelineSet.getLiveTimeline().addEvent(thread.rootEvent!, {
                         toStartOfTimeline: false,
+                        addToState: false,
                     });
                 }
             });
@@ -1957,6 +2070,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 const opts = {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
+                    addToState: false,
                     roomState,
                 };
                 this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, opts);
@@ -1985,7 +2099,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Calls {@link processPollEvent} for a list of events.
+     * Process a list of poll events.
      *
      * @param events - List of events
      */
@@ -2079,6 +2193,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 duplicateStrategy: DuplicateStrategy.Replace,
                 fromCache: false,
                 roomState,
+                addToState: false,
             });
         }
     }
@@ -2270,9 +2385,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     duplicateStrategy: DuplicateStrategy.Replace,
                     fromCache: false,
                     roomState: this.currentState,
+                    addToState: false,
                 });
             } else {
-                timelineSet.addEventToTimeline(thread.rootEvent, timelineSet.getLiveTimeline(), { toStartOfTimeline });
+                timelineSet.addEventToTimeline(thread.rootEvent, timelineSet.getLiveTimeline(), {
+                    toStartOfTimeline,
+                    addToState: false,
+                });
             }
         }
     };
@@ -2303,6 +2422,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             receipts: this.cachedThreadReadReceipts.get(threadId) ?? [],
         });
 
+        // Add the re-emitter before we start adding events to the thread so we don't miss events
+        this.reEmitter.reEmit(thread, [
+            ThreadEvent.Delete,
+            ThreadEvent.Update,
+            ThreadEvent.NewReply,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
+        ]);
+
         // All read receipts should now come down from sync, we do not need to keep
         // a reference to the cached receipts anymore.
         this.cachedThreadReadReceipts.delete(threadId);
@@ -2317,22 +2445,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
         // and pass the event through this.
         thread.addEvents(events, false);
-
-        this.reEmitter.reEmit(thread, [
-            ThreadEvent.Delete,
-            ThreadEvent.Update,
-            ThreadEvent.NewReply,
-            RoomEvent.Timeline,
-            RoomEvent.TimelineReset,
-        ]);
-        const isNewer =
-            this.lastThread?.rootEvent &&
-            rootEvent?.localTimestamp &&
-            this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
-
-        if (!this.lastThread || isNewer) {
-            this.lastThread = thread;
-        }
 
         // We need to update the thread root events, but the thread may not be ready yet.
         // If it isn't, it will fire ThreadEvent.Update when it is and we'll call updateThreadRootEvents then.
@@ -2436,7 +2548,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Fires {@link RoomEvent.Timeline}
      */
     private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void {
-        const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
+        const { duplicateStrategy, timelineWasEmpty, fromCache, addToState } = addLiveEventOptions;
 
         // add to our timeline sets
         for (const timelineSet of this.timelineSets) {
@@ -2444,6 +2556,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 duplicateStrategy,
                 fromCache,
                 timelineWasEmpty,
+                addToState,
             });
         }
 
@@ -2527,11 +2640,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     if (timelineSet.getFilter()!.filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event, timelineSet.getLiveTimeline(), {
                             toStartOfTimeline: false,
+                            addToState: false, // We don't support localEcho of state events yet
                         });
                     }
                 } else {
                     timelineSet.addEventToTimeline(event, timelineSet.getLiveTimeline(), {
                         toStartOfTimeline: false,
+                        addToState: false, // We don't support localEcho of state events yet
                     });
                 }
             }
@@ -2565,7 +2680,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 .filter((event) => {
                     // Filter out the unencrypted messages if the room is encrypted
                     const isEventEncrypted = event.type === EventType.RoomMessageEncrypted;
-                    const isRoomEncrypted = this.client.isRoomEncrypted(this.roomId);
+                    const isRoomEncrypted = this.hasEncryptionStateEvent();
                     return isEventEncrypted || !isRoomEncrypted;
                 });
 
@@ -2754,53 +2869,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    /**
-     * Add some events to this room. This can include state events, message
-     * events and typing notifications. These events are treated as "live" so
-     * they will go to the end of the timeline.
-     *
-     * @param events - A list of events to add.
-     * @param addLiveEventOptions - addLiveEvent options
-     * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
-     */
-    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): Promise<void>;
-    /**
-     * @deprecated In favor of the overload with `IAddLiveEventOptions`
-     */
-    public async addLiveEvents(
-        events: MatrixEvent[],
-        duplicateStrategy?: DuplicateStrategy,
-        fromCache?: boolean,
-    ): Promise<void>;
-    public async addLiveEvents(
-        events: MatrixEvent[],
-        duplicateStrategyOrOpts?: DuplicateStrategy | IAddLiveEventOptions,
-        fromCache = false,
-    ): Promise<void> {
-        let duplicateStrategy: DuplicateStrategy | undefined = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean | undefined = false;
-        if (typeof duplicateStrategyOrOpts === "object") {
-            ({
-                duplicateStrategy,
-                fromCache = false,
-                /* roomState, (not used here) */
-                timelineWasEmpty,
-            } = duplicateStrategyOrOpts);
-        } else if (duplicateStrategyOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` " +
-                    "is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`",
-            );
-        }
-
-        if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
-            throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
-        }
-
-        // sanity check that the live timeline is still live
+    private assertTimelineSetsAreLive(): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
             const liveTimeline = this.timelineSets[i].getLiveTimeline();
             if (liveTimeline.getPaginationToken(EventTimeline.FORWARDS)) {
@@ -2817,6 +2886,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 throw new Error(`live timeline ${i} is no longer live - it has a neighbouring timeline`);
             }
         }
+    }
+
+    /**
+     * Add some events to this room. This can include state events, message
+     * events and typing notifications. These events are treated as "live" so
+     * they will go to the end of the timeline.
+     *
+     * @param events - A list of events to add.
+     * @param addLiveEventOptions - addLiveEvent options
+     * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
+     */
+    public async addLiveEvents(events: MatrixEvent[], addLiveEventOptions: IAddLiveEventOptions): Promise<void> {
+        const { duplicateStrategy, fromCache, timelineWasEmpty = false, addToState } = addLiveEventOptions;
+        if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
+            throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
+        }
+
+        // sanity check that the live timeline is still live
+        this.assertTimelineSetsAreLive();
 
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
@@ -2825,6 +2913,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             duplicateStrategy,
             fromCache,
             timelineWasEmpty,
+            addToState,
         };
 
         // List of extra events to check for being parents of any relations encountered
@@ -2843,11 +2932,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
             }
 
-            let { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
-                event,
-                neighbouringEvents,
-                threadRoots,
-            );
+            let {
+                shouldLiveInRoom,
+                shouldLiveInThread,
+                threadId = "",
+            } = this.eventShouldLiveIn(event, neighbouringEvents, threadRoots);
 
             if (!shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
                 try {
@@ -2862,20 +2951,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         event.setUnsigned(unsigned);
                     }
 
-                    ({ shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
-                        event,
-                        neighbouringEvents,
-                        threadRoots,
-                    ));
+                    ({
+                        shouldLiveInRoom,
+                        shouldLiveInThread,
+                        threadId = "",
+                    } = this.eventShouldLiveIn(event, neighbouringEvents, threadRoots));
                 } catch (e) {
                     logger.error("Failed to load parent event of unhandled relation", e);
                 }
             }
 
-            if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
-                eventsByThread[threadId ?? ""] = [];
+            if (shouldLiveInThread && !eventsByThread[threadId]) {
+                eventsByThread[threadId] = [];
             }
-            eventsByThread[threadId ?? ""]?.push(event);
+            eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(event, options);
@@ -2924,7 +3013,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 [[], [], []],
             );
         } else {
-            // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
+            // When `threadSupport` is disabled treat all events as timelineEvents
             return [events as MatrixEvent[], [] as MatrixEvent[], [] as MatrixEvent[]];
         }
     }
@@ -3083,7 +3172,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             const membership = membershipEvent.getContent().membership;
             this.updateMyMembership(membership!);
 
-            if (membership === "invite") {
+            if (membership === KnownMembership.Invite) {
                 const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
                 strippedStateEvents.forEach((strippedEvent) => {
                     const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
@@ -3096,7 +3185,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                                 content: strippedEvent.content,
                                 event_id: "$fake" + Date.now(),
                                 room_id: this.roomId,
-                                user_id: this.myUserId, // technically a lie
+                                sender: this.myUserId, // technically a lie
                             }),
                         ]);
                     }
@@ -3169,8 +3258,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public maySendMessage(): boolean {
         return (
-            this.getMyMembership() === "join" &&
-            (this.client.isRoomEncrypted(this.roomId)
+            this.getMyMembership() === KnownMembership.Join &&
+            (this.hasEncryptionStateEvent()
                 ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
                 : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId))
         );
@@ -3182,7 +3271,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns true if the user should be permitted to issue invites for this room.
      */
     public canInvite(userId: string): boolean {
-        let canInvite = this.getMyMembership() === "join";
+        let canInvite = this.getMyMembership() === KnownMembership.Join;
         const powerLevelsEvent = this.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         const powerLevels = powerLevelsEvent && powerLevelsEvent.getContent();
         const me = this.getMember(userId);
@@ -3347,11 +3436,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
         // get service members (e.g. helper bots) for exclusion
-        let excludedUserIds: string[] = [];
-        const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
-        if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            excludedUserIds = mFunctionalMembers!.getContent().service_members;
-        }
+        const excludedUserIds = this.getFunctionalMembers();
 
         // get members that are NOT ourselves and are actually in the room.
         let otherNames: string[] = [];
@@ -3368,7 +3453,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
-                return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
+                return (
+                    m.userId !== userId &&
+                    (m.membership === KnownMembership.Invite || m.membership === KnownMembership.Join)
+                );
             });
             otherMembers = otherMembers.filter(({ userId }) => {
                 // filter service members
@@ -3379,7 +3467,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return true;
             });
             // make sure members have stable order
-            otherMembers.sort((a, b) => compare(a.userId, b.userId));
+            const collator = new Intl.Collator();
+            otherMembers.sort((a, b) => collator.compare(a.userId, b.userId));
             // only 5 first members, immitate summaryHeroes
             otherMembers = otherMembers.slice(0, 5);
             otherNames = otherMembers.map((m) => m.name);
@@ -3396,7 +3485,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
-        if (myMembership == "join") {
+        if (myMembership == KnownMembership.Join) {
             const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
             if (thirdPartyInvites?.length) {
@@ -3420,7 +3509,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             leftNames = this.currentState
                 .getMembers()
                 .filter((m) => {
-                    return m.userId !== userId && m.membership !== "invite" && m.membership !== "join";
+                    return (
+                        m.userId !== userId &&
+                        m.membership !== KnownMembership.Invite &&
+                        m.membership !== KnownMembership.Join
+                    );
                 })
                 .map((m) => m.name);
         }
@@ -3671,6 +3764,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public compareEventOrdering(leftEventId: string, rightEventId: string): number | null {
         return compareEventOrdering(this, leftEventId, rightEventId);
+    }
+
+    /**
+     * Return true if this room has an `m.room.encryption` state event.
+     *
+     * If this returns `true`, events sent to this room should be encrypted (and `MatrixClient.sendEvent` and friends
+     * will encrypt outgoing events).
+     */
+    public hasEncryptionStateEvent(): boolean {
+        return Boolean(
+            this.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents(EventType.RoomEncryption, ""),
+        );
     }
 }
 

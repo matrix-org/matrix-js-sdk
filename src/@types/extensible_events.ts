@@ -16,16 +16,15 @@ limitations under the License.
 
 import { EitherAnd, NamespacedValue, Optional, UnstableValue } from "matrix-events-sdk";
 
-import { isProvided } from "../extensible_events_v1/utilities";
+import { isProvided } from "../extensible_events_v1/utilities.ts";
 
 // Types and utilities for MSC1767: Extensible events (version 1) in Matrix
 
 /**
  * Represents the stable and unstable values of a given namespace.
  */
-export type TSNamespace<N> = N extends NamespacedValue<infer S, infer U>
-    ? TSNamespaceValue<S> | TSNamespaceValue<U>
-    : never;
+export type TSNamespace<N> =
+    N extends NamespacedValue<infer S, infer U> ? TSNamespaceValue<S> | TSNamespaceValue<U> : never;
 
 /**
  * Represents a namespaced value, if the value is a string. Used to extract provided types

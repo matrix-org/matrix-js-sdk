@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Export for backward compatibility
-import { ImportRoomKeyProgressData } from "../crypto-api";
+import { ImportRoomKeyProgressData } from "../crypto-api/index.ts";
 
 export type {
     Curve25519AuthData as ICurve25519AuthData,
@@ -24,7 +24,7 @@ export type {
     Curve25519SessionData,
     KeyBackupSession as IKeyBackupSession,
     KeyBackupRoomSessions as IKeyBackupRoomSessions,
-} from "../crypto-api/keybackup";
+} from "../crypto-api/keybackup.ts";
 
 /* eslint-enable camelcase */
 

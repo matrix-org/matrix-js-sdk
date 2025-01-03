@@ -22,10 +22,10 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 import { Optional } from "matrix-events-sdk";
 
-import { IEvent, MatrixEvent } from "./models/event";
-import { M_TIMESTAMP } from "./@types/location";
-import { ReceiptType } from "./@types/read_receipts";
-import { BaseLogger } from "./logger";
+import { IEvent, MatrixEvent } from "./models/event.ts";
+import { M_TIMESTAMP } from "./@types/location.ts";
+import { ReceiptType } from "./@types/read_receipts.ts";
+import { BaseLogger } from "./logger.ts";
 
 const interns = new Map<string, string>();
 
@@ -407,9 +407,12 @@ export async function logDuration<T>(logger: BaseLogger, name: string, block: ()
 
 /**
  * Promise/async version of {@link setImmediate}.
+ *
+ * Implementation is based on `setTimeout` for wider compatibility.
+ * @deprecated Use {@link sleep} instead.
  */
 export function immediate(): Promise<void> {
-    return new Promise(setImmediate);
+    return new Promise((resolve) => setTimeout(resolve));
 }
 
 export function isNullOrUndefined(val: any): boolean {
@@ -646,16 +649,6 @@ export function lexicographicCompare(a: string, b: string): number {
     }
 }
 
-const collator = new Intl.Collator();
-/**
- * Performant language-sensitive string comparison
- * @param a - the first string to compare
- * @param b - the second string to compare
- */
-export function compare(a: string, b: string): number {
-    return collator.compare(a, b);
-}
-
 /**
  * This function is similar to Object.assign() but it assigns recursively and
  * allows you to ignore nullish values from the source
@@ -748,12 +741,7 @@ export function safeSet<O extends Record<any, any>, K extends keyof O>(obj: O, p
 }
 
 export function noUnsafeEventProps(event: Partial<IEvent>): boolean {
-    return !(
-        unsafeProp(event.room_id) ||
-        unsafeProp(event.sender) ||
-        unsafeProp(event.user_id) ||
-        unsafeProp(event.event_id)
-    );
+    return !(unsafeProp(event.room_id) || unsafeProp(event.sender) || unsafeProp(event.event_id));
 }
 
 export class MapWithDefault<K, V> extends Map<K, V> {

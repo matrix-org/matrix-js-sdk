@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
-import { ICrossSigningKey } from "../../client";
-import { IOlmDevice } from "../algorithms/megolm";
-import { TrackingStatus } from "../DeviceList";
-import { IRoomEncryption } from "../RoomList";
-import { IDevice } from "../deviceinfo";
-import { ICrossSigningInfo } from "../CrossSigning";
-import { Logger } from "../../logger";
-import { InboundGroupSessionData } from "../OlmDevice";
-import { MatrixEvent } from "../../models/event";
-import { DehydrationManager } from "../dehydration";
-import { IEncryptedPayload } from "../aes";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
+import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
+import { IOlmDevice } from "../algorithms/megolm.ts";
+import { TrackingStatus } from "../DeviceList.ts";
+import { IRoomEncryption } from "../RoomList.ts";
+import { IDevice } from "../deviceinfo.ts";
+import { ICrossSigningInfo } from "../CrossSigning.ts";
+import { Logger } from "../../logger.ts";
+import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { MatrixEvent } from "../../models/event.ts";
+import { DehydrationManager } from "../dehydration.ts";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Internal module. Definitions for storage for the crypto module
@@ -35,11 +35,11 @@ import { IEncryptedPayload } from "../aes";
 export interface SecretStorePrivateKeys {
     "dehydration": {
         keyInfo: DehydrationManager["keyInfo"];
-        key: IEncryptedPayload;
+        key: AESEncryptedSecretStoragePayload;
         deviceDisplayName: string;
         time: number;
     } | null;
-    "m.megolm_backup.v1": IEncryptedPayload;
+    "m.megolm_backup.v1": AESEncryptedSecretStoragePayload;
 }
 
 /**
@@ -100,13 +100,13 @@ export interface CryptoStore {
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
     storeAccount(txn: unknown, accountPickle: string): void;
-    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
+    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void;
-    storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void;
+    storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void;
     storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         type: K,
@@ -307,6 +307,13 @@ export interface ParkedSharedHistory {
 }
 
 /**
+ * Keys for the `account` object store to store the migration state.
+ * Values are defined in `MigrationState`.
+ * @internal
+ */
+export const ACCOUNT_OBJECT_KEY_MIGRATION_STATE = "migrationState";
+
+/**
  * A record of which steps have been completed in the libolm to Rust Crypto migration.
  *
  * Used by {@link CryptoStore#getMigrationState} and {@link CryptoStore#setMigrationState}.
@@ -325,6 +332,13 @@ export enum MigrationState {
 
     /** OLM_SESSIONS_MIGRATED, and in addition, we have migrated all the Megolm sessions. */
     MEGOLM_SESSIONS_MIGRATED,
+
+    /** MEGOLM_SESSIONS_MIGRATED, and in addition, we have migrated all the room settings. */
+    ROOM_SETTINGS_MIGRATED,
+
+    /** ROOM_SETTINGS_MIGRATED, and in addition, we have done the first own keys query in order to
+     * load the public part of the keys that have been migrated */
+    INITIAL_OWN_KEY_QUERY_DONE,
 }
 
 /**

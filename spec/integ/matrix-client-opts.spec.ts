@@ -6,6 +6,7 @@ import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
 import { IStore } from "../../src/store";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient opts", function () {
     const baseUrl = "http://localhost.or.something";
@@ -43,13 +44,13 @@ describe("MatrixClient opts", function () {
                             }),
                             utils.mkMembership({
                                 room: roomId,
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: userB,
                                 name: "Bob",
                             }),
                             utils.mkMembership({
                                 room: roomId,
-                                mship: "join",
+                                mship: KnownMembership.Join,
                                 user: userId,
                                 name: "Alice",
                             }),
@@ -79,7 +80,7 @@ describe("MatrixClient opts", function () {
         let client: MatrixClient;
         beforeEach(function () {
             client = new MatrixClient({
-                fetchFn: httpBackend.fetchFn as typeof global.fetch,
+                fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
                 store: undefined,
                 baseUrl: baseUrl,
                 userId: userId,
@@ -134,7 +135,7 @@ describe("MatrixClient opts", function () {
         let client: MatrixClient;
         beforeEach(function () {
             client = new MatrixClient({
-                fetchFn: httpBackend.fetchFn as typeof global.fetch,
+                fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
                 store: new MemoryStore() as IStore,
                 baseUrl: baseUrl,
                 userId: userId,

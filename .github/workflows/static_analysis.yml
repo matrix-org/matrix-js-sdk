@@ -8,16 +8,18 @@ on:
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
+permissions: {} # No permissions needed
 jobs:
     ts_lint:
         name: "Typescript Syntax Check"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
             - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version-file: package.json
 
             - name: Install Deps
               run: "yarn install"
@@ -25,25 +27,16 @@ jobs:
             - name: Typecheck
               run: "yarn run lint:types"
 
-            - name: Switch js-sdk to release mode
-              run: |
-                  scripts/switch_package_to_release.js
-                  yarn install
-                  yarn run build:compile
-                  yarn run build:types
-
-            - name: Typecheck (release mode)
-              run: "yarn run lint:types"
-
     js_lint:
         name: "ESLint"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
             - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version-file: package.json
 
             - name: Install Deps
               run: "yarn install"
@@ -53,13 +46,14 @@ jobs:
 
     workflow_lint:
         name: "Workflow Lint"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
             - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version-file: package.json
 
             - name: Install Deps
               run: "yarn install --frozen-lockfile"
@@ -69,26 +63,20 @@ jobs:
 
     docs:
         name: "JSDoc Checker"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
 
             - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version-file: package.json
 
             - name: Install Deps
               run: "yarn install"
 
             - name: Generate Docs
-              run: "yarn run gendoc --treatWarningsAsErrors"
-
-            # Upload artifact duplicates symlink contents so we do this to save 75% space
-            - name: Flatten symlink and write _redirects
-              run: |
-                  find _docs -mindepth 1 -maxdepth 1 ! -type f ! -name stable -printf '/%f/* /stable/:splat\n' > _docs/_redirects
-                  find _docs -mindepth 1 -maxdepth 1 -type l -delete
-                  find _docs -mindepth 1 -maxdepth 1 -type d -execdir mv {} stable \; -quit
+              run: "yarn run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
 
             - name: Upload Artifact
               uses: actions/upload-artifact@v4
@@ -97,3 +85,54 @@ jobs:
                   path: _docs
                   # We'll only use this in a workflow_run, then we're done with it
                   retention-days: 1
+
+    analyse_dead_code:
+        name: "Analyse Dead Code"
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version-file: package.json
+
+            - name: Install Deps
+              run: "yarn install --frozen-lockfile"
+
+            - name: Run linter
+              run: "yarn run lint:knip"
+
+    element-web:
+        name: Downstream tsc element-web
+        if: github.event_name == 'merge_group'
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  repository: element-hq/element-web
+
+            - uses: actions/setup-node@v4
+              with:
+                  cache: "yarn"
+                  node-version: "lts/*"
+
+            - name: Install Dependencies
+              run: "./scripts/layered.sh"
+              env:
+                  # tell layered.sh to check out the right sha of the JS-SDK
+                  JS_SDK_GITHUB_BASE_REF: ${{ github.sha }}
+
+            - name: Typecheck
+              run: "yarn run lint:types"
+
+    # Hook for branch protection to skip downstream typechecking outside of merge queues
+    downstream:
+        name: Downstream Typescript Syntax Check
+        runs-on: ubuntu-24.04
+        if: always()
+        needs:
+            - element-web
+        steps:
+            - if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
+              run: exit 1

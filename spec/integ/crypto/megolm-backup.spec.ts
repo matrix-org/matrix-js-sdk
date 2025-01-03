@@ -21,8 +21,8 @@ import { Mocked } from "jest-mock";
 
 import {
     createClient,
-    CryptoApi,
-    CryptoEvent,
+    Crypto,
+    encodeBase64,
     ICreateClientOpts,
     IEvent,
     IMegolmSessionData,
@@ -42,9 +42,10 @@ import {
 } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
-import { IKeyBackup } from "../../../src/crypto/backup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
+import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent } from "../../../src/crypto-api";
+import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
 
@@ -90,7 +91,7 @@ function mockUploadEmitter(
                     },
                 };
             }
-            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+            const uploadPayload: KeyBackup = JSON.parse((request.body as string) ?? "{}");
             let count = 0;
             for (const [roomId, value] of Object.entries(uploadPayload.rooms)) {
                 for (const sessionId of Object.keys(value.sessions)) {
@@ -116,8 +117,10 @@ function mockUploadEmitter(
 describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
-    // const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
-    // const newBackendOnly = backend === "libolm" ? test.skip : test;
+    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+    const newBackendOnly = backend === "libolm" ? test.skip : test;
+
+    const isNewBackend = backend === "rust-sdk";
 
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
@@ -129,7 +132,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     let e2eKeyResponder: E2EKeyResponder;
 
     beforeEach(async () => {
-        jest.useFakeTimers();
+        // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -191,28 +195,31 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             }
         }
 
-        beforeEach(async () => {
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        beforeEach(
+            async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
-            // ignore requests to send room key requests
-            fetchMock.put("express:/_matrix/client/v3/sendToDevice/m.room_key_request/:request_id", {});
+                // ignore requests to send room key requests
+                fetchMock.put("express:/_matrix/client/v3/sendToDevice/m.room_key_request/:request_id", {});
 
-            aliceClient = await initTestClient();
-            const aliceCrypto = aliceClient.getCrypto()!;
-            await aliceCrypto.storeSessionBackupPrivateKey(
-                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
-            );
+                aliceClient = await initTestClient();
+                const aliceCrypto = aliceClient.getCrypto()!;
+                await aliceCrypto.storeSessionBackupPrivateKey(
+                    Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                    testData.SIGNED_BACKUP_DATA.version!,
+                );
 
-            // start after saving the private key
-            await aliceClient.startClient();
+                // start after saving the private key
+                await aliceClient.startClient();
 
-            // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
-            // XXX: should we automatically re-check after a device becomes verified?
-            await waitForDeviceList();
-            await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-            await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
-        });
+                // tell Alice to trust the dummy device that signed the backup, and re-check the backup.
+                // XXX: should we automatically re-check after a device becomes verified?
+                await waitForDeviceList();
+                await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+                await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+            } /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */,
+            10000,
+        );
 
         it("Alice checks key backups when receiving a message she can't decrypt", async () => {
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id", (url, request) => {
@@ -238,8 +245,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const room = aliceClient.getRoom(ROOM_ID)!;
             const event = room.getLiveTimeline().getEvents()[0];
-            await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
 
+            // On the first decryption attempt, decryption fails.
+            await awaitDecryption(event);
+            expect(event.decryptionFailureReason).toEqual(
+                isNewBackend
+                    ? DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP
+                    : DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
+            );
+
+            // Eventually, decryption succeeds.
+            await awaitDecryption(event, { waitOnDecryptionFailure: true });
             expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
         });
 
@@ -296,10 +312,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     });
 
     describe("recover from backup", () => {
-        let aliceCrypto: CryptoApi;
+        let aliceCrypto: Crypto.CryptoApi;
 
         beforeEach(async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+            fetchMock.get(
+                `path:/_matrix/client/v3/room_keys/version/${testData.SIGNED_BACKUP_DATA.version}`,
+                testData.SIGNED_BACKUP_DATA,
+            );
 
             aliceClient = await initTestClient();
             aliceCrypto = aliceClient.getCrypto()!;
@@ -330,19 +350,28 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 onKeyCached = resolve;
             });
 
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
+            );
+
             const result = await advanceTimersUntil(
-                aliceClient.restoreKeyBackupWithRecoveryKey(
-                    testData.BACKUP_DECRYPTION_KEY_BASE58,
-                    undefined,
-                    undefined,
-                    check!.backupInfo!,
-                    {
-                        cacheCompleteCallback: () => onKeyCached(),
-                    },
-                ),
+                isNewBackend
+                    ? aliceCrypto.restoreKeyBackup()
+                    : aliceClient.restoreKeyBackupWithRecoveryKey(
+                          testData.BACKUP_DECRYPTION_KEY_BASE58,
+                          undefined,
+                          undefined,
+                          check!.backupInfo!,
+                          {
+                              cacheCompleteCallback: () => onKeyCached(),
+                          },
+                      ),
             );
 
             expect(result.imported).toStrictEqual(1);
+
+            if (isNewBackend) return;
 
             await awaitKeyCached;
 
@@ -384,8 +413,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         it("Should import full backup in chunks", async function () {
             const importMockImpl = jest.fn();
-            // @ts-ignore - mock a private method for testing purpose
-            aliceCrypto.importBackedUpRoomKeys = importMockImpl;
+            if (isNewBackend) {
+                // @ts-ignore - mock a private method for testing purpose
+                jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
+            } else {
+                // @ts-ignore - mock a private method for testing purpose
+                jest.spyOn(aliceCrypto, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
+            }
 
             // We need several rooms with several sessions to test chunking
             const { response, expectedTotal } = createBackupDownloadResponse([45, 300, 345, 12, 130]);
@@ -394,16 +428,25 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
 
-            const progressCallback = jest.fn();
-            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
-                testData.BACKUP_DECRYPTION_KEY_BASE58,
-                undefined,
-                undefined,
-                check!.backupInfo!,
-                {
-                    progressCallback,
-                },
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
             );
+
+            const progressCallback = jest.fn();
+            const result = await (isNewBackend
+                ? aliceCrypto.restoreKeyBackup({
+                      progressCallback,
+                  })
+                : aliceClient.restoreKeyBackupWithRecoveryKey(
+                      testData.BACKUP_DECRYPTION_KEY_BASE58,
+                      undefined,
+                      undefined,
+                      check!.backupInfo!,
+                      {
+                          progressCallback,
+                      },
+                  ));
 
             expect(result.imported).toStrictEqual(expectedTotal);
             // Should be called 5 times: 200*4 plus one chunk with the remaining 32
@@ -437,8 +480,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
         });
 
         it("Should continue to process backup if a chunk import fails and report failures", async function () {
-            // @ts-ignore - mock a private method for testing purpose
-            aliceCrypto.importBackedUpRoomKeys = jest
+            const importMockImpl = jest
                 .fn()
                 .mockImplementationOnce(() => {
                     // Fail to import first chunk
@@ -447,22 +489,36 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 // Ok for other chunks
                 .mockResolvedValue(undefined);
 
+            if (isNewBackend) {
+                // @ts-ignore - mock a private method for testing purpose
+                jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
+            } else {
+                // @ts-ignore - mock a private method for testing purpose
+                jest.spyOn(aliceCrypto, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
+            }
+
             const { response, expectedTotal } = createBackupDownloadResponse([100, 300]);
 
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", response);
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
+            );
 
             const progressCallback = jest.fn();
-            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
-                testData.BACKUP_DECRYPTION_KEY_BASE58,
-                undefined,
-                undefined,
-                check!.backupInfo!,
-                {
-                    progressCallback,
-                },
-            );
+            const result = await (isNewBackend
+                ? aliceCrypto.restoreKeyBackup({ progressCallback })
+                : aliceClient.restoreKeyBackupWithRecoveryKey(
+                      testData.BACKUP_DECRYPTION_KEY_BASE58,
+                      undefined,
+                      undefined,
+                      check!.backupInfo!,
+                      {
+                          progressCallback,
+                      },
+                  ));
 
             expect(result.total).toStrictEqual(expectedTotal);
             // A chunk failed to import
@@ -513,20 +569,26 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", response);
 
             const check = await aliceCrypto.checkKeyBackupAndEnable();
-
-            const result = await aliceClient.restoreKeyBackupWithRecoveryKey(
-                testData.BACKUP_DECRYPTION_KEY_BASE58,
-                undefined,
-                undefined,
-                check!.backupInfo!,
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
+                check!.backupInfo!.version!,
             );
+
+            const result = await (isNewBackend
+                ? aliceCrypto.restoreKeyBackup()
+                : aliceClient.restoreKeyBackupWithRecoveryKey(
+                      testData.BACKUP_DECRYPTION_KEY_BASE58,
+                      undefined,
+                      undefined,
+                      check!.backupInfo!,
+                  ));
 
             expect(result.total).toStrictEqual(expectedTotal);
             // A chunk failed to import
             expect(result.imported).toStrictEqual(expectedTotal - decryptionFailureCount);
         });
 
-        it("recover specific session from backup", async function () {
+        oldBackendOnly("recover specific session from backup", async function () {
             fetchMock.get(
                 "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
                 testData.CURVE25519_KEY_BACKUP_DATA,
@@ -546,7 +608,33 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(result.imported).toStrictEqual(1);
         });
 
-        it("Fails on bad recovery key", async function () {
+        newBackendOnly(
+            "Should get the decryption key from the secret storage and restore the key backup",
+            async function () {
+                // @ts-ignore - mock a private method for testing purpose
+                jest.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
+
+                const fullBackup = {
+                    rooms: {
+                        [ROOM_ID]: {
+                            sessions: {
+                                [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
+                            },
+                        },
+                    },
+                };
+                fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+                await aliceCrypto.loadSessionBackupPrivateKeyFromSecretStorage();
+                const decryptionKey = await aliceCrypto.getSessionBackupPrivateKey();
+                expect(encodeBase64(decryptionKey!)).toStrictEqual(testData.BACKUP_DECRYPTION_KEY_BASE64);
+
+                const result = await aliceCrypto.restoreKeyBackup();
+                expect(result.imported).toStrictEqual(1);
+            },
+        );
+
+        oldBackendOnly("Fails on bad recovery key", async function () {
             const fullBackup = {
                 rooms: {
                     [ROOM_ID]: {
@@ -569,6 +657,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                     check!.backupInfo!,
                 ),
             ).rejects.toThrow();
+        });
+
+        newBackendOnly("Should throw an error if the decryption key is not found in cache", async () => {
+            await expect(aliceCrypto.restoreKeyBackup()).rejects.toThrow("No decryption key found in crypto store");
         });
     });
 
@@ -782,7 +874,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
             expect(result).toBeTruthy();
-            jest.runAllTimers();
+            jest.advanceTimersByTime(10 * 60 * 1000);
             await failurePromise;
 
             // Fix the endpoint to do successful uploads
@@ -815,7 +907,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             });
 
             // run the timers, which will make the backup loop redo the request
-            await jest.runAllTimersAsync();
+            await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
             await successPromise;
             await allKeysUploadedPromise;
         });
@@ -874,6 +966,40 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         backupStatus = await aliceCrypto.getActiveSessionBackupVersion();
         expect(backupStatus).toStrictEqual(testData.SIGNED_BACKUP_DATA.version);
+    });
+
+    newBackendOnly("getKeyBackupInfo() should not return a backup if the active backup has been deleted", async () => {
+        // 404 means that there is no active backup
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", 404);
+        fetchMock.delete(`express:/_matrix/client/v3/room_keys/version/${testData.SIGNED_BACKUP_DATA.version}`, {});
+
+        aliceClient = await initTestClient();
+        const aliceCrypto = aliceClient.getCrypto()!;
+        await aliceClient.startClient();
+
+        // tell Alice to trust the dummy device that signed the backup
+        await waitForDeviceList();
+        await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+        await aliceCrypto.checkKeyBackupAndEnable();
+
+        // At this point there is no backup
+        expect(await aliceCrypto.getKeyBackupInfo()).toBeNull();
+
+        // Return now the backup
+        fetchMock.get("express:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA, {
+            overwriteRoutes: true,
+        });
+
+        expect(await aliceCrypto.getKeyBackupInfo()).toStrictEqual(testData.SIGNED_BACKUP_DATA);
+
+        // Delete the backup and we are expecting the key backup to be disabled
+        const keyBackupStatus = defer<boolean>();
+        aliceClient.once(CryptoEvent.KeyBackupStatus, (enabled) => keyBackupStatus.resolve(enabled));
+        await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version!);
+        expect(await keyBackupStatus.promise).toBe(false);
+
+        // The backup info should not be available anymore
+        expect(await aliceCrypto.getKeyBackupInfo()).toBeNull();
     });
 
     describe("isKeyBackupTrusted", () => {

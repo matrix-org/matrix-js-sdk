@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { IMarkerFoundOptions, RoomState } from "./room-state";
-import { EventTimelineSet } from "./event-timeline-set";
-import { MatrixEvent } from "./event";
-import { Filter } from "../filter";
-import { EventType } from "../@types/event";
+import { IMarkerFoundOptions, RoomState } from "./room-state.ts";
+import { EventTimelineSet } from "./event-timeline-set.ts";
+import { MatrixEvent } from "./event.ts";
+import { Filter } from "../filter.ts";
+import { EventType } from "../@types/event.ts";
 
 export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, "timelineWasEmpty"> {
     // This is a separate interface without any extra stuff currently added on
@@ -36,6 +35,11 @@ export interface IAddEventOptions extends Pick<IMarkerFoundOptions, "timelineWas
     toStartOfTimeline: boolean;
     /** The state events to reconcile metadata from */
     roomState?: RoomState;
+    /** Whether to add timeline events to the state as was done in legacy sync v2.
+     * If true then timeline events will be added to the state.
+     * In sync v2 with org.matrix.msc4222.use_state_after and simplified sliding sync,
+     * all state arrives explicitly and timeline events should not be added. */
+    addToState: boolean;
 }
 
 export enum Direction {
@@ -268,7 +272,7 @@ export class EventTimeline {
     /**
      * Get a pagination token
      *
-     * @param direction -   EventTimeline.BACKWARDS to get the pagination
+     * @param direction - EventTimeline.BACKWARDS to get the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to get the
      *   pagination token for going forwards in time.
      *
@@ -361,30 +365,10 @@ export class EventTimeline {
      * @param event - new event
      * @param options - addEvent options
      */
-    public addEvent(event: MatrixEvent, { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions): void;
-    /**
-     * @deprecated In favor of the overload with `IAddEventOptions`
-     */
-    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, roomState?: RoomState): void;
     public addEvent(
         event: MatrixEvent,
-        toStartOfTimelineOrOpts: boolean | IAddEventOptions,
-        roomState?: RoomState,
+        { toStartOfTimeline, roomState, timelineWasEmpty, addToState }: IAddEventOptions,
     ): void {
-        let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean | undefined;
-        if (typeof toStartOfTimelineOrOpts === "object") {
-            ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
-        } else if (toStartOfTimelineOrOpts !== undefined) {
-            // Deprecation warning
-            // FIXME: Remove after 2023-06-01 (technical debt)
-            logger.warn(
-                "Overload deprecated: " +
-                    "`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` " +
-                    "is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`",
-            );
-        }
-
         if (!roomState) {
             roomState = toStartOfTimeline ? this.startState : this.endState;
         }
@@ -395,7 +379,7 @@ export class EventTimeline {
             EventTimeline.setEventMetadata(event, roomState!, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
-            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+            if (addToState && event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
                 roomState?.setStateEvents([event], { timelineWasEmpty });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
@@ -438,14 +422,14 @@ export class EventTimeline {
      *
      * @internal
      */
-    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState): void {
+    public insertEvent(event: MatrixEvent, insertIndex: number, roomState: RoomState, addToState: boolean): void {
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
             EventTimeline.setEventMetadata(event, roomState, false);
 
             // modify state but only on unfiltered timelineSets
-            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+            if (addToState && event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
                 roomState.setStateEvents([event], {});
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try

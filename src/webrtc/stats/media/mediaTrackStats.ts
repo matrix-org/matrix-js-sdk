@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { AudioConcealment } from "../statsReport";
-import { TrackId } from "./mediaTrackHandler";
+import { AudioConcealment } from "../statsReport.ts";
+import { TrackId } from "./mediaTrackHandler.ts";
 
 export interface PacketLoss {
     packetsTotal: number;

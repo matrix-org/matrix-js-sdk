@@ -36,7 +36,7 @@ describe("RoomReceipts", () => {
         // Given there are no receipts in the room
         const room = createRoom();
         const [event] = createEvent();
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
 
         // When I ask about any event, then it is unread
         expect(room.hasUserReadEvent(readerId, event.getId()!)).toBe(false);
@@ -46,7 +46,7 @@ describe("RoomReceipts", () => {
         // Given there are no receipts in the room
         const room = createRoom();
         const [event] = createEventSentBy(readerId);
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
 
         // When I ask about an event I sent, it is read (because a synthetic
         // receipt was created and stored in RoomReceipts)
@@ -57,7 +57,7 @@ describe("RoomReceipts", () => {
         // Given my event exists and is unread
         const room = createRoom();
         const [event, eventId] = createEvent();
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
         expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
 
         // When we receive a receipt for this event+user
@@ -72,7 +72,7 @@ describe("RoomReceipts", () => {
         const room = createRoom();
         const [event1, event1Id] = createEvent();
         const [event2] = createEvent();
-        room.addLiveEvents([event1, event2]);
+        room.addLiveEvents([event1, event2], { addToState: false });
 
         // When we receive a receipt for the later event
         room.addReceipt(createReceipt(readerId, event2));
@@ -86,7 +86,7 @@ describe("RoomReceipts", () => {
         const room = createRoom();
         const [oldEvent, oldEventId] = createEvent();
         const [liveEvent] = createEvent();
-        room.addLiveEvents([liveEvent]);
+        room.addLiveEvents([liveEvent], { addToState: false });
         createOldTimeline(room, [oldEvent]);
 
         // When we receive a receipt for the live event
@@ -120,7 +120,7 @@ describe("RoomReceipts", () => {
         const room = createRoom();
         const [event1] = createEvent();
         const [event2, event2Id] = createEvent();
-        room.addLiveEvents([event1, event2]);
+        room.addLiveEvents([event1, event2], { addToState: false });
 
         // When we receive a receipt for the earlier event
         room.addReceipt(createReceipt(readerId, event1));
@@ -133,7 +133,7 @@ describe("RoomReceipts", () => {
         // Given my event exists and is unread
         const room = createRoom();
         const [event, eventId] = createEvent();
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
         expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
 
         // When we receive a receipt for another user
@@ -151,7 +151,7 @@ describe("RoomReceipts", () => {
         const room = createRoom();
         const [previousEvent] = createEvent();
         const [myEvent] = createEventSentBy(readerId);
-        room.addLiveEvents([previousEvent, myEvent]);
+        room.addLiveEvents([previousEvent, myEvent], { addToState: false });
 
         // And I just received a receipt for the previous event
         room.addReceipt(createReceipt(readerId, previousEvent));
@@ -165,7 +165,7 @@ describe("RoomReceipts", () => {
         const room = createRoom();
         const [myEvent] = createEventSentBy(readerId);
         const [laterEvent] = createEvent();
-        room.addLiveEvents([myEvent, laterEvent]);
+        room.addLiveEvents([myEvent, laterEvent], { addToState: false });
 
         // When I ask about the later event, it is unread (because it's after the synthetic receipt)
         expect(room.hasUserReadEvent(readerId, laterEvent.getId()!)).toBe(false);
@@ -177,7 +177,7 @@ describe("RoomReceipts", () => {
         const [event1] = createEvent();
         const [event2, event2Id] = createEvent();
         const [event3, event3Id] = createEvent();
-        room.addLiveEvents([event1, event2, event3]);
+        room.addLiveEvents([event1, event2, event3], { addToState: false });
 
         // When we receive receipts for the older events out of order
         room.addReceipt(createReceipt(readerId, event2));
@@ -192,7 +192,7 @@ describe("RoomReceipts", () => {
         // Given my event exists and is unread
         const room = createRoom();
         const [event, eventId] = createEvent();
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
         expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
 
         // When we receive a receipt for this event+user
@@ -208,7 +208,7 @@ describe("RoomReceipts", () => {
         const [root, rootId] = createEvent();
         const [event, eventId] = createThreadedEvent(root);
         setupThread(room, root);
-        room.addLiveEvents([root, event]);
+        room.addLiveEvents([root, event], { addToState: false });
         expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
 
         // When we receive a receipt for this event on this thread
@@ -225,7 +225,7 @@ describe("RoomReceipts", () => {
         const [event1, event1Id] = createThreadedEvent(root);
         const [event2] = createThreadedEvent(root);
         setupThread(room, root);
-        room.addLiveEvents([root, event1, event2]);
+        room.addLiveEvents([root, event1, event2], { addToState: false });
 
         // When we receive a receipt for the later event
         room.addReceipt(createThreadedReceipt(readerId, event2, rootId));
@@ -241,7 +241,7 @@ describe("RoomReceipts", () => {
         const [event1] = createThreadedEvent(root);
         const [event2, event2Id] = createThreadedEvent(root);
         setupThread(room, root);
-        room.addLiveEvents([root, event1, event2]);
+        room.addLiveEvents([root, event1, event2], { addToState: false });
 
         // When we receive a receipt for the earlier event
         room.addReceipt(createThreadedReceipt(readerId, event1, rootId));
@@ -256,7 +256,7 @@ describe("RoomReceipts", () => {
         const [root, rootId] = createEvent();
         const [event, eventId] = createThreadedEvent(root);
         setupThread(room, root);
-        room.addLiveEvents([root, event]);
+        room.addLiveEvents([root, event], { addToState: false });
         expect(room.hasUserReadEvent(readerId, eventId)).toBe(false);
 
         // When we receive a receipt for another user
@@ -278,7 +278,7 @@ describe("RoomReceipts", () => {
         const [thread2] = createThreadedEvent(root2);
         setupThread(room, root1);
         setupThread(room, root2);
-        room.addLiveEvents([root1, root2, thread1, thread2]);
+        room.addLiveEvents([root1, root2, thread1, thread2], { addToState: false });
 
         // When we receive a receipt for the later event
         room.addReceipt(createThreadedReceipt(readerId, thread2, root2.getId()!));
@@ -295,7 +295,7 @@ describe("RoomReceipts", () => {
         const [event2, event2Id] = createThreadedEvent(root);
         const [event3, event3Id] = createThreadedEvent(root);
         setupThread(room, root);
-        room.addLiveEvents([root, event1, event2, event3]);
+        room.addLiveEvents([root, event1, event2, event3], { addToState: false });
 
         // When we receive receipts for the older events out of order
         room.addReceipt(createThreadedReceipt(readerId, event2, rootId));
@@ -329,7 +329,7 @@ describe("RoomReceipts", () => {
         const [thread2b, thread2bId] = createThreadedEvent(main2);
         setupThread(room, main1);
         setupThread(room, main2);
-        room.addLiveEvents([main1, thread1a, thread1b, main2, thread2a, main3, thread2b]);
+        room.addLiveEvents([main1, thread1a, thread1b, main2, thread2a, main3, thread2b], { addToState: false });
 
         // And the timestamps on the events are consistent with the order above
         main1.event.origin_server_ts = 1;
@@ -377,7 +377,7 @@ describe("RoomReceipts", () => {
 
             // Add the event to the room
             // The receipt is removed from the dangling state
-            room.addLiveEvents([event]);
+            room.addLiveEvents([event], { addToState: false });
 
             // Then the event is read
             expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
@@ -398,7 +398,7 @@ describe("RoomReceipts", () => {
 
             // Add the events to the room
             // The receipt is removed from the dangling state
-            room.addLiveEvents([root, event]);
+            room.addLiveEvents([root, event], { addToState: false });
 
             // Then the event is read
             expect(room.hasUserReadEvent(readerId, eventId)).toBe(true);
@@ -418,7 +418,7 @@ describe("RoomReceipts", () => {
 
             // Add the event to the room
             // The two receipts should be processed
-            room.addLiveEvents([event]);
+            room.addLiveEvents([event], { addToState: false });
 
             // Then the event is read
             // We expect that the receipt of `otherUserId` didn't replace/erase the receipt of `readerId`
@@ -528,7 +528,7 @@ function createThreadedReceipt(userId: string, referencedEvent: MatrixEvent, thr
  */
 function createOldTimeline(room: Room, events: MatrixEvent[]) {
     const oldTimeline = room.getUnfilteredTimelineSet().addTimeline();
-    room.getUnfilteredTimelineSet().addEventsToTimeline(events, true, oldTimeline);
+    room.getUnfilteredTimelineSet().addEventsToTimeline(events, true, false, oldTimeline);
 }
 
 /**

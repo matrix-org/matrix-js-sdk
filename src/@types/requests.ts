@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IContent, IEvent } from "../models/event";
-import { Preset, Visibility } from "./partials";
-import { IEventWithRoomId, SearchKey } from "./search";
-import { IRoomEventFilter } from "../filter";
-import { Direction } from "../models/event-timeline";
-import { PushRuleAction } from "./PushRules";
-import { IRoomEvent } from "../sync-accumulator";
-import { EventType, RelationType, RoomType } from "./event";
+import { IContent, IEvent } from "../models/event.ts";
+import { Preset, Visibility } from "./partials.ts";
+import { IEventWithRoomId, SearchKey } from "./search.ts";
+import { IRoomEventFilter } from "../filter.ts";
+import { Direction } from "../models/event-timeline.ts";
+import { PushRuleAction } from "./PushRules.ts";
+import { IRoomEvent } from "../sync-accumulator.ts";
+import { EventType, RelationType, RoomType } from "./event.ts";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -75,6 +75,54 @@ export interface IRedactOpts {
 export interface ISendEventResponse {
     event_id: string;
 }
+
+export type TimeoutDelay = {
+    delay: number;
+};
+
+export type ParentDelayId = {
+    parent_delay_id: string;
+};
+
+export type SendTimeoutDelayedEventRequestOpts = TimeoutDelay & Partial<ParentDelayId>;
+export type SendActionDelayedEventRequestOpts = ParentDelayId;
+
+export type SendDelayedEventRequestOpts = SendTimeoutDelayedEventRequestOpts | SendActionDelayedEventRequestOpts;
+
+export type SendDelayedEventResponse = {
+    delay_id: string;
+};
+
+export enum UpdateDelayedEventAction {
+    Cancel = "cancel",
+    Restart = "restart",
+    Send = "send",
+}
+
+export type UpdateDelayedEventRequestOpts = SendDelayedEventResponse & {
+    action: UpdateDelayedEventAction;
+};
+
+type DelayedPartialTimelineEvent = {
+    room_id: string;
+    type: string;
+    content: IContent;
+};
+
+type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
+    state_key: string;
+};
+
+type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
+
+export type DelayedEventInfo = {
+    delayed_events: (DelayedPartialEvent &
+        SendDelayedEventResponse &
+        SendDelayedEventRequestOpts & {
+            running_since: number;
+        })[];
+    next_batch?: string;
+};
 
 export interface IPresenceOpts {
     // One of "online", "offline" or "unavailable"
@@ -162,11 +210,21 @@ export interface ICreateRoomOpts {
 }
 
 export interface IRoomDirectoryOptions {
+    /**
+     * The remote server to query for the room list.
+     * Optional. If unspecified, get the local homeserver's public room list.
+     */
     server?: string;
+    /**
+     * Maximum number of entries to return
+     */
     limit?: number;
+    /**
+     * Token to paginate from
+     */
     since?: string;
 
-    // Filter parameters
+    /** Filter parameters */
     filter?: {
         // String to search for
         generic_search_term?: string;

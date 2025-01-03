@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_receipts";
-import { threadIdForReceipt } from "../client";
-import { Room, RoomEvent } from "./room";
-import { MatrixEvent } from "./event";
-import { logger } from "../logger";
+import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_receipts.ts";
+import { threadIdForReceipt } from "../client.ts";
+import { Room, RoomEvent } from "./room.ts";
+import { MatrixEvent } from "./event.ts";
+import { logger } from "../logger.ts";
 
 /**
  * The latest receipts we have for a room.
@@ -98,7 +98,7 @@ export class RoomReceipts {
     /**
      * Look for dangling receipts for the given event ID,
      * and add them to the thread of unthread receipts if found.
-     * @param eventId - the event ID to look for
+     * @param event - the event to look for
      */
     private onTimelineEvent = (event: MatrixEvent): void => {
         const eventId = event.getId();
@@ -176,7 +176,7 @@ export class RoomReceipts {
      * @returns true if the thread with this ID can be found, and the supplied
      *          user sent the latest message in it.
      */
-    private userSentLatestEventInThread(threadId: string, userId: String): boolean {
+    private userSentLatestEventInThread(threadId: string, userId: string): boolean {
         const timeline =
             threadId === MAIN_ROOM_TIMELINE
                 ? this.room.getLiveTimeline().getEvents()
@@ -278,7 +278,7 @@ class ReceiptsByUser {
     private room: Room;
 
     /** map of userId: UserReceipts */
-    private data: Map<String, UserReceipts>;
+    private data: Map<string, UserReceipts>;
 
     public constructor(room: Room) {
         this.room = room;

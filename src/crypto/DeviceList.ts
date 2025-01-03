@@ -18,17 +18,17 @@ limitations under the License.
  * Manages the list of other users' devices
  */
 
-import { logger } from "../logger";
-import { DeviceInfo, IDevice } from "./deviceinfo";
-import { CrossSigningInfo, ICrossSigningInfo } from "./CrossSigning";
-import * as olmlib from "./olmlib";
-import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
-import { chunkPromises, defer, IDeferred, sleep } from "../utils";
-import { DeviceKeys, IDownloadKeyResult, Keys, MatrixClient, SigningKeys } from "../client";
-import { OlmDevice } from "./OlmDevice";
-import { CryptoStore } from "./store/base";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CryptoEvent, CryptoEventHandlerMap } from "./index";
+import { logger } from "../logger.ts";
+import { DeviceInfo, IDevice } from "./deviceinfo.ts";
+import { CrossSigningInfo, ICrossSigningInfo } from "./CrossSigning.ts";
+import * as olmlib from "./olmlib.ts";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
+import { chunkPromises, defer, IDeferred, sleep } from "../utils.ts";
+import { DeviceKeys, IDownloadKeyResult, Keys, MatrixClient, SigningKeys } from "../client.ts";
+import { OlmDevice } from "./OlmDevice.ts";
+import { CryptoStore } from "./store/base.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { CryptoEvent, CryptoEventHandlerMap } from "./index.ts";
 
 /* State transition diagram for DeviceList.deviceTrackingStatus
  *

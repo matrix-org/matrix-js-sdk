@@ -18,6 +18,7 @@ import { Mocked } from "jest-mock";
 
 import {
     AccountDataClient,
+    calculateKeyCheck,
     PassphraseInfo,
     SecretStorageCallbacks,
     SecretStorageKeyDescriptionAesV1,
@@ -25,8 +26,15 @@ import {
     ServerSideSecretStorageImpl,
     trimTrailingEquals,
 } from "../../src/secret-storage";
-import { calculateKeyCheck } from "../../src/crypto/aes";
 import { randomString } from "../../src/randomstring";
+import { SecretInfo } from "../../src/secret-storage.ts";
+import { AccountDataEvents } from "../../src";
+
+declare module "../../src/@types/event" {
+    interface SecretStorageAccountDataEvents {
+        mysecret: SecretInfo;
+    }
+}
 
 describe("ServerSideSecretStorageImpl", function () {
     describe(".addKey", function () {
@@ -117,9 +125,11 @@ describe("ServerSideSecretStorageImpl", function () {
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
 
             const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
-            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+            async function mockGetAccountData<K extends keyof AccountDataEvents>(
+                eventType: string,
+            ): Promise<AccountDataEvents[K] | null> {
                 if (eventType === "m.secret_storage.key.my_key") {
-                    return storedKey as unknown as T;
+                    return storedKey as any;
                 } else {
                     throw new Error(`unexpected eventType ${eventType}`);
                 }
@@ -135,11 +145,13 @@ describe("ServerSideSecretStorageImpl", function () {
             const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, {});
 
             const storedKey = { iv: "iv", mac: "mac" } as SecretStorageKeyDescriptionAesV1;
-            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+            async function mockGetAccountData<K extends keyof AccountDataEvents>(
+                eventType: string,
+            ): Promise<AccountDataEvents[K] | null> {
                 if (eventType === "m.secret_storage.default_key") {
-                    return { key: "default_key_id" } as unknown as T;
+                    return { key: "default_key_id" } as any;
                 } else if (eventType === "m.secret_storage.key.default_key_id") {
-                    return storedKey as unknown as T;
+                    return storedKey as any;
                 } else {
                     throw new Error(`unexpected eventType ${eventType}`);
                 }
@@ -236,9 +248,11 @@ describe("ServerSideSecretStorageImpl", function () {
 
             // stub out getAccountData to return a key with an unknown algorithm
             const storedKey = { algorithm: "badalg" } as SecretStorageKeyDescriptionCommon;
-            async function mockGetAccountData<T extends Record<string, any>>(eventType: string): Promise<T | null> {
+            async function mockGetAccountData<K extends keyof AccountDataEvents>(
+                eventType: string,
+            ): Promise<AccountDataEvents[K] | null> {
                 if (eventType === "m.secret_storage.key.keyid") {
-                    return storedKey as unknown as T;
+                    return storedKey as any;
                 } else {
                     throw new Error(`unexpected eventType ${eventType}`);
                 }

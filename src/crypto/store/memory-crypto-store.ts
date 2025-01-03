@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../logger";
-import { deepCompare, promiseTry, safeSet } from "../../utils";
+import { logger } from "../../logger.ts";
+import { deepCompare, promiseTry, safeSet } from "../../utils.ts";
 import {
     CryptoStore,
     IDeviceData,
@@ -30,12 +30,23 @@ import {
     ParkedSharedHistory,
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
-} from "./base";
-import { IRoomKeyRequestBody } from "../index";
-import { ICrossSigningKey } from "../../client";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
+} from "./base.ts";
+import { IRoomKeyRequestBody } from "../index.ts";
+import { IOlmDevice } from "../algorithms/megolm.ts";
+import { IRoomEncryption } from "../RoomList.ts";
+import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+
+function encodeSessionKey(senderCurve25519Key: string, sessionId: string): string {
+    return encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);
+}
+
+function decodeSessionKey(key: string): { senderKey: string; sessionId: string } {
+    const keyParts = key.split("/");
+    const senderKey = decodeURIComponent(keyParts[0]);
+    const sessionId = decodeURIComponent(keyParts[1]);
+    return { senderKey, sessionId };
+}
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -45,7 +56,7 @@ export class MemoryCryptoStore implements CryptoStore {
     private migrationState: MigrationState = MigrationState.NOT_STARTED;
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
-    private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
+    private crossSigningKeys: Record<string, CrossSigningKeyInfo> | null = null;
     private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
     private sessions: { [deviceKey: string]: { [sessionId: string]: ISessionInfo } } = {};
@@ -308,7 +319,7 @@ export class MemoryCryptoStore implements CryptoStore {
         this.account = accountPickle;
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void {
         func(this.crossSigningKeys);
     }
 
@@ -321,7 +332,7 @@ export class MemoryCryptoStore implements CryptoStore {
         func(result || null);
     }
 
-    public storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void {
         this.crossSigningKeys = keys;
     }
 
@@ -481,20 +492,14 @@ export class MemoryCryptoStore implements CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        const k = senderCurve25519Key + "/" + sessionId;
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
         func(this.inboundGroupSessions[k] || null, this.inboundGroupSessionsWithheld[k] || null);
     }
 
     public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
         for (const key of Object.keys(this.inboundGroupSessions)) {
-            // we can't use split, as the components we are trying to split out
-            // might themselves contain '/' characters. We rely on the
-            // senderKey being a (32-byte) curve25519 key, base64-encoded
-            // (hence 43 characters long).
-
             func({
-                senderKey: key.slice(0, 43),
-                sessionId: key.slice(44),
+                ...decodeSessionKey(key),
                 sessionData: this.inboundGroupSessions[key],
             });
         }
@@ -507,7 +512,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key + "/" + sessionId;
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
         if (this.inboundGroupSessions[k] === undefined) {
             this.inboundGroupSessions[k] = sessionData;
         }
@@ -519,7 +524,8 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        this.inboundGroupSessions[senderCurve25519Key + "/" + sessionId] = sessionData;
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
+        this.inboundGroupSessions[k] = sessionData;
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -528,7 +534,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key + "/" + sessionId;
+        const k = encodeSessionKey(senderCurve25519Key, sessionId);
         this.inboundGroupSessionsWithheld[k] = sessionData;
     }
 
@@ -554,8 +560,7 @@ export class MemoryCryptoStore implements CryptoStore {
         const result: SessionExtended[] = [];
         for (const [key, session] of Object.entries(this.inboundGroupSessions)) {
             result.push({
-                senderKey: key.slice(0, 43),
-                sessionId: key.slice(44),
+                ...decodeSessionKey(key),
                 sessionData: session,
                 needsBackup: key in this.sessionsNeedingBackup,
             });
@@ -584,7 +589,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessions: { senderKey: string; sessionId: string }[],
     ): Promise<void> {
         for (const { senderKey, sessionId } of sessions) {
-            const k = senderKey + "/" + sessionId;
+            const k = encodeSessionKey(senderKey, sessionId);
             delete this.inboundGroupSessions[k];
         }
     }
@@ -614,8 +619,7 @@ export class MemoryCryptoStore implements CryptoStore {
         for (const session in this.sessionsNeedingBackup) {
             if (this.inboundGroupSessions[session]) {
                 sessions.push({
-                    senderKey: session.slice(0, 43),
-                    sessionId: session.slice(44),
+                    ...decodeSessionKey(session),
                     sessionData: this.inboundGroupSessions[session],
                 });
                 if (limit && session.length >= limit) {
@@ -632,7 +636,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + "/" + session.sessionId;
+            const sessionKey = encodeSessionKey(session.senderKey, session.sessionId);
             delete this.sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
@@ -640,7 +644,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + "/" + session.sessionId;
+            const sessionKey = encodeSessionKey(session.senderKey, session.sessionId);
             this.sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();

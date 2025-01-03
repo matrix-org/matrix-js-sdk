@@ -18,13 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { checkObjectHasKeys, encodeParams } from "../utils";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { Method } from "./method";
-import { ConnectionError, MatrixError } from "./errors";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface";
-import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
-import { QueryDict } from "../utils";
+import { checkObjectHasKeys, encodeParams } from "../utils.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { Method } from "./method.ts";
+import { ConnectionError, MatrixError } from "./errors.ts";
+import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface.ts";
+import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
+import { QueryDict } from "../utils.ts";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
@@ -53,11 +53,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
         this.abortController = new AbortController();
     }
 
-    public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+    public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
         if (this.opts.fetchFn) {
             return this.opts.fetchFn(resource, options);
         }
-        return global.fetch(resource, options);
+        return globalThis.fetch(resource, options);
     }
 
     /**
@@ -111,8 +111,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param body - The HTTP JSON body.
      *
-     * @param opts - additional options.
-     * When `opts.doNotAttemptTokenRefresh` is true, token refresh will not be attempted
+     * @param paramOpts - additional options.
+     * When `paramOpts.doNotAttemptTokenRefresh` is true, token refresh will not be attempted
      * when an expired token is encountered. Used to only attempt token refresh once.
      *
      * @returns Promise which resolves to
@@ -356,7 +356,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
 
             return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
-        } catch (error) {
+        } catch {
             // defensive coding for malformed url
             return "??";
         }

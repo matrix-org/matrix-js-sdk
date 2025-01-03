@@ -16,8 +16,8 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Device, DeviceVerification } from "../models/device";
-import { DeviceKeys } from "../client";
+import { Device, DeviceVerification } from "../models/device.ts";
+import { DeviceKeys } from "../client.ts";
 
 /**
  * Convert a {@link RustSdkCryptoJs.Device} to a {@link Device}
@@ -80,6 +80,7 @@ export function rustDeviceToJsDevice(device: RustSdkCryptoJs.Device, userId: Rus
         verified,
         signatures,
         displayName: device.displayName,
+        dehydrated: device.isDehydrated,
     });
 }
 

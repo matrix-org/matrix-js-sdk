@@ -16,11 +16,11 @@ limitations under the License.
 
 import promiseRetry from "p-retry";
 
-import { MatrixClient } from "../client";
-import { EventType, IEncryptedFile, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event";
-import { Room } from "./room";
-import { logger } from "../logger";
-import { IContent, MatrixEvent } from "./event";
+import { MatrixClient } from "../client.ts";
+import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event.ts";
+import { Room } from "./room.ts";
+import { logger } from "../logger.ts";
+import { IContent, MatrixEvent } from "./event.ts";
 import {
     averageBetweenStrings,
     DEFAULT_ALPHABET,
@@ -28,11 +28,13 @@ import {
     nextString,
     prevString,
     simpleRetryOperation,
-} from "../utils";
-import { MSC3089Branch } from "./MSC3089Branch";
-import { isRoomSharedHistory } from "../crypto/algorithms/megolm";
-import { ISendEventResponse } from "../@types/requests";
-import { FileType } from "../http-api";
+} from "../utils.ts";
+import { MSC3089Branch } from "./MSC3089Branch.ts";
+import { ISendEventResponse } from "../@types/requests.ts";
+import { FileType } from "../http-api/index.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events.ts";
+import type { EncryptedFile, FileContent } from "../@types/media.ts";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -75,6 +77,12 @@ export enum TreePermissions {
     Viewer = "viewer", // Default
     Editor = "editor", // "Moderator" or ~PL50
     Owner = "owner", // "Admin" or PL100
+}
+
+declare module "../@types/media" {
+    interface FileContent {
+        [UNSTABLE_MSC3089_LEAF.name]?: {};
+    }
 }
 
 /**
@@ -127,28 +135,14 @@ export class MSC3089TreeSpace {
      * @param userId - The user ID to invite.
      * @param andSubspaces - True (default) to invite the user to all
      * directories/subspaces too, recursively.
-     * @param shareHistoryKeys - True (default) to share encryption keys
-     * with the invited user. This will allow them to decrypt the events (files)
-     * in the tree. Keys will not be shared if the room is lacking appropriate
-     * history visibility (by default, history visibility is "shared" in trees,
-     * which is an appropriate visibility for these purposes).
      * @returns Promise which resolves when complete.
      */
-    public async invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
+    public async invite(userId: string, andSubspaces = true): Promise<void> {
         const promises: Promise<void>[] = [this.retryInvite(userId)];
         if (andSubspaces) {
-            promises.push(...this.getDirectories().map((d) => d.invite(userId, andSubspaces, shareHistoryKeys)));
+            promises.push(...this.getDirectories().map((d) => d.invite(userId, andSubspaces)));
         }
-        return Promise.all(promises).then(() => {
-            // Note: key sharing is default on because for file trees it is relatively important that the invite
-            // target can actually decrypt the files. The implied use case is that by inviting a user to the tree
-            // it means the sender would like the receiver to view/download the files contained within, much like
-            // sharing a folder in other circles.
-            if (shareHistoryKeys && isRoomSharedHistory(this.room)) {
-                // noinspection JSIgnoredPromiseFromCall - we aren't concerned as much if this fails.
-                this.client.sendSharedHistoryKeys(this.roomId, [userId]);
-            }
-        });
+        await Promise.all(promises);
     }
 
     private retryInvite(userId: string): Promise<void> {
@@ -175,7 +169,7 @@ export class MSC3089TreeSpace {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
-        const pls = currentPls?.getContent() || {};
+        const pls = currentPls?.getContent<RoomPowerLevelsEventContent>() || {};
         const viewLevel = pls["users_default"] || 0;
         const editLevel = pls["events_default"] || 50;
         const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
@@ -233,7 +227,7 @@ export class MSC3089TreeSpace {
             this.roomId,
             EventType.SpaceChild,
             {
-                via: [this.client.getDomain()],
+                via: [this.client.getDomain()!],
             },
             directory.roomId,
         );
@@ -242,7 +236,7 @@ export class MSC3089TreeSpace {
             directory.roomId,
             EventType.SpaceParent,
             {
-                via: [this.client.getDomain()],
+                via: [this.client.getDomain()!],
             },
             this.roomId,
         );
@@ -291,11 +285,11 @@ export class MSC3089TreeSpace {
             await dir.delete();
         }
 
-        const kickMemberships = ["invite", "knock", "join"];
+        const kickMemberships = [KnownMembership.Invite, KnownMembership.Knock, KnownMembership.Join];
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
             const isNotUs = member.getStateKey() !== this.client.getUserId();
-            if (isNotUs && kickMemberships.includes(member.getContent().membership!)) {
+            if (isNotUs && kickMemberships.includes(member.getContent().membership! as KnownMembership)) {
                 const stateKey = member.getStateKey();
                 if (!stateKey) {
                     throw new Error("State key not found for branch");
@@ -449,7 +443,9 @@ export class MSC3089TreeSpace {
                     // XXX: We should be creating gaps to avoid conflicts
                     lastOrder = lastOrder ? nextString(lastOrder) : DEFAULT_ALPHABET[0];
                     const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, target.roomId);
-                    const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
+                    const content = currentChild?.getContent<SpaceChildEventContent>() ?? {
+                        via: [this.client.getDomain()!],
+                    };
                     await this.client.sendStateEvent(
                         parentRoom.roomId,
                         EventType.SpaceChild,
@@ -472,7 +468,7 @@ export class MSC3089TreeSpace {
 
         // Now we can finally update our own order state
         const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, this.roomId);
-        const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
+        const content = currentChild?.getContent<SpaceChildEventContent>() ?? { via: [this.client.getDomain()!] };
         await this.client.sendStateEvent(
             parentRoom.roomId,
             EventType.SpaceChild,
@@ -498,7 +494,7 @@ export class MSC3089TreeSpace {
     public async createFile(
         name: string,
         encryptedContents: FileType,
-        info: Partial<IEncryptedFile>,
+        info: EncryptedFile,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
         const { content_uri: mxc } = await this.client.uploadContent(encryptedContents, {
@@ -506,7 +502,7 @@ export class MSC3089TreeSpace {
         });
         info.url = mxc;
 
-        const fileContent = {
+        const fileContent: FileContent = {
             msgtype: MsgType.File,
             body: name,
             url: mxc,
@@ -525,7 +521,7 @@ export class MSC3089TreeSpace {
             ...additionalContent,
             ...fileContent,
             [UNSTABLE_MSC3089_LEAF.name]: {},
-        });
+        } as FileContent);
 
         await this.client.sendStateEvent(
             this.roomId,

@@ -16,19 +16,19 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient, PendingEventOrdering } from "../client";
-import { TypedReEmitter } from "../ReEmitter";
-import { RelationType } from "../@types/event";
-import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
-import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
-import { NotificationCountType, Room, RoomEvent } from "./room";
-import { RoomState } from "./room-state";
-import { ServerControlledNamespacedValue } from "../NamespacedValue";
-import { logger } from "../logger";
-import { ReadReceipt } from "./read-receipt";
-import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts";
-import { Feature, ServerSupport } from "../feature";
+import { MatrixClient, PendingEventOrdering } from "../client.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
+import { RelationType } from "../@types/event.ts";
+import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event.ts";
+import { Direction, EventTimeline } from "./event-timeline.ts";
+import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set.ts";
+import { NotificationCountType, Room, RoomEvent } from "./room.ts";
+import { RoomState } from "./room-state.ts";
+import { ServerControlledNamespacedValue } from "../NamespacedValue.ts";
+import { logger } from "../logger.ts";
+import { ReadReceipt } from "./read-receipt.ts";
+import { CachedReceiptStructure, Receipt, ReceiptType } from "../@types/read_receipts.ts";
+import { Feature, ServerSupport } from "../feature.ts";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -46,11 +46,6 @@ export type ThreadEventHandlerMap = {
     [ThreadEvent.ViewThread]: () => void;
     [ThreadEvent.Delete]: (thread: Thread) => void;
 } & EventTimelineSetHandlerMap;
-
-/**
- * @deprecated please use ThreadEventHandlerMap instead
- */
-export type EventHandlerMap = ThreadEventHandlerMap;
 
 interface IThreadOpts {
     room: Room;
@@ -84,7 +79,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly timelineSet: EventTimelineSet;
-    public timeline: MatrixEvent[] = [];
 
     private _currentUserParticipated = false;
 
@@ -106,7 +100,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      *
      * So it looks like this is only really relevant when initialEventsFetched
      * is false, because as soon as the initial events have been fetched, we
-     * should have a timeline (I think).
+     * should have a proper chunk of timeline from the pagination fetch.
      *
      * If all replies in this thread are redacted, this is set to the root
      * event. I'm not clear what the meaning of this is, since usually after the
@@ -139,6 +133,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * that we've already fetched them.
      */
     public initialEventsFetched = !Thread.hasServerSideSupport;
+    private initalEventFetchProm: Promise<boolean> | undefined;
 
     /**
      * An array of events to add to the timeline once the thread has been initialised
@@ -199,8 +194,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     };
 
     private async fetchRootEvent(): Promise<void> {
-        this.rootEvent = this.room.findEventById(this.id);
-        // If the rootEvent does not exist in the local stores, then fetch it from the server.
+        // Always fetch the root event, even if we already have it, so we can get the latest
+        // state (via unsigned).
         try {
             const eventData = await this.client.fetchRoomEvent(this.roomId, this.id);
             const mapper = this.client.getEventMapper();
@@ -213,6 +208,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     public static setServerSideSupport(status: FeatureSupport): void {
         Thread.hasServerSideSupport = status;
+        // XXX: This global latching behaviour is really unexpected and means that you can't undo when moving to a server without support
         if (status !== FeatureSupport.Stable) {
             FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
             FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
@@ -322,8 +318,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 toStartOfTimeline,
                 fromCache: false,
                 roomState: this.roomState,
+                addToState: false,
             });
-            this.timeline = this.events;
         }
     }
 
@@ -349,10 +345,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (this.findEventById(eventId)) {
             return;
         }
-        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState);
-
-        // As far as we know, timeline should always be the same as events
-        this.timeline = this.events;
+        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
@@ -382,20 +375,20 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             // When there's no server-side support, just add it to the end of the timeline.
             this.addEventToTimeline(event, toStartOfTimeline);
             this.client.decryptEventIfNeeded(event);
-        } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
-            // When we've asked for the event to be added to the end, and we're
-            // not in the initial state, and this event belongs at the end, add it.
-            this.addEventToTimeline(event, false);
-            this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
             this.addRelatedThreadEvent(event, toStartOfTimeline);
             return;
-        } else if (this.initialEventsFetched) {
-            // If initial events have not been fetched, we are OK to throw away
-            // this event, because we are about to fetch all the events for this
-            // thread from the server.
-
+        } else if (!toStartOfTimeline && isNewestReply) {
+            // When we've asked for the event to be added to the end,
+            // and this event belongs at the end, add it.
+            this.addEventToTimeline(event, false);
+            this.fetchEditsWhereNeeded(event);
+        } else {
             // Otherwise, we should add it, but we suspect it is out of order.
+            // This may be because we've just created the thread object and are
+            // still fetching events, in which case add it where we think is sensible
+            // and it will be removed and replaced with the events from the pagination
+            // request once that completes.
             if (toStartOfTimeline) {
                 // If we're adding at the start of the timeline, it doesn't
                 // matter that it's out of order.
@@ -483,7 +476,6 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             this.setEventMetadata(event);
             await this.fetchEditsWhereNeeded(event);
         }
-        this.timeline = this.events;
     }
 
     /**
@@ -612,29 +604,48 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         await this.processRootEventPromise;
 
         if (!this.initialEventsFetched) {
-            this.initialEventsFetched = true;
-            // fetch initial event to allow proper pagination
-            try {
-                // if the thread has regular events, this will just load the last reply.
-                // if the thread is newly created, this will load the root event.
-                if (this.replyCount === 0 && this.rootEvent) {
-                    this.timelineSet.addEventsToTimeline([this.rootEvent], true, this.liveTimeline, null);
-                    this.liveTimeline.setPaginationToken(null, Direction.Backward);
-                } else {
-                    await this.client.paginateEventTimeline(this.liveTimeline, {
-                        backwards: true,
-                    });
+            if (this.initalEventFetchProm) {
+                await this.initalEventFetchProm;
+            } else {
+                // fetch initial events to allow proper pagination
+                try {
+                    // clear out any events that were added before the pagination request
+                    // completed (eg. from sync). They'll be replaced by those from the pagination.
+                    // Really, we should do this after the pagination request completes, but
+                    // paginateEventTimeline does the request and adds the events in one go, so
+                    // this would need a refactor in order to do. It's therefore possible there's
+                    // a remaining race where an event comes in while the pagination request is
+                    // happening.
+                    this.timelineSet.resetLiveTimeline();
+                    // if the thread has regular events, this will just load the last reply.
+                    // if the thread is newly created, this will load the root event.
+                    if (this.replyCount === 0 && this.rootEvent) {
+                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, false, this.liveTimeline, null);
+                        this.liveTimeline.setPaginationToken(null, Direction.Backward);
+                    } else {
+                        this.initalEventFetchProm = this.client.paginateEventTimeline(this.liveTimeline, {
+                            backwards: true,
+                        });
+                        await this.initalEventFetchProm;
+                    }
+                    // We have now fetched the initial events, so set the flag. We need to do this before
+                    // we actually add the events, so `this.addEvents` knows that it can now safely add
+                    // them rather than buffer them in the pending event list. The main thing is that this
+                    // must remain false while the async fetch happens, so we don't try to add events before
+                    // the pagination has finished. The important thing is that we're not await-ing anything
+                    // else between setting this and adding events, so no races.
+                    this.initialEventsFetched = true;
+                    for (const event of this.replayEvents!) {
+                        this.addEvent(event, false);
+                    }
+                    this.replayEvents = null;
+                    // just to make sure that, if we've created a timeline window for this thread before the thread itself
+                    // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
+                    this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
+                } catch (e) {
+                    logger.error("Failed to load start of newly created thread: ", e);
+                    this.initialEventsFetched = false;
                 }
-                for (const event of this.replayEvents!) {
-                    this.addEvent(event, false);
-                }
-                this.replayEvents = null;
-                // just to make sure that, if we've created a timeline window for this thread before the thread itself
-                // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
-                this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
-            } catch (e) {
-                logger.error("Failed to load start of newly created thread: ", e);
-                this.initialEventsFetched = false;
             }
         }
 
@@ -695,7 +706,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * Return last reply to the thread, if known.
      */
     public lastReply(
-        matches: (ev: MatrixEvent) => boolean = (ev): boolean => ev.isRelation(RelationType.Thread),
+        matches: (ev: MatrixEvent) => boolean = (ev): boolean => ev.isRelation(THREAD_RELATION_TYPE.name),
     ): MatrixEvent | null {
         for (let i = this.timeline.length - 1; i >= 0; i--) {
             const event = this.timeline[i];
@@ -725,6 +736,16 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public get replyToEvent(): Optional<MatrixEvent> {
         return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
+    }
+
+    /**
+     * The live event timeline for this thread.
+     * @deprecated Present for backwards compatibility.
+     *             Use this.events instead
+     * @returns The live event timeline for this thread.
+     */
+    public get timeline(): MatrixEvent[] {
+        return this.events;
     }
 
     public get events(): MatrixEvent[] {

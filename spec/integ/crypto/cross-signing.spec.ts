@@ -21,7 +21,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
 import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
-import { encryptAES } from "../../../src/crypto/aes";
+import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
@@ -81,33 +81,37 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         };
     }
 
-    beforeEach(async () => {
-        // anything that we don't have a specific matcher for silently returns a 404
-        fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
+    beforeEach(
+        async () => {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
 
-        const homeserverUrl = "https://alice-server.com";
-        aliceClient = createClient({
-            baseUrl: homeserverUrl,
-            userId: TEST_USER_ID,
-            accessToken: "akjgkrgjs",
-            deviceId: TEST_DEVICE_ID,
-            cryptoCallbacks: createCryptoCallbacks(),
-        });
+            const homeserverUrl = "https://alice-server.com";
+            aliceClient = createClient({
+                baseUrl: homeserverUrl,
+                userId: TEST_USER_ID,
+                accessToken: "akjgkrgjs",
+                deviceId: TEST_DEVICE_ID,
+                cryptoCallbacks: createCryptoCallbacks(),
+            });
 
-        syncResponder = new SyncResponder(homeserverUrl);
-        e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
-        /** an object which intercepts `/keys/upload` requests on the test homeserver */
-        new E2EKeyReceiver(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl);
+            e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
+            /** an object which intercepts `/keys/upload` requests on the test homeserver */
+            new E2EKeyReceiver(homeserverUrl);
 
-        // Silence warnings from the backup manager
-        fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
-            status: 404,
-            body: { errcode: "M_NOT_FOUND" },
-        });
+            // Silence warnings from the backup manager
+            fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {
+                status: 404,
+                body: { errcode: "M_NOT_FOUND" },
+            });
 
-        await initCrypto(aliceClient);
-    });
+            await initCrypto(aliceClient);
+        },
+        /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
+        10000,
+    );
 
     afterEach(async () => {
         await aliceClient.stopClient();
@@ -165,17 +169,17 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             mockInitialApiRequests(aliceClient.getHomeserverUrl());
 
             // Encrypt the private keys and return them in the /sync response as if they are in Secret Storage
-            const masterKey = await encryptAES(
+            const masterKey = await encryptAESSecretStorageItem(
                 MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,
                 "m.cross_signing.master",
             );
-            const selfSigningKey = await encryptAES(
+            const selfSigningKey = await encryptAESSecretStorageItem(
                 SELF_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,
                 "m.cross_signing.self_signing",
             );
-            const userSigningKey = await encryptAES(
+            const userSigningKey = await encryptAESSecretStorageItem(
                 USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
                 encryptionKey,
                 "m.cross_signing.user_signing",
@@ -343,6 +347,67 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
             expect(isCrossSigningReady).toBeTruthy();
         });
+
+        it("should return false if identity is not trusted, even if the secrets are in 4S", async () => {
+            e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
+
+            // Complete initial sync, to get the 4S account_data events stored
+            mockInitialApiRequests(aliceClient.getHomeserverUrl());
+
+            // For this test we need to have a well-formed 4S setup.
+            const mockSecretInfo = {
+                encrypted: {
+                    // Don't care about the actual values here, just need to be present for validation
+                    KeyId: {
+                        iv: "IVIVIVIVIVIVIV",
+                        ciphertext: "CIPHERTEXTB64",
+                        mac: "MACMACMAC",
+                    },
+                },
+            };
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 1,
+                account_data: {
+                    events: [
+                        {
+                            type: "m.secret_storage.key.KeyId",
+                            content: {
+                                algorithm: "m.secret_storage.v1.aes-hmac-sha2",
+                                // iv and mac not relevant for this test
+                            },
+                        },
+                        {
+                            type: "m.secret_storage.default_key",
+                            content: {
+                                key: "KeyId",
+                            },
+                        },
+                        {
+                            type: "m.cross_signing.master",
+                            content: mockSecretInfo,
+                        },
+                        {
+                            type: "m.cross_signing.user_signing",
+                            content: mockSecretInfo,
+                        },
+                        {
+                            type: "m.cross_signing.self_signing",
+                            content: mockSecretInfo,
+                        },
+                    ],
+                },
+            });
+            await aliceClient.startClient();
+            await syncPromise(aliceClient);
+
+            // Sanity: ensure that the secrets are in 4S
+            const status = await aliceClient.getCrypto()!.getCrossSigningStatus();
+            expect(status.privateKeysInSecretStorage).toBeTruthy();
+
+            const isCrossSigningReady = await aliceClient.getCrypto()!.isCrossSigningReady();
+
+            expect(isCrossSigningReady).toBeFalsy();
+        });
     });
 
     describe("getCrossSigningKeyId", () => {
@@ -398,7 +463,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
 
     describe("crossSignDevice", () => {
         beforeEach(async () => {
-            jest.useFakeTimers();
+            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // make sure that there is another device which we can sign
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);

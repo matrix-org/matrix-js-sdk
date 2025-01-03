@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ServerSideSecretStorage } from "../secret-storage";
+import { SecretStorageKey, ServerSideSecretStorage } from "../secret-storage.ts";
 
 /**
  * Check that the private cross signing keys (master, self signing, user signing) are stored in the secret storage and encrypted with the default secret storage key.
@@ -44,7 +44,7 @@ export async function secretStorageContainsCrossSigningKeys(secretStorage: Serve
  */
 export async function secretStorageCanAccessSecrets(
     secretStorage: ServerSideSecretStorage,
-    secretNames: string[],
+    secretNames: SecretStorageKey[],
 ): Promise<boolean> {
     const defaultKeyId = await secretStorage.getDefaultKeyId();
     if (!defaultKeyId) return false;

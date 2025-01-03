@@ -19,7 +19,16 @@ import { Mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, KnockRoomOpts, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
+import {
+    Filter,
+    JoinRule,
+    KnockRoomOpts,
+    MemoryStore,
+    Method,
+    Room,
+    RoomSummary,
+    SERVICE_TYPES,
+} from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -27,6 +36,7 @@ import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
+import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient", function () {
     const userId = "@alice:localhost";
@@ -158,14 +168,17 @@ describe("MatrixClient", function () {
                     type: "test",
                     content: {},
                 });
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: "join",
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
 
@@ -178,14 +191,17 @@ describe("MatrixClient", function () {
             const roomId = "!roomId:server";
             const roomAlias = "#my-fancy-room:server";
             const room = new Room(roomId, client, userId);
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: "join",
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             store.storeRoom(room);
 
             // The method makes a request to resolve the alias
@@ -247,7 +263,7 @@ describe("MatrixClient", function () {
                 .when("POST", "/knock/" + encodeURIComponent(roomId))
                 .check((request) => {
                     expect(request.data).toEqual({ reason: opts.reason });
-                    expect(request.queryParams).toEqual({ server_name: opts.viaServers });
+                    expect(request.queryParams).toEqual({ server_name: opts.viaServers, via: opts.viaServers });
                 })
                 .respond(200, { room_id: roomId });
 
@@ -265,14 +281,17 @@ describe("MatrixClient", function () {
                     content: {},
                 });
 
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: "knock",
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Knock,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
 
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
@@ -631,9 +650,9 @@ describe("MatrixClient", function () {
         }
 
         beforeEach(function () {
-            // running initCrypto should trigger a key upload
+            // running initLegacyCrypto should trigger a key upload
             httpBackend.when("POST", "/keys/upload").respond(200, {});
-            return Promise.all([client.initCrypto(), httpBackend.flush("/keys/upload", 1)]);
+            return Promise.all([client.initLegacyCrypto(), httpBackend.flush("/keys/upload", 1)]);
         });
 
         afterEach(() => {
@@ -1283,18 +1302,109 @@ describe("MatrixClient", function () {
     });
 
     describe("getCapabilities", () => {
-        it("should cache by default", async () => {
+        it("should return cached capabilities if present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
             httpBackend.when("GET", "/capabilities").respond(200, {
-                capabilities: {
-                    "m.change_password": false,
-                },
+                capabilities: capsObject,
             });
-            const prom = httpBackend.flushAllExpected();
-            const capabilities1 = await client.getCapabilities();
-            const capabilities2 = await client.getCapabilities();
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(await client.getCapabilities()).toEqual(capsObject);
+        });
+
+        it("should fetch capabilities if cache not present", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            const capsPromise = client.getCapabilities();
+            await httpBackend!.flushAllExpected();
+
+            expect(await capsPromise).toEqual(capsObject);
+        });
+    });
+
+    describe("getCachedCapabilities", () => {
+        it("should return cached capabilities or undefined", async () => {
+            const capsObject = {
+                "m.change_password": false,
+            };
+
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+
+            expect(client.getCachedCapabilities()).toBeUndefined();
+
+            client.startClient();
+
+            await httpBackend!.flushAllExpected();
+
+            expect(client.getCachedCapabilities()).toEqual(capsObject);
+        });
+    });
+
+    describe("fetchCapabilities", () => {
+        const capsObject = {
+            "m.change_password": false,
+        };
+
+        beforeEach(() => {
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: capsObject,
+            });
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("should always fetch capabilities and then cache", async () => {
+            const prom = client.fetchCapabilities();
+            await httpBackend.flushAllExpected();
+            const caps = await prom;
+
+            expect(caps).toEqual(capsObject);
+        });
+
+        it("should write-through the cache", async () => {
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+            client.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(client.getCachedCapabilities()).toEqual(capsObject);
+
+            const newCapsObject = {
+                "m.change_password": true,
+            };
+
+            httpBackend.when("GET", "/capabilities").respond(200, {
+                capabilities: newCapsObject,
+            });
+
+            const prom = client.fetchCapabilities();
+            await httpBackend.flushAllExpected();
             await prom;
 
-            expect(capabilities1).toStrictEqual(capabilities2);
+            expect(client.getCachedCapabilities()).toEqual(newCapsObject);
         });
     });
 
@@ -1709,6 +1819,124 @@ describe("MatrixClient", function () {
             await Promise.all([client.unbindThreePid("email", "alice@server.com"), httpBackend.flushAllExpected()]);
         });
     });
+
+    describe("getRoomSummary", () => {
+        const roomId = "!foo:bar";
+        const encodedRoomId = encodeURIComponent(roomId);
+
+        const roomSummary: RoomSummary = {
+            "room_id": roomId,
+            "name": "My Room",
+            "avatar_url": "",
+            "topic": "My room topic",
+            "world_readable": false,
+            "guest_can_join": false,
+            "num_joined_members": 1,
+            "room_type": "",
+            "join_rule": JoinRule.Public,
+            "membership": "leave",
+            "im.nheko.summary.room_version": "6",
+            "im.nheko.summary.encryption": "algo",
+        };
+
+        const prefix = "/_matrix/client/unstable/im.nheko.summary/";
+        const suffix = `summary/${encodedRoomId}`;
+        const deprecatedSuffix = `rooms/${encodedRoomId}/summary`;
+
+        const errorUnrecogStatus = 404;
+        const errorUnrecogBody = {
+            errcode: "M_UNRECOGNIZED",
+            error: "Unsupported endpoint",
+        };
+
+        const errorBadreqStatus = 400;
+        const errorBadreqBody = {
+            errcode: "M_UNKNOWN",
+            error: "Invalid request",
+        };
+
+        it("should respond with a valid room summary object", () => {
+            httpBackend.when("GET", prefix + suffix).respond(200, roomSummary);
+
+            const prom = client.getRoomSummary(roomId).then((response) => {
+                expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should allow fallback to the deprecated endpoint", () => {
+            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(200, roomSummary);
+
+            const prom = client.getRoomSummary(roomId).then((response) => {
+                expect(response).toEqual(roomSummary);
+            });
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should respond to unsupported path with error", () => {
+            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
+            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
+
+            const prom = client.getRoomSummary(roomId).then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorUnrecogStatus);
+                    expect(error.errcode).toEqual(errorUnrecogBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorUnrecogStatus}] ${errorUnrecogBody.error}`);
+                },
+            );
+
+            httpBackend.flush("");
+            return prom;
+        });
+
+        it("should respond to invalid path arguments with error", () => {
+            httpBackend.when("GET", prefix).respond(errorBadreqStatus, errorBadreqBody);
+
+            const prom = client.getRoomSummary("notAroom").then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorBadreqStatus);
+                    expect(error.errcode).toEqual(errorBadreqBody.errcode);
+                    expect(error.message).toEqual(`MatrixError: [${errorBadreqStatus}] ${errorBadreqBody.error}`);
+                },
+            );
+
+            httpBackend.flush("");
+            return prom;
+        });
+    });
+
+    describe("getDomain", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getDomain()).toBeNull();
+        });
+
+        it("should return the domain of the userId", () => {
+            expect(client.getDomain()).toBe("localhost");
+        });
+    });
+
+    describe("getUserIdLocalpart", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getUserIdLocalpart()).toBeNull();
+        });
+
+        it("should return the localpart of the userId", () => {
+            expect(client.getUserIdLocalpart()).toBe("alice");
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
@@ -1719,7 +1947,6 @@ function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
 
 const buildEventMessageInThread = (root: MatrixEvent) =>
     new MatrixEvent({
-        age: 80098509,
         content: {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": "ENCRYPTEDSTUFF",
@@ -1740,12 +1967,10 @@ const buildEventMessageInThread = (root: MatrixEvent) =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80098509 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventPollResponseReference = () =>
     new MatrixEvent({
-        age: 80098509,
         content: {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": "ENCRYPTEDSTUFF",
@@ -1763,7 +1988,6 @@ const buildEventPollResponseReference = () =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80106237 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventReaction = (event: MatrixEvent) =>
@@ -1803,7 +2027,6 @@ const buildEventRedaction = (event: MatrixEvent) =>
 
 const buildEventPollStartThreadRoot = () =>
     new MatrixEvent({
-        age: 80108647,
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
             ciphertext: "ENCRYPTEDSTUFF",
@@ -1817,12 +2040,10 @@ const buildEventPollStartThreadRoot = () =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80108647 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventReply = (target: MatrixEvent) =>
     new MatrixEvent({
-        age: 80098509,
         content: {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": "ENCRYPTEDSTUFF",
@@ -1841,12 +2062,10 @@ const buildEventReply = (target: MatrixEvent) =>
         sender: "@andybalaam-test1:matrix.org",
         type: "m.room.encrypted",
         unsigned: { age: 80098509 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventRoomName = () =>
     new MatrixEvent({
-        age: 80123249,
         content: {
             name: "1 poll, 1 vote, 1 thread",
         },
@@ -1857,12 +2076,10 @@ const buildEventRoomName = () =>
         state_key: "",
         type: "m.room.name",
         unsigned: { age: 80123249 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventEncryption = () =>
     new MatrixEvent({
-        age: 80123383,
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
         },
@@ -1873,12 +2090,10 @@ const buildEventEncryption = () =>
         state_key: "",
         type: "m.room.encryption",
         unsigned: { age: 80123383 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventGuestAccess = () =>
     new MatrixEvent({
-        age: 80123473,
         content: {
             guest_access: "can_join",
         },
@@ -1889,12 +2104,10 @@ const buildEventGuestAccess = () =>
         state_key: "",
         type: "m.room.guest_access",
         unsigned: { age: 80123473 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventHistoryVisibility = () =>
     new MatrixEvent({
-        age: 80123556,
         content: {
             history_visibility: "shared",
         },
@@ -1905,14 +2118,12 @@ const buildEventHistoryVisibility = () =>
         state_key: "",
         type: "m.room.history_visibility",
         unsigned: { age: 80123556 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventJoinRules = () =>
     new MatrixEvent({
-        age: 80123696,
         content: {
-            join_rule: "invite",
+            join_rule: KnownMembership.Invite,
         },
         event_id: "$6JDDeDp7fEc0F6YnTWMruNcKWFltR3e9wk7wWDDJrAU",
         origin_server_ts: 1643815441191,
@@ -1921,12 +2132,10 @@ const buildEventJoinRules = () =>
         state_key: "",
         type: "m.room.join_rules",
         unsigned: { age: 80123696 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventPowerLevels = () =>
     new MatrixEvent({
-        age: 80124105,
         content: {
             ban: 50,
             events: {
@@ -1957,16 +2166,14 @@ const buildEventPowerLevels = () =>
         state_key: "",
         type: "m.room.power_levels",
         unsigned: { age: 80124105 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventMember = () =>
     new MatrixEvent({
-        age: 80125279,
         content: {
             avatar_url: "mxc://matrix.org/aNtbVcFfwotudypZcHsIcPOc",
             displayname: "andybalaam-test1",
-            membership: "join",
+            membership: KnownMembership.Join,
         },
         event_id: "$Ex5eVmMs_ti784mo8bgddynbwLvy6231lCycJr7Cl9M",
         origin_server_ts: 1643815439608,
@@ -1975,12 +2182,10 @@ const buildEventMember = () =>
         state_key: "@andybalaam-test1:matrix.org",
         type: "m.room.member",
         unsigned: { age: 80125279 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 const buildEventCreate = () =>
     new MatrixEvent({
-        age: 80126105,
         content: {
             room_version: "6",
         },
@@ -1991,7 +2196,6 @@ const buildEventCreate = () =>
         state_key: "",
         type: "m.room.create",
         unsigned: { age: 80126105 },
-        user_id: "@andybalaam-test1:matrix.org",
     });
 
 function assertObjectContains(obj: Record<string, any>, expected: any): void {

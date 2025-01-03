@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError } from "./errors";
-import { Logger } from "../logger";
+import { MatrixError } from "./errors.ts";
+import { Logger } from "../logger.ts";
 
 export type Body = Record<string, any> | BodyInit;
 
@@ -36,7 +36,7 @@ export type AccessTokens = {
  */
 export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
 export interface IHttpOpts {
-    fetchFn?: typeof global.fetch;
+    fetchFn?: typeof globalThis.fetch;
 
     baseUrl: string;
     idBaseUrl?: string;

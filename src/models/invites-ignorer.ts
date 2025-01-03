@@ -14,55 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "matrix-events-sdk";
+import { MatrixClient } from "../client.ts";
+import { IContent, MatrixEvent } from "./event.ts";
+import { EventTimeline } from "./event-timeline.ts";
+import { Preset } from "../@types/partials.ts";
+import { globToRegexp } from "../utils.ts";
+import { Room } from "./room.ts";
+import { EventType, StateEvents } from "../@types/event.ts";
+import {
+    IGNORE_INVITES_ACCOUNT_EVENT_KEY,
+    POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyRecommendation,
+    PolicyScope,
+} from "./invites-ignorer-types.ts";
 
-import { MatrixClient } from "../client";
-import { IContent, MatrixEvent } from "./event";
-import { EventTimeline } from "./event-timeline";
-import { Preset } from "../@types/partials";
-import { globToRegexp } from "../utils";
-import { Room } from "./room";
+export { IGNORE_INVITES_ACCOUNT_EVENT_KEY, POLICIES_ACCOUNT_EVENT_TYPE, PolicyRecommendation, PolicyScope };
 
-/// The event type storing the user's individual policies.
-///
-/// Exported for testing purposes.
-export const POLICIES_ACCOUNT_EVENT_TYPE = new UnstableValue("m.policies", "org.matrix.msc3847.policies");
-
-/// The key within the user's individual policies storing the user's ignored invites.
-///
-/// Exported for testing purposes.
-export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(
-    "m.ignore.invites",
-    "org.matrix.msc3847.ignore.invites",
-);
-
-/// The types of recommendations understood.
-enum PolicyRecommendation {
-    Ban = "m.ban",
-}
-
-/**
- * The various scopes for policies.
- */
-export enum PolicyScope {
-    /**
-     * The policy deals with an individual user, e.g. reject invites
-     * from this user.
-     */
-    User = "m.policy.user",
-
-    /**
-     * The policy deals with a room, e.g. reject invites towards
-     * a specific room.
-     */
-    Room = "m.policy.room",
-
-    /**
-     * The policy deals with a server, e.g. reject invites from
-     * this server.
-     */
-    Server = "m.policy.server",
-}
+const scopeToEventTypeMap: Record<PolicyScope, keyof StateEvents> = {
+    [PolicyScope.User]: EventType.PolicyRuleUser,
+    [PolicyScope.Room]: EventType.PolicyRuleRoom,
+    [PolicyScope.Server]: EventType.PolicyRuleServer,
+};
 
 /**
  * A container for ignored invites.
@@ -87,7 +59,7 @@ export class IgnoredInvites {
      */
     public async addRule(scope: PolicyScope, entity: string, reason: string): Promise<string> {
         const target = await this.getOrCreateTargetRoom();
-        const response = await this.client.sendStateEvent(target.roomId, scope, {
+        const response = await this.client.sendStateEvent(target.roomId, scopeToEventTypeMap[scope], {
             entity,
             reason,
             recommendation: PolicyRecommendation.Ban,
@@ -140,8 +112,9 @@ export class IgnoredInvites {
     /**
      * Find out whether an invite should be ignored.
      *
-     * @param sender - The user id for the user who issued the invite.
-     * @param roomId - The room to which the user is invited.
+     * @param params
+     * @param params.sender - The user id for the user who issued the invite.
+     * @param params.roomId - The room to which the user is invited.
      * @returns A rule matching the entity, if any was found, `null` otherwise.
      */
     public async getRuleForInvite({
@@ -172,7 +145,7 @@ export class IgnoredInvites {
                 { scope: PolicyScope.User, entities: [sender] },
                 { scope: PolicyScope.Server, entities: [senderServer, roomServer] },
             ]) {
-                const events = state.getStateEvents(scope);
+                const events = state.getStateEvents(scopeToEventTypeMap[scope]);
                 for (const event of events) {
                     const content = event.getContent();
                     if (content?.recommendation != PolicyRecommendation.Ban) {
@@ -187,7 +160,7 @@ export class IgnoredInvites {
                     let regexp: RegExp;
                     try {
                         regexp = new RegExp(globToRegexp(glob));
-                    } catch (ex) {
+                    } catch {
                         // Assume invalid event.
                         continue;
                     }

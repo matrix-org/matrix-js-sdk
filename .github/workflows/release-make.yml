@@ -20,16 +20,6 @@ on:
                 description: Publish to npm
                 type: boolean
                 default: false
-            dependencies:
-                description: |
-                    List of dependencies to update in `npm-dep=version` format.
-                    `version` can be `"current"` to leave it at the current version.
-                type: string
-                required: false
-            include-changes:
-                description: Project to include changelog entries from in this release.
-                type: string
-                required: false
             gpg-fingerprint:
                 description: Fingerprint of the GPG key to use for signing the git tag and assets, if any.
                 type: string
@@ -44,24 +34,39 @@ on:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
+        outputs:
+            npm-id:
+                description: "The npm package@version string we published"
+                value: ${{ jobs.npm.outputs.id }}
+permissions: {}
 jobs:
+    checks:
+        name: Sanity checks
+        permissions:
+            issues: read
+            pull-requests: read
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-checks.yml@develop
+
     release:
         name: Release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         environment: Release
+        needs: checks
+        permissions:
+            contents: write
         steps:
             - name: Load GPG key
               id: gpg
               if: inputs.gpg-fingerprint
-              uses: crazy-max/ghaction-import-gpg@01dd5d3ca463c7f10f7f4f7b4f177225ac661ee4 # v6
+              uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5 # v6
               with:
                   gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
                   passphrase: ${{ secrets.GPG_PASSPHRASE }}
                   fingerprint: ${{ inputs.gpg-fingerprint }}
 
             - name: Get draft release
-              id: release
-              uses: cardinalby/git-get-release-action@cedef2faf69cb7c55b285bad07688d04430b7ada # v1
+              id: draft-release
+              uses: cardinalby/git-get-release-action@5172c3a026600b1d459b117738c605fabc9e4e44 # v1
               env:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
@@ -71,6 +76,7 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   ref: staging
+                  # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
 
@@ -88,18 +94,12 @@ jobs:
               id: prepare
               run: |
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
-                  {
-                      echo "RELEASE_NOTES<<EOF"
-                      echo "$BODY"
-                      echo "EOF"
-                  } >> $GITHUB_ENV
 
                   HAS_DIST=0
                   jq -e .scripts.dist package.json >/dev/null 2>&1 && HAS_DIST=1
                   echo "has-dist-script=$HAS_DIST" >> $GITHUB_OUTPUT
               env:
-                  BODY: ${{ steps.release.outputs.body }}
-                  VERSION: ${{ steps.release.outputs.tag_name }}
+                  VERSION: ${{ steps.draft-release.outputs.tag_name }}
 
             - name: Finalise version
               if: inputs.final
@@ -128,79 +128,29 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   cache: "yarn"
+                  node-version-file: package.json
 
             - name: Install dependencies
               run: "yarn install --frozen-lockfile"
 
-            - name: Update dependencies
-              id: update-dependencies
-              if: inputs.dependencies
-              run: |
-                  UPDATED=()
-                  while IFS= read -r DEPENDENCY; do
-                      [ -z "$DEPENDENCY" ] && continue
-                      IFS="=" read -r PACKAGE UPDATE_VERSION <<< "$DEPENDENCY"
-
-                      CURRENT_VERSION=$(cat package.json | jq -r .dependencies[\"$PACKAGE\"])
-                      echo "Current $PACKAGE version is $CURRENT_VERSION"
-
-                      if [ "$CURRENT_VERSION" == "null" ]
-                      then
-                          echo "Unable to find $PACKAGE in package.json"
-                          exit 1
-                      fi
-
-                      if [ "$UPDATE_VERSION" == "current" ] || [ "$UPDATE_VERSION" == "$CURRENT_VERSION" ]
-                      then
-                          echo "Not updating dependency $PACKAGE"
-                          continue
-                      fi
-
-                      echo "Upgrading $PACKAGE to $UPDATE_VERSION..."
-                      yarn upgrade "$PACKAGE@$UPDATE_VERSION" --exact
-                      git add -u
-                      git commit -m "Upgrade $PACKAGE to $UPDATE_VERSION"
-                      UPDATED+=("$PACKAGE")
-                  done <<< "$DEPENDENCIES"
-
-                  JSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${UPDATED[@]}")
-                  echo "updated=$JSON" >> $GITHUB_OUTPUT
-              env:
-                  DEPENDENCIES: ${{ inputs.dependencies }}
-
-            - name: Prevent develop dependencies
-              if: inputs.dependencies
+            - name: Handle develop dependencies
               run: |
                   ret=0
-                  cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-                  if [ "$ret" -eq 0 ]; then
-                      echo "package.json contains develop dependencies. Refusing to release."
-                      exit
-                  fi
+                  cat package.json | jq -r '.dependencies | to_entries | .[] | "\(.key) \(.value)"' | grep '#develop$' | while read -r dep ; do
+                      IFS=" "
+                      PACKAGE=${dep[0]}
+                      VERSION=${dep[1]}
+
+                      echo "::warning title=Develop dependency found::$DEPENDENCY will be kept at $VERSION"
+                      yarn upgrade "$PACKAGE@$VERSION" --exact
+                      git add -u
+                      git commit -m "Keep $PACKAGE at $VERSION"
+                  done
 
             - name: Bump package.json version
-              run: yarn version --no-git-tag-version --new-version "${VERSION#v}"
-
-            - name: Ingest upstream changes
-              if: |
-                  inputs.include-changes &&
-                  (!inputs.dependencies || contains(fromJSON(steps.update-dependencies.outputs.updated), inputs.include-changes))
-              uses: actions/github-script@v7
-              env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
-                  DEPENDENCY: ${{ inputs.include-changes }}
-              with:
-                  retries: 3
-                  script: |
-                      const { RELEASE_ID: releaseId, DEPENDENCY, VERSION } = process.env;
-                      const { owner, repo } = context.repo;
-                      const script = require("./.action-repo/scripts/release/merge-release-notes.js");
-                      const notes = await script({
-                          github,
-                          releaseId,
-                          dependencies: [DEPENDENCY.replace("$VERSION", VERSION)],
-                      });
-                      core.exportVariable("RELEASE_NOTES", notes);
+              run: |
+                  yarn version --no-git-tag-version --new-version "${VERSION#v}"
+                  git add package.json
 
             - name: Add to CHANGELOG.md
               if: inputs.final
@@ -219,11 +169,8 @@ jobs:
                   cat CHANGELOG.md.old >> CHANGELOG.md
                   rm CHANGELOG.md.old
                   git add CHANGELOG.md
-
-            - name: Run pre-release script to update package.json fields
-              run: |
-                  ./.action-repo/scripts/release/pre-release.sh
-                  git add package.json
+              env:
+                  RELEASE_NOTES: ${{ steps.draft-release.outputs.body }}
 
             - name: Commit changes
               run: git commit -m "$VERSION"
@@ -237,7 +184,7 @@ jobs:
               uses: ./.action-repo/.github/actions/upload-release-assets
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
                   asset-path: ${{ inputs.asset-path }}
 
             - name: Create signed tag
@@ -252,7 +199,7 @@ jobs:
               uses: ./.action-repo/.github/actions/sign-release-tarball
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
-                  upload-url: ${{ steps.release.outputs.upload_url }}
+                  upload-url: ${{ steps.draft-release.outputs.upload_url }}
 
             # We defer pushing changes until after the release assets are built,
             # signed & uploaded to improve the atomicity of this action.
@@ -273,7 +220,7 @@ jobs:
               if: inputs.expected-asset-count
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
               with:
                   retries: 3
@@ -301,7 +248,7 @@ jobs:
             - name: Publish release
               uses: actions/github-script@v7
               env:
-                  RELEASE_ID: ${{ steps.release.outputs.id }}
+                  RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   FINAL: ${{ inputs.final }}
               with:
                   retries: 3
@@ -335,15 +282,18 @@ jobs:
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-    update-labels:
-        name: Advance release blocker labels
+    post-release:
+        name: Post release steps
         needs: release
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
+        permissions:
+            issues: write
         steps:
             - id: repository
               run: echo "REPO=${GITHUB_REPOSITORY#*/}" >> $GITHUB_OUTPUT
 
-            - uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
+            - name: Advance release blocker labels
+              uses: garganshu/github-label-updater@3770d15ebfed2fe2cb06a241047bc340f774a7d1 # v1.0.0
               with:
                   owner: ${{ github.repository_owner }}
                   repo: ${{ steps.repository.outputs.REPO }}
@@ -351,3 +301,13 @@ jobs:
                   filter-labels: X-Upcoming-Release-Blocker
                   remove-labels: X-Upcoming-Release-Blocker
                   add-labels: X-Release-Blocker
+
+    #            - name: Wait for master->develop gitflow merge
+    #              if: inputs.final
+    #              uses: t3chguy/wait-on-check-action@18541021811b56544d90e0f073401c2b99e249d6 # fork
+    #              with:
+    #                  ref: master
+    #                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+    #                  wait-interval: 10
+    #                  check-name: merge
+    #                  allowed-conclusions: success

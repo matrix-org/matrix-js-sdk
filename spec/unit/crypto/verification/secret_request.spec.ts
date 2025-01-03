@@ -34,7 +34,7 @@ const testKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
 describe("self-verifications", () => {
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("triggers a request for key sharing upon completion", async () => {

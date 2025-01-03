@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, Logger } from "../../logger";
-import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
-import { MemoryCryptoStore } from "./memory-crypto-store";
-import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
-import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors";
-import * as IndexedDBHelpers from "../../indexeddb-helpers";
+import { logger, Logger } from "../../logger.ts";
+import { LocalStorageCryptoStore } from "./localStorage-crypto-store.ts";
+import { MemoryCryptoStore } from "./memory-crypto-store.ts";
+import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend.ts";
+import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors.ts";
+import * as IndexedDBHelpers from "../../indexeddb-helpers.ts";
 import {
     CryptoStore,
     IDeviceData,
@@ -33,12 +33,13 @@ import {
     OutgoingRoomKeyRequest,
     ParkedSharedHistory,
     SecretStorePrivateKeys,
-} from "./base";
-import { IRoomKeyRequestBody } from "../index";
-import { ICrossSigningKey } from "../../client";
-import { IOlmDevice } from "../algorithms/megolm";
-import { IRoomEncryption } from "../RoomList";
-import { InboundGroupSessionData } from "../OlmDevice";
+    ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
+} from "./base.ts";
+import { IRoomKeyRequestBody } from "../index.ts";
+import { IOlmDevice } from "../algorithms/megolm.ts";
+import { IRoomEncryption } from "../RoomList.ts";
+import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /*
  * Internal module. indexeddb storage for e2e.
@@ -61,6 +62,52 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return IndexedDBHelpers.exists(indexedDB, dbName);
+    }
+
+    /**
+     * Utility to check if a legacy crypto store exists and has not been migrated.
+     * Returns true if the store exists and has not been migrated, false otherwise.
+     */
+    public static existsAndIsNotMigrated(indexedDb: IDBFactory, dbName: string): Promise<boolean> {
+        return new Promise<boolean>((resolve, reject) => {
+            let exists = true;
+            const openDBRequest = indexedDb.open(dbName);
+            openDBRequest.onupgradeneeded = (): void => {
+                // Since we did not provide an explicit version when opening, this event
+                // should only fire if the DB did not exist before at any version.
+                exists = false;
+            };
+            openDBRequest.onblocked = (): void => reject(openDBRequest.error);
+            openDBRequest.onsuccess = (): void => {
+                const db = openDBRequest.result;
+                if (!exists) {
+                    db.close();
+                    // The DB did not exist before, but has been created as part of this
+                    // existence check. Delete it now to restore previous state. Delete can
+                    // actually take a while to complete in some browsers, so don't wait for
+                    // it. This won't block future open calls that a store might issue next to
+                    // properly set up the DB.
+                    indexedDb.deleteDatabase(dbName);
+                    resolve(false);
+                } else {
+                    const tx = db.transaction([IndexedDBCryptoStore.STORE_ACCOUNT], "readonly");
+                    const objectStore = tx.objectStore(IndexedDBCryptoStore.STORE_ACCOUNT);
+                    const getReq = objectStore.get(ACCOUNT_OBJECT_KEY_MIGRATION_STATE);
+
+                    getReq.onsuccess = (): void => {
+                        const migrationState = getReq.result ?? MigrationState.NOT_STARTED;
+                        resolve(migrationState === MigrationState.NOT_STARTED);
+                    };
+
+                    getReq.onerror = (): void => {
+                        reject(getReq.error);
+                    };
+
+                    db.close();
+                }
+            };
+            openDBRequest.onerror = (): void => reject(openDBRequest.error);
+        });
     }
 
     private backendPromise?: Promise<CryptoStore>;
@@ -163,7 +210,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
                 );
 
                 try {
-                    return new LocalStorageCryptoStore(global.localStorage);
+                    return new LocalStorageCryptoStore(globalThis.localStorage);
                 } catch (e) {
                     logger.warn(`unable to open localStorage: falling back to in-memory store: ${e}`);
                     return new MemoryCryptoStore();
@@ -373,7 +420,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      */
     public getCrossSigningKeys(
         txn: IDBTransaction,
-        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+        func: (keys: Record<string, CrossSigningKeyInfo> | null) => void,
     ): void {
         this.backend!.getCrossSigningKeys(txn, func);
     }
@@ -397,7 +444,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param txn - An active transaction. See doTxn().
      * @param keys - keys object as getCrossSigningKeys()
      */
-    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, ICrossSigningKey>): void {
+    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, CrossSigningKeyInfo>): void {
         this.backend!.storeCrossSigningKeys(txn, keys);
     }
 

@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../logger";
-import { defer, IDeferred } from "../utils";
-import { ISavedSync } from "./index";
-import { IStoredClientOpts } from "../client";
-import { IStateEventWithRoomId, ISyncResponse } from "../matrix";
-import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { logger } from "../logger.ts";
+import { defer, IDeferred } from "../utils.ts";
+import { ISavedSync } from "./index.ts";
+import { IStoredClientOpts } from "../client.ts";
+import { IStateEventWithRoomId, ISyncResponse } from "../matrix.ts";
+import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend.ts";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker?: Worker;

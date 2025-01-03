@@ -16,18 +16,18 @@ limitations under the License.
 
 /* eslint-disable @babel/no-invalid-this */
 
-import { MemoryStore, IOpts as IBaseOpts } from "./memory";
-import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
-import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
-import { IEvent, MatrixEvent } from "../models/event";
-import { logger } from "../logger";
-import { ISavedSync } from "./index";
-import { IIndexedDBBackend } from "./indexeddb-backend";
-import { ISyncResponse } from "../sync-accumulator";
-import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { IStateEventWithRoomId } from "../@types/search";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
-import { IStoredClientOpts } from "../client";
+import { MemoryStore, IOpts as IBaseOpts } from "./memory.ts";
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.ts";
+import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.ts";
+import { IEvent, MatrixEvent } from "../models/event.ts";
+import { logger } from "../logger.ts";
+import { ISavedSync } from "./index.ts";
+import { IIndexedDBBackend } from "./indexeddb-backend.ts";
+import { ISyncResponse } from "../sync-accumulator.ts";
+import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { IStateEventWithRoomId } from "../@types/search.ts";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { IStoredClientOpts } from "../client.ts";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -42,7 +42,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 interface IOpts extends IBaseOpts {
     /** The Indexed DB interface e.g. `window.indexedDB` */
-    indexedDB: IDBFactory;
+    indexedDB?: IDBFactory;
     /** Optional database name. The same name must be used to open the same database. */
     dbName?: string;
     /** Optional factory to spin up a Worker to execute the IDB transactions within. */
@@ -90,10 +90,10 @@ export class IndexedDBStore extends MemoryStore {
      * ```
      * let opts = { indexedDB: window.indexedDB, localStorage: window.localStorage };
      * let store = new IndexedDBStore(opts);
-     * await store.startup(); // load from indexed db
      * let client = sdk.createClient({
      *     store: store,
      * });
+     * await store.startup(); // load from indexed db, must be called after createClient
      * client.startClient();
      * client.on("sync", function(state, prevState, data) {
      *     if (state === "PREPARED") {
@@ -118,7 +118,10 @@ export class IndexedDBStore extends MemoryStore {
         }
     }
 
-    public on = this.emitter.on.bind(this.emitter);
+    /** Re-exports `TypedEventEmitter.on` */
+    public on(event: EventEmitterEvents | "degraded" | "closed", handler: (...args: any[]) => void): void {
+        this.emitter.on(event, handler);
+    }
 
     /**
      * @returns Resolved when loaded from indexed db.
@@ -140,7 +143,9 @@ export class IndexedDBStore extends MemoryStore {
                 logger.log(`IndexedDBStore.startup: processing presence events`);
                 userPresenceEvents.forEach(([userId, rawEvent]) => {
                     if (!this.createUser) {
-                        throw new Error("createUser is undefined, it should be set with setUserCreator()!");
+                        throw new Error(
+                            "`IndexedDBStore.startup` must be called after assigning it to the client, not before!",
+                        );
                     }
                     const u = this.createUser(userId);
                     if (rawEvent) {
@@ -201,7 +206,7 @@ export class IndexedDBStore extends MemoryStore {
                 throw err;
             },
         );
-    });
+    }, null);
 
     /**
      * Whether this store would like to save its data
@@ -248,7 +253,7 @@ export class IndexedDBStore extends MemoryStore {
         }
 
         return this.backend.syncToDatabase(userTuples);
-    });
+    }, null);
 
     public setSyncData = this.degradable((syncData: ISyncResponse): Promise<void> => {
         return this.backend.setSyncData(syncData);
@@ -305,13 +310,13 @@ export class IndexedDBStore extends MemoryStore {
      * @param fallback - The method name for fallback.
      * @returns A wrapped member function.
      */
-    private degradable<A extends Array<any>, R = void>(
+    private degradable<A extends Array<any>, F extends keyof MemoryStore | null, R = void>(
         func: DegradableFn<A, R>,
-        fallback?: keyof MemoryStore,
-    ): DegradableFn<A, R> {
-        const fallbackFn = fallback ? (super[fallback] as Function) : null;
+        fallback: F,
+    ): DegradableFn<A, F extends string ? R : void> {
+        const fallbackFn = fallback ? (super[fallback] as (...args: A) => Promise<R>) : null;
 
-        return async (...args) => {
+        return (async (...args) => {
             try {
                 return await func.call(this, ...args);
             } catch (e) {
@@ -339,7 +344,7 @@ export class IndexedDBStore extends MemoryStore {
                     return fallbackFn.call(this, ...args);
                 }
             }
-        };
+        }) as DegradableFn<A, F extends string ? R : void>;
     }
 
     // XXX: ideally these would be stored in indexeddb as part of the room but,

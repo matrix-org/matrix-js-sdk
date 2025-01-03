@@ -10,15 +10,16 @@ concurrency:
     cancel-in-progress: true
 env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
+permissions: {} # No permissions required
 jobs:
     jest:
         name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         timeout-minutes: 10
         strategy:
             matrix:
                 specs: [integ, unit]
-                node: [18, "lts/*", 21]
+                node: ["lts/*", 22]
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
@@ -63,26 +64,59 @@ jobs:
                       coverage
                       !coverage/lcov-report
 
-    matrix-react-sdk:
-        name: Downstream test matrix-react-sdk
+    # Dummy completion job to simplify branch protections
+    jest-complete:
+        name: Jest tests
+        needs: jest
+        if: always()
+        runs-on: ubuntu-24.04
+        steps:
+            - if: needs.jest.result != 'skipped' && needs.jest.result != 'success'
+              run: exit 1
+
+    element-web:
+        name: Downstream test element-web
         if: github.event_name == 'merge_group'
-        uses: matrix-org/matrix-react-sdk/.github/workflows/tests.yml@develop
+        uses: element-hq/element-web/.github/workflows/tests.yml@develop
+        permissions:
+            statuses: write
         with:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
+
+    complement-crypto:
+        name: "Run Complement Crypto tests"
+        if: github.event_name == 'merge_group'
+        permissions: read-all
+        uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
+        with:
+            use_js_sdk: "."
+
+    # we need this so the job is reported properly when run in a merge queue
+    downstream-complement-crypto:
+        name: Downstream Complement Crypto tests
+        runs-on: ubuntu-24.04
+        if: always()
+        needs:
+            - complement-crypto
+        steps:
+            - if: needs.complement-crypto.result != 'skipped' && needs.complement-crypto.result != 'success'
+              run: exit 1
 
     # Hook for branch protection to skip downstream testing outside of merge queues
     # and skip sonarcloud coverage within merge queues
     downstream:
         name: Downstream tests
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: always()
         needs:
-            - matrix-react-sdk
+            - element-web
+        permissions:
+            statuses: write
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'
-              uses: Sibz/github-status-action@071b5370da85afbb16637d6eed8524a06bc2053e # v1
+              uses: guibranco/github-status-action-v2@d469d49426f5a7b8a1fbcac20ad274d3e4892321
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: success
@@ -91,5 +125,5 @@ jobs:
                   sha: ${{ github.sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            - if: needs.matrix-react-sdk.result != 'skipped' && needs.matrix-react-sdk.result != 'success'
+            - if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
               run: exit 1

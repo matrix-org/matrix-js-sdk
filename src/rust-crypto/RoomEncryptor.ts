@@ -14,26 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import {
+    CollectStrategy,
     EncryptionAlgorithm,
     EncryptionSettings,
+    HistoryVisibility as RustHistoryVisibility,
     OlmMachine,
     RoomId,
-    UserId,
-    HistoryVisibility as RustHistoryVisibility,
     ToDeviceRequest,
+    UserId,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { EventType } from "../@types/event";
-import { IContent, MatrixEvent } from "../models/event";
-import { Room } from "../models/room";
-import { Logger, logger, LogSpan } from "../logger";
-import { KeyClaimManager } from "./KeyClaimManager";
-import { RoomMember } from "../models/room-member";
-import { HistoryVisibility } from "../@types/partials";
-import { OutgoingRequestsManager } from "./OutgoingRequestsManager";
-import { logDuration } from "../utils";
+import { EventType } from "../@types/event.ts";
+import { IContent, MatrixEvent } from "../models/event.ts";
+import { Room } from "../models/room.ts";
+import { Logger, logger, LogSpan } from "../logger.ts";
+import { KeyClaimManager } from "./KeyClaimManager.ts";
+import { RoomMember } from "../models/room-member.ts";
+import { HistoryVisibility } from "../@types/partials.ts";
+import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
+import { logDuration } from "../utils.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api/index.ts";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -88,7 +91,8 @@ export class RoomEncryptor {
      */
     public onCryptoEvent(config: IContent): void {
         if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
-            this.prefixedLogger.error(`Ignoring m.room.encryption event which requests a change of config`);
+            // This should currently be unreachable, since the Rust SDK will reject any attempts to change config.
+            throw new Error("Cannot reconfigure an active RoomEncryptor");
         }
     }
 
@@ -99,14 +103,12 @@ export class RoomEncryptor {
      */
     public onRoomMembership(member: RoomMember): void {
         if (
-            member.membership == "join" ||
-            (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
+            member.membership == KnownMembership.Join ||
+            (member.membership == KnownMembership.Invite && this.room.shouldEncryptForInvitedMembers())
         ) {
             // make sure we are tracking the deviceList for this user
-            logDuration(this.prefixedLogger, "updateTrackedUsers", async () => {
-                this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
-                    this.prefixedLogger.error("Unable to update tracked users", e);
-                });
+            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]).catch((e) => {
+                this.prefixedLogger.error("Unable to update tracked users", e);
             });
         }
 
@@ -118,10 +120,15 @@ export class RoomEncryptor {
      *
      * This ensures that we have a megolm session ready to use and that we have shared its key with all the devices
      * in the room.
-     *
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
+     * will not send encrypted messages to unverified devices.
+     * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
      */
-    public async prepareForEncryption(globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    public async prepareForEncryption(
+        globalBlacklistUnverifiedDevices: boolean,
+        deviceIsolationMode: DeviceIsolationMode,
+    ): Promise<void> {
         // We consider a prepareForEncryption as an encryption promise as it will potentially share keys
         // even if it doesn't send an event.
         // Usually this is called when the user starts typing, so we want to make sure we have keys ready when the
@@ -129,7 +136,7 @@ export class RoomEncryptor {
         // If `encryptEvent` is invoked before `prepareForEncryption` has completed, the `encryptEvent` call will wait for
         // `prepareForEncryption` to complete before executing.
         // The part where `encryptEvent` shares the room key will then usually be a no-op as it was already performed by `prepareForEncryption`.
-        await this.encryptEvent(null, globalBlacklistUnverifiedDevices);
+        await this.encryptEvent(null, globalBlacklistUnverifiedDevices, deviceIsolationMode);
     }
 
     /**
@@ -139,10 +146,17 @@ export class RoomEncryptor {
      * then, if an event is provided, encrypt it using the session.
      *
      * @param event - Event to be encrypted, or null if only preparing for encryption (in which case we will pre-share the room key).
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
+     * will not send encrypted messages to unverified devices.
+     * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
      */
-    public encryptEvent(event: MatrixEvent | null, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
-        const logger = new LogSpan(this.prefixedLogger, event ? event.getTxnId() ?? "" : "prepareForEncryption");
+    public encryptEvent(
+        event: MatrixEvent | null,
+        globalBlacklistUnverifiedDevices: boolean,
+        deviceIsolationMode: DeviceIsolationMode,
+    ): Promise<void> {
+        const logger = new LogSpan(this.prefixedLogger, event ? (event.getTxnId() ?? "") : "prepareForEncryption");
         // Ensure order of encryption to avoid message ordering issues, as the scheduler only ensures
         // events order after they have been encrypted.
         const prom = this.currentEncryptionPromise
@@ -152,7 +166,7 @@ export class RoomEncryptor {
             })
             .then(async () => {
                 await logDuration(logger, "ensureEncryptionSession", async () => {
-                    await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices);
+                    await this.ensureEncryptionSession(logger, globalBlacklistUnverifiedDevices, deviceIsolationMode);
                 });
                 if (event) {
                     await logDuration(logger, "encryptEventInner", async () => {
@@ -172,9 +186,16 @@ export class RoomEncryptor {
      * in the room.
      *
      * @param logger - a place to write diagnostics to
-     * @param globalBlacklistUnverifiedDevices - When `true`, it will not send encrypted messages to unverified devices
+     * @param globalBlacklistUnverifiedDevices - When `true`, and `deviceIsolationMode` is `AllDevicesIsolationMode`,
+     * will not send encrypted messages to unverified devices.
+     * Ignored when `deviceIsolationMode` is `OnlySignedDevicesIsolationMode`.
+     * @param deviceIsolationMode - The device isolation mode. See {@link DeviceIsolationMode}.
      */
-    private async ensureEncryptionSession(logger: LogSpan, globalBlacklistUnverifiedDevices: boolean): Promise<void> {
+    private async ensureEncryptionSession(
+        logger: LogSpan,
+        globalBlacklistUnverifiedDevices: boolean,
+        deviceIsolationMode: DeviceIsolationMode,
+    ): Promise<void> {
         if (this.encryptionSettings.algorithm !== "m.megolm.v1.aes-sha2") {
             throw new Error(
                 `Cannot encrypt in ${this.room.roomId} for unsupported algorithm '${this.encryptionSettings.algorithm}'`,
@@ -250,14 +271,28 @@ export class RoomEncryptor {
             rustEncryptionSettings.rotationPeriodMessages = BigInt(this.encryptionSettings.rotation_period_msgs);
         }
 
-        // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
-        // See Room#getBlacklistUnverifiedDevices
-        rustEncryptionSettings.onlyAllowTrustedDevices =
-            this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
+        switch (deviceIsolationMode.kind) {
+            case DeviceIsolationModeKind.AllDevicesIsolationMode:
+                {
+                    // When this.room.getBlacklistUnverifiedDevices() === null, the global settings should be used
+                    // See Room#getBlacklistUnverifiedDevices
+                    const onlyAllowTrustedDevices =
+                        this.room.getBlacklistUnverifiedDevices() ?? globalBlacklistUnverifiedDevices;
+                    rustEncryptionSettings.sharingStrategy = CollectStrategy.deviceBasedStrategy(
+                        onlyAllowTrustedDevices,
+                        deviceIsolationMode.errorOnVerifiedUserProblems,
+                    );
+                }
+                break;
+            case DeviceIsolationModeKind.OnlySignedDevicesIsolationMode:
+                rustEncryptionSettings.sharingStrategy = CollectStrategy.identityBasedStrategy();
+                break;
+        }
 
         await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
             const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
                 new RoomId(this.room.roomId),
+                // safe to pass without cloning, as it's not reused here (before or after)
                 userList,
                 rustEncryptionSettings,
             );
