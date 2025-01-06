@@ -14,27 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeBase64, EventTimeline, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
+import { encodeBase64, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import {
-    CallMembershipData,
-    CallMembershipDataLegacy,
-    SessionMembershipData,
-} from "../../../src/matrixrtc/CallMembership";
+import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
-import { makeMockRoom, makeMockRoomState, mockRTCEvent } from "./mocks";
-
-const membershipTemplate: CallMembershipData = {
-    call_id: "",
-    scope: "m.room",
-    application: "m.call",
-    device_id: "AAAAAAA",
-    expires: 60 * 60 * 1000,
-    membershipID: "bloop",
-    foci_active: [{ type: "livekit", livekit_service_url: "https://lk.url" }],
-};
+import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 
 const mockFocus = { type: "mock" };
 
@@ -59,7 +45,7 @@ describe("MatrixRTCSession", () => {
 
     describe("roomSessionForRoom", () => {
         it("creates a room-scoped session from room state", () => {
-            const mockRoom = makeMockRoom([membershipTemplate]);
+            const mockRoom = makeMockRoom(membershipTemplate);
 
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             expect(sess?.memberships.length).toEqual(1);
@@ -67,43 +53,46 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships[0].scope).toEqual("m.room");
             expect(sess?.memberships[0].application).toEqual("m.call");
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            expect(sess?.memberships[0].membershipID).toEqual("bloop");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
             expect(sess?.callId).toEqual("");
         });
 
-        it("ignores expired memberships events", () => {
-            jest.useFakeTimers();
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.expires = 1000;
-            expiredMembership.device_id = "EXPIRED";
-            const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
+        // TODO: re-enable this test when expiry is implemented
+        // eslint-disable-next-line jest/no-commented-out-tests
+        // it("ignores expired memberships events", () => {
+        //     jest.useFakeTimers();
+        //     const expiredMembership = Object.assign({}, membershipTemplate);
+        //     expiredMembership.expires = 1000;
+        //     expiredMembership.device_id = "EXPIRED";
+        //     const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
 
-            jest.advanceTimersByTime(2000);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            jest.useRealTimers();
-        });
+        //     jest.advanceTimersByTime(2000);
+        //     sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //     expect(sess?.memberships.length).toEqual(1);
+        //     expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+        //     jest.useRealTimers();
+        // });
 
         it("ignores memberships events of members not in the room", () => {
-            const mockRoom = makeMockRoom([membershipTemplate]);
+            const mockRoom = makeMockRoom(membershipTemplate);
             mockRoom.hasMembershipState = (state) => state === KnownMembership.Join;
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             expect(sess?.memberships.length).toEqual(0);
         });
 
-        it("honours created_ts", () => {
-            jest.useFakeTimers();
-            jest.setSystemTime(500);
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.created_ts = 500;
-            expiredMembership.expires = 1000;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
-            jest.useRealTimers();
-        });
+        // TODO: re-enable this test when expiry is implemented
+        // eslint-disable-next-line jest/no-commented-out-tests
+        // it("honours created_ts", () => {
+        //     jest.useFakeTimers();
+        //     jest.setSystemTime(500);
+        //     const expiredMembership = Object.assign({}, membershipTemplate);
+        //     expiredMembership.created_ts = 500;
+        //     expiredMembership.expires = 1000;
+        //     const mockRoom = makeMockRoom([expiredMembership]);
+        //     sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //     expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
+        //     jest.useRealTimers();
+        // });
 
         it("returns empty session if no membership events are present", () => {
             const mockRoom = makeMockRoom([]);
@@ -181,14 +170,6 @@ describe("MatrixRTCSession", () => {
             expect(sess.memberships).toHaveLength(0);
         });
 
-        it("ignores memberships with no expires_ts", () => {
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            (expiredMembership.expires as number | undefined) = undefined;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess.memberships).toHaveLength(0);
-        });
-
         it("ignores memberships with no device_id", () => {
             const testMembership = Object.assign({}, membershipTemplate);
             (testMembership.device_id as string | undefined) = undefined;
@@ -224,23 +205,7 @@ describe("MatrixRTCSession", () => {
 
     describe("updateCallMembershipEvent", () => {
         const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
-        const joinSessionConfig = { useLegacyMemberEvents: false };
-
-        const legacyMembershipData: CallMembershipDataLegacy = {
-            call_id: "",
-            scope: "m.room",
-            application: "m.call",
-            device_id: "AAAAAAA_legacy",
-            expires: 60 * 60 * 1000,
-            membershipID: "bloop",
-            foci_active: [mockFocus],
-        };
-
-        const expiredLegacyMembershipData: CallMembershipDataLegacy = {
-            ...legacyMembershipData,
-            device_id: "AAAAAAA_legacy_expired",
-            expires: 0,
-        };
+        const joinSessionConfig = {};
 
         const sessionMembershipData: SessionMembershipData = {
             call_id: "",
@@ -273,39 +238,22 @@ describe("MatrixRTCSession", () => {
             client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
         });
 
-        async function testSession(
-            membershipData: CallMembershipData[] | SessionMembershipData,
-            shouldUseLegacy: boolean,
-        ): Promise<void> {
+        async function testSession(membershipData: SessionMembershipData): Promise<void> {
             sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
 
-            const makeNewLegacyMembershipsMock = jest.spyOn(sess as any, "makeNewLegacyMemberships");
             const makeNewMembershipMock = jest.spyOn(sess as any, "makeNewMembership");
 
             sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
 
-            expect(makeNewLegacyMembershipsMock).toHaveBeenCalledTimes(shouldUseLegacy ? 1 : 0);
-            expect(makeNewMembershipMock).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+            expect(makeNewMembershipMock).toHaveBeenCalledTimes(1);
 
             await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(shouldUseLegacy ? 0 : 1);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
         }
 
-        it("uses legacy events if there are any active legacy calls", async () => {
-            await testSession([expiredLegacyMembershipData, legacyMembershipData, sessionMembershipData], true);
-        });
-
-        it('uses legacy events if a non-legacy call is in a "memberships" array', async () => {
-            await testSession([sessionMembershipData], true);
-        });
-
-        it("uses non-legacy events if all legacy calls are expired", async () => {
-            await testSession([expiredLegacyMembershipData], false);
-        });
-
-        it("uses non-legacy events if there are only non-legacy calls", async () => {
-            await testSession(sessionMembershipData, false);
+        it("sends events", async () => {
+            await testSession(sessionMembershipData);
         });
     });
 
@@ -321,70 +269,6 @@ describe("MatrixRTCSession", () => {
 
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             expect(sess.getOldestMembership()!.deviceId).toEqual("old");
-            jest.useRealTimers();
-        });
-    });
-
-    describe("getsActiveFocus", () => {
-        const activeFociConfig = { type: "livekit", livekit_service_url: "https://active.url" };
-        it("gets the correct active focus with oldest_membership", () => {
-            jest.useFakeTimers();
-            jest.setSystemTime(3000);
-            const mockRoom = makeMockRoom([
-                Object.assign({}, membershipTemplate, {
-                    device_id: "foo",
-                    created_ts: 500,
-                    foci_active: [activeFociConfig],
-                }),
-                Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
-                Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
-            ]);
-
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-
-            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }], {
-                type: "livekit",
-                focus_selection: "oldest_membership",
-            });
-            expect(sess.getActiveFocus()).toBe(activeFociConfig);
-            jest.useRealTimers();
-        });
-        it("does not provide focus if the selction method is unknown", () => {
-            const mockRoom = makeMockRoom([
-                Object.assign({}, membershipTemplate, {
-                    device_id: "foo",
-                    created_ts: 500,
-                    foci_active: [activeFociConfig],
-                }),
-                Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
-                Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
-            ]);
-
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-
-            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }], {
-                type: "livekit",
-                focus_selection: "unknown",
-            });
-            expect(sess.getActiveFocus()).toBe(undefined);
-        });
-        it("gets the correct active focus legacy", () => {
-            jest.useFakeTimers();
-            jest.setSystemTime(3000);
-            const mockRoom = makeMockRoom([
-                Object.assign({}, membershipTemplate, {
-                    device_id: "foo",
-                    created_ts: 500,
-                    foci_active: [activeFociConfig],
-                }),
-                Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
-                Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
-            ]);
-
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-
-            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }]);
-            expect(sess.getActiveFocus()).toBe(activeFociConfig);
             jest.useRealTimers();
         });
     });
@@ -439,67 +323,7 @@ describe("MatrixRTCSession", () => {
             expect(sess!.isJoined()).toEqual(true);
         });
 
-        it("sends a membership event when joining a call", async () => {
-            const realSetTimeout = setTimeout;
-            jest.useFakeTimers();
-            sess!.joinRoomSession([mockFocus], mockFocus);
-            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client.sendStateEvent).toHaveBeenCalledWith(
-                mockRoom!.roomId,
-                EventType.GroupCallMemberPrefix,
-                {
-                    memberships: [
-                        {
-                            application: "m.call",
-                            scope: "m.room",
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            expires: 3600000,
-                            expires_ts: Date.now() + 3600000,
-                            foci_active: [mockFocus],
-
-                            membershipID: expect.stringMatching(".*"),
-                        },
-                    ],
-                },
-                "@alice:example.org",
-            );
-            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(0);
-            jest.useRealTimers();
-        });
-
-        it("uses membershipExpiryTimeout from join config", async () => {
-            const realSetTimeout = setTimeout;
-            jest.useFakeTimers();
-            sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60000 });
-            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client.sendStateEvent).toHaveBeenCalledWith(
-                mockRoom!.roomId,
-                EventType.GroupCallMemberPrefix,
-                {
-                    memberships: [
-                        {
-                            application: "m.call",
-                            scope: "m.room",
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            expires: 60000,
-                            expires_ts: Date.now() + 60000,
-                            foci_active: [mockFocus],
-
-                            membershipID: expect.stringMatching(".*"),
-                        },
-                    ],
-                },
-                "@alice:example.org",
-            );
-            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(0);
-            jest.useRealTimers();
-        });
-
-        describe("non-legacy calls", () => {
+        describe("calls", () => {
             const activeFocusConfig = { type: "livekit", livekit_service_url: "https://active.url" };
             const activeFocus = { type: "livekit", focus_selection: "oldest_membership" };
 
@@ -557,7 +381,6 @@ describe("MatrixRTCSession", () => {
                 });
 
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, {
-                    useLegacyMemberEvents: false,
                     membershipServerSideExpiryTimeout: 9000,
                 });
 
@@ -579,6 +402,7 @@ describe("MatrixRTCSession", () => {
                         application: "m.call",
                         scope: "m.room",
                         call_id: "",
+                        expires: 14400000,
                         device_id: "AAAAAAA",
                         foci_preferred: [activeFocusConfig],
                         focus_active: activeFocus,
@@ -598,7 +422,7 @@ describe("MatrixRTCSession", () => {
                 jest.useRealTimers();
             }
 
-            it("sends a membership event with session payload when joining a non-legacy call", async () => {
+            it("sends a membership event with session payload when joining a call", async () => {
                 await testJoin(false);
             });
 
@@ -607,91 +431,19 @@ describe("MatrixRTCSession", () => {
             });
         });
 
-        it("does nothing if join called when already joined", () => {
+        it("does nothing if join called when already joined", async () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
-
+            await sentStateEvent;
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
 
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-        });
-
-        it("renews membership event before expiry time", async () => {
-            jest.useFakeTimers();
-            let resolveFn: ((_roomId: string, _type: string, val: Record<string, any>) => void) | undefined;
-
-            const eventSentPromise = new Promise<Record<string, any>>((r) => {
-                resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
-                    r(val);
-                };
-            });
-            try {
-                const sendStateEventMock = jest.fn().mockImplementation(resolveFn);
-                client.sendStateEvent = sendStateEventMock;
-
-                sess!.joinRoomSession([mockFocus], mockFocus);
-
-                const eventContent = await eventSentPromise;
-
-                jest.setSystemTime(1000);
-                const event = mockRTCEvent(eventContent.memberships, mockRoom.roomId);
-                const getState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-                getState.getStateEvents = jest.fn().mockReturnValue(event);
-                getState.events = new Map([
-                    [
-                        event.getType(),
-                        {
-                            size: () => true,
-                            has: (_stateKey: string) => true,
-                            get: (_stateKey: string) => event,
-                            values: () => [event],
-                        } as unknown as Map<string, MatrixEvent>,
-                    ],
-                ]);
-
-                const eventReSentPromise = new Promise<Record<string, any>>((r) => {
-                    resolveFn = (_roomId: string, _type: string, val: Record<string, any>) => {
-                        r(val);
-                    };
-                });
-
-                sendStateEventMock.mockReset().mockImplementation(resolveFn);
-
-                // definitely should have renewed by 1 second before the expiry!
-                const timeElapsed = 60 * 60 * 1000 - 1000;
-                jest.setSystemTime(Date.now() + timeElapsed);
-                jest.advanceTimersByTime(timeElapsed);
-                await eventReSentPromise;
-
-                expect(sendStateEventMock).toHaveBeenCalledWith(
-                    mockRoom.roomId,
-                    EventType.GroupCallMemberPrefix,
-                    {
-                        memberships: [
-                            {
-                                application: "m.call",
-                                scope: "m.room",
-                                call_id: "",
-                                device_id: "AAAAAAA",
-                                expires: 3600000 * 2,
-                                expires_ts: 1000 + 3600000 * 2,
-                                foci_active: [mockFocus],
-                                created_ts: 1000,
-                                membershipID: expect.stringMatching(".*"),
-                            },
-                        ],
-                    },
-                    "@alice:example.org",
-                );
-            } finally {
-                jest.useRealTimers();
-            }
         });
     });
 
     describe("onMembershipsChanged", () => {
         it("does not emit if no membership changes", () => {
-            const mockRoom = makeMockRoom([membershipTemplate]);
+            const mockRoom = makeMockRoom(membershipTemplate);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
 
             const onMembershipsChanged = jest.fn();
@@ -702,7 +454,7 @@ describe("MatrixRTCSession", () => {
         });
 
         it("emits on membership changes", () => {
-            const mockRoom = makeMockRoom([membershipTemplate]);
+            const mockRoom = makeMockRoom(membershipTemplate);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
 
             const onMembershipsChanged = jest.fn();
@@ -714,26 +466,28 @@ describe("MatrixRTCSession", () => {
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
 
-        it("emits an event at the time a membership event expires", () => {
-            jest.useFakeTimers();
-            try {
-                const membership = Object.assign({}, membershipTemplate);
-                const mockRoom = makeMockRoom([membership]);
+        // TODO: re-enable this test when expiry is implemented
+        // eslint-disable-next-line jest/no-commented-out-tests
+        // it("emits an event at the time a membership event expires", () => {
+        //     jest.useFakeTimers();
+        //     try {
+        //         const membership = Object.assign({}, membershipTemplate);
+        //         const mockRoom = makeMockRoom([membership]);
 
-                sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-                const membershipObject = sess.memberships[0];
+        //         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //         const membershipObject = sess.memberships[0];
 
-                const onMembershipsChanged = jest.fn();
-                sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+        //         const onMembershipsChanged = jest.fn();
+        //         sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
-                jest.advanceTimersByTime(61 * 1000 * 1000);
+        //         jest.advanceTimersByTime(61 * 1000 * 1000);
 
-                expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
-                expect(sess?.memberships.length).toEqual(0);
-            } finally {
-                jest.useRealTimers();
-            }
-        });
+        //         expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
+        //         expect(sess?.memberships.length).toEqual(0);
+        //     } finally {
+        //         jest.useRealTimers();
+        //     }
+        // });
     });
 
     describe("key management", () => {
@@ -805,9 +559,13 @@ describe("MatrixRTCSession", () => {
                 }
             });
 
-            it("does not send key if join called when already joined", () => {
+            it("does not send key if join called when already joined", async () => {
+                const sentStateEvent = new Promise((resolve) => {
+                    sendStateEventMock = jest.fn(resolve);
+                });
+                client.sendStateEvent = sendStateEventMock;
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-
+                await sentStateEvent;
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 expect(client.sendEvent).toHaveBeenCalledTimes(1);
                 expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
@@ -1016,89 +774,6 @@ describe("MatrixRTCSession", () => {
                 }
             });
 
-            it("re-sends key if a member changes membership ID", async () => {
-                jest.useFakeTimers();
-                try {
-                    const keysSentPromise1 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    const member1 = membershipTemplate;
-                    const member2 = {
-                        ...membershipTemplate,
-                        device_id: "BBBBBBB",
-                    };
-
-                    const mockRoom = makeMockRoom([member1, member2]);
-                    mockRoom.getLiveTimeline().getState = jest
-                        .fn()
-                        .mockReturnValue(makeMockRoomState([member1, member2], mockRoom.roomId));
-
-                    sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-
-                    await keysSentPromise1;
-
-                    // make sure an encryption key was sent
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    sendEventMock.mockClear();
-
-                    // this should be a no-op:
-                    sess.onMembershipUpdate();
-                    expect(sendEventMock).toHaveBeenCalledTimes(0);
-
-                    // advance time to avoid key throttling
-                    jest.advanceTimersByTime(10000);
-
-                    // update membership ID
-                    member2.membershipID = "newID";
-
-                    const keysSentPromise2 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    // this should re-send the key
-                    sess.onMembershipUpdate();
-
-                    await keysSentPromise2;
-
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                } finally {
-                    jest.useRealTimers();
-                }
-            });
-
             it("re-sends key if a member changes created_ts", async () => {
                 jest.useFakeTimers();
                 jest.setSystemTime(1000);
@@ -1240,7 +915,7 @@ describe("MatrixRTCSession", () => {
             it("wraps key index around to 0 when it reaches the maximum", async () => {
                 // this should give us keys with index [0...255, 0, 1]
                 const membersToTest = 258;
-                const members: CallMembershipData[] = [];
+                const members: SessionMembershipData[] = [];
                 for (let i = 0; i < membersToTest; i++) {
                     members.push(Object.assign({}, membershipTemplate, { device_id: `DEVICE${i}` }));
                 }
