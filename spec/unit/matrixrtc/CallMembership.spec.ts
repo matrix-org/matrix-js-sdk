@@ -15,8 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../../../src";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { membershipTemplate } from "./mocks";
+import { CallMembership, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
@@ -86,26 +85,29 @@ describe("CallMembership", () => {
         });
     });
 
-    describe("expiry calculation", () => {
-        let fakeEvent: MatrixEvent;
-        let membership: CallMembership;
+    // TODO: re-enable this test when expiry is implemented
+    // eslint-disable-next-line jest/no-commented-out-tests
+    // describe("expiry calculation", () => {
+    //     let fakeEvent: MatrixEvent;
+    //     let membership: CallMembership;
 
-        beforeEach(() => {
-            // server origin timestamp for this event is 1000
-            fakeEvent = makeMockEvent(1000);
-            membership = new CallMembership(fakeEvent!, membershipTemplate);
+    //     beforeEach(() => {
+    //         // server origin timestamp for this event is 1000
+    //         fakeEvent = makeMockEvent(1000);
+    //         membership = new CallMembership(fakeEvent!, membershipTemplate);
 
-            jest.useFakeTimers();
-        });
+    //         jest.useFakeTimers();
+    //     });
 
-        afterEach(() => {
-            jest.useRealTimers();
-        });
+    //     afterEach(() => {
+    //         jest.useRealTimers();
+    //     });
 
-        it("calculates time until expiry", () => {
-            jest.setSystemTime(2000);
-            // should be using absolute expiry time
-            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
-        });
-    });
+    // eslint-disable-next-line jest/no-commented-out-tests
+    //     it("calculates time until expiry", () => {
+    //         jest.setSystemTime(2000);
+    //         // should be using absolute expiry time
+    //         expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+    //     });
+    // });
 });

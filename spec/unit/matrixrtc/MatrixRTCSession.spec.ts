@@ -57,19 +57,21 @@ describe("MatrixRTCSession", () => {
             expect(sess?.callId).toEqual("");
         });
 
-        it("ignores expired memberships events", () => {
-            jest.useFakeTimers();
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.expires = 1000;
-            expiredMembership.device_id = "EXPIRED";
-            const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
+        // TODO: re-enable this test when expiry is implemented
+        // eslint-disable-next-line jest/no-commented-out-tests
+        // it("ignores expired memberships events", () => {
+        //     jest.useFakeTimers();
+        //     const expiredMembership = Object.assign({}, membershipTemplate);
+        //     expiredMembership.expires = 1000;
+        //     expiredMembership.device_id = "EXPIRED";
+        //     const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
 
-            jest.advanceTimersByTime(2000);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            jest.useRealTimers();
-        });
+        //     jest.advanceTimersByTime(2000);
+        //     sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //     expect(sess?.memberships.length).toEqual(1);
+        //     expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+        //     jest.useRealTimers();
+        // });
 
         it("ignores memberships events of members not in the room", () => {
             const mockRoom = makeMockRoom(membershipTemplate);
@@ -78,17 +80,19 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships.length).toEqual(0);
         });
 
-        it("honours created_ts", () => {
-            jest.useFakeTimers();
-            jest.setSystemTime(500);
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.created_ts = 500;
-            expiredMembership.expires = 1000;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-            expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
-            jest.useRealTimers();
-        });
+        // TODO: re-enable this test when expiry is implemented
+        // eslint-disable-next-line jest/no-commented-out-tests
+        // it("honours created_ts", () => {
+        //     jest.useFakeTimers();
+        //     jest.setSystemTime(500);
+        //     const expiredMembership = Object.assign({}, membershipTemplate);
+        //     expiredMembership.created_ts = 500;
+        //     expiredMembership.expires = 1000;
+        //     const mockRoom = makeMockRoom([expiredMembership]);
+        //     sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //     expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
+        //     jest.useRealTimers();
+        // });
 
         it("returns empty session if no membership events are present", () => {
             const mockRoom = makeMockRoom([]);
@@ -462,26 +466,28 @@ describe("MatrixRTCSession", () => {
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
 
-        it("emits an event at the time a membership event expires", () => {
-            jest.useFakeTimers();
-            try {
-                const membership = Object.assign({}, membershipTemplate);
-                const mockRoom = makeMockRoom([membership]);
+        // TODO: re-enable this test when expiry is implemented
+        // eslint-disable-next-line jest/no-commented-out-tests
+        // it("emits an event at the time a membership event expires", () => {
+        //     jest.useFakeTimers();
+        //     try {
+        //         const membership = Object.assign({}, membershipTemplate);
+        //         const mockRoom = makeMockRoom([membership]);
 
-                sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-                const membershipObject = sess.memberships[0];
+        //         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //         const membershipObject = sess.memberships[0];
 
-                const onMembershipsChanged = jest.fn();
-                sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+        //         const onMembershipsChanged = jest.fn();
+        //         sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
-                jest.advanceTimersByTime(61 * 1000 * 1000);
+        //         jest.advanceTimersByTime(61 * 1000 * 1000);
 
-                expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
-                expect(sess?.memberships.length).toEqual(0);
-            } finally {
-                jest.useRealTimers();
-            }
-        });
+        //         expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
+        //         expect(sess?.memberships.length).toEqual(0);
+        //     } finally {
+        //         jest.useRealTimers();
+        //     }
+        // });
     });
 
     describe("key management", () => {

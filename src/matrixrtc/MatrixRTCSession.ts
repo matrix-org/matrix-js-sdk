@@ -21,7 +21,7 @@ import { Room } from "../models/room.ts";
 import { MatrixClient } from "../client.ts";
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "./CallMembership.ts";
+import { CallMembership, SessionMembershipData } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { Focus } from "./focus.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
@@ -32,6 +32,8 @@ import { HTTPError, MatrixError, safeGetRetryAfterMs } from "../http-api/errors.
 import { MatrixEvent } from "../models/event.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { sleep } from "../utils.ts";
+
+const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4; // 4 hours
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 

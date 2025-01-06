@@ -19,8 +19,6 @@ import { deepCompare } from "../utils.ts";
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 
-export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4; // 4 hours
-
 type CallScope = "m.room" | "m.user";
 
 /**
@@ -40,6 +38,10 @@ export type SessionMembershipData = {
      * and therefore immune to creation race conflicts, uses the `call_id: ""`.
      */
     call_id: string;
+
+    /**
+     * The Matrix device ID of this session. A single user can have multiple sessions on different devices.
+     */
     device_id: string;
 
     /**
@@ -152,26 +154,32 @@ export class CallMembership {
      * Gets the absolute expiry timestamp of the membership.
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
-    public getAbsoluteExpiry(): number {
+    public getAbsoluteExpiry(): number | undefined {
+        // TODO: implement this in a future PR. Something like:
         // TODO: calculate this from the MatrixRTCSession join configuration directly
-        return this.createdTs() + (this.membershipData.expires ?? DEFAULT_EXPIRE_DURATION);
+        // return this.createdTs() + (this.membershipData.expires ?? DEFAULT_EXPIRE_DURATION);
+
+        return undefined;
     }
 
     /**
      * @returns The number of milliseconds until the membership expires or undefined if applicable
      */
-    public getMsUntilExpiry(): number {
-        // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
-        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-        // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-        return this.getAbsoluteExpiry() - Date.now();
+    public getMsUntilExpiry(): number | undefined {
+        // TODO: implement this in a future PR. Something like:
+        // return this.getAbsoluteExpiry() - Date.now();
+
+        return undefined;
     }
 
     /**
      * @returns true if the membership has expired, otherwise false
      */
     public isExpired(): boolean {
-        return this.getMsUntilExpiry() <= 0;
+        // TODO: implement this in a future PR. Something like:
+        // return this.getMsUntilExpiry() <= 0;
+
+        return false;
     }
 
     public getPreferredFoci(): Focus[] {
