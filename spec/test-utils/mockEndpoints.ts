@@ -88,7 +88,7 @@ export function mockSetupMegolmBackupRequests(backupVersion: string): void {
     });
 
     fetchMock.post("path:/_matrix/client/v3/room_keys/version", (url, request) => {
-        const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
         backupData.version = backupVersion;
         backupData.count = 0;
         backupData.etag = "zer";

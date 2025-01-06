@@ -50,6 +50,13 @@ import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IActionsObject } from "../../src/pushprocessor";
 import { KnownMembership } from "../../src/@types/membership";
 
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        a: {};
+        b: {};
+    }
+}
+
 describe("MatrixClient syncing", () => {
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
