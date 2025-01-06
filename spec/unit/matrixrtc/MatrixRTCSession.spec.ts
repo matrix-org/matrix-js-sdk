@@ -538,7 +538,7 @@ describe("MatrixRTCSession", () => {
             });
         });
 
-        it("does nothing if join call when already joined", async () => {
+        it("does nothing if join called when already joined", async () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
             await sentStateEvent;
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
