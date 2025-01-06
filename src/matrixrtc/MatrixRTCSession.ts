@@ -952,7 +952,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
         let newContent: {} | SessionMembershipData = {};
-        // TODO: add back expiary logic to non-legacy events
+        // TODO: implement expiry logic to MSC4143 events
         // previously we checked here if the event is timed out and scheduled a check if not.
         // maybe there is a better way.
         newContent = this.makeNewMembership(localDeviceId);

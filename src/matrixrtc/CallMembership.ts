@@ -19,7 +19,12 @@ import { deepCompare } from "../utils.ts";
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 
-export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4; // 4 hours
+/**
+ * The default duration in milliseconds that a membership is considered valid for.
+ * Ordinarily the client responsible for the session will update the membership before it expires.
+ * We use this duration as the fallback case where stale sessions are present for some reason.
+ */
+export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 
 type CallScope = "m.room" | "m.user";
 
@@ -40,6 +45,10 @@ export type SessionMembershipData = {
      * and therefore immune to creation race conflicts, uses the `call_id: ""`.
      */
     call_id: string;
+
+    /**
+     * The Matrix device ID of this session. A single user can have multiple sessions on different devices.
+     */
     device_id: string;
 
     /**

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../../../src";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, SessionMembershipData, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
 import { membershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0): MatrixEvent {

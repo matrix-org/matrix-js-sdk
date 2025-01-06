@@ -1,3 +1,43 @@
+Changes in [35.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v35.1.0) (2024-12-18)
+==================================================================================================
+This release updates matrix-sdk-crypto-wasm to fix a bug which could prevent loading stored crypto state from storage.
+
+## 🐛 Bug Fixes
+
+* Upgrade matrix-sdk-crypto-wasm to 1.11.0 ([#4593](https://github.com/matrix-org/matrix-js-sdk/pull/4593)).
+
+
+Changes in [35.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v35.0.0) (2024-12-17)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+This release contains several breaking changes which will need code changes in your app. Most notably, `initCrypto()`
+no longer exists and has been moved to `initLegacyCrypto()` in preparation for the eventual removal of Olm. You can
+continue to use legacy Olm crypto for now by calling `initLegacyCrypto()` instead.
+
+You may also need to make further changes if you use more advanced APIs. See the individual PRs (listed in order of size of change) for specific APIs changed and how to migrate.
+
+* Rename `MatrixClient.initCrypto` into `MatrixClient.initLegacyCrypto` ([#4567](https://github.com/matrix-org/matrix-js-sdk/pull/4567)). Contributed by @florianduros.
+* Support MSC4222 `state_after` ([#4487](https://github.com/matrix-org/matrix-js-sdk/pull/4487)). Contributed by @dbkr.
+* Avoid use of Buffer as it does not exist in the Web natively ([#4569](https://github.com/matrix-org/matrix-js-sdk/pull/4569)). Contributed by @t3chguy.
+
+## 🦖 Deprecations
+
+* Deprecate remaining legacy functions and move `CryptoEvent.LegacyCryptoStoreMigrationProgress` handler ([#4560](https://github.com/matrix-org/matrix-js-sdk/pull/4560)). Contributed by @florianduros.
+
+## ✨ Features
+
+* Rename `MatrixClient.initCrypto` into `MatrixClient.initLegacyCrypto` ([#4567](https://github.com/matrix-org/matrix-js-sdk/pull/4567)). Contributed by @florianduros.
+* Avoid use of Buffer as it does not exist in the Web natively ([#4569](https://github.com/matrix-org/matrix-js-sdk/pull/4569)). Contributed by @t3chguy.
+* Re-send MatrixRTC media encryption keys for a new joiner even if a rotation is in progress ([#4561](https://github.com/matrix-org/matrix-js-sdk/pull/4561)). Contributed by @hughns.
+* Support MSC4222 `state_after` ([#4487](https://github.com/matrix-org/matrix-js-sdk/pull/4487)). Contributed by @dbkr.
+* Revert "Fix room state being updated with old (now overwritten) state and emitting for those updates. (#4242)" ([#4532](https://github.com/matrix-org/matrix-js-sdk/pull/4532)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Fix age field check in event echo processing ([#3635](https://github.com/matrix-org/matrix-js-sdk/pull/3635)). Contributed by @stas-demydiuk.
+
+
 Changes in [34.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.13.0) (2024-12-03)
 ====================================================================================================
 ## 🦖 Deprecations

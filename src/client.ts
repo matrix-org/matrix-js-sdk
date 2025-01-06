@@ -136,6 +136,7 @@ import {
     UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
+    AccountDataEvents,
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
     MSC3912_RELATION_BASED_REDACTIONS_PROP,
@@ -232,6 +233,7 @@ import {
 import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
     AddSecretStorageKeyOpts,
+    SecretStorageKey,
     SecretStorageKeyDescription,
     ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
@@ -3070,7 +3072,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
      */
-    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
+    public isSecretStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 
@@ -4236,7 +4238,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
      */
-    public setAccountData(eventType: EventType | string, content: IContent): Promise<{}> {
+    public setAccountData<K extends keyof AccountDataEvents>(
+        eventType: K,
+        content: AccountDataEvents[K] | Record<string, never>,
+    ): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
             $type: eventType,
@@ -4251,7 +4256,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The event type
      * @returns The contents of the given account data event
      */
-    public getAccountData(eventType: string): MatrixEvent | undefined {
+    public getAccountData<K extends keyof AccountDataEvents>(eventType: K): MatrixEvent | undefined {
         return this.store.getAccountData(eventType);
     }
 
@@ -4263,7 +4268,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: The contents of the given account data event.
      * @returns Rejects: with an error response.
      */
-    public async getAccountDataFromServer<T extends { [k: string]: any }>(eventType: string): Promise<T | null> {
+    public async getAccountDataFromServer<K extends keyof AccountDataEvents>(
+        eventType: K,
+    ): Promise<AccountDataEvents[K] | null> {
         if (this.isInitialSyncComplete()) {
             const event = this.store.getAccountData(eventType);
             if (!event) {
@@ -4271,7 +4278,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             // The network version below returns just the content, so this branch
             // does the same to match.
-            return event.getContent<T>();
+            return event.getContent<AccountDataEvents[K]>();
         }
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
@@ -4287,7 +4294,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    public async deleteAccountData(eventType: string): Promise<void> {
+    public async deleteAccountData(eventType: keyof AccountDataEvents): Promise<void> {
         const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
         // if deletion is not supported overwrite with empty content
         if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
@@ -4310,7 +4317,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The array of users that are ignored (empty if none)
      */
     public getIgnoredUsers(): string[] {
-        const event = this.getAccountData("m.ignored_user_list");
+        const event = this.getAccountData(EventType.IgnoredUserList);
         if (!event?.getContent()["ignored_users"]) return [];
         return Object.keys(event.getContent()["ignored_users"]);
     }
@@ -4326,7 +4333,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         userIds.forEach((u) => {
             content.ignored_users[u] = {};
         });
-        return this.setAccountData("m.ignored_user_list", content);
+        return this.setAccountData(EventType.IgnoredUserList, content);
     }
 
     /**
@@ -5065,7 +5072,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
                 throw new Error(
                     "Server does not support relation based redactions " +
-                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId as string} threadId ${threadId}`,
                 );
             }
 
@@ -9264,7 +9271,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         deviceId: string,
         notificationSettings: LocalNotificationSettings,
     ): Promise<{}> {
-        const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}`;
+        const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}` as const;
         return this.setAccountData(key, notificationSettings);
     }
 
