@@ -9,12 +9,13 @@ on:
             ELEMENT_BOT_TOKEN:
                 required: true
 concurrency: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.head_ref || github.ref }}
+permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     changelog:
         name: Preview Changelog
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
-            - uses: mheap/github-action-required-labels@d25134c992b943fb6ad00c25ea00eb5988c0a9dd # v5
+            - uses: mheap/github-action-required-labels@388fd6af37b34cdfe5a23b37060e763217e58b03 # v5
               if: github.event_name != 'merge_group'
               with:
                   labels: |
@@ -29,7 +30,7 @@ jobs:
 
     prevent-blocked:
         name: Prevent Blocked
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             pull-requests: read
         steps:
@@ -42,8 +43,10 @@ jobs:
 
     community-prs:
         name: Label Community PRs
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: github.event.action == 'opened'
+        permissions:
+            pull-requests: write
         steps:
             - name: Check membership
               if: github.event.pull_request.user.login != 'renovate[bot]'
@@ -69,7 +72,7 @@ jobs:
 
     close-if-fork-develop:
         name: Forbid develop branch fork contributions
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: >
             github.event.action == 'opened' &&
             github.event.pull_request.head.ref == 'develop' &&

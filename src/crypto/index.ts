@@ -53,7 +53,7 @@ import { IStore } from "../store/index.ts";
 import { Room, RoomEvent } from "../models/room.ts";
 import { RoomMember, RoomMemberEvent } from "../models/room-member.ts";
 import { EventStatus, IContent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event.ts";
-import { ToDeviceBatch } from "../models/ToDeviceMessage.ts";
+import { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { ClientEvent, IKeysUploadResponse, ISignedKey, IUploadKeySignaturesResponse, MatrixClient } from "../client.ts";
 import { IRoomEncryption, RoomList } from "./RoomList.ts";
 import { IKeyBackupInfo } from "./keybackup.ts";
@@ -77,6 +77,7 @@ import {
     AddSecretStorageKeyOpts,
     calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageKey,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
@@ -102,6 +103,8 @@ import {
     OwnDeviceKeys,
     CryptoEvent as CryptoApiCryptoEvent,
     CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
+    KeyBackupRestoreResult,
+    KeyBackupRestoreOpts,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -324,8 +327,6 @@ export type CryptoEventHandlerMap = CryptoApiCryptoEventHandlerMap & {
      */
     [CryptoEvent.Warning]: (type: string) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
-
-    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {
@@ -537,7 +538,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async init({ exportedOlmDevice, pickleKey }: IInitOpts = {}): Promise<void> {
         logger.log("Crypto: initialising Olm...");
-        await global.Olm.init();
+        await globalThis.Olm.init();
         logger.log(
             exportedOlmDevice
                 ? "Crypto: initialising Olm device from exported device..."
@@ -668,7 +669,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *     and raw private key to avoid round tripping if needed.
      */
     public async createRecoveryKeyFromPassphrase(password?: string): Promise<IRecoveryKey> {
-        const decryption = new global.Olm.PkDecryption();
+        const decryption = new globalThis.Olm.PkDecryption();
         try {
             if (password) {
                 const derivation = await keyFromPassphrase(password);
@@ -1194,21 +1195,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#store}.
      */
-    public storeSecret(name: string, secret: string, keys?: string[]): Promise<void> {
+    public storeSecret(name: SecretStorageKey, secret: string, keys?: string[]): Promise<void> {
         return this.secretStorage.store(name, secret, keys);
     }
 
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#get}.
      */
-    public getSecret(name: string): Promise<string | undefined> {
+    public getSecret(name: SecretStorageKey): Promise<string | undefined> {
         return this.secretStorage.get(name);
     }
 
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
      */
-    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
+    public isSecretStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 
@@ -1252,7 +1253,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public checkSecretStoragePrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
         let decryption: PkDecryption | null = null;
         try {
-            decryption = new global.Olm.PkDecryption();
+            decryption = new globalThis.Olm.PkDecryption();
             const gotPubkey = decryption.init_with_private_key(privateKey);
             // make sure it agrees with the given pubkey
             return gotPubkey === expectedPublicKey;
@@ -1307,6 +1308,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link Crypto.loadSessionBackupPrivateKeyFromSecretStorage}.
+     */
+    public loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void> {
+        throw new Error("Not implmeented");
+    }
+
+    /**
      * Get the current status of key backup.
      *
      * Implementation of {@link Crypto.CryptoApi.getActiveSessionBackupVersion}.
@@ -1316,6 +1324,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return this.backupManager.version ?? null;
         }
         return null;
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#getKeyBackupInfo}.
+     */
+    public async getKeyBackupInfo(): Promise<KeyBackupInfo | null> {
+        throw new Error("Not implemented");
     }
 
     /**
@@ -1354,7 +1369,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public checkCrossSigningPrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
         let signing: PkSigning | null = null;
         try {
-            signing = new global.Olm.PkSigning();
+            signing = new globalThis.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(privateKey);
             // make sure it agrees with the given pubkey
             return gotPubkey === expectedPublicKey;
@@ -1497,7 +1512,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                             devices[deviceId].keys[signame],
                         );
                         deviceIds.push(deviceId);
-                    } catch (e) {}
+                    } catch {}
                 }
             }
         }
@@ -1832,7 +1847,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
             throw new Error(`getBackupDecryptor expects Uint8Array`);
         }
@@ -3483,59 +3498,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *     resolves once the message has been encrypted and sent to the given
      *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
      *     of the successfully sent messages.
+     *
+     * @deprecated Instead use {@link encryptToDeviceMessages} followed by {@link MatrixClient.queueToDevice}.
      */
     public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
-        const toDeviceBatch: ToDeviceBatch = {
-            eventType: EventType.RoomMessageEncrypted,
-            batch: [],
-        };
-
         try {
-            await Promise.all(
-                userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
-                    const deviceId = deviceInfo.deviceId;
-                    const encryptedContent: IEncryptedContent = {
-                        algorithm: olmlib.OLM_ALGORITHM,
-                        sender_key: this.olmDevice.deviceCurve25519Key!,
-                        ciphertext: {},
-                        [ToDeviceMessageId]: uuidv4(),
-                    };
-
-                    toDeviceBatch.batch.push({
-                        userId,
-                        deviceId,
-                        payload: encryptedContent,
-                    });
-
-                    await olmlib.ensureOlmSessionsForDevices(
-                        this.olmDevice,
-                        this.baseApis,
-                        new Map([[userId, [deviceInfo]]]),
-                    );
-                    await olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        this.userId,
-                        this.deviceId,
-                        this.olmDevice,
-                        userId,
-                        deviceInfo,
-                        payload,
-                    );
-                }),
-            );
-
-            // prune out any devices that encryptMessageForDevice could not encrypt for,
-            // in which case it will have just not added anything to the ciphertext object.
-            // There's no point sending messages to devices if we couldn't encrypt to them,
-            // since that's effectively a blank message.
-            toDeviceBatch.batch = toDeviceBatch.batch.filter((msg) => {
-                if (Object.keys(msg.payload.ciphertext).length > 0) {
-                    return true;
-                } else {
-                    logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
-                    return false;
-                }
-            });
+            const toDeviceBatch = await this.prepareToDeviceBatch(userDeviceInfoArr, payload);
 
             try {
                 await this.baseApis.queueToDevice(toDeviceBatch);
@@ -3547,6 +3515,95 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.error("encryptAndSendToDevices promises failed", e);
             throw e;
         }
+    }
+
+    private async prepareToDeviceBatch(
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<ToDeviceBatch> {
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
+
+        await Promise.all(
+            userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
+                const deviceId = deviceInfo.deviceId;
+                const encryptedContent: IEncryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this.olmDevice.deviceCurve25519Key!,
+                    ciphertext: {},
+                    [ToDeviceMessageId]: uuidv4(),
+                };
+
+                toDeviceBatch.batch.push({
+                    userId,
+                    deviceId,
+                    payload: encryptedContent,
+                });
+
+                await olmlib.ensureOlmSessionsForDevices(
+                    this.olmDevice,
+                    this.baseApis,
+                    new Map([[userId, [deviceInfo]]]),
+                );
+                await olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    this.userId,
+                    this.deviceId,
+                    this.olmDevice,
+                    userId,
+                    deviceInfo,
+                    payload,
+                );
+            }),
+        );
+
+        // prune out any devices that encryptMessageForDevice could not encrypt for,
+        // in which case it will have just not added anything to the ciphertext object.
+        // There's no point sending messages to devices if we couldn't encrypt to them,
+        // since that's effectively a blank message.
+        toDeviceBatch.batch = toDeviceBatch.batch.filter((msg) => {
+            if (Object.keys(msg.payload.ciphertext).length > 0) {
+                return true;
+            } else {
+                logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
+                return false;
+            }
+        });
+
+        return toDeviceBatch;
+    }
+
+    /**
+     * Implementation of {@link Crypto.CryptoApi#encryptToDeviceMessages}.
+     */
+    public async encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch> {
+        const userIds = new Set(devices.map(({ userId }) => userId));
+        const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
+
+        const userDeviceInfoArr: IOlmDevice<DeviceInfo>[] = [];
+
+        devices.forEach(({ userId, deviceId }) => {
+            const devices = deviceInfoMap.get(userId);
+            if (!devices) {
+                logger.warn(`No devices found for user ${userId}`);
+                return;
+            }
+
+            if (devices.has(deviceId)) {
+                // Send the message to a specific device
+                userDeviceInfoArr.push({ userId, deviceInfo: devices.get(deviceId)! });
+            } else {
+                logger.warn(`No device found for user ${userId} with id ${deviceId}`);
+            }
+        });
+
+        return this.prepareToDeviceBatch(userDeviceInfoArr, payload);
     }
 
     private onMembership = (event: MatrixEvent, member: RoomMember, oldMembership?: string): void => {
@@ -4264,6 +4321,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Stub function -- dehydration is not implemented here, so throw error
      */
     public async startDehydration(createNewKey?: boolean): Promise<void> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackup is not implemented here, so throw error
+     */
+    public restoreKeyBackup(opts: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult> {
+        throw new Error("Not implemented");
+    }
+
+    /**
+     * Stub function -- restoreKeyBackupWithPassphrase is not implemented here, so throw error
+     */
+    public restoreKeyBackupWithPassphrase(
+        passphrase: string,
+        opts: KeyBackupRestoreOpts,
+    ): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
     }
 }

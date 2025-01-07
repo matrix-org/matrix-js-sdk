@@ -208,6 +208,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     public static setServerSideSupport(status: FeatureSupport): void {
         Thread.hasServerSideSupport = status;
+        // XXX: This global latching behaviour is really unexpected and means that you can't undo when moving to a server without support
         if (status !== FeatureSupport.Stable) {
             FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
             FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
@@ -317,6 +318,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 toStartOfTimeline,
                 fromCache: false,
                 roomState: this.roomState,
+                addToState: false,
             });
         }
     }
@@ -343,7 +345,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (this.findEventById(eventId)) {
             return;
         }
-        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState);
+        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
@@ -618,7 +620,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                     // if the thread has regular events, this will just load the last reply.
                     // if the thread is newly created, this will load the root event.
                     if (this.replyCount === 0 && this.rootEvent) {
-                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, this.liveTimeline, null);
+                        this.timelineSet.addEventsToTimeline([this.rootEvent], true, false, this.liveTimeline, null);
                         this.liveTimeline.setPaginationToken(null, Direction.Backward);
                     } else {
                         this.initalEventFetchProm = this.client.paginateEventTimeline(this.liveTimeline, {

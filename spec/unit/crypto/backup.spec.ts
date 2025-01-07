@@ -33,7 +33,7 @@ import { CryptoStore } from "../../../src/crypto/store/base";
 import { MegolmDecryption as MegolmDecryptionClass } from "../../../src/crypto/algorithms/megolm";
 import { IKeyBackupInfo } from "../../../src/crypto/keybackup";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 
@@ -155,7 +155,7 @@ function makeTestClient(cryptoStore: CryptoStore) {
 }
 
 describe("MegolmBackup", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
@@ -205,14 +205,14 @@ describe("MegolmBackup", function () {
             // clobber the setTimeout function to run 100x faster.
             // ideally we would use lolex, but we have no oportunity
             // to tick the clock between the first try and the retry.
-            const realSetTimeout = global.setTimeout;
-            jest.spyOn(global, "setTimeout").mockImplementation(function (f, n) {
+            const realSetTimeout = globalThis.setTimeout;
+            jest.spyOn(globalThis, "setTimeout").mockImplementation(function (f, n) {
                 return realSetTimeout(f!, n! / 100);
             });
         });
 
         afterEach(function () {
-            jest.spyOn(global, "setTimeout").mockRestore();
+            jest.spyOn(globalThis, "setTimeout").mockRestore();
         });
 
         test("fail if crypto not enabled", async () => {
@@ -231,7 +231,7 @@ describe("MegolmBackup", function () {
 
         test("fail if given backup has no version", async () => {
             const client = makeTestClient(cryptoStore);
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             const data = {
                 algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
                 auth_data: {
@@ -314,7 +314,7 @@ describe("MegolmBackup", function () {
             megolmDecryption.olmlib = mockOlmLib;
 
             return client
-                .initCrypto()
+                .initLegacyCrypto()
                 .then(() => {
                     return cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
                         cryptoStore.addEndToEndInboundGroupSession(
@@ -391,7 +391,7 @@ describe("MegolmBackup", function () {
             megolmDecryption.olmlib = mockOlmLib;
 
             return client
-                .initCrypto()
+                .initLegacyCrypto()
                 .then(() => {
                     return client.crypto!.storeSessionBackupPrivateKey(new Uint8Array(32));
                 })
@@ -471,7 +471,7 @@ describe("MegolmBackup", function () {
             // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             client.uploadDeviceSigningKeys = async function (e) {
                 return {};
             };
@@ -560,7 +560,7 @@ describe("MegolmBackup", function () {
             // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             await cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
                 cryptoStore.addEndToEndInboundGroupSession(
                     "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
@@ -636,7 +636,7 @@ describe("MegolmBackup", function () {
             // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
-            return client.initCrypto();
+            return client.initLegacyCrypto();
         });
 
         afterEach(function () {
@@ -773,11 +773,19 @@ describe("MegolmBackup", function () {
             // initialising the crypto library will trigger a key upload request, which we can stub out
             client.uploadKeysRequest = jest.fn();
 
-            await client.initCrypto();
+            await client.initLegacyCrypto();
 
             cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
             await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
             client.stopClient();
+        });
+    });
+
+    describe("getKeyBackupInfo", () => {
+        it("should return throw an `Not implemented`", async () => {
+            const client = makeTestClient(cryptoStore);
+            await client.initLegacyCrypto();
+            await expect(client.getCrypto()?.getKeyBackupInfo()).rejects.toThrow("Not implemented");
         });
     });
 });

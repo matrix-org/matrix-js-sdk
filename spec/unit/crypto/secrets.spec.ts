@@ -30,6 +30,7 @@ import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { decodeBase64 } from "../../../src/base64";
 import { CrossSigningKeyInfo } from "../../../src/crypto-api";
+import { SecretInfo } from "../../../src/secret-storage.ts";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -43,7 +44,7 @@ async function makeTestClient(
         return true;
     };
 
-    await client.initCrypto();
+    await client.initLegacyCrypto();
 
     // No need to download keys for these tests
     jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
@@ -68,21 +69,27 @@ function sign<T extends IObject | ICurve25519AuthData>(
     };
 }
 
+declare module "../../../src/@types/event" {
+    interface SecretStorageAccountDataEvents {
+        foo: SecretInfo;
+    }
+}
+
 describe("Secrets", function () {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
     beforeAll(function () {
-        return global.Olm.init();
+        return globalThis.Olm.init();
     });
 
     it("should store and retrieve a secret", async function () {
         const key = new Uint8Array(16);
         for (let i = 0; i < 16; i++) key[i] = i;
 
-        const signing = new global.Olm.PkSigning();
+        const signing = new globalThis.Olm.PkSigning();
         const signingKey = signing.generate_seed();
         const signingPubKey = signing.init_with_seed(signingKey);
 
@@ -332,7 +339,7 @@ describe("Secrets", function () {
         });
 
         it("bootstraps when cross-signing keys in secret storage", async function () {
-            const decryption = new global.Olm.PkDecryption();
+            const decryption = new globalThis.Olm.PkDecryption();
             const storagePrivateKey = decryption.get_private_key();
 
             const bob: MatrixClient = await makeTestClient(

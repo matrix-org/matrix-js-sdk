@@ -94,20 +94,14 @@ rl.on("line", function (line) {
             );
         } else if (line.indexOf("/file ") === 0) {
             var filename = line.split(" ")[1].trim();
-            var stream = fs.createReadStream(filename);
-            matrixClient
-                .uploadContent({
-                    stream: stream,
-                    name: filename,
-                })
-                .then(function (url) {
-                    var content = {
-                        msgtype: MsgType.File,
-                        body: filename,
-                        url: JSON.parse(url).content_uri,
-                    };
-                    matrixClient.sendMessage(viewingRoom.roomId, content);
+            let buffer = fs.readFileSync("./your_file_name");
+            matrixClient.uploadContent(new Blob([buffer])).then(function (response) {
+                matrixClient.sendMessage(viewingRoom.roomId, {
+                    msgtype: MsgType.File,
+                    body: filename,
+                    url: response.content_uri,
                 });
+            });
         } else {
             matrixClient.sendTextMessage(viewingRoom.roomId, line).finally(function () {
                 printMessages();
@@ -167,7 +161,7 @@ matrixClient.on(RoomEvent.Timeline, function (event, room, toStartOfTimeline) {
     if (toStartOfTimeline) {
         return; // don't print paginated results
     }
-    if (!viewingRoom || viewingRoom.roomId !== room.roomId) {
+    if (!viewingRoom || viewingRoom.roomId !== room?.roomId) {
         return; // not viewing a room or viewing the wrong room.
     }
     printLine(event);
@@ -386,7 +380,7 @@ function print(str, formatter) {
         }
         console.log.apply(console.log, newArgs);
     } else {
-        console.log.apply(console.log, arguments);
+        console.log.apply(console.log, [...arguments]);
     }
 }
 

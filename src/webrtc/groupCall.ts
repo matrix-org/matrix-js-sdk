@@ -35,7 +35,6 @@ import {
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.ts";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { CallMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -196,11 +195,6 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
-}
-
-// XXX: this hasn't made it into the MSC yet
-export interface ExperimentalGroupCallRoomMemberState {
-    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {
@@ -782,7 +776,7 @@ export class GroupCall extends TypedEventEmitter<
                     return false;
                 }
             }
-        } catch (e) {
+        } catch {
             /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
@@ -817,7 +811,7 @@ export class GroupCall extends TypedEventEmitter<
                 await this.updateLocalUsermediaStream(stream);
                 this.localCallFeed.setAudioVideoMuted(null, muted);
                 setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
-            } catch (_) {
+            } catch {
                 // No permission to video device
                 /* istanbul ignore next */
                 logger.log(
@@ -1445,7 +1439,7 @@ export class GroupCall extends TypedEventEmitter<
      * Recalculates and updates the participant map to match the room state.
      */
     private updateParticipants(): void {
-        const localMember = this.room.getMember(this.client.getUserId()!)!;
+        const localMember = this.room.getMember(this.client.getSafeUserId());
         if (!localMember) {
             // The client hasn't fetched enough of the room state to get our own member
             // event. This probably shouldn't happen, but sanity check & exit for now.

@@ -21,7 +21,6 @@ import { CryptoStore, MigrationState, SecretStorePrivateKeys } from "../crypto/s
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
 import { IHttpOpts, MatrixHttpApi } from "../http-api/index.ts";
 import { requestKeyBackupVersion } from "./backup.ts";
-import { IRoomEncryption } from "../crypto/RoomList.ts";
 import { CrossSigningKeyInfo, Curve25519AuthData } from "../crypto-api/index.ts";
 import { RustCrypto } from "./rust-crypto.ts";
 import { KeyBackupInfo } from "../crypto-api/keybackup.ts";
@@ -29,6 +28,12 @@ import { sleep } from "../utils.ts";
 import { encodeBase64 } from "../base64.ts";
 import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+
+interface LegacyRoomEncryption {
+    algorithm: string;
+    rotation_period_ms?: number;
+    rotation_period_msgs?: number;
+}
 
 /**
  * Determine if any data needs migrating from the legacy store, and do so.
@@ -375,7 +380,7 @@ export async function migrateRoomSettingsFromLegacyCrypto({
         return;
     }
 
-    let rooms: Record<string, IRoomEncryption> = {};
+    let rooms: Record<string, LegacyRoomEncryption> = {};
 
     await legacyStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
         legacyStore.getEndToEndRooms(txn, (result) => {

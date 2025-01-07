@@ -481,6 +481,9 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     public getUserId(): string {
         return this.userId;
     }
+    public getSafeUserId(): string {
+        return this.userId;
+    }
 
     public getDeviceId(): string {
         return this.deviceId;
@@ -582,11 +585,11 @@ export class MockCallFeed {
 }
 
 export function installWebRTCMocks() {
-    global.navigator = {
+    globalThis.navigator = {
         mediaDevices: new MockMediaDevices().typed(),
     } as unknown as Navigator;
 
-    global.window = {
+    globalThis.window = {
         // @ts-ignore Mock
         RTCPeerConnection: MockRTCPeerConnection,
         // @ts-ignore Mock
@@ -596,13 +599,13 @@ export function installWebRTCMocks() {
         getUserMedia: () => new MockMediaStream("local_stream"),
     };
     // @ts-ignore Mock
-    global.document = {};
+    globalThis.document = {};
 
     // @ts-ignore Mock
-    global.AudioContext = MockAudioContext;
+    globalThis.AudioContext = MockAudioContext;
 
     // @ts-ignore Mock
-    global.RTCRtpReceiver = {
+    globalThis.RTCRtpReceiver = {
         getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
@@ -610,7 +613,7 @@ export function installWebRTCMocks() {
     };
 
     // @ts-ignore Mock
-    global.RTCRtpSender = {
+    globalThis.RTCRtpSender = {
         getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
             codecs: [],
             headerExtensions: [],

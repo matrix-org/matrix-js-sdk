@@ -128,7 +128,7 @@ describe("MatrixClient syncing", () => {
 
         const thread = mkThread({ room, client: client!, authorId: selfUserId, participantUserIds: [selfUserId] });
         const threadReply = thread.events.at(-1)!;
-        await room.addLiveEvents([thread.rootEvent]);
+        await room.addLiveEvents([thread.rootEvent], { addToState: false });
 
         // Initialize read receipt datastructure before testing the reaction
         room.addReceiptToStructure(thread.rootEvent.getId()!, ReceiptType.Read, selfUserId, { ts: 1 }, false);

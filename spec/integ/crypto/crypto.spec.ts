@@ -91,7 +91,6 @@ import {
     OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { IKeyBackup } from "../../../src/crypto/backup";
 import {
     createOlmAccount,
     createOlmSession,
@@ -106,6 +105,7 @@ import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
+import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -136,7 +136,7 @@ async function expectSendRoomKey(
     recipientOlmAccount: Olm.Account,
     recipientOlmSession: Olm.Session | null = null,
 ): Promise<Olm.InboundGroupSession> {
-    const Olm = global.Olm;
+    const Olm = globalThis.Olm;
     const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
 
     function onSendRoomKey(content: any): Olm.InboundGroupSession {
@@ -219,7 +219,7 @@ async function expectSendMegolmMessage(
 }
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, initCrypto: InitCrypto) => {
-    if (!global.Olm) {
+    if (!globalThis.Olm) {
         // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
         return;
@@ -230,7 +230,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
     const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
-    const Olm = global.Olm;
+    const Olm = globalThis.Olm;
 
     let testOlmAccount = {} as unknown as Olm.Account;
     let testSenderKey = "";
@@ -1327,7 +1327,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
             // Every 2 messages in the room, the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_msgs: 2,
             };
@@ -1383,7 +1383,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const oneHourInMs = 60 * 60 * 1000;
 
             // Every 1h the session should be rotated
-            syncResponse.rooms[Category.Join][ROOM_ID].state.events[0].content = {
+            syncResponse.rooms[Category.Join][ROOM_ID].state!.events[0].content = {
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_ms: oneHourInMs,
             };
@@ -1741,7 +1741,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             groupSession: groupSession,
             room_id: ROOM_ID,
         });
-        await testClient.client.initCrypto();
+        await testClient.client.initLegacyCrypto();
         const keys = [
             {
                 room_id: ROOM_ID,
@@ -1853,7 +1853,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives shared history before being invited to a room by the sharer", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
-        await beccaTestClient.client.initCrypto();
+        await beccaTestClient.client.initLegacyCrypto();
 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
@@ -1897,13 +1897,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
-        const p2pSession = new global.Olm.Session();
+        const p2pSession = new globalThis.Olm.Session();
         await beccaTestClient.client.crypto!.cryptoStore.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-                    const account = new global.Olm.Account();
+                    const account = new globalThis.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
@@ -2007,7 +2007,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives shared history before being invited to a room by someone else", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
-        await beccaTestClient.client.initCrypto();
+        await beccaTestClient.client.initLegacyCrypto();
 
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
@@ -2045,13 +2045,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
-        const p2pSession = new global.Olm.Session();
+        const p2pSession = new globalThis.Olm.Session();
         await beccaTestClient.client.crypto!.cryptoStore.doTxn(
             "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
-                    const account = new global.Olm.Account();
+                    const account = new globalThis.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
@@ -3121,6 +3121,32 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master)!;
                 expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
             });
+
+            newBackendOnly("should upload existing megolm backup key to a new 4S store", async () => {
+                const backupKeyTo4SPromise = awaitMegolmBackupKeyUpload();
+
+                // we need these to set up the mocks but we don't actually care whether they
+                // resolve because we're not testing those things in this test.
+                awaitCrossSigningKeyUpload("master");
+                awaitCrossSigningKeyUpload("user_signing");
+                awaitCrossSigningKeyUpload("self_signing");
+                awaitSecretStorageKeyStoredInAccountData();
+
+                mockSetupCrossSigningRequests();
+                mockSetupMegolmBackupRequests("1");
+
+                await aliceClient.getCrypto()!.bootstrapCrossSigning({});
+                await aliceClient.getCrypto()!.resetKeyBackup();
+
+                await aliceClient.getCrypto()!.bootstrapSecretStorage({
+                    setupNewSecretStorage: true,
+                    createSecretStorageKey,
+                    setupNewKeyBackup: false,
+                });
+
+                await backupKeyTo4SPromise;
+                expect(accountDataAccumulator.accountDataEvents.get("m.megolm_backup.v1")).toBeDefined();
+            });
         });
 
         describe("Manage Key Backup", () => {
@@ -3138,11 +3164,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // Import a new key that should be uploaded
                 const newKey = testData.MEGOLM_SESSION_DATA;
 
-                const awaitKeyUploaded = new Promise<IKeyBackup>((resolve) => {
+                const awaitKeyUploaded = new Promise<KeyBackup>((resolve) => {
                     fetchMock.put(
                         "path:/_matrix/client/v3/room_keys/keys",
                         (url, request) => {
-                            const uploadPayload: IKeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+                            const uploadPayload: KeyBackup = JSON.parse((request.body as string) ?? "{}");
                             resolve(uploadPayload);
                             return {
                                 status: 200,
@@ -3209,7 +3235,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 fetchMock.post(
                     "path:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
-                        const backupData: KeyBackupInfo = JSON.parse(request.body?.toString() ?? "{}");
+                        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
                         backupData.version = newVersion;
                         backupData.count = 0;
                         backupData.etag = "zer";
@@ -3499,7 +3525,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             return client;
         }
 
-        function mkEncryptionEvent(content: Object) {
+        function mkEncryptionEvent(content: object) {
             return mkEventCustom({
                 sender: persistentStoreClient.getSafeUserId(),
                 type: "m.room.encryption",
@@ -3512,7 +3538,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          *
          * @param stateEvents - Additional state events for the test room
          */
-        function getSyncResponseWithState(stateEvents: Array<Object>) {
+        function getSyncResponseWithState(stateEvents: Array<object>) {
             const roomResponse = {
                 state: {
                     events: [

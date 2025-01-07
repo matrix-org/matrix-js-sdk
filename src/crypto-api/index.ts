@@ -16,12 +16,19 @@ limitations under the License.
 
 import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IMegolmSessionData } from "../@types/crypto.ts";
+import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { Room } from "../models/room.ts";
 import { DeviceMap } from "../models/device.ts";
 import { UIAuthCallback } from "../interactive-auth.ts";
-import { PassphraseInfo, SecretStorageCallbacks, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { PassphraseInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
 import { VerificationRequest } from "./verification.ts";
-import { BackupTrustInfo, KeyBackupCheck, KeyBackupInfo } from "./keybackup.ts";
+import {
+    BackupTrustInfo,
+    KeyBackupCheck,
+    KeyBackupInfo,
+    KeyBackupRestoreOpts,
+    KeyBackupRestoreResult,
+} from "./keybackup.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { MatrixEvent } from "../models/event.ts";
 
@@ -261,9 +268,9 @@ export interface CryptoApi {
      * - is enabled on this account and trusted by this device
      * - has private keys either cached locally or stored in secret storage
      *
-     * If this function returns false, bootstrapCrossSigning() can be used
+     * If this function returns false, {@link bootstrapCrossSigning()} can be used
      * to fix things such that it returns true. That is to say, after
-     * bootstrapCrossSigning() completes successfully, this function should
+     * `bootstrapCrossSigning()` completes successfully, this function should
      * return true.
      *
      * @returns True if cross-signing is ready to be used on this device
@@ -273,7 +280,13 @@ export interface CryptoApi {
     isCrossSigningReady(): Promise<boolean>;
 
     /**
-     * Get the ID of one of the user's cross-signing keys.
+     * Get the ID of one of the user's cross-signing keys, if both private and matching
+     * public parts of that key are available (ie. cached in the local crypto store).
+     *
+     * The public part may not be available if a `/keys/query` request has not yet been
+     * performed, or if the device that created the keys failed to publish them.
+     *
+     * If either part of the keypair is not available, this will return `null`.
      *
      * @param type - The type of key to get the ID of.  One of `CrossSigningKey.Master`, `CrossSigningKey.SelfSigning`,
      *     or `CrossSigningKey.UserSigning`.  Defaults to `CrossSigningKey.Master`.
@@ -304,9 +317,9 @@ export interface CryptoApi {
      * - is storing cross-signing private keys
      * - is storing session backup key (if enabled)
      *
-     * If this function returns false, bootstrapSecretStorage() can be used
+     * If this function returns false, {@link bootstrapSecretStorage()} can be used
      * to fix things such that it returns true. That is to say, after
-     * bootstrapSecretStorage() completes successfully, this function should
+     * `bootstrapSecretStorage()` completes successfully, this function should
      * return true.
      *
      * @returns True if secret storage is ready to be used on this device
@@ -314,17 +327,20 @@ export interface CryptoApi {
     isSecretStorageReady(): Promise<boolean>;
 
     /**
-     * Bootstrap the secret storage by creating a new secret storage key, add it in the secret storage and
-     * store the cross signing keys in the secret storage.
+     * Bootstrap [secret storage](https://spec.matrix.org/v1.12/client-server-api/#storage).
      *
-     * - Generate a new key {@link GeneratedSecretStorageKey} with `createSecretStorageKey`.
-     *   Only if `setupNewSecretStorage` is set or if there is no AES key in the secret storage
-     * - Store this key in the secret storage and set it as the default key.
-     * - Call `cryptoCallbacks.cacheSecretStorageKey` if provided.
-     * - Store the cross signing keys in the secret storage if
-     *      - the cross signing is ready
-     *      - a new key was created during the previous step
-     *      - or the secret storage already contains the cross signing keys
+     * - If secret storage is not already set up, or {@link CreateSecretStorageOpts.setupNewSecretStorage} is set:
+     *   * Calls {@link CreateSecretStorageOpts.createSecretStorageKey} to generate a new key.
+     *   * Stores the metadata of the new key in account data and sets it as the default secret storage key.
+     *   * Calls {@link CryptoCallbacks.cacheSecretStorageKey} if provided.
+     * - Stores the private cross signing keys in the secret storage if they are known, and they are not
+     *   already stored in secret storage.
+     * - If {@link CreateSecretStorageOpts.setupNewKeyBackup} is set, calls {@link CryptoApi.resetKeyBackup}; otherwise,
+     *   stores the key backup decryption key in secret storage if it is known, and it is not
+     *   already stored in secret storage.
+     *
+     * Note that there may be multiple accesses to secret storage during the course of this call, each of which will
+     * result in a call to {@link CryptoCallbacks.getSecretStorageKey}.
      *
      * @param opts - Options object.
      */
@@ -363,6 +379,22 @@ export interface CryptoApi {
      *      object with information about the encryption of the event.
      */
     getEncryptionInfoForEvent(event: MatrixEvent): Promise<EventEncryptionInfo | null>;
+
+    /**
+     * Encrypts a given payload object via Olm to-device messages to a given
+     * set of devices.
+     *
+     * @param eventType - the type of the event to send.
+     * @param devices - an array of devices to encrypt the payload for.
+     * @param payload - the payload to encrypt.
+     *
+     * @returns the batch of encrypted payloads which can then be sent via {@link matrix.MatrixClient#queueToDevice}.
+     */
+    encryptToDeviceMessages(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<ToDeviceBatch>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -480,6 +512,18 @@ export interface CryptoApi {
     storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void>;
 
     /**
+     * Attempt to fetch the backup decryption key from secret storage.
+     *
+     * If the key is found in secret storage, checks it against the latest backup on the server;
+     * if they match, stores the key in the crypto store by calling {@link storeSessionBackupPrivateKey},
+     * which enables automatic restore of individual keys when an Unable-to-decrypt error is encountered.
+     *
+     * If we are unable to fetch the key from secret storage, there is no backup on the server, or the key
+     * does not match, throws an exception.
+     */
+    loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
+
+    /**
      * Get the current status of key backup.
      *
      * @returns If automatic key backups are enabled, the `version` of the active backup. Otherwise, `null`.
@@ -492,6 +536,18 @@ export interface CryptoApi {
      * @param info - key backup info dict from {@link matrix.MatrixClient.getKeyBackupVersion}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
+
+    /**
+     * Return the details of the latest backup on the server, when we last checked.
+     *
+     * This normally returns a cached value, but if we haven't yet made a request to the server, it will fire one off.
+     * It will always return the details of the active backup if key backup is enabled.
+     *
+     * Return null if there is no backup.
+     *
+     * @returns the key backup information
+     */
+    getKeyBackupInfo(): Promise<KeyBackupInfo | null>;
 
     /**
      * Force a re-check of the key backup and enable/disable it as appropriate.
@@ -509,9 +565,10 @@ export interface CryptoApi {
      *
      * If there are existing backups they will be replaced.
      *
-     * The decryption key will be saved in Secret Storage (the {@link matrix.SecretStorage.SecretStorageCallbacks.getSecretStorageKey} Crypto
-     * callback will be called)
-     * and the backup engine will be started.
+     * If secret storage is set up, the new decryption key will be saved (the {@link CryptoCallbacks.getSecretStorageKey}
+     * callback will be called to obtain the secret storage key).
+     *
+     * The backup engine will be started using the new backup version (i.e., {@link checkKeyBackupAndEnable} is called).
      */
     resetKeyBackup(): Promise<void>;
 
@@ -521,6 +578,36 @@ export interface CryptoApi {
      * @param version - The backup version to delete.
      */
     deleteKeyBackupVersion(version: string): Promise<void>;
+
+    /**
+     * Download and restore the full key backup from the homeserver.
+     *
+     * Before calling this method, a decryption key, and the backup version to restore,
+     * must have been saved in the crypto store. This happens in one of the following ways:
+     *
+     * - When a new backup version is created with {@link CryptoApi.resetKeyBackup}, a new key is created and cached.
+     * - The key can be loaded from secret storage with {@link CryptoApi.loadSessionBackupPrivateKeyFromSecretStorage}.
+     * - The key can be received from another device via secret sharing, typically as part of the interactive verification flow.
+     * - The key and backup version can also be set explicitly via {@link CryptoApi.storeSessionBackupPrivateKey},
+     *   though this is not expected to be a common operation.
+     *
+     * Warning: the full key backup may be quite large, so this operation may take several hours to complete.
+     * Use of {@link KeyBackupRestoreOpts.progressCallback} is recommended.
+     *
+     * @param opts
+     */
+    restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
+
+    /**
+     * Restores a key backup using a passphrase.
+     * The decoded key (derived from the passphrase) is stored locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
+     *
+     * @param passphrase - The passphrase to use to restore the key backup.
+     * @param opts
+     *
+     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/shared via 4S.
+     */
+    restoreKeyBackupWithPassphrase(passphrase: string, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
@@ -863,8 +950,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Room key import progress report.
- * Used when calling {@link CryptoApi#importRoomKeys} or
- * {@link CryptoApi#importRoomKeysAsJson} as the parameter of
+ * Used when calling {@link CryptoApi#importRoomKeys},
+ * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
 export interface ImportRoomKeyProgressData {
@@ -912,12 +999,77 @@ export interface CrossSigningStatus {
 /**
  * Crypto callbacks provided by the application
  */
-export interface CryptoCallbacks extends SecretStorageCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
+export interface CryptoCallbacks {
     /**
-     * Called by {@link CryptoApi#bootstrapSecretStorage}
+     * Called to retrieve a secret storage encryption key.
+     *
+     * [Server-side secret storage](https://spec.matrix.org/v1.12/client-server-api/#key-storage)
+     * is, as the name implies, a mechanism for storing secrets which should be shared between
+     * clients on the server. For example, it is typically used for storing the
+     * [key backup decryption key](https://spec.matrix.org/v1.12/client-server-api/#decryption-key)
+     * and the private [cross-signing keys](https://spec.matrix.org/v1.12/client-server-api/#cross-signing).
+     *
+     * The secret storage mechanism encrypts the secrets before uploading them to the server using a
+     * secret storage key. The schema supports multiple keys, but in practice only one tends to be used
+     * at once; this is the "default secret storage key" and may be known as the "recovery key" (or, sometimes,
+     * the "security key").
+     *
+     * Secret storage can be set up by calling {@link CryptoApi.bootstrapSecretStorage}. Having done so, when
+     * the crypto stack needs to access secret storage (for example, when setting up a new device, or to
+     * store newly-generated secrets), it will use this callback (`getSecretStorageKey`).
+     *
+     * Note that the secret storage key may be needed several times in quick succession: it is recommended
+     * that applications use a temporary cache to avoid prompting the user multiple times for the key. See
+     * also {@link cacheSecretStorageKey} which is called when a new key is created.
+     *
+     * The helper method {@link deriveRecoveryKeyFromPassphrase} may be useful if the secret storage key
+     * was derived from a passphrase.
+     *
+     * @param opts - An options object.
+     *
+     * @param name - the name of the *secret* (NB: not the encryption key) being stored or retrieved.
+     *    When the item is stored in account data, it will have this `type`.
+     *
+     * @returns a pair [`keyId`, `privateKey`], where `keyId` is one of the keys from the `keys` parameter,
+     *    and `privateKey` is the raw private encryption key, as appropriate for the encryption algorithm.
+     *    (For `m.secret_storage.v1.aes-hmac-sha2`, it is the input to an HKDF as defined in the
+     *    [specification](https://spec.matrix.org/v1.6/client-server-api/#msecret_storagev1aes-hmac-sha2).)
+     *
+     *    Alternatively, if none of the keys are known, may return `null` — in which case the original
+     *     operation that requires access to a secret in secret storage may fail with an exception.
+     */
+    getSecretStorageKey?: (
+        opts: {
+            /**
+             * Details of the secret storage keys required: a map from the key ID
+             * (excluding the `m.secret_storage.key.` prefix) to details of the key.
+             *
+             * When storing a secret, `keys` will contain exactly one entry.
+             *
+             * For secret retrieval, `keys` may contain several entries, and the application can return
+             * any one of the requested keys. Unless your application specifically wants to offer the
+             * user the ability to have more than one secret storage key active at a time, it is recommended
+             * to call {@link matrix.SecretStorage.ServerSideSecretStorage.getDefaultKeyId | ServerSideSecretStorage.getDefaultKeyId}
+             * to figure out which is the current default key, and to return `null` if the default key is not listed in `keys`.
+             */
+            keys: Record<string, SecretStorageKeyDescription>;
+        },
+        name: string,
+    ) => Promise<[string, Uint8Array] | null>;
+
+    /** @deprecated: unused with the Rust crypto stack. */
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    /** @deprecated: unused with the Rust crypto stack. */
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    /** @deprecated: unused with the Rust crypto stack. */
+    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
+
+    /**
+     * Called by {@link CryptoApi.bootstrapSecretStorage} when a new default secret storage key is created.
+     *
+     * Applications can use this to (temporarily) cache the secret storage key, for later return by
+     * {@link getSecretStorageKey}.
+     *
      * @param keyId - secret storage key id
      * @param keyInfo - secret storage key info
      * @param key - private key to store
@@ -939,6 +1091,7 @@ export interface CryptoCallbacks extends SecretStorageCallbacks {
         checkFunc: (key: Uint8Array) => void,
     ) => Promise<Uint8Array>;
 
+    /** @deprecated: unused with the Rust crypto stack. */
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
@@ -957,6 +1110,7 @@ export interface CreateSecretStorageOpts {
     /**
      * The current key backup object. If passed,
      * the passphrase and recovery key from this backup will be used.
+     * @deprecated Not used by the Rust crypto stack.
      */
     keyBackupInfo?: KeyBackupInfo;
 
@@ -1069,6 +1223,16 @@ export enum EventShieldReason {
      * decryption keys.
      */
     MISMATCHED_SENDER_KEY,
+
+    /**
+     * The event was sent unencrypted in an encrypted room.
+     */
+    SENT_IN_CLEAR,
+
+    /**
+     * The sender was previously verified but changed their identity.
+     */
+    VERIFICATION_VIOLATION,
 }
 
 /** The result of a call to {@link CryptoApi.getOwnDeviceKeys} */
@@ -1080,8 +1244,8 @@ export interface OwnDeviceKeys {
 }
 
 export * from "./verification.ts";
-export * from "./keybackup.ts";
+export type * from "./keybackup.ts";
 export * from "./recovery-key.ts";
 export * from "./key-passphrase.ts";
 export * from "./CryptoEvent.ts";
-export * from "./CryptoEventHandlerMap.ts";
+export type * from "./CryptoEventHandlerMap.ts";

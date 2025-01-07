@@ -130,7 +130,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: IClientWellKnown): Promise<ClientConfig> {
+    public static async fromDiscoveryConfig(wellknown?: IClientWellKnown): Promise<ClientConfig> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
@@ -414,16 +414,16 @@ export class AutoDiscovery {
         }
     }
 
-    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
         if (this.fetchFn) {
             return this.fetchFn(resource, options);
         }
-        return global.fetch(resource, options);
+        return globalThis.fetch(resource, options);
     }
 
-    private static fetchFn?: typeof global.fetch;
+    private static fetchFn?: typeof globalThis.fetch;
 
-    public static setFetchFn(fetchFn: typeof global.fetch): void {
+    public static setFetchFn(fetchFn: typeof globalThis.fetch): void {
         AutoDiscovery.fetchFn = fetchFn;
     }
 

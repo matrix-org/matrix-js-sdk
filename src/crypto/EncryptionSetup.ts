@@ -25,6 +25,7 @@ import { IKeyBackupInfo } from "./keybackup.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage.ts";
 import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../crypto-api/index.ts";
+import { AccountDataEvents } from "../@types/event.ts";
 
 interface ICrossSigningKeys {
     authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -106,12 +107,15 @@ export class EncryptionSetupBuilder {
         if (!this.keySignatures) {
             this.keySignatures = {};
         }
-        const userSignatures = this.keySignatures[userId] || {};
+        const userSignatures = this.keySignatures[userId] ?? {};
         this.keySignatures[userId] = userSignatures;
         userSignatures[deviceId] = signature;
     }
 
-    public async setAccountData(type: string, content: object): Promise<void> {
+    public async setAccountData<K extends keyof AccountDataEvents>(
+        type: K,
+        content: AccountDataEvents[K],
+    ): Promise<void> {
         await this.accountDataClientAdapter.setAccountData(type, content);
     }
 
@@ -160,7 +164,7 @@ export class EncryptionSetupOperation {
     /**
      */
     public constructor(
-        private readonly accountData: Map<string, object>,
+        private readonly accountData: Map<keyof AccountDataEvents, MatrixEvent>,
         private readonly crossSigningKeys?: ICrossSigningKeys,
         private readonly keyBackupInfo?: IKeyBackupInfo,
         private readonly keySignatures?: KeySignatures,
@@ -190,7 +194,7 @@ export class EncryptionSetupOperation {
         // set account data
         if (this.accountData) {
             for (const [type, content] of this.accountData) {
-                await baseApis.setAccountData(type, content);
+                await baseApis.setAccountData(type, content.getContent());
             }
         }
         // upload first cross-signing signatures with the new key
@@ -236,7 +240,7 @@ class AccountDataClientAdapter
     implements AccountDataClient
 {
     //
-    public readonly values = new Map<string, MatrixEvent>();
+    public readonly values = new Map<keyof AccountDataEvents, MatrixEvent>();
 
     /**
      * @param existingValues - existing account data
@@ -248,33 +252,26 @@ class AccountDataClientAdapter
     /**
      * @returns the content of the account data
      */
-    public getAccountDataFromServer<T extends { [k: string]: any }>(type: string): Promise<T | null> {
+    public getAccountDataFromServer<K extends keyof AccountDataEvents>(type: K): Promise<AccountDataEvents[K] | null> {
         return Promise.resolve(this.getAccountData(type));
     }
 
     /**
      * @returns the content of the account data
      */
-    public getAccountData<T extends { [k: string]: any }>(type: string): T | null {
-        const modifiedValue = this.values.get(type);
-        if (modifiedValue) {
-            return modifiedValue as unknown as T;
-        }
-        const existingValue = this.existingValues.get(type);
-        if (existingValue) {
-            return existingValue.getContent<T>();
-        }
-        return null;
+    public getAccountData<K extends keyof AccountDataEvents>(type: K): AccountDataEvents[K] | null {
+        const event = this.values.get(type) ?? this.existingValues.get(type);
+        return event?.getContent<AccountDataEvents[K]>() ?? null;
     }
 
-    public setAccountData(type: string, content: any): Promise<{}> {
+    public setAccountData<K extends keyof AccountDataEvents>(type: K, content: AccountDataEvents[K]): Promise<{}> {
+        const event = new MatrixEvent({ type, content });
         const lastEvent = this.values.get(type);
-        this.values.set(type, content);
+        this.values.set(type, event);
         // ensure accountData is emitted on the next tick,
         // as SecretStorage listens for it while calling this method
         // and it seems to rely on this.
         return Promise.resolve().then(() => {
-            const event = new MatrixEvent({ type, content });
             this.emit(ClientEvent.AccountData, event, lastEvent);
             return {};
         });

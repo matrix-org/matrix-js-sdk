@@ -14,16 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @deprecated in favour of MSC4108-based implementation
- */
-export * from "./MSC3906Rendezvous.ts";
 export * from "./MSC4108SignInWithQR.ts";
-export * from "./RendezvousChannel.ts";
-export * from "./RendezvousCode.ts";
+export type * from "./RendezvousChannel.ts";
+export type * from "./RendezvousCode.ts";
 export * from "./RendezvousError.ts";
 export * from "./RendezvousFailureReason.ts";
 export * from "./RendezvousIntent.ts";
-export * from "./RendezvousTransport.ts";
+export type * from "./RendezvousTransport.ts";
 export * from "./transports/index.ts";
 export * from "./channels/index.ts";

@@ -168,14 +168,17 @@ describe("MatrixClient", function () {
                     type: "test",
                     content: {},
                 });
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: KnownMembership.Join,
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
 
@@ -188,14 +191,17 @@ describe("MatrixClient", function () {
             const roomId = "!roomId:server";
             const roomAlias = "#my-fancy-room:server";
             const room = new Room(roomId, client, userId);
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: KnownMembership.Join,
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Join,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
             store.storeRoom(room);
 
             // The method makes a request to resolve the alias
@@ -275,14 +281,17 @@ describe("MatrixClient", function () {
                     content: {},
                 });
 
-            room.addLiveEvents([
-                utils.mkMembership({
-                    user: userId,
-                    room: roomId,
-                    mship: KnownMembership.Knock,
-                    event: true,
-                }),
-            ]);
+            room.addLiveEvents(
+                [
+                    utils.mkMembership({
+                        user: userId,
+                        room: roomId,
+                        mship: KnownMembership.Knock,
+                        event: true,
+                    }),
+                ],
+                { addToState: true },
+            );
 
             httpBackend.verifyNoOutstandingRequests();
             store.storeRoom(room);
@@ -641,9 +650,9 @@ describe("MatrixClient", function () {
         }
 
         beforeEach(function () {
-            // running initCrypto should trigger a key upload
+            // running initLegacyCrypto should trigger a key upload
             httpBackend.when("POST", "/keys/upload").respond(200, {});
-            return Promise.all([client.initCrypto(), httpBackend.flush("/keys/upload", 1)]);
+            return Promise.all([client.initLegacyCrypto(), httpBackend.flush("/keys/upload", 1)]);
         });
 
         afterEach(() => {
@@ -1904,6 +1913,28 @@ describe("MatrixClient", function () {
 
             httpBackend.flush("");
             return prom;
+        });
+    });
+
+    describe("getDomain", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getDomain()).toBeNull();
+        });
+
+        it("should return the domain of the userId", () => {
+            expect(client.getDomain()).toBe("localhost");
+        });
+    });
+
+    describe("getUserIdLocalpart", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getUserIdLocalpart()).toBeNull();
+        });
+
+        it("should return the localpart of the userId", () => {
+            expect(client.getUserIdLocalpart()).toBe("alice");
         });
     });
 });

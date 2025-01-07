@@ -415,7 +415,7 @@ export class InteractiveAuth<T> {
         while (this.submitPromise) {
             try {
                 await this.submitPromise;
-            } catch (e) {}
+            } catch {}
         }
 
         // use the sessionid from the last request, if one is present.

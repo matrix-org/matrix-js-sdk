@@ -26,8 +26,9 @@ import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { EventDecryptionResult } from "../../src/common-crypto/CryptoBackend";
 import * as testData from "../test-utils/test-data";
 import { KnownMembership } from "../../src/@types/membership";
+import type { DeviceInfoMap } from "../../src/crypto/DeviceList";
 
-const Olm = global.Olm;
+const Olm = globalThis.Olm;
 
 function awaitEvent(emitter: EventEmitter, event: string): Promise<void> {
     return new Promise((resolve) => {
@@ -118,7 +119,7 @@ describe("Crypto", function () {
 
     it("getVersion() should return the current version of the olm library", async () => {
         const client = new TestClient("@alice:example.com", "deviceid").client;
-        await client.initCrypto();
+        await client.initLegacyCrypto();
 
         const olmVersionTuple = Crypto.getOlmVersion();
         expect(client.getCrypto()?.getVersion()).toBe(
@@ -129,7 +130,7 @@ describe("Crypto", function () {
     describe("encrypted events", function () {
         it("provides encryption information for events from unverified senders", async function () {
             const client = new TestClient("@alice:example.com", "deviceid").client;
-            await client.initCrypto();
+            await client.initLegacyCrypto();
 
             // unencrypted event
             const event = {
@@ -209,7 +210,7 @@ describe("Crypto", function () {
             let client: MatrixClient;
             beforeEach(async () => {
                 client = new TestClient("@alice:example.com", "deviceid").client;
-                await client.initCrypto();
+                await client.initLegacyCrypto();
 
                 // mock out the verification check
                 client.crypto!.checkUserTrust = (userId) => new UserTrustLevel(true, false, false);
@@ -305,7 +306,7 @@ describe("Crypto", function () {
 
         it("doesn't throw an error when attempting to decrypt a redacted event", async () => {
             const client = new TestClient("@alice:example.com", "deviceid").client;
-            await client.initCrypto();
+            await client.initLegacyCrypto();
 
             const event = new MatrixEvent({
                 content: {},
@@ -438,10 +439,10 @@ describe("Crypto", function () {
             secondAliceClient = new TestClient("@alice:example.com", "secondAliceDevice").client;
             bobClient = new TestClient("@bob:example.com", "bobdevice").client;
             claraClient = new TestClient("@clara:example.com", "claradevice").client;
-            await aliceClient.initCrypto();
-            await secondAliceClient.initCrypto();
-            await bobClient.initCrypto();
-            await claraClient.initCrypto();
+            await aliceClient.initLegacyCrypto();
+            await secondAliceClient.initLegacyCrypto();
+            await bobClient.initLegacyCrypto();
+            await claraClient.initLegacyCrypto();
         });
 
         afterEach(async function () {
@@ -607,7 +608,7 @@ describe("Crypto", function () {
             event.claimedEd25519Key = null;
             try {
                 await bobClient.crypto!.decryptEvent(event);
-            } catch (e) {
+            } catch {
                 // we expect this to fail because we don't have the
                 // decryption keys yet
             }
@@ -1110,7 +1111,7 @@ describe("Crypto", function () {
             jest.spyOn(logger, "debug").mockImplementation(() => {});
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             client.crypto!.isCrossSigningReady = async () => false;
             client.crypto!.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
             client.crypto!.baseApis.setAccountData = jest.fn().mockResolvedValue(null);
@@ -1146,9 +1147,9 @@ describe("Crypto", function () {
 
             client = new TestClient("@alice:example.org", "aliceweb");
 
-            // running initCrypto should trigger a key upload
+            // running initLegacyCrypto should trigger a key upload
             client.httpBackend.when("POST", "/keys/upload").respond(200, {});
-            await Promise.all([client.client.initCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
+            await Promise.all([client.client.initLegacyCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
 
             encryptedPayload = {
                 algorithm: "m.olm.v1.curve25519-aes-sha2",
@@ -1245,12 +1246,123 @@ describe("Crypto", function () {
         });
     });
 
+    describe("encryptToDeviceMessages", () => {
+        let client: TestClient;
+        let ensureOlmSessionsForDevices: jest.SpiedFunction<typeof olmlib.ensureOlmSessionsForDevices>;
+        let encryptMessageForDevice: jest.SpiedFunction<typeof olmlib.encryptMessageForDevice>;
+        const payload = { hello: "world" };
+        let encryptedPayload: object;
+        let crypto: Crypto;
+
+        beforeEach(async () => {
+            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices.mockResolvedValue(new Map());
+            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
+            });
+
+            client = new TestClient("@alice:example.org", "aliceweb");
+
+            // running initLegacyCrypto should trigger a key upload
+            client.httpBackend.when("POST", "/keys/upload").respond(200, {});
+            await Promise.all([client.client.initLegacyCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
+
+            encryptedPayload = {
+                algorithm: "m.olm.v1.curve25519-aes-sha2",
+                sender_key: client.client.crypto!.olmDevice.deviceCurve25519Key,
+                ciphertext: { plaintext: { type: 0, body: JSON.stringify(payload) } },
+            };
+
+            crypto = client.client.getCrypto() as Crypto;
+        });
+
+        afterEach(async () => {
+            ensureOlmSessionsForDevices.mockRestore();
+            encryptMessageForDevice.mockRestore();
+            await client.stop();
+        });
+
+        it("returns encrypted batch where devices known", async () => {
+            const deviceInfoMap: DeviceInfoMap = new Map([
+                [
+                    "@bob:example.org",
+                    new Map([
+                        ["bobweb", new DeviceInfo("bobweb")],
+                        ["bobmobile", new DeviceInfo("bobmobile")],
+                    ]),
+                ],
+                ["@carol:example.org", new Map([["caroldesktop", new DeviceInfo("caroldesktop")]])],
+            ]);
+            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(deviceInfoMap);
+            // const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
+
+            const batch = await client.client.getCrypto()?.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { userId: "@bob:example.org", deviceId: "bobweb" },
+                    { userId: "@bob:example.org", deviceId: "bobmobile" },
+                    { userId: "@carol:example.org", deviceId: "caroldesktop" },
+                    { userId: "@carol:example.org", deviceId: "carolmobile" }, // not known
+                ],
+                payload,
+            );
+            expect(crypto.deviceList.downloadKeys).toHaveBeenCalledWith(
+                ["@bob:example.org", "@carol:example.org"],
+                false,
+            );
+            expect(encryptMessageForDevice).toHaveBeenCalledTimes(3);
+            const expectedPayload = expect.objectContaining({
+                ...encryptedPayload,
+                "org.matrix.msgid": expect.any(String),
+                "sender_key": expect.any(String),
+            });
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch.length).toEqual(3);
+            expect(batch).toEqual({
+                eventType: "m.room.encrypted",
+                batch: expect.arrayContaining([
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "bobweb",
+                        payload: expectedPayload,
+                    },
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "bobmobile",
+                        payload: expectedPayload,
+                    },
+                    {
+                        userId: "@carol:example.org",
+                        deviceId: "caroldesktop",
+                        payload: expectedPayload,
+                    },
+                ]),
+            });
+        });
+
+        it("returns empty batch if no devices known", async () => {
+            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(new Map());
+            const batch = await crypto.encryptToDeviceMessages(
+                "m.test.type",
+                [
+                    { deviceId: "AAA", userId: "@user1:domain" },
+                    { deviceId: "BBB", userId: "@user1:domain" },
+                    { deviceId: "CCC", userId: "@user2:domain" },
+                ],
+                payload,
+            );
+            expect(batch?.eventType).toEqual("m.room.encrypted");
+            expect(batch?.batch).toEqual([]);
+        });
+    });
+
     describe("checkSecretStoragePrivateKey", () => {
         let client: TestClient;
 
         beforeEach(async () => {
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+            await client.client.initLegacyCrypto();
         });
 
         afterEach(async () => {
@@ -1276,7 +1388,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+            await client.client.initLegacyCrypto();
         });
 
         afterEach(async () => {
@@ -1302,7 +1414,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+            await client.client.initLegacyCrypto();
         });
 
         afterEach(async function () {

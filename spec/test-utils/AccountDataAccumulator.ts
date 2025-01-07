@@ -27,7 +27,7 @@ export class AccountDataAccumulator {
      * Will be updated when fetchMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
      * Will be used by `sendSyncResponseWithUpdatedAccountData`
      */
-    public accountDataEvents: Map<String, any> = new Map();
+    public accountDataEvents: Map<string, any> = new Map();
 
     /**
      * Intercept requests to set a particular type of account data.
@@ -101,7 +101,7 @@ export class AccountDataAccumulator {
                     })),
                 },
             });
-        } catch (err) {
+        } catch {
             // Might fail with "Cannot queue more than one /sync response" if called too often.
             // It's ok if it fails here, the sync response is cumulative and will contain
             // the latest account data.

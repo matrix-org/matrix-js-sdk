@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// this is needed to tell TS about global.Olm
+// this is needed to tell TS about globalThis.Olm
 import "@matrix-org/olm";
 
 export {};
 
 declare global {
-    // use `number` as the return type in all cases for global.set{Interval,Timeout},
+    // use `number` as the return type in all cases for globalThis.set{Interval,Timeout},
     // so we don't accidentally use the methods on NodeJS.Timeout - they only exist in a subset of environments.
     // The overload for clear{Interval,Timeout} is resolved as expected.
     // We use `ReturnType<typeof setTimeout>` in the code to be agnostic of if this definition gets loaded.
@@ -65,6 +65,26 @@ declare global {
     interface Navigator {
         // We check for the webkit-prefixed getUserMedia to detect if we're
         // on webkit: we should check if we still need to do this
-        webkitGetUserMedia: DummyInterfaceWeShouldntBeUsingThis;
+        webkitGetUserMedia?: DummyInterfaceWeShouldntBeUsingThis;
+    }
+
+    export interface Uint8ArrayToBase64Options {
+        alphabet?: "base64" | "base64url";
+        omitPadding?: boolean;
+    }
+
+    interface Uint8Array {
+        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.prototype.tobase64
+        toBase64?(options?: Uint8ArrayToBase64Options): string;
+    }
+
+    export interface Uint8ArrayFromBase64Options {
+        alphabet?: "base64"; // Our fallback code only handles base64.
+        lastChunkHandling?: "loose"; // Our fallback code doesn't support other handling at this time.
+    }
+
+    interface Uint8ArrayConstructor {
+        // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.frombase64
+        fromBase64?(base64: string, options?: Uint8ArrayFromBase64Options): Uint8Array;
     }
 }

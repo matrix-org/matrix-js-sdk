@@ -74,7 +74,7 @@ describe("eventMapperFor", function () {
         const event = mapper(eventDefinition);
         expect(event).toBeInstanceOf(MatrixEvent);
 
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
         expect(room.findEventById(eventId)).toBe(event);
 
         const event2 = mapper(eventDefinition);
@@ -109,7 +109,7 @@ describe("eventMapperFor", function () {
 
         room.oldState.setStateEvents([event]);
         room.currentState.setStateEvents([event]);
-        room.addLiveEvents([event]);
+        room.addLiveEvents([event], { addToState: false });
         expect(room.findEventById(eventId)).toBe(event);
 
         const event2 = mapper(eventDefinition);

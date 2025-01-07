@@ -35,11 +35,7 @@ import {
     SpaceChildEventContent,
     SpaceParentEventContent,
 } from "./state_events.ts";
-import {
-    ExperimentalGroupCallRoomMemberState,
-    IGroupCallRoomMemberState,
-    IGroupCallRoomState,
-} from "../webrtc/groupCall.ts";
+import { IGroupCallRoomMemberState, IGroupCallRoomState } from "../webrtc/groupCall.ts";
 import { MSC3089EventContent } from "../models/MSC3089Branch.ts";
 import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon.ts";
 import { XOR } from "./common.ts";
@@ -58,6 +54,10 @@ import {
 import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types.ts";
 import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls.ts";
 import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
+import { LocalNotificationSettings } from "./local_notifications.ts";
+import { IPushRules } from "./PushRules.ts";
+import { SecretInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
 
 export enum EventType {
     // Room state events
@@ -357,14 +357,41 @@ export interface StateEvents {
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: XOR<
-        XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>,
-        XOR<SessionMembershipData, {}>
-    >;
+    [EventType.GroupCallMemberPrefix]: XOR<IGroupCallRoomMemberState, XOR<SessionMembershipData, {}>>;
 
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+}
+
+/**
+ * Mapped type from event type to content type for all specified global account_data events.
+ */
+export interface AccountDataEvents extends SecretStorageAccountDataEvents {
+    [EventType.PushRules]: IPushRules;
+    [EventType.Direct]: { [userId: string]: string[] };
+    [EventType.IgnoredUserList]: { [userId: string]: {} };
+    "m.secret_storage.default_key": { key: string };
+    "m.identity_server": { base_url: string | null };
+    [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
+    [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
+
+    // Invites-ignorer events
+    [POLICIES_ACCOUNT_EVENT_TYPE.name]: { [key: string]: any };
+    [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
+}
+
+/**
+ * Mapped type from event type to content type for all specified global events encrypted by secret storage.
+ *
+ * See https://spec.matrix.org/v1.13/client-server-api/#msecret_storagev1aes-hmac-sha2-1
+ */
+export interface SecretStorageAccountDataEvents {
+    "m.megolm_backup.v1": SecretInfo;
+    "m.cross_signing.master": SecretInfo;
+    "m.cross_signing.self_signing": SecretInfo;
+    "m.cross_signing.user_signing": SecretInfo;
+    "org.matrix.msc3814": SecretInfo;
 }

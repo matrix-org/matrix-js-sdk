@@ -42,7 +42,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 interface IOpts extends IBaseOpts {
     /** The Indexed DB interface e.g. `window.indexedDB` */
-    indexedDB: IDBFactory;
+    indexedDB?: IDBFactory;
     /** Optional database name. The same name must be used to open the same database. */
     dbName?: string;
     /** Optional factory to spin up a Worker to execute the IDB transactions within. */
@@ -206,7 +206,7 @@ export class IndexedDBStore extends MemoryStore {
                 throw err;
             },
         );
-    });
+    }, null);
 
     /**
      * Whether this store would like to save its data
@@ -253,7 +253,7 @@ export class IndexedDBStore extends MemoryStore {
         }
 
         return this.backend.syncToDatabase(userTuples);
-    });
+    }, null);
 
     public setSyncData = this.degradable((syncData: ISyncResponse): Promise<void> => {
         return this.backend.setSyncData(syncData);
@@ -310,13 +310,13 @@ export class IndexedDBStore extends MemoryStore {
      * @param fallback - The method name for fallback.
      * @returns A wrapped member function.
      */
-    private degradable<A extends Array<any>, R = void>(
+    private degradable<A extends Array<any>, F extends keyof MemoryStore | null, R = void>(
         func: DegradableFn<A, R>,
-        fallback?: keyof MemoryStore,
-    ): DegradableFn<A, R> {
-        const fallbackFn = fallback ? (super[fallback] as Function) : null;
+        fallback: F,
+    ): DegradableFn<A, F extends string ? R : void> {
+        const fallbackFn = fallback ? (super[fallback] as (...args: A) => Promise<R>) : null;
 
-        return async (...args) => {
+        return (async (...args) => {
             try {
                 return await func.call(this, ...args);
             } catch (e) {
@@ -344,7 +344,7 @@ export class IndexedDBStore extends MemoryStore {
                     return fallbackFn.call(this, ...args);
                 }
             }
-        };
+        }) as DegradableFn<A, F extends string ? R : void>;
     }
 
     // XXX: ideally these would be stored in indexeddb as part of the room but,
