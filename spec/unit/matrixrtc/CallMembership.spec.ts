@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../../../src";
-import { CallMembership, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, SessionMembershipData, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
+import { membershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
@@ -74,6 +75,18 @@ describe("CallMembership", () => {
             expect(membership.createdTs()).toEqual(67890);
         });
 
+        it("considers memberships unexpired if local age low enough", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
+            expect(new CallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(false);
+        });
+
+        it("considers memberships expired if local age large enough", () => {
+            const fakeEvent = makeMockEvent(1000);
+            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
+            expect(new CallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(true);
+        });
+
         it("returns preferred foci", () => {
             const fakeEvent = makeMockEvent();
             const mockFocus = { type: "this_is_a_mock_focus" };
@@ -85,29 +98,26 @@ describe("CallMembership", () => {
         });
     });
 
-    // TODO: re-enable this test when expiry is implemented
-    // eslint-disable-next-line jest/no-commented-out-tests
-    // describe("expiry calculation", () => {
-    //     let fakeEvent: MatrixEvent;
-    //     let membership: CallMembership;
+    describe("expiry calculation", () => {
+        let fakeEvent: MatrixEvent;
+        let membership: CallMembership;
 
-    //     beforeEach(() => {
-    //         // server origin timestamp for this event is 1000
-    //         fakeEvent = makeMockEvent(1000);
-    //         membership = new CallMembership(fakeEvent!, membershipTemplate);
+        beforeEach(() => {
+            // server origin timestamp for this event is 1000
+            fakeEvent = makeMockEvent(1000);
+            membership = new CallMembership(fakeEvent!, membershipTemplate);
 
-    //         jest.useFakeTimers();
-    //     });
+            jest.useFakeTimers();
+        });
 
-    //     afterEach(() => {
-    //         jest.useRealTimers();
-    //     });
+        afterEach(() => {
+            jest.useRealTimers();
+        });
 
-    // eslint-disable-next-line jest/no-commented-out-tests
-    //     it("calculates time until expiry", () => {
-    //         jest.setSystemTime(2000);
-    //         // should be using absolute expiry time
-    //         expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
-    //     });
-    // });
+        it("calculates time until expiry", () => {
+            jest.setSystemTime(2000);
+            // should be using absolute expiry time
+            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+        });
+    });
 });
