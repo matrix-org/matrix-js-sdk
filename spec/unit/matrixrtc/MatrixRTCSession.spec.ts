@@ -16,7 +16,8 @@ limitations under the License.
 
 import { encodeBase64, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import { SessionMembershipData, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
+import { DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { MyMembershipManager } from "../../../src/matrixrtc/MatrixRTCMyMembershipManager";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
@@ -235,14 +236,13 @@ describe("MatrixRTCSession", () => {
         });
 
         async function testSession(membershipData: SessionMembershipData): Promise<void> {
+            const makeNewMembershipSpy = jest.spyOn(MyMembershipManager.prototype as any, "makeNewMembership");
             sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
-
-            const makeNewMembershipMock = jest.spyOn(sess as any, "makeNewMembership");
 
             sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
 
-            expect(makeNewMembershipMock).toHaveBeenCalledTimes(1);
+            expect(makeNewMembershipSpy).toHaveBeenCalledTimes(1);
 
             await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
@@ -477,23 +477,25 @@ describe("MatrixRTCSession", () => {
                         return Promise.reject(error);
                     });
                 });
-
-                // needed to advance the mock timers properly
-                const scheduledDelayDisconnection = new Promise<void>((resolve) => {
-                    const originalFn: () => void = (sess as any).scheduleDelayDisconnection;
-                    (sess as any).scheduleDelayDisconnection = jest.fn(() => {
-                        originalFn.call(sess);
-                        resolve();
-                    });
-                });
-
+                // needed to join so that myMembershipManager gets created
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, {
                     membershipServerSideExpiryTimeout: 9000,
                 });
 
-                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 9000);
+                // needed to advance the mock timers properly
+                // depends on myMembershipManager being created
+                const scheduledDelayDisconnection = new Promise<void>((resolve) => {
+                    const myMemManager = (sess as any).myMembershipManager;
+                    const originalFn: () => void = myMemManager.scheduleDelayDisconnection;
+                    myMemManager.scheduleDelayDisconnection = jest.fn(() => {
+                        originalFn.call(myMemManager);
+                        resolve();
+                    });
+                });
+
+                expect((sess as any).myMembershipManager).toHaveProperty("membershipServerSideExpiryTimeout", 9000);
                 await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
-                expect(sess).toHaveProperty("membershipServerSideExpiryTimeout", 7500);
+                expect((sess as any).myMembershipManager).toHaveProperty("membershipServerSideExpiryTimeout", 7500);
 
                 await sendDelayedStateAttempt;
                 jest.advanceTimersByTime(5000);
