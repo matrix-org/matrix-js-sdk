@@ -67,14 +67,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
 };
 
-export interface JoinSessionConfig {
-    /**
-     *  If true, generate and share a media key for this participant,
-     *  and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
-     *  media keys for other participants become available.
-     */
-    manageMediaKeys?: boolean;
-
+export interface JoinSessionMemberConfig {
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
@@ -94,24 +87,38 @@ export interface JoinSessionConfig {
     callMemberEventRetryDelayMinimum?: number;
 
     /**
-     * The jitter (in milliseconds) which is added to callMemberEventRetryDelayMinimum before retrying
-     * sending the membership event. e.g. if this is set to 1000, then a random delay of between 0 and 1000
-     * milliseconds will be added.
+     * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
+     * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
+     */
+    membershipServerSideExpiryTimeout?: number;
+
+    /**
+     * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
+     */
+    membershipKeepAlivePeriod?: number;
+
+    /**
+     * @deprecated It should be possible to make it stable without this.
      */
     callMemberEventRetryJitter?: number;
-
+}
+export interface JoinSessionEncryptionConfig {
+    /**
+     *  If true, generate and share a media key for this participant,
+     *  and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
+     *  media keys for other participants become available.
+     */
+    manageMediaKeys?: boolean;
     /**
      * The minimum time (in milliseconds) between each attempt to send encryption key(s).
      * e.g. if this is set to 1000, then we will send at most one key event every second.
      */
     updateEncryptionKeyThrottle?: number;
-
     /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
      * tend to leave calls at the same time.
      */
     makeKeyDelay?: number;
-
     /**
      * The delay (in milliseconds) between creating and sending a new key and starting to encrypt with it. This
      * gives other a chance to receive the new key to minimise the chance they don't get media they can't decrypt.
@@ -119,39 +126,21 @@ export interface JoinSessionConfig {
      * makeKeyDelay + useKeyDelay
      */
     useKeyDelay?: number;
-
-    /**
-     * The timeout (in milliseconds) after which the server will consider the membership to have expired if it
-     * has not received a keep-alive from the client.
-     */
-    membershipServerSideExpiryTimeout?: number;
-
-    /**
-     * The period (in milliseconds) that the client will send membership keep-alives to the server.
-     */
-    membershipKeepAlivePeriod?: number;
 }
+export type JoinSessionConfig = JoinSessionMemberConfig & JoinSessionEncryptionConfig;
 
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
+    private myMembershipManager?: MyMembershipManager;
+
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
 
-    private relativeExpiry: number | undefined;
-
     // undefined means not yet joined
     private joinConfig?: JoinSessionConfig;
-
-    private get membershipExpiryTimeout(): number {
-        return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
-    }
-
-    private get callMemberEventRetryDelayMinimum(): number {
-        return this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
-    }
 
     private get updateEncryptionKeyThrottle(): number {
         return this.joinConfig?.updateEncryptionKeyThrottle ?? 3_000;
@@ -165,48 +154,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.joinConfig?.useKeyDelay ?? 5_000;
     }
 
-    /**
-     * If the server disallows the configured {@link membershipServerSideExpiryTimeout},
-     * this stores a delay that the server does allow.
-     */
-    private membershipServerSideExpiryTimeoutOverride?: number;
-
-    private get membershipServerSideExpiryTimeout(): number {
-        return (
-            this.membershipServerSideExpiryTimeoutOverride ??
-            this.joinConfig?.membershipServerSideExpiryTimeout ??
-            8_000
-        );
-    }
-
-    private get membershipKeepAlivePeriod(): number {
-        return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
-    }
-
-    private get callMemberEventRetryJitter(): number {
-        return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
-    }
-
-    private memberEventTimeout?: ReturnType<typeof setTimeout>;
     private expiryTimeout?: ReturnType<typeof setTimeout>;
     private keysEventUpdateTimeout?: ReturnType<typeof setTimeout>;
     private makeNewKeyTimeout?: ReturnType<typeof setTimeout>;
     private setNewKeyTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    // This is a Focus with the specified fields for an ActiveFocus (e.g. LivekitFocusActive for type="livekit")
-    private ownFocusActive?: Focus;
-    // This is a Foci array that contains the Focus objects this user is aware of and proposes to use.
-    private ownFociPreferred?: Focus[];
-
-    private updateCallMembershipRunning = false;
-    private needCallMembershipUpdate = false;
-
     private manageMediaKeys = false;
     // userId:deviceId => array of (key, timestamp)
     private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
     private lastEncryptionKeyUpdateRequest?: number;
-
-    private disconnectDelayId: string | undefined;
 
     // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
     // if it looks like a membership has been updated.
