@@ -7351,7 +7351,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Copy over a known event sender if we can
                 for (const ev of sr.context.getTimeline()) {
                     const sender = room.getMember(ev.getSender()!);
-                    if (!ev.sender && sender) ev.sender = sender;
+                    if (!ev.sender && sender) {
+                        ev.setMetadata(room.currentState, false);
+                    }
                 }
             }
             searchResults.results.push(sr);
