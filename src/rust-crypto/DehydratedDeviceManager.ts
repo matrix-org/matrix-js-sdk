@@ -202,7 +202,7 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
      * Returns whether or not a dehydrated device was found.
      */
     public async rehydrateDeviceIfAvailable(): Promise<boolean> {
-        const key = (await this.getCachedKey()) || (await this.getKey(false));
+        const key = await this.getKey(false);
         if (!key) {
             return false;
         }
