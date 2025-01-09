@@ -283,7 +283,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         super();
         this._callId = memberships[0]?.callId;
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        roomState?.on(RoomStateEvent.Members, this.onMembershipUpdate);
+        roomState?.on(RoomStateEvent.Members, this.onMembershipsUpdate);
         this.setExpiryTimer();
     }
 
@@ -305,7 +305,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.expiryTimeout = undefined;
         }
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        roomState?.off(RoomStateEvent.Members, this.onMembershipUpdate);
+        roomState?.off(RoomStateEvent.Members, this.onMembershipsUpdate);
     }
 
     /**
@@ -646,7 +646,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.onMembershipUpdate, soonestExpiry);
+            this.expiryTimeout = setTimeout(this.onMembershipsUpdate, soonestExpiry);
         }
     }
 
@@ -746,7 +746,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    public onMembershipUpdate = (): void => {
+    public onMembershipsUpdate = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
@@ -763,7 +763,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             if (this.isJoined() && !this.memberships.some(this.isMyMembership)) {
                 logger.warn("Missing own membership: force re-join");
                 // TODO: Should this be awaited? And is there anything to tell the focus?
-                this.membershipManager?.triggerCallMembershipEventUpdate();
+                this.membershipManager?.onMembershipsUpdate();
             }
         }
 

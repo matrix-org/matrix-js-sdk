@@ -93,10 +93,10 @@ export class MembershipManager {
             return true;
         }
     }
-    public stop(): void {
-        if (this.memberEventTimeout) {
-            clearTimeout(this.memberEventTimeout);
-            this.memberEventTimeout = undefined;
+
+    public async onMembershipsUpdate(): Promise<void> {
+        return this.triggerCallMembershipEventUpdate();
+    }
         }
     }
     public triggerCallMembershipEventUpdate = async (): Promise<void> => {
