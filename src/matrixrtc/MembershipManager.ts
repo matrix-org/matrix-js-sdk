@@ -65,21 +65,24 @@ export class MembershipManager {
     private get callMemberEventRetryJitter(): number {
         return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
     }
-    public joinRoomSession(): void {
+
+    public join(fociPreferred: Focus[], fociActive?: Focus): void {
+        this.ownFocusActive = fociActive;
+        this.ownFociPreferred = fociPreferred;
+        this.relativeExpiry = this.membershipExpiryTimeout;
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
         this.triggerCallMembershipEventUpdate();
     }
-    public setJoined(fociPreferred: Focus[], fociActive?: Focus): void {
-        this.ownFocusActive = fociActive;
-        this.ownFociPreferred = fociPreferred;
-        this.relativeExpiry = this.membershipExpiryTimeout;
-    }
-    public setLeft(): void {
+
+    public async leave(timeout: number | undefined = undefined): Promise<boolean> {
         this.relativeExpiry = undefined;
         this.ownFocusActive = undefined;
-    }
-    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
+
+        if (this.memberEventTimeout) {
+            clearTimeout(this.memberEventTimeout);
+            this.memberEventTimeout = undefined;
+        }
         if (timeout) {
             // The sleep promise returns the string 'timeout' and the membership update void
             // A success implies that the membership update was quicker then the timeout.

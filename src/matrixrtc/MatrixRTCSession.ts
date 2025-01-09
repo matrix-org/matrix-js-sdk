@@ -299,12 +299,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * Performs cleanup & removes timers for client shutdown
      */
     public async stop(): Promise<void> {
-        await this.membershipManager?.leaveRoomSession(1000);
+        await this.membershipManager?.leave(1000);
         if (this.expiryTimeout) {
             clearTimeout(this.expiryTimeout);
             this.expiryTimeout = undefined;
         }
-        this.membershipManager?.stop();
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         roomState?.off(RoomStateEvent.Members, this.onMembershipUpdate);
     }
@@ -324,6 +323,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param joinConfig - Additional configuration for the joined session.
      */
     public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
+        this.joinConfig = joinConfig;
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
@@ -332,16 +332,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.getOldestMembership(),
             );
         }
-        this.joinConfig = joinConfig;
+        this.membershipManager.join(fociPreferred, fociActive);
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
-        // TODO: it feels wrong to be doing `setJoined()` and then `joinRoomSession()` non-atomically
-        // A new api between MembershipManager and the session will need to be defined.
-        this.membershipManager.setJoined(fociPreferred, fociActive);
         if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
             this.requestSendCurrentKey();
         }
-        this.membershipManager.joinRoomSession();
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
@@ -383,10 +379,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.joinConfig = undefined;
-        this.membershipManager!.setLeft();
         this.manageMediaKeys = false;
+        const leavePromise = this.membershipManager!.leave(timeout);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
-        return await this.membershipManager!.leaveRoomSession(timeout);
+        return await leavePromise;
     }
 
     public getActiveFocus(): Focus | undefined {
