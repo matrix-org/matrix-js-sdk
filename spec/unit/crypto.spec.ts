@@ -858,8 +858,7 @@ describe("Crypto", function () {
             );
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             ksEvent.event.sender = claraClient.getUserId()!;
-            // @ts-ignore - private field access
-            ksEvent._sender = new RoomMember(roomId, claraClient.getUserId()!);
+            ksEvent.sender = new RoomMember(roomId, claraClient.getUserId()!);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto!.olmDevice.getInboundGroupSessionKey(
                 roomId,
@@ -946,8 +945,7 @@ describe("Crypto", function () {
 
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             ksEvent.event.sender = aliceClient.getUserId()!;
-            // @ts-ignore - private field access
-            ksEvent._sender = new RoomMember(roomId, aliceClient.getUserId()!);
+            ksEvent.sender = new RoomMember(roomId, aliceClient.getUserId()!);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto!.olmDevice.getInboundGroupSessionKey(
                 roomId,
@@ -1017,8 +1015,7 @@ describe("Crypto", function () {
 
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             ksEvent.event.sender = claraClient.getUserId()!;
-            // @ts-ignore - private field access
-            ksEvent._sender = new RoomMember(roomId, claraClient.getUserId()!);
+            ksEvent.sender = new RoomMember(roomId, claraClient.getUserId()!);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto!.olmDevice.getInboundGroupSessionKey(
                 roomId,

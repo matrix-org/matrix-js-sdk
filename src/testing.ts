@@ -72,8 +72,7 @@ export function mkMatrixEvent(opts: {
     }
 
     const mxEvent = new MatrixEvent(event);
-    // @ts-ignore - private field access
-    mxEvent._sender = {
+    mxEvent.sender = {
         userId: opts.sender,
         membership: "join",
         name: opts.sender,

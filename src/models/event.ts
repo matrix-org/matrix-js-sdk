@@ -322,8 +322,23 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public localTimestamp: number;
 
-    private _sender: RoomMember | null = null;
-    private _target: RoomMember | null = null;
+    /**
+     * The room member who sent this event, or null e.g.
+     * this is a presence event. This is only guaranteed to be set for events that
+     * appear in a timeline, ie. do not guarantee that it will be set on state
+     * events.
+     * @privateRemarks
+     * Should be read-only
+     */
+    public sender: RoomMember | null = null;
+
+    /**
+     * The room member who is the target of this event, e.g.
+     * the invitee, the person being banned, etc.
+     * @privateRemarks
+     * Should be read-only
+     */
+    public target: RoomMember | null = null;
 
     /**
      * Update the sentinels and forwardLooking flag for this event.
@@ -346,12 +361,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (affectsSelf || !this.sender?.events?.member) {
             const newSender = stateContext.getSentinelMember(this.getSender()!);
             if (newSender !== this.sender) changed = true;
-            this._sender = newSender;
+            this.sender = newSender;
         }
         if (affectsSelf || (!this.target?.events?.member && this.getType() === EventType.RoomMember)) {
             const newTarget = stateContext.getSentinelMember(this.getStateKey()!);
             if (newTarget !== this.target) changed = true;
-            this._target = newTarget;
+            this.target = newTarget;
         }
 
         if (this.isState()) {
@@ -367,24 +382,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (changed) {
             this.emit(MatrixEventEvent.SentinelUpdated);
         }
-    }
-
-    /**
-     * The room member who sent this event, or null e.g.
-     * this is a presence event. This is only guaranteed to be set for events that
-     * appear in a timeline, ie. do not guarantee that it will be set on state
-     * events.
-     */
-    public get sender(): RoomMember | null {
-        return this._sender;
-    }
-
-    /**
-     * The room member who is the target of this event, e.g.
-     * the invitee, the person being banned, etc.
-     */
-    public get target(): RoomMember | null {
-        return this._target;
     }
 
     /**
