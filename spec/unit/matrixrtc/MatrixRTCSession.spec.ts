@@ -485,10 +485,10 @@ describe("MatrixRTCSession", () => {
                 // needed to advance the mock timers properly
                 // depends on myMembershipManager being created
                 const scheduledDelayDisconnection = new Promise<void>((resolve) => {
-                    const myMemManager = (sess as any).myMembershipManager;
-                    const originalFn: () => void = myMemManager.scheduleDelayDisconnection;
-                    myMemManager.scheduleDelayDisconnection = jest.fn(() => {
-                        originalFn.call(myMemManager);
+                    const membershipManager = (sess as any).membershipManager;
+                    const originalFn: () => void = membershipManager.scheduleDelayDisconnection;
+                    membershipManager.scheduleDelayDisconnection = jest.fn(() => {
+                        originalFn.call(membershipManager);
                         resolve();
                     });
                 });
