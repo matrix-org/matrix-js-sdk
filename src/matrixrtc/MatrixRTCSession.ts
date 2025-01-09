@@ -385,6 +385,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return await leavePromise;
     }
 
+    /**
+     * Get the active focus from the current CallMemberState event
+     * @returns The focus that is currently in use to connect to this session. This is undefined
+     * if the client is not connected to this session.
+     */
     public getActiveFocus(): Focus | undefined {
         return this.membershipManager?.getActiveFocus();
     }
@@ -654,6 +659,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.memberships[0];
     }
 
+    /**
+     * This method is used when the user is not yet connected to the Session but wants to know what focus
+     * the users in the session are using to make a decision how it wants/should connect.
+     *
+     * See also `getActiveFocus`
+     * @returns The focus which should be used when joining this session.
+     */
     public getFocusInUse(): Focus | undefined {
         const oldestMembership = this.getOldestMembership();
         if (oldestMembership?.getFocusSelection() === "oldest_membership") {
