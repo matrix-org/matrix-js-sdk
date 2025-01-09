@@ -17,10 +17,10 @@ limitations under the License.
 import { encodeBase64, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { MembershipManager } from "../../../src/matrixrtc/MembershipManager";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
+import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 
 const mockFocus = { type: "mock" };
@@ -236,16 +236,15 @@ describe("MatrixRTCSession", () => {
         });
 
         async function testSession(membershipData: SessionMembershipData): Promise<void> {
-            const makeNewMembershipSpy = jest.spyOn(MembershipManager.prototype as any, "makeNewMembership");
             sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
 
             sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
 
-            expect(makeNewMembershipSpy).toHaveBeenCalledTimes(1);
+            expect(sendStateEventMock).toHaveBeenCalledTimes(1);
 
             await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            expect(sendDelayedStateMock).toHaveBeenCalledTimes(1);
         }
 
         it("sends events", async () => {
@@ -323,9 +322,11 @@ describe("MatrixRTCSession", () => {
         let sendStateEventMock: jest.Mock;
         let sendDelayedStateMock: jest.Mock;
         let sendEventMock: jest.Mock;
+        let updateDelayedEventMock: jest.Mock;
 
         let sentStateEvent: Promise<void>;
         let sentDelayedState: Promise<void>;
+        let updatedDelayedEvent: Promise<void>;
 
         beforeEach(() => {
             sentStateEvent = new Promise((resolve) => {
@@ -339,12 +340,15 @@ describe("MatrixRTCSession", () => {
                     };
                 });
             });
+            updatedDelayedEvent = new Promise((r) => {
+                updateDelayedEventMock = jest.fn(r);
+            });
             sendEventMock = jest.fn();
             client.sendStateEvent = sendStateEventMock;
             client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
             client.sendEvent = sendEventMock;
 
-            client._unstable_updateDelayedEvent = jest.fn();
+            client._unstable_updateDelayedEvent = updateDelayedEventMock;
 
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
@@ -482,19 +486,7 @@ describe("MatrixRTCSession", () => {
                     membershipServerSideExpiryTimeout: 9000,
                 });
 
-                // needed to advance the mock timers properly
-                // depends on myMembershipManager being created
-                const scheduledDelayDisconnection = new Promise<void>((resolve) => {
-                    const membershipManager = (sess as any).membershipManager;
-                    const originalFn: () => void = membershipManager.scheduleDelayDisconnection;
-                    membershipManager.scheduleDelayDisconnection = jest.fn(() => {
-                        originalFn.call(membershipManager);
-                        resolve();
-                    });
-                });
-
                 await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
-
                 await sendDelayedStateAttempt;
                 const callProps = (d: number) => {
                     return [mockRoom!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
@@ -525,11 +517,13 @@ describe("MatrixRTCSession", () => {
                 await sentDelayedState;
 
                 // should have prepared the heartbeat to keep delaying the leave event while still connected
-                await scheduledDelayDisconnection;
-                // should have tried updating the delayed leave to test that it wasn't replaced by own state
+                await updatedDelayedEvent;
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-                // should update delayed disconnect
+
+                // ensures that we reach the code that schedules the timeout for the next delay update before we advance the timers.
+                await flushPromises();
                 jest.advanceTimersByTime(5000);
+                // should update delayed disconnect
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
 
                 jest.useRealTimers();
