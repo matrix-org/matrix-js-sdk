@@ -422,7 +422,6 @@ describe("MatrixRTCSession", () => {
                         type: "livekit",
                     },
                 },
-
                 "_@alice:example.org_AAAAAAA",
             );
             await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
@@ -454,6 +453,7 @@ describe("MatrixRTCSession", () => {
                     });
                 });
 
+                const userStateKey = `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`;
                 // preparing the delayed disconnect should handle ratelimiting
                 const sendDelayedStateAttempt = new Promise<void>((resolve) => {
                     const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
@@ -477,7 +477,7 @@ describe("MatrixRTCSession", () => {
                         return Promise.reject(error);
                     });
                 });
-                // needed to join so that myMembershipManager gets created
+
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, {
                     membershipServerSideExpiryTimeout: 9000,
                 });
@@ -493,11 +493,15 @@ describe("MatrixRTCSession", () => {
                     });
                 });
 
-                expect((sess as any).myMembershipManager).toHaveProperty("membershipServerSideExpiryTimeout", 9000);
                 await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
-                expect((sess as any).myMembershipManager).toHaveProperty("membershipServerSideExpiryTimeout", 7500);
 
                 await sendDelayedStateAttempt;
+                const callProps = (d: number) => {
+                    return [mockRoom!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
+                };
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(1, ...callProps(9000));
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(2, ...callProps(7500));
+
                 jest.advanceTimersByTime(5000);
 
                 await sendStateEventAttempt.then(); // needed to resolve after resendIfRateLimited catches
@@ -516,7 +520,7 @@ describe("MatrixRTCSession", () => {
                         foci_preferred: [activeFocusConfig],
                         focus_active: activeFocus,
                     } satisfies SessionMembershipData,
-                    `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`,
+                    userStateKey,
                 );
                 await sentDelayedState;
 
