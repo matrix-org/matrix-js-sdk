@@ -29,7 +29,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
-import { MyMembershipManager } from "./MatrixRTCMyMembershipManager.ts";
+import { MembershipManager } from "./MembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -65,7 +65,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
 };
 
-export interface JoinSessionMemberConfig {
+export interface MembershipConfig {
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
@@ -100,7 +100,7 @@ export interface JoinSessionMemberConfig {
      */
     callMemberEventRetryJitter?: number;
 }
-export interface JoinSessionEncryptionConfig {
+export interface EncryptionConfig {
     /**
      *  If true, generate and share a media key for this participant,
      *  and emit MatrixRTCSessionEvent.EncryptionKeyChanged when
@@ -125,14 +125,14 @@ export interface JoinSessionEncryptionConfig {
      */
     useKeyDelay?: number;
 }
-export type JoinSessionConfig = JoinSessionMemberConfig & JoinSessionEncryptionConfig;
+export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
 
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
-    private myMembershipManager?: MyMembershipManager;
+    private membershipManager?: MembershipManager;
 
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
@@ -292,19 +292,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * This is determined by checking if the relativeExpiry has been set.
      */
     public isJoined(): boolean {
-        return this.myMembershipManager?.isJoined() ?? false;
+        return this.membershipManager?.isJoined() ?? false;
     }
 
     /**
      * Performs cleanup & removes timers for client shutdown
      */
     public async stop(): Promise<void> {
-        await this.myMembershipManager?.leaveRoomSession(1000);
+        await this.membershipManager?.leaveRoomSession(1000);
         if (this.expiryTimeout) {
             clearTimeout(this.expiryTimeout);
             this.expiryTimeout = undefined;
         }
-        this.myMembershipManager?.stop();
+        this.membershipManager?.stop();
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         roomState?.off(RoomStateEvent.Members, this.onMembershipUpdate);
     }
@@ -328,18 +328,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         } else {
-            this.myMembershipManager = new MyMembershipManager(joinConfig, this.room, this.client, () =>
+            this.membershipManager = new MembershipManager(joinConfig, this.room, this.client, () =>
                 this.getOldestMembership(),
             );
         }
         this.joinConfig = joinConfig;
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
-        this.myMembershipManager.setJoined(fociPreferred, fociActive);
+        // TODO: it feels wrong to be doing `setJoined()` and then `joinRoomSession()` non-atomically
+        // A new api between MembershipManager and the session will need to be defined.
+        this.membershipManager.setJoined(fociPreferred, fociActive);
         if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
             this.requestSendCurrentKey();
         }
-        this.myMembershipManager.joinRoomSession();
+        this.membershipManager.joinRoomSession();
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
@@ -381,14 +383,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.room.roomId}`);
         this.joinConfig = undefined;
-        this.myMembershipManager!.setLeft();
+        this.membershipManager!.setLeft();
         this.manageMediaKeys = false;
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
-        return await this.myMembershipManager!.leaveRoomSession(timeout);
+        return await this.membershipManager!.leaveRoomSession(timeout);
     }
 
     public getActiveFocus(): Focus | undefined {
-        return this.myMembershipManager?.getActiveFocus();
+        return this.membershipManager?.getActiveFocus();
     }
 
     /**
@@ -765,7 +767,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             if (this.isJoined() && !this.memberships.some(this.isMyMembership)) {
                 logger.warn("Missing own membership: force re-join");
                 // TODO: Should this be awaited? And is there anything to tell the focus?
-                this.myMembershipManager?.triggerCallMembershipEventUpdate();
+                this.membershipManager?.triggerCallMembershipEventUpdate();
             }
         }
 

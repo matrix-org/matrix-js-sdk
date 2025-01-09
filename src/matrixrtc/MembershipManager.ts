@@ -6,13 +6,17 @@ import { sleep } from "../utils.ts";
 import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "./CallMembership.ts";
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { JoinSessionMemberConfig } from "./MatrixRTCSession.ts";
+import { MembershipConfig } from "./MatrixRTCSession.ts";
 
-export class MyMembershipManager {
+/**
+ *  This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
+ *  @internal
+ */
+export class MembershipManager {
     private relativeExpiry: number | undefined;
 
     public constructor(
-        private joinConfig: JoinSessionMemberConfig | undefined,
+        private joinConfig: MembershipConfig | undefined,
         private room: Room,
         private client: MatrixClient,
         private getOldestMembership: () => CallMembership | undefined,

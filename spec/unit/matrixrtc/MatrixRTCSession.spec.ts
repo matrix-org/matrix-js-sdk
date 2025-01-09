@@ -17,7 +17,7 @@ limitations under the License.
 import { encodeBase64, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { MyMembershipManager } from "../../../src/matrixrtc/MatrixRTCMyMembershipManager";
+import { MembershipManager } from "../../../src/matrixrtc/MembershipManager";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { randomString } from "../../../src/randomstring";
@@ -236,7 +236,7 @@ describe("MatrixRTCSession", () => {
         });
 
         async function testSession(membershipData: SessionMembershipData): Promise<void> {
-            const makeNewMembershipSpy = jest.spyOn(MyMembershipManager.prototype as any, "makeNewMembership");
+            const makeNewMembershipSpy = jest.spyOn(MembershipManager.prototype as any, "makeNewMembership");
             sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
 
             sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
