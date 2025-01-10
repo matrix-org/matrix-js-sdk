@@ -21,7 +21,7 @@ export interface MembershipManagerInterface {
     isJoined(): boolean;
     join(fociPreferred: Focus[], fociActive?: Focus): void;
     leave(timeout: number | undefined): Promise<boolean>;
-    onMembershipsUpdate(): Promise<void>;
+    onMembershipsUpdate(memberships: CallMembership[]): Promise<void>;
     getActiveFocus(): Focus | undefined;
 }
 
@@ -135,8 +135,15 @@ export class MembershipManager implements MembershipManagerInterface {
         }
     }
 
-    public async onMembershipsUpdate(): Promise<void> {
-        return this.triggerCallMembershipEventUpdate();
+    public async onMembershipsUpdate(memberships: CallMembership[]): Promise<void> {
+        const isMyMembership = (m: CallMembership): boolean =>
+            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
+
+        if (this.isJoined() && !memberships.some(isMyMembership)) {
+            logger.warn("Missing own membership: force re-join");
+            // TODO: Should this be awaited? And is there anything to tell the focus?
+            return this.triggerCallMembershipEventUpdate();
+        }
     }
 
     public getActiveFocus(): Focus | undefined {
