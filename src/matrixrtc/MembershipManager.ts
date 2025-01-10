@@ -10,7 +10,13 @@ import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { MembershipConfig } from "./MatrixRTCSession.ts";
-
+/**
+ * This interface defines what a MembershipManager uses and exposes.
+ * This interface is what we use to write tests and allows to change the actual implementation
+ * Without breaking tests because of some internal method renaming.
+ *
+ * @internal
+ */
 export abstract class MembershipManagerInterface {
     public constructor(
         joinConfig: MembershipConfig | undefined,
@@ -48,7 +54,7 @@ export abstract class MembershipManagerInterface {
  *
  *  @internal
  */
-export class MembershipManager {
+export class MembershipManager implements MembershipManagerInterface {
     private relativeExpiry: number | undefined;
 
     private memberEventTimeout?: ReturnType<typeof setTimeout>;

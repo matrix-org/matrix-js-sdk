@@ -755,6 +755,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
     /**
+     * @deprecated use onMembershipsUpdate instead. this should be called when any membership in the call is updated
+     * the old name might have implied to only need to call this when your own membership changes.
+     */
+    public onMembershipUpdate = (): void => {
+        this.onMembershipsUpdate();
+    };
+
+    /**
      * Examines the latest call memberships and handles any encryption key sending or rotation that is needed.
      *
      * This function should be called when the room members or call memberships might have changed.
