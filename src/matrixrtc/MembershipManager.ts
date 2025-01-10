@@ -11,26 +11,25 @@ import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { MembershipConfig } from "./MatrixRTCSession.ts";
 
-export interface LocalMembershipManagerInterface {
-    constructor: (
+export abstract class MembershipManagerInterface {
+    public constructor(
         joinConfig: MembershipConfig | undefined,
-        room: {
-            getLiveTimeline: () => void;
-        },
-        client: {
-            sendState: () => void;
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            unstable_sendDelayedState: () => void;
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            unstable_sendDelayedEvent: () => void;
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            unstable_updateDelayedEvent: () => void;
-        },
-    ) => MembershipManagerInterface;
-    isJoined(): boolean;
-    leave(timeout: number | undefined): Promise<boolean>;
-    onMembershipsUpdate(): Promise<void>;
-    getActiveFocus(): Focus | undefined;
+        room: Pick<Room, "getLiveTimeline">,
+        client: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedEvent"
+            | "_unstable_sendDelayedStateEvent"
+        >,
+        getOldestMembership: () => CallMembership | undefined,
+    ) {}
+    public abstract isJoined(): boolean;
+    public abstract join(fociPreferred: Focus[], fociActive?: Focus): void;
+    public abstract leave(timeout: number | undefined): Promise<boolean>;
+    public abstract onMembershipsUpdate(): Promise<void>;
+    public abstract getActiveFocus(): Focus | undefined;
 }
 
 /**
@@ -85,11 +84,9 @@ export class MembershipManager {
             8_000
         );
     }
-
     private get membershipKeepAlivePeriod(): number {
         return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
-
     private get callMemberEventRetryJitter(): number {
         return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
     }

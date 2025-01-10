@@ -29,7 +29,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
-import { MembershipManager } from "./MembershipManager.ts";
+import { MembershipManager, MembershipManagerInterface } from "./MembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -132,7 +132,7 @@ export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
-    private membershipManager?: MembershipManager;
+    private membershipManager?: MembershipManagerInterface;
 
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
@@ -283,6 +283,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         super();
         this._callId = memberships[0]?.callId;
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onMembershipsUpdate);
         this.setExpiryTimer();
     }
@@ -332,7 +333,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 this.getOldestMembership(),
             );
         }
-        this.membershipManager.join(fociPreferred, fociActive);
+        this.membershipManager!.join(fociPreferred, fociActive);
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
         if (joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
