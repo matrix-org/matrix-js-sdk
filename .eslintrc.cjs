@@ -139,6 +139,8 @@ module.exports = {
                     },
                 ],
                 "no-extra-boolean-cast": "error",
+                // to avoid unnecessary runtime dependencies between files
+                "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
             },
         },
         {

@@ -14,14 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine, CrossSigningStatus, CrossSigningBootstrapRequests } from "@matrix-org/matrix-sdk-crypto-wasm";
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import {
+    type OlmMachine,
+    type CrossSigningStatus,
+    type CrossSigningBootstrapRequests,
+} from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { BootstrapCrossSigningOpts } from "../crypto-api/index.ts";
+import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type BootstrapCrossSigningOpts } from "../crypto-api/index.ts";
 import { logger } from "../logger.ts";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
-import { UIAuthCallback } from "../interactive-auth.ts";
-import { ServerSideSecretStorage } from "../secret-storage.ts";
+import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type UIAuthCallback } from "../interactive-auth.ts";
+import { type ServerSideSecretStorage } from "../secret-storage.ts";
 
 /** Manages the cross-signing keys for our own user.
  *

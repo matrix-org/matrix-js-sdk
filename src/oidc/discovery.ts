@@ -18,7 +18,7 @@ import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
 import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate.ts";
 import { Method, timeoutSignal } from "../http-api/index.ts";
-import { OidcClientConfig } from "./index.ts";
+import { type OidcClientConfig } from "./index.ts";
 
 /**
  * @experimental

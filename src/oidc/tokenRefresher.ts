@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
+import { type IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
-import { AccessTokens } from "../http-api/index.ts";
+import { type AccessTokens } from "../http-api/index.ts";
 import { generateScope } from "./authorize.ts";
 import { discoverAndValidateOIDCIssuerWellKnown } from "./discovery.ts";
 import { logger } from "../logger.ts";

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousCode, RendezvousIntent, RendezvousFailureReason } from "./index.ts";
+import { type RendezvousCode, type RendezvousIntent, type RendezvousFailureReason } from "./index.ts";
 
 export interface RendezvousChannel<T> {
     /**

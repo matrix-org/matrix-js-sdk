@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { Curve25519AuthData, KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
+import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type Curve25519AuthData, type KeyBackupInfo, type KeyBackupSession } from "../crypto-api/keybackup.ts";
 import { CryptoEvent } from "../crypto-api/index.ts";
-import { Logger } from "../logger.ts";
-import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
-import { RustBackupManager } from "./backup.ts";
+import { type Logger } from "../logger.ts";
+import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
+import { type RustBackupManager } from "./backup.ts";
 import { encodeUri, sleep } from "../utils.ts";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 
 // The minimum time to wait between two retries in case of errors. To avoid hammering the server.
 const KEY_BACKUP_BACKOFF = 5000; // ms

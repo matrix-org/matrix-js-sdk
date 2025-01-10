@@ -15,12 +15,12 @@ limitations under the License.
 */
 import { v4 as uuidv4 } from "uuid";
 
-import { MatrixClient } from "../client.ts";
-import { ICryptoCallbacks, IEncryptedContent } from "./index.ts";
-import { defer, IDeferred } from "../utils.ts";
+import { type MatrixClient } from "../client.ts";
+import { type ICryptoCallbacks, type IEncryptedContent } from "./index.ts";
+import { defer, type IDeferred } from "../utils.ts";
 import { ToDeviceMessageId } from "../@types/event.ts";
 import { logger } from "../logger.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type MatrixEvent } from "../models/event.ts";
 import * as olmlib from "./olmlib.ts";
 
 export interface ISecretRequest {

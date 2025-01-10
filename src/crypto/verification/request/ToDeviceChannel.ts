@@ -28,9 +28,9 @@ import {
 } from "./VerificationRequest.ts";
 import { errorFromEvent, newUnexpectedMessageError } from "../Error.ts";
 import { MatrixEvent } from "../../../models/event.ts";
-import { IVerificationChannel } from "./Channel.ts";
-import { MatrixClient } from "../../../client.ts";
-import { IRequestsMap } from "../../index.ts";
+import { type IVerificationChannel } from "./Channel.ts";
+import { type MatrixClient } from "../../../client.ts";
+import { type IRequestsMap } from "../../index.ts";
 
 export type Request = VerificationRequest<ToDeviceChannel>;
 

@@ -18,23 +18,23 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
-    GeneratedSas,
-    ShowQrCodeCallbacks,
-    ShowSasCallbacks,
+    type GeneratedSas,
+    type ShowQrCodeCallbacks,
+    type ShowSasCallbacks,
     VerificationPhase,
-    VerificationRequest,
+    type VerificationRequest,
     VerificationRequestEvent,
-    VerificationRequestEventHandlerMap,
-    Verifier,
+    type VerificationRequestEventHandlerMap,
+    type Verifier,
     VerifierEvent,
-    VerifierEventHandlerMap,
+    type VerifierEventHandlerMap,
 } from "../crypto-api/verification.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type OutgoingRequest, type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type MatrixEvent } from "../models/event.ts";
 import { EventType, MsgType } from "../@types/event.ts";
-import { defer, IDeferred } from "../utils.ts";
+import { defer, type IDeferred } from "../utils.ts";
 import { VerificationMethod } from "../types.ts";
 
 /**

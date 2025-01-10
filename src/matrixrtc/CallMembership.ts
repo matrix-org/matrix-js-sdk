@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../matrix.ts";
+import { type MatrixEvent } from "../matrix.ts";
 import { deepCompare } from "../utils.ts";
-import { Focus } from "./focus.ts";
+import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 
 /**

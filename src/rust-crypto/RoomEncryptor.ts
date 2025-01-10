@@ -20,23 +20,23 @@ import {
     EncryptionAlgorithm,
     EncryptionSettings,
     HistoryVisibility as RustHistoryVisibility,
-    OlmMachine,
+    type OlmMachine,
     RoomId,
-    ToDeviceRequest,
+    type ToDeviceRequest,
     UserId,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event.ts";
-import { IContent, MatrixEvent } from "../models/event.ts";
-import { Room } from "../models/room.ts";
-import { Logger, logger, LogSpan } from "../logger.ts";
-import { KeyClaimManager } from "./KeyClaimManager.ts";
-import { RoomMember } from "../models/room-member.ts";
+import { type IContent, type MatrixEvent } from "../models/event.ts";
+import { type Room } from "../models/room.ts";
+import { type Logger, logger, LogSpan } from "../logger.ts";
+import { type KeyClaimManager } from "./KeyClaimManager.ts";
+import { type RoomMember } from "../models/room-member.ts";
 import { HistoryVisibility } from "../@types/partials.ts";
-import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
+import { type OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { logDuration } from "../utils.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api/index.ts";
+import { type DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api/index.ts";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room

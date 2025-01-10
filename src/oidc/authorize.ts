@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
+import { type IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
 import { logger } from "../logger.ts";
 import { randomString } from "../randomstring.ts";
 import { OidcError } from "./error.ts";
 import {
-    BearerTokenResponse,
-    UserState,
+    type BearerTokenResponse,
+    type UserState,
     validateBearerTokenResponse,
-    ValidatedIssuerMetadata,
+    type ValidatedIssuerMetadata,
     validateIdToken,
     validateStoredUserState,
 } from "./validate.ts";

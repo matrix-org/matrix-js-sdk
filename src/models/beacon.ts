@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MBeaconEventContent } from "../@types/beacon.ts";
+import { type MBeaconEventContent } from "../@types/beacon.ts";
 import {
-    BeaconInfoState,
-    BeaconLocationState,
+    type BeaconInfoState,
+    type BeaconLocationState,
     parseBeaconContent,
     parseBeaconInfoContent,
 } from "../content-helpers.ts";
-import { MatrixEvent } from "./event.ts";
+import { type MatrixEvent } from "./event.ts";
 import { sortEventsByLatestContentTimestamp } from "../utils.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 

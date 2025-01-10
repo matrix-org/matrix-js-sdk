@@ -20,9 +20,9 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
-import { IContent, IUnsigned } from "./models/event.ts";
-import { IRoomSummary } from "./models/room-summary.ts";
-import { EventType } from "./@types/event.ts";
+import { type IContent, type IUnsigned } from "./models/event.ts";
+import { type IRoomSummary } from "./models/room-summary.ts";
+import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 

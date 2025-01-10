@@ -16,48 +16,48 @@ limitations under the License.
 
 import { NamespacedValue, UnstableValue } from "../NamespacedValue.ts";
 import {
-    PolicyRuleEventContent,
-    RoomAvatarEventContent,
-    RoomCanonicalAliasEventContent,
-    RoomCreateEventContent,
-    RoomEncryptionEventContent,
-    RoomGuestAccessEventContent,
-    RoomHistoryVisibilityEventContent,
-    RoomJoinRulesEventContent,
-    RoomMemberEventContent,
-    RoomNameEventContent,
-    RoomPinnedEventsEventContent,
-    RoomPowerLevelsEventContent,
-    RoomServerAclEventContent,
-    RoomThirdPartyInviteEventContent,
-    RoomTombstoneEventContent,
-    RoomTopicEventContent,
-    SpaceChildEventContent,
-    SpaceParentEventContent,
+    type PolicyRuleEventContent,
+    type RoomAvatarEventContent,
+    type RoomCanonicalAliasEventContent,
+    type RoomCreateEventContent,
+    type RoomEncryptionEventContent,
+    type RoomGuestAccessEventContent,
+    type RoomHistoryVisibilityEventContent,
+    type RoomJoinRulesEventContent,
+    type RoomMemberEventContent,
+    type RoomNameEventContent,
+    type RoomPinnedEventsEventContent,
+    type RoomPowerLevelsEventContent,
+    type RoomServerAclEventContent,
+    type RoomThirdPartyInviteEventContent,
+    type RoomTombstoneEventContent,
+    type RoomTopicEventContent,
+    type SpaceChildEventContent,
+    type SpaceParentEventContent,
 } from "./state_events.ts";
-import { IGroupCallRoomMemberState, IGroupCallRoomState } from "../webrtc/groupCall.ts";
-import { MSC3089EventContent } from "../models/MSC3089Branch.ts";
-import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon.ts";
-import { XOR } from "./common.ts";
-import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events.ts";
+import { type IGroupCallRoomMemberState, type IGroupCallRoomState } from "../webrtc/groupCall.ts";
+import { type MSC3089EventContent } from "../models/MSC3089Branch.ts";
+import { type M_BEACON, type M_BEACON_INFO, type MBeaconEventContent, type MBeaconInfoEventContent } from "./beacon.ts";
+import { type XOR } from "./common.ts";
+import { type ReactionEventContent, type RoomMessageEventContent, type StickerEventContent } from "./events.ts";
 import {
-    MCallAnswer,
-    MCallBase,
-    MCallCandidates,
-    MCallHangupReject,
-    MCallInviteNegotiate,
-    MCallReplacesEvent,
-    MCallSelectAnswer,
-    SDPStreamMetadata,
-    SDPStreamMetadataKey,
+    type MCallAnswer,
+    type MCallBase,
+    type MCallCandidates,
+    type MCallHangupReject,
+    type MCallInviteNegotiate,
+    type MCallReplacesEvent,
+    type MCallSelectAnswer,
+    type SDPStreamMetadata,
+    type SDPStreamMetadataKey,
 } from "../webrtc/callEventTypes.ts";
-import { EncryptionKeysEventContent, ICallNotifyContent } from "../matrixrtc/types.ts";
-import { M_POLL_END, M_POLL_START, PollEndEventContent, PollStartEventContent } from "./polls.ts";
-import { SessionMembershipData } from "../matrixrtc/CallMembership.ts";
-import { LocalNotificationSettings } from "./local_notifications.ts";
-import { IPushRules } from "./PushRules.ts";
-import { SecretInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
-import { POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import { type EncryptionKeysEventContent, type ICallNotifyContent } from "../matrixrtc/types.ts";
+import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
+import { type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
+import { type LocalNotificationSettings } from "./local_notifications.ts";
+import { type IPushRules } from "./PushRules.ts";
+import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
+import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
 
 export enum EventType {
     // Room state events

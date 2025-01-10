@@ -23,10 +23,10 @@ import { logger } from "../../logger.ts";
 import * as olmlib from "../olmlib.ts";
 import { DeviceInfo } from "../deviceinfo.ts";
 import { DecryptionAlgorithm, EncryptionAlgorithm, registerAlgorithm } from "./base.ts";
-import { Room } from "../../models/room.ts";
-import { IContent, MatrixEvent } from "../../models/event.ts";
-import { IEncryptedContent, IOlmEncryptedContent } from "../index.ts";
-import { IInboundSession } from "../OlmDevice.ts";
+import { type Room } from "../../models/room.ts";
+import { type IContent, type MatrixEvent } from "../../models/event.ts";
+import { type IEncryptedContent, type IOlmEncryptedContent } from "../index.ts";
+import { type IInboundSession } from "../OlmDevice.ts";
 import { DecryptionFailureCode } from "../../crypto-api/index.ts";
 import { DecryptionError } from "../../common-crypto/CryptoBackend.ts";
 

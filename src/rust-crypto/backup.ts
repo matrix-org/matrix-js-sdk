@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine, SignatureVerification } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OlmMachine, type SignatureVerification } from "@matrix-org/matrix-sdk-crypto-wasm";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
-    BackupTrustInfo,
-    Curve25519AuthData,
-    KeyBackupCheck,
-    KeyBackupInfo,
-    KeyBackupSession,
-    Curve25519SessionData,
-    KeyBackupRestoreOpts,
-    KeyBackupRestoreResult,
-    KeyBackupRoomSessions,
+    type BackupTrustInfo,
+    type Curve25519AuthData,
+    type KeyBackupCheck,
+    type KeyBackupInfo,
+    type KeyBackupSession,
+    type Curve25519SessionData,
+    type KeyBackupRestoreOpts,
+    type KeyBackupRestoreResult,
+    type KeyBackupRoomSessions,
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
-import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
+import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { encodeUri, logDuration } from "../utils.ts";
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
-import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
-import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
-import { IMegolmSessionData } from "../@types/crypto.ts";
+import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { type ImportRoomKeyProgressData, type ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
+import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { type IMegolmSessionData } from "../@types/crypto.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk/lib/types";
+import { type Optional } from "matrix-events-sdk/lib/types";
 
 /**
  * Represents a simple Matrix namespaced value. This will assume that if a stable prefix

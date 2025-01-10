@@ -19,12 +19,18 @@ limitations under the License.
  */
 
 import { checkObjectHasKeys, encodeParams } from "../utils.ts";
-import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { Method } from "./method.ts";
-import { ConnectionError, MatrixError } from "./errors.ts";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts, Body } from "./interface.ts";
+import { ConnectionError, type MatrixError } from "./errors.ts";
+import {
+    HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    type IHttpOpts,
+    type IRequestOpts,
+    type Body,
+} from "./interface.ts";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
-import { QueryDict } from "../utils.ts";
+import { type QueryDict } from "../utils.ts";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;

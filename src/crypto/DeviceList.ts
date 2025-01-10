@@ -19,16 +19,16 @@ limitations under the License.
  */
 
 import { logger } from "../logger.ts";
-import { DeviceInfo, IDevice } from "./deviceinfo.ts";
-import { CrossSigningInfo, ICrossSigningInfo } from "./CrossSigning.ts";
+import { DeviceInfo, type IDevice } from "./deviceinfo.ts";
+import { CrossSigningInfo, type ICrossSigningInfo } from "./CrossSigning.ts";
 import * as olmlib from "./olmlib.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
-import { chunkPromises, defer, IDeferred, sleep } from "../utils.ts";
-import { DeviceKeys, IDownloadKeyResult, Keys, MatrixClient, SigningKeys } from "../client.ts";
-import { OlmDevice } from "./OlmDevice.ts";
-import { CryptoStore } from "./store/base.ts";
+import { chunkPromises, defer, type IDeferred, sleep } from "../utils.ts";
+import { type DeviceKeys, type IDownloadKeyResult, type Keys, type MatrixClient, type SigningKeys } from "../client.ts";
+import { type OlmDevice } from "./OlmDevice.ts";
+import { type CryptoStore } from "./store/base.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { CryptoEvent, CryptoEventHandlerMap } from "./index.ts";
+import { CryptoEvent, type CryptoEventHandlerMap } from "./index.ts";
 
 /* State transition diagram for DeviceList.deviceTrackingStatus
  *

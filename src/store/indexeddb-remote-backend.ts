@@ -15,12 +15,12 @@ limitations under the License.
 */
 
 import { logger } from "../logger.ts";
-import { defer, IDeferred } from "../utils.ts";
-import { ISavedSync } from "./index.ts";
-import { IStoredClientOpts } from "../client.ts";
-import { IStateEventWithRoomId, ISyncResponse } from "../matrix.ts";
-import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend.ts";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { defer, type IDeferred } from "../utils.ts";
+import { type ISavedSync } from "./index.ts";
+import { type IStoredClientOpts } from "../client.ts";
+import { type IStateEventWithRoomId, type ISyncResponse } from "../matrix.ts";
+import { type IIndexedDBBackend, type UserTuple } from "./indexeddb-backend.ts";
+import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker?: Worker;

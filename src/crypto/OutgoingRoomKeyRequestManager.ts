@@ -17,9 +17,9 @@ limitations under the License.
 import { v4 as uuidv4 } from "uuid";
 
 import { logger } from "../logger.ts";
-import { MatrixClient } from "../client.ts";
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index.ts";
-import { CryptoStore, OutgoingRoomKeyRequest } from "./store/base.ts";
+import { type MatrixClient } from "../client.ts";
+import { type IRoomKeyRequestBody, type IRoomKeyRequestRecipient } from "./index.ts";
+import { type CryptoStore, type OutgoingRoomKeyRequest } from "./store/base.ts";
 import { EventType, ToDeviceMessageId } from "../@types/event.ts";
 import { MapWithDefault } from "../utils.ts";
 

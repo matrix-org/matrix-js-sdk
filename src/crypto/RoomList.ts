@@ -18,7 +18,7 @@ limitations under the License.
  * Manages the list of encrypted rooms
  */
 
-import { CryptoStore } from "./store/base.ts";
+import { type CryptoStore } from "./store/base.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
 
 /* eslint-disable camelcase */

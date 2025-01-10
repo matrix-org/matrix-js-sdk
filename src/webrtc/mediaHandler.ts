@@ -20,7 +20,7 @@ limitations under the License.
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { GroupCallType, GroupCallState } from "../webrtc/groupCall.ts";
 import { logger } from "../logger.ts";
-import { MatrixClient } from "../client.ts";
+import { type MatrixClient } from "../client.ts";
 
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed",

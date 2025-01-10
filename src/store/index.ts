@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType } from "../@types/event.ts";
-import { Room } from "../models/room.ts";
-import { User } from "../models/user.ts";
-import { IEvent, MatrixEvent } from "../models/event.ts";
-import { Filter } from "../filter.ts";
-import { RoomSummary } from "../models/room-summary.ts";
-import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator.ts";
-import { IStartClientOpts } from "../client.ts";
-import { IStateEventWithRoomId } from "../@types/search.ts";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
-import { EventEmitterEvents } from "../models/typed-event-emitter.ts";
+import { type EventType } from "../@types/event.ts";
+import { type Room } from "../models/room.ts";
+import { type User } from "../models/user.ts";
+import { type IEvent, type MatrixEvent } from "../models/event.ts";
+import { type Filter } from "../filter.ts";
+import { type RoomSummary } from "../models/room-summary.ts";
+import { type IMinimalEvent, type IRooms, type ISyncResponse } from "../sync-accumulator.ts";
+import { type IStartClientOpts } from "../client.ts";
+import { type IStateEventWithRoomId } from "../@types/search.ts";
+import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { type EventEmitterEvents } from "../models/typed-event-emitter.ts";
 
 export interface ISavedSync {
     nextBatch: string;

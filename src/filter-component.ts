@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RelationType } from "./@types/event.ts";
-import { MatrixEvent } from "./models/event.ts";
+import { type RelationType } from "./@types/event.ts";
+import { type MatrixEvent } from "./models/event.ts";
 import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread.ts";
 
 /**

@@ -19,11 +19,11 @@ limitations under the License.
  * of requests.
  */
 import { logger } from "./logger.ts";
-import { MatrixEvent } from "./models/event.ts";
+import { type MatrixEvent } from "./models/event.ts";
 import { EventType } from "./@types/event.ts";
-import { defer, IDeferred, removeElement } from "./utils.ts";
-import { calculateRetryBackoff, MatrixError } from "./http-api/index.ts";
-import { ISendEventResponse } from "./@types/requests.ts";
+import { defer, type IDeferred, removeElement } from "./utils.ts";
+import { calculateRetryBackoff, type MatrixError } from "./http-api/index.ts";
+import { type ISendEventResponse } from "./@types/requests.ts";
 
 const DEBUG = false; // set true to enable console logging.
 

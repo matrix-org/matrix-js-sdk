@@ -1,7 +1,7 @@
 // allow non-camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
-import { CallErrorCode } from "./call.ts";
+import { type CallErrorCode } from "./call.ts";
 
 // TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
 export const SDPStreamMetadataKey = "org.matrix.msc3077.sdp_stream_metadata";
