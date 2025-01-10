@@ -555,7 +555,7 @@ describe("MatrixRTCSession", () => {
 
             const onMembershipsChanged = jest.fn();
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
-            sess.onMembershipsUpdate();
+            sess.onRTCSessionMemberUpdate();
 
             expect(onMembershipsChanged).not.toHaveBeenCalled();
         });
@@ -568,7 +568,7 @@ describe("MatrixRTCSession", () => {
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
             mockRoom.getLiveTimeline().getState = jest.fn().mockReturnValue(makeMockRoomState([], mockRoom.roomId));
-            sess.onMembershipsUpdate();
+            sess.onRTCSessionMemberUpdate();
 
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
@@ -757,7 +757,7 @@ describe("MatrixRTCSession", () => {
                     mockRoom.getLiveTimeline().getState = jest
                         .fn()
                         .mockReturnValue(makeMockRoomState([membershipTemplate], mockRoom.roomId));
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
 
                     // member2 re-joins which should trigger an immediate re-send
                     const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
@@ -766,7 +766,7 @@ describe("MatrixRTCSession", () => {
                     mockRoom.getLiveTimeline().getState = jest
                         .fn()
                         .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId));
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
                     // but, that immediate resend is throttled so we need to wait a bit
                     jest.advanceTimersByTime(1000);
                     const { keys } = await keysSentPromise2;
@@ -819,7 +819,7 @@ describe("MatrixRTCSession", () => {
                     mockRoom.getLiveTimeline().getState = jest
                         .fn()
                         .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId));
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
 
                     await keysSentPromise2;
 
@@ -873,7 +873,7 @@ describe("MatrixRTCSession", () => {
                     sendEventMock.mockClear();
 
                     // these should be a no-op:
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
                     expect(sendEventMock).toHaveBeenCalledTimes(0);
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
                 } finally {
@@ -927,7 +927,7 @@ describe("MatrixRTCSession", () => {
                     sendEventMock.mockClear();
 
                     // this should be a no-op:
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
                     expect(sendEventMock).toHaveBeenCalledTimes(0);
 
                     // advance time to avoid key throttling
@@ -941,7 +941,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     // this should re-send the key
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
 
                     await keysSentPromise2;
 
@@ -1004,7 +1004,7 @@ describe("MatrixRTCSession", () => {
                     mockRoom.getLiveTimeline().getState = jest
                         .fn()
                         .mockReturnValue(makeMockRoomState([membershipTemplate], mockRoom.roomId));
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
 
                     jest.advanceTimersByTime(10000);
 
@@ -1049,7 +1049,7 @@ describe("MatrixRTCSession", () => {
                                 );
                         }
 
-                        sess!.onMembershipsUpdate();
+                        sess!.onRTCSessionMemberUpdate();
 
                         // advance time to avoid key throttling
                         jest.advanceTimersByTime(10000);
@@ -1090,7 +1090,7 @@ describe("MatrixRTCSession", () => {
                     mockRoom.getLiveTimeline().getState = jest
                         .fn()
                         .mockReturnValue(makeMockRoomState([membershipTemplate, member2], mockRoom.roomId));
-                    sess.onMembershipsUpdate();
+                    sess.onRTCSessionMemberUpdate();
 
                     await new Promise((resolve) => {
                         realSetTimeout(resolve);

@@ -29,7 +29,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { MatrixEvent } from "../models/event.ts";
-import { MembershipManager, MembershipManagerInterface } from "./MembershipManager.ts";
+import { LegacyMembershipManager, IMembershipManager } from "./MembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -132,7 +132,7 @@ export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
-    private membershipManager?: MembershipManagerInterface;
+    private membershipManager?: IMembershipManager;
 
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
@@ -284,7 +284,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         this._callId = memberships[0]?.callId;
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
-        roomState?.on(RoomStateEvent.Members, this.onMembershipsUpdate);
+        roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.setExpiryTimer();
     }
 
@@ -306,7 +306,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.expiryTimeout = undefined;
         }
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        roomState?.off(RoomStateEvent.Members, this.onMembershipsUpdate);
+        roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
     }
 
     /**
@@ -329,7 +329,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         } else {
-            this.membershipManager = new MembershipManager(joinConfig, this.room, this.client, () =>
+            this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
                 this.getOldestMembership(),
             );
         }
@@ -652,7 +652,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.onMembershipsUpdate, soonestExpiry);
+            this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
         }
     }
 
@@ -755,19 +755,35 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
     /**
-     * @deprecated use onMembershipsUpdate instead. this should be called when any membership in the call is updated
+     * @deprecated use onRoomMemberUpdate or onRTCSessionMemberUpdate instead. this should be called when any membership in the call is updated
      * the old name might have implied to only need to call this when your own membership changes.
      */
     public onMembershipUpdate = (): void => {
-        this.onMembershipsUpdate();
+        this.recalculateSessionMembers();
     };
 
     /**
+     * Call this when the room members have changed.
+     */
+    public onRoomMemberUpdate = (): void => {
+        this.recalculateSessionMembers();
+    };
+
+    /**
+     * Call this when sth changed that impacts the current rtc members in this session.
+     */
+    public onRTCSessionMemberUpdate = (): void => {
+        this.recalculateSessionMembers();
+    };
+
+    /**
+     * Call this when anything that could impact rtc memberships has changed: Room Members or RTC members.
+     *
      * Examines the latest call memberships and handles any encryption key sending or rotation that is needed.
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    public onMembershipsUpdate = (): void => {
+    private recalculateSessionMembers = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
 
@@ -781,7 +797,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Memberships for call in room ${this.room.roomId} have changed: emitting`);
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
 
-            this.membershipManager?.onMembershipsUpdate(this.memberships);
+            this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
         }
 
         if (this.manageMediaKeys && this.isJoined()) {

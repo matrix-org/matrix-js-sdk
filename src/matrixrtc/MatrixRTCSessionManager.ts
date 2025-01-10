@@ -153,7 +153,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
         const wasActiveAndKnown = sess.memberships.length > 0 && !isNewSession;
 
-        sess.onMembershipsUpdate();
+        sess.onRTCSessionMemberUpdate();
 
         const nowActive = sess.memberships.length > 0;
 

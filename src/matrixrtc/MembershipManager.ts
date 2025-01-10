@@ -17,11 +17,14 @@ import { MembershipConfig } from "./MatrixRTCSession.ts";
  *
  * @internal
  */
-export interface MembershipManagerInterface {
+export interface IMembershipManager {
     isJoined(): boolean;
     join(fociPreferred: Focus[], fociActive?: Focus): void;
     leave(timeout: number | undefined): Promise<boolean>;
-    onMembershipsUpdate(memberships: CallMembership[]): Promise<void>;
+    /**
+     * call this if the MatrixRTC session members have changed
+     */
+    onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
     getActiveFocus(): Focus | undefined;
 }
 
@@ -41,7 +44,7 @@ export interface MembershipManagerInterface {
  *
  *  @internal
  */
-export class MembershipManager implements MembershipManagerInterface {
+export class LegacyMembershipManager implements IMembershipManager {
     private relativeExpiry: number | undefined;
 
     private memberEventTimeout?: ReturnType<typeof setTimeout>;
@@ -135,7 +138,7 @@ export class MembershipManager implements MembershipManagerInterface {
         }
     }
 
-    public async onMembershipsUpdate(memberships: CallMembership[]): Promise<void> {
+    public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const isMyMembership = (m: CallMembership): boolean =>
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
