@@ -17,25 +17,12 @@ import { MembershipConfig } from "./MatrixRTCSession.ts";
  *
  * @internal
  */
-export abstract class MembershipManagerInterface {
-    public constructor(
-        joinConfig: MembershipConfig | undefined,
-        room: Pick<Room, "getLiveTimeline">,
-        client: Pick<
-            MatrixClient,
-            | "getUserId"
-            | "getDeviceId"
-            | "sendStateEvent"
-            | "_unstable_sendDelayedEvent"
-            | "_unstable_sendDelayedStateEvent"
-        >,
-        getOldestMembership: () => CallMembership | undefined,
-    ) {}
-    public abstract isJoined(): boolean;
-    public abstract join(fociPreferred: Focus[], fociActive?: Focus): void;
-    public abstract leave(timeout: number | undefined): Promise<boolean>;
-    public abstract onMembershipsUpdate(): Promise<void>;
-    public abstract getActiveFocus(): Focus | undefined;
+export interface MembershipManagerInterface {
+    isJoined(): boolean;
+    join(fociPreferred: Focus[], fociActive?: Focus): void;
+    leave(timeout: number | undefined): Promise<boolean>;
+    onMembershipsUpdate(): Promise<void>;
+    getActiveFocus(): Focus | undefined;
 }
 
 /**
@@ -99,8 +86,16 @@ export class MembershipManager implements MembershipManagerInterface {
 
     public constructor(
         private joinConfig: MembershipConfig | undefined,
-        private room: Room,
-        private client: MatrixClient,
+        private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
+        private client: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedEvent"
+            | "_unstable_sendDelayedStateEvent"
+            | "_unstable_updateDelayedEvent"
+        >,
         private getOldestMembership: () => CallMembership | undefined,
     ) {}
 
