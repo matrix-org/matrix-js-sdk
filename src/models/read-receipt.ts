@@ -12,18 +12,18 @@ limitations under the License.
 */
 
 import {
-    CachedReceipt,
+    type CachedReceipt,
     MAIN_ROOM_TIMELINE,
-    Receipt,
-    ReceiptCache,
+    type Receipt,
+    type ReceiptCache,
     ReceiptType,
-    WrappedReceipt,
+    type WrappedReceipt,
 } from "../@types/read_receipts.ts";
-import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter.ts";
+import { type ListenerMap, TypedEventEmitter } from "./typed-event-emitter.ts";
 import { isSupportedReceiptType } from "../utils.ts";
 import { MatrixEvent } from "./event.ts";
 import { EventType } from "../@types/event.ts";
-import { EventTimelineSet } from "./event-timeline-set.ts";
+import { type EventTimelineSet } from "./event-timeline-set.ts";
 import { MapWithDefault } from "../utils.ts";
 import { NotificationCountType } from "./room.ts";
 import { logger } from "../logger.ts";

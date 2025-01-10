@@ -17,11 +17,11 @@ limitations under the License.
 */
 
 import { logger } from "./logger.ts";
-import { MatrixClient } from "./client.ts";
-import { defer, IDeferred } from "./utils.ts";
+import { type MatrixClient } from "./client.ts";
+import { defer, type IDeferred } from "./utils.ts";
 import { MatrixError } from "./http-api/index.ts";
-import { UIAResponse } from "./@types/uia.ts";
-import { UserIdentifier } from "./@types/auth.ts";
+import { type UIAResponse } from "./@types/uia.ts";
+import { type UserIdentifier } from "./@types/auth.ts";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";

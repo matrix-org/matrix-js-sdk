@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
+import { type IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
 
-import { IUsageLimit } from "../@types/partials.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type IUsageLimit } from "../@types/partials.ts";
+import { type MatrixEvent } from "../models/event.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Export for backward compatibility
-import { ImportRoomKeyProgressData } from "../crypto-api/index.ts";
+import { type ImportRoomKeyProgressData } from "../crypto-api/index.ts";
 
 export type {
     Curve25519AuthData as ICurve25519AuthData,

@@ -17,20 +17,20 @@ limitations under the License.
 import { logger } from "../../../logger.ts";
 import { errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError } from "../Error.ts";
 import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode.ts";
-import { IVerificationChannel } from "./Channel.ts";
-import { MatrixClient } from "../../../client.ts";
-import { MatrixEvent } from "../../../models/event.ts";
+import { type IVerificationChannel } from "./Channel.ts";
+import { type MatrixClient } from "../../../client.ts";
+import { type MatrixEvent } from "../../../models/event.ts";
 import { EventType } from "../../../@types/event.ts";
-import { VerificationBase } from "../Base.ts";
-import { VerificationMethod } from "../../index.ts";
+import { type VerificationBase } from "../Base.ts";
+import { type VerificationMethod } from "../../index.ts";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter.ts";
 import {
     canAcceptVerificationRequest,
     VerificationPhase as Phase,
-    VerificationRequest as IVerificationRequest,
+    type VerificationRequest as IVerificationRequest,
     VerificationRequestEvent,
-    VerificationRequestEventHandlerMap,
-    Verifier,
+    type VerificationRequestEventHandlerMap,
+    type Verifier,
 } from "../../../crypto-api/verification.ts";
 
 // backwards-compatibility exports

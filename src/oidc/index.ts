@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import type { SigningKey } from "oidc-client-ts";
-import { ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate.ts";
+import { type ValidatedIssuerConfig, type ValidatedIssuerMetadata } from "./validate.ts";
 
 export * from "./authorize.ts";
 export * from "./discovery.ts";

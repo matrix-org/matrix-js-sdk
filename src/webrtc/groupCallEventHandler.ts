@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event.ts";
-import { MatrixClient, ClientEvent } from "../client.ts";
-import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall.ts";
-import { Room } from "../models/room.ts";
-import { RoomState, RoomStateEvent } from "../models/room-state.ts";
-import { RoomMember } from "../models/room-member.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { type MatrixClient, ClientEvent } from "../client.ts";
+import { GroupCall, GroupCallIntent, GroupCallType, type IGroupCallDataChannelOptions } from "./groupCall.ts";
+import { type Room } from "../models/room.ts";
+import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { type RoomMember } from "../models/room-member.ts";
 import { logger } from "../logger.ts";
 import { EventType } from "../@types/event.ts";
 import { SyncState } from "../sync.ts";

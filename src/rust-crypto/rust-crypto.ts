@@ -22,56 +22,60 @@ import { KnownMembership } from "../@types/membership.ts";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
 import type { IEncryptedEventInfo } from "../crypto/api.ts";
 import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
-import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
-import { Room } from "../models/room.ts";
-import { RoomMember } from "../models/room-member.ts";
+import { type MatrixEvent, MatrixEventEvent } from "../models/event.ts";
+import { type Room } from "../models/room.ts";
+import { type RoomMember } from "../models/room-member.ts";
 import {
-    BackupDecryptor,
-    CryptoBackend,
+    type BackupDecryptor,
+    type CryptoBackend,
     DecryptionError,
-    OnSyncCompletedData,
+    type OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
-import { logger, Logger, LogSpan } from "../logger.ts";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
+import { logger, type Logger, LogSpan } from "../logger.ts";
+import { type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RoomEncryptor } from "./RoomEncryptor.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { KeyClaimManager } from "./KeyClaimManager.ts";
 import { logDuration, MapWithDefault } from "../utils.ts";
 import {
-    BackupTrustInfo,
-    BootstrapCrossSigningOpts,
-    CreateSecretStorageOpts,
+    type BackupTrustInfo,
+    type BootstrapCrossSigningOpts,
+    type CreateSecretStorageOpts,
     CrossSigningKey,
-    CrossSigningKeyInfo,
-    CrossSigningStatus,
-    CryptoApi,
-    CryptoCallbacks,
+    type CrossSigningKeyInfo,
+    type CrossSigningStatus,
+    type CryptoApi,
+    type CryptoCallbacks,
     DecryptionFailureCode,
     DeviceVerificationStatus,
-    EventEncryptionInfo,
+    type EventEncryptionInfo,
     EventShieldColour,
     EventShieldReason,
-    GeneratedSecretStorageKey,
-    ImportRoomKeysOpts,
-    KeyBackupCheck,
-    KeyBackupInfo,
-    OwnDeviceKeys,
+    type GeneratedSecretStorageKey,
+    type ImportRoomKeysOpts,
+    type KeyBackupCheck,
+    type KeyBackupInfo,
+    type OwnDeviceKeys,
     UserVerificationStatus,
-    VerificationRequest,
+    type VerificationRequest,
     encodeRecoveryKey,
     deriveRecoveryKeyFromPassphrase,
-    DeviceIsolationMode,
+    type DeviceIsolationMode,
     AllDevicesIsolationMode,
     DeviceIsolationModeKind,
     CryptoEvent,
-    CryptoEventHandlerMap,
-    KeyBackupRestoreOpts,
-    KeyBackupRestoreResult,
+    type CryptoEventHandlerMap,
+    type KeyBackupRestoreOpts,
+    type KeyBackupRestoreResult,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
-import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
-import { Device, DeviceMap } from "../models/device.ts";
-import { SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorageKey, ServerSideSecretStorage } from "../secret-storage.ts";
+import { type IDownloadKeyResult, type IQueryKeysRequest } from "../client.ts";
+import { type Device, type DeviceMap } from "../models/device.ts";
+import {
+    SECRET_STORAGE_ALGORITHM_V1_AES,
+    type SecretStorageKey,
+    type ServerSideSecretStorage,
+} from "../secret-storage.ts";
 import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
@@ -81,7 +85,7 @@ import { decryptionKeyMatchesKeyBackupInfo, RustBackupManager } from "./backup.t
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { randomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
-import { ISignatures } from "../@types/signed.ts";
+import { type ISignatures } from "../@types/signed.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";

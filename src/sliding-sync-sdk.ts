@@ -19,31 +19,37 @@ import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
 import { logger } from "./logger.ts";
 import { promiseMapSeries } from "./utils.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
-import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client.ts";
+import { ClientEvent, type IStoredClientOpts, type MatrixClient } from "./client.ts";
 import {
-    ISyncStateData,
+    type ISyncStateData,
     SyncState,
     _createAndReEmitRoom,
-    SyncApiOptions,
+    type SyncApiOptions,
     defaultClientOpts,
     defaultSyncApiOpts,
-    SetPresence,
+    type SetPresence,
 } from "./sync.ts";
-import { MatrixEvent } from "./models/event.ts";
-import { Crypto } from "./crypto/index.ts";
-import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator.ts";
+import { type MatrixEvent } from "./models/event.ts";
+import { type Crypto } from "./crypto/index.ts";
+import {
+    type IMinimalEvent,
+    type IRoomEvent,
+    type IStateEvent,
+    type IStrippedState,
+    type ISyncResponse,
+} from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
-    Extension,
+    type Extension,
     ExtensionState,
-    MSC3575RoomData,
-    MSC3575SlidingSyncResponse,
-    SlidingSync,
+    type MSC3575RoomData,
+    type MSC3575SlidingSyncResponse,
+    type SlidingSync,
     SlidingSyncEvent,
     SlidingSyncState,
 } from "./sliding-sync.ts";
 import { EventType } from "./@types/event.ts";
-import { IPushRules } from "./@types/PushRules.ts";
+import { type IPushRules } from "./@types/PushRules.ts";
 import { RoomStateEvent } from "./models/room-state.ts";
 import { RoomMemberEvent } from "./models/room-member.ts";
 import { KnownMembership } from "./@types/membership.ts";

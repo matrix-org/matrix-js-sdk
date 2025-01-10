@@ -15,9 +15,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IClientWellKnown, IWellKnownConfig, IServerVersions } from "./client.ts";
+import { type IClientWellKnown, type IWellKnownConfig, type IServerVersions } from "./client.ts";
 import { logger } from "./logger.ts";
-import { MatrixError, Method, timeoutSignal } from "./http-api/index.ts";
+import { type MatrixError, Method, timeoutSignal } from "./http-api/index.ts";
 import { SUPPORTED_MATRIX_VERSIONS } from "./version-support.ts";
 
 // Dev note: Auto discovery is part of the spec.

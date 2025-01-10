@@ -15,7 +15,7 @@ limitations under the License.
 */
 import { CallStatsReportGatherer } from "./callStatsReportGatherer.ts";
 import { StatsReportEmitter } from "./statsReportEmitter.ts";
-import { CallStatsReportSummary } from "./callStatsReportSummary.ts";
+import { type CallStatsReportSummary } from "./callStatsReportSummary.ts";
 import { SummaryStatsReportGatherer } from "./summaryStatsReportGatherer.ts";
 import { logger } from "../../logger.ts";
 

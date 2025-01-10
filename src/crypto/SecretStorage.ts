@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ICryptoCallbacks } from "./index.ts";
-import { MatrixEvent } from "../models/event.ts";
-import { MatrixClient } from "../client.ts";
+import { type ICryptoCallbacks } from "./index.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { type MatrixClient } from "../client.ts";
 import {
-    SecretStorageKeyDescription,
-    SecretStorageKeyTuple,
-    SecretStorageKeyObject,
-    AddSecretStorageKeyOpts,
-    AccountDataClient,
-    ServerSideSecretStorage,
+    type SecretStorageKeyDescription,
+    type SecretStorageKeyTuple,
+    type SecretStorageKeyObject,
+    type AddSecretStorageKeyOpts,
+    type AccountDataClient,
+    type ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
-    SecretStorageKey,
+    type SecretStorageKey,
 } from "../secret-storage.ts";
-import { ISecretRequest, SecretSharing } from "./SecretSharing.ts";
+import { type ISecretRequest, SecretSharing } from "./SecretSharing.ts";
 
 /* re-exports for backwards compatibility */
 export type {

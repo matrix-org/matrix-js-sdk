@@ -19,11 +19,11 @@ limitations under the License.
  * do verification with this method).
  */
 
-import { VerificationBase as Base, VerificationEvent, VerificationEventHandlerMap } from "./Base.ts";
-import { IVerificationChannel } from "./request/Channel.ts";
-import { MatrixClient } from "../../client.ts";
-import { MatrixEvent } from "../../models/event.ts";
-import { VerificationRequest } from "./request/VerificationRequest.ts";
+import { VerificationBase as Base, type VerificationEvent, type VerificationEventHandlerMap } from "./Base.ts";
+import { type IVerificationChannel } from "./request/Channel.ts";
+import { type MatrixClient } from "../../client.ts";
+import { type MatrixEvent } from "../../models/event.ts";
+import { type VerificationRequest } from "./request/VerificationRequest.ts";
 
 export class IllegalMethod extends Base<VerificationEvent, VerificationEventHandlerMap> {
     public static factory(

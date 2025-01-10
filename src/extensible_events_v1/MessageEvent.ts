@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import { type Optional } from "matrix-events-sdk";
 
 import { ExtensibleEvent } from "./ExtensibleEvent.ts";
 import {
-    ExtensibleEventType,
-    IMessageRendering,
-    IPartialEvent,
+    type ExtensibleEventType,
+    type IMessageRendering,
+    type IPartialEvent,
     isEventTypeSame,
     M_HTML,
     M_MESSAGE,
-    ExtensibleAnyMessageEventContent,
+    type ExtensibleAnyMessageEventContent,
     M_TEXT,
 } from "../@types/extensible_events.ts";
 import { isOptionalAString, isProvided } from "./utilities.ts";

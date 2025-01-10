@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IHttpOpts, MatrixHttpApi, Method } from "./http-api/index.ts";
+import { type IHttpOpts, type MatrixHttpApi, Method } from "./http-api/index.ts";
 import { logger } from "./logger.ts";
 
 // How often we update the server capabilities.

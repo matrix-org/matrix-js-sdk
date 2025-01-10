@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { parse as parseContentType, ParsedMediaType } from "content-type";
+import { parse as parseContentType, type ParsedMediaType } from "content-type";
 
 import { logger } from "../logger.ts";
 import { sleep } from "../utils.ts";

@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd } from "matrix-events-sdk";
+import { type EitherAnd } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue.ts";
-import { IMessageRendering } from "./extensible_events.ts";
+import { type IMessageRendering } from "./extensible_events.ts";
 
 /**
  * Extensible topic event type based on MSC3765

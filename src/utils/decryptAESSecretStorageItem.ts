@@ -16,7 +16,7 @@
 
 import { decodeBase64 } from "../base64.ts";
 import { deriveKeys } from "./internal/deriveKeys.ts";
-import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Decrypt an AES-encrypted Secret Storage item.

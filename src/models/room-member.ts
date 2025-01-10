@@ -16,13 +16,13 @@ limitations under the License.
 
 import { getHttpUriForMxc } from "../content-repo.ts";
 import { removeDirectionOverrideChars, removeHiddenChars } from "../utils.ts";
-import { User } from "./user.ts";
-import { MatrixEvent } from "./event.ts";
-import { RoomState } from "./room-state.ts";
+import { type User } from "./user.ts";
+import { type MatrixEvent } from "./event.ts";
+import { type RoomState } from "./room-state.ts";
 import { logger } from "../logger.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { EventType } from "../@types/event.ts";
-import { KnownMembership, Membership } from "../@types/membership.ts";
+import { KnownMembership, type Membership } from "../@types/membership.ts";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",

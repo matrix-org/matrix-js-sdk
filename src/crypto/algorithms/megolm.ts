@@ -21,27 +21,27 @@ limitations under the License.
 import { v4 as uuidv4 } from "uuid";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto.ts";
-import { logger, Logger } from "../../logger.ts";
+import { logger, type Logger } from "../../logger.ts";
 import * as olmlib from "../olmlib.ts";
 import {
     DecryptionAlgorithm,
-    DecryptionClassParams,
+    type DecryptionClassParams,
     EncryptionAlgorithm,
-    IParams,
+    type IParams,
     registerAlgorithm,
     UnknownDeviceError,
 } from "./base.ts";
-import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice.ts";
-import { Room } from "../../models/room.ts";
-import { DeviceInfo } from "../deviceinfo.ts";
-import { IOlmSessionResult } from "../olmlib.ts";
-import { DeviceInfoMap } from "../DeviceList.ts";
-import { IContent, MatrixEvent } from "../../models/event.ts";
+import { type IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice.ts";
+import { type Room } from "../../models/room.ts";
+import { type DeviceInfo } from "../deviceinfo.ts";
+import { type IOlmSessionResult } from "../olmlib.ts";
+import { type DeviceInfoMap } from "../DeviceList.ts";
+import { type IContent, type MatrixEvent } from "../../models/event.ts";
 import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event.ts";
-import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index.ts";
+import { type IMegolmEncryptedContent, type IncomingRoomKeyRequest, type IEncryptedContent } from "../index.ts";
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
-import { OlmGroupSessionExtraData } from "../../@types/crypto.ts";
-import { MatrixError } from "../../http-api/index.ts";
+import { type OlmGroupSessionExtraData } from "../../@types/crypto.ts";
+import { type MatrixError } from "../../http-api/index.ts";
 import { immediate, MapWithDefault } from "../../utils.ts";
 import { KnownMembership } from "../../@types/membership.ts";
 import { DecryptionFailureCode } from "../../crypto-api/index.ts";

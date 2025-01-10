@@ -18,15 +18,21 @@ import { RoomMember } from "./room-member.ts";
 import { logger } from "../logger.ts";
 import { isNumber, removeHiddenChars } from "../utils.ts";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event.ts";
-import { IEvent, MatrixEvent, MatrixEventEvent } from "./event.ts";
-import { MatrixClient } from "../client.ts";
+import { type IEvent, type MatrixEvent, MatrixEventEvent } from "./event.ts";
+import { type MatrixClient } from "../client.ts";
 import { GuestAccess, HistoryVisibility, JoinRule } from "../@types/partials.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
-import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon.ts";
+import {
+    Beacon,
+    BeaconEvent,
+    type BeaconEventHandlerMap,
+    getBeaconInfoIdentifier,
+    type BeaconIdentifier,
+} from "./beacon.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { RoomJoinRulesEventContent } from "../@types/state_events.ts";
+import { type RoomJoinRulesEventContent } from "../@types/state_events.ts";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the

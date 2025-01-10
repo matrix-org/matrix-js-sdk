@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceInfo } from "./deviceinfo.ts";
+import { type DeviceInfo } from "./deviceinfo.ts";
 
 /* re-exports for backwards compatibility. */
 // CrossSigningKey is used as a value in `client.ts`, we can't export it as a type

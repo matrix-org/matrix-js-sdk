@@ -15,15 +15,15 @@ limitations under the License.
 */
 
 import { ExtensibleEvent } from "./ExtensibleEvent.ts";
-import { M_POLL_RESPONSE, PollResponseEventContent, PollResponseSubtype } from "../@types/polls.ts";
+import { M_POLL_RESPONSE, type PollResponseEventContent, type PollResponseSubtype } from "../@types/polls.ts";
 import {
-    ExtensibleEventType,
-    IPartialEvent,
+    type ExtensibleEventType,
+    type IPartialEvent,
     isEventTypeSame,
     REFERENCE_RELATION,
 } from "../@types/extensible_events.ts";
 import { InvalidEventError } from "./InvalidEventError.ts";
-import { PollStartEvent } from "./PollStartEvent.ts";
+import { type PollStartEvent } from "./PollStartEvent.ts";
 
 /**
  * Represents a poll response event.

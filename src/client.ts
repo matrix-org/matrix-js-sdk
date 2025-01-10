@@ -18,125 +18,151 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { Optional } from "matrix-events-sdk";
+import { type Optional } from "matrix-events-sdk";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto.ts";
-import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync.ts";
+import { type ISyncStateData, type SetPresence, SyncApi, type SyncApiOptions, SyncState } from "./sync.ts";
 import {
     EventStatus,
-    IContent,
-    IDecryptOptions,
-    IEvent,
+    type IContent,
+    type IDecryptOptions,
+    type IEvent,
     MatrixEvent,
     MatrixEventEvent,
-    MatrixEventHandlerMap,
-    PushDetails,
+    type MatrixEventHandlerMap,
+    type PushDetails,
 } from "./models/event.ts";
 import { StubStore } from "./store/stub.ts";
-import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call.ts";
-import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter.ts";
-import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler.ts";
+import {
+    type CallEvent,
+    type CallEventHandlerMap,
+    createNewMatrixCall,
+    type MatrixCall,
+    supportsMatrixCall,
+} from "./webrtc/call.ts";
+import { Filter, type IFilterDefinition, type IRoomEventFilter } from "./filter.ts";
+import {
+    CallEventHandler,
+    type CallEventHandlerEvent,
+    type CallEventHandlerEventHandlerMap,
+} from "./webrtc/callEventHandler.ts";
 import {
     GroupCallEventHandler,
-    GroupCallEventHandlerEvent,
-    GroupCallEventHandlerEventHandlerMap,
+    type GroupCallEventHandlerEvent,
+    type GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler.ts";
 import * as utils from "./utils.ts";
-import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
+import { noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
-import { IActionsObject, PushProcessor } from "./pushprocessor.ts";
-import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.ts";
+import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
+import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
-import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
-import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
+import { type IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
+import { type IOlmDevice } from "./crypto/algorithms/megolm.ts";
 import { TypedReEmitter } from "./ReEmitter.ts";
-import { IRoomEncryption } from "./crypto/RoomList.ts";
-import { logger, Logger } from "./logger.ts";
+import { type IRoomEncryption } from "./crypto/RoomList.ts";
+import { logger, type Logger } from "./logger.ts";
 import { SERVICE_TYPES } from "./service-types.ts";
 import {
-    Body,
+    type Body,
     ClientPrefix,
-    FileType,
-    HttpApiEvent,
-    HttpApiEventHandlerMap,
-    HTTPError,
+    type FileType,
+    type HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    type HTTPError,
     IdentityPrefix,
-    IHttpOpts,
-    IRequestOpts,
+    type IHttpOpts,
+    type IRequestOpts,
     MatrixError,
     MatrixHttpApi,
     MediaPrefix,
     Method,
     retryNetworkOperation,
-    TokenRefreshFunction,
-    Upload,
-    UploadOpts,
-    UploadResponse,
+    type TokenRefreshFunction,
+    type Upload,
+    type UploadOpts,
+    type UploadResponse,
 } from "./http-api/index.ts";
 import {
     Crypto,
     CryptoEvent as LegacyCryptoEvent,
-    CryptoEventHandlerMap as LegacyCryptoEventHandlerMap,
+    type CryptoEventHandlerMap as LegacyCryptoEventHandlerMap,
     fixBackupKey,
-    ICheckOwnCrossSigningTrustOpts,
-    IRoomKeyRequestBody,
+    type ICheckOwnCrossSigningTrustOpts,
+    type IRoomKeyRequestBody,
     isCryptoAvailable,
 } from "./crypto/index.ts";
-import { DeviceInfo } from "./crypto/deviceinfo.ts";
-import { User, UserEvent, UserEventHandlerMap } from "./models/user.ts";
+import { type DeviceInfo } from "./crypto/deviceinfo.ts";
+import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
-import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration.ts";
+import { DEHYDRATION_ALGORITHM, type IDehydratedDevice, type IDehydratedDeviceKeyInfo } from "./crypto/dehydration.ts";
 import {
-    IKeyBackupInfo,
-    IKeyBackupPrepareOpts,
-    IKeyBackupRestoreOpts,
-    IKeyBackupRestoreResult,
-    IKeyBackupRoomSessions,
-    IKeyBackupSession,
+    type IKeyBackupInfo,
+    type IKeyBackupPrepareOpts,
+    type IKeyBackupRestoreOpts,
+    type IKeyBackupRestoreResult,
+    type IKeyBackupRoomSessions,
+    type IKeyBackupSession,
 } from "./crypto/keybackup.ts";
-import { IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
-import { MatrixScheduler } from "./scheduler.ts";
-import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon.ts";
-import { AuthDict } from "./interactive-auth.ts";
-import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator.ts";
-import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api.ts";
-import { EventTimelineSet } from "./models/event-timeline-set.ts";
-import { VerificationRequest } from "./crypto/verification/request/VerificationRequest.ts";
-import { VerificationBase as Verification } from "./crypto/verification/Base.ts";
-import * as ContentHelpers from "./content-helpers.ts";
-import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning.ts";
-import { NotificationCountType, Room, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room.ts";
-import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member.ts";
-import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state.ts";
+import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
+import { type MatrixScheduler } from "./scheduler.ts";
+import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
+import { type AuthDict } from "./interactive-auth.ts";
+import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
 import {
-    DelayedEventInfo,
-    IAddThreePidOnlyBody,
-    IBindThreePidBody,
-    IContextResponse,
-    ICreateRoomOpts,
-    IEventSearchOpts,
-    IFilterResponse,
-    IGuestAccessOpts,
-    IJoinRoomOpts,
-    INotificationsResponse,
-    IPaginateOpts,
-    IPresenceOpts,
-    IRedactOpts,
-    IRelationsRequestOpts,
-    IRelationsResponse,
-    IRoomDirectoryOptions,
-    ISearchOpts,
-    ISendEventResponse,
-    IStatusResponse,
-    ITagsResponse,
-    KnockRoomOpts,
-    SendDelayedEventRequestOpts,
-    SendDelayedEventResponse,
-    UpdateDelayedEventAction,
+    CrossSigningKey,
+    type ICreateSecretStorageOpts,
+    type IEncryptedEventInfo,
+    type IRecoveryKey,
+} from "./crypto/api.ts";
+import { type EventTimelineSet } from "./models/event-timeline-set.ts";
+import { type VerificationRequest } from "./crypto/verification/request/VerificationRequest.ts";
+import { type VerificationBase as Verification } from "./crypto/verification/Base.ts";
+import * as ContentHelpers from "./content-helpers.ts";
+import {
+    type CrossSigningInfo,
+    type DeviceTrustLevel,
+    type ICacheCallbacks,
+    type UserTrustLevel,
+} from "./crypto/CrossSigning.ts";
+import {
+    NotificationCountType,
+    type Room,
+    type RoomEvent,
+    type RoomEventHandlerMap,
+    type RoomNameState,
+} from "./models/room.ts";
+import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
+import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
+import {
+    type DelayedEventInfo,
+    type IAddThreePidOnlyBody,
+    type IBindThreePidBody,
+    type IContextResponse,
+    type ICreateRoomOpts,
+    type IEventSearchOpts,
+    type IFilterResponse,
+    type IGuestAccessOpts,
+    type IJoinRoomOpts,
+    type INotificationsResponse,
+    type IPaginateOpts,
+    type IPresenceOpts,
+    type IRedactOpts,
+    type IRelationsRequestOpts,
+    type IRelationsResponse,
+    type IRoomDirectoryOptions,
+    type ISearchOpts,
+    type ISendEventResponse,
+    type IStatusResponse,
+    type ITagsResponse,
+    type KnockRoomOpts,
+    type SendDelayedEventRequestOpts,
+    type SendDelayedEventResponse,
+    type UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
-    AccountDataEvents,
+    type AccountDataEvents,
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
     MSC3912_RELATION_BASED_REDACTIONS_PROP,
@@ -145,8 +171,8 @@ import {
     RelationType,
     RoomCreateTypeField,
     RoomType,
-    StateEvents,
-    TimelineEvents,
+    type StateEvents,
+    type TimelineEvents,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
@@ -154,53 +180,64 @@ import {
 import {
     GuestAccess,
     HistoryVisibility,
-    IdServerUnbindResult,
-    JoinRule,
+    type IdServerUnbindResult,
+    type JoinRule,
     Preset,
-    Visibility,
+    type Visibility,
 } from "./@types/partials.ts";
-import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
+import { type EventMapper, eventMapperFor, type MapperOpts } from "./event-mapper.ts";
 import { randomString } from "./randomstring.ts";
-import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup.ts";
-import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
-import { ISignatures } from "./@types/signed.ts";
-import { IStore } from "./store/index.ts";
-import { ISecretRequest } from "./crypto/SecretStorage.ts";
 import {
-    IEventWithRoomId,
-    ISearchRequestBody,
-    ISearchResponse,
-    ISearchResults,
-    IStateEventWithRoomId,
+    BackupManager,
+    type IKeyBackup,
+    type IKeyBackupCheck,
+    type IPreparedKeyBackupVersion,
+    type TrustInfo,
+} from "./crypto/backup.ts";
+import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
+import { type ISignatures } from "./@types/signed.ts";
+import { type IStore } from "./store/index.ts";
+import { type ISecretRequest } from "./crypto/SecretStorage.ts";
+import {
+    type IEventWithRoomId,
+    type ISearchRequestBody,
+    type ISearchResponse,
+    type ISearchResults,
+    type IStateEventWithRoomId,
     SearchOrderBy,
 } from "./@types/search.ts";
-import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse.ts";
-import { IHierarchyRoom } from "./@types/spaces.ts";
+import { type ISynapseAdminDeactivateResponse, type ISynapseAdminWhoisResponse } from "./@types/synapse.ts";
+import { type IHierarchyRoom } from "./@types/spaces.ts";
 import {
-    IPusher,
-    IPusherRequest,
-    IPushRule,
-    IPushRules,
-    PushRuleAction,
+    type IPusher,
+    type IPusherRequest,
+    type IPushRule,
+    type IPushRules,
+    type PushRuleAction,
     PushRuleActionName,
     PushRuleKind,
-    RuleId,
+    type RuleId,
 } from "./@types/PushRules.ts";
-import { IThreepid } from "./@types/threepids.ts";
-import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base.ts";
-import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./webrtc/groupCall.ts";
+import { type IThreepid } from "./@types/threepids.ts";
+import { type CryptoStore, type OutgoingRoomKeyRequest } from "./crypto/store/base.ts";
+import {
+    GroupCall,
+    type GroupCallIntent,
+    type GroupCallType,
+    type IGroupCallDataChannelOptions,
+} from "./webrtc/groupCall.ts";
 import { MediaHandler } from "./webrtc/mediaHandler.ts";
 import {
-    ILoginFlowsResponse,
-    IRefreshTokenResponse,
-    LoginRequest,
-    LoginResponse,
-    LoginTokenPostResponse,
-    SSOAction,
+    type ILoginFlowsResponse,
+    type IRefreshTokenResponse,
+    type LoginRequest,
+    type LoginResponse,
+    type LoginTokenPostResponse,
+    type SSOAction,
 } from "./@types/auth.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts.ts";
-import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync.ts";
+import { type MSC3575SlidingSyncRequest, type MSC3575SlidingSyncResponse, type SlidingSync } from "./sliding-sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
 import {
     determineFeatureSupport,
@@ -210,41 +247,41 @@ import {
     ThreadFilterType,
     threadFilterTypeToFilter,
 } from "./models/thread.ts";
-import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon.ts";
+import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
-import { ToDeviceBatch } from "./models/ToDeviceMessage.ts";
+import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
-import { UIARequest, UIAResponse } from "./@types/uia.ts";
-import { LocalNotificationSettings } from "./@types/local_notifications.ts";
+import { type UIARequest, type UIAResponse } from "./@types/uia.ts";
+import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature.ts";
-import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend.ts";
+import { type BackupDecryptor, type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
 import {
-    BootstrapCrossSigningOpts,
-    CrossSigningKeyInfo,
-    CryptoApi,
+    type BootstrapCrossSigningOpts,
+    type CrossSigningKeyInfo,
+    type CryptoApi,
     decodeRecoveryKey,
-    ImportRoomKeysOpts,
+    type ImportRoomKeysOpts,
     CryptoEvent,
-    CryptoEventHandlerMap,
-    CryptoCallbacks,
+    type CryptoEventHandlerMap,
+    type CryptoCallbacks,
 } from "./crypto-api/index.ts";
-import { DeviceInfoMap } from "./crypto/DeviceList.ts";
+import { type DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
-    AddSecretStorageKeyOpts,
-    SecretStorageKey,
-    SecretStorageKeyDescription,
-    ServerSideSecretStorage,
+    type AddSecretStorageKeyOpts,
+    type SecretStorageKey,
+    type SecretStorageKeyDescription,
+    type ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage.ts";
-import { RegisterRequest, RegisterResponse } from "./@types/registration.ts";
+import { type RegisterRequest, type RegisterResponse } from "./@types/registration.ts";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager.ts";
 import { getRelationsThreadFilter } from "./thread-utils.ts";
-import { KnownMembership, Membership } from "./@types/membership.ts";
-import { RoomMessageEventContent, StickerEventContent } from "./@types/events.ts";
-import { ImageInfo } from "./@types/media.ts";
-import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
+import { KnownMembership, type Membership } from "./@types/membership.ts";
+import { type RoomMessageEventContent, type StickerEventContent } from "./@types/events.ts";
+import { type ImageInfo } from "./@types/media.ts";
+import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
 

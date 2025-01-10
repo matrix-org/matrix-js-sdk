@@ -26,33 +26,33 @@ import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger.ts";
 import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../utils.ts";
-import { MatrixEvent } from "../models/event.ts";
-import { EventType, TimelineEvents, ToDeviceMessageId } from "../@types/event.ts";
-import { RoomMember } from "../models/room-member.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { EventType, type TimelineEvents, ToDeviceMessageId } from "../@types/event.ts";
+import { type RoomMember } from "../models/room-member.ts";
 import { randomString } from "../randomstring.ts";
 import {
-    MCallReplacesEvent,
-    MCallAnswer,
-    MCallInviteNegotiate,
-    CallCapabilities,
+    type MCallReplacesEvent,
+    type MCallAnswer,
+    type MCallInviteNegotiate,
+    type CallCapabilities,
     SDPStreamMetadataPurpose,
-    SDPStreamMetadata,
+    type SDPStreamMetadata,
     SDPStreamMetadataKey,
-    MCallSDPStreamMetadataChanged,
-    MCallSelectAnswer,
-    MCAllAssertedIdentity,
-    MCallCandidates,
-    MCallBase,
-    MCallHangupReject,
+    type MCallSDPStreamMetadataChanged,
+    type MCallSelectAnswer,
+    type MCAllAssertedIdentity,
+    type MCallCandidates,
+    type MCallBase,
+    type MCallHangupReject,
 } from "./callEventTypes.ts";
 import { CallFeed } from "./callFeed.ts";
-import { MatrixClient } from "../client.ts";
+import { type MatrixClient } from "../client.ts";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { DeviceInfo } from "../crypto/deviceinfo.ts";
 import { GroupCallUnknownDeviceError } from "./groupCall.ts";
-import { IScreensharingOpts } from "./mediaHandler.ts";
+import { type IScreensharingOpts } from "./mediaHandler.ts";
 import { MatrixError } from "../http-api/index.ts";
-import { GroupCallStats } from "./stats/groupCallStats.ts";
+import { type GroupCallStats } from "./stats/groupCallStats.ts";
 
 interface CallOpts {
     // The room ID for this call.

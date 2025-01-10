@@ -17,20 +17,20 @@ limitations under the License.
 import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IMegolmSessionData } from "../@types/crypto.ts";
 import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
-import { Room } from "../models/room.ts";
-import { DeviceMap } from "../models/device.ts";
-import { UIAuthCallback } from "../interactive-auth.ts";
-import { PassphraseInfo, SecretStorageKeyDescription } from "../secret-storage.ts";
-import { VerificationRequest } from "./verification.ts";
+import { type Room } from "../models/room.ts";
+import { type DeviceMap } from "../models/device.ts";
+import { type UIAuthCallback } from "../interactive-auth.ts";
+import { type PassphraseInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
+import { type VerificationRequest } from "./verification.ts";
 import {
-    BackupTrustInfo,
-    KeyBackupCheck,
-    KeyBackupInfo,
-    KeyBackupRestoreOpts,
-    KeyBackupRestoreResult,
+    type BackupTrustInfo,
+    type KeyBackupCheck,
+    type KeyBackupInfo,
+    type KeyBackupRestoreOpts,
+    type KeyBackupRestoreResult,
 } from "./keybackup.ts";
-import { ISignatures } from "../@types/signed.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type ISignatures } from "../@types/signed.ts";
+import { type MatrixEvent } from "../models/event.ts";
 
 /**
  * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.

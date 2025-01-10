@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { Device } from "../models/device.ts";
-import { DeviceInfo } from "./deviceinfo.ts";
+import { type DeviceInfo } from "./deviceinfo.ts";
 
 /**
  * Convert a {@link DeviceInfo} to a {@link Device}.

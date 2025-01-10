@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { jwtDecode } from "jwt-decode";
-import { IdTokenClaims, OidcMetadata, SigninResponse } from "oidc-client-ts";
+import { type IdTokenClaims, type OidcMetadata, type SigninResponse } from "oidc-client-ts";
 
 import { logger } from "../logger.ts";
 import { OidcError } from "./error.ts";

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "./event.ts";
+import { type MatrixEvent } from "./event.ts";
 import { Direction } from "./event-timeline.ts";
 
 export class EventContext {

@@ -14,14 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
+import {
+    type Account,
+    type InboundGroupSession,
+    type OutboundGroupSession,
+    type Session,
+    type Utility,
+} from "@matrix-org/olm";
 
-import { logger, Logger } from "../logger.ts";
+import { logger, type Logger } from "../logger.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
-import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base.ts";
-import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm.ts";
-import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto.ts";
-import { IMessage } from "./algorithms/olm.ts";
+import { type CryptoStore, type IProblem, type ISessionInfo, type IWithheld } from "./store/base.ts";
+import { type IOlmDevice, type IOutboundGroupSessionKey } from "./algorithms/megolm.ts";
+import { type IMegolmSessionData, type OlmGroupSessionExtraData } from "../@types/crypto.ts";
+import { type IMessage } from "./algorithms/olm.ts";
 import { DecryptionFailureCode } from "../crypto-api/index.ts";
 import { DecryptionError } from "../common-crypto/CryptoBackend.ts";
 

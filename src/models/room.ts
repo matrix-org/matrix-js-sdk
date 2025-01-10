@@ -14,22 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_START, Optional } from "matrix-events-sdk";
+import { M_POLL_START, type Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
     DuplicateStrategy,
-    IAddLiveEventOptions,
-    EventTimelineSetHandlerMap,
+    type IAddLiveEventOptions,
+    type EventTimelineSetHandlerMap,
 } from "./event-timeline-set.ts";
 import { Direction, EventTimeline } from "./event-timeline.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
 import { removeElement } from "../utils.ts";
 import { normalize, noUnsafeEventProps } from "../utils.ts";
-import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event.ts";
+import {
+    type IEvent,
+    type IThreadBundledRelationship,
+    MatrixEvent,
+    MatrixEventEvent,
+    type MatrixEventHandlerMap,
+} from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { IRoomSummary, RoomSummary } from "./room-summary.ts";
+import { type IRoomSummary, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
@@ -41,36 +47,36 @@ import {
     RelationType,
     UNSIGNED_THREAD_ID_FIELD,
 } from "../@types/event.ts";
-import { MatrixClient, PendingEventOrdering } from "../client.ts";
-import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials.ts";
-import { Filter, IFilterDefinition } from "../filter.ts";
-import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state.ts";
-import { BeaconEvent, BeaconEventHandlerMap } from "./beacon.ts";
+import { type MatrixClient, PendingEventOrdering } from "../client.ts";
+import { type GuestAccess, type HistoryVisibility, type JoinRule, type ResizeMethod } from "../@types/partials.ts";
+import { Filter, type IFilterDefinition } from "../filter.ts";
+import { type RoomState, RoomStateEvent, type RoomStateEventHandlerMap } from "./room-state.ts";
+import { BeaconEvent, type BeaconEventHandlerMap } from "./beacon.ts";
 import {
     Thread,
     ThreadEvent,
-    ThreadEventHandlerMap as ThreadHandlerMap,
+    type ThreadEventHandlerMap as ThreadHandlerMap,
     FILTER_RELATED_BY_REL_TYPES,
     THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread.ts";
 import {
-    CachedReceiptStructure,
+    type CachedReceiptStructure,
     MAIN_ROOM_TIMELINE,
-    Receipt,
-    ReceiptContent,
+    type Receipt,
+    type ReceiptContent,
     ReceiptType,
 } from "../@types/read_receipts.ts";
-import { IStateEventWithRoomId } from "../@types/search.ts";
+import { type IStateEventWithRoomId } from "../@types/search.ts";
 import { RelationsContainer } from "./relations-container.ts";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt.ts";
 import { isPollEvent, Poll, PollEvent } from "./poll.ts";
 import { RoomReceipts } from "./room-receipts.ts";
 import { compareEventOrdering } from "./compare-event-ordering.ts";
 import * as utils from "../utils.ts";
-import { KnownMembership, Membership } from "../@types/membership.ts";
-import { Capabilities, IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
+import { KnownMembership, type Membership } from "../@types/membership.ts";
+import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be

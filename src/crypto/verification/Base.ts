@@ -24,17 +24,17 @@ import { EventType } from "../../@types/event.ts";
 import { logger } from "../../logger.ts";
 import { DeviceInfo } from "../deviceinfo.ts";
 import { newTimeoutError } from "./Error.ts";
-import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossSigning.ts";
-import { IVerificationChannel } from "./request/Channel.ts";
-import { MatrixClient } from "../../client.ts";
-import { VerificationRequest } from "./request/VerificationRequest.ts";
+import { type KeysDuringVerification, requestKeysDuringVerification } from "../CrossSigning.ts";
+import { type IVerificationChannel } from "./request/Channel.ts";
+import { type MatrixClient } from "../../client.ts";
+import { type VerificationRequest } from "./request/VerificationRequest.ts";
 import { TypedEventEmitter } from "../../models/typed-event-emitter.ts";
 import {
-    ShowQrCodeCallbacks,
-    ShowSasCallbacks,
-    Verifier,
+    type ShowQrCodeCallbacks,
+    type ShowSasCallbacks,
+    type Verifier,
     VerifierEvent,
-    VerifierEventHandlerMap,
+    type VerifierEventHandlerMap,
 } from "../../crypto-api/verification.ts";
 
 const timeoutException = new Error("Verification timed out");

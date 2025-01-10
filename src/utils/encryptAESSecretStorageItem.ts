@@ -16,7 +16,7 @@
 
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { deriveKeys } from "./internal/deriveKeys.ts";
-import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Encrypt a string as a secret storage item, using AES-CTR.

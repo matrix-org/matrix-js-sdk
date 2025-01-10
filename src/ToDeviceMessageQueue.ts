@@ -16,13 +16,13 @@ limitations under the License.
 
 import { ToDeviceMessageId } from "./@types/event.ts";
 import { logger } from "./logger.ts";
-import { MatrixClient, ClientEvent } from "./client.ts";
-import { MatrixError } from "./http-api/index.ts";
+import { type MatrixClient, ClientEvent } from "./client.ts";
+import { type MatrixError } from "./http-api/index.ts";
 import {
-    IndexedToDeviceBatch,
-    ToDeviceBatch,
-    ToDeviceBatchWithTxnId,
-    ToDevicePayload,
+    type IndexedToDeviceBatch,
+    type ToDeviceBatch,
+    type ToDeviceBatchWithTxnId,
+    type ToDevicePayload,
 } from "./models/ToDeviceMessage.ts";
 import { MatrixScheduler } from "./scheduler.ts";
 import { SyncState } from "./sync.ts";

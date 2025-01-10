@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { ConnectionStats } from "./connectionStats.ts";
-import { StatsReportEmitter } from "./statsReportEmitter.ts";
-import { ByteSend, ByteSentStatsReport, TrackID } from "./statsReport.ts";
+import { type StatsReportEmitter } from "./statsReportEmitter.ts";
+import { type ByteSend, type ByteSentStatsReport, type TrackID } from "./statsReport.ts";
 import { ConnectionStatsBuilder } from "./connectionStatsBuilder.ts";
 import { TransportStatsBuilder } from "./transportStatsBuilder.ts";
 import { MediaSsrcHandler } from "./media/mediaSsrcHandler.ts";
@@ -25,7 +25,7 @@ import { MediaTrackStatsHandler } from "./media/mediaTrackStatsHandler.ts";
 import { TrackStatsBuilder } from "./trackStatsBuilder.ts";
 import { ConnectionStatsReportBuilder } from "./connectionStatsReportBuilder.ts";
 import { ValueFormatter } from "./valueFormatter.ts";
-import { CallStatsReportSummary } from "./callStatsReportSummary.ts";
+import { type CallStatsReportSummary } from "./callStatsReportSummary.ts";
 import { logger } from "../../logger.ts";
 import { CallFeedStatsReporter } from "./callFeedStatsReporter.ts";
 

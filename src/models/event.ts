@@ -19,34 +19,34 @@ limitations under the License.
  * the public classes.
  */
 
-import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
+import { type ExtensibleEvent, ExtensibleEvents, type Optional } from "matrix-events-sdk";
 
 import type { IEventDecryptionResult } from "../@types/crypto.ts";
 import { logger } from "../logger.ts";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest.ts";
+import { type VerificationRequest } from "../crypto/verification/request/VerificationRequest.ts";
 import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     EventType,
-    MsgType,
+    type MsgType,
     RelationType,
     ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
     UNSIGNED_MEMBERSHIP_FIELD,
 } from "../@types/event.ts";
-import { Crypto } from "../crypto/index.ts";
+import { type Crypto } from "../crypto/index.ts";
 import { deepSortedObjectEntries, internaliseString } from "../utils.ts";
-import { RoomMember } from "./room-member.ts";
-import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread.ts";
-import { IActionsObject } from "../pushprocessor.ts";
+import { type RoomMember } from "./room-member.ts";
+import { type Thread, THREAD_RELATION_TYPE, ThreadEvent, type ThreadEventHandlerMap } from "./thread.ts";
+import { type IActionsObject } from "../pushprocessor.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
-import { MatrixError } from "../http-api/index.ts";
+import { type MatrixError } from "../http-api/index.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
-import { EventStatus } from "./event-status.ts";
-import { CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend.ts";
-import { IAnnotatedPushRule } from "../@types/PushRules.ts";
-import { Room } from "./room.ts";
+import { type EventStatus } from "./event-status.ts";
+import { type CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend.ts";
+import { type IAnnotatedPushRule } from "../@types/PushRules.ts";
+import { type Room } from "./room.ts";
 import { EventTimeline } from "./event-timeline.ts";
-import { Membership } from "../@types/membership.ts";
+import { type Membership } from "../@types/membership.ts";
 import { DecryptionFailureCode } from "../crypto-api/index.ts";
 
 export { EventStatus } from "./event-status.ts";

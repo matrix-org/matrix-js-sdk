@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
-import { IOlmDevice } from "../algorithms/megolm.ts";
-import { TrackingStatus } from "../DeviceList.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { IDevice } from "../deviceinfo.ts";
-import { ICrossSigningInfo } from "../CrossSigning.ts";
-import { Logger } from "../../logger.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
-import { MatrixEvent } from "../../models/event.ts";
-import { DehydrationManager } from "../dehydration.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
-import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
+import { type IRoomKeyRequestBody, type IRoomKeyRequestRecipient } from "../index.ts";
+import { type RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
+import { type IOlmDevice } from "../algorithms/megolm.ts";
+import { type TrackingStatus } from "../DeviceList.ts";
+import { type IRoomEncryption } from "../RoomList.ts";
+import { type IDevice } from "../deviceinfo.ts";
+import { type ICrossSigningInfo } from "../CrossSigning.ts";
+import { type Logger } from "../../logger.ts";
+import { type InboundGroupSessionData } from "../OlmDevice.ts";
+import { type MatrixEvent } from "../../models/event.ts";
+import { type DehydrationManager } from "../dehydration.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
 
 /**
  * Internal module. Definitions for storage for the crypto module

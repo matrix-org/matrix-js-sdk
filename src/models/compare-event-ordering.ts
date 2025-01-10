@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "./event.ts";
-import { Room } from "./room.ts";
+import { type MatrixEvent } from "./event.ts";
+import { type Room } from "./room.ts";
 import { inMainTimelineForReceipt, threadIdForReceipt } from "../client.ts";
 
 /**

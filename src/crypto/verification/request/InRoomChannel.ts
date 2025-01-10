@@ -17,11 +17,11 @@ limitations under the License.
 
 import { VerificationRequest, REQUEST_TYPE, READY_TYPE, START_TYPE } from "./VerificationRequest.ts";
 import { logger } from "../../../logger.ts";
-import { IVerificationChannel } from "./Channel.ts";
-import { EventType, TimelineEvents } from "../../../@types/event.ts";
-import { MatrixClient } from "../../../client.ts";
-import { MatrixEvent } from "../../../models/event.ts";
-import { IRequestsMap } from "../../index.ts";
+import { type IVerificationChannel } from "./Channel.ts";
+import { EventType, type TimelineEvents } from "../../../@types/event.ts";
+import { type MatrixClient } from "../../../client.ts";
+import { type MatrixEvent } from "../../../models/event.ts";
+import { type IRequestsMap } from "../../index.ts";
 
 const MESSAGE_TYPE = EventType.RoomMessage;
 const M_REFERENCE = "m.reference";

@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { EventContext } from "./event-context.ts";
-import { EventMapper } from "../event-mapper.ts";
-import { IResultContext, ISearchResult } from "../@types/search.ts";
+import { type EventMapper } from "../event-mapper.ts";
+import { type IResultContext, type ISearchResult } from "../@types/search.ts";
 
 export class SearchResult {
     /**

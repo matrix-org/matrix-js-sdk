@@ -16,18 +16,18 @@ limitations under the License.
 
 /* eslint-disable @babel/no-invalid-this */
 
-import { MemoryStore, IOpts as IBaseOpts } from "./memory.ts";
+import { MemoryStore, type IOpts as IBaseOpts } from "./memory.ts";
 import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.ts";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.ts";
-import { IEvent, MatrixEvent } from "../models/event.ts";
+import { type IEvent, MatrixEvent } from "../models/event.ts";
 import { logger } from "../logger.ts";
-import { ISavedSync } from "./index.ts";
-import { IIndexedDBBackend } from "./indexeddb-backend.ts";
-import { ISyncResponse } from "../sync-accumulator.ts";
-import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { IStateEventWithRoomId } from "../@types/search.ts";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
-import { IStoredClientOpts } from "../client.ts";
+import { type ISavedSync } from "./index.ts";
+import { type IIndexedDBBackend } from "./indexeddb-backend.ts";
+import { type ISyncResponse } from "../sync-accumulator.ts";
+import { type EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { type IStateEventWithRoomId } from "../@types/search.ts";
+import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { type IStoredClientOpts } from "../client.ts";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.

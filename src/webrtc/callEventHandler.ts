@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event.ts";
+import { type MatrixEvent } from "../models/event.ts";
 import { logger } from "../logger.ts";
-import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call.ts";
+import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, type MatrixCall } from "./call.ts";
 import { EventType } from "../@types/event.ts";
-import { ClientEvent, MatrixClient } from "../client.ts";
-import { MCallAnswer, MCallHangupReject } from "./callEventTypes.ts";
-import { GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from "./groupCall.ts";
+import { ClientEvent, type MatrixClient } from "../client.ts";
+import { type MCallAnswer, type MCallHangupReject } from "./callEventTypes.ts";
+import { type GroupCall, GroupCallErrorCode, GroupCallEvent, GroupCallUnknownDeviceError } from "./groupCall.ts";
 import { RoomEvent } from "../models/room.ts";
 
 // Don't ring unless we'd be ringing for at least 3 seconds: the user needs some

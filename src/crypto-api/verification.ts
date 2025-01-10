@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event.ts";
-import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.

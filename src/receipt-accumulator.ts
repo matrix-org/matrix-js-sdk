@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMinimalEvent } from "./sync-accumulator.ts";
+import { type IMinimalEvent } from "./sync-accumulator.ts";
 import { EventType } from "./@types/event.ts";
 import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils.ts";
-import { IContent } from "./models/event.ts";
-import { ReceiptContent, ReceiptType } from "./@types/read_receipts.ts";
+import { type IContent } from "./models/event.ts";
+import { type ReceiptContent, type ReceiptType } from "./@types/read_receipts.ts";
 
 interface AccumulatedReceipt {
     data: IMinimalEvent;
