@@ -1,7 +1,10 @@
+import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
+import type { MatrixClient } from "../client.ts";
 import { HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger } from "../logger.ts";
-import { EventTimeline, EventType, MatrixClient, Room } from "../matrix.ts";
+import { EventTimeline } from "../models/event-timeline.ts";
+import { Room } from "../models/room.ts";
 import { sleep } from "../utils.ts";
 import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "./CallMembership.ts";
 import { Focus } from "./focus.ts";
