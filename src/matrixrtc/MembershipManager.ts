@@ -10,20 +10,43 @@ import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { MembershipConfig } from "./MatrixRTCSession.ts";
+/**
+ * This interface defines what a MembershipManager uses and exposes.
+ * This interface is what we use to write tests and allows to change the actual implementation
+ * Without breaking tests because of some internal method renaming.
+ *
+ * @internal
+ */
+export interface IMembershipManager {
+    isJoined(): boolean;
+    join(fociPreferred: Focus[], fociActive?: Focus): void;
+    leave(timeout: number | undefined): Promise<boolean>;
+    /**
+     * call this if the MatrixRTC session members have changed
+     */
+    onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
+    getActiveFocus(): Focus | undefined;
+}
 
 /**
- *  This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
+ * This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
+ *
+ * Its responsibitiy is to manage the locals user membership:
+ *  - send that sate event
+ *  - send the delayed leave event
+ *  - update the delayed leave event while connected
+ *  - update the state event when it times out (for calls longer than membershipExpiryTimeout ~ 4h)
+ *
+ * It is possible to test this class on its own. The api surface (to use for tests) is
+ * defined in `MembershipManagerInterface`.
+ *
+ * It is recommended to only use this interface for testing to allow replacing this class.
+ *
  *  @internal
  */
-export class MembershipManager {
+export class LegacyMembershipManager implements IMembershipManager {
     private relativeExpiry: number | undefined;
 
-    public constructor(
-        private joinConfig: MembershipConfig | undefined,
-        private room: Room,
-        private client: MatrixClient,
-        private getOldestMembership: () => CallMembership | undefined,
-    ) {}
     private memberEventTimeout?: ReturnType<typeof setTimeout>;
 
     /**
@@ -57,29 +80,53 @@ export class MembershipManager {
             8_000
         );
     }
-
     private get membershipKeepAlivePeriod(): number {
         return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
-
     private get callMemberEventRetryJitter(): number {
         return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
     }
-    public joinRoomSession(): void {
+
+    public constructor(
+        private joinConfig: MembershipConfig | undefined,
+        private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
+        private client: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedEvent"
+            | "_unstable_sendDelayedStateEvent"
+            | "_unstable_updateDelayedEvent"
+        >,
+        private getOldestMembership: () => CallMembership | undefined,
+    ) {}
+
+    /*
+     * Returns true if we intend to be participating in the MatrixRTC session.
+     * This is determined by checking if the relativeExpiry has been set.
+     */
+    public isJoined(): boolean {
+        return this.relativeExpiry !== undefined;
+    }
+
+    public join(fociPreferred: Focus[], fociActive?: Focus): void {
+        this.ownFocusActive = fociActive;
+        this.ownFociPreferred = fociPreferred;
+        this.relativeExpiry = this.membershipExpiryTimeout;
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
         this.triggerCallMembershipEventUpdate();
     }
-    public setJoined(fociPreferred: Focus[], fociActive?: Focus): void {
-        this.ownFocusActive = fociActive;
-        this.ownFociPreferred = fociPreferred;
-        this.relativeExpiry = this.membershipExpiryTimeout;
-    }
-    public setLeft(): void {
+
+    public async leave(timeout: number | undefined = undefined): Promise<boolean> {
         this.relativeExpiry = undefined;
         this.ownFocusActive = undefined;
-    }
-    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
+
+        if (this.memberEventTimeout) {
+            clearTimeout(this.memberEventTimeout);
+            this.memberEventTimeout = undefined;
+        }
         if (timeout) {
             // The sleep promise returns the string 'timeout' and the membership update void
             // A success implies that the membership update was quicker then the timeout.
@@ -90,13 +137,38 @@ export class MembershipManager {
             return true;
         }
     }
-    public stop(): void {
-        if (this.memberEventTimeout) {
-            clearTimeout(this.memberEventTimeout);
-            this.memberEventTimeout = undefined;
+
+    public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
+        const isMyMembership = (m: CallMembership): boolean =>
+            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
+
+        if (this.isJoined() && !memberships.some(isMyMembership)) {
+            logger.warn("Missing own membership: force re-join");
+            // TODO: Should this be awaited? And is there anything to tell the focus?
+            return this.triggerCallMembershipEventUpdate();
         }
     }
-    public triggerCallMembershipEventUpdate = async (): Promise<void> => {
+
+    public getActiveFocus(): Focus | undefined {
+        if (this.ownFocusActive) {
+            // A livekit active focus
+            if (isLivekitFocusActive(this.ownFocusActive)) {
+                if (this.ownFocusActive.focus_selection === "oldest_membership") {
+                    const oldestMembership = this.getOldestMembership();
+                    return oldestMembership?.getPreferredFoci()[0];
+                }
+            } else {
+                logger.warn("Unknown own ActiveFocus type. This makes it impossible to connect to an SFU.");
+            }
+        } else {
+            // We do not understand the membership format (could be legacy). We default to oldestMembership
+            // Once there are other methods this is a hard error!
+            const oldestMembership = this.getOldestMembership();
+            return oldestMembership?.getPreferredFoci()[0];
+        }
+    }
+
+    private triggerCallMembershipEventUpdate = async (): Promise<void> => {
         // TODO: Should this await on a shared promise?
         if (this.updateCallMembershipRunning) {
             this.needCallMembershipUpdate = true;
@@ -121,13 +193,7 @@ export class MembershipManager {
         }
         return {};
     }
-    /*
-     * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
-     */
-    public isJoined(): boolean {
-        return this.relativeExpiry !== undefined;
-    }
+
     /**
      * Constructs our own membership
      */
@@ -143,21 +209,7 @@ export class MembershipManager {
         };
     }
 
-    public getActiveFocus(): Focus | undefined {
-        if (this.ownFocusActive && isLivekitFocusActive(this.ownFocusActive)) {
-            // A livekit active focus
-            if (this.ownFocusActive.focus_selection === "oldest_membership") {
-                const oldestMembership = this.getOldestMembership();
-                return oldestMembership?.getPreferredFoci()[0];
-            }
-        } else {
-            // We do not understand the membership format (could be legacy). We default to oldestMembership
-            // Once there are other methods this is a hard error!
-            const oldestMembership = this.getOldestMembership();
-            return oldestMembership?.getPreferredFoci()[0];
-        }
-    }
-    public async updateCallMembershipEvent(): Promise<void> {
+    private async updateCallMembershipEvent(): Promise<void> {
         if (this.memberEventTimeout) {
             clearTimeout(this.memberEventTimeout);
             this.memberEventTimeout = undefined;
@@ -192,9 +244,7 @@ export class MembershipManager {
                                 stateKey,
                             ),
                         );
-                        logger.log("BEFOER:", this.disconnectDelayId);
                         this.disconnectDelayId = res.delay_id;
-                        logger.log("AFTER:", this.disconnectDelayId);
                     } catch (e) {
                         if (
                             e instanceof MatrixError &&
@@ -213,6 +263,7 @@ export class MembershipManager {
                         logger.error("Failed to prepare delayed disconnection event:", e);
                     }
                 };
+
                 await prepareDelayedDisconnection();
                 // Send join event _after_ preparing the delayed disconnection event
                 await resendIfRateLimited(() =>
