@@ -763,7 +763,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     };
 
     /**
-     * Call this when the room members have changed.
+     * Call this when the Matrix room members have changed.
      */
     public onRoomMemberUpdate = (): void => {
         this.recalculateSessionMembers();
