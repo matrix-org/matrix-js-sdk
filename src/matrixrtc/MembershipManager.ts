@@ -22,7 +22,6 @@ export interface IMembershipManager {
      * If we are trying to join the session.
      * It does not reflect if the room state is already configures to represent us being joined.
      * It only means that the Manager is running.
-     * This is determined by checking if the relativeExpiry has been set.
      * @returns true if we intend to be participating in the MatrixRTC session
      */
     isJoined(): boolean;
@@ -34,7 +33,9 @@ export interface IMembershipManager {
     join(fociPreferred: Focus[], fociActive?: Focus): void;
     /**
      * Send all necessary events to make this user leave the RTC session.
-     * @param timeout
+     * @param timeout the maximum duration in ms until the promise is forced to resolve.
+     * @returns It resolves with true in case the leave was sent successfully.
+     * It resolves with false in case we hit the timeout before sending successfully.
      */
     leave(timeout: number | undefined): Promise<boolean>;
     /**
@@ -43,7 +44,7 @@ export interface IMembershipManager {
     onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
     /**
      * The used active focus in the currently joined session.
-     * @returns undefined if not joined.
+     * @returns the used active focus in the currently joined session or undefined if not joined.
      */
     getActiveFocus(): Focus | undefined;
 }
