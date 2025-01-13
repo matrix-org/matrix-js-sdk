@@ -412,7 +412,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param event the event to process
      */
     public onCallEncryption = (event: MatrixEvent): void => {
-        this.encryptionManager.onCallEncryption(event);
+        this.encryptionManager.onCallEncryptionEventReceived(event);
     };
 
     /**

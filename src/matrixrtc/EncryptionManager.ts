@@ -1,5 +1,5 @@
 import { type MatrixClient } from "../client.ts";
-import { logger } from "../logger.ts";
+import { logger as rootLogger } from "../logger.ts";
 import { MatrixEvent } from "../models/event.ts";
 import { Room } from "../models/room.ts";
 import { EncryptionConfig } from "./MatrixRTCSession.ts";
@@ -9,9 +9,10 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { EventType } from "../@types/event.ts";
+const logger = rootLogger.getChild("MatrixRTCSession");
 
 /**
- * A type collecting call encryption statistics.
+ * A type collecting call encryption statistics for a session.
  */
 export type Statistics = {
     counters: {
@@ -23,16 +24,27 @@ export type Statistics = {
     };
 };
 
+/**
+ * This interface is for testing and for making it possible to interchange the encryption manager.
+ * @internal
+ */
 export interface IEncryptionManager {
     join(joinConfig: EncryptionConfig | undefined): void;
     leave(): void;
     onMembershipsUpdate(oldMemberships: CallMembership[]): Promise<void>;
-    onCallEncryption(event: MatrixEvent): void;
-    requestSendCurrentKey(): void;
+    onCallEncryptionEventReceived(event: MatrixEvent): void;
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
     statistics: Statistics;
 }
 
+/**
+ * This class implements the IEncryptionManager interface,
+ * and takes care of managing the encryption keys of all rtc members:
+ *  - generate new keys for the local user and send them to other participants
+ *  - track all keys of all other members and update livekit.
+ *
+ * @internal
+ */
 export class EncryptionManager implements IEncryptionManager {
     private manageMediaKeys = false;
     private keysEventUpdateTimeout?: ReturnType<typeof setTimeout>;
@@ -58,9 +70,6 @@ export class EncryptionManager implements IEncryptionManager {
 
     private currentEncryptionKeyIndex = -1;
 
-    /**
-     * The statistics for this session.
-     */
     public statistics: Statistics = {
         counters: {
             /**
@@ -205,7 +214,7 @@ export class EncryptionManager implements IEncryptionManager {
      * Requests that we resend our current keys to the room. May send a keys event immediately
      * or queue for alter if one has already been sent recently.
      */
-    public requestSendCurrentKey(): void {
+    private requestSendCurrentKey(): void {
         if (!this.manageMediaKeys) return;
 
         if (
@@ -316,7 +325,7 @@ export class EncryptionManager implements IEncryptionManager {
      *
      * @param event the event to process
      */
-    public onCallEncryption = (event: MatrixEvent): void => {
+    public onCallEncryptionEventReceived = (event: MatrixEvent): void => {
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
 
