@@ -770,7 +770,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     };
 
     /**
-     * Call this when sth changed that impacts the current rtc members in this session.
+     * Call this when something changed that may impacts the current MatrixRTC members in this session.
      */
     public onRTCSessionMemberUpdate = (): void => {
         this.recalculateSessionMembers();
