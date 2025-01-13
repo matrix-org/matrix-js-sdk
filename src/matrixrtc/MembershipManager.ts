@@ -18,13 +18,30 @@ import { MembershipConfig } from "./MatrixRTCSession.ts";
  * @internal
  */
 export interface IMembershipManager {
+    /**
+     * Returns true if we intend to be participating in the MatrixRTC session.
+     * This is determined by checking if the relativeExpiry has been set.
+     */
     isJoined(): boolean;
+    /**
+     * Start sending all necessary events to make this user participant in the RTC session.
+     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * @param fociActive the active focus to use in the joined RTC membership event.
+     */
     join(fociPreferred: Focus[], fociActive?: Focus): void;
+    /**
+     * Send all necessary events to make this user leave the RTC session
+     * @param timeout
+     */
     leave(timeout: number | undefined): Promise<boolean>;
     /**
      * call this if the MatrixRTC session members have changed
      */
     onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
+    /**
+     * Returns the used active focus in the currently joined session.
+     * @returns undefined if not joined.
+     */
     getActiveFocus(): Focus | undefined;
 }
 
@@ -102,10 +119,6 @@ export class LegacyMembershipManager implements IMembershipManager {
         private getOldestMembership: () => CallMembership | undefined,
     ) {}
 
-    /*
-     * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
-     */
     public isJoined(): boolean {
         return this.relativeExpiry !== undefined;
     }
