@@ -18,13 +18,34 @@ import { MembershipConfig } from "./MatrixRTCSession.ts";
  * @internal
  */
 export interface IMembershipManager {
+    /**
+     * If we are trying to join the session.
+     * It does not reflect if the room state is already configures to represent us being joined.
+     * It only means that the Manager is running.
+     * @returns true if we intend to be participating in the MatrixRTC session
+     */
     isJoined(): boolean;
+    /**
+     * Start sending all necessary events to make this user participant in the RTC session.
+     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * @param fociActive the active focus to use in the joined RTC membership event.
+     */
     join(fociPreferred: Focus[], fociActive?: Focus): void;
+    /**
+     * Send all necessary events to make this user leave the RTC session.
+     * @param timeout the maximum duration in ms until the promise is forced to resolve.
+     * @returns It resolves with true in case the leave was sent successfully.
+     * It resolves with false in case we hit the timeout before sending successfully.
+     */
     leave(timeout: number | undefined): Promise<boolean>;
     /**
-     * call this if the MatrixRTC session members have changed
+     * Call this if the MatrixRTC session members have changed.
      */
     onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
+    /**
+     * The used active focus in the currently joined session.
+     * @returns the used active focus in the currently joined session or undefined if not joined.
+     */
     getActiveFocus(): Focus | undefined;
 }
 
@@ -102,10 +123,6 @@ export class LegacyMembershipManager implements IMembershipManager {
         private getOldestMembership: () => CallMembership | undefined,
     ) {}
 
-    /*
-     * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
-     */
     public isJoined(): boolean {
         return this.relativeExpiry !== undefined;
     }
