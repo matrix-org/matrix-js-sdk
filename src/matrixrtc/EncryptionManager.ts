@@ -16,10 +16,20 @@ const logger = rootLogger.getChild("MatrixRTCSession");
  */
 export type Statistics = {
     counters: {
+        /**
+         * The number of times we have sent a room event containing encryption keys.
+         */
         roomEventEncryptionKeysSent: number;
+        /**
+         * The number of times we have received a room event containing encryption keys.
+         */
         roomEventEncryptionKeysReceived: number;
     };
     totals: {
+        /**
+         * The total age (in milliseconds) of all room events containing encryption keys that we have received.
+         * We track the total age so that we can later calculate the average age of all keys received.
+         */
         roomEventEncryptionKeysReceivedTotalAge: number;
     };
 };
@@ -32,6 +42,13 @@ export interface IEncryptionManager {
     join(joinConfig: EncryptionConfig | undefined): void;
     leave(): void;
     onMembershipsUpdate(oldMemberships: CallMembership[]): Promise<void>;
+    /**
+     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
+     * This should be called each time the relevant event is received from a room timeline.
+     * If the event is malformed then it will be logged and ignored.
+     *
+     * @param event the event to process
+     */
     onCallEncryptionEventReceived(event: MatrixEvent): void;
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
     statistics: Statistics;
@@ -72,20 +89,10 @@ export class EncryptionManager implements IEncryptionManager {
 
     public statistics: Statistics = {
         counters: {
-            /**
-             * The number of times we have sent a room event containing encryption keys.
-             */
             roomEventEncryptionKeysSent: 0,
-            /**
-             * The number of times we have received a room event containing encryption keys.
-             */
             roomEventEncryptionKeysReceived: 0,
         },
         totals: {
-            /**
-             * The total age (in milliseconds) of all room events containing encryption keys that we have received.
-             * We track the total age so that we can later calculate the average age of all keys received.
-             */
             roomEventEncryptionKeysReceivedTotalAge: 0,
         },
     };
@@ -107,7 +114,6 @@ export class EncryptionManager implements IEncryptionManager {
     }
     private joined = false;
     public join(joinConfig: EncryptionConfig): void {
-        // TODO: this is probably removable
         this.joinConfig = joinConfig;
         this.joined = true;
         this.manageMediaKeys = this.joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
@@ -116,6 +122,7 @@ export class EncryptionManager implements IEncryptionManager {
             this.requestSendCurrentKey();
         }
     }
+
     public leave(): void {
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
@@ -318,13 +325,6 @@ export class EncryptionManager implements IEncryptionManager {
         }
     };
 
-    /**
-     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
-     * This should be called each time the relevant event is received from a room timeline.
-     * If the event is malformed then it will be logged and ignored.
-     *
-     * @param event the event to process
-     */
     public onCallEncryptionEventReceived = (event: MatrixEvent): void => {
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
