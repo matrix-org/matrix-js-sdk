@@ -90,8 +90,9 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
         await this.olmMachine.dehydratedDevices().saveDehydratedDeviceKey(key);
         this.emit(DehydratedDevicesEvents.PickleKeyCached);
     }
+
     /**
-     * Return whether the server supports dehydrated devices.
+     * Implementation of {@link DehydratedDevicesAPI#isSupported}.
      */
     public async isSupported(): Promise<boolean> {
         // call the endpoint to get a dehydrated device.  If it returns an
@@ -121,18 +122,7 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
     }
 
     /**
-     * Start using device dehydration.
-     *
-     * - Rehydrates a dehydrated device, if one is available.
-     * - Creates a new dehydration key, if necessary, and stores it in Secret
-     *   Storage.
-     *   - If `createNewKey` is set to true, always creates a new key.
-     *   - If a dehydration key is not available, creates a new one.
-     * - Creates a new dehydrated device, and schedules periodically creating
-     *   new dehydrated devices.
-     *
-     * @param createNewKey - whether to force creation of a new dehydration key.
-     *   This can be used, for example, if Secret Storage is being reset.
+     * Implementation of {@link DehydratedDevicesAPI#start}.
      */
     public async start(createNewKey?: boolean): Promise<void> {
         this.stop();
@@ -283,7 +273,7 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
      * Creates and stores a new key in secret storage if none is available.
      */
     public async createAndUploadDehydratedDevice(): Promise<void> {
-        const key = ((await this.getCachedKey()) || (await this.getKey(true)))!;
+        const key = (await this.getKey(true))!;
 
         const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
         this.emit(DehydratedDevicesEvents.DeviceCreated);

@@ -1277,6 +1277,15 @@ export type DehydratedDevicesEventsMap = {
     [DehydratedDevicesEvents.SchedulingError]: (msg: string) => void;
 };
 
+/**
+ * Manages dehydrated devices
+ *
+ * * determining server support for dehydrated devices
+ * * creating new dehydrated devices when requested, including periodically
+ *   replacing the dehydrated device with a new one
+ * * rehydrating a device when requested, and when present
+ *
+ */
 export abstract class DehydratedDevicesAPI extends TypedEventEmitter<
     DehydratedDevicesEvents,
     DehydratedDevicesEventsMap
@@ -1285,7 +1294,25 @@ export abstract class DehydratedDevicesAPI extends TypedEventEmitter<
         super();
     }
 
+    /**
+     * Return whether the server supports dehydrated devices.
+     */
     public abstract isSupported(): Promise<boolean>;
+
+    /**
+     * Start using device dehydration.
+     *
+     * - Rehydrates a dehydrated device, if one is available.
+     * - Creates a new dehydration key, if necessary, and stores it in Secret
+     *   Storage.
+     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If a dehydration key is not available, creates a new one.
+     * - Creates a new dehydrated device, and schedules periodically creating
+     *   new dehydrated devices.
+     *
+     * @param createNewKey - whether to force creation of a new dehydration key.
+     *   This can be used, for example, if Secret Storage is being reset.
+     */
     public abstract start(createNewKey?: boolean): Promise<void>;
 }
 
