@@ -48,6 +48,7 @@ import { Room } from "./room.ts";
 import { EventTimeline } from "./event-timeline.ts";
 import { Membership } from "../@types/membership.ts";
 import { DecryptionFailureCode } from "../crypto-api/index.ts";
+import { RoomState } from "./room-state.ts";
 
 export { EventStatus } from "./event-status.ts";
 
@@ -232,6 +233,7 @@ export enum MatrixEventEvent {
     Status = "Event.status",
     Replaced = "Event.replaced",
     RelationsCreated = "Event.relationsCreated",
+    SentinelUpdated = "Event.sentinelUpdated",
 }
 
 export type MatrixEventEmittedEvents = MatrixEventEvent | ThreadEvent.Update;
@@ -244,6 +246,7 @@ export type MatrixEventHandlerMap = {
     [MatrixEventEvent.Status]: (event: MatrixEvent, status: EventStatus | null) => void;
     [MatrixEventEvent.Replaced]: (event: MatrixEvent) => void;
     [MatrixEventEvent.RelationsCreated]: (relationType: string, eventType: string) => void;
+    [MatrixEventEvent.SentinelUpdated]: () => void;
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
 export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
@@ -328,6 +331,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public sender: RoomMember | null = null;
+
     /**
      * The room member who is the target of this event, e.g.
      * the invitee, the person being banned, etc.
@@ -335,6 +339,51 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public target: RoomMember | null = null;
+
+    /**
+     * Update the sentinels and forwardLooking flag for this event.
+     * @param stateContext -  the room state to be queried
+     * @param toStartOfTimeline -  if true the event's forwardLooking flag is set false
+     * @internal
+     */
+    public setMetadata(stateContext: RoomState, toStartOfTimeline: boolean): void {
+        // If an event is an m.room.member state event then we should set the sentinels again in case setEventMetadata
+        // was already called before the state was applied and thus the sentinel points at the member from before this event.
+        const affectsSelf =
+            this.isState() && this.getType() === EventType.RoomMember && this.getSender() === this.getStateKey();
+
+        let changed = false;
+        // When we try to generate a sentinel member before we have that member
+        // in the members object, we still generate a sentinel but it doesn't
+        // have a membership event, so test to see if events.member is set. We
+        // check this to avoid overriding non-sentinel members by sentinel ones
+        // when adding the event to a filtered timeline
+        if (affectsSelf || !this.sender?.events?.member) {
+            const newSender = stateContext.getSentinelMember(this.getSender()!);
+            if (newSender !== this.sender) changed = true;
+            this.sender = newSender;
+        }
+        if (affectsSelf || (!this.target?.events?.member && this.getType() === EventType.RoomMember)) {
+            const newTarget = stateContext.getSentinelMember(this.getStateKey()!);
+            if (newTarget !== this.target) changed = true;
+            this.target = newTarget;
+        }
+
+        if (this.isState()) {
+            // room state has no concept of 'old' or 'current', but we want the
+            // room state to regress back to previous values if toStartOfTimeline
+            // is set, which means inspecting prev_content if it exists. This
+            // is done by toggling the forwardLooking flag.
+            if (toStartOfTimeline) {
+                this.forwardLooking = false;
+            }
+        }
+
+        if (changed) {
+            this.emit(MatrixEventEvent.SentinelUpdated);
+        }
+    }
+
     /**
      * The sending status of the event.
      * @privateRemarks

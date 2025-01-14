@@ -180,8 +180,8 @@ export function calculateRetryBackoff(err: any, attempts: number, retryConnectio
         return -1;
     }
 
-    if (err.httpStatus && (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401)) {
-        // client error; no amount of retrying will save you now.
+    if (err.httpStatus && Math.floor(err.httpStatus / 100) === 4 && err.httpStatus !== 429) {
+        // client error; no amount of retrying will save you now (except for rate limiting which is handled below)
         return -1;
     }
 

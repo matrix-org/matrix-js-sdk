@@ -15,16 +15,36 @@ limitations under the License.
 */
 
 import { EventType, MatrixEvent, Room } from "../../../src";
-import { CallMembershipData, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { randomString } from "../../../src/randomstring";
 
-type MembershipData = CallMembershipData[] | SessionMembershipData;
+type MembershipData = SessionMembershipData[] | SessionMembershipData | {};
+
+export const membershipTemplate: SessionMembershipData = {
+    application: "m.call",
+    call_id: "",
+    device_id: "AAAAAAA",
+    scope: "m.room",
+    focus_active: { type: "livekit", livekit_service_url: "https://lk.url" },
+    foci_preferred: [
+        {
+            livekit_alias: "!alias:something.org",
+            livekit_service_url: "https://livekit-jwt.something.io",
+            type: "livekit",
+        },
+        {
+            livekit_alias: "!alias:something.org",
+            livekit_service_url: "https://livekit-jwt.something.dev",
+            type: "livekit",
+        },
+    ],
+};
 
 export function makeMockRoom(membershipData: MembershipData): Room {
     const roomId = randomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
     const roomState = makeMockRoomState(membershipData, roomId);
-    return {
+    const room = {
         roomId: roomId,
         hasMembershipState: jest.fn().mockReturnValue(true),
         getLiveTimeline: jest.fn().mockReturnValue({
@@ -32,41 +52,46 @@ export function makeMockRoom(membershipData: MembershipData): Room {
         }),
         getVersion: jest.fn().mockReturnValue("default"),
     } as unknown as Room;
+    return room;
 }
 
 export function makeMockRoomState(membershipData: MembershipData, roomId: string) {
-    const event = mockRTCEvent(membershipData, roomId);
+    const events = Array.isArray(membershipData)
+        ? membershipData.map((m) => mockRTCEvent(m, roomId))
+        : [mockRTCEvent(membershipData, roomId)];
+    const keysAndEvents = events.map((e) => {
+        const data = e.getContent() as SessionMembershipData;
+        return [`_${e.sender?.userId}_${data.device_id}`];
+    });
+
     return {
         on: jest.fn(),
         off: jest.fn(),
         getStateEvents: (_: string, stateKey: string) => {
-            if (stateKey !== undefined) return event;
-            return [event];
+            if (stateKey !== undefined) return keysAndEvents.find(([k]) => k === stateKey)?.[1];
+            return events;
         },
-        events: new Map([
-            [
-                event.getType(),
-                {
-                    size: () => true,
-                    has: (_stateKey: string) => true,
-                    get: (_stateKey: string) => event,
-                    values: () => [event],
-                },
-            ],
-        ]),
+        events:
+            events.length === 0
+                ? new Map()
+                : new Map([
+                      [
+                          EventType.GroupCallMemberPrefix,
+                          {
+                              size: () => true,
+                              has: (stateKey: string) => keysAndEvents.find(([k]) => k === stateKey),
+                              get: (stateKey: string) => keysAndEvents.find(([k]) => k === stateKey)?.[1],
+                              values: () => events,
+                          },
+                      ],
+                  ]),
     };
 }
 
 export function mockRTCEvent(membershipData: MembershipData, roomId: string): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-        getContent: jest.fn().mockReturnValue(
-            !Array.isArray(membershipData)
-                ? membershipData
-                : {
-                      memberships: membershipData,
-                  },
-        ),
+        getContent: jest.fn().mockReturnValue(membershipData),
         getSender: jest.fn().mockReturnValue("@mock:user.example"),
         getTs: jest.fn().mockReturnValue(Date.now()),
         getRoomId: jest.fn().mockReturnValue(roomId),
