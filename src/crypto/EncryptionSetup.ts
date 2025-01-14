@@ -264,7 +264,10 @@ class AccountDataClientAdapter
         return event?.getContent<AccountDataEvents[K]>() ?? null;
     }
 
-    public setAccountData<K extends keyof AccountDataEvents>(type: K, content: AccountDataEvents[K]): Promise<{}> {
+    public setAccountData<K extends keyof AccountDataEvents>(
+        type: K,
+        content: AccountDataEvents[K] | Record<string, never>,
+    ): Promise<{}> {
         const event = new MatrixEvent({ type, content });
         const lastEvent = this.values.get(type);
         this.values.set(type, event);
