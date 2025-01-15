@@ -249,7 +249,7 @@ export class SyncApi {
     }
 
     public createRoom(roomId: string): Room {
-        const room = _createAndReEmitRoom(this.client, roomId, this.opts);
+        const room = _createAndSetupRoom(this.client, roomId, this.opts);
 
         room.on(RoomStateEvent.Marker, (markerEvent, markerFoundOptions) => {
             this.onMarkerStateEvent(room, markerEvent, markerFoundOptions);
@@ -410,7 +410,6 @@ export class SyncApi {
 
         const client = this.client;
         this._peekRoom = this.createRoom(roomId);
-        client.store.storeRoom(this._peekRoom);
         return this.client.roomInitialSync(roomId, limit).then((response) => {
             if (this._peekRoom?.roomId !== roomId) {
                 throw new Error("Peeking aborted");
@@ -1682,7 +1681,6 @@ export class SyncApi {
                 let isBrandNewRoom = false;
                 if (!room) {
                     room = this.createRoom(roomId);
-                    client.store.storeRoom(room);
                     isBrandNewRoom = true;
                 }
                 return {
@@ -1940,9 +1938,17 @@ export class SyncApi {
     };
 }
 
-// /!\ This function is not intended for public use! It's only exported from
-// here in order to share some common logic with sliding-sync-sdk.ts.
-export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
+/**
+ * Creates a new room, wires up the client remitter for it, and adds it to the client store.
+ * @param client the client using which to create the room
+ * @param roomId the ID of the room to create
+ * @param opts the options to use when creating the room
+ * @internal
+ * @privateRemarks
+ * /!\ This function is not intended for public use! It's only exported from
+ * here in order to share some common logic with sliding-sync-sdk.ts.
+ */
+export function _createAndSetupRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
     const { timelineSupport } = client;
 
     const room = new Room(roomId, client, client.getUserId()!, {
@@ -1983,6 +1989,7 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
             RoomMemberEvent.Membership,
         ]);
     });
+    client.store.storeRoom(room);
 
     return room;
 }

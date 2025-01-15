@@ -23,7 +23,7 @@ import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client.ts";
 import {
     ISyncStateData,
     SyncState,
-    _createAndReEmitRoom,
+    _createAndSetupRoom,
     SyncApiOptions,
     defaultClientOpts,
     defaultSyncApiOpts,
@@ -388,8 +388,7 @@ export class SlidingSyncSdk {
                 logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
-            room = _createAndReEmitRoom(this.client, roomId, this.opts);
-            this.client.store.storeRoom(room);
+            room = _createAndSetupRoom(this.client, roomId, this.opts);
         }
         await this.processRoomData(this.client, room!, roomData);
     }
