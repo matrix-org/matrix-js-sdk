@@ -389,6 +389,8 @@ export class SlidingSyncSdk {
                 return;
             }
             room = _createAndReEmitRoom(this.client, roomId, this.opts);
+            this.client.store.storeRoom(room);
+            this.client.emit(ClientEvent.Room, room);
         }
         await this.processRoomData(this.client, room!, roomData);
     }
@@ -644,8 +646,6 @@ export class SlidingSyncSdk {
             await this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
-                this.client.store.storeRoom(room);
-                this.client.emit(ClientEvent.Room, room);
             }
             inviteStateEvents.forEach((e) => {
                 this.client.emit(ClientEvent.Event, e);
@@ -723,10 +723,6 @@ export class SlidingSyncSdk {
         room.updateMyMembership(KnownMembership.Join);
 
         room.recalculate();
-        if (roomData.initial) {
-            client.store.storeRoom(room);
-            client.emit(ClientEvent.Room, room);
-        }
 
         // check if any timeline events should bing and add them to the notifEvents array:
         // we'll purge this once we've fully processed the sync response
