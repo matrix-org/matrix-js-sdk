@@ -148,7 +148,10 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
      * @param content - the content object to be set
      * @returns an empty object
      */
-    setAccountData: <K extends keyof AccountDataEvents>(eventType: K, content: AccountDataEvents[K]) => Promise<{}>;
+    setAccountData: <K extends keyof AccountDataEvents>(
+        eventType: K,
+        content: AccountDataEvents[K] | Record<string, never>,
+    ) => Promise<{}>;
 }
 
 /**
@@ -316,9 +319,12 @@ export interface ServerSideSecretStorage {
     /**
      * Set the default key ID for encrypting secrets.
      *
+     * If keyId is `null`, the default key id value in the account data will be set to an empty object.
+     * This is considered as "disabling" the default key.
+     *
      * @param keyId - The new default key ID
      */
-    setDefaultKeyId(keyId: string): Promise<void>;
+    setDefaultKeyId(keyId: string | null): Promise<void>;
 }
 
 /**
@@ -357,21 +363,33 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
     }
 
     /**
-     * Set the default key ID for encrypting secrets.
-     *
-     * @param keyId - The new default key ID
+     * Implementation of {@link ServerSideSecretStorage#setDefaultKeyId}.
      */
-    public setDefaultKeyId(keyId: string): Promise<void> {
+    public setDefaultKeyId(keyId: string | null): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const listener = (ev: MatrixEvent): void => {
-                if (ev.getType() === "m.secret_storage.default_key" && ev.getContent().key === keyId) {
+                if (ev.getType() !== "m.secret_storage.default_key") {
+                    //  Different account data item
+                    return;
+                }
+
+                // If keyId === null, the content should be an empty object.
+                // Otherwise, the `key` in the content object should match keyId.
+                const content = ev.getContent();
+                const isSameKey = keyId === null ? Object.keys(content).length === 0 : content.key === keyId;
+                if (isSameKey) {
                     this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                     resolve();
                 }
             };
             this.accountDataAdapter.on(ClientEvent.AccountData, listener);
 
-            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", { key: keyId }).catch((e) => {
+            // The spec [1] says that the value of the account data entry should be an object with a `key` property.
+            // It doesn't specify how to delete the default key; we do it by setting the account data to an empty object.
+            //
+            // [1]: https://spec.matrix.org/v1.13/client-server-api/#key-storage
+            const newValue: Record<string, never> | { key: string } = keyId === null ? {} : { key: keyId };
+            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", newValue).catch((e) => {
                 this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                 reject(e);
             });
