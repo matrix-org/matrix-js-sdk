@@ -249,7 +249,7 @@ export class SyncApi {
     }
 
     public createRoom(roomId: string): Room {
-        const room = _createAndReEmitRoom(this.client, roomId, this.opts);
+        const room = _createAndSetupRoom(this.client, roomId, this.opts);
 
         room.on(RoomStateEvent.Marker, (markerEvent, markerFoundOptions) => {
             this.onMarkerStateEvent(room, markerEvent, markerFoundOptions);
@@ -356,7 +356,7 @@ export class SyncApi {
 
         let leaveRooms: WrappedRoom<ILeftRoom>[] = [];
         if (data.rooms?.leave) {
-            leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
+            leaveRooms = this.processRoomArray(data.rooms.leave);
         }
 
         const rooms = await Promise.all(
@@ -385,7 +385,6 @@ export class SyncApi {
                 const { timelineEvents } = await this.mapAndInjectRoomEvents(leaveObj);
 
                 room.recalculate();
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
 
                 this.processEventsForNotifs(room, timelineEvents);
@@ -468,7 +467,6 @@ export class SyncApi {
                 response.messages.start,
             );
 
-            client.store.storeRoom(this._peekRoom);
             client.emit(ClientEvent.Room, this._peekRoom);
 
             this.peekPoll(this._peekRoom);
@@ -1226,16 +1224,16 @@ export class SyncApi {
 
         if (data.rooms) {
             if (data.rooms.invite) {
-                inviteRooms = this.mapSyncResponseToRoomArray(data.rooms.invite);
+                inviteRooms = this.processRoomArray(data.rooms.invite);
             }
             if (data.rooms.join) {
-                joinRooms = this.mapSyncResponseToRoomArray(data.rooms.join);
+                joinRooms = this.processRoomArray(data.rooms.join);
             }
             if (data.rooms.leave) {
-                leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
+                leaveRooms = this.processRoomArray(data.rooms.leave);
             }
             if (data.rooms.knock) {
-                knockRooms = this.mapSyncResponseToRoomArray(data.rooms.knock);
+                knockRooms = this.processRoomArray(data.rooms.knock);
             }
         }
 
@@ -1271,7 +1269,6 @@ export class SyncApi {
 
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             } else {
                 // Update room state for invite->reject->invite cycles
@@ -1469,10 +1466,8 @@ export class SyncApi {
 
             // we deliberately don't add accountData to the timeline
             room.addAccountData(accountDataEvents);
-
             room.recalculate();
             if (joinObj.isBrandNewRoom) {
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             }
 
@@ -1500,7 +1495,6 @@ export class SyncApi {
 
             room.recalculate();
             if (leaveObj.isBrandNewRoom) {
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             }
 
@@ -1529,7 +1523,6 @@ export class SyncApi {
 
             if (knockObj.isBrandNewRoom) {
                 room.recalculate();
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             } else {
                 // Update room state for knock->leave->knock cycles
@@ -1669,7 +1662,12 @@ export class SyncApi {
             );
     }
 
-    private mapSyncResponseToRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom | IKnockedRoom>(
+    /**
+     * For each room check if it is known, if not then create the Room object, add it to the store and set isBrandNewRoom
+     * @param obj the rooms membership block from /sync to process
+     * @private
+     */
+    private processRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom | IKnockedRoom>(
         obj: Record<string, T>,
     ): Array<WrappedRoom<T>> {
         // Maps { roomid: {stuff}, roomid: {stuff} }
@@ -1940,9 +1938,17 @@ export class SyncApi {
     };
 }
 
-// /!\ This function is not intended for public use! It's only exported from
-// here in order to share some common logic with sliding-sync-sdk.ts.
-export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
+/**
+ * Creates a new room, wires up the client remitter for it, and adds it to the client store.
+ * @param client the client using which to create the room
+ * @param roomId the ID of the room to create
+ * @param opts the options to use when creating the room
+ * @internal
+ * @privateRemarks
+ * /!\ This function is not intended for public use! It's only exported from
+ * here in order to share some common logic with sliding-sync-sdk.ts.
+ */
+export function _createAndSetupRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
     const { timelineSupport } = client;
 
     const room = new Room(roomId, client, client.getUserId()!, {
@@ -1983,6 +1989,7 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
             RoomMemberEvent.Membership,
         ]);
     });
+    client.store.storeRoom(room);
 
     return room;
 }
