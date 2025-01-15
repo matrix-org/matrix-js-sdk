@@ -1468,6 +1468,9 @@ export class SyncApi {
             // we deliberately don't add accountData to the timeline
             room.addAccountData(accountDataEvents);
             room.recalculate();
+            if (joinObj.isBrandNewRoom) {
+                client.emit(ClientEvent.Room, room);
+            }
 
             this.processEventsForNotifs(room, timelineEvents);
 
@@ -1519,8 +1522,13 @@ export class SyncApi {
 
             await this.injectRoomEvents(room, stateEvents, undefined);
 
-            // Update room state for knock->leave->knock cycles
-            room.recalculate();
+            if (knockObj.isBrandNewRoom) {
+                room.recalculate();
+                client.emit(ClientEvent.Room, room);
+            } else {
+                // Update room state for knock->leave->knock cycles
+                room.recalculate();
+            }
             stateEvents.forEach(function (e) {
                 client.emit(ClientEvent.Event, e);
             });
@@ -1675,7 +1683,6 @@ export class SyncApi {
                 if (!room) {
                     room = this.createRoom(roomId);
                     client.store.storeRoom(room);
-                    client.emit(ClientEvent.Room, room);
                     isBrandNewRoom = true;
                 }
                 return {
