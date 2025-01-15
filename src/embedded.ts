@@ -563,10 +563,10 @@ export class RoomWidgetClient extends MatrixClient {
             await this.updateTxId(event);
 
             if (this.syncApi instanceof SyncApi) {
-                this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
+                await this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
             } else {
                 // Sliding Sync
-                this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+                await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
             }
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
@@ -606,10 +606,10 @@ export class RoomWidgetClient extends MatrixClient {
                 const event = new MatrixEvent(rawEvent as Partial<IEvent>);
 
                 if (this.syncApi instanceof SyncApi) {
-                    this.syncApi.injectRoomEvents(this.room!, undefined, [event]);
+                    await this.syncApi.injectRoomEvents(this.room!, undefined, [event]);
                 } else {
                     // Sliding Sync
-                    this.syncApi!.injectRoomEvents(this.room!, [event]);
+                    await this.syncApi!.injectRoomEvents(this.room!, [event]);
                 }
                 logger.info(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
             } else {
