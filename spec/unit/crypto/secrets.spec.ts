@@ -30,6 +30,7 @@ import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { decodeBase64 } from "../../../src/base64";
 import { CrossSigningKeyInfo } from "../../../src/crypto-api";
+import { SecretInfo } from "../../../src/secret-storage.ts";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },
@@ -66,6 +67,12 @@ function sign<T extends IObject | ICurve25519AuthData>(
         signatures: ISignatures;
         unsigned?: object;
     };
+}
+
+declare module "../../../src/@types/event" {
+    interface SecretStorageAccountDataEvents {
+        foo: SecretInfo;
+    }
 }
 
 describe("Secrets", function () {

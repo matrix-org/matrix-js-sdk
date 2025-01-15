@@ -28,6 +28,7 @@ import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
+import { AccountDataEvents, SecretStorageAccountDataEvents } from "./@types/event.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -138,7 +139,7 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
      * @param eventType - The type of account data
      * @returns The contents of the given account data event, or `null` if the event is not found
      */
-    getAccountDataFromServer: <T extends Record<string, any>>(eventType: string) => Promise<T | null>;
+    getAccountDataFromServer: <K extends keyof AccountDataEvents>(eventType: K) => Promise<AccountDataEvents[K] | null>;
 
     /**
      * Set account data event for the current user, with retries
@@ -147,7 +148,10 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
      * @param content - the content object to be set
      * @returns an empty object
      */
-    setAccountData: (eventType: string, content: any) => Promise<{}>;
+    setAccountData: <K extends keyof AccountDataEvents>(
+        eventType: K,
+        content: AccountDataEvents[K] | Record<string, never>,
+    ) => Promise<{}>;
 }
 
 /**
@@ -200,7 +204,17 @@ export interface SecretStorageCallbacks {
     ) => Promise<[string, Uint8Array] | null>;
 }
 
-interface SecretInfo {
+/**
+ * Account Data event types which can store secret-storage-encrypted information.
+ */
+export type SecretStorageKey = keyof SecretStorageAccountDataEvents;
+
+/**
+ * Account Data event content type for storing secret-storage-encrypted information.
+ *
+ * See https://spec.matrix.org/v1.13/client-server-api/#msecret_storagev1aes-hmac-sha2-1
+ */
+export interface SecretInfo {
     encrypted: {
         [keyId: string]: AESEncryptedSecretStoragePayload;
     };
@@ -293,7 +307,7 @@ export interface ServerSideSecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    isStored(name: string): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null>;
+    isStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null>;
 
     /**
      * Get the current default key ID for encrypting secrets.
@@ -305,9 +319,12 @@ export interface ServerSideSecretStorage {
     /**
      * Set the default key ID for encrypting secrets.
      *
+     * If keyId is `null`, the default key id value in the account data will be set to an empty object.
+     * This is considered as "disabling" the default key.
+     *
      * @param keyId - The new default key ID
      */
-    setDefaultKeyId(keyId: string): Promise<void>;
+    setDefaultKeyId(keyId: string | null): Promise<void>;
 }
 
 /**
@@ -340,29 +357,39 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @returns The default key ID or null if no default key ID is set
      */
     public async getDefaultKeyId(): Promise<string | null> {
-        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
-            "m.secret_storage.default_key",
-        );
+        const defaultKey = await this.accountDataAdapter.getAccountDataFromServer("m.secret_storage.default_key");
         if (!defaultKey) return null;
-        return defaultKey.key;
+        return defaultKey.key ?? null;
     }
 
     /**
-     * Set the default key ID for encrypting secrets.
-     *
-     * @param keyId - The new default key ID
+     * Implementation of {@link ServerSideSecretStorage#setDefaultKeyId}.
      */
-    public setDefaultKeyId(keyId: string): Promise<void> {
+    public setDefaultKeyId(keyId: string | null): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const listener = (ev: MatrixEvent): void => {
-                if (ev.getType() === "m.secret_storage.default_key" && ev.getContent().key === keyId) {
+                if (ev.getType() !== "m.secret_storage.default_key") {
+                    //  Different account data item
+                    return;
+                }
+
+                // If keyId === null, the content should be an empty object.
+                // Otherwise, the `key` in the content object should match keyId.
+                const content = ev.getContent();
+                const isSameKey = keyId === null ? Object.keys(content).length === 0 : content.key === keyId;
+                if (isSameKey) {
                     this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                     resolve();
                 }
             };
             this.accountDataAdapter.on(ClientEvent.AccountData, listener);
 
-            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", { key: keyId }).catch((e) => {
+            // The spec [1] says that the value of the account data entry should be an object with a `key` property.
+            // It doesn't specify how to delete the default key; we do it by setting the account data to an empty object.
+            //
+            // [1]: https://spec.matrix.org/v1.13/client-server-api/#key-storage
+            const newValue: Record<string, never> | { key: string } = keyId === null ? {} : { key: keyId };
+            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", newValue).catch((e) => {
                 this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                 reject(e);
             });
@@ -409,11 +436,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         if (!keyId) {
             do {
                 keyId = randomString(32);
-            } while (
-                await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescription>(
-                    `m.secret_storage.key.${keyId}`,
-                )
-            );
+            } while (await this.accountDataAdapter.getAccountDataFromServer(`m.secret_storage.key.${keyId}`));
         }
 
         await this.accountDataAdapter.setAccountData(`m.secret_storage.key.${keyId}`, keyInfo);
@@ -441,9 +464,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
             return null;
         }
 
-        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescriptionAesV1>(
-            "m.secret_storage.key." + keyId,
-        );
+        const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(`m.secret_storage.key.${keyId}`);
         return keyInfo ? [keyId, keyInfo] : null;
     }
 
@@ -492,7 +513,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @param secret - The secret contents.
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
      */
-    public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
+    public async store(name: SecretStorageKey, secret: string, keys?: string[] | null): Promise<void> {
         const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {
@@ -509,9 +530,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
 
         for (const keyId of keys) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescriptionAesV1>(
-                "m.secret_storage.key." + keyId,
-            );
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(`m.secret_storage.key.${keyId}`);
             if (!keyInfo) {
                 throw new Error("Unknown key: " + keyId);
             }
@@ -542,8 +561,8 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      * @returns the decrypted contents of the secret, or "undefined" if `name` is not found in
      *    the user's account data.
      */
-    public async get(name: string): Promise<string | undefined> {
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretInfo>(name);
+    public async get(name: SecretStorageKey): Promise<string | undefined> {
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
         if (!secretInfo) {
             return;
         }
@@ -555,9 +574,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         const keys: Record<string, SecretStorageKeyDescriptionAesV1> = {};
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescriptionAesV1>(
-                "m.secret_storage.key." + keyId,
-            );
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(`m.secret_storage.key.${keyId}`);
             const encInfo = secretInfo.encrypted[keyId];
             // only use keys we understand the encryption algorithm of
             if (keyInfo?.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
@@ -590,9 +607,9 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStored(name: string): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null> {
+    public async isStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescriptionAesV1> | null> {
         // check if secret exists
-        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretInfo>(name);
+        const secretInfo = await this.accountDataAdapter.getAccountDataFromServer(name);
         if (!secretInfo?.encrypted) return null;
 
         const ret: Record<string, SecretStorageKeyDescriptionAesV1> = {};
@@ -600,9 +617,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<SecretStorageKeyDescriptionAesV1>(
-                "m.secret_storage.key." + keyId,
-            );
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer(`m.secret_storage.key.${keyId}`);
             if (!keyInfo) continue;
             const encInfo = secretInfo.encrypted[keyId];
 

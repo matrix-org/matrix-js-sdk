@@ -45,6 +45,13 @@ import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
 import { KnownMembership } from "../../src/@types/membership";
 
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        global_test: {};
+        tester: {};
+    }
+}
+
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient | undefined;
     let httpBackend: MockHttpBackend | undefined;

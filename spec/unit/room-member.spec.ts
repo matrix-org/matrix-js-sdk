@@ -65,6 +65,40 @@ describe("RoomMember", function () {
             const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false, false);
             expect(url).toEqual(null);
         });
+
+        it("should return unauthenticated media URL if useAuthentication is not set", function () {
+            member.events.member = utils.mkEvent({
+                event: true,
+                type: "m.room.member",
+                skey: userA,
+                room: roomId,
+                user: userA,
+                content: {
+                    membership: KnownMembership.Join,
+                    avatar_url: "mxc://flibble/wibble",
+                },
+            });
+            const url = member.getAvatarUrl(hsUrl, 1, 1, "", false, false);
+            // Check for unauthenticated media prefix
+            expect(url?.indexOf("/_matrix/media/v3/")).not.toEqual(-1);
+        });
+
+        it("should return authenticated media URL if useAuthentication=true", function () {
+            member.events.member = utils.mkEvent({
+                event: true,
+                type: "m.room.member",
+                skey: userA,
+                room: roomId,
+                user: userA,
+                content: {
+                    membership: KnownMembership.Join,
+                    avatar_url: "mxc://flibble/wibble",
+                },
+            });
+            const url = member.getAvatarUrl(hsUrl, 1, 1, "", false, false, true);
+            // Check for authenticated media prefix
+            expect(url?.indexOf("/_matrix/client/v1/media/")).not.toEqual(-1);
+        });
     });
 
     describe("setPowerLevelEvent", function () {

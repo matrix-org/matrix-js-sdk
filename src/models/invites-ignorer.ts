@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "matrix-events-sdk";
-
 import { MatrixClient } from "../client.ts";
 import { IContent, MatrixEvent } from "./event.ts";
 import { EventTimeline } from "./event-timeline.ts";
@@ -23,47 +21,14 @@ import { Preset } from "../@types/partials.ts";
 import { globToRegexp } from "../utils.ts";
 import { Room } from "./room.ts";
 import { EventType, StateEvents } from "../@types/event.ts";
+import {
+    IGNORE_INVITES_ACCOUNT_EVENT_KEY,
+    POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyRecommendation,
+    PolicyScope,
+} from "./invites-ignorer-types.ts";
 
-/// The event type storing the user's individual policies.
-///
-/// Exported for testing purposes.
-export const POLICIES_ACCOUNT_EVENT_TYPE = new UnstableValue("m.policies", "org.matrix.msc3847.policies");
-
-/// The key within the user's individual policies storing the user's ignored invites.
-///
-/// Exported for testing purposes.
-export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(
-    "m.ignore.invites",
-    "org.matrix.msc3847.ignore.invites",
-);
-
-/// The types of recommendations understood.
-export enum PolicyRecommendation {
-    Ban = "m.ban",
-}
-
-/**
- * The various scopes for policies.
- */
-export enum PolicyScope {
-    /**
-     * The policy deals with an individual user, e.g. reject invites
-     * from this user.
-     */
-    User = "m.policy.user",
-
-    /**
-     * The policy deals with a room, e.g. reject invites towards
-     * a specific room.
-     */
-    Room = "m.policy.room",
-
-    /**
-     * The policy deals with a server, e.g. reject invites from
-     * this server.
-     */
-    Server = "m.policy.server",
-}
+export { IGNORE_INVITES_ACCOUNT_EVENT_KEY, POLICIES_ACCOUNT_EVENT_TYPE, PolicyRecommendation, PolicyScope };
 
 const scopeToEventTypeMap: Record<PolicyScope, keyof StateEvents> = {
     [PolicyScope.User]: EventType.PolicyRuleUser,
