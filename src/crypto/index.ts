@@ -4340,6 +4340,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     ): Promise<KeyBackupRestoreResult> {
         throw new Error("Not implemented");
     }
+
+    /**
+     * Stub function -- resetEncryption is not implemented here, so throw error
+     */
+    public resetEncryption(): Promise<void> {
+        throw new Error("Not implemented");
+    }
 }
 
 /**
