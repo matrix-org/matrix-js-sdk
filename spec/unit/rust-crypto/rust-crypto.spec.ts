@@ -64,6 +64,8 @@ import {
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -1722,6 +1724,168 @@ describe("RustCrypto", () => {
             });
             expect(await rustCrypto.isDehydrationSupported()).toBe(true);
         });
+
+        it("should handle dehydration start options", async () => {
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+            const e2eKeyReceiver = new E2EKeyReceiver("http://server");
+            const e2eKeyResponder = new E2EKeyResponder("http://server");
+            e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
+                status: 200,
+                body: {},
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
+                status: 200,
+                body: {},
+            });
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
+            // we need to process a sync so that the OlmMachine will upload keys
+            await rustCrypto.preprocessToDeviceMessages([]);
+            await rustCrypto.onSyncCompleted({});
+
+            // dehydration requires secret storage and cross signing
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+            await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            await rustCrypto.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            // set up mocks needed for device dehydration
+            let dehydratedDeviceInfo: Record<string, any> | undefined;
+            const getDehydratedDeviceMock = jest.fn(() => {
+                if (dehydratedDeviceInfo) {
+                    return {
+                        status: 200,
+                        body: dehydratedDeviceInfo,
+                    };
+                } else {
+                    return {
+                        status: 404,
+                        body: {
+                            errcode: "M_NOT_FOUND",
+                            error: "Not found",
+                        },
+                    };
+                }
+            });
+            fetchMock.get(
+                "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+                getDehydratedDeviceMock,
+            );
+            const putDehydratedDeviceMock = jest.fn((path, opts) => {
+                const content = JSON.parse(opts.body as string);
+                dehydratedDeviceInfo = {
+                    device_id: content.device_id,
+                    device_data: content.device_data,
+                };
+                return {
+                    status: 200,
+                    body: {
+                        device_id: content.device_id,
+                    },
+                };
+            });
+            fetchMock.put(
+                "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+                putDehydratedDeviceMock,
+            );
+            fetchMock.post(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
+                status: 200,
+                body: {
+                    events: [],
+                    next_batch: "foo",
+                },
+            });
+
+            fetchMock.mockClear();
+
+            // Start with testing `onlyIfKeyCached: true`.  Since this is our
+            // first run, there is no key cached, so should do nothing.  i.e. it
+            // should not make any HTTP requests and should not create a new key.
+            await rustCrypto.startDehydration({ onlyIfKeyCached: true });
+            expect(getDehydratedDeviceMock).not.toHaveBeenCalled();
+            expect(putDehydratedDeviceMock).not.toHaveBeenCalled();
+            expect(await secretStorage.get("org.matrix.msc3814")).toBeFalsy();
+
+            getDehydratedDeviceMock.mockClear();
+            putDehydratedDeviceMock.mockClear();
+
+            // With default options and no key is available, should create new
+            // key and create new dehydrated device (so it will `PUT
+            // /dehydrated_device`).  It won't try to rehydrate the device,
+            // since it has no dehydration key yet.
+            await rustCrypto.startDehydration();
+            expect(putDehydratedDeviceMock).toHaveBeenCalled();
+            const origDehydrationKey = await secretStorage.get("org.matrix.msc3814");
+            expect(origDehydrationKey).toBeTruthy();
+
+            getDehydratedDeviceMock.mockClear();
+            putDehydratedDeviceMock.mockClear();
+
+            // Start again with default options, but this time it will try to
+            // rehydrate a device (so it will `GET /dehydrated_device`).  It
+            // should keep the same dehydration key.
+            await rustCrypto.startDehydration();
+            expect(getDehydratedDeviceMock).toHaveBeenCalled();
+            expect(putDehydratedDeviceMock).toHaveBeenCalled();
+            expect(await secretStorage.get("org.matrix.msc3814")).toEqual(origDehydrationKey);
+
+            getDehydratedDeviceMock.mockClear();
+            putDehydratedDeviceMock.mockClear();
+
+            // Again try "onlyIfKeyCached: true", but this time we already have
+            // a cached key, so it will rehydrate the device and create a new
+            // dehydrated device.  It should keep the same dehydration key.
+            await rustCrypto.startDehydration({ onlyIfKeyCached: true });
+            expect(getDehydratedDeviceMock).toHaveBeenCalled();
+            expect(putDehydratedDeviceMock).toHaveBeenCalled();
+            expect(await secretStorage.get("org.matrix.msc3814")).toEqual(origDehydrationKey);
+
+            getDehydratedDeviceMock.mockClear();
+            putDehydratedDeviceMock.mockClear();
+
+            // With "rehydrate: false", it should not try to rehydrate, but
+            // still create a new dehydrated device.  It should keep the same
+            // dehydration key.
+            await rustCrypto.startDehydration({ rehydrate: false });
+            expect(getDehydratedDeviceMock).not.toHaveBeenCalled();
+            expect(putDehydratedDeviceMock).toHaveBeenCalled();
+            expect(await secretStorage.get("org.matrix.msc3814")).toEqual(origDehydrationKey);
+
+            getDehydratedDeviceMock.mockClear();
+            putDehydratedDeviceMock.mockClear();
+
+            // With "createNewKey: true", it should create a new dehydration key
+            await rustCrypto.startDehydration({ createNewKey: true });
+            expect(getDehydratedDeviceMock).toHaveBeenCalled();
+            expect(putDehydratedDeviceMock).toHaveBeenCalled();
+            expect(await secretStorage.get("org.matrix.msc3814")).not.toEqual(origDehydrationKey);
+
+            getDehydratedDeviceMock.mockClear();
+            putDehydratedDeviceMock.mockClear();
+
+            rustCrypto.stop();
+        });
     });
 
     describe("import & export secrets bundle", () => {
@@ -1949,6 +2113,8 @@ class DummyAccountDataClient
         return {};
     }
 }
+
+/** emulate 
 
 /** Pad a string to 43 characters long */
 function pad43(x: string): string {

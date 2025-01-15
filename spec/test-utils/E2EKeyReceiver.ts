@@ -19,6 +19,7 @@ import { Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
+import { deepCompare, sleep } from "../../src/utils";
 
 /** Interface implemented by classes that intercept `/keys/upload` requests from test clients to catch the uploaded keys
  *
@@ -82,9 +83,9 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     private async onKeyUploadRequest(onOnTimeKeysUploaded: () => void, options: RequestInit): Promise<object> {
         const content = JSON.parse(options.body as string);
 
-        // device keys may only be uploaded once
+        // device keys should not change after they've been uploaded
         if (content.device_keys && Object.keys(content.device_keys).length > 0) {
-            if (this.deviceKeys) {
+            if (this.deviceKeys && !deepCompare(this.deviceKeys.keys, content.device_keys.keys)) {
                 throw new Error("Application attempted to upload E2E device keys multiple times");
             }
             this.debug(`received device keys`);
@@ -98,7 +99,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
             // otherwise the client ends up tight-looping one-time-key-uploads and filling the logs with junk.
             if (Object.keys(this.oneTimeKeys).length > 0) {
                 this.debug(`received second batch of one-time keys: blocking response`);
-                await new Promise(() => {});
+                await sleep(50);
             }
 
             this.debug(`received ${Object.keys(content.one_time_keys).length} one-time keys`);

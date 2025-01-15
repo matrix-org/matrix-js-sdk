@@ -23,7 +23,7 @@ import { IToDeviceEvent } from "../sync-accumulator.ts";
 import { ServerSideSecretStorage } from "../secret-storage.ts";
 import { decodeBase64 } from "../base64.ts";
 import { Logger } from "../logger.ts";
-import { DehydratedDevicesEvents, DehydratedDevicesAPI } from "../crypto-api/index.ts";
+import { DehydratedDevicesEvents, DehydratedDevicesAPI, StartDehydrationOpts } from "../crypto-api/index.ts";
 
 /**
  * The response body of `GET /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device`.
@@ -123,27 +123,38 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
     /**
      * Start using device dehydration.
      *
-     * - Rehydrates a dehydrated device, if one is available.
+     * - Rehydrates a dehydrated device, if one is available and `opts.rehydrate`
+     *   is `true`.
      * - Creates a new dehydration key, if necessary, and stores it in Secret
      *   Storage.
-     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If `opts.createNewKey` is set to true, always creates a new key.
      *   - If a dehydration key is not available, creates a new one.
      * - Creates a new dehydrated device, and schedules periodically creating
      *   new dehydrated devices.
      *
-     * @param createNewKey - whether to force creation of a new dehydration key.
-     *   This can be used, for example, if Secret Storage is being reset.
+     * @param opts - options for device dehydration. For backwards compatibility
+     *     with old code, a boolean can be given here, which will be treated as
+     *     the `createNewKey` option. However, this is deprecated.
      */
-    public async start(createNewKey?: boolean): Promise<void> {
-        this.stop();
-        try {
-            await this.rehydrateDeviceIfAvailable();
-        } catch (e) {
-            // If rehydration fails, there isn't much we can do about it.  Log
-            // the error, and create a new device.
-            this.logger.info("dehydration: Error rehydrating device:", e);
+    public async start(opts: StartDehydrationOpts | boolean = {}): Promise<void> {
+        if (typeof opts === "boolean") {
+            opts = { createNewKey: opts };
         }
-        if (createNewKey) {
+
+        if (opts.onlyIfKeyCached && !(await this.getCachedKey())) {
+            return;
+        }
+        this.stop();
+        if (opts.rehydrate !== false) {
+            try {
+                await this.rehydrateDeviceIfAvailable();
+            } catch (e) {
+                // If rehydration fails, there isn't much we can do about it.  Log
+                // the error, and create a new device.
+                this.logger.info("dehydration: Error rehydrating device:", e);
+            }
+        }
+        if (opts.createNewKey) {
             await this.resetKey();
         }
         await this.scheduleDeviceDehydration();
