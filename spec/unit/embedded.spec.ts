@@ -28,7 +28,6 @@ import {
     WidgetApiToWidgetAction,
     MatrixCapabilities,
     ITurnServer,
-    IRoomEvent,
     IOpenIDCredentials,
     ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
@@ -635,12 +634,20 @@ describe("RoomWidgetClient", () => {
         });
 
         it("receives", async () => {
-            await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+            const init = makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
             expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
             expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+            // Client needs to be told that the room state is loaded
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.UpdateState}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.UpdateState}`, { detail: { data: { state: [] } } }),
+            );
+            await init;
 
             const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
             const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
+            // Let's assume that a state event comes in but it doesn't actually
+            // update the state of the room just yet (maybe it's unauthorized)
             widgetApi.emit(
                 `action:${WidgetApiToWidgetAction.SendEvent}`,
                 new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
@@ -649,26 +656,43 @@ describe("RoomWidgetClient", () => {
             // The client should've emitted about the received event
             expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
             expect(await emittedSync).toEqual(SyncState.Syncing);
-            // It should've also inserted the event into the room object
+            // However it should not have changed the room state
             const room = client.getRoom("!1:example.org");
-            expect(room).not.toBeNull();
+            expect(room!.currentState.getStateEvents("org.example.foo", "bar")).toBe(null);
+
+            // Now assume that the state event becomes favored by state
+            // resolution for whatever reason and enters into the current state
+            // of the room
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.UpdateState}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.UpdateState}`, {
+                    detail: { data: { state: [event] } },
+                }),
+            );
+            // It should now have changed the room state
             expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
         });
 
-        it("backfills", async () => {
-            widgetApi.readStateEvents.mockImplementation(async (eventType, limit, stateKey) =>
-                eventType === "org.example.foo" && (limit ?? Infinity) > 0 && stateKey === "bar"
-                    ? [event as IRoomEvent]
-                    : [],
+        it("ignores state updates for other rooms", async () => {
+            const init = makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+            // Client needs to be told that the room state is loaded
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.UpdateState}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.UpdateState}`, { detail: { data: { state: [] } } }),
             );
+            await init;
 
-            await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
-            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
-            expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
-
-            const room = client.getRoom("!1:example.org");
-            expect(room).not.toBeNull();
-            expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            // Now a room we're not interested in receives a state update
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.UpdateState}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.UpdateState}`, {
+                    detail: { data: { state: [{ ...event, room_id: "!other-room:example.org" }] } },
+                }),
+            );
+            // No change to the room state
+            for (const room of client.getRooms()) {
+                expect(room.currentState.getStateEvents("org.example.foo", "bar")).toBe(null);
+            }
         });
     });
 

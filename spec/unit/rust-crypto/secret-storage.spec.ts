@@ -19,6 +19,18 @@ import {
     secretStorageContainsCrossSigningKeys,
 } from "../../../src/rust-crypto/secret-storage";
 import { ServerSideSecretStorage } from "../../../src/secret-storage";
+import { SecretInfo } from "../../../src/secret-storage.ts";
+
+declare module "../../../src/@types/event" {
+    interface SecretStorageAccountDataEvents {
+        secretA: SecretInfo;
+        secretB: SecretInfo;
+        secretC: SecretInfo;
+        secretD: SecretInfo;
+        secretE: SecretInfo;
+        Unknown: SecretInfo;
+    }
+}
 
 describe("secret-storage", () => {
     describe("secretStorageContainsCrossSigningKeys", () => {

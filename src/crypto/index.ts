@@ -77,6 +77,7 @@ import {
     AddSecretStorageKeyOpts,
     calculateKeyCheck,
     SECRET_STORAGE_ALGORITHM_V1_AES,
+    SecretStorageKey,
     SecretStorageKeyDescription,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
@@ -326,8 +327,6 @@ export type CryptoEventHandlerMap = CryptoApiCryptoEventHandlerMap & {
      */
     [CryptoEvent.Warning]: (type: string) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
-
-    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
 };
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {
@@ -1196,21 +1195,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#store}.
      */
-    public storeSecret(name: string, secret: string, keys?: string[]): Promise<void> {
+    public storeSecret(name: SecretStorageKey, secret: string, keys?: string[]): Promise<void> {
         return this.secretStorage.store(name, secret, keys);
     }
 
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#get}.
      */
-    public getSecret(name: string): Promise<string | undefined> {
+    public getSecret(name: SecretStorageKey): Promise<string | undefined> {
         return this.secretStorage.get(name);
     }
 
     /**
      * @deprecated Use {@link MatrixClient#secretStorage} and {@link SecretStorage.ServerSideSecretStorage#isStored}.
      */
-    public isSecretStored(name: string): Promise<Record<string, SecretStorageKeyDescription> | null> {
+    public isSecretStored(name: SecretStorageKey): Promise<Record<string, SecretStorageKeyDescription> | null> {
         return this.secretStorage.isStored(name);
     }
 
@@ -1848,7 +1847,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
             throw new Error(`getBackupDecryptor expects Uint8Array`);
         }

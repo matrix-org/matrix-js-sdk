@@ -368,6 +368,11 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * If false, any non-matrix content URLs will be ignored. Setting this option to
      * true will expose URLs that, if fetched, will leak information about the user
      * to anyone who they share a room with.
+     * @param useAuthentication - (optional) If true, the caller supports authenticated
+     * media and wants an authentication-required URL. Note that server support for
+     * authenticated media will not be checked - it is the caller's responsibility
+     * to do so before calling this function. Note also that useAuthentication
+     * implies allowRedirects. Defaults to false (unauthenticated endpoints).
      * @returns the avatar URL or null.
      */
     public getAvatarUrl(
@@ -377,13 +382,23 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         resizeMethod: string,
         allowDefault = true,
         allowDirectLinks: boolean,
+        useAuthentication: boolean = false,
     ): string | null {
         const rawUrl = this.getMxcAvatarUrl();
 
         if (!rawUrl && !allowDefault) {
             return null;
         }
-        const httpUrl = getHttpUriForMxc(baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks);
+        const httpUrl = getHttpUriForMxc(
+            baseUrl,
+            rawUrl,
+            width,
+            height,
+            resizeMethod,
+            allowDirectLinks,
+            undefined,
+            useAuthentication,
+        );
         if (httpUrl) {
             return httpUrl;
         }

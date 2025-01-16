@@ -30,7 +30,6 @@ import {
 } from "../crypto-api/keybackup.ts";
 import { logger } from "../logger.ts";
 import { ClientPrefix, IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
-import { IMegolmSessionData } from "../crypto/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { encodeUri, logDuration } from "../utils.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
@@ -38,6 +37,7 @@ import { sleep } from "../utils.ts";
 import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { ImportRoomKeyProgressData, ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
 import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { IMegolmSessionData } from "../@types/crypto.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];

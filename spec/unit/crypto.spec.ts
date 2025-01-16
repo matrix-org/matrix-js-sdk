@@ -119,7 +119,7 @@ describe("Crypto", function () {
 
     it("getVersion() should return the current version of the olm library", async () => {
         const client = new TestClient("@alice:example.com", "deviceid").client;
-        await client.initCrypto();
+        await client.initLegacyCrypto();
 
         const olmVersionTuple = Crypto.getOlmVersion();
         expect(client.getCrypto()?.getVersion()).toBe(
@@ -130,7 +130,7 @@ describe("Crypto", function () {
     describe("encrypted events", function () {
         it("provides encryption information for events from unverified senders", async function () {
             const client = new TestClient("@alice:example.com", "deviceid").client;
-            await client.initCrypto();
+            await client.initLegacyCrypto();
 
             // unencrypted event
             const event = {
@@ -210,7 +210,7 @@ describe("Crypto", function () {
             let client: MatrixClient;
             beforeEach(async () => {
                 client = new TestClient("@alice:example.com", "deviceid").client;
-                await client.initCrypto();
+                await client.initLegacyCrypto();
 
                 // mock out the verification check
                 client.crypto!.checkUserTrust = (userId) => new UserTrustLevel(true, false, false);
@@ -306,7 +306,7 @@ describe("Crypto", function () {
 
         it("doesn't throw an error when attempting to decrypt a redacted event", async () => {
             const client = new TestClient("@alice:example.com", "deviceid").client;
-            await client.initCrypto();
+            await client.initLegacyCrypto();
 
             const event = new MatrixEvent({
                 content: {},
@@ -439,10 +439,10 @@ describe("Crypto", function () {
             secondAliceClient = new TestClient("@alice:example.com", "secondAliceDevice").client;
             bobClient = new TestClient("@bob:example.com", "bobdevice").client;
             claraClient = new TestClient("@clara:example.com", "claradevice").client;
-            await aliceClient.initCrypto();
-            await secondAliceClient.initCrypto();
-            await bobClient.initCrypto();
-            await claraClient.initCrypto();
+            await aliceClient.initLegacyCrypto();
+            await secondAliceClient.initLegacyCrypto();
+            await bobClient.initLegacyCrypto();
+            await claraClient.initLegacyCrypto();
         });
 
         afterEach(async function () {
@@ -1111,7 +1111,7 @@ describe("Crypto", function () {
             jest.spyOn(logger, "debug").mockImplementation(() => {});
             jest.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             client.crypto!.isCrossSigningReady = async () => false;
             client.crypto!.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
             client.crypto!.baseApis.setAccountData = jest.fn().mockResolvedValue(null);
@@ -1147,9 +1147,9 @@ describe("Crypto", function () {
 
             client = new TestClient("@alice:example.org", "aliceweb");
 
-            // running initCrypto should trigger a key upload
+            // running initLegacyCrypto should trigger a key upload
             client.httpBackend.when("POST", "/keys/upload").respond(200, {});
-            await Promise.all([client.client.initCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
+            await Promise.all([client.client.initLegacyCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
 
             encryptedPayload = {
                 algorithm: "m.olm.v1.curve25519-aes-sha2",
@@ -1264,9 +1264,9 @@ describe("Crypto", function () {
 
             client = new TestClient("@alice:example.org", "aliceweb");
 
-            // running initCrypto should trigger a key upload
+            // running initLegacyCrypto should trigger a key upload
             client.httpBackend.when("POST", "/keys/upload").respond(200, {});
-            await Promise.all([client.client.initCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
+            await Promise.all([client.client.initLegacyCrypto(), client.httpBackend.flush("/keys/upload", 1)]);
 
             encryptedPayload = {
                 algorithm: "m.olm.v1.curve25519-aes-sha2",
@@ -1362,7 +1362,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+            await client.client.initLegacyCrypto();
         });
 
         afterEach(async () => {
@@ -1388,7 +1388,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+            await client.client.initLegacyCrypto();
         });
 
         afterEach(async () => {
@@ -1414,7 +1414,7 @@ describe("Crypto", function () {
 
         beforeEach(async () => {
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+            await client.client.initLegacyCrypto();
         });
 
         afterEach(async function () {

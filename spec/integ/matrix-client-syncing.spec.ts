@@ -50,6 +50,13 @@ import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IActionsObject } from "../../src/pushprocessor";
 import { KnownMembership } from "../../src/@types/membership";
 
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        a: {};
+        b: {};
+    }
+}
+
 describe("MatrixClient syncing", () => {
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
@@ -112,7 +119,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should emit RoomEvent.MyMembership for invite->leave->invite cycles", async () => {
-            await client!.initCrypto();
+            await client!.initLegacyCrypto();
 
             const roomId = "!cycles:example.org";
 
@@ -227,7 +234,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should emit RoomEvent.MyMembership for knock->leave->knock cycles", async () => {
-            await client!.initCrypto();
+            await client!.initLegacyCrypto();
 
             const roomId = "!cycles:example.org";
 
@@ -2573,7 +2580,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         idbHttpBackend.when("GET", "/pushrules/").respond(200, {});
         idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
 
-        await idbClient.initCrypto();
+        await idbClient.initLegacyCrypto();
 
         const roomId = "!invite:example.org";
 

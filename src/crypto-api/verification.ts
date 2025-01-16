@@ -155,7 +155,7 @@ export interface VerificationRequest
      * @param qrCodeData - the decoded QR code.
      * @returns A verifier; call `.verify()` on it to wait for the other side to complete the verification flow.
      */
-    scanQRCode(qrCodeData: Uint8Array): Promise<Verifier>;
+    scanQRCode(qrCodeData: Uint8ClampedArray): Promise<Verifier>;
 
     /**
      * The verifier which is doing the actual verification, once the method has been established.
@@ -170,7 +170,7 @@ export interface VerificationRequest
      *
      * @deprecated Not supported in Rust Crypto. Use {@link VerificationRequest#generateQRCode} instead.
      */
-    getQRCodeBytes(): Buffer | undefined;
+    getQRCodeBytes(): Uint8ClampedArray | undefined;
 
     /**
      * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
@@ -178,7 +178,7 @@ export interface VerificationRequest
      * Only returns data once `phase` is {@link VerificationPhase.Ready} and the other party can scan a QR code;
      * otherwise returns `undefined`.
      */
-    generateQRCode(): Promise<Buffer | undefined>;
+    generateQRCode(): Promise<Uint8ClampedArray | undefined>;
 
     /**
      * If this request has been cancelled, the cancellation code (e.g `m.user`) which is responsible for cancelling

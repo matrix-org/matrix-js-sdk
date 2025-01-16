@@ -650,9 +650,9 @@ describe("MatrixClient", function () {
         }
 
         beforeEach(function () {
-            // running initCrypto should trigger a key upload
+            // running initLegacyCrypto should trigger a key upload
             httpBackend.when("POST", "/keys/upload").respond(200, {});
-            return Promise.all([client.initCrypto(), httpBackend.flush("/keys/upload", 1)]);
+            return Promise.all([client.initLegacyCrypto(), httpBackend.flush("/keys/upload", 1)]);
         });
 
         afterEach(() => {
@@ -1913,6 +1913,28 @@ describe("MatrixClient", function () {
 
             httpBackend.flush("");
             return prom;
+        });
+    });
+
+    describe("getDomain", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getDomain()).toBeNull();
+        });
+
+        it("should return the domain of the userId", () => {
+            expect(client.getDomain()).toBe("localhost");
+        });
+    });
+
+    describe("getUserIdLocalpart", () => {
+        it("should return null if no userId is set", () => {
+            const client = new MatrixClient({ baseUrl: "http://localhost" });
+            expect(client.getUserIdLocalpart()).toBeNull();
+        });
+
+        it("should return the localpart of the userId", () => {
+            expect(client.getUserIdLocalpart()).toBe("alice");
         });
     });
 });

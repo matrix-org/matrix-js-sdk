@@ -481,6 +481,9 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     public getUserId(): string {
         return this.userId;
     }
+    public getSafeUserId(): string {
+        return this.userId;
+    }
 
     public getDeviceId(): string {
         return this.deviceId;

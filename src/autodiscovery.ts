@@ -130,7 +130,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: IClientWellKnown): Promise<ClientConfig> {
+    public static async fromDiscoveryConfig(wellknown?: IClientWellKnown): Promise<ClientConfig> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to

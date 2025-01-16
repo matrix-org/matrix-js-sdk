@@ -345,10 +345,10 @@ describe("MatrixClient crypto", () => {
 
     beforeEach(async () => {
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
-        await aliTestClient.client.initCrypto();
+        await aliTestClient.client.initLegacyCrypto();
 
         bobTestClient = new TestClient(bobUserId, bobDeviceId, bobAccessToken);
-        await bobTestClient.client.initCrypto();
+        await bobTestClient.client.initLegacyCrypto();
 
         aliMessages = [];
         bobMessages = [];

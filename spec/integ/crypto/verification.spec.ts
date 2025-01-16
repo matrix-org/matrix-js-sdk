@@ -78,6 +78,7 @@ import {
     encryptGroupSessionKey,
     encryptMegolmEvent,
     encryptSecretSend,
+    getTestOlmAccountKeys,
     ToDeviceEvent,
 } from "./olm-utils";
 import { KeyBackupInfo } from "../../../src/crypto-api";
@@ -473,21 +474,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.phase).toEqual(VerificationPhase.Ready);
 
             // we should now have QR data we can display
-            const qrCodeBuffer = (await request.generateQRCode())!;
-            expect(qrCodeBuffer).toBeTruthy();
+            const rawQrCodeBuffer = (await request.generateQRCode())!;
+            expect(rawQrCodeBuffer).toBeTruthy();
+            const qrCodeBuffer = new Uint8Array(rawQrCodeBuffer);
 
+            const textDecoder = new TextDecoder();
             // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
-            expect(qrCodeBuffer.subarray(0, 6).toString("latin1")).toEqual("MATRIX");
-            expect(qrCodeBuffer.readUint8(6)).toEqual(0x02); // version
-            expect(qrCodeBuffer.readUint8(7)).toEqual(0x02); // mode
-            const txnIdLen = qrCodeBuffer.readUint16BE(8);
-            expect(qrCodeBuffer.subarray(10, 10 + txnIdLen).toString("utf-8")).toEqual(transactionId);
+            expect(textDecoder.decode(qrCodeBuffer.slice(0, 6))).toEqual("MATRIX");
+            expect(qrCodeBuffer[6]).toEqual(0x02); // version
+            expect(qrCodeBuffer[7]).toEqual(0x02); // mode
+            const txnIdLen = (qrCodeBuffer[8] << 8) + qrCodeBuffer[9];
+            expect(textDecoder.decode(qrCodeBuffer.slice(10, 10 + txnIdLen))).toEqual(transactionId);
             // Alice's device's public key comes next, but we have nothing to do with it here.
-            // const aliceDevicePubKey = qrCodeBuffer.subarray(10 + txnIdLen, 32 + 10 + txnIdLen);
-            expect(qrCodeBuffer.subarray(42 + txnIdLen, 32 + 42 + txnIdLen)).toEqual(
-                Buffer.from(MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64, "base64"),
+            // const aliceDevicePubKey = qrCodeBuffer.slice(10 + txnIdLen, 32 + 10 + txnIdLen);
+            expect(encodeUnpaddedBase64(qrCodeBuffer.slice(42 + txnIdLen, 32 + 42 + txnIdLen))).toEqual(
+                MASTER_CROSS_SIGNING_PUBLIC_KEY_BASE64,
             );
-            const sharedSecret = qrCodeBuffer.subarray(74 + txnIdLen);
+            const sharedSecret = qrCodeBuffer.slice(74 + txnIdLen);
 
             // we should still be "Ready" and have no verifier
             expect(request.phase).toEqual(VerificationPhase.Ready);
@@ -805,7 +808,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             // we should now have QR data we can display
             const qrCodeBuffer = (await request.generateQRCode())!;
             expect(qrCodeBuffer).toBeTruthy();
-            const sharedSecret = qrCodeBuffer.subarray(74 + transactionId.length);
+            const sharedSecret = qrCodeBuffer.slice(74 + transactionId.length);
 
             // the dummy device "scans" the displayed QR code and acknowledges it with a "m.key.verification.start"
             returnToDeviceMessageFromSync(buildReciprocateStartMessage(transactionId, sharedSecret));
@@ -990,6 +993,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             aliceClient.setGlobalErrorOnUnknownDevices(false);
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
             await syncPromise(aliceClient);
+
+            // Rust crypto requires the sender's device keys before it accepts a
+            // verification request.
+            if (backend === "rust-sdk") {
+                const crypto = aliceClient.getCrypto()!;
+
+                const bobDeviceKeys = getTestOlmAccountKeys(testOlmAccount, BOB_TEST_USER_ID, "BobDevice");
+                e2eKeyResponder.addDeviceKeys(bobDeviceKeys);
+                syncResponder.sendOrQueueSyncResponse({ device_lists: { changed: [BOB_TEST_USER_ID] } });
+                await syncPromise(aliceClient);
+                await crypto.getUserDeviceInfo([BOB_TEST_USER_ID]);
+            }
         });
 
         /**
@@ -1627,7 +1642,7 @@ function buildReadyMessage(
 }
 
 /** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
-function buildReciprocateStartMessage(transactionId: string, sharedSecret: Uint8Array) {
+function buildReciprocateStartMessage(transactionId: string, sharedSecret: ArrayBuffer) {
     return {
         type: "m.key.verification.start",
         content: {
@@ -1723,7 +1738,7 @@ function buildQRCode(
     key2Base64: string,
     sharedSecret: string,
     mode = 0x02,
-): Uint8Array {
+): Uint8ClampedArray {
     // https://spec.matrix.org/v1.7/client-server-api/#qr-code-format
 
     const qrCodeBuffer = Buffer.alloc(150); // oversize
@@ -1739,5 +1754,5 @@ function buildQRCode(
     idx += qrCodeBuffer.write(sharedSecret, idx);
 
     // truncate to the right length
-    return qrCodeBuffer.subarray(0, idx);
+    return new Uint8ClampedArray(qrCodeBuffer.subarray(0, idx));
 }

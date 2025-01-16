@@ -49,18 +49,12 @@ export class MediaTrackHandler {
 
     public getLocalTrackIdByMid(mid: string): string | undefined {
         const transceiver = this.pc.getTransceivers().find((t) => t.mid === mid);
-        if (transceiver !== undefined && !!transceiver.sender && !!transceiver.sender.track) {
-            return transceiver.sender.track.id;
-        }
-        return undefined;
+        return transceiver?.sender?.track?.id;
     }
 
     public getRemoteTrackIdByMid(mid: string): string | undefined {
         const transceiver = this.pc.getTransceivers().find((t) => t.mid === mid);
-        if (transceiver !== undefined && !!transceiver.receiver && !!transceiver.receiver.track) {
-            return transceiver.receiver.track.id;
-        }
-        return undefined;
+        return transceiver?.receiver?.track?.id;
     }
 
     public getActiveSimulcastStreams(): number {

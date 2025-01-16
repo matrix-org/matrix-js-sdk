@@ -281,8 +281,9 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
      *
      * @deprecated Prefer `generateQRCode`.
      */
-    public getQRCodeBytes(): Buffer | undefined {
-        return this._qrCodeData?.getBuffer();
+    public getQRCodeBytes(): Uint8ClampedArray | undefined {
+        if (!this._qrCodeData) return;
+        return new Uint8ClampedArray(this._qrCodeData.getBuffer());
     }
 
     /**
@@ -291,7 +292,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
      * Only returns data once `phase` is `Ready` and the other party can scan a QR code;
      * otherwise returns `undefined`.
      */
-    public async generateQRCode(): Promise<Buffer | undefined> {
+    public async generateQRCode(): Promise<Uint8ClampedArray | undefined> {
         return this.getQRCodeBytes();
     }
 
@@ -478,7 +479,7 @@ export class VerificationRequest<C extends IVerificationChannel = IVerificationC
         return verifier;
     }
 
-    public scanQRCode(qrCodeData: Uint8Array): Promise<Verifier> {
+    public scanQRCode(qrCodeData: Uint8ClampedArray): Promise<Verifier> {
         throw new Error("QR code scanning not supported by legacy crypto");
     }
 

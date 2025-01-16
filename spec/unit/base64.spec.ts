@@ -15,34 +15,10 @@ limitations under the License.
 */
 
 import { TextEncoder, TextDecoder } from "util";
-import NodeBuffer from "node:buffer";
 
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64, encodeUnpaddedBase64Url } from "../../src/base64";
 
-describe.each(["browser", "node"])("Base64 encoding (%s)", (env) => {
-    let origBuffer = Buffer;
-
-    beforeAll(() => {
-        if (env === "browser") {
-            origBuffer = Buffer;
-            // @ts-ignore
-            // eslint-disable-next-line no-global-assign
-            Buffer = undefined;
-
-            globalThis.atob = NodeBuffer.atob;
-            globalThis.btoa = NodeBuffer.btoa;
-        }
-    });
-
-    afterAll(() => {
-        // eslint-disable-next-line no-global-assign
-        Buffer = origBuffer;
-        // @ts-ignore
-        globalThis.atob = undefined;
-        // @ts-ignore
-        globalThis.btoa = undefined;
-    });
-
+describe("Base64 encoding", () => {
     it("Should decode properly encoded data", () => {
         const decoded = new TextDecoder().decode(decodeBase64("ZW5jb2RpbmcgaGVsbG8gd29ybGQ="));
 

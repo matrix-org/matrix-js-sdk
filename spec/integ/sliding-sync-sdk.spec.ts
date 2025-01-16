@@ -45,6 +45,13 @@ import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
 import { KnownMembership } from "../../src/@types/membership";
 
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        global_test: {};
+        tester: {};
+    }
+}
+
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient | undefined;
     let httpBackend: MockHttpBackend | undefined;
@@ -119,7 +126,7 @@ describe("SlidingSyncSdk", () => {
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", new Map(), {}, client, 0));
         if (testOpts.withCrypto) {
             httpBackend!.when("GET", "/room_keys/version").respond(404, {});
-            await client!.initCrypto();
+            await client!.initLegacyCrypto();
             syncOpts.cryptoCallbacks = syncOpts.crypto = client!.crypto;
         }
         httpBackend!.when("GET", "/_matrix/client/v3/pushrules").respond(200, {});

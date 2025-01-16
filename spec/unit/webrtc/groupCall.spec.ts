@@ -1430,7 +1430,7 @@ describe("Group Call", function () {
         let client: MatrixClient;
 
         beforeEach(() => {
-            client = new MatrixClient({ baseUrl: "base_url" });
+            client = new MatrixClient({ baseUrl: "base_url", userId: "my_user_id" });
 
             jest.spyOn(client, "sendStateEvent").mockResolvedValue({} as any);
         });

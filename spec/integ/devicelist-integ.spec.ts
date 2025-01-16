@@ -77,7 +77,7 @@ describe("DeviceList management:", function () {
 
     async function createTestClient() {
         const testClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs", sessionStoreBackend);
-        await testClient.client.initCrypto();
+        await testClient.client.initLegacyCrypto();
         return testClient;
     }
 

@@ -20,6 +20,7 @@ import { RelationType } from "../@types/event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { MatrixClient } from "../client.ts";
 import { Room } from "./room.ts";
+import { CryptoBackend } from "../common-crypto/CryptoBackend.ts";
 
 export enum RelationsEvent {
     Add = "Relations.add",
@@ -323,8 +324,9 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return event;
         }, null);
 
-        if (lastReplacement?.shouldAttemptDecryption() && this.client.isCryptoEnabled()) {
-            await lastReplacement.attemptDecryption(this.client.crypto!);
+        if (lastReplacement?.shouldAttemptDecryption() && this.client.getCrypto()) {
+            // Dirty but we are expecting to pass the cryptoBackend which is not accessible here
+            await lastReplacement.attemptDecryption(this.client.getCrypto() as CryptoBackend);
         } else if (lastReplacement?.isBeingDecrypted()) {
             await lastReplacement.getDecryptionPromise();
         }

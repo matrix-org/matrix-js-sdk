@@ -26,7 +26,7 @@ const KEY_SIZE = 32;
  * @param key
  */
 export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
-    const buf = Buffer.alloc(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
+    const buf = new Uint8Array(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
     buf.set(OLM_RECOVERY_KEY_PREFIX, 0);
     buf.set(key, OLM_RECOVERY_KEY_PREFIX.length);
 

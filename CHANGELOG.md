@@ -1,3 +1,82 @@
+Changes in [36.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v36.0.0) (2025-01-14)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Remove support for "legacy" MSC3898 group calling in MatrixRTCSession and CallMembership ([#4583](https://github.com/matrix-org/matrix-js-sdk/pull/4583)). Contributed by @toger5.
+
+## ✨ Features
+
+* MatrixRTC: Implement expiry logic for CallMembership and additional test coverage ([#4587](https://github.com/matrix-org/matrix-js-sdk/pull/4587)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Don't retry on 4xx responses ([#4601](https://github.com/matrix-org/matrix-js-sdk/pull/4601)). Contributed by @dbkr.
+* Upgrade matrix-sdk-crypto-wasm to 12.1.0 ([#4596](https://github.com/matrix-org/matrix-js-sdk/pull/4596)). Contributed by @andybalaam.
+* Avoid key prompts when resetting crypto ([#4586](https://github.com/matrix-org/matrix-js-sdk/pull/4586)). Contributed by @dbkr.
+* Handle when aud OIDC claim is an Array ([#4584](https://github.com/matrix-org/matrix-js-sdk/pull/4584)). Contributed by @liamdiprose.
+* Save the key backup key to 4S during `bootstrapSecretStorage ` ([#4542](https://github.com/matrix-org/matrix-js-sdk/pull/4542)). Contributed by @dbkr.
+* Only re-prepare MatrixrRTC delayed disconnection event on 404  ([#4575](https://github.com/matrix-org/matrix-js-sdk/pull/4575)). Contributed by @toger5.
+
+
+Changes in [35.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v35.1.0) (2024-12-18)
+==================================================================================================
+This release updates matrix-sdk-crypto-wasm to fix a bug which could prevent loading stored crypto state from storage.
+
+## 🐛 Bug Fixes
+
+* Upgrade matrix-sdk-crypto-wasm to 1.11.0 ([#4593](https://github.com/matrix-org/matrix-js-sdk/pull/4593)).
+
+
+Changes in [35.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v35.0.0) (2024-12-17)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+This release contains several breaking changes which will need code changes in your app. Most notably, `initCrypto()`
+no longer exists and has been moved to `initLegacyCrypto()` in preparation for the eventual removal of Olm. You can
+continue to use legacy Olm crypto for now by calling `initLegacyCrypto()` instead.
+
+You may also need to make further changes if you use more advanced APIs. See the individual PRs (listed in order of size of change) for specific APIs changed and how to migrate.
+
+* Rename `MatrixClient.initCrypto` into `MatrixClient.initLegacyCrypto` ([#4567](https://github.com/matrix-org/matrix-js-sdk/pull/4567)). Contributed by @florianduros.
+* Support MSC4222 `state_after` ([#4487](https://github.com/matrix-org/matrix-js-sdk/pull/4487)). Contributed by @dbkr.
+* Avoid use of Buffer as it does not exist in the Web natively ([#4569](https://github.com/matrix-org/matrix-js-sdk/pull/4569)). Contributed by @t3chguy.
+
+## 🦖 Deprecations
+
+* Deprecate remaining legacy functions and move `CryptoEvent.LegacyCryptoStoreMigrationProgress` handler ([#4560](https://github.com/matrix-org/matrix-js-sdk/pull/4560)). Contributed by @florianduros.
+
+## ✨ Features
+
+* Rename `MatrixClient.initCrypto` into `MatrixClient.initLegacyCrypto` ([#4567](https://github.com/matrix-org/matrix-js-sdk/pull/4567)). Contributed by @florianduros.
+* Avoid use of Buffer as it does not exist in the Web natively ([#4569](https://github.com/matrix-org/matrix-js-sdk/pull/4569)). Contributed by @t3chguy.
+* Re-send MatrixRTC media encryption keys for a new joiner even if a rotation is in progress ([#4561](https://github.com/matrix-org/matrix-js-sdk/pull/4561)). Contributed by @hughns.
+* Support MSC4222 `state_after` ([#4487](https://github.com/matrix-org/matrix-js-sdk/pull/4487)). Contributed by @dbkr.
+* Revert "Fix room state being updated with old (now overwritten) state and emitting for those updates. (#4242)" ([#4532](https://github.com/matrix-org/matrix-js-sdk/pull/4532)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Fix age field check in event echo processing ([#3635](https://github.com/matrix-org/matrix-js-sdk/pull/3635)). Contributed by @stas-demydiuk.
+
+
+Changes in [34.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.13.0) (2024-12-03)
+====================================================================================================
+## 🦖 Deprecations
+
+* Deprecate `MatrixClient.isEventSenderVerified` ([#4527](https://github.com/matrix-org/matrix-js-sdk/pull/4527)). Contributed by @florianduros.
+* Add `restoreKeybackup` to `CryptoApi`. ([#4476](https://github.com/matrix-org/matrix-js-sdk/pull/4476)). Contributed by @florianduros.
+
+## ✨ Features
+
+* Ensure we disambiguate display names which look like MXIDs ([#4540](https://github.com/matrix-org/matrix-js-sdk/pull/4540)). Contributed by @t3chguy.
+* Add `CryptoApi.getBackupInfo` ([#4512](https://github.com/matrix-org/matrix-js-sdk/pull/4512)). Contributed by @florianduros.
+* Fix local echo in embedded mode ([#4498](https://github.com/matrix-org/matrix-js-sdk/pull/4498)). Contributed by @toger5.
+* Add `restoreKeybackup` to `CryptoApi`. ([#4476](https://github.com/matrix-org/matrix-js-sdk/pull/4476)). Contributed by @florianduros.
+
+## 🐛 Bug Fixes
+
+* Fix `RustBackupManager` remaining values after current backup removal ([#4537](https://github.com/matrix-org/matrix-js-sdk/pull/4537)). Contributed by @florianduros.
+
+
 Changes in [34.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v34.12.0) (2024-11-19)
 ====================================================================================================
 ## 🦖 Deprecations

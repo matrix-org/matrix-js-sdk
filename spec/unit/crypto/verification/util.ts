@@ -119,7 +119,7 @@ export async function makeTestClients(
         clients.push(testClient);
     }
 
-    await Promise.all(clients.map((testClient) => testClient.client.initCrypto()));
+    await Promise.all(clients.map((testClient) => testClient.client.initLegacyCrypto()));
 
     const destroy = () => {
         timeouts.forEach((t) => clearTimeout(t));

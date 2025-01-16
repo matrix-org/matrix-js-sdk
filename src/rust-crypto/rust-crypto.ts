@@ -71,7 +71,7 @@ import {
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
 import { Device, DeviceMap } from "../models/device.ts";
-import { SECRET_STORAGE_ALGORITHM_V1_AES, ServerSideSecretStorage } from "../secret-storage.ts";
+import { SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorageKey, ServerSideSecretStorage } from "../secret-storage.ts";
 import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
 import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
@@ -329,7 +329,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend#getBackupDecryptor}.
      */
-    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: ArrayLike<number>): Promise<BackupDecryptor> {
+    public async getBackupDecryptor(backupInfo: KeyBackupInfo, privKey: Uint8Array): Promise<BackupDecryptor> {
         if (!(privKey instanceof Uint8Array)) {
             throw new Error(`getBackupDecryptor: expects Uint8Array`);
         }
@@ -653,7 +653,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#getUserVerificationStatus}.
      */
     public async getUserVerificationStatus(userId: string): Promise<UserVerificationStatus> {
-        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
             await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
         if (userIdentity === undefined) {
             return new UserVerificationStatus(false, false, false);
@@ -662,7 +662,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const verified = userIdentity.isVerified();
         const wasVerified = userIdentity.wasPreviouslyVerified();
         const needsUserApproval =
-            userIdentity instanceof RustSdkCryptoJs.UserIdentity ? userIdentity.identityNeedsUserApproval() : false;
+            userIdentity instanceof RustSdkCryptoJs.OtherUserIdentity
+                ? userIdentity.identityNeedsUserApproval()
+                : false;
         userIdentity.free();
         return new UserVerificationStatus(verified, wasVerified, false, needsUserApproval);
     }
@@ -671,7 +673,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#pinCurrentUserIdentity}.
      */
     public async pinCurrentUserIdentity(userId: string): Promise<void> {
-        const userIdentity: RustSdkCryptoJs.UserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
             await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
 
         if (userIdentity === undefined) {
@@ -768,7 +770,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     public async isSecretStorageReady(): Promise<boolean> {
         // make sure that the cross-signing keys are stored
-        const secretsToCheck = [
+        const secretsToCheck: SecretStorageKey[] = [
             "m.cross_signing.master",
             "m.cross_signing.user_signing",
             "m.cross_signing.self_signing",
@@ -841,9 +843,40 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
         }
 
-        if (setupNewKeyBackup) {
+        // likewise with the key backup key: if we have one, store it in secret storage (if it's not already there)
+        // also don't bother storing it if we're about to set up a new backup
+        if (!setupNewKeyBackup) {
+            await this.saveBackupKeyToStorage();
+        } else {
             await this.resetKeyBackup();
         }
+    }
+
+    /**
+     * If we have a backup key for the current, trusted backup in cache,
+     * save it to secret storage.
+     */
+    private async saveBackupKeyToStorage(): Promise<void> {
+        const keyBackupInfo = await this.backupManager.getServerBackupInfo();
+        if (!keyBackupInfo || !keyBackupInfo.version) {
+            logger.info("Not saving backup key to secret storage: no backup info");
+            return;
+        }
+
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        if (!backupKeys.decryptionKey) {
+            logger.info("Not saving backup key to secret storage: no backup key");
+            return;
+        }
+
+        if (!decryptionKeyMatchesKeyBackupInfo(backupKeys.decryptionKey, keyBackupInfo)) {
+            logger.info("Not saving backup key to secret storage: decryption key does not match backup info");
+            return;
+        }
+
+        const backupKeyBase64 = backupKeys.decryptionKey.toBase64();
+
+        await this.secretStorage.store("m.megolm_backup.v1", backupKeyBase64);
     }
 
     /**
@@ -1020,7 +1053,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#requestVerificationDM}
      */
     public async requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
-        const userIdentity: RustSdkCryptoJs.UserIdentity | undefined = await this.olmMachine.getIdentity(
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | undefined = await this.olmMachine.getIdentity(
             new RustSdkCryptoJs.UserId(userId),
         );
 
@@ -1178,7 +1211,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
         if (!backupKeys.decryptionKey) return null;
-        return Buffer.from(backupKeys.decryptionKey.toBase64(), "base64");
+        return decodeBase64(backupKeys.decryptionKey.toBase64());
     }
 
     /**
@@ -2035,7 +2068,7 @@ class EventDecryptor {
                     errorDetails,
                 );
 
-            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityPreviouslyVerified:
+            case RustSdkCryptoJs.DecryptionErrorCode.SenderIdentityVerificationViolation:
                 // We're refusing to decrypt due to not trusting the sender,
                 // rather than failing to decrypt due to lack of keys, so we
                 // don't need to keep it on the pending list.
@@ -2200,7 +2233,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
         case RustSdkCryptoJs.ShieldStateCode.SentInClear:
             shieldReason = EventShieldReason.SENT_IN_CLEAR;
             break;
-        case RustSdkCryptoJs.ShieldStateCode.PreviouslyVerified:
+        case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
             break;
     }

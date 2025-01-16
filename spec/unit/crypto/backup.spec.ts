@@ -231,7 +231,7 @@ describe("MegolmBackup", function () {
 
         test("fail if given backup has no version", async () => {
             const client = makeTestClient(cryptoStore);
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             const data = {
                 algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
                 auth_data: {
@@ -314,7 +314,7 @@ describe("MegolmBackup", function () {
             megolmDecryption.olmlib = mockOlmLib;
 
             return client
-                .initCrypto()
+                .initLegacyCrypto()
                 .then(() => {
                     return cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
                         cryptoStore.addEndToEndInboundGroupSession(
@@ -391,7 +391,7 @@ describe("MegolmBackup", function () {
             megolmDecryption.olmlib = mockOlmLib;
 
             return client
-                .initCrypto()
+                .initLegacyCrypto()
                 .then(() => {
                     return client.crypto!.storeSessionBackupPrivateKey(new Uint8Array(32));
                 })
@@ -471,7 +471,7 @@ describe("MegolmBackup", function () {
             // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             client.uploadDeviceSigningKeys = async function (e) {
                 return {};
             };
@@ -560,7 +560,7 @@ describe("MegolmBackup", function () {
             // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             await cryptoStore.doTxn("readwrite", [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
                 cryptoStore.addEndToEndInboundGroupSession(
                     "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
@@ -636,7 +636,7 @@ describe("MegolmBackup", function () {
             // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
-            return client.initCrypto();
+            return client.initLegacyCrypto();
         });
 
         afterEach(function () {
@@ -773,7 +773,7 @@ describe("MegolmBackup", function () {
             // initialising the crypto library will trigger a key upload request, which we can stub out
             client.uploadKeysRequest = jest.fn();
 
-            await client.initCrypto();
+            await client.initLegacyCrypto();
 
             cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
             await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
@@ -784,7 +784,7 @@ describe("MegolmBackup", function () {
     describe("getKeyBackupInfo", () => {
         it("should return throw an `Not implemented`", async () => {
             const client = makeTestClient(cryptoStore);
-            await client.initCrypto();
+            await client.initLegacyCrypto();
             await expect(client.getCrypto()?.getKeyBackupInfo()).rejects.toThrow("Not implemented");
         });
     });

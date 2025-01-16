@@ -91,7 +91,7 @@ function mockUploadEmitter(
                     },
                 };
             }
-            const uploadPayload: KeyBackup = JSON.parse(request.body?.toString() ?? "{}");
+            const uploadPayload: KeyBackup = JSON.parse((request.body as string) ?? "{}");
             let count = 0;
             for (const [roomId, value] of Object.entries(uploadPayload.rooms)) {
                 for (const sessionId of Object.keys(value.sessions)) {

@@ -138,6 +138,7 @@ module.exports = {
                         tryExtensions: [".ts"],
                     },
                 ],
+                "no-extra-boolean-cast": "error",
             },
         },
         {
