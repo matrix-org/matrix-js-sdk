@@ -117,18 +117,13 @@ describe("SlidingSyncSdk", () => {
     };
 
     // assign client/httpBackend globals
-    const setupClient = async (testOpts?: Partial<IStoredClientOpts & { withCrypto: boolean }>) => {
+    const setupClient = async (testOpts?: Partial<IStoredClientOpts>) => {
         testOpts = testOpts || {};
         const syncOpts: SyncApiOptions = {};
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", new Map(), {}, client, 0));
-        if (testOpts.withCrypto) {
-            httpBackend!.when("GET", "/room_keys/version").respond(404, {});
-            await client!.initLegacyCrypto();
-            syncOpts.cryptoCallbacks = syncOpts.crypto = client!.crypto;
-        }
         httpBackend!.when("GET", "/_matrix/client/v3/pushrules").respond(200, {});
         sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts, syncOpts);
     };
@@ -624,61 +619,6 @@ describe("SlidingSyncSdk", () => {
             expect(inviteeMember).toBeTruthy();
             expect(inviteeMember.getMxcAvatarUrl()).toEqual(inviteeProfile.avatar_url);
             expect(inviteeMember.name).toEqual(inviteeProfile.displayname);
-        });
-    });
-
-    describe("ExtensionE2EE", () => {
-        let ext: Extension<any, any>;
-
-        beforeAll(async () => {
-            await setupClient({
-                withCrypto: true,
-            });
-            const hasSynced = sdk!.sync();
-            await httpBackend!.flushAllExpected();
-            await hasSynced;
-            ext = findExtension("e2ee");
-        });
-
-        afterAll(async () => {
-            // needed else we do some async operations in the background which can cause Jest to whine:
-            // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
-            // Attempted to log "Saving device tracking data null"."
-            client!.crypto!.stop();
-        });
-
-        it("gets enabled on the initial request only", () => {
-            expect(ext.onRequest(true)).toEqual({
-                enabled: true,
-            });
-            expect(ext.onRequest(false)).toEqual(undefined);
-        });
-
-        it("can update device lists", () => {
-            client!.crypto!.processDeviceLists = jest.fn();
-            ext.onResponse({
-                device_lists: {
-                    changed: ["@alice:localhost"],
-                    left: ["@bob:localhost"],
-                },
-            });
-            expect(client!.crypto!.processDeviceLists).toHaveBeenCalledWith({
-                changed: ["@alice:localhost"],
-                left: ["@bob:localhost"],
-            });
-        });
-
-        it("can update OTK counts and unused fallback keys", () => {
-            client!.crypto!.processKeyCounts = jest.fn();
-            ext.onResponse({
-                device_one_time_keys_count: {
-                    signed_curve25519: 42,
-                },
-                device_unused_fallback_key_types: ["signed_curve25519"],
-            });
-            expect(client!.crypto!.processKeyCounts).toHaveBeenCalledWith({ signed_curve25519: 42 }, [
-                "signed_curve25519",
-            ]);
         });
     });
 
