@@ -296,7 +296,7 @@ export interface ICreateClientOpts {
      * specified, uses a default implementation (indexeddb in the browser,
      * in-memory otherwise).
      *
-     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initLegacyCrypto}),
+     * This is only used for the legacy crypto implementation,
      * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
      * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
      * data can be migrated from the legacy store.
@@ -391,7 +391,7 @@ export interface ICreateClientOpts {
      *
      * This must be set to the same value every time the client is initialised for the same device.
      *
-     * This is only used for the legacy crypto implementation (as used by {@link MatrixClient#initLegacyCrypto}),
+     * This is only used for the legacy crypto implementation,
      * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
      * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
      * data can be migrated from the legacy store.
@@ -2139,90 +2139,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Initialise support for end-to-end encryption in this client, using libolm.
-     *
-     * You should call this method after creating the matrixclient, but *before*
-     * calling `startClient`, if you want to support end-to-end encryption.
-     *
-     * It will return a Promise which will resolve when the crypto layer has been
-     * successfully initialised.
-     *
-     * @deprecated libolm is deprecated. Prefer {@link initRustCrypto}.
-     */
-    public async initLegacyCrypto(): Promise<void> {
-        if (!isCryptoAvailable()) {
-            throw new Error(
-                `End-to-end encryption not supported in this js-sdk build: did ` +
-                    `you remember to load the olm library?`,
-            );
-        }
-
-        if (this.cryptoBackend) {
-            this.logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
-            return;
-        }
-
-        if (!this.cryptoStore) {
-            // the cryptostore is provided by sdk.createClient, so this shouldn't happen
-            throw new Error(`Cannot enable encryption: no cryptoStore provided`);
-        }
-
-        this.logger.debug("Crypto: Starting up crypto store...");
-        await this.cryptoStore.startup();
-
-        const userId = this.getUserId();
-        if (userId === null) {
-            throw new Error(
-                `Cannot enable encryption on MatrixClient with unknown userId: ` +
-                    `ensure userId is passed in createClient().`,
-            );
-        }
-        if (this.deviceId === null) {
-            throw new Error(
-                `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
-                    `ensure deviceId is passed in createClient().`,
-            );
-        }
-
-        const crypto = new Crypto(this, userId, this.deviceId, this.store, this.cryptoStore, this.verificationMethods!);
-
-        this.reEmitter.reEmit(crypto, [
-            LegacyCryptoEvent.KeyBackupFailed,
-            LegacyCryptoEvent.KeyBackupSessionsRemaining,
-            LegacyCryptoEvent.RoomKeyRequest,
-            LegacyCryptoEvent.RoomKeyRequestCancellation,
-            LegacyCryptoEvent.Warning,
-            LegacyCryptoEvent.DevicesUpdated,
-            LegacyCryptoEvent.WillUpdateDevices,
-            LegacyCryptoEvent.DeviceVerificationChanged,
-            LegacyCryptoEvent.UserTrustStatusChanged,
-            LegacyCryptoEvent.KeysChanged,
-        ]);
-
-        this.logger.debug("Crypto: initialising crypto object...");
-        await crypto.init({
-            exportedOlmDevice: this.exportedOlmDeviceToImport,
-            pickleKey: this.pickleKey,
-        });
-        delete this.exportedOlmDeviceToImport;
-
-        this.olmVersion = Crypto.getOlmVersion();
-
-        // if crypto initialisation was successful, tell it to attach its event handlers.
-        crypto.registerEventHandlers(this as Parameters<Crypto["registerEventHandlers"]>[0]);
-        this.cryptoBackend = this.crypto = crypto;
-
-        // upload our keys in the background
-        this.crypto.uploadDeviceKeys().catch((e) => {
-            // TODO: throwing away this error is a really bad idea.
-            this.logger.error("Error uploading device keys", e);
-        });
-    }
-
-    /**
      * Initialise support for end-to-end encryption in this client, using the rust matrix-sdk-crypto.
-     *
-     * An alternative to {@link initLegacyCrypto}.
      *
      * **WARNING**: the cryptography stack is not thread-safe. Having multiple `MatrixClient` instances connected to
      * the same Indexed DB will cause data corruption and decryption failures. The application layer is responsible for
@@ -2323,7 +2240,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Access the crypto API for this client.
      *
-     * If end-to-end encryption has been enabled for this client (via {@link initLegacyCrypto} or {@link initRustCrypto}),
+     * If end-to-end encryption has been enabled for this client (via {@link initRustCrypto}),
      * returns an object giving access to the crypto API. Otherwise, returns `undefined`.
      */
     public getCrypto(): CryptoApi | undefined {
