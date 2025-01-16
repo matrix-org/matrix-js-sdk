@@ -17,9 +17,9 @@ limitations under the License.
 
 import { encodeUnpaddedBase64Url } from "./base64.ts";
 
-const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
-const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const DIGITS = "0123456789";
+export const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
+export const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+export const DIGITS = "0123456789";
 
 export function secureRandomBase64Url(len: number): string {
     const key = new Uint8Array(len);
@@ -28,24 +28,29 @@ export function secureRandomBase64Url(len: number): string {
     return encodeUnpaddedBase64Url(key);
 }
 
-export function randomString(len: number): string {
-    return randomStringFrom(len, UPPERCASE + LOWERCASE + DIGITS);
+/**
+ * Generates a random string of uppercase and lowercase letters plus digits using a
+ * cryptographically secure random number generator.
+ * @param len The length of the string to generate
+ * @returns Random string of uppercase and lowercase letters plus digits of length `len`
+ */
+export function secureRandomString(len: number): string {
+    return secureRandomStringFrom(len, UPPERCASE + LOWERCASE + DIGITS);
 }
 
-export function randomLowercaseString(len: number): string {
-    return randomStringFrom(len, LOWERCASE);
-}
-
-export function randomUppercaseString(len: number): string {
-    return randomStringFrom(len, UPPERCASE);
-}
-
-function randomStringFrom(len: number, chars: string): string {
+/**
+ * Generate a cryptographically secure random string using characters given
+ * @param len The length of the string to generate
+ * @param chars The characters to use in the random string.
+ * @returns Random string of characters of length `len`
+ */
+export function secureRandomStringFrom(len: number, chars: string): string {
+    const positions = new Uint32Array(chars.length);
     let ret = "";
-
-    for (let i = 0; i < len; ++i) {
-        ret += chars.charAt(Math.floor(Math.random() * chars.length));
+    crypto.getRandomValues(positions);
+    for (let i = 0; i < len; i++) {
+        const currentCharPlace = positions[i % chars.length] % chars.length;
+        ret += chars[currentCharPlace];
     }
-
     return ret;
 }

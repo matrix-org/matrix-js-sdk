@@ -16,10 +16,11 @@ limitations under the License.
 
 import { decodeBase64 } from "../../src/base64";
 import {
-    randomLowercaseString,
-    randomString,
-    randomUppercaseString,
+    secureRandomString,
     secureRandomBase64Url,
+    secureRandomStringFrom,
+    LOWERCASE,
+    UPPERCASE,
 } from "../../src/randomstring";
 
 describe("Random strings", () => {
@@ -33,34 +34,40 @@ describe("Random strings", () => {
         expect(decoded).toHaveLength(n);
     });
 
-    it.each([8, 16, 32])("randomString generates string of %i characters", (n: number) => {
-        const rand1 = randomString(n);
-        const rand2 = randomString(n);
+    it.each([8, 16, 32])("secureRandomString generates string of %i characters", (n: number) => {
+        const rand1 = secureRandomString(n);
+        const rand2 = secureRandomString(n);
 
         expect(rand1).not.toEqual(rand2);
 
         expect(rand1).toHaveLength(n);
     });
 
-    it.each([8, 16, 32])("randomLowercaseString generates lowercase string of %i characters", (n: number) => {
-        const rand1 = randomLowercaseString(n);
-        const rand2 = randomLowercaseString(n);
+    it.each([8, 16, 32])(
+        "secureRandomStringFrom generates lowercase string of %i characters when given lowercase",
+        (n: number) => {
+            const rand1 = secureRandomStringFrom(n, LOWERCASE);
+            const rand2 = secureRandomStringFrom(n, LOWERCASE);
 
-        expect(rand1).not.toEqual(rand2);
+            expect(rand1).not.toEqual(rand2);
 
-        expect(rand1).toHaveLength(n);
+            expect(rand1).toHaveLength(n);
 
-        expect(rand1.toLowerCase()).toEqual(rand1);
-    });
+            expect(rand1.toLowerCase()).toEqual(rand1);
+        },
+    );
 
-    it.each([8, 16, 32])("randomUppercaseString generates lowercase string of %i characters", (n: number) => {
-        const rand1 = randomUppercaseString(n);
-        const rand2 = randomUppercaseString(n);
+    it.each([8, 16, 32])(
+        "secureRandomStringFrom generates uppercase string of %i characters when given uppercase",
+        (n: number) => {
+            const rand1 = secureRandomStringFrom(n, UPPERCASE);
+            const rand2 = secureRandomStringFrom(n, UPPERCASE);
 
-        expect(rand1).not.toEqual(rand2);
+            expect(rand1).not.toEqual(rand2);
 
-        expect(rand1).toHaveLength(n);
+            expect(rand1).toHaveLength(n);
 
-        expect(rand1.toUpperCase()).toEqual(rand1);
-    });
+            expect(rand1.toUpperCase()).toEqual(rand1);
+        },
+    );
 });

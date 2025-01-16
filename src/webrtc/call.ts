@@ -29,7 +29,7 @@ import { checkObjectHasKeys, isNullOrUndefined, recursivelyAssign } from "../uti
 import { MatrixEvent } from "../models/event.ts";
 import { EventType, TimelineEvents, ToDeviceMessageId } from "../@types/event.ts";
 import { RoomMember } from "../models/room-member.ts";
-import { randomString } from "../randomstring.ts";
+import { secureRandomString } from "../randomstring.ts";
 import {
     MCallReplacesEvent,
     MCallAnswer,
@@ -277,7 +277,7 @@ export class CallError extends Error {
 }
 
 export function genCallID(): string {
-    return Date.now().toString() + randomString(16);
+    return Date.now().toString() + secureRandomString(16);
 }
 
 function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {

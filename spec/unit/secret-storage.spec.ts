@@ -27,7 +27,7 @@ import {
     ServerSideSecretStorageImpl,
     trimTrailingEquals,
 } from "../../src/secret-storage";
-import { randomString } from "../../src/randomstring";
+import { secureRandomString } from "../../src/randomstring";
 import { SecretInfo } from "../../src/secret-storage.ts";
 import { AccountDataEvents, ClientEvent, MatrixEvent, TypedEventEmitter } from "../../src";
 import { defer, IDeferred } from "../../src/utils";
@@ -179,7 +179,7 @@ describe("ServerSideSecretStorageImpl", function () {
         it("should return true for a correct key check", async function () {
             const secretStorage = new ServerSideSecretStorageImpl({} as AccountDataClient, {});
 
-            const myKey = new TextEncoder().encode(randomString(32));
+            const myKey = new TextEncoder().encode(secureRandomString(32));
             const { iv, mac } = await calculateKeyCheck(myKey);
 
             const keyInfo: SecretStorageKeyDescriptionAesV1 = {
