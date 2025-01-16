@@ -27,6 +27,7 @@ import {
     UNSTABLE_MSC2716_MARKER,
     MatrixClient,
     ClientEvent,
+    IndexedDBCryptoStore,
     ISyncResponse,
     IRoomEvent,
     IJoinedRoom,
@@ -115,6 +116,236 @@ describe("MatrixClient syncing", () => {
             client!.startClient();
 
             await httpBackend!.flushAllExpected();
+        });
+
+        it("should emit RoomEvent.MyMembership for invite->leave->invite cycles", async () => {
+            await client!.initRustCrypto();
+
+            const roomId = "!cycles:example.org";
+
+            // First sync: an invite
+            const inviteSyncRoomSection = {
+                invite: {
+                    [roomId]: {
+                        invite_state: {
+                            events: [
+                                {
+                                    type: "m.room.member",
+                                    state_key: selfUserId,
+                                    content: {
+                                        membership: KnownMembership.Invite,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: inviteSyncRoomSection,
+            });
+
+            // Second sync: a leave (reject of some kind)
+            httpBackend!.when("POST", "/leave").respond(200, {});
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: {
+                    leave: {
+                        [roomId]: {
+                            account_data: { events: [] },
+                            ephemeral: { events: [] },
+                            state: {
+                                events: [
+                                    {
+                                        type: "m.room.member",
+                                        state_key: selfUserId,
+                                        content: {
+                                            membership: KnownMembership.Leave,
+                                        },
+                                        prev_content: {
+                                            membership: KnownMembership.Invite,
+                                        },
+                                        // XXX: And other fields required on an event
+                                    },
+                                ],
+                            },
+                            timeline: {
+                                limited: false,
+                                events: [
+                                    {
+                                        type: "m.room.member",
+                                        state_key: selfUserId,
+                                        content: {
+                                            membership: KnownMembership.Leave,
+                                        },
+                                        prev_content: {
+                                            membership: KnownMembership.Invite,
+                                        },
+                                        // XXX: And other fields required on an event
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            });
+
+            // Third sync: another invite
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: inviteSyncRoomSection,
+            });
+
+            // First fire: an initial invite
+            let fires = 0;
+            client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                // Room, string, string
+                fires++;
+                expect(room.roomId).toBe(roomId);
+                expect(membership).toBe(KnownMembership.Invite);
+                expect(oldMembership).toBeFalsy();
+
+                // Second fire: a leave
+                client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                    fires++;
+                    expect(room.roomId).toBe(roomId);
+                    expect(membership).toBe(KnownMembership.Leave);
+                    expect(oldMembership).toBe(KnownMembership.Invite);
+
+                    // Third/final fire: a second invite
+                    client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                        fires++;
+                        expect(room.roomId).toBe(roomId);
+                        expect(membership).toBe(KnownMembership.Invite);
+                        expect(oldMembership).toBe(KnownMembership.Leave);
+                    });
+                });
+
+                // For maximum safety, "leave" the room after we register the handler
+                client!.leave(roomId);
+            });
+
+            // noinspection ES6MissingAwait
+            client!.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(fires).toBe(3);
+        });
+
+        it("should emit RoomEvent.MyMembership for knock->leave->knock cycles", async () => {
+            await client!.initRustCrypto();
+
+            const roomId = "!cycles:example.org";
+
+            // First sync: an knock
+            const knockSyncRoomSection = {
+                knock: {
+                    [roomId]: {
+                        knock_state: {
+                            events: [
+                                {
+                                    type: "m.room.member",
+                                    state_key: selfUserId,
+                                    content: {
+                                        membership: KnownMembership.Knock,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: knockSyncRoomSection,
+            });
+
+            // Second sync: a leave (reject of some kind)
+            httpBackend!.when("POST", "/leave").respond(200, {});
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: {
+                    leave: {
+                        [roomId]: {
+                            account_data: { events: [] },
+                            ephemeral: { events: [] },
+                            state: {
+                                events: [
+                                    {
+                                        type: "m.room.member",
+                                        state_key: selfUserId,
+                                        content: {
+                                            membership: KnownMembership.Leave,
+                                        },
+                                        prev_content: {
+                                            membership: KnownMembership.Knock,
+                                        },
+                                        // XXX: And other fields required on an event
+                                    },
+                                ],
+                            },
+                            timeline: {
+                                limited: false,
+                                events: [
+                                    {
+                                        type: "m.room.member",
+                                        state_key: selfUserId,
+                                        content: {
+                                            membership: KnownMembership.Leave,
+                                        },
+                                        prev_content: {
+                                            membership: KnownMembership.Knock,
+                                        },
+                                        // XXX: And other fields required on an event
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            });
+
+            // Third sync: another knock
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: knockSyncRoomSection,
+            });
+
+            // First fire: an initial knock
+            let fires = 0;
+            client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                // Room, string, string
+                fires++;
+                expect(room.roomId).toBe(roomId);
+                expect(membership).toBe(KnownMembership.Knock);
+                expect(oldMembership).toBeFalsy();
+
+                // Second fire: a leave
+                client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                    fires++;
+                    expect(room.roomId).toBe(roomId);
+                    expect(membership).toBe(KnownMembership.Leave);
+                    expect(oldMembership).toBe(KnownMembership.Knock);
+
+                    // Third/final fire: a second knock
+                    client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                        fires++;
+                        expect(room.roomId).toBe(roomId);
+                        expect(membership).toBe(KnownMembership.Knock);
+                        expect(oldMembership).toBe(KnownMembership.Leave);
+                    });
+                });
+
+                // For maximum safety, "leave" the room after we register the handler
+                client!.leave(roomId);
+            });
+
+            // noinspection ES6MissingAwait
+            client!.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(fires).toBe(3);
         });
 
         it("should honour lazyLoadMembers if user is not a guest", () => {
@@ -2338,6 +2569,61 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         rooms: {},
         presence: {},
     };
+
+    it("should emit ClientEvent.Room when invited while using indexeddb crypto store", async () => {
+        const idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
+            cryptoStore: new IndexedDBCryptoStore(globalThis.indexedDB, "tests"),
+        });
+        const idbHttpBackend = idbTestClient.httpBackend;
+        const idbClient = idbTestClient.client;
+        idbHttpBackend.when("GET", "/versions").respond(200, {});
+        idbHttpBackend.when("GET", "/pushrules/").respond(200, {});
+        idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+        await idbClient.initRustCrypto();
+
+        const roomId = "!invite:example.org";
+
+        // First sync: an invite
+        const inviteSyncRoomSection = {
+            invite: {
+                [roomId]: {
+                    invite_state: {
+                        events: [
+                            {
+                                type: "m.room.member",
+                                state_key: selfUserId,
+                                content: {
+                                    membership: KnownMembership.Invite,
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        };
+        idbHttpBackend.when("GET", "/sync").respond(200, {
+            ...syncData,
+            rooms: inviteSyncRoomSection,
+        });
+
+        // First fire: an initial invite
+        let fires = 0;
+        idbClient.once(ClientEvent.Room, (room) => {
+            fires++;
+            expect(room.roomId).toBe(roomId);
+        });
+
+        // noinspection ES6MissingAwait
+        idbClient.startClient();
+        await idbHttpBackend.flushAllExpected();
+
+        expect(fires).toBe(1);
+
+        idbHttpBackend.verifyNoOutstandingExpectation();
+        idbClient.stopClient();
+        idbHttpBackend.stop();
+    });
 
     it("should query server for which thread a 2nd order relation belongs to and stash in sync accumulator", async () => {
         const roomId = "!room:example.org";
