@@ -8244,29 +8244,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @returns Promise which resolves to a LoginResponse object
-     * @returns Rejects: with an error response.
+     * Sends a `/login` request to the server, to create a new device.
+     *
+     * Note that the results are *not* persisted in this {@link MatrixClient} object: a new `MatrixClient`
+     * must be constructed to use the returned details.
      */
     public login(loginType: LoginRequest["type"], data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
-        return this.http
-            .authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
-                ...data,
-                type: loginType,
-            })
-            .then((response) => {
-                if (response.access_token && response.user_id) {
-                    this.http.opts.accessToken = response.access_token;
-                    this.credentials = {
-                        userId: response.user_id,
-                    };
-                }
-                return response;
-            });
+        return this.http.authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
+            ...data,
+            type: loginType,
+        });
     }
 
     /**
-     * @returns Promise which resolves to a LoginResponse object
-     * @returns Rejects: with an error response.
+     * Sends a `/login` request to the server with username and password, to create a new device.
+     *
+     * Note that the results are *not* persisted in this {@link MatrixClient} object: a new `MatrixClient`
+     * must be constructed to use the returned details.
      */
     public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
         return this.login("m.login.password", {
@@ -8308,9 +8302,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Sends a `/login` request to the server with login token, to create a new device.
+     *
+     * Note that the results are *not* persisted in this {@link MatrixClient} object: a new `MatrixClient`
+     * must be constructed to use the returned details.
+     *
      * @param token - Login token previously received from homeserver
-     * @returns Promise which resolves to a LoginResponse object
-     * @returns Rejects: with an error response.
      */
     public loginWithToken(token: string): Promise<LoginResponse> {
         return this.login("m.login.token", {
