@@ -154,7 +154,7 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
 `matrix-js-sdk` can be used in either Node.js applications (ensure you have the latest LTS version of Node.js installed),
 or in browser applications, via a bundler such as Webpack or Vite.
 
-You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officialy supported.
+You can also use the sdk with [Deno](https://deno.land/) (`import npm:matrix-js-sdk`) but its not officially supported.
 
 ## Emitted events
 
