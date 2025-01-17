@@ -44,6 +44,7 @@ import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
 import { KnownMembership } from "../../src/@types/membership";
+import { SyncCryptoCallbacks } from "../../src/common-crypto/CryptoBackend";
 
 declare module "../../src/@types/event" {
     interface AccountDataEvents {
@@ -57,6 +58,7 @@ describe("SlidingSyncSdk", () => {
     let httpBackend: MockHttpBackend | undefined;
     let sdk: SlidingSyncSdk | undefined;
     let mockSlidingSync: SlidingSync | undefined;
+    let syncCryptoCallback: SyncCryptoCallbacks | undefined;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
 
@@ -117,13 +119,19 @@ describe("SlidingSyncSdk", () => {
     };
 
     // assign client/httpBackend globals
-    const setupClient = async (testOpts?: Partial<IStoredClientOpts>) => {
+    const setupClient = async (testOpts?: Partial<IStoredClientOpts & { withCrypto: boolean }>) => {
         testOpts = testOpts || {};
         const syncOpts: SyncApiOptions = {};
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", new Map(), {}, client, 0));
+        if (testOpts.withCrypto) {
+            httpBackend!.when("GET", "/room_keys/version").respond(404, {});
+            await client!.initRustCrypto({ useIndexedDB: false });
+            syncCryptoCallback = client!.getCrypto() as unknown as SyncCryptoCallbacks;
+            syncOpts.cryptoCallbacks = syncCryptoCallback;
+        }
         httpBackend!.when("GET", "/_matrix/client/v3/pushrules").respond(200, {});
         sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts, syncOpts);
     };
@@ -619,6 +627,54 @@ describe("SlidingSyncSdk", () => {
             expect(inviteeMember).toBeTruthy();
             expect(inviteeMember.getMxcAvatarUrl()).toEqual(inviteeProfile.avatar_url);
             expect(inviteeMember.name).toEqual(inviteeProfile.displayname);
+        });
+    });
+
+    describe("ExtensionE2EE", () => {
+        let ext: Extension<any, any>;
+
+        beforeAll(async () => {
+            await setupClient({
+                withCrypto: true,
+            });
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("e2ee");
+        });
+
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+
+        it("can update device lists", () => {
+            syncCryptoCallback!.processDeviceLists = jest.fn();
+            ext.onResponse({
+                device_lists: {
+                    changed: ["@alice:localhost"],
+                    left: ["@bob:localhost"],
+                },
+            });
+            expect(syncCryptoCallback!.processDeviceLists).toHaveBeenCalledWith({
+                changed: ["@alice:localhost"],
+                left: ["@bob:localhost"],
+            });
+        });
+
+        it("can update OTK counts and unused fallback keys", () => {
+            syncCryptoCallback!.processKeyCounts = jest.fn();
+            ext.onResponse({
+                device_one_time_keys_count: {
+                    signed_curve25519: 42,
+                },
+                device_unused_fallback_key_types: ["signed_curve25519"],
+            });
+            expect(syncCryptoCallback!.processKeyCounts).toHaveBeenCalledWith({ signed_curve25519: 42 }, [
+                "signed_curve25519",
+            ]);
         });
     });
 
