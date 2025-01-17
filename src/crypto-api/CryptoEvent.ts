@@ -15,7 +15,7 @@
  */
 
 /**
- * Events emitted by the {@link CryptoApi}
+ * Cryptography-related events emitted by the {@link MatrixClient}.
  */
 export enum CryptoEvent {
     /**
