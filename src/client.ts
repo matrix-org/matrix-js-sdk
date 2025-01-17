@@ -19,6 +19,7 @@ limitations under the License.
  */
 
 import { Optional } from "matrix-events-sdk";
+import { MetadataService, OidcClientSettingsStore, OidcMetadata } from "oidc-client-ts";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto.ts";
 import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync.ts";
@@ -247,6 +248,12 @@ import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
+import {
+    discoverAndValidateOIDCIssuerWellKnown,
+    isValidatedIssuerMetadata,
+    OidcClientConfig,
+    validateOIDCIssuerWellKnown,
+} from "./oidc/index.ts";
 
 export type Store = IStore;
 
@@ -10328,6 +10335,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Resolves: A promise of an object containing the OIDC issuer if configured
      * @returns Rejects: when the request fails (module:http-api.MatrixError)
      * @experimental - part of MSC2965
+     * @deprecated in favour of getAuthMetadata
      */
     public async getAuthIssuer(): Promise<{
         issuer: string;
@@ -10335,6 +10343,52 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.request(Method.Get, "/auth_issuer", undefined, undefined, {
             prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
         });
+    }
+
+    /**
+     * Discover and validate delegated auth configuration
+     * - delegated auth issuer openid-configuration is reachable
+     * - delegated auth issuer openid-configuration is configured correctly for us
+     * Fetches /auth_metadata falling back to legacy implementation using /auth_issuer followed by
+     * https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
+     * When successful, validated metadata is returned
+     * @returns validated authentication metadata and optionally signing keys
+     * @throws when delegated auth config is invalid or unreachable
+     * @experimental - part of MSC2965
+     */
+    public async getAuthMetadata(): Promise<OidcClientConfig> {
+        let authMetadata: OidcMetadata | undefined;
+        try {
+            authMetadata = await this.http.request<OidcMetadata>(Method.Get, "/auth_metadata", undefined, undefined, {
+                prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                const { issuer } = await this.getAuthIssuer();
+                return discoverAndValidateOIDCIssuerWellKnown(issuer);
+            }
+            throw e;
+        }
+
+        const validatedIssuerConfig = validateOIDCIssuerWellKnown(authMetadata);
+
+        // create a temporary settings store, so we can use metadata service for discovery
+        const settings = new OidcClientSettingsStore({
+            authority: validatedIssuerConfig.issuer,
+            redirect_uri: "", // Not known yet, this is here to make the type checker happy
+            client_id: "", // Not known yet, this is here to make the type checker happy
+        });
+        const metadataService = new MetadataService(settings);
+        const metadata = await metadataService.getMetadata();
+        const signingKeys = (await metadataService.getSigningKeys()) ?? undefined;
+
+        isValidatedIssuerMetadata(metadata);
+
+        return {
+            ...validatedIssuerConfig,
+            metadata,
+            signingKeys,
+        };
     }
 }
 

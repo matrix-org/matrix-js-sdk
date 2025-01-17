@@ -30,6 +30,7 @@ import { OidcClientConfig } from "./index.ts";
  * @param issuer - the OIDC issuer as returned by the /auth_issuer API
  * @returns validated authentication metadata and optionally signing keys
  * @throws when delegated auth config is invalid or unreachable
+ * @deprecated in favour of {@link MatrixClient#getAuthMetadata}
  */
 export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Promise<OidcClientConfig> => {
     const issuerOpenIdConfigUrl = new URL(".well-known/openid-configuration", issuer);

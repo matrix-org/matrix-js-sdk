@@ -21,6 +21,7 @@ import { logger } from "../logger.ts";
 import { OidcError } from "./error.ts";
 
 export type ValidatedIssuerConfig = {
+    issuer: string;
     authorizationEndpoint: string;
     tokenEndpoint: string;
     registrationEndpoint?: string;
@@ -78,6 +79,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
     }
 
     const isInvalid = [
+        requiredStringProperty(wellKnown, "issuer"),
         requiredStringProperty(wellKnown, "authorization_endpoint"),
         requiredStringProperty(wellKnown, "token_endpoint"),
         requiredStringProperty(wellKnown, "revocation_endpoint"),
@@ -92,6 +94,7 @@ export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuer
 
     if (!isInvalid) {
         return {
+            issuer: <string>wellKnown["issuer"],
             authorizationEndpoint: <string>wellKnown["authorization_endpoint"],
             tokenEndpoint: <string>wellKnown["token_endpoint"],
             registrationEndpoint: <string>wellKnown["registration_endpoint"],
