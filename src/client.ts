@@ -252,6 +252,7 @@ import {
     discoverAndValidateOIDCIssuerWellKnown,
     isValidatedIssuerMetadata,
     OidcClientConfig,
+    ValidatedIssuerMetadata,
     validateOIDCIssuerWellKnown,
 } from "./oidc/index.ts";
 
@@ -10357,11 +10358,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @experimental - part of MSC2965
      */
     public async getAuthMetadata(): Promise<OidcClientConfig> {
-        let authMetadata: OidcMetadata | undefined;
+        let authMetadata: ValidatedIssuerMetadata | undefined;
         try {
-            authMetadata = await this.http.request<OidcMetadata>(Method.Get, "/auth_metadata", undefined, undefined, {
-                prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
-            });
+            authMetadata = await this.http.request<ValidatedIssuerMetadata>(
+                Method.Get,
+                "/auth_metadata",
+                undefined,
+                undefined,
+                {
+                    prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+                },
+            );
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
                 const { issuer } = await this.getAuthIssuer();

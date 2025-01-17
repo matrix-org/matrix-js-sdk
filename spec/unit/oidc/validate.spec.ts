@@ -18,13 +18,14 @@ import { mocked } from "jest-mock";
 import { jwtDecode } from "jwt-decode";
 
 import { logger } from "../../../src/logger";
-import { validateIdToken, validateOIDCIssuerWellKnown } from "../../../src/oidc/validate";
+import { ValidatedIssuerMetadata, validateIdToken, validateOIDCIssuerWellKnown } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
 jest.mock("jwt-decode");
 
 describe("validateOIDCIssuerWellKnown", () => {
-    const validWk: any = {
+    const validWk: ValidatedIssuerMetadata = {
+        issuer: "https://test.org",
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
         registration_endpoint: "https://authorize.org/regsiter",
@@ -63,6 +64,7 @@ describe("validateOIDCIssuerWellKnown", () => {
 
     it("should return validated issuer config", () => {
         expect(validateOIDCIssuerWellKnown(validWk)).toEqual({
+            issuer: validWk.issuer,
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: validWk.registration_endpoint,
@@ -72,9 +74,9 @@ describe("validateOIDCIssuerWellKnown", () => {
     });
 
     it("should return validated issuer config without registrationendpoint", () => {
-        const wk = { ...validWk };
-        delete wk.registration_endpoint;
+        const { registration_endpoint: _, ...wk } = validWk;
         expect(validateOIDCIssuerWellKnown(wk)).toEqual({
+            issuer: validWk.issuer,
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
             registrationEndpoint: undefined,
