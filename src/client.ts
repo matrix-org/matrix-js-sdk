@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { Optional } from "matrix-events-sdk";
-import { MetadataService, OidcClientSettingsStore, OidcMetadata } from "oidc-client-ts";
+import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto.ts";
 import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync.ts";
