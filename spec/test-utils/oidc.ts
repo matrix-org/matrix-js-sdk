@@ -19,10 +19,14 @@ import { OidcClientConfig, ValidatedIssuerMetadata } from "../../src";
 /**
  * Makes a valid OidcClientConfig with minimum valid values
  * @param issuer used as the base for all other urls
+ * @param additionalGrantTypes to add to the default grant types
  * @returns OidcClientConfig
  */
-export const makeDelegatedAuthConfig = (issuer = "https://auth.org/"): OidcClientConfig => {
-    const metadata = mockOpenIdConfiguration(issuer);
+export const makeDelegatedAuthConfig = (
+    issuer = "https://auth.org/",
+    additionalGrantTypes: string[] = [],
+): OidcClientConfig => {
+    const metadata = mockOpenIdConfiguration(issuer, additionalGrantTypes);
 
     return {
         issuer,
@@ -37,6 +41,7 @@ export const makeDelegatedAuthConfig = (issuer = "https://auth.org/"): OidcClien
 /**
  * Useful for mocking <issuer>/.well-known/openid-configuration
  * @param issuer used as the base for all other urls
+ * @param additionalGrantTypes to add to the default grant types
  * @returns ValidatedIssuerMetadata
  */
 export const mockOpenIdConfiguration = (
