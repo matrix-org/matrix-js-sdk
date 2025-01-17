@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Mock } from "jest-mock";
+
 import {
     ClientEvent,
     EventTimeline,
@@ -24,19 +26,8 @@ import {
     RoomEvent,
 } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
-import { CallMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
-import { makeMockRoom } from "./mocks";
-
-const membershipTemplate: CallMembershipData = {
-    call_id: "",
-    scope: "m.room",
-    application: "m.call",
-    device_id: "AAAAAAA",
-    expires: 60 * 60 * 1000,
-    membershipID: "bloop",
-    foci_active: [{ type: "test" }],
-};
+import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 
 describe("MatrixRTCSessionManager", () => {
     let client: MatrixClient;
@@ -69,16 +60,15 @@ describe("MatrixRTCSessionManager", () => {
     it("Fires event when session ends", () => {
         const onEnded = jest.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
-
-        const memberships = [membershipTemplate];
-
-        const room1 = makeMockRoom(memberships);
+        const room1 = makeMockRoom(membershipTemplate);
         jest.spyOn(client, "getRooms").mockReturnValue([room1]);
         jest.spyOn(client, "getRoom").mockReturnValue(room1);
 
         client.emit(ClientEvent.Room, room1);
 
-        memberships.splice(0, 1);
+        (room1.getLiveTimeline as Mock).mockReturnValue({
+            getState: jest.fn().mockReturnValue(makeMockRoomState([{}], room1.roomId)),
+        });
 
         const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
         const membEvent = roomState.getStateEvents("")[0];

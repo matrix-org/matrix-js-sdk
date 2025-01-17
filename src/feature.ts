@@ -60,6 +60,7 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
     [Feature.RelationsRecursion]: {
         unstablePrefixes: ["org.matrix.msc3981"],
+        matrixVersion: "v1.10",
     },
     [Feature.IntentionalMentions]: {
         unstablePrefixes: ["org.matrix.msc3952_intentional_mentions"],

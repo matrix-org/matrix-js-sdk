@@ -35,11 +35,7 @@ import {
     SpaceChildEventContent,
     SpaceParentEventContent,
 } from "./state_events.ts";
-import {
-    ExperimentalGroupCallRoomMemberState,
-    IGroupCallRoomMemberState,
-    IGroupCallRoomState,
-} from "../webrtc/groupCall.ts";
+import { IGroupCallRoomMemberState, IGroupCallRoomState } from "../webrtc/groupCall.ts";
 import { MSC3089EventContent } from "../models/MSC3089Branch.ts";
 import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon.ts";
 import { XOR } from "./common.ts";
@@ -361,10 +357,7 @@ export interface StateEvents {
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: XOR<
-        XOR<IGroupCallRoomMemberState, ExperimentalGroupCallRoomMemberState>,
-        XOR<SessionMembershipData, {}>
-    >;
+    [EventType.GroupCallMemberPrefix]: XOR<IGroupCallRoomMemberState, XOR<SessionMembershipData, {}>>;
 
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;

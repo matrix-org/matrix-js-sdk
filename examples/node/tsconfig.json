@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "target": "es2022",
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "noImplicitAny": false,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "allowJs": true,
+        "checkJs": true,
+        "strict": true
+    },
+    "include": ["app.js"]
+}
