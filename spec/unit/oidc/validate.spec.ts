@@ -28,8 +28,8 @@ describe("validateOIDCIssuerWellKnown", () => {
         issuer: "https://test.org",
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
-        registration_endpoint: "https://authorize.org/regsiter",
-        revocation_endpoint: "https://authorize.org/regsiter",
+        registration_endpoint: "https://authorize.org/register",
+        revocation_endpoint: "https://authorize.org/revoke",
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
@@ -63,25 +63,31 @@ describe("validateOIDCIssuerWellKnown", () => {
     });
 
     it("should return validated issuer config", () => {
-        expect(validateAuthMetadata(validWk)).toEqual({
-            issuer: validWk.issuer,
-            authorizationEndpoint: validWk.authorization_endpoint,
-            tokenEndpoint: validWk.token_endpoint,
-            registrationEndpoint: validWk.registration_endpoint,
-            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
-            accountManagementEndpoint: "https://authorize.org/account",
-        });
+        expect(validateAuthMetadata(validWk)).toEqual(
+            expect.objectContaining({
+                issuer: validWk.issuer,
+                authorization_endpoint: validWk.authorization_endpoint,
+                token_endpoint: validWk.token_endpoint,
+                registration_endpoint: validWk.registration_endpoint,
+                account_management_actions_supported: ["org.matrix.cross_signing_reset"],
+                account_management_uri: "https://authorize.org/account",
+            }),
+        );
     });
 
-    it("should return validated issuer config without registrationendpoint", () => {
+    it("should return validated issuer config without registration_endpoint", () => {
         const { registration_endpoint: _, ...wk } = validWk;
         expect(validateAuthMetadata(wk)).toEqual({
             issuer: validWk.issuer,
-            authorizationEndpoint: validWk.authorization_endpoint,
-            tokenEndpoint: validWk.token_endpoint,
-            registrationEndpoint: undefined,
-            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
-            accountManagementEndpoint: "https://authorize.org/account",
+            authorization_endpoint: validWk.authorization_endpoint,
+            token_endpoint: validWk.token_endpoint,
+            revocation_endpoint: validWk.revocation_endpoint,
+            registration_endpoint: undefined,
+            account_management_actions_supported: ["org.matrix.cross_signing_reset"],
+            account_management_uri: "https://authorize.org/account",
+            code_challenge_methods_supported: ["S256"],
+            grant_types_supported: ["authorization_code"],
+            response_types_supported: ["code"],
         });
     });
 
