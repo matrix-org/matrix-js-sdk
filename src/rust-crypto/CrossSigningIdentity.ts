@@ -87,7 +87,7 @@ export class CrossSigningIdentity {
                     "bootstrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
                         "in secret storage, reading storage and caching locally",
                 );
-                const status: CrossSigningStatus = await this.olmMachine.importCrossSigningKeys(
+                const status = await this.olmMachine.importCrossSigningKeys(
                     masterKeyFromSecretStorage,
                     selfSigningKeyFromSecretStorage,
                     userSigningKeyFromSecretStorage,
