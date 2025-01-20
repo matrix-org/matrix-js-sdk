@@ -1895,7 +1895,7 @@ describe("RustCrypto", () => {
             fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
         });
 
-        it("key backup should stay disabled after reset", async () => {
+        it("reset should reset 4S, backup and cross-signing", async () => {
             // We don't have a key backup
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", {});
 
@@ -1939,9 +1939,9 @@ describe("RustCrypto", () => {
             );
 
             // A new key backup should be created after the reset
-            let content!: KeyBackupInfo;
+            let newKeyBackupInfo!: KeyBackupInfo;
             fetchMock.post("path:/_matrix/client/v3/room_keys/version", (res, options) => {
-                content = JSON.parse(options.body as string);
+                newKeyBackupInfo = JSON.parse(options.body as string);
                 return { version: "2" };
             });
 
@@ -1949,7 +1949,7 @@ describe("RustCrypto", () => {
             await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
 
             // A new key backup should be created
-            expect(content.auth_data).toBeTruthy();
+            expect(newKeyBackupInfo.auth_data).toBeTruthy();
             // The new cross signing keys should be uploaded
             expect(authUploadDeviceSigningKeys).toHaveBeenCalledWith(expect.any(Function));
         });
