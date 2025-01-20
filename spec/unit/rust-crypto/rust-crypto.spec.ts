@@ -2114,8 +2114,6 @@ class DummyAccountDataClient
     }
 }
 
-/** emulate 
-
 /** Pad a string to 43 characters long */
 function pad43(x: string): string {
     return x + ".".repeat(43 - x.length);
