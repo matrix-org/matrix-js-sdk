@@ -18,13 +18,13 @@ import { mocked } from "jest-mock";
 import { jwtDecode } from "jwt-decode";
 
 import { logger } from "../../../src/logger";
-import { ValidatedIssuerMetadata, validateIdToken, validateOIDCIssuerWellKnown } from "../../../src/oidc/validate";
+import { ValidatedAuthMetadata, validateIdToken, validateAuthMetadata } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
 jest.mock("jwt-decode");
 
 describe("validateOIDCIssuerWellKnown", () => {
-    const validWk: ValidatedIssuerMetadata = {
+    const validWk: ValidatedAuthMetadata = {
         issuer: "https://test.org",
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
@@ -45,14 +45,14 @@ describe("validateOIDCIssuerWellKnown", () => {
 
     it("should throw OP support error when wellKnown is not an object", () => {
         expect(() => {
-            validateOIDCIssuerWellKnown([]);
+            validateAuthMetadata([]);
         }).toThrow(OidcError.OpSupport);
         expect(logger.error).toHaveBeenCalledWith("Issuer configuration not found or malformed");
     });
 
     it("should log all errors before throwing", () => {
         expect(() => {
-            validateOIDCIssuerWellKnown({
+            validateAuthMetadata({
                 ...validWk,
                 authorization_endpoint: undefined,
                 response_types_supported: [],
@@ -63,7 +63,7 @@ describe("validateOIDCIssuerWellKnown", () => {
     });
 
     it("should return validated issuer config", () => {
-        expect(validateOIDCIssuerWellKnown(validWk)).toEqual({
+        expect(validateAuthMetadata(validWk)).toEqual({
             issuer: validWk.issuer,
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
@@ -75,7 +75,7 @@ describe("validateOIDCIssuerWellKnown", () => {
 
     it("should return validated issuer config without registrationendpoint", () => {
         const { registration_endpoint: _, ...wk } = validWk;
-        expect(validateOIDCIssuerWellKnown(wk)).toEqual({
+        expect(validateAuthMetadata(wk)).toEqual({
             issuer: validWk.issuer,
             authorizationEndpoint: validWk.authorization_endpoint,
             tokenEndpoint: validWk.token_endpoint,
@@ -108,7 +108,7 @@ describe("validateOIDCIssuerWellKnown", () => {
             ...validWk,
             [key]: value,
         };
-        expect(() => validateOIDCIssuerWellKnown(wk)).toThrow(OidcError.OpSupport);
+        expect(() => validateAuthMetadata(wk)).toThrow(OidcError.OpSupport);
     });
 });
 

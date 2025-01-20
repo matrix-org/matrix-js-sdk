@@ -76,6 +76,7 @@ import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from ".
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { KnownMembership } from "../../src/@types/membership";
 import { RoomMessageEventContent } from "../../src/@types/events";
+import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
 
 jest.useFakeTimers();
 
@@ -3485,6 +3486,49 @@ describe("MatrixClient", function () {
             ];
 
             await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
+            expect(httpLookups.length).toEqual(0);
+        });
+    });
+
+    describe("getAuthMetadata", () => {
+        it("should use unstable prefix", async () => {
+            const metadata = mockOpenIdConfiguration();
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    data: metadata,
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("should fall back to auth_issuer + openid-configuration", async () => {
+            const metadata = mockOpenIdConfiguration();
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+                {
+                    method: "GET",
+                    path: `/auth_issuer`,
+                    data: { issuer: metadata.issuer },
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+                {
+                    method: "GET",
+                    path: `${metadata.issuer}.well-known/openid-configuration`,
+                    data: metadata,
+                },
+            ];
+
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
     });

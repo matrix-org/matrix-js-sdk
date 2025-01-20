@@ -188,3 +188,5 @@ export async function decryptExistingEvent(
     } as Parameters<MatrixEvent["attemptDecryption"]>[0];
     await mxEvent.attemptDecryption(mockCrypto);
 }
+
+export * from "../spec/test-utils/oidc.ts";

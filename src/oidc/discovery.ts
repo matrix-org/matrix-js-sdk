@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
-import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate.ts";
+import { validateAuthMetadata } from "./validate.ts";
 import { Method, timeoutSignal } from "../http-api/index.ts";
 import { OidcClientConfig } from "./index.ts";
 
@@ -39,23 +39,27 @@ export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Pr
         signal: timeoutSignal(5000),
     });
     const issuerWellKnown = await issuerWellKnownResponse.json();
-    const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown);
+    return validateAuthMetadataAndKeys(issuerWellKnown);
+};
+
+/**
+ *
+ * @param authMetadata
+ */
+export const validateAuthMetadataAndKeys = async (authMetadata: unknown): Promise<OidcClientConfig> => {
+    const validatedIssuerConfig = validateAuthMetadata(authMetadata);
 
     // create a temporary settings store, so we can use metadata service for discovery
     const settings = new OidcClientSettingsStore({
-        authority: issuer,
+        authority: validatedIssuerConfig.issuer,
+        metadata: validatedIssuerConfig,
         redirect_uri: "", // Not known yet, this is here to make the type checker happy
         client_id: "", // Not known yet, this is here to make the type checker happy
     });
     const metadataService = new MetadataService(settings);
-    const metadata = await metadataService.getMetadata();
-    const signingKeys = (await metadataService.getSigningKeys()) ?? undefined;
-
-    isValidatedIssuerMetadata(metadata);
 
     return {
         ...validatedIssuerConfig,
-        metadata,
-        signingKeys,
+        signingKeys: await metadataService.getSigningKeys(),
     };
 };

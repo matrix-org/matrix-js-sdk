@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClientConfig, ValidatedIssuerMetadata } from "../../src";
+import { OidcClientConfig, ValidatedAuthMetadata } from "../../src";
 
 /**
  * Makes a valid OidcClientConfig with minimum valid values
  * @param issuer used as the base for all other urls
  * @param additionalGrantTypes to add to the default grant types
  * @returns OidcClientConfig
+ * @experimental
  */
 export const makeDelegatedAuthConfig = (
     issuer = "https://auth.org/",
@@ -29,12 +30,8 @@ export const makeDelegatedAuthConfig = (
     const metadata = mockOpenIdConfiguration(issuer, additionalGrantTypes);
 
     return {
-        issuer,
-        accountManagementEndpoint: issuer + "account",
-        registrationEndpoint: metadata.registration_endpoint,
-        authorizationEndpoint: metadata.authorization_endpoint,
-        tokenEndpoint: metadata.token_endpoint,
-        metadata,
+        ...metadata,
+        signingKeys: null,
     };
 };
 
@@ -42,12 +39,13 @@ export const makeDelegatedAuthConfig = (
  * Useful for mocking <issuer>/.well-known/openid-configuration
  * @param issuer used as the base for all other urls
  * @param additionalGrantTypes to add to the default grant types
- * @returns ValidatedIssuerMetadata
+ * @returns ValidatedAuthMetadata
+ * @experimental
  */
 export const mockOpenIdConfiguration = (
     issuer = "https://auth.org/",
     additionalGrantTypes: string[] = [],
-): ValidatedIssuerMetadata => ({
+): ValidatedAuthMetadata => ({
     issuer,
     revocation_endpoint: issuer + "revoke",
     token_endpoint: issuer + "token",

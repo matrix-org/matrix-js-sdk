@@ -194,7 +194,7 @@ export class MSC4108SignInWithQR {
                     logger.error("Failed to discover OIDC metadata", e);
                 }
 
-                if (oidcClientConfig?.metadata.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
+                if (oidcClientConfig?.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],

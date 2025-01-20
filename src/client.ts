@@ -19,7 +19,6 @@ limitations under the License.
  */
 
 import { Optional } from "matrix-events-sdk";
-import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto.ts";
 import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync.ts";
@@ -248,13 +247,7 @@ import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
-import {
-    discoverAndValidateOIDCIssuerWellKnown,
-    isValidatedIssuerMetadata,
-    OidcClientConfig,
-    ValidatedIssuerMetadata,
-    validateOIDCIssuerWellKnown,
-} from "./oidc/index.ts";
+import { discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig, validateAuthMetadataAndKeys } from "./oidc/index.ts";
 
 export type Store = IStore;
 
@@ -10358,17 +10351,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @experimental - part of MSC2965
      */
     public async getAuthMetadata(): Promise<OidcClientConfig> {
-        let authMetadata: ValidatedIssuerMetadata | undefined;
+        let authMetadata: unknown | undefined;
         try {
-            authMetadata = await this.http.request<ValidatedIssuerMetadata>(
-                Method.Get,
-                "/auth_metadata",
-                undefined,
-                undefined,
-                {
-                    prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
-                },
-            );
+            authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
+                prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+            });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
                 const { issuer } = await this.getAuthIssuer();
@@ -10377,25 +10364,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw e;
         }
 
-        const validatedIssuerConfig = validateOIDCIssuerWellKnown(authMetadata);
-
-        // create a temporary settings store, so we can use metadata service for discovery
-        const settings = new OidcClientSettingsStore({
-            authority: validatedIssuerConfig.issuer,
-            redirect_uri: "", // Not known yet, this is here to make the type checker happy
-            client_id: "", // Not known yet, this is here to make the type checker happy
-        });
-        const metadataService = new MetadataService(settings);
-        const metadata = await metadataService.getMetadata();
-        const signingKeys = (await metadataService.getSigningKeys()) ?? undefined;
-
-        isValidatedIssuerMetadata(metadata);
-
-        return {
-            ...validatedIssuerConfig,
-            metadata,
-            signingKeys,
-        };
+        return validateAuthMetadataAndKeys(authMetadata);
     }
 }
 
