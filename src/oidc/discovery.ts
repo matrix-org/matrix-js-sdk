@@ -43,8 +43,10 @@ export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Pr
 };
 
 /**
- *
- * @param authMetadata
+ * @experimental
+ * Validate the authentication metadata and fetch the signing keys from the jwks_uri in the metadata
+ * @param authMetadata - the authentication metadata to validate
+ * @returns validated authentication metadata and signing keys
  */
 export const validateAuthMetadataAndKeys = async (authMetadata: unknown): Promise<OidcClientConfig> => {
     const validatedIssuerConfig = validateAuthMetadata(authMetadata);
