@@ -23,7 +23,7 @@ import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client.ts";
 import {
     ISyncStateData,
     SyncState,
-    _createAndReEmitRoom,
+    _createAndSetupRoom,
     SyncApiOptions,
     defaultClientOpts,
     defaultSyncApiOpts,
@@ -387,7 +387,7 @@ export class SlidingSyncSdk {
                 logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
-            room = _createAndReEmitRoom(this.client, roomId, this.opts);
+            room = _createAndSetupRoom(this.client, roomId, this.opts);
         }
         await this.processRoomData(this.client, room!, roomData);
     }
@@ -643,7 +643,6 @@ export class SlidingSyncSdk {
             await this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
-                this.client.store.storeRoom(room);
                 this.client.emit(ClientEvent.Room, room);
             }
             inviteStateEvents.forEach((e) => {
@@ -723,8 +722,7 @@ export class SlidingSyncSdk {
 
         room.recalculate();
         if (roomData.initial) {
-            client.store.storeRoom(room);
-            client.emit(ClientEvent.Room, room);
+            this.client.emit(ClientEvent.Room, room);
         }
 
         // check if any timeline events should bing and add them to the notifEvents array:
