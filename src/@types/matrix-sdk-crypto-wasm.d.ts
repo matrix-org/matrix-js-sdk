@@ -20,6 +20,11 @@ declare module "@matrix-org/matrix-sdk-crypto-wasm" {
     interface OlmMachine {
         importSecretsBundle(bundle: RustSdkCryptoJs.SecretsBundle): Promise<void>;
         exportSecretsBundle(): Promise<RustSdkCryptoJs.SecretsBundle>;
+        importCrossSigningKeys(
+            master_key?: string,
+            self_signing_key?: string,
+            user_signing_key?: string,
+        ): Promise<RustSdkCryptoJs.CrossSigningStatus>;
     }
 
     interface SecretsBundle {
