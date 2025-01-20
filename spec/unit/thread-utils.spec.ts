@@ -15,12 +15,12 @@ limitations under the License.
 */
 
 import { IEvent } from "../../src";
-import { randomString } from "../../src/randomstring";
+import { secureRandomString } from "../../src/randomstring";
 import { getRelationsThreadFilter } from "../../src/thread-utils";
 
 function makeEvent(relatesToEvent: string, relType: string): Partial<IEvent> {
     return {
-        event_id: randomString(10),
+        event_id: secureRandomString(10),
         type: "m.room.message",
         content: {
             "msgtype": "m.text",

@@ -23,7 +23,7 @@ limitations under the License.
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { ClientEvent, ClientEventHandlerMap } from "./client.ts";
 import { MatrixEvent } from "./models/event.ts";
-import { randomString } from "./randomstring.ts";
+import { secureRandomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
@@ -435,7 +435,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
         // Create a unique key id. XXX: this is racey.
         if (!keyId) {
             do {
-                keyId = randomString(32);
+                keyId = secureRandomString(32);
             } while (await this.accountDataAdapter.getAccountDataFromServer(`m.secret_storage.key.${keyId}`));
         }
 

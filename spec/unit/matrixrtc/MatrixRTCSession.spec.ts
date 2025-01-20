@@ -19,7 +19,7 @@ import { KnownMembership } from "../../../src/@types/membership";
 import { DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
-import { randomString } from "../../../src/randomstring";
+import { secureRandomString } from "../../../src/randomstring";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 
@@ -98,7 +98,7 @@ describe("MatrixRTCSession", () => {
         });
 
         it("safely ignores events with no memberships section", () => {
-            const roomId = randomString(8);
+            const roomId = secureRandomString(8);
             const event = {
                 getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
                 getContent: jest.fn().mockReturnValue({}),
@@ -133,7 +133,7 @@ describe("MatrixRTCSession", () => {
         });
 
         it("safely ignores events with junk memberships section", () => {
-            const roomId = randomString(8);
+            const roomId = secureRandomString(8);
             const event = {
                 getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
                 getContent: jest.fn().mockReturnValue({ memberships: ["i am a fish"] }),
