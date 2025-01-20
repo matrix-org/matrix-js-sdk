@@ -1912,9 +1912,16 @@ describe("RustCrypto", () => {
         });
 
         it("key backup should be re-enabled after reset", async () => {
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
             // When we will delete the key backup
-            fetchMock.delete("path:/_matrix/client/v3/room_keys/version/1", {});
+            let backupIsDeleted = false;
+            fetchMock.delete("path:/_matrix/client/v3/room_keys/version/1", () => {
+                backupIsDeleted = true;
+                return {};
+            });
+            // If the backup is deleted, we will return an empty object
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
+                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+            });
 
             // We consider the key backup as trusted
             jest.spyOn(RustBackupManager.prototype, "isKeyBackupTrusted").mockResolvedValue({
@@ -1925,18 +1932,6 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
             // We have a key backup
             expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull();
-
-            let nbCalls = 0;
-            fetchMock.get(
-                "path:/_matrix/client/v3/room_keys/version",
-                () => {
-                    // First call is when we check if the key backup is enabled.
-                    // Second call is when we get the next backup after we deleted the first key backup,
-                    // we return an empty object because we don't have a key backup anymore.
-                    return ++nbCalls === 1 ? testData.SIGNED_BACKUP_DATA : {};
-                },
-                { overwriteRoutes: true },
-            );
 
             // A new key backup should be created after the reset
             let newKeyBackupInfo!: KeyBackupInfo;
