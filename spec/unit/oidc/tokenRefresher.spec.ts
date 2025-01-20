@@ -55,8 +55,8 @@ describe("OidcTokenRefresher", () => {
     });
 
     beforeEach(() => {
-        fetchMock.get(`${config.metadata.issuer}.well-known/openid-configuration`, config.metadata);
-        fetchMock.get(`${config.metadata.issuer}jwks`, {
+        fetchMock.get(`${config.issuer}.well-known/openid-configuration`, config);
+        fetchMock.get(`${config.issuer}jwks`, {
             status: 200,
             headers: {
                 "Content-Type": "application/json",
@@ -64,7 +64,7 @@ describe("OidcTokenRefresher", () => {
             keys: [],
         });
 
-        fetchMock.post(config.tokenEndpoint, {
+        fetchMock.post(config.token_endpoint, {
             status: 200,
             headers: {
                 "Content-Type": "application/json",
@@ -81,7 +81,7 @@ describe("OidcTokenRefresher", () => {
     it("throws when oidc client cannot be initialised", async () => {
         jest.spyOn(logger, "error");
         fetchMock.get(
-            `${config.metadata.issuer}.well-known/openid-configuration`,
+            `${config.issuer}.well-known/openid-configuration`,
             {
                 ok: false,
                 status: 404,
@@ -126,7 +126,7 @@ describe("OidcTokenRefresher", () => {
 
             const result = await refresher.doRefreshAccessToken("refresh-token");
 
-            expect(fetchMock).toHaveFetched(config.tokenEndpoint, {
+            expect(fetchMock).toHaveFetched(config.token_endpoint, {
                 method: "POST",
             });
 
@@ -153,7 +153,7 @@ describe("OidcTokenRefresher", () => {
         it("should only have one inflight refresh request at once", async () => {
             fetchMock
                 .postOnce(
-                    config.tokenEndpoint,
+                    config.token_endpoint,
                     {
                         status: 200,
                         headers: {
@@ -164,7 +164,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: true },
                 )
                 .postOnce(
-                    config.tokenEndpoint,
+                    config.token_endpoint,
                     {
                         status: 200,
                         headers: {
@@ -188,7 +188,7 @@ describe("OidcTokenRefresher", () => {
             const result2 = await first;
 
             // only one call to token endpoint
-            expect(fetchMock).toHaveFetchedTimes(1, config.tokenEndpoint);
+            expect(fetchMock).toHaveFetchedTimes(1, config.token_endpoint);
             expect(result1).toEqual({
                 accessToken: "first-new-access-token",
                 refreshToken: "first-new-refresh-token",
@@ -208,7 +208,7 @@ describe("OidcTokenRefresher", () => {
 
         it("should log and rethrow when token refresh fails", async () => {
             fetchMock.post(
-                config.tokenEndpoint,
+                config.token_endpoint,
                 {
                     status: 503,
                     headers: {
@@ -228,7 +228,7 @@ describe("OidcTokenRefresher", () => {
             // make sure inflight request is cleared after a failure
             fetchMock
                 .postOnce(
-                    config.tokenEndpoint,
+                    config.token_endpoint,
                     {
                         status: 503,
                         headers: {
@@ -238,7 +238,7 @@ describe("OidcTokenRefresher", () => {
                     { overwriteRoutes: true },
                 )
                 .postOnce(
-                    config.tokenEndpoint,
+                    config.token_endpoint,
                     {
                         status: 200,
                         headers: {

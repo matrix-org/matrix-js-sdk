@@ -40,8 +40,8 @@ jest.mock("jwt-decode");
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
-    const authorizationEndpoint = delegatedAuthConfig.authorizationEndpoint;
-    const tokenEndpoint = delegatedAuthConfig.tokenEndpoint;
+    const authorizationEndpoint = delegatedAuthConfig.authorization_endpoint;
+    const tokenEndpoint = delegatedAuthConfig.token_endpoint;
     const clientId = "xyz789";
     const baseUrl = "https://test.com";
 
@@ -52,10 +52,7 @@ describe("oidc authorization", () => {
         jest.spyOn(logger, "warn");
         jest.setSystemTime(now);
 
-        fetchMock.get(
-            delegatedAuthConfig.metadata.issuer + ".well-known/openid-configuration",
-            mockOpenIdConfiguration(),
-        );
+        fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
         globalThis.TextEncoder = TextEncoder;
     });
 
@@ -127,11 +124,9 @@ describe("oidc authorization", () => {
         it("should generate url with correct parameters", async () => {
             const nonce = "abc123";
 
-            const metadata = delegatedAuthConfig.metadata;
-
             const authUrl = new URL(
                 await generateOidcAuthorizationUrl({
-                    metadata,
+                    metadata: delegatedAuthConfig,
                     homeserverUrl: baseUrl,
                     clientId,
                     redirectUri: baseUrl,
@@ -156,11 +151,9 @@ describe("oidc authorization", () => {
         it("should generate url with create prompt", async () => {
             const nonce = "abc123";
 
-            const metadata = delegatedAuthConfig.metadata;
-
             const authUrl = new URL(
                 await generateOidcAuthorizationUrl({
-                    metadata,
+                    metadata: delegatedAuthConfig,
                     homeserverUrl: baseUrl,
                     clientId,
                     redirectUri: baseUrl,

@@ -77,11 +77,12 @@ export class OidcTokenRefresher {
             const scope = generateScope(deviceId);
 
             this.oidcClient = new OidcClient({
-                ...config.metadata,
+                metadata: config,
+                signingKeys: config.signingKeys ?? undefined,
                 client_id: clientId,
                 scope,
                 redirect_uri: redirectUri,
-                authority: config.metadata.issuer,
+                authority: config.issuer,
                 stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
             });
         } catch (error) {
