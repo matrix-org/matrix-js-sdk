@@ -15,7 +15,7 @@
  */
 
 /**
- * Cryptography-related events emitted by the {@link MatrixClient}.
+ * Cryptography-related events emitted by the {@link matrix.MatrixClient}.
  */
 export enum CryptoEvent {
     /**
