@@ -95,7 +95,7 @@ export class CrossSigningIdentity {
 
                 // Check that `importCrossSigningKeys` worked correctly (for example, it will fail silently if the
                 // public keys are not available).
-                if (!status.hasMaster || !status.hasSelfSigning || !status.hasSelfSigning) {
+                if (!status.hasMaster || !status.hasSelfSigning || !status.hasUserSigning) {
                     throw new Error("importCrossSigningKeys failed to import the keys");
                 }
 
