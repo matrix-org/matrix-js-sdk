@@ -396,6 +396,19 @@ export interface CryptoApi {
         payload: ToDevicePayload,
     ): Promise<ToDeviceBatch>;
 
+    /**
+     * Reset the encryption of the user by going through the following steps:
+     * - Disable backing up room keys and delete any existing backups.
+     * - Remove the default secret storage key from the account data (ie: the recovery key).
+     * - Reset the cross-signing keys.
+     * - Re-enable backing up room keys if enabled before.
+     *
+     * @param authUploadDeviceSigningKeys - Callback to authenticate the upload of device signing keys.
+     *      Used when resetting the cross signing keys.
+     *      See {@link BootstrapCrossSigningOpts#authUploadDeviceSigningKeys}.
+     */
+    resetEncryption(authUploadDeviceSigningKeys: UIAuthCallback<void>): Promise<void>;
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Device/User verification

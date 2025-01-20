@@ -61,6 +61,7 @@ import {
     EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
+    KeyBackupInfo,
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
@@ -72,6 +73,7 @@ import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
+import { RustBackupManager } from "../../../src/rust-crypto/backup.ts";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -1877,6 +1879,74 @@ describe("RustCrypto", () => {
                     "sender_key": expect.any(String),
                 }),
             );
+        });
+    });
+
+    describe("resetEncryption", () => {
+        let secretStorage: ServerSideSecretStorage;
+        beforeEach(() => {
+            secretStorage = {
+                setDefaultKeyId: jest.fn(),
+                hasKey: jest.fn().mockResolvedValue(false),
+                getKey: jest.fn().mockResolvedValue(null),
+            } as unknown as ServerSideSecretStorage;
+
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
+        });
+
+        it("reset should reset 4S, backup and cross-signing", async () => {
+            // We don't have a key backup
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {});
+
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
+
+            const authUploadDeviceSigningKeys = jest.fn();
+            await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
+
+            // The default key id should be deleted
+            expect(secretStorage.setDefaultKeyId).toHaveBeenCalledWith(null);
+            expect(await rustCrypto.getActiveSessionBackupVersion()).toBeNull();
+            // The new cross signing keys should be uploaded
+            expect(authUploadDeviceSigningKeys).toHaveBeenCalledWith(expect.any(Function));
+        });
+
+        it("key backup should be re-enabled after reset", async () => {
+            // When we will delete the key backup
+            let backupIsDeleted = false;
+            fetchMock.delete("path:/_matrix/client/v3/room_keys/version/1", () => {
+                backupIsDeleted = true;
+                return {};
+            });
+            // If the backup is deleted, we will return an empty object
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
+                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+            });
+
+            // We consider the key backup as trusted
+            jest.spyOn(RustBackupManager.prototype, "isKeyBackupTrusted").mockResolvedValue({
+                trusted: true,
+                matchesDecryptionKey: true,
+            });
+
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
+            // We have a key backup
+            expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull();
+
+            // A new key backup should be created after the reset
+            let newKeyBackupInfo!: KeyBackupInfo;
+            fetchMock.post("path:/_matrix/client/v3/room_keys/version", (res, options) => {
+                newKeyBackupInfo = JSON.parse(options.body as string);
+                return { version: "2" };
+            });
+
+            const authUploadDeviceSigningKeys = jest.fn();
+            await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
+
+            // A new key backup should be created
+            expect(newKeyBackupInfo.auth_data).toBeTruthy();
+            // The new cross signing keys should be uploaded
+            expect(authUploadDeviceSigningKeys).toHaveBeenCalledWith(expect.any(Function));
         });
     });
 });
