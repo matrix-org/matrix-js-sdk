@@ -8246,27 +8246,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     *
+     * @deprecated This method has unintuitive behaviour: it updates the `MatrixClient` instance with *some* of the
+     *    returned credentials. Instead, call {@link loginRequest} and create a new `MatrixClient` instance using the
+     *    results. See https://github.com/matrix-org/matrix-js-sdk/issues/4502.
      */
     public login(loginType: LoginRequest["type"], data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
-        return this.http
-            .authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
-                ...data,
-                type: loginType,
-            })
-            .then((response) => {
-                if (response.access_token && response.user_id) {
-                    this.http.opts.accessToken = response.access_token;
-                    this.credentials = {
-                        userId: response.user_id,
-                    };
-                }
-                return response;
-            });
+        return this.loginRequest({
+            ...data,
+            type: loginType,
+        }).then((response) => {
+            if (response.access_token && response.user_id) {
+                this.http.opts.accessToken = response.access_token;
+                this.credentials = {
+                    userId: response.user_id,
+                };
+            }
+            return response;
+        });
     }
 
     /**
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     *
+     * @deprecated This method has unintuitive behaviour: it updates the `MatrixClient` instance with *some* of the
+     *   returned credentials. Instead, call {@link loginRequest} with `data.type: "m.login.password"`, and create a new
+     *   `MatrixClient` instance using the results. See https://github.com/matrix-org/matrix-js-sdk/issues/4502.
      */
     public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
         return this.login("m.login.password", {
@@ -8311,11 +8317,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param token - Login token previously received from homeserver
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     *
+     * @deprecated This method has unintuitive behaviour: it updates the `MatrixClient` instance with *some* of the
+     *   returned credentials. Instead, call {@link loginRequest} with `data.type: "m.login.token"`, and create a new
+     *   `MatrixClient` instance using the results. See https://github.com/matrix-org/matrix-js-sdk/issues/4502.
      */
     public loginWithToken(token: string): Promise<LoginResponse> {
         return this.login("m.login.token", {
             token: token,
         });
+    }
+
+    /**
+     * Sends a `POST /login` request to the server.
+     *
+     * If successful, this will create a new device and access token for the user.
+     *
+     * @see {@link MatrixClient.loginFlows} which makes a `GET /login` request.
+     * @see https://spec.matrix.org/v1.13/client-server-api/#post_matrixclientv3login
+     *
+     * @param data - Credentials and other details for the login request.
+     */
+    public async loginRequest(data: LoginRequest): Promise<LoginResponse> {
+        return await this.http.authedRequest<LoginResponse>(Method.Post, "/login", undefined, data);
     }
 
     /**
