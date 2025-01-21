@@ -74,7 +74,8 @@ export function secureRandomStringFrom(len: number, chars: string): string {
     // this as we can't possibly map them onto the character set while keeping each character equally
     // likely to be chosen (minus 1 to convert to indices in a string). (Essentially, we're using a d8
     // to choose between 7 possibilities and re-rolling on an 8, keeping all 7 outcomes equally likely.)
-    const maxRandValue = Math.floor(255 / chars.length) * chars.length - 1;
+    // Our random values must be strictly less than this
+    const randomValueCutoff = 256 - (256 % chars.length);
 
     // Grab 30% more entropy than we need. This should be enough that we can discard the values that are
     // too high without having to go back and grab more unless we're super unlucky.
@@ -92,7 +93,7 @@ export function secureRandomStringFrom(len: number, chars: string): string {
 
         const randomByte = entropyBuffer[entropyBufferPos++];
 
-        if (randomByte < maxRandValue) {
+        if (randomByte < randomValueCutoff) {
             result.push(chars[randomByte % chars.length]);
         }
     }
