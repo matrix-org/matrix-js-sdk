@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EventType, MatrixEvent, Room } from "../../../src";
 import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { randomString } from "../../../src/randomstring";
+import { secureRandomString } from "../../../src/randomstring";
 
 type MembershipData = SessionMembershipData[] | SessionMembershipData | {};
 
@@ -41,7 +41,7 @@ export const membershipTemplate: SessionMembershipData = {
 };
 
 export function makeMockRoom(membershipData: MembershipData): Room {
-    const roomId = randomString(8);
+    const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
     const roomState = makeMockRoomState(membershipData, roomId);
     const room = {

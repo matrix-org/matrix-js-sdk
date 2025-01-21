@@ -17,7 +17,7 @@ limitations under the License.
 import { IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
 
 import { logger } from "../logger.ts";
-import { randomString } from "../randomstring.ts";
+import { secureRandomString } from "../randomstring.ts";
 import { OidcError } from "./error.ts";
 import {
     BearerTokenResponse,
@@ -52,7 +52,7 @@ export type AuthorizationParams = {
  * @returns scope
  */
 export const generateScope = (deviceId?: string): string => {
-    const safeDeviceId = deviceId ?? randomString(10);
+    const safeDeviceId = deviceId ?? secureRandomString(10);
     return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
 };
 
@@ -79,9 +79,9 @@ const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
 export const generateAuthorizationParams = ({ redirectUri }: { redirectUri: string }): AuthorizationParams => ({
     scope: generateScope(),
     redirectUri,
-    state: randomString(8),
-    nonce: randomString(8),
-    codeVerifier: randomString(64), // https://tools.ietf.org/html/rfc7636#section-4.1 length needs to be 43-128 characters
+    state: secureRandomString(8),
+    nonce: secureRandomString(8),
+    codeVerifier: secureRandomString(64), // https://tools.ietf.org/html/rfc7636#section-4.1 length needs to be 43-128 characters
 });
 
 /**

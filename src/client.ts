@@ -160,7 +160,7 @@ import {
     Visibility,
 } from "./@types/partials.ts";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
-import { randomString } from "./randomstring.ts";
+import { secureRandomString } from "./randomstring.ts";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup.ts";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
 import { ISignatures } from "./@types/signed.ts";
@@ -1346,7 +1346,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
-        this.sessionId = randomString(10);
+        this.sessionId = secureRandomString(10);
 
         const userId = opts.userId || null;
         this.credentials = { userId };
@@ -7998,7 +7998,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns A new client secret
      */
     public generateClientSecret(): string {
-        return randomString(32);
+        return secureRandomString(32);
     }
 
     /**
