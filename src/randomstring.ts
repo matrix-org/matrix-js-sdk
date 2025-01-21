@@ -53,10 +53,11 @@ export function secureRandomString(len: number): string {
 }
 
 /**
- * Generate a cryptographically secure random string using characters given
- * @param len The length of the string to generate (must be positive and less than 32768)
- * @param chars The characters to use in the random string (between 2 and 256 characters long).
- * @returns Random string of characters of length `len`
+ * Generate a cryptographically secure random string using characters given.
+ *
+ * @param len - The length of the string to generate (must be positive and less than 32768).
+ * @param chars - The characters to use in the random string (between 2 and 256 characters long).
+ * @returns Random string of characters of length `len`.
  */
 export function secureRandomStringFrom(len: number, chars: string): string {
     // This is intended for latin strings so 256 possibilities should be more than enough and
