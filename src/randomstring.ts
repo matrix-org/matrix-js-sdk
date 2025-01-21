@@ -18,7 +18,7 @@ limitations under the License.
 import { encodeUnpaddedBase64Url } from "./base64.ts";
 
 /**
- * String representing the lowercase latin alphabet for use in secureRandomStringFrom
+ * String representing the lowercase latin alphabet for use in {@link secureRandomStringFrom}
  * (can be combined with other such exports or other characters by appending strings)
  */
 export const LOWERCASE = "abcdefghijklmnopqrstuvwxyz";
