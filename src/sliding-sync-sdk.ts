@@ -30,7 +30,6 @@ import {
     SetPresence,
 } from "./sync.ts";
 import { MatrixEvent } from "./models/event.ts";
-import { Crypto } from "./crypto/index.ts";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -66,7 +65,7 @@ type ExtensionE2EEResponse = Pick<
 >;
 
 class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
-    public constructor(private readonly crypto: Crypto) {}
+    public constructor(private readonly crypto: SyncCryptoCallbacks) {}
 
     public name(): string {
         return "e2ee";
@@ -373,8 +372,8 @@ export class SlidingSyncSdk {
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
         ];
-        if (this.syncOpts.crypto) {
-            extensions.push(new ExtensionE2EE(this.syncOpts.crypto));
+        if (this.syncOpts.cryptoCallbacks) {
+            extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);

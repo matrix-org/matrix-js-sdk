@@ -16,13 +16,18 @@ limitations under the License.
 
 import { decodeBase64 } from "../../src/base64";
 import {
-    randomLowercaseString,
-    randomString,
-    randomUppercaseString,
+    secureRandomString,
     secureRandomBase64Url,
+    secureRandomStringFrom,
+    LOWERCASE,
+    UPPERCASE,
 } from "../../src/randomstring";
 
 describe("Random strings", () => {
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
     it.each([8, 16, 32])("secureRandomBase64 generates %i valid base64 bytes", (n: number) => {
         const randb641 = secureRandomBase64Url(n);
         const randb642 = secureRandomBase64Url(n);
@@ -33,34 +38,77 @@ describe("Random strings", () => {
         expect(decoded).toHaveLength(n);
     });
 
-    it.each([8, 16, 32])("randomString generates string of %i characters", (n: number) => {
-        const rand1 = randomString(n);
-        const rand2 = randomString(n);
+    it.each([8, 16, 32])("secureRandomString generates string of %i characters", (n: number) => {
+        const rand1 = secureRandomString(n);
+        const rand2 = secureRandomString(n);
 
         expect(rand1).not.toEqual(rand2);
 
         expect(rand1).toHaveLength(n);
     });
 
-    it.each([8, 16, 32])("randomLowercaseString generates lowercase string of %i characters", (n: number) => {
-        const rand1 = randomLowercaseString(n);
-        const rand2 = randomLowercaseString(n);
+    it.each([8, 16, 32])(
+        "secureRandomStringFrom generates lowercase string of %i characters when given lowercase",
+        (n: number) => {
+            const rand1 = secureRandomStringFrom(n, LOWERCASE);
+            const rand2 = secureRandomStringFrom(n, LOWERCASE);
 
-        expect(rand1).not.toEqual(rand2);
+            expect(rand1).not.toEqual(rand2);
 
-        expect(rand1).toHaveLength(n);
+            expect(rand1).toHaveLength(n);
 
-        expect(rand1.toLowerCase()).toEqual(rand1);
+            expect(rand1.toLowerCase()).toEqual(rand1);
+        },
+    );
+
+    it.each([8, 16, 32])(
+        "secureRandomStringFrom generates uppercase string of %i characters when given uppercase",
+        (n: number) => {
+            const rand1 = secureRandomStringFrom(n, UPPERCASE);
+            const rand2 = secureRandomStringFrom(n, UPPERCASE);
+
+            expect(rand1).not.toEqual(rand2);
+
+            expect(rand1).toHaveLength(n);
+
+            expect(rand1.toUpperCase()).toEqual(rand1);
+        },
+    );
+
+    it("throws if given character set less than 2 characters", () => {
+        expect(() => secureRandomStringFrom(8, "a")).toThrow();
     });
 
-    it.each([8, 16, 32])("randomUppercaseString generates lowercase string of %i characters", (n: number) => {
-        const rand1 = randomUppercaseString(n);
-        const rand2 = randomUppercaseString(n);
+    it("throws if given character set more than 256 characters", () => {
+        const charSet = Array.from({ length: 257 }, (_, i) => "a").join("");
 
-        expect(rand1).not.toEqual(rand2);
+        expect(() => secureRandomStringFrom(8, charSet)).toThrow();
+    });
 
-        expect(rand1).toHaveLength(n);
+    it("throws if given length less than 1", () => {
+        expect(() => secureRandomStringFrom(0, "abc")).toThrow();
+    });
 
-        expect(rand1.toUpperCase()).toEqual(rand1);
+    it("throws if given length more than 32768", () => {
+        expect(() => secureRandomStringFrom(32769, "abc")).toThrow();
+    });
+
+    it("asks for more entropy if given entropy is unusable", () => {
+        // This is testing the internal implementation details of the function rather
+        // than strictly the public API. The intention is to have some assertion that
+        // the rejection sampling to make the distribution even over all possible characters
+        // is doing what it's supposed to do.
+
+        // mock once to fill with 255 the first time: 255 should be unusable because
+        // we give 10 possible characters below and 256 is not evenly divisible by 10, so
+        // this should force it to call for more entropy.
+        jest.spyOn(globalThis.crypto, "getRandomValues").mockImplementationOnce((arr) => {
+            if (arr === null) throw new Error("Buffer is null");
+            new Uint8Array(arr.buffer).fill(255);
+            return arr;
+        });
+
+        secureRandomStringFrom(8, "0123456789");
+        expect(globalThis.crypto.getRandomValues).toHaveBeenCalledTimes(2);
     });
 });

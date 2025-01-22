@@ -79,7 +79,7 @@ import { EventType, MsgType } from "../@types/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { decryptionKeyMatchesKeyBackupInfo, RustBackupManager } from "./backup.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
-import { randomString } from "../randomstring.ts";
+import { secureRandomString } from "../randomstring.ts";
 import { ClientStoppedError } from "../errors.ts";
 import { ISignatures } from "../@types/signed.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
@@ -957,7 +957,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         if (password) {
             // Generate the key from the passphrase
             // first we generate a random salt
-            const salt = randomString(32);
+            const salt = secureRandomString(32);
             // then we derive the key from the passphrase
             const recoveryKey = await deriveRecoveryKeyFromPassphrase(
                 password,
@@ -1100,7 +1100,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @returns the event id
      */
     private async sendVerificationRequestContent(roomId: string, verificationEventContent: string): Promise<string> {
-        const txId = randomString(32);
+        const txId = secureRandomString(32);
         // Send the verification request content to the DM room
         const { event_id: eventId } = await this.http.authedRequest<{ event_id: string }>(
             Method.Put,
