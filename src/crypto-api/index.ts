@@ -222,6 +222,15 @@ export interface CryptoApi {
     pinCurrentUserIdentity(userId: string): Promise<void>;
 
     /**
+     * Remove the requirement for this identity to be verified, and pin it.
+     *
+     * This is useful if the user was previously verified but is not anymore
+     * ({@link UserVerificationStatus.wasCrossSigningVerified}) and it is not possible to verify him again now.
+     *
+     */
+    withdrawVerificationRequirement(userId: string): Promise<void>;
+
+    /**
      * Get the verification status of a given device.
      *
      * @param userId - The ID of the user whose device is to be checked.

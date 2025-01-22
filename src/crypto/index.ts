@@ -1577,6 +1577,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Implementation of {@link Crypto.CryptoApi.withdrawVerificationRequirement}.
+     */
+    public async withdrawVerificationRequirement(userId: string): Promise<void> {
+        throw new Error("not implemented");
+    }
+
+    /**
      * Check whether a given device is trusted.
      *
      * @param userId - The ID of the user whose device is to be checked.
