@@ -23,7 +23,8 @@ import { IToDeviceEvent } from "../sync-accumulator.ts";
 import { ServerSideSecretStorage } from "../secret-storage.ts";
 import { decodeBase64 } from "../base64.ts";
 import { Logger } from "../logger.ts";
-import { DehydratedDevicesEvents, DehydratedDevicesAPI } from "../crypto-api/index.ts";
+import { CryptoEvent } from "../crypto-api/index.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 /**
  * The response body of `GET /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device`.
@@ -68,7 +69,7 @@ const DEHYDRATION_INTERVAL = 7 * 24 * 60 * 60 * 1000;
  *
  * @internal
  */
-export class DehydratedDeviceManager extends DehydratedDevicesAPI {
+export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevicesEvents, DehydratedDevicesEventMap> {
     /** the ID of the interval for periodically replacing the dehydrated device */
     private intervalId?: ReturnType<typeof setInterval>;
 
@@ -88,7 +89,7 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
 
     private async cacheKey(key: RustSdkCryptoJs.DehydratedDeviceKey): Promise<void> {
         await this.olmMachine.dehydratedDevices().saveDehydratedDeviceKey(key);
-        this.emit(DehydratedDevicesEvents.PickleKeyCached);
+        this.emit(CryptoEvent.DehydrationKeyCached);
     }
 
     /**
@@ -176,8 +177,12 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
                 await this.resetKey();
             } else {
                 const bytes = decodeBase64(keyB64);
-                const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
-                await this.cacheKey(key);
+                try {
+                    const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
+                    await this.cacheKey(key);
+                } finally {
+                    bytes.fill(0);
+                }
             }
         }
         return (await this.getCachedKey())!;
@@ -221,7 +226,7 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
         }
 
         this.logger.info("dehydration: dehydrated device found");
-        this.emit(DehydratedDevicesEvents.RehydrationStarted);
+        this.emit(CryptoEvent.RehydrationStarted);
 
         const rehydratedDevice = await this.olmMachine
             .dehydratedDevices()
@@ -259,10 +264,10 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
             const roomKeyInfos = await rehydratedDevice.receiveEvents(JSON.stringify(eventResp.events));
             roomKeyCount += roomKeyInfos.length;
 
-            this.emit(DehydratedDevicesEvents.RehydrationProgress, roomKeyCount, toDeviceCount);
+            this.emit(CryptoEvent.RehydrationProgress, roomKeyCount, toDeviceCount);
         }
         this.logger.info(`dehydration: received ${roomKeyCount} room keys from ${toDeviceCount} to-device events`);
-        this.emit(DehydratedDevicesEvents.RehydrationEnded);
+        this.emit(CryptoEvent.RehydrationEnded);
 
         return true;
     }
@@ -276,11 +281,11 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
         const key = (await this.getKey(true))!;
 
         const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
-        this.emit(DehydratedDevicesEvents.DeviceCreated);
+        this.emit(CryptoEvent.DehydratedDeviceCreated);
         const request = await dehydratedDevice.keysForUpload("Dehydrated device", key);
 
         await this.outgoingRequestProcessor.makeOutgoingRequest(request);
-        this.emit(DehydratedDevicesEvents.DeviceUploaded);
+        this.emit(CryptoEvent.DehydratedDeviceUploaded);
 
         this.logger.info("dehydration: uploaded device");
     }
@@ -295,7 +300,7 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
         await this.createAndUploadDehydratedDevice();
         this.intervalId = setInterval(() => {
             this.createAndUploadDehydratedDevice().catch((error) => {
-                this.emit(DehydratedDevicesEvents.SchedulingError, error.message);
+                this.emit(CryptoEvent.DehydrationSchedulingError, error.message);
                 this.logger.error("Error creating dehydrated device:", error);
             });
         }, DEHYDRATION_INTERVAL);
@@ -313,3 +318,30 @@ export class DehydratedDeviceManager extends DehydratedDevicesAPI {
         }
     }
 }
+
+/**
+ * The events fired by the DehydratedDeviceManager
+ * @internal
+ */
+export type DehydratedDevicesEvents =
+    | CryptoEvent.DehydratedDeviceCreated
+    | CryptoEvent.DehydratedDeviceUploaded
+    | CryptoEvent.RehydrationStarted
+    | CryptoEvent.RehydrationEnded
+    | CryptoEvent.RehydrationProgress
+    | CryptoEvent.DehydrationKeyCached
+    | CryptoEvent.DehydrationSchedulingError;
+
+/**
+ * A map of the {@link DehydratedDeviceEvents} fired by the {@link DehydratedDeviceManager} and their payloads.
+ * @internal
+ */
+export type DehydratedDevicesEventMap = {
+    [CryptoEvent.DehydratedDeviceCreated]: () => void;
+    [CryptoEvent.DehydratedDeviceUploaded]: () => void;
+    [CryptoEvent.RehydrationStarted]: () => void;
+    [CryptoEvent.RehydrationEnded]: () => void;
+    [CryptoEvent.RehydrationProgress]: (roomKeyCount: number, toDeviceCount: number) => void;
+    [CryptoEvent.DehydrationKeyCached]: () => void;
+    [CryptoEvent.DehydrationSchedulingError]: (msg: string) => void;
+};

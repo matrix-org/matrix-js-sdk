@@ -90,4 +90,36 @@ export enum CryptoEvent {
      * `progress === total === -1`.
      */
     LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
+
+    /** Fires when a new dehydrated device is created locally. */
+    DehydratedDeviceCreated = "dehydration.DehydratedDeviceCreated",
+
+    /** Fires when a new dehydrated device is successfully uploaded to the server. */
+    DehydratedDeviceUploaded = "dehydration.DehydratedDeviceUploaded",
+
+    /** Fires when rehydration has started. */
+    RehydrationStarted = "dehydration.RehydrationStarted",
+
+    /** Fires when rehydration has finished. */
+    RehydrationEnded = "dehydration.RehydrationEnded",
+
+    /**
+     * Fires during rehydration, to inform the application of rehydration progress.
+     *
+     * The payload is a pair `[roomKeyCount: number, toDeviceCount: number]`,
+     * where `roomKeyCount` is the number of room keys that have been received
+     * so far, and `toDeviceCount` is the number of to-device messages received
+     * so far (including the messages containing room keys).
+     */
+    RehydrationProgress = "dehydration.RehydrationProgress",
+
+    /** Fires when a dehydrated device key has been cached */
+    DehydrationKeyCached = "dehydration.DehydrationKeyCached",
+
+    /**
+     * Fires when an error occurred during rotation of the dehydrated device.
+     *
+     * The payload is an error message as a string.
+     */
+    DehydrationSchedulingError = "dehydration.DehydrationSchedulingError",
 }

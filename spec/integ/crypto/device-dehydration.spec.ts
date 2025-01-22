@@ -18,11 +18,11 @@ import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
 
 import { ClientEvent, createClient, MatrixClient, MatrixEvent } from "../../../src";
+import { CryptoEvent } from "../../../src/crypto-api/index";
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { DehydratedDevicesEvents } from "../../../src/crypto-api";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
@@ -41,26 +41,25 @@ describe("Device dehydration", () => {
 
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
 
-        const dehydratedDevices = matrixClient.getCrypto()!.dehydratedDevices();
         let creationEventCount = 0;
         let pickleKeyCachedEventCount = 0;
         let rehydrationStartedCount = 0;
         let rehydrationEndedCount = 0;
         let rehydrationProgressEvent = 0;
 
-        dehydratedDevices.on(DehydratedDevicesEvents.DeviceCreated, () => {
+        matrixClient.on(CryptoEvent.DehydratedDeviceCreated, () => {
             creationEventCount++;
         });
-        dehydratedDevices.on(DehydratedDevicesEvents.PickleKeyCached, () => {
+        matrixClient.on(CryptoEvent.DehydrationKeyCached, () => {
             pickleKeyCachedEventCount++;
         });
-        dehydratedDevices.on(DehydratedDevicesEvents.RehydrationStarted, () => {
+        matrixClient.on(CryptoEvent.RehydrationStarted, () => {
             rehydrationStartedCount++;
         });
-        dehydratedDevices.on(DehydratedDevicesEvents.RehydrationEnded, () => {
+        matrixClient.on(CryptoEvent.RehydrationEnded, () => {
             rehydrationEndedCount++;
         });
-        dehydratedDevices.on(DehydratedDevicesEvents.RehydrationProgress, (roomKeyCount, toDeviceCount) => {
+        matrixClient.on(CryptoEvent.RehydrationProgress, (roomKeyCount, toDeviceCount) => {
             rehydrationProgressEvent++;
         });
 
