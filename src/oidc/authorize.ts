@@ -23,7 +23,7 @@ import {
     BearerTokenResponse,
     UserState,
     validateBearerTokenResponse,
-    ValidatedIssuerMetadata,
+    ValidatedAuthMetadata,
     validateIdToken,
     validateStoredUserState,
 } from "./validate.ts";
@@ -138,7 +138,7 @@ export const generateOidcAuthorizationUrl = async ({
     urlState,
 }: {
     clientId: string;
-    metadata: ValidatedIssuerMetadata;
+    metadata: ValidatedAuthMetadata;
     homeserverUrl: string;
     identityServerUrl?: string;
     redirectUri: string;
