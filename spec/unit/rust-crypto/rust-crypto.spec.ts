@@ -1561,6 +1561,7 @@ describe("RustCrypto", () => {
         });
 
         it("throws an error for our own user", async () => {
+            jest.useRealTimers();
             const e2eKeyReceiver = new E2EKeyReceiver("http://server");
             const e2eKeyResponder = new E2EKeyResponder("http://server");
             e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
