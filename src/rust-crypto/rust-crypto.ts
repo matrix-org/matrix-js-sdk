@@ -88,6 +88,7 @@ import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.t
 import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
 import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
+import { UIAuthCallback } from "../interactive-auth.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1470,6 +1471,30 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         return batch;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#resetEncryption}.
+     */
+    public async resetEncryption(authUploadDeviceSigningKeys: UIAuthCallback<void>): Promise<void> {
+        const backupEnabled = (await this.backupManager.getActiveBackupVersion()) !== null;
+
+        // Disable backup, and delete all the backups from the server
+        await this.backupManager.deleteAllKeyBackupVersions();
+
+        // Disable the recovery key and the secret storage
+        await this.secretStorage.setDefaultKeyId(null);
+
+        // Reset the cross-signing keys
+        await this.crossSigningIdentity.bootstrapCrossSigning({
+            setupNewCrossSigning: true,
+            authUploadDeviceSigningKeys,
+        });
+
+        // If key backup was enabled, we create a new backup
+        if (backupEnabled) {
+            await this.resetKeyBackup();
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
