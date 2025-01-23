@@ -48,7 +48,6 @@ import {
 import { CallFeed } from "./callFeed.ts";
 import { MatrixClient } from "../client.ts";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { DeviceInfo } from "../crypto/deviceinfo.ts";
 import { GroupCallUnknownDeviceError } from "./groupCall.ts";
 import { IScreensharingOpts } from "./mediaHandler.ts";
 import { MatrixError } from "../http-api/index.ts";
@@ -426,7 +425,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private callStartTime?: number;
 
     private opponentDeviceId?: string;
-    private opponentDeviceInfo?: DeviceInfo;
+    private hasOpponentDeviceInfo?: boolean;
     private opponentSessionId?: string;
     public groupCallId?: string;
 
@@ -633,7 +632,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // ourselves (for example if the client is a RoomWidgetClient)
         if (!this.client.getCrypto()) {
             // All we know is the device ID
-            this.opponentDeviceInfo = new DeviceInfo(this.opponentDeviceId);
+            this.hasOpponentDeviceInfo = true;
             return;
         }
         const userId = this.invitee || this.getOpponentMember()?.userId;
@@ -642,8 +641,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // Here we were calling `MatrixClient.crypto.deviceList.downloadKeys` which is not supported by the rust cryptography.
         const deviceInfoMap = new Map();
-        this.opponentDeviceInfo = deviceInfoMap.get(userId)?.get(this.opponentDeviceId);
-        if (this.opponentDeviceInfo === undefined) {
+        this.hasOpponentDeviceInfo = Boolean(deviceInfoMap.get(userId)?.get(this.opponentDeviceId));
+        if (!this.hasOpponentDeviceInfo) {
             throw new GroupCallUnknownDeviceError(userId);
         }
     }
@@ -2509,7 +2508,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember()!.userId;
             if (this.client.getUseE2eForGroupCall()) {
-                if (!this.opponentDeviceInfo) {
+                if (!this.hasOpponentDeviceInfo) {
                     logger.warn(`Call ${this.callId} sendVoipEvent() failed: we do not have opponentDeviceInfo`);
                     return;
                 }
