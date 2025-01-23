@@ -227,12 +227,16 @@ describe("MatrixRTCSession", () => {
             it("sends keep-alive for delayed leave event where supported", () => {});
 
             it("extends `expires` when call still active", () => {});
+
+            it("does not send more than once per `membershipKeepAlivePeriod`", () => {});
         });
 
         describe("server error handling", () => {
             describe("retries sending delayed leave event", () => {
                 it("sends it if delayed leave event is still valid at time of retry", () => {});
-                it("abandons it if delayed leave event is no longer valid at time of retry", () => {});
+                it("abandons it if delayed leave event is no longer valid at time of retry", () => {
+                    // I think this will break on LegacyMembershipManager
+                });
             });
 
             describe("retries sending membership event", () => {
