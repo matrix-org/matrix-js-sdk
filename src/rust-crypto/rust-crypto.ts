@@ -1477,6 +1477,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#resetEncryption}.
      */
     public async resetEncryption(authUploadDeviceSigningKeys: UIAuthCallback<void>): Promise<void> {
+        this.logger.debug("resetEncryption: resetting encryption");
+
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
 
@@ -1491,6 +1493,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         // Create a new key backup
         await this.resetKeyBackup();
+
+        this.logger.debug("resetEncryption: ended");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
