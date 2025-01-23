@@ -29,6 +29,7 @@ import {
     IWidgetApiResponse,
     IWidgetApiResponseData,
     IUpdateStateToWidgetActionRequest,
+    UnstableApiVersion,
 } from "matrix-widget-api";
 
 import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event.ts";
@@ -260,6 +261,10 @@ export class RoomWidgetClient extends MatrixClient {
         if (sendContentLoaded) widgetApi.sendContentLoaded();
     }
 
+    public async supportUpdateState(): Promise<boolean> {
+        return (await this.widgetApi.getClientVersions())?.includes(UnstableApiVersion.MSC2762_UPDATE_STATE);
+    }
+
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
         this.lifecycle = new AbortController();
 
@@ -284,14 +289,41 @@ export class RoomWidgetClient extends MatrixClient {
 
         await this.widgetApiReady;
 
+        // sync room state:
+        if (await this.supportUpdateState()) {
+            // This will resolve once the client driver has sent us all the allowed room state.
+            await this.roomStateSynced;
+        } else {
+            // Backfill the requested events
+            // We only get the most recent event for every type + state key combo,
+            // so it doesn't really matter what order we inject them in
+            await Promise.all(
+                this.capabilities.receiveState?.map(async ({ eventType, stateKey }) => {
+                    const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [
+                        this.roomId,
+                    ]);
+                    const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
+
+                    if (this.syncApi instanceof SyncApi) {
+                        // Passing events as `stateAfterEventList` will update the state.
+                        await this.syncApi.injectRoomEvents(this.room!, undefined, events);
+                    } else {
+                        await this.syncApi!.injectRoomEvents(this.room!, events); // Sliding Sync
+                    }
+                    events.forEach((event) => {
+                        this.emit(ClientEvent.Event, event);
+                        logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
+                    });
+                }) ?? [],
+            );
+        }
+
         if (opts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
                 this.fetchClientWellKnown();
             }, 1000 * opts.clientWellKnownPollPeriod);
             this.fetchClientWellKnown();
         }
-
-        await this.roomStateSynced;
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
 
@@ -563,11 +595,24 @@ export class RoomWidgetClient extends MatrixClient {
             await this.updateTxId(event);
 
             if (this.syncApi instanceof SyncApi) {
-                await this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
+                if (await this.supportUpdateState()) {
+                    await this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
+                } else {
+                    // Passing undefined for `stateAfterEventList` will make `injectRoomEvents` run in legacy mode
+                    // -> state events in `timelineEventList` will update the state.
+                    await this.syncApi.injectRoomEvents(this.room!, [], undefined, [event]);
+                }
             } else {
                 // Sliding Sync
-                await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+                if (await this.supportUpdateState()) {
+                    await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+                } else {
+                    logger.error(
+                        "slididng sync cannot be used in widget mode if the client widget driver does not support the version: 'org.matrix.msc2762_update_state'",
+                    );
+                }
             }
+
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()}`);
@@ -597,7 +642,11 @@ export class RoomWidgetClient extends MatrixClient {
 
     private onStateUpdate = async (ev: CustomEvent<IUpdateStateToWidgetActionRequest>): Promise<void> => {
         ev.preventDefault();
-
+        if (!(await this.supportUpdateState())) {
+            logger.warn(
+                "received update_state widget action but the widget driver did not claim to support 'org.matrix.msc2762_update_state'",
+            );
+        }
         for (const rawEvent of ev.detail.data.state) {
             // Verify the room ID matches, since it's possible for the client to
             // send us state updates from other rooms if this widget is always
