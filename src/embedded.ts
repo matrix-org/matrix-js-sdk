@@ -289,7 +289,11 @@ export class RoomWidgetClient extends MatrixClient {
 
         await this.widgetApiReady;
 
-        if (!(await this.supportUpdateState())) {
+        // sync room state:
+        if (await this.supportUpdateState()) {
+            // This will resolve once the client driver has sent us all the allowed room state.
+            await this.roomStateSynced;
+        } else {
             // Backfill the requested events
             // We only get the most recent event for every type + state key combo,
             // so it doesn't really matter what order we inject them in
@@ -320,8 +324,6 @@ export class RoomWidgetClient extends MatrixClient {
             }, 1000 * opts.clientWellKnownPollPeriod);
             this.fetchClientWellKnown();
         }
-
-        await this.roomStateSynced;
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
 
