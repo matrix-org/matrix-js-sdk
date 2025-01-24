@@ -65,6 +65,8 @@ import {
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -1534,34 +1536,47 @@ describe("RustCrypto", () => {
 
     describe("pinCurrentIdentity", () => {
         let rustCrypto: RustCrypto;
-        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
 
-        beforeEach(() => {
-            olmMachine = {
-                getIdentity: jest.fn(),
-            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
-            rustCrypto = new RustCrypto(
-                logger,
-                olmMachine,
-                {} as MatrixClient["http"],
+        beforeEach(async () => {
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
                 TEST_USER,
                 TEST_DEVICE_ID,
-                {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                secretStorage,
             );
         });
 
         it("throws an error for an unknown user", async () => {
-            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+            await expect(rustCrypto.pinCurrentUserIdentity("@other_user:example.com")).rejects.toThrow(
                 "Cannot pin identity of unknown user",
             );
         });
 
         it("throws an error for our own user", async () => {
-            const ownIdentity = new RustSdkCryptoJs.OwnUserIdentity();
-            olmMachine.getIdentity.mockResolvedValue(ownIdentity);
-
-            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+            jest.useRealTimers();
+            const e2eKeyReceiver = new E2EKeyReceiver("http://server");
+            const e2eKeyResponder = new E2EKeyResponder("http://server");
+            e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
+            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
+                status: 200,
+                body: {},
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
+                status: 200,
+                body: {},
+            });
+            await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            await expect(rustCrypto.pinCurrentUserIdentity(TEST_USER)).rejects.toThrow(
                 "Cannot pin identity of own user",
             );
         });
