@@ -23,7 +23,7 @@ import { IToDeviceEvent } from "../sync-accumulator.ts";
 import { ServerSideSecretStorage } from "../secret-storage.ts";
 import { decodeBase64 } from "../base64.ts";
 import { Logger } from "../logger.ts";
-import { CryptoEvent } from "../crypto-api/index.ts";
+import { CryptoEvent, CryptoEventHandlerMap } from "../crypto-api/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 /**
@@ -83,17 +83,13 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
         super();
     }
 
-    private async getCachedKey(): Promise<RustSdkCryptoJs.DehydratedDeviceKey | undefined> {
-        return await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey();
-    }
-
     private async cacheKey(key: RustSdkCryptoJs.DehydratedDeviceKey): Promise<void> {
         await this.olmMachine.dehydratedDevices().saveDehydratedDeviceKey(key);
         this.emit(CryptoEvent.DehydrationKeyCached);
     }
 
     /**
-     * Implementation of {@link DehydratedDevicesAPI#isSupported}.
+     * Return whether the server supports dehydrated devices.
      */
     public async isSupported(): Promise<boolean> {
         // call the endpoint to get a dehydrated device.  If it returns an
@@ -123,7 +119,18 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
     }
 
     /**
-     * Implementation of {@link DehydratedDevicesAPI#start}.
+     * Start using device dehydration.
+     *
+     * - Rehydrates a dehydrated device, if one is available.
+     * - Creates a new dehydration key, if necessary, and stores it in Secret
+     *   Storage.
+     * - If `createNewKey` is set to true, always creates a new key.
+     * - If a dehydration key is not available, creates a new one.
+     * - Creates a new dehydrated device, and schedules periodically creating
+     *   new dehydrated devices.
+     *
+     * @param createNewKey - whether to force creation of a new dehydration key.
+     *   This can be used, for example, if Secret Storage is being reset.
      */
     public async start(createNewKey?: boolean): Promise<void> {
         this.stop();
@@ -152,11 +159,12 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
      *
      * Creates a new key and stores it in secret storage.
      */
-    public async resetKey(): Promise<void> {
+    public async resetKey(): Promise<RustSdkCryptoJs.DehydratedDeviceKey> {
         const key = RustSdkCryptoJs.DehydratedDeviceKey.createRandomKey();
         await this.secretStorage.store(SECRET_STORAGE_NAME, key.toBase64());
         // also cache it
         await this.cacheKey(key);
+        return key;
     }
 
     /**
@@ -167,25 +175,24 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
      * @returns the key, if available, or `null` if no key is available
      */
     private async getKey(create: boolean): Promise<RustSdkCryptoJs.DehydratedDeviceKey | null> {
-        const cachedKey = await this.getCachedKey();
-        if (!cachedKey) {
-            const keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME);
-            if (keyB64 === undefined) {
-                if (!create) {
-                    return null;
-                }
-                await this.resetKey();
-            } else {
-                const bytes = decodeBase64(keyB64);
-                try {
-                    const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
-                    await this.cacheKey(key);
-                } finally {
-                    bytes.fill(0);
-                }
+        const cachedKey = await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey();
+        if (cachedKey) return cachedKey;
+        const keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME);
+        if (keyB64 === undefined) {
+            if (!create) {
+                return null;
+            }
+            return await this.resetKey();
+        } else {
+            const bytes = decodeBase64(keyB64);
+            try {
+                const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
+                await this.cacheKey(key);
+                return key;
+            } finally {
+                bytes.fill(0);
             }
         }
-        return (await this.getCachedKey())!;
     }
 
     /**
@@ -267,7 +274,7 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
             this.emit(CryptoEvent.RehydrationProgress, roomKeyCount, toDeviceCount);
         }
         this.logger.info(`dehydration: received ${roomKeyCount} room keys from ${toDeviceCount} to-device events`);
-        this.emit(CryptoEvent.RehydrationEnded);
+        this.emit(CryptoEvent.RehydrationCompleted);
 
         return true;
     }
@@ -300,7 +307,7 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
         await this.createAndUploadDehydratedDevice();
         this.intervalId = setInterval(() => {
             this.createAndUploadDehydratedDevice().catch((error) => {
-                this.emit(CryptoEvent.DehydrationSchedulingError, error.message);
+                this.emit(CryptoEvent.DehydratedDeviceRotationError, error.message);
                 this.logger.error("Error creating dehydrated device:", error);
             });
         }, DEHYDRATION_INTERVAL);
@@ -323,25 +330,17 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
  * The events fired by the DehydratedDeviceManager
  * @internal
  */
-export type DehydratedDevicesEvents =
+type DehydratedDevicesEvents =
     | CryptoEvent.DehydratedDeviceCreated
     | CryptoEvent.DehydratedDeviceUploaded
     | CryptoEvent.RehydrationStarted
-    | CryptoEvent.RehydrationEnded
     | CryptoEvent.RehydrationProgress
+    | CryptoEvent.RehydrationCompleted
     | CryptoEvent.DehydrationKeyCached
-    | CryptoEvent.DehydrationSchedulingError;
+    | CryptoEvent.DehydratedDeviceRotationError;
 
 /**
  * A map of the {@link DehydratedDeviceEvents} fired by the {@link DehydratedDeviceManager} and their payloads.
  * @internal
  */
-export type DehydratedDevicesEventMap = {
-    [CryptoEvent.DehydratedDeviceCreated]: () => void;
-    [CryptoEvent.DehydratedDeviceUploaded]: () => void;
-    [CryptoEvent.RehydrationStarted]: () => void;
-    [CryptoEvent.RehydrationEnded]: () => void;
-    [CryptoEvent.RehydrationProgress]: (roomKeyCount: number, toDeviceCount: number) => void;
-    [CryptoEvent.DehydrationKeyCached]: () => void;
-    [CryptoEvent.DehydrationSchedulingError]: (msg: string) => void;
-};
+export type DehydratedDevicesEventMap = Pick<CryptoEventHandlerMap, DehydratedDevicesEvents>;

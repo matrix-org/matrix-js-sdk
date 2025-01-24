@@ -42,22 +42,22 @@ describe("Device dehydration", () => {
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
 
         let creationEventCount = 0;
-        let pickleKeyCachedEventCount = 0;
+        let dehydrationKeyCachedEventCount = 0;
         let rehydrationStartedCount = 0;
-        let rehydrationEndedCount = 0;
+        let rehydrationCompletedCount = 0;
         let rehydrationProgressEvent = 0;
 
         matrixClient.on(CryptoEvent.DehydratedDeviceCreated, () => {
             creationEventCount++;
         });
         matrixClient.on(CryptoEvent.DehydrationKeyCached, () => {
-            pickleKeyCachedEventCount++;
+            dehydrationKeyCachedEventCount++;
         });
         matrixClient.on(CryptoEvent.RehydrationStarted, () => {
             rehydrationStartedCount++;
         });
-        matrixClient.on(CryptoEvent.RehydrationEnded, () => {
-            rehydrationEndedCount++;
+        matrixClient.on(CryptoEvent.RehydrationCompleted, () => {
+            rehydrationCompletedCount++;
         });
         matrixClient.on(CryptoEvent.RehydrationProgress, (roomKeyCount, toDeviceCount) => {
             rehydrationProgressEvent++;
@@ -98,7 +98,7 @@ describe("Device dehydration", () => {
 
         expect(dehydrationCount).toEqual(1);
         expect(creationEventCount).toEqual(1);
-        expect(pickleKeyCachedEventCount).toEqual(1);
+        expect(dehydrationKeyCachedEventCount).toEqual(1);
 
         // a week later, we should have created another dehydrated device
         const dehydrationPromise = new Promise<void>((resolve, reject) => {
@@ -107,7 +107,7 @@ describe("Device dehydration", () => {
         jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
 
-        expect(pickleKeyCachedEventCount).toEqual(1);
+        expect(dehydrationKeyCachedEventCount).toEqual(1);
         expect(dehydrationCount).toEqual(2);
         expect(creationEventCount).toEqual(2);
 
@@ -142,10 +142,10 @@ describe("Device dehydration", () => {
         expect(eventsResponse.mock.calls).toHaveLength(2);
 
         expect(rehydrationStartedCount).toEqual(1);
-        expect(rehydrationEndedCount).toEqual(1);
+        expect(rehydrationCompletedCount).toEqual(1);
         expect(creationEventCount).toEqual(3);
         expect(rehydrationProgressEvent).toEqual(1);
-        expect(pickleKeyCachedEventCount).toEqual(2);
+        expect(dehydrationKeyCachedEventCount).toEqual(2);
 
         matrixClient.stopClient();
     });

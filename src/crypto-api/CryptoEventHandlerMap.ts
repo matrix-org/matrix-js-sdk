@@ -18,7 +18,6 @@ import { CryptoEvent } from "./CryptoEvent.ts";
 import { VerificationRequest } from "./verification.ts";
 import { UserVerificationStatus } from "./index.ts";
 import { RustBackupCryptoEventMap } from "../rust-crypto/backup.ts";
-import { DehydratedDevicesEventMap } from "../rust-crypto/DehydratedDeviceManager.ts";
 
 /**
  * A map of the {@link CryptoEvent} fired by the {@link CryptoApi} and their payloads.
@@ -31,5 +30,11 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
-} & RustBackupCryptoEventMap &
-    DehydratedDevicesEventMap;
+    [CryptoEvent.DehydratedDeviceCreated]: () => void;
+    [CryptoEvent.DehydratedDeviceUploaded]: () => void;
+    [CryptoEvent.RehydrationStarted]: () => void;
+    [CryptoEvent.RehydrationProgress]: (roomKeyCount: number, toDeviceCount: number) => void;
+    [CryptoEvent.RehydrationCompleted]: () => void;
+    [CryptoEvent.DehydrationKeyCached]: () => void;
+    [CryptoEvent.DehydratedDeviceRotationError]: (msg: string) => void;
+} & RustBackupCryptoEventMap;

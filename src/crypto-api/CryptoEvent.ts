@@ -91,17 +91,32 @@ export enum CryptoEvent {
      */
     LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
 
-    /** Fires when a new dehydrated device is created locally. */
+    /**
+     * Fires when a new dehydrated device is created locally.
+     *
+     * After the client calls {@link CryptoApi.startDehydration}, this event
+     * will be fired every time a new dehydrated device is created.  It may fire
+     * before `startDehydration` returns. */
     DehydratedDeviceCreated = "dehydration.DehydratedDeviceCreated",
 
-    /** Fires when a new dehydrated device is successfully uploaded to the server. */
+    /**
+     * Fires when a new dehydrated device is successfully uploaded to the server.
+     *
+     * This should fire shortly after {@link DehydratedDeviceCreated} fires. If
+     * upload is unsuccessful, this will be reported either by an error thrown
+     * by {@link CryptoApi.startDehydration} (for errors that happen before
+     * `startDehydration` returns), or by firing {@DehydratedDeviceRotationError}
+     * (for errors that happen during regular rotation of the dehydrated device)
+     */
     DehydratedDeviceUploaded = "dehydration.DehydratedDeviceUploaded",
 
-    /** Fires when rehydration has started. */
+    /**
+     * Fires when rehydration has started.
+     *
+     * After the client calls {@link CryptoApi.startDehydration}, this event will
+     * fire if a dehydrated device is found and we attempt to rehydrate it.
+     */
     RehydrationStarted = "dehydration.RehydrationStarted",
-
-    /** Fires when rehydration has finished. */
-    RehydrationEnded = "dehydration.RehydrationEnded",
 
     /**
      * Fires during rehydration, to inform the application of rehydration progress.
@@ -113,13 +128,18 @@ export enum CryptoEvent {
      */
     RehydrationProgress = "dehydration.RehydrationProgress",
 
-    /** Fires when a dehydrated device key has been cached */
+    /** Fires when rehydration has completed successfully. */
+    RehydrationCompleted = "dehydration.RehydrationCompleted",
+
+    /**
+     * Fires when a dehydrated device key has been cached in the local database.
+     */
     DehydrationKeyCached = "dehydration.DehydrationKeyCached",
 
     /**
-     * Fires when an error occurred during rotation of the dehydrated device.
+     * Fires when an error occurs during periodic rotation of the dehydrated device.
      *
      * The payload is an error message as a string.
      */
-    DehydrationSchedulingError = "dehydration.DehydrationSchedulingError",
+    DehydratedDeviceRotationError = "dehydration.DehydratedDeviceRotationError",
 }

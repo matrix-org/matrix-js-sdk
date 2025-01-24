@@ -193,10 +193,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             CryptoEvent.DehydratedDeviceCreated,
             CryptoEvent.DehydratedDeviceUploaded,
             CryptoEvent.RehydrationStarted,
-            CryptoEvent.RehydrationEnded,
             CryptoEvent.RehydrationProgress,
+            CryptoEvent.RehydrationCompleted,
             CryptoEvent.DehydrationKeyCached,
-            CryptoEvent.DehydrationSchedulingError,
+            CryptoEvent.DehydratedDeviceRotationError,
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
