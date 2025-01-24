@@ -23,7 +23,7 @@ import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { emitPromise } from "../../test-utils/test-utils";
+import { emitPromise, EventCounter } from "../../test-utils/test-utils";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
@@ -42,27 +42,11 @@ describe("Device dehydration", () => {
 
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
 
-        let creationEventCount = 0;
-        let dehydrationKeyCachedEventCount = 0;
-        let rehydrationStartedCount = 0;
-        let rehydrationCompletedCount = 0;
-        let rehydrationProgressEvent = 0;
-
-        matrixClient.on(CryptoEvent.DehydratedDeviceCreated, () => {
-            creationEventCount++;
-        });
-        matrixClient.on(CryptoEvent.DehydrationKeyCached, () => {
-            dehydrationKeyCachedEventCount++;
-        });
-        matrixClient.on(CryptoEvent.RehydrationStarted, () => {
-            rehydrationStartedCount++;
-        });
-        matrixClient.on(CryptoEvent.RehydrationCompleted, () => {
-            rehydrationCompletedCount++;
-        });
-        matrixClient.on(CryptoEvent.RehydrationProgress, (roomKeyCount, toDeviceCount) => {
-            rehydrationProgressEvent++;
-        });
+        const creationEventCounter = new EventCounter(matrixClient, CryptoEvent.DehydratedDeviceCreated);
+        const dehydrationKeyCachedEventCounter = new EventCounter(matrixClient, CryptoEvent.DehydrationKeyCached);
+        const rehydrationStartedCounter = new EventCounter(matrixClient, CryptoEvent.RehydrationStarted);
+        const rehydrationCompletedCounter = new EventCounter(matrixClient, CryptoEvent.RehydrationCompleted);
+        const rehydrationProgressCounter = new EventCounter(matrixClient, CryptoEvent.RehydrationProgress);
 
         // count the number of times the dehydration key gets set
         let setDehydrationCount = 0;
@@ -98,8 +82,8 @@ describe("Device dehydration", () => {
         await crypto.startDehydration();
 
         expect(dehydrationCount).toEqual(1);
-        expect(creationEventCount).toEqual(1);
-        expect(dehydrationKeyCachedEventCount).toEqual(1);
+        expect(creationEventCounter.counter).toEqual(1);
+        expect(dehydrationKeyCachedEventCounter.counter).toEqual(1);
 
         // a week later, we should have created another dehydrated device
         const dehydrationPromise = new Promise<void>((resolve, reject) => {
@@ -108,9 +92,9 @@ describe("Device dehydration", () => {
         jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
 
-        expect(dehydrationKeyCachedEventCount).toEqual(1);
+        expect(dehydrationKeyCachedEventCounter.counter).toEqual(1);
         expect(dehydrationCount).toEqual(2);
-        expect(creationEventCount).toEqual(2);
+        expect(creationEventCounter.counter).toEqual(2);
 
         // restart dehydration -- rehydrate the device that we created above,
         // and create a new dehydrated device.  We also set `createNewKey`, so
@@ -142,11 +126,11 @@ describe("Device dehydration", () => {
         expect(setDehydrationCount).toEqual(2);
         expect(eventsResponse.mock.calls).toHaveLength(2);
 
-        expect(rehydrationStartedCount).toEqual(1);
-        expect(rehydrationCompletedCount).toEqual(1);
-        expect(creationEventCount).toEqual(3);
-        expect(rehydrationProgressEvent).toEqual(1);
-        expect(dehydrationKeyCachedEventCount).toEqual(2);
+        expect(rehydrationStartedCounter.counter).toEqual(1);
+        expect(rehydrationCompletedCounter.counter).toEqual(1);
+        expect(creationEventCounter.counter).toEqual(3);
+        expect(rehydrationProgressCounter.counter).toEqual(1);
+        expect(dehydrationKeyCachedEventCounter.counter).toEqual(2);
 
         // test that if we get an error when we try to rotate, it emits an event
         fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
