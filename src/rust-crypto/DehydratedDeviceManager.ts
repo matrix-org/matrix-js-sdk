@@ -124,8 +124,8 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
      * - Rehydrates a dehydrated device, if one is available.
      * - Creates a new dehydration key, if necessary, and stores it in Secret
      *   Storage.
-     * - If `createNewKey` is set to true, always creates a new key.
-     * - If a dehydration key is not available, creates a new one.
+     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If a dehydration key is not available, creates a new one.
      * - Creates a new dehydrated device, and schedules periodically creating
      *   new dehydrated devices.
      *
