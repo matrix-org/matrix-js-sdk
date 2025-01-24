@@ -144,11 +144,13 @@ describe("Device dehydration", () => {
         jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await rotationErrorEventPromise;
 
-        // Restart dehydration, but replace the dehydrated device with something
-        // bogus so that rehydration fails.
+        // Restart dehydration, but return an error for GET /dehydrated_device so that rehydration fails.
         fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
-            device_id: dehydratedDeviceBody.device_id,
-            device_data: Object.assign({ device_pickle: "AAAA" }, dehydratedDeviceBody.device_data),
+            status: 500,
+            body: {
+                errcode: "M_UNKNOWN",
+                error: "Unknown error",
+            },
         });
         fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
             return {};
