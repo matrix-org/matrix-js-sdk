@@ -35,6 +35,7 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.RehydrationStarted]: () => void;
     [CryptoEvent.RehydrationProgress]: (roomKeyCount: number, toDeviceCount: number) => void;
     [CryptoEvent.RehydrationCompleted]: () => void;
+    [CryptoEvent.RehydrationError]: (msg: string) => void;
     [CryptoEvent.DehydrationKeyCached]: () => void;
     [CryptoEvent.DehydratedDeviceRotationError]: (msg: string) => void;
 } & RustBackupCryptoEventMap;

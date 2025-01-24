@@ -131,6 +131,12 @@ export enum CryptoEvent {
     /** Fires when rehydration has completed successfully. */
     RehydrationCompleted = "dehydration.RehydrationCompleted",
 
+    /** Fires when there was an error in rehydration.
+     *
+     * The payload is an error message as a string.
+     */
+    RehydrationError = "dehydration.RehydrationError",
+
     /**
      * Fires when a dehydrated device key has been cached in the local database.
      */

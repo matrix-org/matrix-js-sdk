@@ -23,6 +23,7 @@ import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { emitPromise } from "../../test-utils/test-utils";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
@@ -146,6 +147,31 @@ describe("Device dehydration", () => {
         expect(creationEventCount).toEqual(3);
         expect(rehydrationProgressEvent).toEqual(1);
         expect(dehydrationKeyCachedEventCount).toEqual(2);
+
+        // test that if we get an error when we try to rotate, it emits an event
+        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            status: 500,
+            body: {
+                errcode: "M_UNKNOWN",
+                error: "Unknown error",
+            },
+        });
+        const rotationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.DehydratedDeviceRotationError);
+        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        await rotationErrorEventPromise;
+
+        // Restart dehydration, but replace the dehydrated device with something
+        // bogus so that rehydration fails.
+        fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            device_id: dehydratedDeviceBody.device_id,
+            device_data: Object.assign({ device_pickle: "AAAA" }, dehydratedDeviceBody.device_data),
+        });
+        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
+            return {};
+        });
+        const rehydrationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.RehydrationError);
+        await crypto.startDehydration(true);
+        await rehydrationErrorEventPromise;
 
         matrixClient.stopClient();
     });

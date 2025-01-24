@@ -140,6 +140,7 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
             // If rehydration fails, there isn't much we can do about it.  Log
             // the error, and create a new device.
             this.logger.info("dehydration: Error rehydrating device:", e);
+            this.emit(CryptoEvent.RehydrationError, (e as Error).message);
         }
         if (createNewKey) {
             await this.resetKey();
@@ -336,6 +337,7 @@ type DehydratedDevicesEvents =
     | CryptoEvent.RehydrationStarted
     | CryptoEvent.RehydrationProgress
     | CryptoEvent.RehydrationCompleted
+    | CryptoEvent.RehydrationError
     | CryptoEvent.DehydrationKeyCached
     | CryptoEvent.DehydratedDeviceRotationError;
 

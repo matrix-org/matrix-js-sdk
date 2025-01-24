@@ -195,6 +195,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             CryptoEvent.RehydrationStarted,
             CryptoEvent.RehydrationProgress,
             CryptoEvent.RehydrationCompleted,
+            CryptoEvent.RehydrationError,
             CryptoEvent.DehydrationKeyCached,
             CryptoEvent.DehydratedDeviceRotationError,
         ]);
