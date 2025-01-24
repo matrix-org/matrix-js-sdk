@@ -105,7 +105,7 @@ export enum CryptoEvent {
      * This should fire shortly after {@link DehydratedDeviceCreated} fires. If
      * upload is unsuccessful, this will be reported either by an error thrown
      * by {@link CryptoApi.startDehydration} (for errors that happen before
-     * `startDehydration` returns), or by firing {@DehydratedDeviceRotationError}
+     * `startDehydration` returns), or by firing {@link DehydratedDeviceRotationError}
      * (for errors that happen during regular rotation of the dehydrated device)
      */
     DehydratedDeviceUploaded = "dehydration.DehydratedDeviceUploaded",
