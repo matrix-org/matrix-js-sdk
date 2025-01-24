@@ -87,11 +87,17 @@ export class CrossSigningIdentity {
                     "bootstrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
                         "in secret storage, reading storage and caching locally",
                 );
-                await this.olmMachine.importCrossSigningKeys(
+                const status = await this.olmMachine.importCrossSigningKeys(
                     masterKeyFromSecretStorage,
                     selfSigningKeyFromSecretStorage,
                     userSigningKeyFromSecretStorage,
                 );
+
+                // Check that `importCrossSigningKeys` worked correctly (for example, it will fail silently if the
+                // public keys are not available).
+                if (!status.hasMaster || !status.hasSelfSigning || !status.hasUserSigning) {
+                    throw new Error("importCrossSigningKeys failed to import the keys");
+                }
 
                 // Get the current device
                 const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(

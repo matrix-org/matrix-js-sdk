@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { Mocked, mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import { logger } from "../../src/logger";
 import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
@@ -76,6 +77,7 @@ import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from ".
 import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { KnownMembership } from "../../src/@types/membership";
 import { RoomMessageEventContent } from "../../src/@types/events";
+import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
 
 jest.useFakeTimers();
 
@@ -265,13 +267,17 @@ describe("MatrixClient", function () {
 
             if (next.error) {
                 // eslint-disable-next-line
-                return Promise.reject({
-                    errcode: (<MatrixError>next.error).errcode,
-                    httpStatus: (<MatrixError>next.error).httpStatus,
-                    name: (<MatrixError>next.error).errcode,
-                    message: "Expected testing error",
-                    data: next.error,
-                });
+                return Promise.reject(
+                    new MatrixError(
+                        {
+                            errcode: (<MatrixError>next.error).errcode,
+                            name: (<MatrixError>next.error).errcode,
+                            message: "Expected testing error",
+                            data: next.error,
+                        },
+                        (<MatrixError>next.error).httpStatus,
+                    ),
+                );
             }
             return Promise.resolve(next.data);
         }
@@ -3485,6 +3491,63 @@ describe("MatrixClient", function () {
             ];
 
             await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
+            expect(httpLookups.length).toEqual(0);
+        });
+    });
+
+    describe("getAuthMetadata", () => {
+        beforeEach(() => {
+            fetchMock.mockReset();
+            // This request is made by oidc-client-ts so is not intercepted by httpLookups
+            fetchMock.get("https://auth.org/jwks", {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                keys: [],
+            });
+        });
+
+        it("should use unstable prefix", async () => {
+            const metadata = mockOpenIdConfiguration();
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    data: metadata,
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+
+            await expect(client.getAuthMetadata()).resolves.toEqual({
+                ...metadata,
+                signingKeys: [],
+            });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("should fall back to auth_issuer + openid-configuration", async () => {
+            const metadata = mockOpenIdConfiguration();
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+                {
+                    method: "GET",
+                    path: `/auth_issuer`,
+                    data: { issuer: metadata.issuer },
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
+
+            await expect(client.getAuthMetadata()).resolves.toEqual({
+                ...metadata,
+                signingKeys: [],
+            });
             expect(httpLookups.length).toEqual(0);
         });
     });

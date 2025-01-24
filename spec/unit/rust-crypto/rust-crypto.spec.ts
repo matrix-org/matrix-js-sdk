@@ -61,9 +61,12 @@ import {
     EventShieldReason,
     ImportRoomKeysOpts,
     KeyBackupCheck,
+    KeyBackupInfo,
     VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
+import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -72,6 +75,7 @@ import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
+import { RustBackupManager } from "../../../src/rust-crypto/backup.ts";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -1532,34 +1536,47 @@ describe("RustCrypto", () => {
 
     describe("pinCurrentIdentity", () => {
         let rustCrypto: RustCrypto;
-        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
 
-        beforeEach(() => {
-            olmMachine = {
-                getIdentity: jest.fn(),
-            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
-            rustCrypto = new RustCrypto(
-                logger,
-                olmMachine,
-                {} as MatrixClient["http"],
+        beforeEach(async () => {
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+            rustCrypto = await makeTestRustCrypto(
+                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                    baseUrl: "http://server/",
+                    prefix: "",
+                    onlyData: true,
+                }),
                 TEST_USER,
                 TEST_DEVICE_ID,
-                {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                secretStorage,
             );
         });
 
         it("throws an error for an unknown user", async () => {
-            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+            await expect(rustCrypto.pinCurrentUserIdentity("@other_user:example.com")).rejects.toThrow(
                 "Cannot pin identity of unknown user",
             );
         });
 
         it("throws an error for our own user", async () => {
-            const ownIdentity = new RustSdkCryptoJs.OwnUserIdentity();
-            olmMachine.getIdentity.mockResolvedValue(ownIdentity);
-
-            await expect(rustCrypto.pinCurrentUserIdentity("@alice:example.com")).rejects.toThrow(
+            jest.useRealTimers();
+            const e2eKeyReceiver = new E2EKeyReceiver("http://server");
+            const e2eKeyResponder = new E2EKeyResponder("http://server");
+            e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
+            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
+                status: 200,
+                body: {},
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
+                status: 200,
+                body: {},
+            });
+            await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            await expect(rustCrypto.pinCurrentUserIdentity(TEST_USER)).rejects.toThrow(
                 "Cannot pin identity of own user",
             );
         });
@@ -1877,6 +1894,58 @@ describe("RustCrypto", () => {
                     "sender_key": expect.any(String),
                 }),
             );
+        });
+    });
+
+    describe("resetEncryption", () => {
+        let secretStorage: ServerSideSecretStorage;
+        beforeEach(() => {
+            secretStorage = {
+                setDefaultKeyId: jest.fn(),
+                hasKey: jest.fn().mockResolvedValue(false),
+                getKey: jest.fn().mockResolvedValue(null),
+            } as unknown as ServerSideSecretStorage;
+
+            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
+        });
+
+        it("reset should reset 4S, backup and cross-signing", async () => {
+            // When we will delete the key backup
+            let backupIsDeleted = false;
+            fetchMock.delete("path:/_matrix/client/v3/room_keys/version/1", () => {
+                backupIsDeleted = true;
+                return {};
+            });
+            // If the backup is deleted, we will return an empty object
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
+                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+            });
+
+            // A new key backup should be created after the reset
+            let newKeyBackupInfo!: KeyBackupInfo;
+            fetchMock.post("path:/_matrix/client/v3/room_keys/version", (res, options) => {
+                newKeyBackupInfo = JSON.parse(options.body as string);
+                return { version: "2" };
+            });
+
+            // We consider the key backup as trusted
+            jest.spyOn(RustBackupManager.prototype, "isKeyBackupTrusted").mockResolvedValue({
+                trusted: true,
+                matchesDecryptionKey: true,
+            });
+
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
+            // We have a key backup
+            expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull();
+
+            const authUploadDeviceSigningKeys = jest.fn();
+            await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
+
+            // A new key backup should be created
+            expect(newKeyBackupInfo.auth_data).toBeTruthy();
+            // The new cross signing keys should be uploaded
+            expect(authUploadDeviceSigningKeys).toHaveBeenCalledWith(expect.any(Function));
         });
     });
 });

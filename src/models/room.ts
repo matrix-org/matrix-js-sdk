@@ -1661,6 +1661,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * "crop" or "scale".
      * @param allowDefault - True to allow an identicon for this room if an
      * avatar URL wasn't explicitly set. Default: true. (Deprecated)
+     * @param useAuthentication - (optional) If true, the caller supports authenticated
+     * media and wants an authentication-required URL. Note that server support for
+     * authenticated media will not be checked - it is the caller's responsibility
+     * to do so before calling this function. Note also that useAuthentication
+     * implies allowRedirects. Defaults to false (unauthenticated endpoints).
      * @returns the avatar URL or null.
      */
     public getAvatarUrl(
@@ -1669,6 +1674,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         height: number,
         resizeMethod: ResizeMethod,
         allowDefault = true,
+        useAuthentication: boolean = false,
     ): string | null {
         const roomAvatarEvent = this.currentState.getStateEvents(EventType.RoomAvatar, "");
         if (!roomAvatarEvent && !allowDefault) {
@@ -1677,7 +1683,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const mainUrl = roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
         if (mainUrl) {
-            return getHttpUriForMxc(baseUrl, mainUrl, width, height, resizeMethod);
+            return getHttpUriForMxc(
+                baseUrl,
+                mainUrl,
+                width,
+                height,
+                resizeMethod,
+                undefined,
+                undefined,
+                useAuthentication,
+            );
         }
 
         return null;

@@ -299,6 +299,48 @@ describe("Room", function () {
             const url = room.getAvatarUrl(hsUrl, 64, 64, "crop", false);
             expect(url).toEqual(null);
         });
+
+        it("should return unauthenticated media URL if useAuthentication is not set", function () {
+            // @ts-ignore - mocked doesn't handle overloads sanely
+            mocked(room.currentState.getStateEvents).mockImplementation(function (type, key) {
+                if (type === EventType.RoomAvatar && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: EventType.RoomAvatar,
+                        skey: "",
+                        room: roomId,
+                        user: userA,
+                        content: {
+                            url: "mxc://flibble/wibble",
+                        },
+                    });
+                }
+            });
+            const url = room.getAvatarUrl(hsUrl, 100, 100, "scale");
+            // Check for unauthenticated media prefix
+            expect(url?.indexOf("/_matrix/media/v3/")).not.toEqual(-1);
+        });
+
+        it("should return authenticated media URL if useAuthentication=true", function () {
+            // @ts-ignore - mocked doesn't handle overloads sanely
+            mocked(room.currentState.getStateEvents).mockImplementation(function (type, key) {
+                if (type === EventType.RoomAvatar && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: EventType.RoomAvatar,
+                        skey: "",
+                        room: roomId,
+                        user: userA,
+                        content: {
+                            url: "mxc://flibble/wibble",
+                        },
+                    });
+                }
+            });
+            const url = room.getAvatarUrl(hsUrl, 100, 100, "scale", undefined, true);
+            // Check for authenticated media prefix
+            expect(url?.indexOf("/_matrix/client/v1/media/")).not.toEqual(-1);
+        });
     });
 
     describe("getMember", function () {

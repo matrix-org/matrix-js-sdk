@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from "../randomstring.ts";
+import { secureRandomString } from "../randomstring.ts";
 import { deriveRecoveryKeyFromPassphrase } from "../crypto-api/index.ts";
 
 const DEFAULT_ITERATIONS = 500000;
@@ -30,7 +30,7 @@ interface IKey {
  * @param passphrase - The passphrase to generate the key from
  */
 export async function keyFromPassphrase(passphrase: string): Promise<IKey> {
-    const salt = randomString(32);
+    const salt = secureRandomString(32);
 
     const key = await deriveRecoveryKeyFromPassphrase(passphrase, salt, DEFAULT_ITERATIONS);
 

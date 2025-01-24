@@ -160,7 +160,7 @@ import {
     Visibility,
 } from "./@types/partials.ts";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
-import { randomString } from "./randomstring.ts";
+import { secureRandomString } from "./randomstring.ts";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup.ts";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
 import { ISignatures } from "./@types/signed.ts";
@@ -247,6 +247,7 @@ import { ImageInfo } from "./@types/media.ts";
 import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
+import { discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig, validateAuthMetadataAndKeys } from "./oidc/index.ts";
 
 export type Store = IStore;
 
@@ -1346,7 +1347,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
-        this.sessionId = randomString(10);
+        this.sessionId = secureRandomString(10);
 
         const userId = opts.userId || null;
         this.credentials = { userId };
@@ -8006,7 +8007,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns A new client secret
      */
     public generateClientSecret(): string {
-        return randomString(32);
+        return secureRandomString(32);
     }
 
     /**
@@ -8254,27 +8255,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     *
+     * @deprecated This method has unintuitive behaviour: it updates the `MatrixClient` instance with *some* of the
+     *    returned credentials. Instead, call {@link loginRequest} and create a new `MatrixClient` instance using the
+     *    results. See https://github.com/matrix-org/matrix-js-sdk/issues/4502.
      */
     public login(loginType: LoginRequest["type"], data: Omit<LoginRequest, "type">): Promise<LoginResponse> {
-        return this.http
-            .authedRequest<LoginResponse>(Method.Post, "/login", undefined, {
-                ...data,
-                type: loginType,
-            })
-            .then((response) => {
-                if (response.access_token && response.user_id) {
-                    this.http.opts.accessToken = response.access_token;
-                    this.credentials = {
-                        userId: response.user_id,
-                    };
-                }
-                return response;
-            });
+        return this.loginRequest({
+            ...data,
+            type: loginType,
+        }).then((response) => {
+            if (response.access_token && response.user_id) {
+                this.http.opts.accessToken = response.access_token;
+                this.credentials = {
+                    userId: response.user_id,
+                };
+            }
+            return response;
+        });
     }
 
     /**
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     *
+     * @deprecated This method has unintuitive behaviour: it updates the `MatrixClient` instance with *some* of the
+     *   returned credentials. Instead, call {@link loginRequest} with `data.type: "m.login.password"`, and create a new
+     *   `MatrixClient` instance using the results. See https://github.com/matrix-org/matrix-js-sdk/issues/4502.
      */
     public loginWithPassword(user: string, password: string): Promise<LoginResponse> {
         return this.login("m.login.password", {
@@ -8319,11 +8326,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param token - Login token previously received from homeserver
      * @returns Promise which resolves to a LoginResponse object
      * @returns Rejects: with an error response.
+     *
+     * @deprecated This method has unintuitive behaviour: it updates the `MatrixClient` instance with *some* of the
+     *   returned credentials. Instead, call {@link loginRequest} with `data.type: "m.login.token"`, and create a new
+     *   `MatrixClient` instance using the results. See https://github.com/matrix-org/matrix-js-sdk/issues/4502.
      */
     public loginWithToken(token: string): Promise<LoginResponse> {
         return this.login("m.login.token", {
             token: token,
         });
+    }
+
+    /**
+     * Sends a `POST /login` request to the server.
+     *
+     * If successful, this will create a new device and access token for the user.
+     *
+     * @see {@link MatrixClient.loginFlows} which makes a `GET /login` request.
+     * @see https://spec.matrix.org/v1.13/client-server-api/#post_matrixclientv3login
+     *
+     * @param data - Credentials and other details for the login request.
+     */
+    public async loginRequest(data: LoginRequest): Promise<LoginResponse> {
+        return await this.http.authedRequest<LoginResponse>(Method.Post, "/login", undefined, data);
     }
 
     /**
@@ -10336,6 +10361,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Resolves: A promise of an object containing the OIDC issuer if configured
      * @returns Rejects: when the request fails (module:http-api.MatrixError)
      * @experimental - part of MSC2965
+     * @deprecated in favour of getAuthMetadata
      */
     public async getAuthIssuer(): Promise<{
         issuer: string;
@@ -10343,6 +10369,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.request(Method.Get, "/auth_issuer", undefined, undefined, {
             prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
         });
+    }
+
+    /**
+     * Discover and validate delegated auth configuration
+     * - delegated auth issuer openid-configuration is reachable
+     * - delegated auth issuer openid-configuration is configured correctly for us
+     * Fetches /auth_metadata falling back to legacy implementation using /auth_issuer followed by
+     * https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
+     * When successful, validated metadata is returned
+     * @returns validated authentication metadata and optionally signing keys
+     * @throws when delegated auth config is invalid or unreachable
+     * @experimental - part of MSC2965
+     */
+    public async getAuthMetadata(): Promise<OidcClientConfig> {
+        let authMetadata: unknown | undefined;
+        try {
+            authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
+                prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                const { issuer } = await this.getAuthIssuer();
+                return discoverAndValidateOIDCIssuerWellKnown(issuer);
+            }
+            throw e;
+        }
+
+        return validateAuthMetadataAndKeys(authMetadata);
     }
 }
 

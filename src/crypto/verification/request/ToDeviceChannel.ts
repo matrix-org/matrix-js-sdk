@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from "../../../randomstring.ts";
+import { secureRandomString } from "../../../randomstring.ts";
 import { logger } from "../../../logger.ts";
 import {
     CANCEL_TYPE,
@@ -283,7 +283,7 @@ export class ToDeviceChannel implements IVerificationChannel {
      * @returns the transaction id
      */
     public static makeTransactionId(): string {
-        return randomString(32);
+        return secureRandomString(32);
     }
 }
 
