@@ -186,6 +186,7 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
                 return null;
             }
             return await this.resetKey();
+        }
 
         // We successfully found the key in secret storage: decode it, and cache it in
         // the rust SDK's crypto store.
