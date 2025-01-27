@@ -96,7 +96,8 @@ export enum CryptoEvent {
      *
      * After the client calls {@link CryptoApi.startDehydration}, this event
      * will be fired every time a new dehydrated device is created.  It may fire
-     * before `startDehydration` returns. */
+     * before `startDehydration` returns.
+     */
     DehydratedDeviceCreated = "dehydration.DehydratedDeviceCreated",
 
     /**

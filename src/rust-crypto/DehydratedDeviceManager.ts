@@ -159,11 +159,13 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
      * Reset the dehydration key.
      *
      * Creates a new key and stores it in secret storage.
+     *
+     * @returns The newly-generated key.
      */
     public async resetKey(): Promise<RustSdkCryptoJs.DehydratedDeviceKey> {
         const key = RustSdkCryptoJs.DehydratedDeviceKey.createRandomKey();
         await this.secretStorage.store(SECRET_STORAGE_NAME, key.toBase64());
-        // also cache it
+        // Also cache it in the rust SDK's crypto store.
         await this.cacheKey(key);
         return key;
     }
@@ -184,15 +186,16 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
                 return null;
             }
             return await this.resetKey();
-        } else {
-            const bytes = decodeBase64(keyB64);
-            try {
-                const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
-                await this.cacheKey(key);
-                return key;
-            } finally {
-                bytes.fill(0);
-            }
+
+        // We successfully found the key in secret storage: decode it, and cache it in
+        // the rust SDK's crypto store.
+        const bytes = decodeBase64(keyB64);
+        try {
+            const key = RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes);
+            await this.cacheKey(key);
+            return key;
+        } finally {
+            bytes.fill(0);
         }
     }
 
@@ -345,4 +348,4 @@ type DehydratedDevicesEvents =
  * A map of the {@link DehydratedDeviceEvents} fired by the {@link DehydratedDeviceManager} and their payloads.
  * @internal
  */
-export type DehydratedDevicesEventMap = Pick<CryptoEventHandlerMap, DehydratedDevicesEvents>;
+type DehydratedDevicesEventMap = Pick<CryptoEventHandlerMap, DehydratedDevicesEvents>;
