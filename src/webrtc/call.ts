@@ -640,11 +640,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!userId) throw new Error("Couldn't find opponent user ID to init crypto");
 
         // Here we were calling `MatrixClient.crypto.deviceList.downloadKeys` which is not supported by the rust cryptography.
-        const deviceInfoMap = new Map();
-        this.hasOpponentDeviceInfo = Boolean(deviceInfoMap.get(userId)?.get(this.opponentDeviceId));
-        if (!this.hasOpponentDeviceInfo) {
-            throw new GroupCallUnknownDeviceError(userId);
-        }
+        this.hasOpponentDeviceInfo = false;
+        throw new GroupCallUnknownDeviceError(userId);
     }
 
     /**
