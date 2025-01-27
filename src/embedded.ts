@@ -28,7 +28,6 @@ import {
     WidgetApiAction,
     IWidgetApiResponse,
     IWidgetApiResponseData,
-    IUpdateStateToWidgetActionRequest,
 } from "matrix-widget-api";
 
 import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event.ts";
@@ -137,7 +136,6 @@ export type EventHandlerMap = { [RoomWidgetClientEvent.PendingEventsChanged]: ()
 export class RoomWidgetClient extends MatrixClient {
     private room?: Room;
     private readonly widgetApiReady: Promise<void>;
-    private readonly roomStateSynced: Promise<void>;
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
@@ -191,11 +189,6 @@ export class RoomWidgetClient extends MatrixClient {
         };
 
         this.widgetApiReady = new Promise<void>((resolve) => this.widgetApi.once("ready", resolve));
-        this.roomStateSynced = capabilities.receiveState?.length
-            ? new Promise<void>((resolve) =>
-                  this.widgetApi.once(`action:${WidgetApiToWidgetAction.UpdateState}`, resolve),
-              )
-            : Promise.resolve();
 
         // Request capabilities for the functionality this client needs to support
         if (
@@ -248,7 +241,6 @@ export class RoomWidgetClient extends MatrixClient {
 
         widgetApi.on(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
         widgetApi.on(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
-        widgetApi.on(`action:${WidgetApiToWidgetAction.UpdateState}`, this.onStateUpdate);
 
         // Open communication with the host
         widgetApi.start();
@@ -284,6 +276,28 @@ export class RoomWidgetClient extends MatrixClient {
 
         await this.widgetApiReady;
 
+        // Backfill the requested events
+        // We only get the most recent event for every type + state key combo,
+        // so it doesn't really matter what order we inject them in
+        await Promise.all(
+            this.capabilities.receiveState?.map(async ({ eventType, stateKey }) => {
+                const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
+                const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
+
+                if (this.syncApi instanceof SyncApi) {
+                    // Passing undefined for `stateAfterEventList` allows will make `injectRoomEvents` run in legacy mode
+                    // -> state events in `timelineEventList` will update the state.
+                    await this.syncApi.injectRoomEvents(this.room!, undefined, events);
+                } else {
+                    await this.syncApi!.injectRoomEvents(this.room!, events); // Sliding Sync
+                }
+                events.forEach((event) => {
+                    this.emit(ClientEvent.Event, event);
+                    logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
+                });
+            }) ?? [],
+        );
+
         if (opts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
                 this.fetchClientWellKnown();
@@ -291,9 +305,8 @@ export class RoomWidgetClient extends MatrixClient {
             this.fetchClientWellKnown();
         }
 
-        await this.roomStateSynced;
         this.setSyncState(SyncState.Syncing);
-        logger.info("Finished initial sync");
+        logger.info("Finished backfilling events");
 
         this.matrixRTC.start();
 
@@ -304,7 +317,6 @@ export class RoomWidgetClient extends MatrixClient {
     public stopClient(): void {
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
-        this.widgetApi.off(`action:${WidgetApiToWidgetAction.UpdateState}`, this.onStateUpdate);
 
         super.stopClient();
         this.lifecycle!.abort(); // Signal to other async tasks that the client has stopped
@@ -562,15 +574,36 @@ export class RoomWidgetClient extends MatrixClient {
             // Only inject once we have update the txId
             await this.updateTxId(event);
 
+            // The widget API does not tell us whether a state event came from `state_after` or not so we assume legacy behaviour for now.
             if (this.syncApi instanceof SyncApi) {
-                await this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
+                // The code will want to be something like:
+                // ```
+                // if (!params.addToTimeline && !params.addToState) {
+                // // Passing undefined for `stateAfterEventList` makes `injectRoomEvents` run in "legacy mode"
+                // // -> state events part of the `timelineEventList` parameter will update the state.
+                //     this.injectRoomEvents(this.room!, [], undefined, [event]);
+                // } else {
+                //     this.injectRoomEvents(this.room!, undefined, params.addToState ? [event] : [], params.addToTimeline ? [event] : []);
+                // }
+                // ```
+
+                // Passing undefined for `stateAfterEventList` allows will make `injectRoomEvents` run in legacy mode
+                // -> state events in `timelineEventList` will update the state.
+                await this.syncApi.injectRoomEvents(this.room!, [], undefined, [event]);
             } else {
-                // Sliding Sync
-                await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
+                // The code will want to be something like:
+                // ```
+                // if (!params.addToTimeline && !params.addToState) {
+                //     this.injectRoomEvents(this.room!, [], [event]);
+                // } else {
+                //     this.injectRoomEvents(this.room!, params.addToState ? [event] : [], params.addToTimeline ? [event] : []);
+                // }
+                // ```
+                await this.syncApi!.injectRoomEvents(this.room!, [], [event]); // Sliding Sync
             }
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
-            logger.info(`Received event ${event.getId()} ${event.getType()}`);
+            logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
         } else {
             const { event_id: eventId, room_id: roomId } = ev.detail.data;
             logger.info(`Received event ${eventId} for a different room ${roomId}; discarding`);
@@ -592,32 +625,6 @@ export class RoomWidgetClient extends MatrixClient {
 
         this.emit(ClientEvent.ToDeviceEvent, event);
         this.setSyncState(SyncState.Syncing);
-        await this.ack(ev);
-    };
-
-    private onStateUpdate = async (ev: CustomEvent<IUpdateStateToWidgetActionRequest>): Promise<void> => {
-        ev.preventDefault();
-
-        for (const rawEvent of ev.detail.data.state) {
-            // Verify the room ID matches, since it's possible for the client to
-            // send us state updates from other rooms if this widget is always
-            // on screen
-            if (rawEvent.room_id === this.roomId) {
-                const event = new MatrixEvent(rawEvent as Partial<IEvent>);
-
-                if (this.syncApi instanceof SyncApi) {
-                    await this.syncApi.injectRoomEvents(this.room!, undefined, [event]);
-                } else {
-                    // Sliding Sync
-                    await this.syncApi!.injectRoomEvents(this.room!, [event]);
-                }
-                logger.info(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
-            } else {
-                const { event_id: eventId, room_id: roomId } = ev.detail.data;
-                logger.info(`Received state entry ${eventId} for a different room ${roomId}; discarding`);
-            }
-        }
-
         await this.ack(ev);
     };
 
