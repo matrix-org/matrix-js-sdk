@@ -374,6 +374,8 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [EventType.Direct]: { [userId: string]: string[] };
     [EventType.IgnoredUserList]: { [userId: string]: {} };
     "m.secret_storage.default_key": { key: string };
+    // Flag set by the rust SDK (Element X) and also used by us to mark that the user opted out of backup
+    "m.org.matrix.custom.backup_disabled": { disabled: boolean };
     "m.identity_server": { base_url: string | null };
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
     [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
