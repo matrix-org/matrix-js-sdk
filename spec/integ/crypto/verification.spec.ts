@@ -25,7 +25,6 @@ import Olm from "@matrix-org/olm";
 
 import {
     createClient,
-    CryptoEvent,
     DeviceVerification,
     IContent,
     ICreateClientOpts,
@@ -81,7 +80,7 @@ import {
     getTestOlmAccountKeys,
     ToDeviceEvent,
 } from "./olm-utils";
-import { KeyBackupInfo } from "../../../src/crypto-api";
+import { KeyBackupInfo, CryptoEvent } from "../../../src/crypto-api";
 import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
