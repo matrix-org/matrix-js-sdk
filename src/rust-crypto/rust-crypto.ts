@@ -183,11 +183,22 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
         this.eventDecryptor = new EventDecryptor(this.logger, olmMachine, this.perSessionBackupDownloader);
 
+        // re-emit the events emitted by managers
         this.reemitter.reEmit(this.backupManager, [
             CryptoEvent.KeyBackupStatus,
             CryptoEvent.KeyBackupSessionsRemaining,
             CryptoEvent.KeyBackupFailed,
             CryptoEvent.KeyBackupDecryptionKeyCached,
+        ]);
+        this.reemitter.reEmit(this.dehydratedDeviceManager, [
+            CryptoEvent.DehydratedDeviceCreated,
+            CryptoEvent.DehydratedDeviceUploaded,
+            CryptoEvent.RehydrationStarted,
+            CryptoEvent.RehydrationProgress,
+            CryptoEvent.RehydrationCompleted,
+            CryptoEvent.RehydrationError,
+            CryptoEvent.DehydrationKeyCached,
+            CryptoEvent.DehydratedDeviceRotationError,
         ]);
 
         this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);

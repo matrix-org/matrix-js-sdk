@@ -44,7 +44,7 @@ import {
     MemoryCryptoStore,
     TypedEventEmitter,
 } from "../../../src";
-import { mkEvent } from "../../test-utils/test-utils";
+import { emitPromise, mkEvent } from "../../test-utils/test-utils";
 import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -1738,6 +1738,110 @@ describe("RustCrypto", () => {
                 device_data: "data",
             });
             expect(await rustCrypto.isDehydrationSupported()).toBe(true);
+        });
+
+        it("should load the dehydration key from SSSS if available", async () => {
+            fetchMock.config.overwriteRoutes = true;
+
+            const secretStorageCallbacks = {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                },
+            } as SecretStorageCallbacks;
+            const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+            // Create a RustCrypto to set up device dehydration.
+            const e2eKeyReceiver1 = new E2EKeyReceiver("http://server");
+            const e2eKeyResponder1 = new E2EKeyResponder("http://server");
+            e2eKeyResponder1.addKeyReceiver(TEST_USER, e2eKeyReceiver1);
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
+                status: 200,
+                body: {},
+            });
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
+                status: 200,
+                body: {},
+            });
+            const rustCrypto1 = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
+
+            // dehydration requires secret storage and cross signing
+            async function createSecretStorageKey() {
+                return {
+                    keyInfo: {} as AddSecretStorageKeyOpts,
+                    privateKey: new Uint8Array(32),
+                };
+            }
+            await rustCrypto1.bootstrapCrossSigning({ setupNewCrossSigning: true });
+            await rustCrypto1.bootstrapSecretStorage({
+                createSecretStorageKey,
+                setupNewSecretStorage: true,
+                setupNewKeyBackup: false,
+            });
+
+            // we need to process a sync so that the OlmMachine will upload keys
+            await rustCrypto1.preprocessToDeviceMessages([]);
+            await rustCrypto1.onSyncCompleted({});
+
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            let dehydratedDeviceBody: any;
+            fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
+                dehydratedDeviceBody = JSON.parse(opts.body as string);
+                return {};
+            });
+            await rustCrypto1.startDehydration();
+            await rustCrypto1.stop();
+
+            // Create another RustCrypto, using the same SecretStorage, to
+            // rehydrate the device.
+            const e2eKeyReceiver2 = new E2EKeyReceiver("http://server");
+            const e2eKeyResponder2 = new E2EKeyResponder("http://server");
+            e2eKeyResponder2.addKeyReceiver(TEST_USER, e2eKeyReceiver2);
+
+            const rustCrypto2 = await makeTestRustCrypto(
+                makeMatrixHttpApi(),
+                TEST_USER,
+                "ANOTHERDEVICE",
+                secretStorage,
+            );
+
+            // dehydration requires secret storage and cross signing
+            await rustCrypto2.bootstrapCrossSigning({ setupNewCrossSigning: true });
+
+            // we need to process a sync so that the OlmMachine will upload keys
+            await rustCrypto2.preprocessToDeviceMessages([]);
+            await rustCrypto2.onSyncCompleted({});
+
+            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                device_id: dehydratedDeviceBody.device_id,
+                device_data: dehydratedDeviceBody.device_data,
+            });
+            fetchMock.post(
+                `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
+                {
+                    events: [],
+                    next_batch: "token",
+                },
+            );
+
+            // We check that a RehydrationCompleted event gets emitted, which
+            // means that the device was successfully rehydrated.
+            const rehydrationCompletedPromise = emitPromise(rustCrypto2, CryptoEvent.RehydrationCompleted);
+            await rustCrypto2.startDehydration();
+            await rehydrationCompletedPromise;
+            await rustCrypto2.stop();
         });
     });
 

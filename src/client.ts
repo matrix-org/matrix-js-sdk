@@ -2311,6 +2311,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             CryptoEvent.KeysChanged,
             CryptoEvent.DevicesUpdated,
             CryptoEvent.WillUpdateDevices,
+            CryptoEvent.DehydratedDeviceCreated,
+            CryptoEvent.DehydratedDeviceUploaded,
+            CryptoEvent.RehydrationStarted,
+            CryptoEvent.RehydrationProgress,
+            CryptoEvent.RehydrationCompleted,
+            CryptoEvent.RehydrationError,
+            CryptoEvent.DehydrationKeyCached,
+            CryptoEvent.DehydratedDeviceRotationError,
         ]);
     }
 
