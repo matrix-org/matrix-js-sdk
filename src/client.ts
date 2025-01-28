@@ -223,11 +223,6 @@ export const UNSTABLE_MSC3852_LAST_SEEN_UA = new UnstableValue(
     "org.matrix.msc3852.last_seen_user_agent",
 );
 
-interface IExportedDevice {
-    userId: string;
-    deviceId: string;
-}
-
 export interface IKeysUploadResponse {
     one_time_key_counts: {
         // eslint-disable-line camelcase
@@ -334,15 +329,6 @@ export interface ICreateClientOpts {
      * `?user_id=`.
      */
     queryParams?: Record<string, string>;
-
-    /**
-     * Device data exported with
-     * "exportDevice" method that must be imported to recreate this device.
-     * Should only be useful for devices with end-to-end crypto enabled.
-     * If provided, deviceId and userId should **NOT** be provided at the top
-     * level (they are present in the exported data).
-     */
-    deviceToImport?: IExportedDevice;
 
     /**
      * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link ICreateClientOpts#cryptoStore}.
@@ -1288,24 +1274,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger: this.logger,
         });
 
-        if (opts.deviceToImport) {
-            if (this.deviceId) {
-                this.logger.warn(
-                    "not importing device because device ID is provided to " +
-                        "constructor independently of exported data",
-                );
-            } else if (this.credentials.userId) {
-                this.logger.warn(
-                    "not importing device because user ID is provided to " +
-                        "constructor independently of exported data",
-                );
-            } else if (!opts.deviceToImport.deviceId) {
-                this.logger.warn("not importing device because no device ID in exported data");
-            } else {
-                this.deviceId = opts.deviceToImport.deviceId;
-                this.credentials.userId = opts.deviceToImport.userId;
-            }
-        } else if (opts.pickleKey) {
+        if (opts.pickleKey) {
             this.legacyPickleKey = opts.pickleKey;
         }
 
