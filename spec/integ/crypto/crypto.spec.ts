@@ -95,7 +95,6 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
-import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
@@ -995,7 +994,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         keyResponder.addDeviceKeys(testDeviceKeys);
 
         await startClientAndAwaitFirstSync();
-        aliceClient.setGlobalErrorOnUnknownDevices(false);
 
         // tell alice she is sharing a room with bob
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
@@ -1013,8 +1011,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await expectSendRoomKey("@bob:xyz", testOlmAccount);
     });
 
-    it("Alice sends a megolm message with GlobalErrorOnUnknownDevices=false", async () => {
-        aliceClient.setGlobalErrorOnUnknownDevices(false);
+    it("Alice sends a megolm message", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
@@ -1042,7 +1039,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     it("We should start a new megolm session after forceDiscardSession", async () => {
-        aliceClient.setGlobalErrorOnUnknownDevices(false);
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);
         keyResponder.addKeyReceiver("@alice:localhost", keyReceiver);
@@ -1075,87 +1071,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const inboundGroupSessionPromise2 = expectSendRoomKey("@bob:xyz", testOlmAccount);
         const p2 = expectSendMegolmMessage(inboundGroupSessionPromise2);
         await Promise.all([aliceClient.sendTextMessage(ROOM_ID, "test2"), p2]);
-    });
-
-    describe("get|setGlobalErrorOnUnknownDevices", () => {
-        it("should raise an error if crypto is disabled", () => {
-            aliceClient["cryptoBackend"] = undefined;
-            expect(() => aliceClient.setGlobalErrorOnUnknownDevices(true)).toThrow("encryption disabled");
-            expect(() => aliceClient.getGlobalErrorOnUnknownDevices()).toThrow("encryption disabled");
-        });
-
-        oldBackendOnly("should permit sending to unknown devices", async () => {
-            expect(aliceClient.getGlobalErrorOnUnknownDevices()).toBeTruthy();
-
-            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await startClientAndAwaitFirstSync();
-            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
-
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-            await syncPromise(aliceClient);
-
-            // start out with the device unknown - the send should be rejected.
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
-            await aliceClient.sendTextMessage(ROOM_ID, "test").then(
-                () => {
-                    throw new Error("sendTextMessage failed on an unknown device");
-                },
-                (e) => {
-                    expect(e.name).toEqual("UnknownDeviceError");
-                },
-            );
-
-            // enable sending to unknown devices, and resend
-            aliceClient.setGlobalErrorOnUnknownDevices(false);
-            expect(aliceClient.getGlobalErrorOnUnknownDevices()).toBeFalsy();
-
-            const room = aliceClient.getRoom(ROOM_ID)!;
-            const pendingMsg = room.getPendingEvents()[0];
-
-            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
-
-            await Promise.all([
-                aliceClient.resendEvent(pendingMsg, room),
-                expectSendMegolmMessage(inboundGroupSessionPromise),
-            ]);
-        });
-    });
-
-    describe("get|setGlobalBlacklistUnverifiedDevices", () => {
-        it("should send a m.unverified code in toDevice messages to an unverified device when globalBlacklistUnverifiedDevices=true", async () => {
-            aliceClient.getCrypto()!.globalBlacklistUnverifiedDevices = true;
-
-            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await startClientAndAwaitFirstSync();
-            await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
-
-            // Tell alice we share a room with bob
-            syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-            await syncPromise(aliceClient);
-
-            // Force alice to download bob keys
-            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
-
-            // Wait to receive the toDevice message and return bob device content
-            const toDevicePromise = new Promise<ToDevicePayload>((resolve) => {
-                fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key.withheld/"), (url, request) => {
-                    const content = JSON.parse(request.body as string);
-                    resolve(content.messages["@bob:xyz"]["DEVICE_ID"]);
-                    return {};
-                });
-            });
-
-            // Mock endpoint of message sending
-            fetchMock.put(new RegExp("/send/"), { event_id: "$event_id" });
-
-            await aliceClient.sendTextMessage(ROOM_ID, "test");
-
-            // Finally, check that the toDevice message has the m.unverified code
-            const toDeviceContent = await toDevicePromise;
-            expect(toDeviceContent.code).toBe("m.unverified");
-        });
     });
 
     describe("Session should rotate according to encryption settings", () => {
@@ -1475,7 +1390,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("getEncryptionInfoForEvent", () => {
         it("handles outgoing events", async () => {
-            aliceClient.setGlobalErrorOnUnknownDevices(false);
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
 
@@ -1579,7 +1493,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // set up the aliceTestClient so that it is a room with no known members
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync({ lazyLoadMembers: true });
-            aliceClient.setGlobalErrorOnUnknownDevices(false);
 
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([]));
             await syncPromise(aliceClient);

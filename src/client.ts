@@ -1971,41 +1971,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set whether sendMessage in a room with unknown and unverified devices
-     * should throw an error and not send them message. This has 'Global' for
-     * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
-     * no room-level equivalent for this setting.
-     *
-     * This API is currently UNSTABLE and may change or be removed without notice.
-     *
-     * It has no effect with the Rust crypto implementation.
-     *
-     * @param value - whether error on unknown devices
-     *
-     * ```ts
-     * client.getCrypto().globalErrorOnUnknownDevices = value;
-     * ```
-     */
-    public setGlobalErrorOnUnknownDevices(value: boolean): void {
-        if (!this.cryptoBackend) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        this.cryptoBackend.globalErrorOnUnknownDevices = value;
-    }
-
-    /**
-     * @returns whether to error on unknown devices
-     *
-     * This API is currently UNSTABLE and may change or be removed without notice.
-     */
-    public getGlobalErrorOnUnknownDevices(): boolean {
-        if (!this.cryptoBackend) {
-            throw new Error("End-to-end encryption disabled");
-        }
-        return this.cryptoBackend.globalErrorOnUnknownDevices;
-    }
-
-    /**
      * Whether encryption is enabled for a room.
      * @param roomId - the room id to query.
      * @returns whether encryption is enabled.
