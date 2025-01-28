@@ -1,3 +1,21 @@
+Changes in [36.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v36.1.0) (2025-01-28)
+==================================================================================================
+## ✨ Features
+
+* Deprecate `MatrixClient.login` and replace with `loginRequest` ([#4632](https://github.com/matrix-org/matrix-js-sdk/pull/4632)). Contributed by @richvdh.
+* Use `SyncCryptoCallback` api instead of legacy crypto in sliding sync ([#4624](https://github.com/matrix-org/matrix-js-sdk/pull/4624)). Contributed by @florianduros.
+* Distinguish room state and timeline events in embedded clients ([#4574](https://github.com/matrix-org/matrix-js-sdk/pull/4574)). Contributed by @robintown.
+* Allow setting default secret storage key id to null ([#4615](https://github.com/matrix-org/matrix-js-sdk/pull/4615)). Contributed by @florianduros.
+* Add authenticated media to getAvatarUrl in room and room-member models ([#4616](https://github.com/matrix-org/matrix-js-sdk/pull/4616)). Contributed by @m004.
+* Send MSC3981 'recurse' param on `/relations` endpoint on Matrix 1.10 servers ([#4023](https://github.com/matrix-org/matrix-js-sdk/pull/4023)). Contributed by @dbkr.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] Revert "Distinguish room state and timeline events in embedded clients (#4574)" ([#4657](https://github.com/matrix-org/matrix-js-sdk/pull/4657)). Contributed by @RiotRobot.
+* Change randomString et al to be secure ([#4621](https://github.com/matrix-org/matrix-js-sdk/pull/4621)). Contributed by @dbkr.
+* Fix issue with sentinels being incorrect on m.room.member events ([#4609](https://github.com/matrix-org/matrix-js-sdk/pull/4609)). Contributed by @t3chguy.
+
+
 Changes in [36.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v36.0.0) (2025-01-14)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
