@@ -16,7 +16,6 @@ limitations under the License.
 
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
-import { IOlmDevice } from "../algorithms/megolm.ts";
 import { TrackingStatus } from "../DeviceList.ts";
 import { IRoomEncryption } from "../RoomList.ts";
 import { IDevice } from "../deviceinfo.ts";
@@ -81,22 +80,6 @@ export interface CryptoStore {
      */
     setMigrationState(migrationState: MigrationState): Promise<void>;
 
-    getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest>;
-    getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null>;
-    getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null>;
-    getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]>;
-    getOutgoingRoomKeyRequestsByTarget(
-        userId: string,
-        deviceId: string,
-        wantedStates: number[],
-    ): Promise<OutgoingRoomKeyRequest[]>;
-    updateOutgoingRoomKeyRequest(
-        requestId: string,
-        expectedState: number,
-        updates: Partial<OutgoingRoomKeyRequest>,
-    ): Promise<OutgoingRoomKeyRequest | null>;
-    deleteOutgoingRoomKeyRequest(requestId: string, expectedState: number): Promise<OutgoingRoomKeyRequest | null>;
-
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
     storeAccount(txn: unknown, accountPickle: string): void;
@@ -106,7 +89,6 @@ export interface CryptoStore {
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void;
-    storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void;
     storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         type: K,
@@ -126,11 +108,7 @@ export interface CryptoStore {
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void;
-    getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo | null) => void): void;
     storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void;
-    storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void>;
-    getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;
-    filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]>;
 
     /**
      * Get a batch of end-to-end sessions from the database.
@@ -156,23 +134,10 @@ export interface CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void;
-    getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void;
-    addEndToEndInboundGroupSession(
-        senderCurve25519Key: string,
-        sessionId: string,
-        sessionData: InboundGroupSessionData,
-        txn: unknown,
-    ): void;
     storeEndToEndInboundGroupSession(
         senderCurve25519Key: string,
         sessionId: string,
         sessionData: InboundGroupSessionData,
-        txn: unknown,
-    ): void;
-    storeEndToEndInboundGroupSessionWithheld(
-        senderCurve25519Key: string,
-        sessionId: string,
-        sessionData: IWithheld,
         txn: unknown,
     ): void;
 
@@ -201,21 +166,8 @@ export interface CryptoStore {
     deleteEndToEndInboundGroupSessionsBatch(sessions: { senderKey: string; sessionId: string }[]): Promise<void>;
 
     // Device Data
-    getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void;
-    storeEndToEndDeviceData(deviceData: IDeviceData, txn: unknown): void;
-    storeEndToEndRoom(roomId: string, roomInfo: IRoomEncryption, txn: unknown): void;
     getEndToEndRooms(txn: unknown, func: (rooms: Record<string, IRoomEncryption>) => void): void;
-    getSessionsNeedingBackup(limit: number): Promise<ISession[]>;
-    countSessionsNeedingBackup(txn?: unknown): Promise<number>;
-    unmarkSessionsNeedingBackup(sessions: ISession[], txn?: unknown): Promise<void>;
     markSessionsNeedingBackup(sessions: ISession[], txn?: unknown): Promise<void>;
-    addSharedHistoryInboundGroupSession(roomId: string, senderKey: string, sessionId: string, txn?: unknown): void;
-    getSharedHistoryInboundGroupSessions(
-        roomId: string,
-        txn?: unknown,
-    ): Promise<[senderKey: string, sessionId: string][]>;
-    addParkedSharedHistory(roomId: string, data: ParkedSharedHistory, txn?: unknown): void;
-    takeParkedSharedHistory(roomId: string, txn?: unknown): Promise<ParkedSharedHistory[]>;
 
     // Session key backups
     doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T, log?: Logger): Promise<T>;
