@@ -728,7 +728,8 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
 
             const payload = { type: "org.example.foo", hello: "world" };
-            await client.encryptAndSendToDevices(
+            const embeddedClient = client as RoomWidgetClient;
+            await embeddedClient.encryptAndSendToDevices(
                 [
                     { userId: "@alice:example.org", deviceInfo: new DeviceInfo("aliceWeb") },
                     { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobDesktop") },

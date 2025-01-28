@@ -19,7 +19,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
+import { AuthDict, createClient, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
@@ -37,6 +37,7 @@ import {
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
+import { CryptoEvent } from "../../../src/crypto-api";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections

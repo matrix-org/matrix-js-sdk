@@ -68,13 +68,11 @@ import {
     PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
-import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
 import { defer, QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
-import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
 import { RoomMessageEventContent } from "../../src/@types/events";
 import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
@@ -1937,7 +1935,7 @@ describe("MatrixClient", function () {
                 encryptEvent: jest.fn(),
                 stop: jest.fn(),
             } as unknown as Mocked<Crypto>;
-            client.crypto = client["cryptoBackend"] = mockCrypto;
+            client["cryptoBackend"] = mockCrypto;
         });
 
         function assertCancelled() {
@@ -2320,21 +2318,6 @@ describe("MatrixClient", function () {
             expect(await client.checkTurnServers()).toBe(false);
             client.off(ClientEvent.TurnServersError, onTurnServersError);
             expect(events).toEqual([[error, true]]); // fatal
-        });
-    });
-
-    describe("encryptAndSendToDevices", () => {
-        it("throws an error if crypto is unavailable", () => {
-            client.crypto = undefined;
-            expect(() => client.encryptAndSendToDevices([], {})).toThrow();
-        });
-
-        it("is an alias for the crypto method", async () => {
-            client.crypto = testUtils.mock(Crypto, "Crypto");
-            const deviceInfos: IOlmDevice[] = [];
-            const payload = {};
-            await client.encryptAndSendToDevices(deviceInfos, payload);
-            expect(client.crypto.encryptAndSendToDevices).toHaveBeenLastCalledWith(deviceInfos, payload);
         });
     });
 
@@ -3199,82 +3182,10 @@ describe("MatrixClient", function () {
             client["_secretStorage"] = mockSecretStorage;
         });
 
-        it("hasSecretStorageKey", async () => {
-            mockSecretStorage.hasKey.mockResolvedValue(false);
-            expect(await client.hasSecretStorageKey("mykey")).toBe(false);
-            expect(mockSecretStorage.hasKey).toHaveBeenCalledWith("mykey");
-        });
-
-        it("isSecretStored", async () => {
-            const mockResult = { key: {} as SecretStorageKeyDescriptionAesV1 };
-            mockSecretStorage.isStored.mockResolvedValue(mockResult);
-            expect(await client.isSecretStored("mysecret")).toBe(mockResult);
-            expect(mockSecretStorage.isStored).toHaveBeenCalledWith("mysecret");
-        });
-
-        it("getDefaultSecretStorageKeyId", async () => {
-            mockSecretStorage.getDefaultKeyId.mockResolvedValue("bzz");
-            expect(await client.getDefaultSecretStorageKeyId()).toEqual("bzz");
-        });
-
         it("isKeyBackupKeyStored", async () => {
             mockSecretStorage.isStored.mockResolvedValue(null);
             expect(await client.isKeyBackupKeyStored()).toBe(null);
             expect(mockSecretStorage.isStored).toHaveBeenCalledWith("m.megolm_backup.v1");
-        });
-    });
-
-    // these wrappers are deprecated, but we need coverage of them to pass the quality gate
-    describe("Crypto wrappers", () => {
-        describe("exception if no crypto", () => {
-            it("isCrossSigningReady", () => {
-                expect(() => client.isCrossSigningReady()).toThrow("End-to-end encryption disabled");
-            });
-
-            it("bootstrapCrossSigning", () => {
-                expect(() => client.bootstrapCrossSigning({})).toThrow("End-to-end encryption disabled");
-            });
-
-            it("isSecretStorageReady", () => {
-                expect(() => client.isSecretStorageReady()).toThrow("End-to-end encryption disabled");
-            });
-        });
-
-        describe("defer to crypto backend", () => {
-            let mockCryptoBackend: Mocked<CryptoBackend>;
-
-            beforeEach(() => {
-                mockCryptoBackend = {
-                    isCrossSigningReady: jest.fn(),
-                    bootstrapCrossSigning: jest.fn(),
-                    isSecretStorageReady: jest.fn(),
-                    stop: jest.fn().mockResolvedValue(undefined),
-                } as unknown as Mocked<CryptoBackend>;
-                client["cryptoBackend"] = mockCryptoBackend;
-            });
-
-            it("isCrossSigningReady", async () => {
-                const testResult = "test";
-                mockCryptoBackend.isCrossSigningReady.mockResolvedValue(testResult as unknown as boolean);
-                expect(await client.isCrossSigningReady()).toBe(testResult);
-                expect(mockCryptoBackend.isCrossSigningReady).toHaveBeenCalledTimes(1);
-            });
-
-            it("bootstrapCrossSigning", async () => {
-                const testOpts = {};
-                mockCryptoBackend.bootstrapCrossSigning.mockResolvedValue(undefined);
-                await client.bootstrapCrossSigning(testOpts);
-                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledTimes(1);
-                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledWith(testOpts);
-            });
-
-            it("isSecretStorageReady", async () => {
-                client["cryptoBackend"] = mockCryptoBackend;
-                const testResult = "test";
-                mockCryptoBackend.isSecretStorageReady.mockResolvedValue(testResult as unknown as boolean);
-                expect(await client.isSecretStorageReady()).toBe(testResult);
-                expect(mockCryptoBackend.isSecretStorageReady).toHaveBeenCalledTimes(1);
-            });
         });
     });
 

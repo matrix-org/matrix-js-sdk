@@ -3774,7 +3774,7 @@ describe("Room", function () {
 
     it("should load pending events from from the store and decrypt if needed", async () => {
         const client = new TestClient(userA).client;
-        client.crypto = client["cryptoBackend"] = {
+        client["cryptoBackend"] = {
             decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
         } as unknown as Crypto;
         client.store.getPendingEvents = jest.fn(async (roomId) => [

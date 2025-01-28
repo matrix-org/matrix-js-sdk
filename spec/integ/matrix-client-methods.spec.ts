@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import HttpBackend from "matrix-mock-request";
-import { Mocked } from "jest-mock";
 
 import * as utils from "../test-utils/test-utils";
 import { IStoredClientOpts, MatrixClient } from "../../src/client";
@@ -34,7 +33,6 @@ import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -1505,49 +1503,6 @@ describe("MatrixClient", function () {
             const prom = client.setPowerLevel("!room_id:server", userId, 42);
             await httpBackend.flushAllExpected();
             await prom;
-        });
-    });
-
-    describe("uploadKeys", () => {
-        // uploadKeys() is a no-op nowadays, so there's not much to test here.
-        it("should complete successfully", async () => {
-            await client.uploadKeys();
-        });
-    });
-
-    describe("getCryptoTrustCrossSignedDevices", () => {
-        it("should throw if e2e is disabled", () => {
-            expect(() => client.getCryptoTrustCrossSignedDevices()).toThrow("End-to-end encryption disabled");
-        });
-
-        it("should proxy to the crypto backend", async () => {
-            const mockBackend = {
-                getTrustCrossSignedDevices: jest.fn().mockReturnValue(true),
-            } as unknown as Mocked<CryptoBackend>;
-            client["cryptoBackend"] = mockBackend;
-
-            expect(client.getCryptoTrustCrossSignedDevices()).toBe(true);
-            mockBackend.getTrustCrossSignedDevices.mockReturnValue(false);
-            expect(client.getCryptoTrustCrossSignedDevices()).toBe(false);
-        });
-    });
-
-    describe("setCryptoTrustCrossSignedDevices", () => {
-        it("should throw if e2e is disabled", () => {
-            expect(() => client.setCryptoTrustCrossSignedDevices(false)).toThrow("End-to-end encryption disabled");
-        });
-
-        it("should proxy to the crypto backend", async () => {
-            const mockBackend = {
-                setTrustCrossSignedDevices: jest.fn(),
-            } as unknown as Mocked<CryptoBackend>;
-            client["cryptoBackend"] = mockBackend;
-
-            client.setCryptoTrustCrossSignedDevices(true);
-            expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(true);
-
-            client.setCryptoTrustCrossSignedDevices(false);
-            expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(false);
         });
     });
 

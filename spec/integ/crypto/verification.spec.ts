@@ -25,7 +25,6 @@ import Olm from "@matrix-org/olm";
 
 import {
     createClient,
-    CryptoEvent,
     DeviceVerification,
     IContent,
     ICreateClientOpts,
@@ -81,7 +80,7 @@ import {
     getTestOlmAccountKeys,
     ToDeviceEvent,
 } from "./olm-utils";
-import { KeyBackupInfo } from "../../../src/crypto-api";
+import { KeyBackupInfo, CryptoEvent } from "../../../src/crypto-api";
 import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
@@ -907,7 +906,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
     describe("Send verification request in DM", () => {
         beforeEach(async () => {
             aliceClient = await startTestClient();
-            aliceClient.setGlobalErrorOnUnknownDevices(false);
 
             e2eKeyResponder.addCrossSigningData(BOB_SIGNED_CROSS_SIGNING_KEYS_DATA);
             e2eKeyResponder.addDeviceKeys(BOB_SIGNED_TEST_DEVICE_DATA);
@@ -990,7 +988,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             testOlmAccount.create();
 
             aliceClient = await startTestClient();
-            aliceClient.setGlobalErrorOnUnknownDevices(false);
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([BOB_TEST_USER_ID]));
             await syncPromise(aliceClient);
 
