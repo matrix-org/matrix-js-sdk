@@ -700,6 +700,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Implementation of {@link CryptoApi#withdrawVerificationRequirement}.
+     */
+    public async withdrawVerificationRequirement(userId: string): Promise<void> {
+        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | RustSdkCryptoJs.OwnUserIdentity | undefined =
+            await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
+
+        if (userIdentity === undefined) {
+            throw new Error("Cannot withdraw verification of unknown user");
+        }
+
+        await userIdentity.withdrawVerification();
+    }
+
+    /**
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {

@@ -1582,6 +1582,57 @@ describe("RustCrypto", () => {
         });
     });
 
+    describe("withdraw verification", () => {
+        function createTestSetup(): { olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>; rustCrypto: RustCrypto } {
+            const olmMachine = {
+                getIdentity: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            const rustCrypto = new RustCrypto(
+                logger,
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+            return { olmMachine, rustCrypto };
+        }
+
+        it("throws an error for an unknown user", async () => {
+            const { rustCrypto } = createTestSetup();
+            await expect(rustCrypto.withdrawVerificationRequirement("@alice:example.com")).rejects.toThrow(
+                "Cannot withdraw verification of unknown user",
+            );
+        });
+
+        it("Calls withdraw for other identity", async () => {
+            const { olmMachine, rustCrypto } = createTestSetup();
+            const identity = {
+                withdrawVerification: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OtherUserIdentity>;
+
+            olmMachine.getIdentity.mockResolvedValue(identity);
+
+            await rustCrypto.withdrawVerificationRequirement("@bob:example.com");
+
+            expect(identity.withdrawVerification).toHaveBeenCalled();
+        });
+
+        it("Calls withdraw for own identity", async () => {
+            const { olmMachine, rustCrypto } = createTestSetup();
+            const ownIdentity = {
+                withdrawVerification: jest.fn(),
+            } as unknown as Mocked<RustSdkCryptoJs.OwnUserIdentity>;
+
+            olmMachine.getIdentity.mockResolvedValue(ownIdentity);
+
+            await rustCrypto.withdrawVerificationRequirement("@alice:example.com");
+
+            expect(ownIdentity.withdrawVerification).toHaveBeenCalled();
+        });
+    });
+
     describe("key backup", () => {
         it("is started when rust crypto is created", async () => {
             // `RustCrypto.checkKeyBackupAndEnable` async call is made in background in the RustCrypto constructor.
