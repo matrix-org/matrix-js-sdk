@@ -1583,14 +1583,11 @@ describe("RustCrypto", () => {
     });
 
     describe("withdraw verification", () => {
-        let rustCrypto: RustCrypto;
-        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
-
-        beforeEach(() => {
-            olmMachine = {
+        function createTestSetup(): { olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>; rustCrypto: RustCrypto } {
+            const olmMachine = {
                 getIdentity: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
-            rustCrypto = new RustCrypto(
+            const rustCrypto = new RustCrypto(
                 logger,
                 olmMachine,
                 {} as MatrixClient["http"],
@@ -1599,15 +1596,18 @@ describe("RustCrypto", () => {
                 {} as ServerSideSecretStorage,
                 {} as CryptoCallbacks,
             );
-        });
+            return { olmMachine, rustCrypto };
+        }
 
         it("throws an error for an unknown user", async () => {
+            const { rustCrypto } = createTestSetup();
             await expect(rustCrypto.withdrawVerificationRequirement("@alice:example.com")).rejects.toThrow(
                 "Cannot withdraw verification of unknown user",
             );
         });
 
         it("Calls withdraw for other identity", async () => {
+            const { olmMachine, rustCrypto } = createTestSetup();
             const identity = {
                 withdrawVerification: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OtherUserIdentity>;
@@ -1620,6 +1620,7 @@ describe("RustCrypto", () => {
         });
 
         it("Calls withdraw for own identity", async () => {
+            const { olmMachine, rustCrypto } = createTestSetup();
             const ownIdentity = {
                 withdrawVerification: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OwnUserIdentity>;
