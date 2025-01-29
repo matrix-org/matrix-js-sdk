@@ -45,11 +45,30 @@ import { MatrixEvent } from "../models/event.ts";
  * The options to start device dehydration.
  */
 export interface StartDehydrationOpts {
-    /** Force creation of a new dehydration key. Defaults to `false`. */
+    /**
+     * Force creation of a new dehydration key, even if there is already an
+     * existing dehydration key. If `false`, and `onlyIfKeyCached` is `false`, a
+     * new key will be created if there is no existing dehydration key, whether
+     * already cached in our local storage or stored in Secret Storage.
+     *
+     * Checking for the presence of the key in Secret Storage may result in the
+     * `getSecretStorageKey` callback being called.
+     *
+     * Defaults to `false`.
+     */
     createNewKey?: boolean;
-    /** Only start dehydration if we have a cached key. Defaults to `false`. */
+    /**
+     * Only start dehydration if we have a dehydration key cached in our local
+     * storage. If `true`, Secret Storage will not be checked. Defaults to
+     * `false`.
+     */
     onlyIfKeyCached?: boolean;
-    /** Try to rehydrate a device before creating a new dehydrated device. Defaults to `true`. */
+    /**
+     * Try to rehydrate a device before creating a new dehydrated device.
+     * Setting this to `false` may be useful for situations where the client is
+     * known to pre-date the dehydrated device, and so rehydration is
+     * unnecessary. Defaults to `true`.
+     */
     rehydrate?: boolean;
 }
 
