@@ -21,7 +21,6 @@ import { Mocked } from "jest-mock";
 
 import {
     createClient,
-    Crypto,
     encodeBase64,
     ICreateClientOpts,
     IEvent,
@@ -44,7 +43,7 @@ import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, IDeferred } from "../../../src/utils";
-import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent } from "../../../src/crypto-api";
+import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent, CryptoApi } from "../../../src/crypto-api";
 import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
@@ -311,7 +310,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
     });
 
     describe("recover from backup", () => {
-        let aliceCrypto: Crypto.CryptoApi;
+        let aliceCrypto: CryptoApi;
 
         beforeEach(async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
