@@ -14,18 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
-import { TrackingStatus } from "../DeviceList.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { IDevice } from "../deviceinfo.ts";
-import { ICrossSigningInfo } from "../CrossSigning.ts";
 import { Logger } from "../../logger.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
 import { MatrixEvent } from "../../models/event.ts";
-import { DehydrationManager } from "../dehydration.ts";
 import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
+import { ISignatures } from "../../@types/signed.ts";
 
 /**
  * Internal module. Definitions for storage for the crypto module
@@ -33,7 +26,7 @@ import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecre
 
 export interface SecretStorePrivateKeys {
     "dehydration": {
-        keyInfo: DehydrationManager["keyInfo"];
+        keyInfo: { [props: string]: any };
         key: AESEncryptedSecretStoragePayload;
         deviceDisplayName: string;
         time: number;
@@ -298,3 +291,119 @@ export enum MigrationState {
  * {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
  */
 export const SESSION_BATCH_SIZE = 50;
+
+export interface InboundGroupSessionData {
+    room_id: string; // eslint-disable-line camelcase
+    /** pickled Olm.InboundGroupSession */
+    session: string;
+    keysClaimed?: Record<string, string>;
+    /** Devices involved in forwarding this session to us (normally empty). */
+    forwardingCurve25519KeyChain: string[];
+    /** whether this session is untrusted. */
+    untrusted?: boolean;
+    /** whether this session exists during the room being set to shared history. */
+    sharedHistory?: boolean;
+}
+
+export interface ICrossSigningInfo {
+    keys: Record<string, CrossSigningKeyInfo>;
+    firstUse: boolean;
+    crossSigningVerifiedBefore: boolean;
+}
+
+/* eslint-disable camelcase */
+export interface IRoomEncryption {
+    algorithm: string;
+    rotation_period_ms?: number;
+    rotation_period_msgs?: number;
+}
+/* eslint-enable camelcase */
+
+export enum TrackingStatus {
+    NotTracked,
+    PendingDownload,
+    DownloadInProgress,
+    UpToDate,
+}
+
+/**
+ *  possible states for a room key request
+ *
+ * The state machine looks like:
+ * ```
+ *
+ *     |         (cancellation sent)
+ *     | .-------------------------------------------------.
+ *     | |                                                 |
+ *     V V       (cancellation requested)                  |
+ *   UNSENT  -----------------------------+                |
+ *     |                                  |                |
+ *     |                                  |                |
+ *     | (send successful)                |  CANCELLATION_PENDING_AND_WILL_RESEND
+ *     V                                  |                Λ
+ *    SENT                                |                |
+ *     |--------------------------------  |  --------------'
+ *     |                                  |  (cancellation requested with intent
+ *     |                                  |   to resend the original request)
+ *     |                                  |
+ *     | (cancellation requested)         |
+ *     V                                  |
+ * CANCELLATION_PENDING                   |
+ *     |                                  |
+ *     | (cancellation sent)              |
+ *     V                                  |
+ * (deleted)  <---------------------------+
+ * ```
+ */
+export enum RoomKeyRequestState {
+    /** request not yet sent */
+    Unsent,
+    /** request sent, awaiting reply */
+    Sent,
+    /** reply received, cancellation not yet sent */
+    CancellationPending,
+    /**
+     * Cancellation not yet sent and will transition to UNSENT instead of
+     * being deleted once the cancellation has been sent.
+     */
+    CancellationPendingAndWillResend,
+}
+
+/* eslint-disable camelcase */
+interface IRoomKey {
+    room_id: string;
+    algorithm: string;
+}
+
+/**
+ * The parameters of a room key request. The details of the request may
+ * vary with the crypto algorithm, but the management and storage layers for
+ * outgoing requests expect it to have 'room_id' and 'session_id' properties.
+ */
+export interface IRoomKeyRequestBody extends IRoomKey {
+    session_id: string;
+    sender_key: string;
+}
+
+/* eslint-enable camelcase */
+
+export interface IRoomKeyRequestRecipient {
+    userId: string;
+    deviceId: string;
+}
+
+interface IDevice {
+    keys: Record<string, string>;
+    algorithms: string[];
+    verified: DeviceVerification;
+    known: boolean;
+    unsigned?: Record<string, any>;
+    signatures?: ISignatures;
+}
+
+/** State of the verification of the device. */
+export enum DeviceVerification {
+    Blocked = -1,
+    Unverified = 0,
+    Verified = 1,
+}

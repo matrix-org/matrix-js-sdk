@@ -26,9 +26,9 @@ import {
     Mode,
     SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
+    InboundGroupSessionData,
+    IRoomEncryption,
 } from "./base.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
 import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /**
