@@ -53,12 +53,12 @@ import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
-import { Crypto } from "../../src/crypto";
 import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -3776,7 +3776,7 @@ describe("Room", function () {
         const client = new TestClient(userA).client;
         client["cryptoBackend"] = {
             decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
-        } as unknown as Crypto;
+        } as unknown as CryptoBackend;
         client.store.getPendingEvents = jest.fn(async (roomId) => [
             {
                 event_id: "$1:server",

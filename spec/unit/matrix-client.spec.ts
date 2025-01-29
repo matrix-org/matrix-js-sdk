@@ -31,8 +31,6 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
-import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
-import { Crypto } from "../../src/crypto";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
@@ -76,6 +74,7 @@ import { ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
 import { RoomMessageEventContent } from "../../src/@types/events";
 import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 jest.useFakeTimers();
 
@@ -1188,7 +1187,7 @@ describe("MatrixClient", function () {
                         type: EventType.RoomEncryption,
                         state_key: "",
                         content: {
-                            algorithm: MEGOLM_ALGORITHM,
+                            algorithm: "m.megolm.v1.aes-sha2",
                         },
                     },
                 ],
@@ -1914,7 +1913,7 @@ describe("MatrixClient", function () {
             hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
 
-        let mockCrypto: Mocked<Crypto>;
+        let mockCrypto: Mocked<CryptoBackend>;
 
         let event: MatrixEvent;
         beforeEach(async () => {
@@ -1934,7 +1933,7 @@ describe("MatrixClient", function () {
                 isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
                 encryptEvent: jest.fn(),
                 stop: jest.fn(),
-            } as unknown as Mocked<Crypto>;
+            } as unknown as Mocked<CryptoBackend>;
             client["cryptoBackend"] = mockCrypto;
         });
 
