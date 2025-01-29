@@ -425,16 +425,6 @@ export interface CryptoApi {
     getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[];
 
     /**
-     * Finds a DM verification request that is already in progress for the given room id
-     *
-     * @param roomId - the room to use for verification
-     *
-     * @returns the VerificationRequest that is in progress, if any
-     * @deprecated prefer `userId` parameter variant.
-     */
-    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
-
-    /**
      * Finds a DM verification request that is already in progress for the given room and user.
      *
      * @param roomId - the room to use for verification.
@@ -500,18 +490,6 @@ export interface CryptoApi {
      * @returns the key, if any, or null
      */
     getSessionBackupPrivateKey(): Promise<Uint8Array | null>;
-
-    /**
-     * Store the backup decryption key.
-     *
-     * This should be called if the client has received the key from another device via secret sharing (gossiping).
-     * It is the responsability of the caller to check that the decryption key is valid for the current backup version.
-     *
-     * @param key - the backup decryption key
-     *
-     * @deprecated prefer the variant with a `version` parameter.
-     */
-    storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
 
     /**
      * Store the backup decryption key.
@@ -732,45 +710,6 @@ export enum DecryptionFailureCode {
 
     /** Unknown or unclassified error. */
     UNKNOWN_ERROR = "UNKNOWN_ERROR",
-
-    /** @deprecated only used in legacy crypto */
-    MEGOLM_BAD_ROOM = "MEGOLM_BAD_ROOM",
-
-    /** @deprecated only used in legacy crypto */
-    MEGOLM_MISSING_FIELDS = "MEGOLM_MISSING_FIELDS",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_DECRYPT_GROUP_MESSAGE_ERROR = "OLM_DECRYPT_GROUP_MESSAGE_ERROR",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_BAD_ENCRYPTED_MESSAGE = "OLM_BAD_ENCRYPTED_MESSAGE",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_BAD_RECIPIENT = "OLM_BAD_RECIPIENT",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_BAD_RECIPIENT_KEY = "OLM_BAD_RECIPIENT_KEY",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_BAD_ROOM = "OLM_BAD_ROOM",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_BAD_SENDER_CHECK_FAILED = "OLM_BAD_SENDER_CHECK_FAILED",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_BAD_SENDER = "OLM_BAD_SENDER",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_FORWARDED_MESSAGE = "OLM_FORWARDED_MESSAGE",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_MISSING_CIPHERTEXT = "OLM_MISSING_CIPHERTEXT",
-
-    /** @deprecated only used in legacy crypto */
-    OLM_NOT_INCLUDED_IN_RECIPIENTS = "OLM_NOT_INCLUDED_IN_RECIPIENTS",
-
-    /** @deprecated only used in legacy crypto */
-    UNKNOWN_ENCRYPTION_ALGORITHM = "UNKNOWN_ENCRYPTION_ALGORITHM",
 }
 
 /** Base {@link DeviceIsolationMode} kind. */
@@ -862,7 +801,6 @@ export class UserVerificationStatus {
     public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
-        private readonly tofu: boolean,
         needsUserApproval: boolean = false,
     ) {
         this.needsUserApproval = needsUserApproval;
@@ -888,15 +826,6 @@ export class UserVerificationStatus {
      */
     public wasCrossSigningVerified(): boolean {
         return this.crossSigningVerifiedBefore;
-    }
-
-    /**
-     * @returns true if this user's key is trusted on first use
-     *
-     * @deprecated No longer supported, with the Rust crypto stack.
-     */
-    public isTofu(): boolean {
-        return this.tofu;
     }
 }
 
@@ -981,10 +910,6 @@ export interface ImportRoomKeyProgressData {
 export interface ImportRoomKeysOpts {
     /** Reports ongoing progress of the import process. Can be used for feedback. */
     progressCallback?: (stage: ImportRoomKeyProgressData) => void;
-    /** @deprecated the rust SDK will always such imported keys as untrusted */
-    untrusted?: boolean;
-    /** @deprecated not useful externally */
-    source?: string;
 }
 
 /**
@@ -1070,13 +995,6 @@ export interface CryptoCallbacks {
         name: string,
     ) => Promise<[string, Uint8Array] | null>;
 
-    /** @deprecated: unused with the Rust crypto stack. */
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
-    /** @deprecated: unused with the Rust crypto stack. */
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    /** @deprecated: unused with the Rust crypto stack. */
-    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
-
     /**
      * Called by {@link CryptoApi.bootstrapSecretStorage} when a new default secret storage key is created.
      *
@@ -1088,24 +1006,6 @@ export interface CryptoCallbacks {
      * @param key - private key to store
      */
     cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
-
-    /** @deprecated: unused with the Rust crypto stack. */
-    onSecretRequested?: (
-        userId: string,
-        deviceId: string,
-        requestId: string,
-        secretName: string,
-        deviceTrust: DeviceVerificationStatus,
-    ) => Promise<string | undefined>;
-
-    /** @deprecated: unused with the Rust crypto stack. */
-    getDehydrationKey?: (
-        keyInfo: SecretStorageKeyDescription,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
-
-    /** @deprecated: unused with the Rust crypto stack. */
-    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 /**
@@ -1121,13 +1021,6 @@ export interface CreateSecretStorageOpts {
     createSecretStorageKey?: () => Promise<GeneratedSecretStorageKey>;
 
     /**
-     * The current key backup object. If passed,
-     * the passphrase and recovery key from this backup will be used.
-     * @deprecated Not used by the Rust crypto stack.
-     */
-    keyBackupInfo?: KeyBackupInfo;
-
-    /**
      * If true, a new key backup version will be
      * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
      * is supplied.
@@ -1138,18 +1031,6 @@ export interface CreateSecretStorageOpts {
      * Reset even if keys already exist.
      */
     setupNewSecretStorage?: boolean;
-
-    /**
-     * Function called to get the user's current key backup passphrase.
-     *
-     * Should return a promise that resolves with a Uint8Array
-     * containing the key, or rejects if the key cannot be obtained.
-     *
-     * Only used when the client has existing key backup, but no secret storage.
-     *
-     * @deprecated Not used by the Rust crypto stack.
-     */
-    getKeyBackupPassphrase?: () => Promise<Uint8Array>;
 }
 
 /** Types of cross-signing key */
