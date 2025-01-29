@@ -18,7 +18,6 @@ import { MockedObject } from "jest-mock";
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
-import { Crypto, IEventDecryptionResult } from "../../../src/crypto";
 import {
     IAnnotatedPushRule,
     MatrixClient,
@@ -28,7 +27,7 @@ import {
     TweakName,
 } from "../../../src";
 import { DecryptionFailureCode } from "../../../src/crypto-api";
-import { DecryptionError } from "../../../src/common-crypto/CryptoBackend";
+import { CryptoBackend, DecryptionError, EventDecryptionResult } from "../../../src/common-crypto/CryptoBackend";
 
 describe("MatrixEvent", () => {
     it("should create copies of itself", () => {
@@ -369,7 +368,7 @@ describe("MatrixEvent", () => {
             const testError = new Error("test error");
             const crypto = {
                 decryptEvent: jest.fn().mockRejectedValue(testError),
-            } as unknown as Crypto;
+            } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
@@ -391,7 +390,7 @@ describe("MatrixEvent", () => {
             const testError = new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, "uisi");
             const crypto = {
                 decryptEvent: jest.fn().mockRejectedValue(testError),
-            } as unknown as Crypto;
+            } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
@@ -418,7 +417,7 @@ describe("MatrixEvent", () => {
                             "The sender has disabled encrypting to unverified devices.",
                         ),
                     ),
-            } as unknown as Crypto;
+            } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
@@ -453,7 +452,7 @@ describe("MatrixEvent", () => {
                             },
                         });
                     }),
-            } as unknown as Crypto;
+            } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
 
@@ -478,7 +477,7 @@ describe("MatrixEvent", () => {
 
             const crypto = {
                 decryptEvent: jest.fn().mockImplementationOnce(() => {
-                    return Promise.resolve<IEventDecryptionResult>({
+                    return Promise.resolve<EventDecryptionResult>({
                         clearEvent: {
                             type: "m.room.message",
                             content: {
@@ -491,7 +490,7 @@ describe("MatrixEvent", () => {
                         },
                     });
                 }),
-            } as unknown as Crypto;
+            } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
             expect(encryptedEvent.getType()).toEqual("m.room.message");
