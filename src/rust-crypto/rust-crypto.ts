@@ -1030,9 +1030,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @returns the VerificationRequest that is in progress, if any
      *
      */
-    public findVerificationRequestDMInProgress(roomId: string, userId?: string): VerificationRequest | undefined {
-        if (!userId) throw new Error("missing userId");
-
+    public findVerificationRequestDMInProgress(roomId: string, userId: string): VerificationRequest | undefined {
         const requests: RustSdkCryptoJs.VerificationRequest[] = this.olmMachine.getVerificationRequests(
             new RustSdkCryptoJs.UserId(userId),
         );
@@ -1223,13 +1221,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param key - the backup decryption key
      * @param version - the backup version for this key.
      */
-    public async storeSessionBackupPrivateKey(key: Uint8Array, version?: string): Promise<void> {
+    public async storeSessionBackupPrivateKey(key: Uint8Array, version: string): Promise<void> {
         const base64Key = encodeBase64(key);
-
-        if (!version) {
-            throw new Error("storeSessionBackupPrivateKey: version is required");
-        }
-
         await this.backupManager.saveBackupDecryptionKey(
             RustSdkCryptoJs.BackupDecryptionKey.fromBase64(base64Key),
             version,
