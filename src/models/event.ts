@@ -23,7 +23,6 @@ import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
 import type { IEventDecryptionResult } from "../@types/crypto.ts";
 import { logger } from "../logger.ts";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest.ts";
 import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     EventType,
@@ -33,7 +32,6 @@ import {
     UNSIGNED_THREAD_ID_FIELD,
     UNSIGNED_MEMBERSHIP_FIELD,
 } from "../@types/event.ts";
-import { Crypto } from "../crypto/index.ts";
 import { deepSortedObjectEntries, internaliseString } from "../utils.ts";
 import { RoomMember } from "./room-member.ts";
 import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread.ts";
@@ -405,12 +403,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public forwardLooking = true;
-
-    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
-     * `Crypto` will set this the `VerificationRequest` for the event
-     * so it can be easily accessed from the timeline.
-     */
-    public verificationRequest?: VerificationRequest;
 
     private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
@@ -887,28 +879,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         this.decryptionPromise = this.decryptionLoop(crypto, options);
         return this.decryptionPromise;
-    }
-
-    /**
-     * Cancel any room key request for this event and resend another.
-     *
-     * @param crypto - crypto module
-     * @param userId - the user who received this event
-     *
-     * @returns a promise that resolves when the request is queued
-     */
-    public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
-        const wireContent = this.getWireContent();
-        return crypto.requestRoomKey(
-            {
-                algorithm: wireContent.algorithm,
-                room_id: this.getRoomId()!,
-                session_id: wireContent.session_id,
-                sender_key: wireContent.sender_key,
-            },
-            this.getKeyRequestRecipients(userId),
-            true,
-        );
     }
 
     /**
@@ -1718,10 +1688,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             decrypted: event,
             encrypted: this.event,
         };
-    }
-
-    public setVerificationRequest(request: VerificationRequest): void {
-        this.verificationRequest = request;
     }
 
     public setTxnId(txnId: string): void {
