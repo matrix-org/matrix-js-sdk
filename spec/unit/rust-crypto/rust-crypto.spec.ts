@@ -1455,31 +1455,12 @@ describe("RustCrypto", () => {
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
         });
-
-        it("fails to save a key if version not provided", async () => {
-            const key = "testtesttesttesttesttesttesttest";
-            const rustCrypto = await makeTestRustCrypto();
-            await expect(() => rustCrypto.storeSessionBackupPrivateKey(new TextEncoder().encode(key))).rejects.toThrow(
-                "storeSessionBackupPrivateKey: version is required",
-            );
-            const fetched = await rustCrypto.getSessionBackupPrivateKey();
-            expect(fetched).toBeNull();
-        });
     });
 
     describe("getActiveSessionBackupVersion", () => {
         it("returns null", async () => {
             const rustCrypto = await makeTestRustCrypto();
             expect(await rustCrypto.getActiveSessionBackupVersion()).toBeNull();
-        });
-    });
-
-    describe("findVerificationRequestDMInProgress", () => {
-        it("throws an error if the userId is not provided", async () => {
-            const rustCrypto = await makeTestRustCrypto();
-            expect(() => rustCrypto.findVerificationRequestDMInProgress(testData.TEST_ROOM_ID)).toThrow(
-                "missing userId",
-            );
         });
     });
 
