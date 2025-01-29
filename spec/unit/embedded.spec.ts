@@ -40,7 +40,6 @@ import { SyncState } from "../../src/sync";
 import { ICapabilities, RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
 import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
-import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { sleep } from "../../src/utils";
 
 const testOIDCToken = {
@@ -731,8 +730,8 @@ describe("RoomWidgetClient", () => {
             const embeddedClient = client as RoomWidgetClient;
             await embeddedClient.encryptAndSendToDevices(
                 [
-                    { userId: "@alice:example.org", deviceInfo: new DeviceInfo("aliceWeb") },
-                    { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobDesktop") },
+                    { userId: "@alice:example.org", deviceId: "aliceWeb" },
+                    { userId: "@bob:example.org", deviceId: "bobDesktop" },
                 ],
                 payload,
             );
