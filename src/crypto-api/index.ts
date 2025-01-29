@@ -42,6 +42,18 @@ import { MatrixEvent } from "../models/event.ts";
  */
 
 /**
+ * The options to start device dehydration.
+ */
+export interface StartDehydrationOpts {
+    /** Force creation of a new dehydration key. Defaults to `false`. */
+    createNewKey?: boolean;
+    /** Only start dehydration if we have a cached key. Defaults to `false`. */
+    onlyIfKeyCached?: boolean;
+    /** Try to rehydrate a device before creating a new dehydrated device. Defaults to `true`. */
+    rehydrate?: boolean;
+}
+
+/**
  * Public interface to the cryptography parts of the js-sdk
  *
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
@@ -649,10 +661,11 @@ export interface CryptoApi {
     /**
      * Start using device dehydration.
      *
-     * - Rehydrates a dehydrated device, if one is available.
+     * - Rehydrates a dehydrated device, if one is available and `opts.rehydrate`
+     *   is `true`.
      * - Creates a new dehydration key, if necessary, and stores it in Secret
      *   Storage.
-     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If `opts.createNewKey` is set to true, always creates a new key.
      *   - If a dehydration key is not available, creates a new one.
      * - Creates a new dehydrated device, and schedules periodically creating
      *   new dehydrated devices.
@@ -661,11 +674,11 @@ export interface CryptoApi {
      * `true`, and must not be called until after cross-signing and secret
      * storage have been set up.
      *
-     * @param createNewKey - whether to force creation of a new dehydration key.
-     *   This can be used, for example, if Secret Storage is being reset.  Defaults
-     *   to false.
+     * @param opts - options for device dehydration. For backwards compatibility
+     *     with old code, a boolean can be given here, which will be treated as
+     *     the `createNewKey` option. However, this is deprecated.
      */
-    startDehydration(createNewKey?: boolean): Promise<void>;
+    startDehydration(opts?: StartDehydrationOpts | boolean): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //

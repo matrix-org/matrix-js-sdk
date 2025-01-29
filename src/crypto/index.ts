@@ -105,6 +105,7 @@ import {
     CryptoEventHandlerMap as CryptoApiCryptoEventHandlerMap,
     KeyBackupRestoreResult,
     KeyBackupRestoreOpts,
+    StartDehydrationOpts,
 } from "../crypto-api/index.ts";
 import { Device, DeviceMap } from "../models/device.ts";
 import { deviceInfoToDevice } from "./device-converter.ts";
@@ -4327,7 +4328,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Stub function -- dehydration is not implemented here, so throw error
      */
-    public async startDehydration(createNewKey?: boolean): Promise<void> {
+    public async startDehydration(createNewKey?: StartDehydrationOpts | boolean): Promise<void> {
         throw new Error("Not implemented");
     }
 
