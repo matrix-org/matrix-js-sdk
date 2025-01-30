@@ -429,13 +429,18 @@ describe("initRustCrypto", () => {
             expect(session.senderSigningKey).toBe(undefined);
         }, 10000);
 
-        async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
+        async function encryptAndStoreSecretKey(
+            type: string,
+            key: Uint8Array,
+            pickleKey: string,
+            store: MemoryCryptoStore,
+        ) {
             const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), Buffer.from(pickleKey), type);
             store.storeSecretStorePrivateKey(undefined, type as keyof SecretStorePrivateKeys, encryptedKey);
         }
 
         /** Create a bunch of fake Olm sessions and stash them in the DB. */
-        function createSessions(store: CryptoStore, nDevices: number, nSessionsPerDevice: number) {
+        function createSessions(store: MemoryCryptoStore, nDevices: number, nSessionsPerDevice: number) {
             for (let i = 0; i < nDevices; i++) {
                 for (let j = 0; j < nSessionsPerDevice; j++) {
                     const sessionData = {
@@ -450,7 +455,7 @@ describe("initRustCrypto", () => {
         }
 
         /** Create a bunch of fake Megolm sessions and stash them in the DB. */
-        function createMegolmSessions(store: CryptoStore, nDevices: number, nSessionsPerDevice: number) {
+        function createMegolmSessions(store: MemoryCryptoStore, nDevices: number, nSessionsPerDevice: number) {
             for (let i = 0; i < nDevices; i++) {
                 for (let j = 0; j < nSessionsPerDevice; j++) {
                     store.storeEndToEndInboundGroupSession(
