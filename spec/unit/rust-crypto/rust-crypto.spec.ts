@@ -1894,6 +1894,193 @@ describe("RustCrypto", () => {
             await rehydrationCompletedPromise;
             await rustCrypto2.stop();
         });
+
+        describe("start dehydration options", () => {
+            let rustCrypto: RustCrypto;
+            let secretStorage: ServerSideSecretStorageImpl;
+            let dehydratedDeviceInfo: Record<string, any> | undefined;
+
+            // Function that is called when `GET /dehydrated_device` is called
+            // (i.e. when we try to rehydrate a device)
+            const getDehydratedDeviceMock = jest.fn(() => {
+                if (dehydratedDeviceInfo) {
+                    return {
+                        status: 200,
+                        body: dehydratedDeviceInfo,
+                    };
+                } else {
+                    return {
+                        status: 404,
+                        body: {
+                            errcode: "M_NOT_FOUND",
+                            error: "Not found",
+                        },
+                    };
+                }
+            });
+            // Function that is called when `PUT /dehydrated_device` is called
+            // (i.e. when we create a new dehydrated device)
+            const putDehydratedDeviceMock = jest.fn((path, opts) => {
+                const content = JSON.parse(opts.body as string);
+                dehydratedDeviceInfo = {
+                    device_id: content.device_id,
+                    device_data: content.device_data,
+                };
+                return {
+                    status: 200,
+                    body: {
+                        device_id: content.device_id,
+                    },
+                };
+            });
+
+            beforeEach(async () => {
+                // Set up a RustCrypto object with secret storage and cross-signing.
+                const secretStorageCallbacks = {
+                    getSecretStorageKey: async (keys: any, name: string) => {
+                        return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                    },
+                } as SecretStorageCallbacks;
+                secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
+
+                const e2eKeyReceiver = new E2EKeyReceiver("http://server");
+                const e2eKeyResponder = new E2EKeyResponder("http://server");
+                e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: {
+                        errcode: "M_NOT_FOUND",
+                        error: "Not found",
+                    },
+                });
+                fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
+                    status: 200,
+                    body: {},
+                });
+                fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
+                    status: 200,
+                    body: {},
+                });
+                rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
+
+                // dehydration requires secret storage and cross signing
+                async function createSecretStorageKey() {
+                    return {
+                        keyInfo: {} as AddSecretStorageKeyOpts,
+                        privateKey: new Uint8Array(32),
+                    };
+                }
+                await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
+                await rustCrypto.bootstrapSecretStorage({
+                    createSecretStorageKey,
+                    setupNewSecretStorage: true,
+                    setupNewKeyBackup: false,
+                });
+                // we need to process a sync so that the OlmMachine will upload keys
+                await rustCrypto.preprocessToDeviceMessages([]);
+                await rustCrypto.onSyncCompleted({});
+
+                // set up mocks needed for device dehydration
+                dehydratedDeviceInfo = undefined;
+                fetchMock.get(
+                    "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+                    getDehydratedDeviceMock,
+                );
+                fetchMock.put(
+                    "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+                    putDehydratedDeviceMock,
+                );
+                fetchMock.post(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
+                    status: 200,
+                    body: {
+                        events: [],
+                        next_batch: "foo",
+                    },
+                });
+                getDehydratedDeviceMock.mockClear();
+                putDehydratedDeviceMock.mockClear();
+            });
+
+            afterEach(() => {
+                rustCrypto.stop();
+            });
+
+            // Several tests require a dehydrated device and dehydration key
+            // already set up.
+            async function setUpInitialDehydratedDevice() {
+                await rustCrypto.startDehydration();
+                getDehydratedDeviceMock.mockClear();
+                putDehydratedDeviceMock.mockClear();
+                return await secretStorage.get("org.matrix.msc3814");
+            }
+
+            it("should create a new key and dehydrate a device when no options given", async () => {
+                // With the default options, when we don't have an existing key ...
+                await rustCrypto.startDehydration();
+                // ... we create a new dehydration key ...
+                expect(await secretStorage.get("org.matrix.msc3814")).toBeTruthy();
+                // ... and create a new dehydrated device.
+                expect(putDehydratedDeviceMock).toHaveBeenCalled();
+            });
+
+            it("should rehydrate a device if available and keep existing key when no options given", async () => {
+                const origDehydrationKey = await setUpInitialDehydratedDevice();
+
+                // If we already have a dehydration key and dehydrated device...
+                await rustCrypto.startDehydration();
+                // ... we should fetch the device to rehydrate it ...
+                expect(getDehydratedDeviceMock).toHaveBeenCalled();
+                // ... create a new dehydrated device ...
+                expect(putDehydratedDeviceMock).toHaveBeenCalled();
+                // ... and keep the same dehydration key.
+                expect(await secretStorage.get("org.matrix.msc3814")).toEqual(origDehydrationKey);
+            });
+
+            it("should do nothing if onlyIfKeyCached is true and we have no key cached", async () => {
+                // Since there is no key cached, so should do nothing.  i.e. it
+                // should not make any HTTP requests and should not create a new key.
+                await rustCrypto.startDehydration({ onlyIfKeyCached: true });
+                expect(getDehydratedDeviceMock).not.toHaveBeenCalled();
+                expect(putDehydratedDeviceMock).not.toHaveBeenCalled();
+                expect(await secretStorage.get("org.matrix.msc3814")).toBeFalsy();
+            });
+
+            it("should start dehydration when onlyIfKeyCached is true, and we have a cached key", async () => {
+                const origDehydrationKey = await setUpInitialDehydratedDevice();
+
+                // If `onlyIfKeyCached` is `true`, and we already have have a
+                // key, we should behave the same as if no options were given.
+                await rustCrypto.startDehydration({ onlyIfKeyCached: true });
+                expect(getDehydratedDeviceMock).toHaveBeenCalled();
+                expect(putDehydratedDeviceMock).toHaveBeenCalled();
+                expect(await secretStorage.get("org.matrix.msc3814")).toEqual(origDehydrationKey);
+            });
+
+            it("should not rehydrate if rehydrate is set to false", async () => {
+                const origDehydrationKey = await setUpInitialDehydratedDevice();
+
+                // If `rehydrate` is set to `false` ...
+                await rustCrypto.startDehydration({ rehydrate: false });
+                // ... we should not try to rehydrate ...
+                expect(getDehydratedDeviceMock).not.toHaveBeenCalled();
+                // ... but we should still create a new dehydrated device ...
+                expect(putDehydratedDeviceMock).toHaveBeenCalled();
+                // ... and we should keep the same dehydration key.
+                expect(await secretStorage.get("org.matrix.msc3814")).toEqual(origDehydrationKey);
+            });
+
+            it("should create a new key if createNewKey is set to true", async () => {
+                const origDehydrationKey = await setUpInitialDehydratedDevice();
+
+                // If `createNewKey` is set to `true` ...
+                await rustCrypto.startDehydration({ createNewKey: true });
+                // ... we should rehydrate and dehydrate as normal ...
+                expect(getDehydratedDeviceMock).toHaveBeenCalled();
+                expect(putDehydratedDeviceMock).toHaveBeenCalled();
+                // ... and we should create a new dehydration key.
+                expect(await secretStorage.get("org.matrix.msc3814")).not.toEqual(origDehydrationKey);
+            });
+        });
     });
 
     describe("import & export secrets bundle", () => {

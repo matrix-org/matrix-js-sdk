@@ -67,6 +67,7 @@ import {
     CryptoEventHandlerMap,
     KeyBackupRestoreOpts,
     KeyBackupRestoreResult,
+    StartDehydrationOpts,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { IDownloadKeyResult, IQueryKeysRequest } from "../client.ts";
@@ -1425,11 +1426,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoApi#startDehydration}.
      */
-    public async startDehydration(createNewKey?: boolean): Promise<void> {
+    public async startDehydration(opts: StartDehydrationOpts | boolean = {}): Promise<void> {
         if (!(await this.isCrossSigningReady()) || !(await this.isSecretStorageReady())) {
             throw new Error("Device dehydration requires cross-signing and secret storage to be set up");
         }
-        return await this.dehydratedDeviceManager.start(createNewKey);
+        return await this.dehydratedDeviceManager.start(opts || {});
     }
 
     /**
