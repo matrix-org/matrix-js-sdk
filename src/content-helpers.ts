@@ -31,6 +31,7 @@ import {
 } from "./@types/location.ts";
 import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic.ts";
 import { RoomMessageEventContent } from "./@types/events.ts";
+import { Optional } from "matrix-events-sdk";
 
 /**
  * Generates the content for a HTML Message event
@@ -185,18 +186,21 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 /**
  * Topic event helpers
  */
-export type MakeTopicContent = (topic: string, htmlTopic?: string) => MRoomTopicEventContent;
+export type MakeTopicContent = (topic: Optional<string>, htmlTopic?: string) => MRoomTopicEventContent;
 
 export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
-    const renderings = [{ body: topic, mimetype: "text/plain" }];
+    const renderings = [];
+    if (isProvided(topic)) {
+        renderings.push({ body: topic, mimetype: "text/plain" });
+    }
     if (isProvided(htmlTopic)) {
-        renderings.push({ body: htmlTopic!, mimetype: "text/html" });
+        renderings.push({ body: htmlTopic, mimetype: "text/html" });
     }
     return { topic, [M_TOPIC.name]: renderings };
 };
 
 export type TopicState = {
-    text: string;
+    text: Optional<string>;
     html?: string;
 };
 
