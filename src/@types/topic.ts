@@ -60,4 +60,4 @@ export type MTopicEvent = EitherAnd<{ [M_TOPIC.name]: MTopicContent }, { [M_TOPI
 /**
  * The event content for an m.room.topic event
  */
-export type MRoomTopicEventContent = { topic: string | null | undefined } & MTopicEvent;
+export type MRoomTopicEventContent = { topic: string | null | undefined } & (MTopicEvent | {});
