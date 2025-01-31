@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
-
 import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { MsgType } from "./@types/event.ts";
 import { M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events.ts";
@@ -187,7 +185,7 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 /**
  * Topic event helpers
  */
-export type MakeTopicContent = (topic: Optional<string>, htmlTopic?: string) => MRoomTopicEventContent;
+export type MakeTopicContent = (topic: string | null | undefined, htmlTopic?: string) => MRoomTopicEventContent;
 
 export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
     const renderings = [];
@@ -201,16 +199,17 @@ export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
 };
 
 export type TopicState = {
-    text: Optional<string>;
+    text?: string;
     html?: string;
 };
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
     const mtopic = M_TOPIC.findIn<MTopicContent>(content);
     if (!Array.isArray(mtopic)) {
-        return { text: content.topic };
+        return { text: content.topic ?? undefined };
     }
-    const text = mtopic?.find((r) => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
+    const text =
+        mtopic?.find((r) => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic ?? undefined;
     const html = mtopic?.find((r) => r.mimetype === "text/html")?.body;
     return { text, html };
 };
