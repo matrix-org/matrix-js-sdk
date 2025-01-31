@@ -211,13 +211,11 @@ describe("Topic content helpers", () => {
         it("creates an empty event when the topic is falsey", () => {
             expect(makeTopicContent(undefined)).toEqual({
                 topic: undefined,
-                [M_TOPIC.name]: [
-                ],
+                [M_TOPIC.name]: [],
             });
             expect(makeTopicContent(null)).toEqual({
                 topic: null,
-                [M_TOPIC.name]: [
-                ],
+                [M_TOPIC.name]: [],
             });
         });
     });

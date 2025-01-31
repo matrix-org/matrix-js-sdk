@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Optional } from "matrix-events-sdk";
+
 import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { MsgType } from "./@types/event.ts";
 import { M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events.ts";
@@ -31,7 +33,6 @@ import {
 } from "./@types/location.ts";
 import { MRoomTopicEventContent, MTopicContent, M_TOPIC } from "./@types/topic.ts";
 import { RoomMessageEventContent } from "./@types/events.ts";
-import { Optional } from "matrix-events-sdk";
 
 /**
  * Generates the content for a HTML Message event
