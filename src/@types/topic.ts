@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd } from "matrix-events-sdk";
+import { EitherAnd, Optional } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue.ts";
 import { IMessageRendering } from "./extensible_events.ts";
@@ -60,4 +60,4 @@ export type MTopicEvent = EitherAnd<{ [M_TOPIC.name]: MTopicContent }, { [M_TOPI
 /**
  * The event content for an m.room.topic event
  */
-export type MRoomTopicEventContent = { topic: string } & MTopicEvent;
+export type MRoomTopicEventContent = { topic: Optional<string> } & MTopicEvent;
