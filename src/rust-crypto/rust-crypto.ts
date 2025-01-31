@@ -20,7 +20,6 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
-import type { IEncryptedEventInfo } from "../crypto/api.ts";
 import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
 import { MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { Room } from "../models/room.ts";
@@ -267,64 +266,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
         }
         return await this.eventDecryptor.attemptEventDecryption(event, this.deviceIsolationMode);
-    }
-
-    /**
-     * Implementation of (deprecated) {@link MatrixClient#getEventEncryptionInfo}.
-     *
-     * @param event - event to inspect
-     */
-    public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
-        const ret: Partial<IEncryptedEventInfo> = {};
-
-        ret.senderKey = event.getSenderKey() ?? undefined;
-        ret.algorithm = event.getWireContent().algorithm;
-
-        if (!ret.senderKey || !ret.algorithm) {
-            ret.encrypted = false;
-            return ret as IEncryptedEventInfo;
-        }
-        ret.encrypted = true;
-        ret.authenticated = true;
-        ret.mismatchedSender = true;
-        return ret as IEncryptedEventInfo;
-    }
-
-    /**
-     * Implementation of {@link CryptoBackend#checkUserTrust}.
-     *
-     * Stub for backwards compatibility.
-     *
-     */
-    public checkUserTrust(userId: string): UserVerificationStatus {
-        return new UserVerificationStatus(false, false, false);
-    }
-
-    /**
-     * Get the cross signing information for a given user.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     *
-     * @param userId - the user ID to get the cross-signing info for.
-     *
-     * @returns the cross signing information for the user.
-     */
-    public getStoredCrossSigningForUser(userId: string): null {
-        // TODO
-        return null;
-    }
-
-    /**
-     * This function is unneeded for the rust-crypto.
-     * The cross signing key import and the device verification are done in {@link CryptoApi#bootstrapCrossSigning}
-     *
-     * The function is stub to keep the compatibility with the old crypto.
-     * More information: https://github.com/vector-im/element-web/issues/25648
-     *
-     * Implementation of {@link CryptoBackend#checkOwnCrossSigningTrust}
-     */
-    public async checkOwnCrossSigningTrust(): Promise<void> {
-        return;
     }
 
     /**
