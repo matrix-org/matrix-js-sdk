@@ -65,3 +65,39 @@ export interface IUsageLimit {
     // eslint-disable-next-line camelcase
     admin_contact?: string;
 }
+
+/**
+ * A policy name & url in a specific internationalisation
+ * @see https://spec.matrix.org/v1.13/identity-service-api/#get_matrixidentityv2terms_response-200_internationalised-policy
+ */
+export interface InternationalisedPolicy {
+    name: string;
+    url: string;
+}
+
+/**
+ * A versioned policy with internationalised variants
+ * @see https://spec.matrix.org/v1.13/identity-service-api/#get_matrixidentityv2terms_response-200_policy-object
+ */
+export interface Policy {
+    /**
+     * The version for the policy.
+     * There are no requirements on what this might be and could be “alpha”, semantically versioned, or arbitrary.
+     */
+    version: string;
+    /**
+     * The policy information for the specified language.
+     * @remarks the type has to include a union with string due to limitations in the type system.
+     */
+    [lang: string]: InternationalisedPolicy | string;
+}
+
+/**
+ * Response from the Terms API for Identity servers
+ * @see https://spec.matrix.org/v1.13/identity-service-api/#get_matrixidentityv2terms
+ */
+export interface Terms {
+    policies: {
+        [policyName: string]: Policy;
+    };
+}
