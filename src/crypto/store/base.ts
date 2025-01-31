@@ -69,11 +69,17 @@ export interface CryptoStore {
 
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
+    storeAccount(txn: unknown, accountPickle: string): void;
     getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
+    ): void;
+    storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
     ): void;
 
     // Olm Sessions
@@ -89,6 +95,8 @@ export interface CryptoStore {
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void;
+
+    storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void;
 
     /**
      * Get a batch of end-to-end sessions from the database.
@@ -113,6 +121,12 @@ export interface CryptoStore {
         sessionId: string,
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
+    ): void;
+    storeEndToEndInboundGroupSession(
+        senderCurve25519Key: string,
+        sessionId: string,
+        sessionData: InboundGroupSessionData,
+        txn: unknown,
     ): void;
 
     /**
