@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { Logger } from "../../logger.ts";
-import { MatrixEvent } from "../../models/event.ts";
 import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
 import { ISignatures } from "../../@types/signed.ts";
@@ -196,12 +195,6 @@ export interface IDeviceData {
     syncToken?: string;
 }
 
-export interface IProblem {
-    type: string;
-    fixed: boolean;
-    time: number;
-}
-
 export interface IWithheld {
     // eslint-disable-next-line camelcase
     room_id: string;
@@ -235,15 +228,6 @@ export interface OutgoingRoomKeyRequest {
      * current state of this request
      */
     state: RoomKeyRequestState;
-}
-
-export interface ParkedSharedHistory {
-    senderId: string;
-    senderKey: string;
-    sessionId: string;
-    sessionKey: string;
-    keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
-    forwardingCurve25519KeyChain: string[];
 }
 
 /**
