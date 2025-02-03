@@ -21,7 +21,7 @@ import { Optional } from "matrix-events-sdk";
  * @param s - The optional to test.
  * @returns True if the value is defined.
  */
-export function isProvided<T>(s: Optional<T>): boolean {
+export function isProvided<T>(s: Optional<T>): s is T {
     return s !== null && s !== undefined;
 }
 

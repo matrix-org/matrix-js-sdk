@@ -90,7 +90,7 @@ export interface RoomNameEventContent {
 }
 
 export interface RoomTopicEventContent {
-    topic: string;
+    topic: string | undefined | null;
 }
 
 export interface RoomAvatarEventContent {

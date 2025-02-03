@@ -185,27 +185,31 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 /**
  * Topic event helpers
  */
-export type MakeTopicContent = (topic: string, htmlTopic?: string) => MRoomTopicEventContent;
+export type MakeTopicContent = (topic: string | null | undefined, htmlTopic?: string) => MRoomTopicEventContent;
 
 export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
-    const renderings = [{ body: topic, mimetype: "text/plain" }];
+    const renderings = [];
+    if (isProvided(topic)) {
+        renderings.push({ body: topic, mimetype: "text/plain" });
+    }
     if (isProvided(htmlTopic)) {
-        renderings.push({ body: htmlTopic!, mimetype: "text/html" });
+        renderings.push({ body: htmlTopic, mimetype: "text/html" });
     }
     return { topic, [M_TOPIC.name]: renderings };
 };
 
 export type TopicState = {
-    text: string;
+    text?: string;
     html?: string;
 };
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
     const mtopic = M_TOPIC.findIn<MTopicContent>(content);
     if (!Array.isArray(mtopic)) {
-        return { text: content.topic };
+        return { text: content.topic ?? undefined };
     }
-    const text = mtopic?.find((r) => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
+    const text =
+        mtopic?.find((r) => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic ?? undefined;
     const html = mtopic?.find((r) => r.mimetype === "text/html")?.body;
     return { text, html };
 };

@@ -157,6 +157,7 @@ import {
     IdServerUnbindResult,
     JoinRule,
     Preset,
+    Terms,
     Visibility,
 } from "./@types/partials.ts";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
@@ -4491,11 +4492,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * @param roomId - The room to update the topic in.
+     * @param topic - The plaintext topic. May be empty to remove the topic.
      * @param htmlTopic - Optional.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public setRoomTopic(roomId: string, topic: string, htmlTopic?: string): Promise<ISendEventResponse> {
+    public setRoomTopic(roomId: string, topic?: string, htmlTopic?: string): Promise<ISendEventResponse> {
         const content = ContentHelpers.makeTopicContent(topic, htmlTopic);
         return this.sendStateEvent(roomId, EventType.RoomTopic, content);
     }
@@ -10035,8 +10038,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, path, params);
     }
 
-    public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<any> {
-        // TODO: Types
+    public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<Terms> {
         const url = this.termsUrlForService(serviceType, baseUrl);
         return this.http.requestOtherUrl(Method.Get, url);
     }
