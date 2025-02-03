@@ -303,7 +303,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         const trustInfo = await this.isKeyBackupTrusted(backupInfo);
 
-        if (!trustInfo.trusted) {
+        if (!trustInfo.matchesDecryptionKey && !trustInfo.trusted) {
             if (activeVersion !== null) {
                 logger.log("Key backup present on server but not trusted: disabling key backup");
                 await this.disableKeyBackup();
