@@ -4490,11 +4490,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * @param roomId - The room to update the topic in.
+     * @param topic - The plaintext topic. May be empty to remove the topic.
      * @param htmlTopic - Optional.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public setRoomTopic(roomId: string, topic: string, htmlTopic?: string): Promise<ISendEventResponse> {
+    public setRoomTopic(roomId: string, topic?: string, htmlTopic?: string): Promise<ISendEventResponse> {
         const content = ContentHelpers.makeTopicContent(topic, htmlTopic);
         return this.sendStateEvent(roomId, EventType.RoomTopic, content);
     }
