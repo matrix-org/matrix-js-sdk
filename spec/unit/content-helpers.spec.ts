@@ -268,5 +268,26 @@ describe("Topic content helpers", () => {
                 html: "<b>pizza</b>",
             });
         });
+
+        it("parses legacy event content", () => {
+            expect(
+                parseTopicContent({
+                    topic: "pizza",
+                }),
+            ).toEqual({
+                text: "pizza",
+            });
+        });
+
+        it("uses legacy event content when new topic key is invalid", () => {
+            expect(
+                parseTopicContent({
+                    "topic": "pizza",
+                    "m.topic": {} as any,
+                }),
+            ).toEqual({
+                text: "pizza",
+            });
+        });
     });
 });
