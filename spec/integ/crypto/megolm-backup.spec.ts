@@ -114,8 +114,6 @@ function mockUploadEmitter(
 }
 
 describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
-    const isNewBackend = backend === "rust-sdk";
-
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
     let syncResponder: SyncResponder;
@@ -242,11 +240,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
             // On the first decryption attempt, decryption fails.
             await awaitDecryption(event);
-            expect(event.decryptionFailureReason).toEqual(
-                isNewBackend
-                    ? DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP
-                    : DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
-            );
+            expect(event.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP);
 
             // Eventually, decryption succeeds.
             await awaitDecryption(event, { waitOnDecryptionFailure: true });
@@ -378,13 +372,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
 
         it("Should import full backup in chunks", async function () {
             const importMockImpl = jest.fn();
-            if (isNewBackend) {
-                // @ts-ignore - mock a private method for testing purpose
-                jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
-            } else {
-                // @ts-ignore - mock a private method for testing purpose
-                jest.spyOn(aliceCrypto, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
-            }
+            // @ts-ignore - mock a private method for testing purpose
+            jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
 
             // We need several rooms with several sessions to test chunking
             const { response, expectedTotal } = createBackupDownloadResponse([45, 300, 345, 12, 130]);
@@ -444,13 +433,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
                 // Ok for other chunks
                 .mockResolvedValue(undefined);
 
-            if (isNewBackend) {
-                // @ts-ignore - mock a private method for testing purpose
-                jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
-            } else {
-                // @ts-ignore - mock a private method for testing purpose
-                jest.spyOn(aliceCrypto, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
-            }
+            // @ts-ignore - mock a private method for testing purpose
+            jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
 
             const { response, expectedTotal } = createBackupDownloadResponse([100, 300]);
 

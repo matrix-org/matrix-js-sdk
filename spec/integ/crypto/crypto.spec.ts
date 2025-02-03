@@ -1347,19 +1347,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             // now check getEncryptionInfoForEvent again
             const encInfo2 = await aliceClient.getCrypto()!.getEncryptionInfoForEvent(lastEvent);
-            let expectedEncryptionInfo;
-            if (backend === "rust-sdk") {
-                // rust crypto does not trust its own device until it is cross-signed.
-                expectedEncryptionInfo = {
-                    shieldColour: EventShieldColour.RED,
-                    shieldReason: EventShieldReason.UNSIGNED_DEVICE,
-                };
-            } else {
-                expectedEncryptionInfo = {
-                    shieldColour: EventShieldColour.NONE,
-                    shieldReason: null,
-                };
-            }
+            // rust crypto does not trust its own device until it is cross-signed.
+            const expectedEncryptionInfo = {
+                shieldColour: EventShieldColour.RED,
+                shieldReason: EventShieldReason.UNSIGNED_DEVICE,
+            };
             expect(encInfo2).toEqual(expectedEncryptionInfo);
         });
     });

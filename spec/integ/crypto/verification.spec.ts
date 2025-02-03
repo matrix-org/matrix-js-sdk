@@ -989,15 +989,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // Rust crypto requires the sender's device keys before it accepts a
             // verification request.
-            if (backend === "rust-sdk") {
-                const crypto = aliceClient.getCrypto()!;
+            const crypto = aliceClient.getCrypto()!;
 
-                const bobDeviceKeys = getTestOlmAccountKeys(testOlmAccount, BOB_TEST_USER_ID, "BobDevice");
-                e2eKeyResponder.addDeviceKeys(bobDeviceKeys);
-                syncResponder.sendOrQueueSyncResponse({ device_lists: { changed: [BOB_TEST_USER_ID] } });
-                await syncPromise(aliceClient);
-                await crypto.getUserDeviceInfo([BOB_TEST_USER_ID]);
-            }
+            const bobDeviceKeys = getTestOlmAccountKeys(testOlmAccount, BOB_TEST_USER_ID, "BobDevice");
+            e2eKeyResponder.addDeviceKeys(bobDeviceKeys);
+            syncResponder.sendOrQueueSyncResponse({ device_lists: { changed: [BOB_TEST_USER_ID] } });
+            await syncPromise(aliceClient);
+            await crypto.getUserDeviceInfo([BOB_TEST_USER_ID]);
         });
 
         /**
