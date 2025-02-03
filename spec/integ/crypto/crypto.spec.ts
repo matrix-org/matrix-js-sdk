@@ -58,10 +58,7 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
-    MsgType,
     PendingEventOrdering,
-    RoomMember,
-    RoomStateEvent,
 } from "../../../src/matrix";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
@@ -218,10 +215,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         logger.warn("not running megolm tests: Olm not present");
         return;
     }
-
-    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
-    // Rust backend. Once we have full support in the rust sdk, it will go away.
-    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
 
     const Olm = globalThis.Olm;
 
@@ -1273,97 +1266,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         expect(decryptedEvent.getClearContent()).toBeUndefined();
     });
 
-    oldBackendOnly("allows sending an encrypted event as soon as room state arrives", async () => {
-        /* Empirically, clients expect to be able to send encrypted events as soon as the
-         * RoomStateEvent.NewMember notification is emitted, so test that works correctly.
-         */
-        const testRoomId = "!testRoom:id";
-        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await startClientAndAwaitFirstSync();
-
-        /* Alice makes the /createRoom call */
-        fetchMock.postOnce(new RegExp("/createRoom"), { room_id: testRoomId });
-        await aliceClient.createRoom({
-            initial_state: [
-                {
-                    type: "m.room.encryption",
-                    state_key: "",
-                    content: { algorithm: "m.megolm.v1.aes-sha2" },
-                },
-            ],
-        });
-
-        /* The sync arrives in two parts; first the m.room.create... */
-        syncResponder.sendOrQueueSyncResponse({
-            rooms: {
-                join: {
-                    [testRoomId]: {
-                        timeline: {
-                            events: [
-                                {
-                                    type: "m.room.create",
-                                    state_key: "",
-                                    event_id: "$create",
-                                },
-                                {
-                                    type: "m.room.member",
-                                    state_key: aliceClient.getUserId(),
-                                    content: { membership: KnownMembership.Join },
-                                    event_id: "$alijoin",
-                                },
-                            ],
-                        },
-                    },
-                },
-            },
-        });
-        await syncPromise(aliceClient);
-
-        // ... and then the e2e event and an invite ...
-        syncResponder.sendOrQueueSyncResponse({
-            rooms: {
-                join: {
-                    [testRoomId]: {
-                        timeline: {
-                            events: [
-                                {
-                                    type: "m.room.encryption",
-                                    state_key: "",
-                                    content: { algorithm: "m.megolm.v1.aes-sha2" },
-                                    event_id: "$e2e",
-                                },
-                                {
-                                    type: "m.room.member",
-                                    state_key: "@other:user",
-                                    content: { membership: KnownMembership.Invite },
-                                    event_id: "$otherinvite",
-                                },
-                            ],
-                        },
-                    },
-                },
-            },
-        });
-
-        // as soon as the roomMember arrives, try to send a message
-        expectAliceKeyQuery({ device_keys: { "@other:user": {} }, failures: {} });
-        aliceClient.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
-            if (member.userId == "@other:user") {
-                aliceClient.sendMessage(testRoomId, { msgtype: MsgType.Text, body: "Hello, World" });
-            }
-        });
-
-        // flush the sync and wait for the /send/ request.
-        const sendEventPromise = new Promise((resolve) => {
-            fetchMock.putOnce(new RegExp("/send/m.room.encrypted/"), () => {
-                resolve(undefined);
-                return { event_id: "asdfgh" };
-            });
-        });
-        await syncPromise(aliceClient);
-        await sendEventPromise;
-    });
-
     describe("getEncryptionInfoForEvent", () => {
         it("handles outgoing events", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -1614,74 +1516,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 });
             },
         );
-
-        oldBackendOnly("does not block decryption on an 'm.unavailable' report", async function () {
-            // there may be a key downloads for alice
-            expectAliceKeyQuery({ device_keys: {}, failures: {} });
-
-            await startClientAndAwaitFirstSync();
-
-            // encrypt a message with a group session.
-            const groupSession = new Olm.OutboundGroupSession();
-            groupSession.create();
-            const messageEncryptedEvent = encryptMegolmEvent({
-                senderKey: testSenderKey,
-                groupSession: groupSession,
-                room_id: ROOM_ID,
-            });
-
-            // Alice gets the room message, but not the key
-            syncResponder.sendOrQueueSyncResponse({
-                next_batch: 1,
-                rooms: {
-                    join: { [ROOM_ID]: { timeline: { events: [messageEncryptedEvent] } } },
-                },
-            });
-            await syncPromise(aliceClient);
-
-            // alice will (eventually) send a room-key request
-            fetchMock.putOnce(new RegExp("/sendToDevice/m.room_key_request/"), {});
-
-            // at this point, the message should be a decryption failure
-            const room = aliceClient.getRoom(ROOM_ID)!;
-            const event = room.getLiveTimeline().getEvents()[0];
-            expect(event.isDecryptionFailure()).toBeTruthy();
-
-            // we want to wait for the message to be updated, so create a promise for it
-            const retryPromise = new Promise((resolve) => {
-                event.once(MatrixEventEvent.Decrypted, (ev) => {
-                    resolve(ev);
-                });
-            });
-
-            // alice gets back a room-key-withheld notification
-            syncResponder.sendOrQueueSyncResponse({
-                next_batch: 2,
-                to_device: {
-                    events: [
-                        {
-                            type: "m.room_key.withheld",
-                            sender: "@bob:example.com",
-                            content: {
-                                algorithm: "m.megolm.v1.aes-sha2",
-                                room_id: ROOM_ID,
-                                session_id: groupSession.session_id(),
-                                sender_key: testSenderKey,
-                                code: "m.unavailable",
-                                reason: "",
-                            },
-                        },
-                    ],
-                },
-            });
-            await syncPromise(aliceClient);
-
-            // the withheld notification should trigger a retry; wait for it
-            await retryPromise;
-
-            // finally: the message should still be a regular decryption failure, not a withheld notification.
-            expect(event.getContent().body).not.toContain("withheld");
-        });
     });
 
     describe("key upload request", () => {
