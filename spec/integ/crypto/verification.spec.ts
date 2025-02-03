@@ -118,10 +118,6 @@ const TEST_HOMESERVER_URL = "https://alice-server.com";
  */
 // we test with both crypto stacks...
 describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
-    // backend. Once we drop support for legacy crypto, it will go away.
-    const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
-
     /** the client under test */
     let aliceClient: MatrixClient;
 
@@ -568,7 +564,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(qrCodeBuffer).toBeUndefined();
         });
 
-        newBackendOnly("can verify another by scanning their QR code", async () => {
+        it("can verify another by scanning their QR code", async () => {
             aliceClient = await startTestClient();
             // we need cross-signing keys for a QR code verification
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
@@ -1149,43 +1145,40 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request?.otherUserId).toBe("@bob:xyz");
         });
 
-        newBackendOnly(
-            "If the verification request is not decrypted within 5 minutes, the request is ignored",
-            async () => {
-                const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
-                const groupSession = new Olm.OutboundGroupSession();
-                groupSession.create();
+        it("If the verification request is not decrypted within 5 minutes, the request is ignored", async () => {
+            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
 
-                // make the room_key event, but don't send it yet
-                const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
+            // make the room_key event, but don't send it yet
+            const toDeviceEvent = encryptGroupSessionKeyForAlice(groupSession, p2pSession);
 
-                // Add verification request from Bob to Alice in the DM between them
-                returnRoomMessageFromSync(TEST_ROOM_ID, createEncryptedVerificationRequest(groupSession));
+            // Add verification request from Bob to Alice in the DM between them
+            returnRoomMessageFromSync(TEST_ROOM_ID, createEncryptedVerificationRequest(groupSession));
 
-                // Wait for the sync response to be processed
-                await syncPromise(aliceClient);
+            // Wait for the sync response to be processed
+            await syncPromise(aliceClient);
 
-                const room = aliceClient.getRoom(TEST_ROOM_ID)!;
-                const matrixEvent = room.getLiveTimeline().getEvents()[0];
+            const room = aliceClient.getRoom(TEST_ROOM_ID)!;
+            const matrixEvent = room.getLiveTimeline().getEvents()[0];
 
-                // wait for a first attempt at decryption: should fail
-                await awaitDecryption(matrixEvent);
-                expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
+            // wait for a first attempt at decryption: should fail
+            await awaitDecryption(matrixEvent);
+            expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
 
-                // Advance time by 5mins, the verification request should be ignored after that
-                jest.advanceTimersByTime(5 * 60 * 1000);
+            // Advance time by 5mins, the verification request should be ignored after that
+            jest.advanceTimersByTime(5 * 60 * 1000);
 
-                // Send Bob the room keys
-                returnToDeviceMessageFromSync(toDeviceEvent);
+            // Send Bob the room keys
+            returnToDeviceMessageFromSync(toDeviceEvent);
 
-                // Wait for the message to be decrypted
-                await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
+            // Wait for the message to be decrypted
+            await awaitDecryption(matrixEvent, { waitOnDecryptionFailure: true });
 
-                const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
-                // the request should not be present
-                expect(request).not.toBeDefined();
-            },
-        );
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+            // the request should not be present
+            expect(request).not.toBeDefined();
+        });
     });
 
     describe("Secrets are gossiped after verification", () => {
@@ -1257,7 +1250,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             fetchMock.mockReset();
         });
 
-        newBackendOnly("Should request cross signing keys after verification", async () => {
+        it("Should request cross signing keys after verification", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
@@ -1268,7 +1261,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await requestPromises.get("m.cross_signing.self_signing");
         });
 
-        newBackendOnly("Should accept the backup decryption key gossip if valid", async () => {
+        it("Should accept the backup decryption key gossip if valid", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
@@ -1287,7 +1280,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(encodeBase64(cachedKey!)).toEqual(BACKUP_DECRYPTION_KEY_BASE64);
         });
 
-        newBackendOnly("Should not accept the backup decryption key gossip if private key do not match", async () => {
+        it("Should not accept the backup decryption key gossip if private key do not match", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
@@ -1308,7 +1301,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(cachedKey).toBeNull();
         });
 
-        newBackendOnly("Should not accept the backup decryption key gossip if backup not trusted", async () => {
+        it("Should not accept the backup decryption key gossip if backup not trusted", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
@@ -1332,7 +1325,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(cachedKey).toBeNull();
         });
 
-        newBackendOnly("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
+        it("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
@@ -1357,7 +1350,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(cachedKey).toBeNull();
         });
 
-        newBackendOnly("Should not accept an invalid backup decryption key", async () => {
+        it("Should not accept an invalid backup decryption key", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();

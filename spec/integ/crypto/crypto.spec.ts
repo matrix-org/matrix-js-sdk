@@ -222,7 +222,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
     // Rust backend. Once we have full support in the rust sdk, it will go away.
     const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
-    const newBackendOnly = backend !== "rust-sdk" ? test.skip : test;
 
     const Olm = globalThis.Olm;
 
@@ -548,7 +547,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 return await awaitDecryption;
             }
 
-            newBackendOnly("fails with HISTORICAL_MESSAGE_BACKUP_NO_BACKUP when there is no backup", async () => {
+            it("fails with HISTORICAL_MESSAGE_BACKUP_NO_BACKUP when there is no backup", async () => {
                 fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
                     status: 404,
                     body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
@@ -560,7 +559,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
             });
 
-            newBackendOnly("fails with HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED when the backup is broken", async () => {
+            it("fails with HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED when the backup is broken", async () => {
                 fetchMock.get("path:/_matrix/client/v3/room_keys/version", {});
                 expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
                 await startClientAndAwaitFirstSync();
@@ -571,7 +570,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 );
             });
 
-            newBackendOnly("fails with HISTORICAL_MESSAGE_WORKING_BACKUP when backup is working", async () => {
+            it("fails with HISTORICAL_MESSAGE_WORKING_BACKUP when backup is working", async () => {
                 // The test backup data is signed by a dummy device. We'll need to tell Alice about the device, and
                 // later, tell her to trust it, so that she trusts the backup.
                 const e2eResponder = new E2EKeyResponder(aliceClient.getHomeserverUrl());
@@ -604,7 +603,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_WORKING_BACKUP);
             });
 
-            newBackendOnly("fails with NOT_JOINED if user is not member of room", async () => {
+            it("fails with NOT_JOINED if user is not member of room", async () => {
                 fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
                     status: 404,
                     body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
@@ -620,148 +619,125 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
             });
 
-            newBackendOnly(
-                "fails with NOT_JOINED if user is not member of room (MSC4115 unstable prefix)",
-                async () => {
-                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                        status: 404,
-                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
-                    });
-                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-                    await startClientAndAwaitFirstSync();
+            it("fails with NOT_JOINED if user is not member of room (MSC4115 unstable prefix)", async () => {
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
 
-                    const ev = await sendEventAndAwaitDecryption({
-                        unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "leave",
-                        },
-                    });
-                    expect(ev.decryptionFailureReason).toEqual(
-                        DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED,
-                    );
-                },
-            );
+                const ev = await sendEventAndAwaitDecryption({
+                    unsigned: {
+                        [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "leave",
+                    },
+                });
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
+            });
 
-            newBackendOnly(
-                "fails with another error when the server reports user was a member of the room",
-                async () => {
-                    // This tests that when the server reports that the user
-                    // was invited at the time the event was sent, then we
-                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
-                    // and instead get some other error, since the user should
-                    // have gotten the key for the event.
-                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                        status: 404,
-                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
-                    });
-                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-                    await startClientAndAwaitFirstSync();
+            it("fails with another error when the server reports user was a member of the room", async () => {
+                // This tests that when the server reports that the user
+                // was invited at the time the event was sent, then we
+                // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
+                // and instead get some other error, since the user should
+                // have gotten the key for the event.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
 
-                    const ev = await sendEventAndAwaitDecryption({
-                        unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.name]: "invite",
-                        },
-                    });
-                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
-                },
-            );
+                const ev = await sendEventAndAwaitDecryption({
+                    unsigned: {
+                        [UNSIGNED_MEMBERSHIP_FIELD.name]: "invite",
+                    },
+                });
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+            });
 
-            newBackendOnly(
-                "fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)",
-                async () => {
-                    // This tests that when the server reports that the user
-                    // was invited at the time the event was sent, then we
-                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
-                    // and instead get some other error, since the user should
-                    // have gotten the key for the event.
-                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                        status: 404,
-                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
-                    });
-                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-                    await startClientAndAwaitFirstSync();
+            it("fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)", async () => {
+                // This tests that when the server reports that the user
+                // was invited at the time the event was sent, then we
+                // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
+                // and instead get some other error, since the user should
+                // have gotten the key for the event.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
 
-                    const ev = await sendEventAndAwaitDecryption({
-                        unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "invite",
-                        },
-                    });
-                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
-                },
-            );
+                const ev = await sendEventAndAwaitDecryption({
+                    unsigned: {
+                        [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "invite",
+                    },
+                });
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+            });
 
-            newBackendOnly(
-                "fails with another error when the server reports user was a member of the room",
-                async () => {
-                    // This tests that when the server reports the user's
-                    // membership, and reports that the user was joined, then we
-                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
-                    // instead get some other error.
-                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                        status: 404,
-                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
-                    });
-                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-                    await startClientAndAwaitFirstSync();
+            it("fails with another error when the server reports user was a member of the room", async () => {
+                // This tests that when the server reports the user's
+                // membership, and reports that the user was joined, then we
+                // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
+                // instead get some other error.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
 
-                    const ev = await sendEventAndAwaitDecryption({
-                        unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.name]: "join",
-                        },
-                    });
-                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
-                },
-            );
+                const ev = await sendEventAndAwaitDecryption({
+                    unsigned: {
+                        [UNSIGNED_MEMBERSHIP_FIELD.name]: "join",
+                    },
+                });
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+            });
 
-            newBackendOnly(
-                "fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)",
-                async () => {
-                    // This tests that when the server reports the user's
-                    // membership, and reports that the user was joined, then we
-                    // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
-                    // instead get some other error.
-                    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                        status: 404,
-                        body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
-                    });
-                    expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-                    await startClientAndAwaitFirstSync();
+            it("fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)", async () => {
+                // This tests that when the server reports the user's
+                // membership, and reports that the user was joined, then we
+                // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error, and
+                // instead get some other error.
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    status: 404,
+                    body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+                });
+                expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+                await startClientAndAwaitFirstSync();
 
-                    const ev = await sendEventAndAwaitDecryption({
-                        unsigned: {
-                            [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "join",
-                        },
-                    });
-                    expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
-                },
-            );
+                const ev = await sendEventAndAwaitDecryption({
+                    unsigned: {
+                        [UNSIGNED_MEMBERSHIP_FIELD.altName!]: "join",
+                    },
+                });
+                expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
+            });
         });
 
         describe("IsolationMode decryption tests", () => {
-            newBackendOnly(
-                "OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed",
-                async () => {
-                    const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
+            it("OnlySigned mode - fails with an error when cross-signed sender is required but sender is not cross-signed", async () => {
+                const decryptedEvent = await setUpTestAndDecrypt(new OnlySignedDevicesIsolationMode());
 
-                    // It will error as an unknown device because we haven't fetched
-                    // the sender's device keys.
-                    expect(decryptedEvent.isDecryptionFailure()).toBe(true);
-                    expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
-                },
-            );
+                // It will error as an unknown device because we haven't fetched
+                // the sender's device keys.
+                expect(decryptedEvent.isDecryptionFailure()).toBe(true);
+                expect(decryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_SENDER_DEVICE);
+            });
 
-            newBackendOnly(
-                "NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed",
-                async () => {
-                    const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
+            it("NoIsolation mode - Decrypts with warning when cross-signed sender is required but sender is not cross-signed", async () => {
+                const decryptedEvent = await setUpTestAndDecrypt(new AllDevicesIsolationMode(false));
 
-                    expect(decryptedEvent.isDecryptionFailure()).toBe(false);
+                expect(decryptedEvent.isDecryptionFailure()).toBe(false);
 
-                    expect(await aliceClient.getCrypto()!.getEncryptionInfoForEvent(decryptedEvent)).toEqual({
-                        shieldColour: EventShieldColour.RED,
-                        shieldReason: EventShieldReason.UNKNOWN_DEVICE,
-                    });
-                },
-            );
+                expect(await aliceClient.getCrypto()!.getEncryptionInfoForEvent(decryptedEvent)).toEqual({
+                    shieldColour: EventShieldColour.RED,
+                    shieldReason: EventShieldReason.UNKNOWN_DEVICE,
+                });
+            });
 
             async function setUpTestAndDecrypt(isolationMode: DeviceIsolationMode): Promise<MatrixEvent> {
                 // This tests that a message will not be decrypted if the sender
@@ -1086,7 +1062,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             return encryptedMessage;
         }
 
-        newBackendOnly("should rotate the session after 2 messages", async () => {
+        it("should rotate the session after 2 messages", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
@@ -1133,7 +1109,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(thirdSessionId).not.toBe(sessionId);
         });
 
-        newBackendOnly("should rotate the session after 1h", async () => {
+        it("should rotate the session after 1h", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
@@ -1186,7 +1162,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
     });
 
-    newBackendOnly("should rotate the session when the history visibility changes", async () => {
+    it("should rotate the session when the history visibility changes", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
@@ -2102,16 +2078,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         describe("bootstrapSecretStorage", () => {
             // Doesn't work with legacy crypto, which will try to bootstrap even without private key, which is buggy.
-            newBackendOnly(
-                "should throw an error if we are unable to create a key because createSecretStorageKey is not set",
-                async () => {
-                    await expect(
-                        aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true }),
-                    ).rejects.toThrow("unable to create a new secret storage key, createSecretStorageKey is not set");
+            it("should throw an error if we are unable to create a key because createSecretStorageKey is not set", async () => {
+                await expect(
+                    aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true }),
+                ).rejects.toThrow("unable to create a new secret storage key, createSecretStorageKey is not set");
 
-                    expect(await aliceClient.getCrypto()!.isSecretStorageReady()).toStrictEqual(false);
-                },
-            );
+                expect(await aliceClient.getCrypto()!.isSecretStorageReady()).toStrictEqual(false);
+            });
 
             it("Should create a 4S key", async () => {
                 accountDataAccumulator.interceptGetAccountData();
@@ -2257,7 +2230,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
             });
 
-            newBackendOnly("should upload existing megolm backup key to a new 4S store", async () => {
+            it("should upload existing megolm backup key to a new 4S store", async () => {
                 const backupKeyTo4SPromise = awaitMegolmBackupKeyUpload();
 
                 // we need these to set up the mocks but we don't actually care whether they
@@ -2476,7 +2449,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(verificationStatus.needsUserApproval).toBe(false);
         });
 
-        newBackendOnly("An unverified user changes identity", async () => {
+        it("An unverified user changes identity", async () => {
             // We have to be tracking Bob's keys, which means we need to share a room with him
             syncResponder.sendOrQueueSyncResponse({
                 ...getSyncResponse([BOB_TEST_USER_ID]),

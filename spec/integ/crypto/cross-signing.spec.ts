@@ -56,10 +56,6 @@ const TEST_DEVICE_ID = "xzcvb";
  * to provide the most effective integration tests possible.
  */
 describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
-    // backend. Once we drop support for legacy crypto, it will go away.
-    const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
-
     let aliceClient: MatrixClient;
 
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
@@ -163,7 +159,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             );
         });
 
-        newBackendOnly("get cross signing keys from secret storage and import them", async () => {
+        it("get cross signing keys from secret storage and import them", async () => {
             // Return public cross signing keys
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
@@ -264,7 +260,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(calls.length).toEqual(0);
         });
 
-        newBackendOnly("will upload existing cross-signing keys to an established secret storage", async () => {
+        it("will upload existing cross-signing keys to an established secret storage", async () => {
             // This rather obscure codepath covers the case that:
             //   - 4S is set up and working
             //   - our device has private cross-signing keys, but has not published them to 4S
