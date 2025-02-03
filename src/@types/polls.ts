@@ -22,6 +22,7 @@ import {
     RelatesToRelationship,
     TSNamespace,
 } from "./extensible_events.ts";
+import { EmptyObject } from "./common.ts";
 
 /**
  * Identifier for a disclosed poll.
@@ -109,7 +110,7 @@ export const M_POLL_END = new UnstableValue("m.poll.end", "org.matrix.msc3381.po
 /**
  * The event definition for an m.poll.end event (in content)
  */
-export type PollEndEvent = EitherAnd<{ [M_POLL_END.name]: {} }, { [M_POLL_END.altName]: {} }>;
+export type PollEndEvent = EitherAnd<{ [M_POLL_END.name]: EmptyObject }, { [M_POLL_END.altName]: EmptyObject }>;
 
 /**
  * The content for an m.poll.end event

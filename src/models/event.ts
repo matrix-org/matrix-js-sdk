@@ -49,6 +49,7 @@ import { EventTimeline } from "./event-timeline.ts";
 import { Membership } from "../@types/membership.ts";
 import { DecryptionFailureCode } from "../crypto-api/index.ts";
 import { RoomState } from "./room-state.ts";
+import { EmptyObject } from "../@types/common.ts";
 
 export { EventStatus } from "./event-status.ts";
 
@@ -1376,7 +1377,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @returns The redaction event JSON, or an empty object
      */
-    public getRedactionEvent(): IEvent | {} | null {
+    public getRedactionEvent(): IEvent | EmptyObject | null {
         if (!this.isRedacted()) return null;
 
         if (this.clearEvent?.unsigned) {

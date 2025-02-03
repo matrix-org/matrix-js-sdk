@@ -38,7 +38,7 @@ import {
 import { IGroupCallRoomMemberState, IGroupCallRoomState } from "../webrtc/groupCall.ts";
 import { MSC3089EventContent } from "../models/MSC3089Branch.ts";
 import { M_BEACON, M_BEACON_INFO, MBeaconEventContent, MBeaconInfoEventContent } from "./beacon.ts";
-import { XOR } from "./common.ts";
+import { EmptyObject } from "./common.ts";
 import { ReactionEventContent, RoomMessageEventContent, StickerEventContent } from "./events.ts";
 import {
     MCallAnswer,
@@ -337,7 +337,7 @@ export interface StateEvents {
     [EventType.RoomJoinRules]: RoomJoinRulesEventContent;
     [EventType.RoomMember]: RoomMemberEventContent;
     // XXX: Spec says this event has 3 required fields but kicking such an invitation requires sending `{}`
-    [EventType.RoomThirdPartyInvite]: XOR<RoomThirdPartyInviteEventContent, {}>;
+    [EventType.RoomThirdPartyInvite]: RoomThirdPartyInviteEventContent | EmptyObject;
     [EventType.RoomPowerLevels]: RoomPowerLevelsEventContent;
     [EventType.RoomName]: RoomNameEventContent;
     [EventType.RoomTopic]: RoomTopicEventContent;
@@ -351,13 +351,13 @@ export interface StateEvents {
     [EventType.SpaceChild]: SpaceChildEventContent;
     [EventType.SpaceParent]: SpaceParentEventContent;
 
-    [EventType.PolicyRuleUser]: XOR<PolicyRuleEventContent, {}>;
-    [EventType.PolicyRuleRoom]: XOR<PolicyRuleEventContent, {}>;
-    [EventType.PolicyRuleServer]: XOR<PolicyRuleEventContent, {}>;
+    [EventType.PolicyRuleUser]: PolicyRuleEventContent | EmptyObject;
+    [EventType.PolicyRuleRoom]: PolicyRuleEventContent | EmptyObject;
+    [EventType.PolicyRuleServer]: PolicyRuleEventContent | EmptyObject;
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: XOR<IGroupCallRoomMemberState, XOR<SessionMembershipData, {}>>;
+    [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
 
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
@@ -372,7 +372,7 @@ export interface StateEvents {
 export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [EventType.PushRules]: IPushRules;
     [EventType.Direct]: { [userId: string]: string[] };
-    [EventType.IgnoredUserList]: { [userId: string]: {} };
+    [EventType.IgnoredUserList]: { ignored_users: { [userId: string]: EmptyObject } };
     "m.secret_storage.default_key": { key: string };
     // Flag set by the rust SDK (Element X) and also used by us to mark that the user opted out of backup
     // (I don't know why it's m.org.matrix...)
