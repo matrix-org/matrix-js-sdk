@@ -635,7 +635,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_USER_NOT_JOINED);
             });
 
-            it("fails with another error when the server reports user was a member of the room", async () => {
+            it("fails with another error when the server reports user was invited in the room", async () => {
                 // This tests that when the server reports that the user
                 // was invited at the time the event was sent, then we
                 // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
@@ -656,7 +656,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 expect(ev.decryptionFailureReason).toEqual(DecryptionFailureCode.HISTORICAL_MESSAGE_NO_KEY_BACKUP);
             });
 
-            it("fails with another error when the server reports user was a member of the room (MSC4115 unstable prefix)", async () => {
+            it("fails with another error when the server reports user was invited in the room (MSC4115 unstable prefix)", async () => {
                 // This tests that when the server reports that the user
                 // was invited at the time the event was sent, then we
                 // don't get a HISTORICAL_MESSAGE_USER_NOT_JOINED error,
