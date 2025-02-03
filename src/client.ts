@@ -157,6 +157,7 @@ import {
     IdServerUnbindResult,
     JoinRule,
     Preset,
+    Terms,
     Visibility,
 } from "./@types/partials.ts";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
@@ -10036,8 +10037,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, path, params);
     }
 
-    public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<any> {
-        // TODO: Types
+    public getTerms(serviceType: SERVICE_TYPES, baseUrl: string): Promise<Terms> {
         const url = this.termsUrlForService(serviceType, baseUrl);
         return this.http.requestOtherUrl(Method.Get, url);
     }
