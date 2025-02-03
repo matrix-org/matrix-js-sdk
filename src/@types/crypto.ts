@@ -30,7 +30,7 @@ interface Extensible {
 
 /* eslint-disable camelcase */
 
-/** The result of a call to {@link CryptoApi.exportRoomKeys} */
+/** The result of a call to CryptoApi.exportRoomKeys */
 export interface IMegolmSessionData extends Extensible {
     /** Sender's Curve25519 device key */
     sender_key: string;
