@@ -19,41 +19,41 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, Optional, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, type Optional, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
-import { emitPromise, IMessageOpts } from "../test-utils/test-utils";
+import { emitPromise, type IMessageOpts } from "../test-utils/test-utils";
 import {
     Direction,
     DuplicateStrategy,
     EventStatus,
-    EventTimelineSet,
+    type EventTimelineSet,
     EventType,
     Filter,
     FILTER_RELATED_BY_REL_TYPES,
     FILTER_RELATED_BY_SENDERS,
-    IContent,
-    IEvent,
-    IRelationsRequestOpts,
-    IStateEventWithRoomId,
+    type IContent,
+    type IEvent,
+    type IRelationsRequestOpts,
+    type IStateEventWithRoomId,
     JoinRule,
-    MatrixClient,
+    type MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
     PollEvent,
     RelationType,
     RoomEvent,
-    RoomMember,
+    type RoomMember,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { NotificationCountType, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
-import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
+import { ReceiptType, type WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
-import { Crypto } from "../../src/crypto";
+import { type Crypto } from "../../src/crypto";
 import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";

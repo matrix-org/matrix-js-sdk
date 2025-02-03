@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeBase64, EventType, MatrixClient, MatrixError, MatrixEvent, Room } from "../../../src";
+import { encodeBase64, EventType, MatrixClient, MatrixError, type MatrixEvent, type Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import { DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
-import { EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
+import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";

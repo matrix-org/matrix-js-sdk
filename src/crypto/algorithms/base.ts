@@ -19,14 +19,19 @@ limitations under the License.
  */
 
 import type { IMegolmSessionData } from "../../@types/crypto.ts";
-import { MatrixClient } from "../../client.ts";
-import { Room } from "../../models/room.ts";
-import { OlmDevice } from "../OlmDevice.ts";
-import { IContent, MatrixEvent, RoomMember } from "../../matrix.ts";
-import { Crypto, IEncryptedContent, IEventDecryptionResult, IncomingRoomKeyRequest } from "../index.ts";
-import { DeviceInfo } from "../deviceinfo.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { DeviceInfoMap } from "../DeviceList.ts";
+import { type MatrixClient } from "../../client.ts";
+import { type Room } from "../../models/room.ts";
+import { type OlmDevice } from "../OlmDevice.ts";
+import { type IContent, type MatrixEvent, type RoomMember } from "../../matrix.ts";
+import {
+    type Crypto,
+    type IEncryptedContent,
+    type IEventDecryptionResult,
+    type IncomingRoomKeyRequest,
+} from "../index.ts";
+import { type DeviceInfo } from "../deviceinfo.ts";
+import { type IRoomEncryption } from "../RoomList.ts";
+import { type DeviceInfoMap } from "../DeviceList.ts";
 
 /**
  * Map of registered encryption algorithm classes. A map from string to {@link EncryptionAlgorithm} class

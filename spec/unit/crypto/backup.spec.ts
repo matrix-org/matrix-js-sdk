@@ -28,10 +28,10 @@ import { Crypto } from "../../../src/crypto";
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { BackupManager } from "../../../src/crypto/backup";
 import { StubStore } from "../../../src/store/stub";
-import { IndexedDBCryptoStore, MatrixScheduler } from "../../../src";
-import { CryptoStore } from "../../../src/crypto/store/base";
-import { MegolmDecryption as MegolmDecryptionClass } from "../../../src/crypto/algorithms/megolm";
-import { IKeyBackupInfo } from "../../../src/crypto/keybackup";
+import { IndexedDBCryptoStore, type MatrixScheduler } from "../../../src";
+import { type CryptoStore } from "../../../src/crypto/store/base";
+import { type MegolmDecryption as MegolmDecryptionClass } from "../../../src/crypto/algorithms/megolm";
+import { type IKeyBackupInfo } from "../../../src/crypto/keybackup";
 
 const Olm = globalThis.Olm;
 

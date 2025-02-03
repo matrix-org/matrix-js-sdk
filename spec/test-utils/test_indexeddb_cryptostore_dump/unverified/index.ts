@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DumpDataSetInfo } from "../index";
+import { type DumpDataSetInfo } from "../index";
 
 /**
  * A key query response containing the current keys of the tested user.

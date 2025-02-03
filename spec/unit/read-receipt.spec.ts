@@ -16,9 +16,9 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { MAIN_ROOM_TIMELINE, ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, ReceiptType, type WrappedReceipt } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
-import { EventType, MatrixEvent, RelationType, Room, threadIdForReceipt } from "../../src/matrix";
+import { EventType, type MatrixEvent, RelationType, Room, threadIdForReceipt } from "../../src/matrix";
 import { synthesizeReceipt } from "../../src/models/read-receipt";
 import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";

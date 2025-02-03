@@ -16,7 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { KeyBackupInfo } from "../../src/crypto-api";
+import { type KeyBackupInfo } from "../../src/crypto-api";
 
 /**
  * Mock out the endpoints that the js-sdk calls when we call `MatrixClient.start()`.

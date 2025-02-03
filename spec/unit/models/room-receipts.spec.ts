@@ -14,7 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { FeatureSupport, MatrixClient, MatrixEvent, ReceiptContent, THREAD_RELATION_TYPE, Thread } from "../../../src";
+import {
+    FeatureSupport,
+    type MatrixClient,
+    MatrixEvent,
+    type ReceiptContent,
+    THREAD_RELATION_TYPE,
+    Thread,
+} from "../../../src";
 import { Room } from "../../../src/models/room";
 
 /**

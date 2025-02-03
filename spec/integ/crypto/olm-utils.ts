@@ -17,11 +17,19 @@ limitations under the License.
 import Olm from "@matrix-org/olm";
 import anotherjson from "another-json";
 
-import { IContent, IDeviceKeys, IDownloadKeyResult, IEvent, Keys, MatrixClient, SigningKeys } from "../../../src";
-import { IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
-import { ISyncResponder } from "../../test-utils/SyncResponder";
+import {
+    type IContent,
+    type IDeviceKeys,
+    type IDownloadKeyResult,
+    type IEvent,
+    type Keys,
+    type MatrixClient,
+    type SigningKeys,
+} from "../../../src";
+import { type IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
+import { type ISyncResponder } from "../../test-utils/SyncResponder";
 import { syncPromise } from "../../test-utils/test-utils";
-import { KeyBackupInfo } from "../../../src/crypto-api";
+import { type KeyBackupInfo } from "../../../src/crypto-api";
 
 /**
  * @module

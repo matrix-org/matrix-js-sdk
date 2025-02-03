@@ -16,11 +16,11 @@ limitations under the License.
 
 import { TypedEventEmitter } from "../../models/typed-event-emitter.ts";
 import {
-    ByteSentStatsReport,
-    CallFeedReport,
-    ConnectionStatsReport,
+    type ByteSentStatsReport,
+    type CallFeedReport,
+    type ConnectionStatsReport,
     StatsReport,
-    SummaryStatsReport,
+    type SummaryStatsReport,
 } from "./statsReport.ts";
 
 export type StatsReportHandlerMap = {

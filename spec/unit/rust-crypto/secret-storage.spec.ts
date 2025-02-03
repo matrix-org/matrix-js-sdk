@@ -18,8 +18,8 @@ import {
     secretStorageCanAccessSecrets,
     secretStorageContainsCrossSigningKeys,
 } from "../../../src/rust-crypto/secret-storage";
-import { ServerSideSecretStorage } from "../../../src/secret-storage";
-import { SecretInfo } from "../../../src/secret-storage.ts";
+import { type ServerSideSecretStorage } from "../../../src/secret-storage";
+import { type SecretInfo } from "../../../src/secret-storage.ts";
 
 declare module "../../../src/@types/event" {
     interface SecretStorageAccountDataEvents {

@@ -15,10 +15,10 @@ limitations under the License.
 */
 
 import { RelationType } from "../../src/@types/event";
-import { MatrixClient } from "../../src/client";
-import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { Room } from "../../src/models/room";
-import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { type MatrixClient } from "../../src/client";
+import { type MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import { type Room } from "../../src/models/room";
+import { type Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { mkMessage } from "./test-utils";
 
 export const makeThreadEvent = ({

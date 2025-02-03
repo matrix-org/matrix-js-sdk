@@ -15,47 +15,47 @@ limitations under the License.
 */
 
 import {
-    WidgetApi,
+    type WidgetApi,
     WidgetApiToWidgetAction,
     WidgetApiResponseError,
     MatrixCapabilities,
-    IWidgetApiRequest,
-    IWidgetApiAcknowledgeResponseData,
-    ISendEventToWidgetActionRequest,
-    ISendToDeviceToWidgetActionRequest,
-    ISendEventFromWidgetResponseData,
-    IWidgetApiRequestData,
-    WidgetApiAction,
-    IWidgetApiResponse,
-    IWidgetApiResponseData,
+    type IWidgetApiRequest,
+    type IWidgetApiAcknowledgeResponseData,
+    type ISendEventToWidgetActionRequest,
+    type ISendToDeviceToWidgetActionRequest,
+    type ISendEventFromWidgetResponseData,
+    type IWidgetApiRequestData,
+    type WidgetApiAction,
+    type IWidgetApiResponse,
+    type IWidgetApiResponseData,
 } from "matrix-widget-api";
 
-import { MatrixEvent, IEvent, IContent, EventStatus } from "./models/event.ts";
+import { MatrixEvent, type IEvent, type IContent, EventStatus } from "./models/event.ts";
 import {
-    ISendEventResponse,
-    SendDelayedEventRequestOpts,
-    SendDelayedEventResponse,
-    UpdateDelayedEventAction,
+    type ISendEventResponse,
+    type SendDelayedEventRequestOpts,
+    type SendDelayedEventResponse,
+    type UpdateDelayedEventAction,
 } from "./@types/requests.ts";
-import { EventType, StateEvents } from "./@types/event.ts";
+import { EventType, type StateEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
 import {
     MatrixClient,
     ClientEvent,
-    IMatrixClientCreateOpts,
-    IStartClientOpts,
-    SendToDeviceContentMap,
-    IOpenIDToken,
+    type IMatrixClientCreateOpts,
+    type IStartClientOpts,
+    type SendToDeviceContentMap,
+    type IOpenIDToken,
     UNSTABLE_MSC4140_DELAYED_EVENTS,
 } from "./client.ts";
 import { SyncApi, SyncState } from "./sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
 import { MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
-import { Room } from "./models/room.ts";
-import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage.ts";
-import { DeviceInfo } from "./crypto/deviceinfo.ts";
-import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
+import { type Room } from "./models/room.ts";
+import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
+import { type DeviceInfo } from "./crypto/deviceinfo.ts";
+import { type IOlmDevice } from "./crypto/algorithms/megolm.ts";
 import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
 import { TypedEventEmitter } from "./matrix.ts";
 

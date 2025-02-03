@@ -20,49 +20,49 @@ import {
     KeysQueryRequest,
     Migration,
     OlmMachine,
-    PickledInboundGroupSession,
-    PickledSession,
+    type PickledInboundGroupSession,
+    type PickledSession,
     StoreHandle,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { mocked, Mocked } from "jest-mock";
+import { mocked, type Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
-    AccountDataEvents,
-    Device,
+    type AccountDataEvents,
+    type Device,
     DeviceVerification,
     encodeBase64,
-    HttpApiEvent,
-    HttpApiEventHandlerMap,
-    IHttpOpts,
-    IToDeviceEvent,
-    MatrixClient,
+    type HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    type IHttpOpts,
+    type IToDeviceEvent,
+    type MatrixClient,
     MatrixEvent,
     MatrixHttpApi,
     MemoryCryptoStore,
     TypedEventEmitter,
 } from "../../../src";
 import { emitPromise, mkEvent } from "../../test-utils/test-utils";
-import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
-import { IEventDecryptionResult, IMegolmSessionData } from "../../../src/@types/crypto";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
+import { type IEventDecryptionResult, type IMegolmSessionData } from "../../../src/@types/crypto";
+import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import {
-    AccountDataClient,
-    AddSecretStorageKeyOpts,
-    SecretStorageCallbacks,
-    ServerSideSecretStorage,
+    type AccountDataClient,
+    type AddSecretStorageKeyOpts,
+    type SecretStorageCallbacks,
+    type ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "../../../src/secret-storage";
 import {
-    CryptoCallbacks,
+    type CryptoCallbacks,
     EventShieldColour,
     EventShieldReason,
-    ImportRoomKeysOpts,
-    KeyBackupCheck,
-    KeyBackupInfo,
-    VerificationRequest,
+    type ImportRoomKeysOpts,
+    type KeyBackupCheck,
+    type KeyBackupInfo,
+    type VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -70,10 +70,10 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
-import { ClientEvent, ClientEventHandlerMap } from "../../../src/client";
-import { Curve25519AuthData } from "../../../src/crypto-api/keybackup";
+import { ClientEvent, type ClientEventHandlerMap } from "../../../src/client";
+import { type Curve25519AuthData } from "../../../src/crypto-api/keybackup";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
-import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
+import { type CryptoStore, type SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 import { RustBackupManager } from "../../../src/rust-crypto/backup.ts";
 

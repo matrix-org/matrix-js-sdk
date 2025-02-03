@@ -17,17 +17,17 @@ limitations under the License.
 import "../../../olm-loader";
 import { makeTestClients } from "./util";
 import { MatrixEvent } from "../../../../src/models/event";
-import { ISasEvent, SAS, SasEvent } from "../../../../src/crypto/verification/SAS";
-import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
+import { type ISasEvent, SAS, SasEvent } from "../../../../src/crypto/verification/SAS";
+import { DeviceInfo, type IDevice } from "../../../../src/crypto/deviceinfo";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { logger } from "../../../../src/logger";
 import { resetCrossSigningKeys } from "../crypto-utils";
-import { VerificationBase } from "../../../../src/crypto/verification/Base";
-import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
-import { MatrixClient } from "../../../../src";
-import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
-import { TestClient } from "../../../TestClient";
+import { type VerificationBase } from "../../../../src/crypto/verification/Base";
+import { type IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
+import { type MatrixClient } from "../../../../src";
+import { type VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
+import { type TestClient } from "../../../TestClient";
 
 const Olm = globalThis.Olm;
 

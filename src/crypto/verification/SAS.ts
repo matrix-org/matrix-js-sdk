@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
+import { type Utility, type SAS as OlmSAS } from "@matrix-org/olm";
 
 import { VerificationBase as Base, SwitchStartEventError } from "./Base.ts";
 import {
@@ -30,10 +30,15 @@ import {
     newUserCancelledError,
 } from "./Error.ts";
 import { logger } from "../../logger.ts";
-import { IContent, MatrixEvent } from "../../models/event.ts";
+import { type IContent, type MatrixEvent } from "../../models/event.ts";
 import { generateDecimalSas } from "./SASDecimal.ts";
 import { EventType } from "../../@types/event.ts";
-import { EmojiMapping, GeneratedSas, ShowSasCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
+import {
+    type EmojiMapping,
+    type GeneratedSas,
+    type ShowSasCallbacks,
+    VerifierEvent,
+} from "../../crypto-api/verification.ts";
 import { VerificationMethod } from "../../types.ts";
 
 // backwards-compatibility exports

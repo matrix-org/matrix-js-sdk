@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { WidgetApi } from "matrix-widget-api";
+import { type WidgetApi } from "matrix-widget-api";
 
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store.ts";
 import { MemoryStore } from "./store/memory.ts";
 import { MatrixScheduler } from "./scheduler.ts";
-import { MatrixClient, ICreateClientOpts } from "./client.ts";
-import { RoomWidgetClient, ICapabilities } from "./embedded.ts";
-import { CryptoStore } from "./crypto/store/base.ts";
+import { MatrixClient, type ICreateClientOpts } from "./client.ts";
+import { RoomWidgetClient, type ICapabilities } from "./embedded.ts";
+import { type CryptoStore } from "./crypto/store/base.ts";
 
 export * from "./client.ts";
 export * from "./serverCapabilities.ts";

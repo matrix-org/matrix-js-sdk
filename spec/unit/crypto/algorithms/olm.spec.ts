@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { type MockedObject } from "jest-mock";
 
 import "../../../olm-loader";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
@@ -23,7 +23,7 @@ import { logger } from "../../../../src/logger";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
-import { MatrixClient } from "../../../../src";
+import { type MatrixClient } from "../../../../src";
 
 function makeOlmDevice() {
     const cryptoStore = new MemoryCryptoStore();

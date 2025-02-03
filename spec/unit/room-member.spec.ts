@@ -21,8 +21,8 @@ import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
 import {
     createClient,
     EventType,
-    MatrixClient,
-    RoomState,
+    type MatrixClient,
+    type RoomState,
     UNSTABLE_MSC2666_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_SHARED_ROOMS,

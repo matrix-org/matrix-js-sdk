@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { GroupCall, MatrixCall, MatrixClient } from "../../../src";
+import { type GroupCall, type MatrixCall, type MatrixClient } from "../../../src";
 import { MediaHandler, MediaHandlerEvent } from "../../../src/webrtc/mediaHandler";
 import { MockMediaDeviceInfo, MockMediaDevices, MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
 

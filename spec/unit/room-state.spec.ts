@@ -14,17 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { type MockedObject } from "jest-mock";
 
 import * as utils from "../test-utils/test-utils";
 import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
-import { Beacon, BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
+import { type Beacon, BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
 import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
-import { MatrixClient } from "../../src/client";
+import { type MatrixClient } from "../../src/client";
 import { defer } from "../../src/utils";
 import { Room } from "../../src/models/room";
 import { KnownMembership } from "../../src/@types/membership";

@@ -4,12 +4,12 @@ import type { MatrixClient } from "../client.ts";
 import { HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger } from "../logger.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
-import { Room } from "../models/room.ts";
+import { type Room } from "../models/room.ts";
 import { sleep } from "../utils.ts";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "./CallMembership.ts";
-import { Focus } from "./focus.ts";
+import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
+import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { MembershipConfig } from "./MatrixRTCSession.ts";
+import { type MembershipConfig } from "./MatrixRTCSession.ts";
 /**
  * This interface defines what a MembershipManager uses and exposes.
  * This interface is what we use to write tests and allows to change the actual implementation

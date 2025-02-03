@@ -15,11 +15,11 @@ limitations under the License.
 */
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 import {
-    ByteSentStatsReport,
-    CallFeedReport,
-    ConnectionStatsReport,
+    type ByteSentStatsReport,
+    type CallFeedReport,
+    type ConnectionStatsReport,
     StatsReport,
-    SummaryStatsReport,
+    type SummaryStatsReport,
 } from "../../../../src/webrtc/stats/statsReport";
 
 describe("StatsReportEmitter", () => {

@@ -29,11 +29,16 @@ import type { IE2EKeyReceiver } from "./test-utils/E2EKeyReceiver";
 import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
-import { createClient, IStartClientOpts } from "../src/matrix";
-import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
+import { createClient, type IStartClientOpts } from "../src/matrix";
+import {
+    type ICreateClientOpts,
+    type IDownloadKeyResult,
+    type MatrixClient,
+    PendingEventOrdering,
+} from "../src/client";
 import { MockStorageApi } from "./MockStorageApi";
-import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
-import { ISyncResponder } from "./test-utils/SyncResponder";
+import { type IKeysUploadResponse, type IUploadKeysRequest } from "../src/client";
+import { type ISyncResponder } from "./test-utils/SyncResponder";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient

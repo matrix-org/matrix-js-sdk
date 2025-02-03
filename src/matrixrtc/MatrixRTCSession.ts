@@ -17,16 +17,16 @@ limitations under the License.
 import { logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
-import { Room } from "../models/room.ts";
-import { MatrixClient } from "../client.ts";
+import { type Room } from "../models/room.ts";
+import { type MatrixClient } from "../client.ts";
 import { EventType } from "../@types/event.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
-import { Focus } from "./focus.ts";
+import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { MatrixEvent } from "../models/event.ts";
-import { LegacyMembershipManager, IMembershipManager } from "./MembershipManager.ts";
-import { EncryptionManager, IEncryptionManager, Statistics } from "./EncryptionManager.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { LegacyMembershipManager, type IMembershipManager } from "./MembershipManager.ts";
+import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 

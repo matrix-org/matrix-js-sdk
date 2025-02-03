@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked, MockedObject } from "jest-mock";
+import { mocked, type MockedObject } from "jest-mock";
 
 import type { DeviceInfoMap } from "../../../../src/crypto/DeviceList";
 import "../../../olm-loader";
@@ -23,15 +23,15 @@ import * as algorithms from "../../../../src/crypto/algorithms";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
 import * as testUtils from "../../../test-utils/test-utils";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
-import { Crypto, IncomingRoomKeyRequest } from "../../../../src/crypto";
+import { Crypto, type IncomingRoomKeyRequest } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
 import { MatrixEvent } from "../../../../src/models/event";
 import { TestClient } from "../../../TestClient";
 import { Room } from "../../../../src/models/room";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { TypedEventEmitter } from "../../../../src/models/typed-event-emitter";
-import { ClientEvent, MatrixClient, RoomMember } from "../../../../src";
-import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
+import { ClientEvent, type MatrixClient, RoomMember } from "../../../../src";
+import { DeviceInfo, type IDevice } from "../../../../src/crypto/deviceinfo";
 import { DeviceTrustLevel } from "../../../../src/crypto/CrossSigning";
 import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypto/algorithms/megolm";
 import { recursiveMapToObject } from "../../../../src/utils";

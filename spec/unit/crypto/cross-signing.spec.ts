@@ -17,18 +17,18 @@ limitations under the License.
 
 import "../../olm-loader";
 import anotherjson from "another-json";
-import { PkSigning } from "@matrix-org/olm";
-import HttpBackend from "matrix-mock-request";
+import { type PkSigning } from "@matrix-org/olm";
 
+import type HttpBackend from "matrix-mock-request";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixError } from "../../../src/http-api";
 import { logger } from "../../../src/logger";
-import { ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
+import { type ICreateClientOpts, type ISignedKey, type MatrixClient } from "../../../src/client";
 import { CryptoEvent } from "../../../src/crypto";
-import { IDevice } from "../../../src/crypto/deviceinfo";
+import { type IDevice } from "../../../src/crypto/deviceinfo";
 import { TestClient } from "../../TestClient";
 import { resetCrossSigningKeys } from "./crypto-utils";
-import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../../../src/crypto-api";
+import { type BootstrapCrossSigningOpts, type CrossSigningKeyInfo } from "../../../src/crypto-api";
 
 const PUSH_RULES_RESPONSE: Response = {
     method: "GET",

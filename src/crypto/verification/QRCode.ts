@@ -22,11 +22,11 @@ import { VerificationBase as Base } from "./Base.ts";
 import { newKeyMismatchError, newUserCancelledError } from "./Error.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../../base64.ts";
 import { logger } from "../../logger.ts";
-import { VerificationRequest } from "./request/VerificationRequest.ts";
-import { MatrixClient } from "../../client.ts";
-import { IVerificationChannel } from "./request/Channel.ts";
-import { MatrixEvent } from "../../models/event.ts";
-import { ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
+import { type VerificationRequest } from "./request/VerificationRequest.ts";
+import { type MatrixClient } from "../../client.ts";
+import { type IVerificationChannel } from "./request/Channel.ts";
+import { type MatrixEvent } from "../../models/event.ts";
+import { type ShowQrCodeCallbacks, VerifierEvent } from "../../crypto-api/verification.ts";
 import { VerificationMethod } from "../../types.ts";
 
 export const SHOW_QR_CODE_METHOD = VerificationMethod.ShowQrCode;

@@ -20,9 +20,9 @@ import { logger } from "../../../src/logger";
 import * as utils from "../../../src/utils";
 import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
 import { DeviceList } from "../../../src/crypto/DeviceList";
-import { IDownloadKeyResult, MatrixClient } from "../../../src";
-import { OlmDevice } from "../../../src/crypto/OlmDevice";
-import { CryptoStore } from "../../../src/crypto/store/base";
+import { type IDownloadKeyResult, type MatrixClient } from "../../../src";
+import { type OlmDevice } from "../../../src/crypto/OlmDevice";
+import { type CryptoStore } from "../../../src/crypto/store/base";
 
 const signedDeviceList: IDownloadKeyResult = {
     failures: {},

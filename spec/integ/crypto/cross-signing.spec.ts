@@ -18,13 +18,13 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
+import { CRYPTO_BACKENDS, type InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { type AuthDict, createClient, CryptoEvent, type MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
-import { CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
+import { type CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
+import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import {
     MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,

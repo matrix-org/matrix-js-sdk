@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TrackID } from "../../../../src/webrtc/stats/statsReport";
+import { type TrackID } from "../../../../src/webrtc/stats/statsReport";
 import { MediaTrackStats } from "../../../../src/webrtc/stats/media/mediaTrackStats";
 import { ConnectionStatsReportBuilder } from "../../../../src/webrtc/stats/connectionStatsReportBuilder";
 

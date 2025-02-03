@@ -17,25 +17,25 @@ limitations under the License.
 import { logger } from "../../logger.ts";
 import { deepCompare, promiseTry, safeSet } from "../../utils.ts";
 import {
-    CryptoStore,
-    IDeviceData,
-    IProblem,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type IDeviceData,
+    type IProblem,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
-    SecretStorePrivateKeys,
+    type Mode,
+    type OutgoingRoomKeyRequest,
+    type ParkedSharedHistory,
+    type SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
 } from "./base.ts";
-import { IRoomKeyRequestBody } from "../index.ts";
-import { IOlmDevice } from "../algorithms/megolm.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type IRoomKeyRequestBody } from "../index.ts";
+import { type IOlmDevice } from "../algorithms/megolm.ts";
+import { type IRoomEncryption } from "../RoomList.ts";
+import { type InboundGroupSessionData } from "../OlmDevice.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 function encodeSessionKey(senderCurve25519Key: string, sessionId: string): string {
     return encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);

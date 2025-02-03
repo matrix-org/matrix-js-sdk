@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../../../models/event.ts";
-import { VerificationRequest } from "./VerificationRequest.ts";
+import { type MatrixEvent } from "../../../models/event.ts";
+import { type VerificationRequest } from "./VerificationRequest.ts";
 
 export interface IVerificationChannel {
     request?: VerificationRequest;

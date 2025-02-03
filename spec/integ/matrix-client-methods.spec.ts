@@ -13,28 +13,28 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import HttpBackend from "matrix-mock-request";
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 
+import type HttpBackend from "matrix-mock-request";
 import * as utils from "../test-utils/test-utils";
-import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
+import { CRYPTO_ENABLED, type IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import {
     Filter,
     JoinRule,
-    KnockRoomOpts,
+    type KnockRoomOpts,
     MemoryStore,
     Method,
     Room,
-    RoomSummary,
+    type RoomSummary,
     SERVICE_TYPES,
 } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
-import { IFilterDefinition } from "../../src/filter";
-import { ISearchResults } from "../../src/@types/search";
-import { IStore } from "../../src/store";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { type IFilterDefinition } from "../../src/filter";
+import { type ISearchResults } from "../../src/@types/search";
+import { type IStore } from "../../src/store";
+import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SetPresence } from "../../src/sync";
 import { KnownMembership } from "../../src/@types/membership";
 

@@ -22,14 +22,14 @@ import anotherjson from "another-json";
 
 import type { PkSigning } from "@matrix-org/olm";
 import type { IOneTimeKey } from "../@types/crypto.ts";
-import { OlmDevice } from "./OlmDevice.ts";
-import { DeviceInfo } from "./deviceinfo.ts";
-import { Logger, logger } from "../logger.ts";
-import { IClaimOTKsResult, MatrixClient } from "../client.ts";
-import { ISignatures } from "../@types/signed.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type OlmDevice } from "./OlmDevice.ts";
+import { type DeviceInfo } from "./deviceinfo.ts";
+import { type Logger, logger } from "../logger.ts";
+import { type IClaimOTKsResult, type MatrixClient } from "../client.ts";
+import { type ISignatures } from "../@types/signed.ts";
+import { type MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
-import { IMessage } from "./algorithms/olm.ts";
+import { type IMessage } from "./algorithms/olm.ts";
 import { MapWithDefault } from "../utils.ts";
 
 enum Algorithm {

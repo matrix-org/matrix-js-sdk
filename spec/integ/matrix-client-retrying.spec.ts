@@ -14,9 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import HttpBackend from "matrix-mock-request";
-
-import { EventStatus, MatrixClient, MatrixScheduler, MsgType, RoomEvent } from "../../src/matrix";
+import type HttpBackend from "matrix-mock-request";
+import { EventStatus, type MatrixClient, MatrixScheduler, MsgType, RoomEvent } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { TestClient } from "../TestClient";
 

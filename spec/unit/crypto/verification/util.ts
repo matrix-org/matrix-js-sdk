@@ -16,11 +16,16 @@ limitations under the License.
 */
 
 import { TestClient } from "../../../TestClient";
-import { IContent, MatrixEvent } from "../../../../src/models/event";
-import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
+import { type IContent, MatrixEvent } from "../../../../src/models/event";
+import { type IRoomTimelineData } from "../../../../src/models/event-timeline-set";
 import { Room, RoomEvent } from "../../../../src/models/room";
 import { logger } from "../../../../src/logger";
-import { MatrixClient, ClientEvent, ICreateClientOpts, SendToDeviceContentMap } from "../../../../src/client";
+import {
+    type MatrixClient,
+    ClientEvent,
+    type ICreateClientOpts,
+    type SendToDeviceContentMap,
+} from "../../../../src/client";
 
 interface UserInfo {
     userId: string;

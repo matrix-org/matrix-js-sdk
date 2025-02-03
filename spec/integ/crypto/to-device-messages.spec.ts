@@ -18,8 +18,8 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { createClient, MatrixClient } from "../../../src";
+import { CRYPTO_BACKENDS, getSyncResponse, type InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { createClient, type MatrixClient } from "../../../src";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { SyncResponder } from "../../test-utils/SyncResponder";

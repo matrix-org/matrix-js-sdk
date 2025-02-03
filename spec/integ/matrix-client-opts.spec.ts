@@ -5,7 +5,7 @@ import { ClientEvent, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
-import { IStore } from "../../src/store";
+import { type IStore } from "../../src/store";
 import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient opts", function () {
