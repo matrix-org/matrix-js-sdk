@@ -420,9 +420,8 @@ describe("verification", () => {
                 expect(requests[0].transactionId).toEqual(transactionId);
             }
 
-            // legacy crypto picks devices individually; rust crypto uses a broadcast message
-            const toDeviceMessage =
-                requestBody.messages[TEST_USER_ID]["*"] ?? requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
+            // rust crypto uses a broadcast message
+            const toDeviceMessage = requestBody.messages[TEST_USER_ID]["*"];
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
         });
@@ -510,10 +509,8 @@ describe("verification", () => {
             reciprocateQRCodeCallbacks.confirm();
             await sendToDevicePromise;
 
-            // at this point, on legacy crypto, the master key is already marked as trusted, and the request is "Done".
             // Rust crypto, on the other hand, waits for the 'done' to arrive from the other side.
             if (request.phase === VerificationPhase.Done) {
-                // legacy crypto: we're all done
                 const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
                 // eslint-disable-next-line jest/no-conditional-expect
                 expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();

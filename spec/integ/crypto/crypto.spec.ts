@@ -51,7 +51,6 @@ import {
     IContent,
     IDownloadKeyResult,
     IEvent,
-    IndexedDBCryptoStore,
     IStartClientOpts,
     MatrixClient,
     MatrixEvent,
@@ -1901,7 +1900,6 @@ describe("crypto", () => {
         });
 
         describe("bootstrapSecretStorage", () => {
-            // Doesn't work with legacy crypto, which will try to bootstrap even without private key, which is buggy.
             it("should throw an error if we are unable to create a key because createSecretStorageKey is not set", async () => {
                 await expect(
                     aliceClient.getCrypto()!.bootstrapSecretStorage({ setupNewSecretStorage: true }),
@@ -1947,8 +1945,6 @@ describe("crypto", () => {
             });
 
             it("should do nothing if an AES key is already in the secret storage and setupNewSecretStorage is not set", async () => {
-                const awaitAccountDataClientUpdate = awaitAccountDataUpdate("m.secret_storage.default_key");
-
                 const bootstrapPromise = aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
 
                 // Wait for the key to be uploaded in the account data
@@ -1959,9 +1955,6 @@ describe("crypto", () => {
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
-
-                // On legacy crypto we need to wait for ClientEvent.AccountData before calling bootstrap again.
-                await awaitAccountDataClientUpdate;
 
                 // Call again bootstrapSecretStorage
                 await aliceClient.getCrypto()!.bootstrapSecretStorage({ createSecretStorageKey });
@@ -2210,7 +2203,6 @@ describe("crypto", () => {
 
                 await aliceClient.getCrypto()!.deleteKeyBackupVersion(nextVersion!);
                 await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
-                // XXX Legacy crypto does not update 4S when doing that; should ensure that rust implem does it.
                 expect(await aliceClient.getCrypto()!.getActiveSessionBackupVersion()).toBeNull();
             });
         });
@@ -2313,7 +2305,7 @@ describe("crypto", () => {
 
     /** Guards against downgrade attacks from servers hiding or manipulating the crypto settings. */
     describe("Persistent encryption settings", () => {
-        let persistentStoreClient: MatrixClient;
+        let client1: MatrixClient;
         let client2: MatrixClient;
 
         beforeEach(async () => {
@@ -2326,12 +2318,13 @@ describe("crypto", () => {
             // For legacy crypto, these tests only work properly with a proper (indexeddb-based) CryptoStore, so
             // rather than using the existing `aliceClient`, create a new client. Once we drop legacy crypto, we can
             // just use `aliceClient` here.
-            persistentStoreClient = await makeNewClient(homeserverurl, userId, "persistentStoreClient");
-            await persistentStoreClient.startClient({});
+            // XXX: Even with the rust-crypto, we need to create to a new client. The tests fail with a timeout error.
+            client1 = await makeNewClient(homeserverurl, userId, "client1");
+            await client1.startClient({});
         });
 
         afterEach(async () => {
-            persistentStoreClient.stopClient();
+            client1.stopClient();
             client2?.stopClient();
         });
 
@@ -2339,13 +2332,13 @@ describe("crypto", () => {
             // Alice is in an encrypted room
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2" });
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
-            await syncPromise(persistentStoreClient);
+            await syncPromise(client1);
 
             // Send a message, and expect to get an `m.room.encrypted` event.
-            await Promise.all([persistentStoreClient.sendTextMessage(ROOM_ID, "test"), expectEncryptedSendMessage()]);
+            await Promise.all([client1.sendTextMessage(ROOM_ID, "test"), expectEncryptedSendMessage()]);
 
             // We now replace the client, and allow the new one to resync, *without* the encryption event.
-            client2 = await replaceClient(persistentStoreClient);
+            client2 = await replaceClient(client1);
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([]));
             await client2.startClient({});
             await syncPromise(client2);
@@ -2358,11 +2351,11 @@ describe("crypto", () => {
             // Alice is in an encrypted room, where the rotation period is set to 2 messages
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
-            await syncPromise(persistentStoreClient);
+            await syncPromise(client1);
 
             // Send a message, and expect to get an `m.room.encrypted` event.
             const [, msg1Content] = await Promise.all([
-                persistentStoreClient.sendTextMessage(ROOM_ID, "test1"),
+                client1.sendTextMessage(ROOM_ID, "test1"),
                 expectEncryptedSendMessage(),
             ]);
 
@@ -2376,17 +2369,17 @@ describe("crypto", () => {
                 next_batch: "1",
                 rooms: { join: { [TEST_ROOM_ID]: { timeline: { events: [encryptionState2], prev_batch: "" } } } },
             });
-            await syncPromise(persistentStoreClient);
+            await syncPromise(client1);
 
             // Send two more messages. The first should use the same megolm session as the first; the second should
             // use a different one.
             const [, msg2Content] = await Promise.all([
-                persistentStoreClient.sendTextMessage(ROOM_ID, "test2"),
+                client1.sendTextMessage(ROOM_ID, "test2"),
                 expectEncryptedSendMessage(),
             ]);
             expect(msg2Content.session_id).toEqual(msg1Content.session_id);
             const [, msg3Content] = await Promise.all([
-                persistentStoreClient.sendTextMessage(ROOM_ID, "test3"),
+                client1.sendTextMessage(ROOM_ID, "test3"),
                 expectEncryptedSendMessage(),
             ]);
             expect(msg3Content.session_id).not.toEqual(msg1Content.session_id);
@@ -2396,13 +2389,13 @@ describe("crypto", () => {
             // Alice is in an encrypted room, where the rotation period is set to 2 messages
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
-            await syncPromise(persistentStoreClient);
+            await syncPromise(client1);
 
             // Send a message, and expect to get an `m.room.encrypted` event.
-            await Promise.all([persistentStoreClient.sendTextMessage(ROOM_ID, "test1"), expectEncryptedSendMessage()]);
+            await Promise.all([client1.sendTextMessage(ROOM_ID, "test1"), expectEncryptedSendMessage()]);
 
             // We now replace the client, and allow the new one to resync with a *different* encryption event.
-            client2 = await replaceClient(persistentStoreClient);
+            client2 = await replaceClient(client1);
             const encryptionState2 = mkEncryptionEvent({
                 algorithm: "m.megolm.v1.aes-sha2",
                 rotation_period_msgs: 100,
@@ -2433,11 +2426,7 @@ describe("crypto", () => {
                 userId: userId,
                 accessToken: "akjgkrgjs",
                 deviceId: "xzcvb",
-                cryptoCallbacks: createCryptoCallbacks(),
                 logger: logger.getChild(loggerPrefix),
-
-                // For legacy crypto, these tests only work with a proper persistent cryptoStore.
-                cryptoStore: new IndexedDBCryptoStore(indexedDB, "test"),
             });
             await client.initRustCrypto();
             mockInitialApiRequests(client.getHomeserverUrl());
@@ -2446,7 +2435,7 @@ describe("crypto", () => {
 
         function mkEncryptionEvent(content: object) {
             return mkEventCustom({
-                sender: persistentStoreClient.getSafeUserId(),
+                sender: client1.getSafeUserId(),
                 type: "m.room.encryption",
                 state_key: "",
                 content: content,
@@ -2463,7 +2452,7 @@ describe("crypto", () => {
                     events: [
                         mkMembershipCustom({
                             membership: KnownMembership.Join,
-                            sender: persistentStoreClient.getSafeUserId(),
+                            sender: client1.getSafeUserId(),
                         }),
                         ...stateEvents,
                     ],

@@ -417,9 +417,8 @@ describe("cross-signing", () => {
         function awaitCrossSigningKeysUpload() {
             return new Promise<any>((resolve) => {
                 fetchMock.post(
-                    // legacy crypto uses /unstable/; /v3/ is correct
                     {
-                        url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
+                        url: new RegExp("/_matrix/client/v3/keys/device_signing/upload"),
                         name: "upload-keys",
                     },
                     (url, options) => {
@@ -471,9 +470,6 @@ describe("cross-signing", () => {
             syncResponder.sendOrQueueSyncResponse({ next_batch: 1 });
             await aliceClient.startClient();
             await syncPromise(aliceClient);
-
-            // Wait for legacy crypto to find the device
-            await jest.advanceTimersByTimeAsync(10);
 
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([aliceClient.getSafeUserId()]);
             expect(devices.get(aliceClient.getSafeUserId())!.has(testData.TEST_DEVICE_ID)).toBeTruthy();

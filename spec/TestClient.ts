@@ -26,12 +26,10 @@ import MockHttpBackend from "matrix-mock-request";
 
 import type { IDeviceKeys, IOneTimeKey } from "../src/@types/crypto";
 import type { IE2EKeyReceiver } from "./test-utils/E2EKeyReceiver";
-import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
 import { createClient, IStartClientOpts } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
-import { MockStorageApi } from "./MockStorageApi";
 import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
 import { ISyncResponder } from "./test-utils/SyncResponder";
 
@@ -55,10 +53,6 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
         sessionStoreBackend?: Storage,
         options?: Partial<ICreateClientOpts>,
     ) {
-        if (sessionStoreBackend === undefined) {
-            sessionStoreBackend = new MockStorageApi() as unknown as Storage;
-        }
-
         this.httpBackend = new MockHttpBackend();
 
         const fullOptions: ICreateClientOpts = {
@@ -69,10 +63,6 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
             fetchFn: this.httpBackend.fetchFn as typeof globalThis.fetch,
             ...options,
         };
-        if (!fullOptions.cryptoStore) {
-            // expose this so the tests can get to it
-            fullOptions.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
-        }
         this.client = createClient(fullOptions);
 
         this.deviceKeys = null;
