@@ -207,6 +207,17 @@ describe("Topic content helpers", () => {
                 ],
             });
         });
+
+        it("creates an empty event when the topic is falsey", () => {
+            expect(makeTopicContent(undefined)).toEqual({
+                topic: undefined,
+                [M_TOPIC.name]: [],
+            });
+            expect(makeTopicContent(null)).toEqual({
+                topic: null,
+                [M_TOPIC.name]: [],
+            });
+        });
     });
 
     describe("parseTopicContent()", () => {
@@ -255,6 +266,27 @@ describe("Topic content helpers", () => {
             ).toEqual({
                 text: "pizza",
                 html: "<b>pizza</b>",
+            });
+        });
+
+        it("parses legacy event content", () => {
+            expect(
+                parseTopicContent({
+                    topic: "pizza",
+                }),
+            ).toEqual({
+                text: "pizza",
+            });
+        });
+
+        it("uses legacy event content when new topic key is invalid", () => {
+            expect(
+                parseTopicContent({
+                    "topic": "pizza",
+                    "m.topic": {} as any,
+                }),
+            ).toEqual({
+                text: "pizza",
             });
         });
     });

@@ -564,6 +564,19 @@ CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
 export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
 
 /**
+ * Counts the number of times that an event was emitted.
+ */
+export class EventCounter {
+    public counter;
+    constructor(emitter: EventEmitter, event: string) {
+        this.counter = 0;
+        emitter.on(event, () => {
+            this.counter++;
+        });
+    }
+}
+
+/**
  * Advance the fake timers in a loop until the given promise resolves or rejects.
  *
  * Returns the result of the promise.

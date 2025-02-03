@@ -30,4 +30,12 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
+    [CryptoEvent.DehydratedDeviceCreated]: () => void;
+    [CryptoEvent.DehydratedDeviceUploaded]: () => void;
+    [CryptoEvent.RehydrationStarted]: () => void;
+    [CryptoEvent.RehydrationProgress]: (roomKeyCount: number, toDeviceCount: number) => void;
+    [CryptoEvent.RehydrationCompleted]: () => void;
+    [CryptoEvent.RehydrationError]: (msg: string) => void;
+    [CryptoEvent.DehydrationKeyCached]: () => void;
+    [CryptoEvent.DehydratedDeviceRotationError]: (msg: string) => void;
 } & RustBackupCryptoEventMap;

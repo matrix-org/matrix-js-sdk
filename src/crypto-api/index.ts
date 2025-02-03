@@ -42,6 +42,37 @@ import { MatrixEvent } from "../models/event.ts";
  */
 
 /**
+ * The options to start device dehydration.
+ */
+export interface StartDehydrationOpts {
+    /**
+     * Force creation of a new dehydration key, even if there is already an
+     * existing dehydration key. If `false`, and `onlyIfKeyCached` is `false`, a
+     * new key will be created if there is no existing dehydration key, whether
+     * already cached in our local storage or stored in Secret Storage.
+     *
+     * Checking for the presence of the key in Secret Storage may result in the
+     * `getSecretStorageKey` callback being called.
+     *
+     * Defaults to `false`.
+     */
+    createNewKey?: boolean;
+    /**
+     * Only start dehydration if we have a dehydration key cached in our local
+     * storage. If `true`, Secret Storage will not be checked. Defaults to
+     * `false`.
+     */
+    onlyIfKeyCached?: boolean;
+    /**
+     * Try to rehydrate a device before creating a new dehydrated device.
+     * Setting this to `false` may be useful for situations where the client is
+     * known to pre-date the dehydrated device, and so rehydration is
+     * unnecessary. Defaults to `true`.
+     */
+    rehydrate?: boolean;
+}
+
+/**
  * Public interface to the cryptography parts of the js-sdk
  *
  * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
@@ -220,6 +251,15 @@ export interface CryptoApi {
      * Throws an error if called on our own user ID, or on a user ID that we don't have an identity for.
      */
     pinCurrentUserIdentity(userId: string): Promise<void>;
+
+    /**
+     * Remove the requirement for this identity to be verified, and pin it.
+     *
+     * This is useful if the user was previously verified but is not anymore
+     * ({@link UserVerificationStatus.wasCrossSigningVerified}) and it is not possible to verify him again now.
+     *
+     */
+    withdrawVerificationRequirement(userId: string): Promise<void>;
 
     /**
      * Get the verification status of a given device.
@@ -638,10 +678,11 @@ export interface CryptoApi {
     /**
      * Start using device dehydration.
      *
-     * - Rehydrates a dehydrated device, if one is available.
+     * - Rehydrates a dehydrated device, if one is available and `opts.rehydrate`
+     *   is `true`.
      * - Creates a new dehydration key, if necessary, and stores it in Secret
      *   Storage.
-     *   - If `createNewKey` is set to true, always creates a new key.
+     *   - If `opts.createNewKey` is set to true, always creates a new key.
      *   - If a dehydration key is not available, creates a new one.
      * - Creates a new dehydrated device, and schedules periodically creating
      *   new dehydrated devices.
@@ -650,11 +691,11 @@ export interface CryptoApi {
      * `true`, and must not be called until after cross-signing and secret
      * storage have been set up.
      *
-     * @param createNewKey - whether to force creation of a new dehydration key.
-     *   This can be used, for example, if Secret Storage is being reset.  Defaults
-     *   to false.
+     * @param opts - options for device dehydration. For backwards compatibility
+     *     with old code, a boolean can be given here, which will be treated as
+     *     the `createNewKey` option. However, this is deprecated.
      */
-    startDehydration(createNewKey?: boolean): Promise<void>;
+    startDehydration(opts?: StartDehydrationOpts | boolean): Promise<void>;
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
