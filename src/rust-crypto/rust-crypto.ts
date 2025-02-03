@@ -1508,6 +1508,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
 
+        // Remove the stored secrets in the secret storage
+        await this.secretStorage.store("m.cross_signing.master", null);
+        await this.secretStorage.store("m.cross_signing.self_signing", null);
+        await this.secretStorage.store("m.cross_signing.user_signing", null);
+        await this.secretStorage.store("m.megolm_backup.v1", null);
         // Disable the recovery key and the secret storage
         await this.secretStorage.setDefaultKeyId(null);
 
