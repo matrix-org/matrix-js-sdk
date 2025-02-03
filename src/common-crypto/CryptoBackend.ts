@@ -156,13 +156,6 @@ export interface OnSyncCompletedData {
 }
 
 /**
- * Options object for {@link CryptoBackend#checkOwnCrossSigningTrust}.
- */
-export interface CheckOwnCrossSigningTrustOpts {
-    allowPrivateKeyRequests?: boolean;
-}
-
-/**
  * The result of a (successful) call to {@link CryptoBackend.decryptEvent}
  */
 export interface EventDecryptionResult {

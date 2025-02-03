@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { Logger } from "../../logger.ts";
-import { MatrixEvent } from "../../models/event.ts";
 import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
 import { ISignatures } from "../../@types/signed.ts";
@@ -69,11 +68,17 @@ export interface CryptoStore {
 
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
+    storeAccount(txn: unknown, accountPickle: string): void;
     getCrossSigningKeys(txn: unknown, func: (keys: Record<string, CrossSigningKeyInfo> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
+    ): void;
+    storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
     ): void;
 
     // Olm Sessions
@@ -89,6 +94,8 @@ export interface CryptoStore {
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void;
+
+    storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void;
 
     /**
      * Get a batch of end-to-end sessions from the database.
@@ -113,6 +120,12 @@ export interface CryptoStore {
         sessionId: string,
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
+    ): void;
+    storeEndToEndInboundGroupSession(
+        senderCurve25519Key: string,
+        sessionId: string,
+        sessionData: InboundGroupSessionData,
+        txn: unknown,
     ): void;
 
     /**
@@ -182,12 +195,6 @@ export interface IDeviceData {
     syncToken?: string;
 }
 
-export interface IProblem {
-    type: string;
-    fixed: boolean;
-    time: number;
-}
-
 export interface IWithheld {
     // eslint-disable-next-line camelcase
     room_id: string;
@@ -221,15 +228,6 @@ export interface OutgoingRoomKeyRequest {
      * current state of this request
      */
     state: RoomKeyRequestState;
-}
-
-export interface ParkedSharedHistory {
-    senderId: string;
-    senderKey: string;
-    sessionId: string;
-    sessionKey: string;
-    keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
-    forwardingCurve25519KeyChain: string[];
 }
 
 /**
