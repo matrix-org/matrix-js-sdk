@@ -32,13 +32,7 @@ import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
-import {
-    advanceTimersUntil,
-    awaitDecryption,
-    CRYPTO_BACKENDS,
-    InitCrypto,
-    syncPromise,
-} from "../../test-utils/test-utils";
+import { advanceTimersUntil, awaitDecryption, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
 import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
@@ -113,7 +107,7 @@ function mockUploadEmitter(
     return emitter;
 }
 
-describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backend: string, initCrypto: InitCrypto) => {
+describe("megolm-keys backup", () => {
     let aliceClient: MatrixClient;
     /** an object which intercepts `/sync` requests on the test homeserver */
     let syncResponder: SyncResponder;
@@ -159,7 +153,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             deviceId: TEST_DEVICE_ID,
             ...opts,
         });
-        await initCrypto(client);
+        await client.initRustCrypto();
 
         return client;
     }

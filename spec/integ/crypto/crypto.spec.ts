@@ -24,10 +24,8 @@ import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
 import {
-    CRYPTO_BACKENDS,
     emitPromise,
     getSyncResponse,
-    InitCrypto,
     mkEventCustom,
     mkMembershipCustom,
     syncPromise,
@@ -209,7 +207,7 @@ async function expectSendMegolmMessage(
     return JSON.parse(r.plaintext);
 }
 
-describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, initCrypto: InitCrypto) => {
+describe("crypto", () => {
     if (!globalThis.Olm) {
         // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
@@ -369,7 +367,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             keyReceiver = new E2EKeyReceiver(homeserverUrl);
             syncResponder = new SyncResponder(homeserverUrl);
 
-            await initCrypto(aliceClient);
+            await aliceClient.initRustCrypto();
 
             // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
             testOlmAccount = await createOlmAccount();
@@ -2441,7 +2439,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 // For legacy crypto, these tests only work with a proper persistent cryptoStore.
                 cryptoStore: new IndexedDBCryptoStore(indexedDB, "test"),
             });
-            await initCrypto(client);
+            await client.initRustCrypto();
             mockInitialApiRequests(client.getHomeserverUrl());
             return client;
         }

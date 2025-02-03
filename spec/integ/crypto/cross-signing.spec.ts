@@ -18,7 +18,7 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
+import { syncPromise } from "../../test-utils/test-utils";
 import { AuthDict, createClient, MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
@@ -55,7 +55,7 @@ const TEST_DEVICE_ID = "xzcvb";
  * These tests work by intercepting HTTP requests via fetch-mock rather than mocking out bits of the client, so as
  * to provide the most effective integration tests possible.
  */
-describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: string, initCrypto: InitCrypto) => {
+describe("cross-signing", () => {
     let aliceClient: MatrixClient;
 
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
@@ -104,7 +104,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
                 body: { errcode: "M_NOT_FOUND" },
             });
 
-            await initCrypto(aliceClient);
+            await aliceClient.initRustCrypto();
         },
         /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
         10000,

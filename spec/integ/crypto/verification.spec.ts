@@ -44,14 +44,7 @@ import {
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { defer, escapeRegExp } from "../../../src/utils";
-import {
-    awaitDecryption,
-    CRYPTO_BACKENDS,
-    emitPromise,
-    getSyncResponse,
-    InitCrypto,
-    syncPromise,
-} from "../../test-utils/test-utils";
+import { awaitDecryption, emitPromise, getSyncResponse, syncPromise } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     BACKUP_DECRYPTION_KEY_BASE64,
@@ -117,7 +110,7 @@ const TEST_HOMESERVER_URL = "https://alice-server.com";
  * to provide the most effective integration tests possible.
  */
 // we test with both crypto stacks...
-describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: string, initCrypto: InitCrypto) => {
+describe("verification", () => {
     /** the client under test */
     let aliceClient: MatrixClient;
 
@@ -1470,7 +1463,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             deviceId: "device_under_test",
             ...opts,
         });
-        await initCrypto(client);
+        await client.initRustCrypto();
         await client.startClient();
         return client;
     }
