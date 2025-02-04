@@ -22,6 +22,7 @@ import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index.ts";
 import { CryptoStore, OutgoingRoomKeyRequest } from "./store/base.ts";
 import { EventType, ToDeviceMessageId } from "../@types/event.ts";
 import { MapWithDefault } from "../utils.ts";
+import { EmptyObject } from "../@types/common.ts";
 
 /**
  * Internal module. Management of outgoing room key requests.
@@ -460,7 +461,7 @@ export class OutgoingRoomKeyRequestManager {
         message: RequestMessage,
         recipients: IRoomKeyRequestRecipient[],
         txnId?: string,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const contentMap = new MapWithDefault<string, Map<string, Record<string, any>>>(() => new Map());
         for (const recip of recipients) {
             const userDeviceMap = contentMap.getOrCreate(recip.userId);

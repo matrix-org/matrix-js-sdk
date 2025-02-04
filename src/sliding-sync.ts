@@ -265,7 +265,7 @@ export enum ExtensionState {
 /**
  * An interface that must be satisfied to register extensions
  */
-export interface Extension<Req extends {}, Res extends {}> {
+export interface Extension<Req extends object, Res extends object> {
     /**
      * The extension name to go under 'extensions' in the request body.
      * @returns The JSON key.

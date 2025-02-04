@@ -26,6 +26,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage.ts";
 import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../crypto-api/index.ts";
 import { AccountDataEvents } from "../@types/event.ts";
+import { EmptyObject } from "../@types/common.ts";
 
 interface ICrossSigningKeys {
     authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -267,7 +268,7 @@ class AccountDataClientAdapter
     public setAccountData<K extends keyof AccountDataEvents>(
         type: K,
         content: AccountDataEvents[K] | Record<string, never>,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const event = new MatrixEvent({ type, content });
         const lastEvent = this.values.get(type);
         this.values.set(type, event);

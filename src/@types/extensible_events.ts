@@ -97,12 +97,12 @@ export type AnyRelation = TSNamespace<typeof REFERENCE_RELATION> | string;
 /**
  * An m.relates_to relationship
  */
-export type RelatesToRelationship<R = never, C = never> = {
+export type RelatesToRelationship<R = never> = {
     "m.relates_to": {
         // See https://github.com/microsoft/TypeScript/issues/23182#issuecomment-379091887 for array syntax
         rel_type: [R] extends [never] ? AnyRelation : TSNamespace<R>;
         event_id: string;
-    } & DefaultNever<C, {}>;
+    };
 };
 
 /**

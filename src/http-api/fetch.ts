@@ -68,7 +68,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         this.opts.idBaseUrl = url;
     }
 
-    public idServerRequest<T extends {} = Record<string, unknown>>(
+    public idServerRequest<T extends object = Record<string, unknown>>(
         method: Method,
         path: string,
         params: Record<string, string | string[]> | undefined,

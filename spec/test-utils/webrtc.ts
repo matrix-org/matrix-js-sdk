@@ -17,6 +17,7 @@ limitations under the License.
 import {
     ClientEvent,
     ClientEventHandlerMap,
+    EmptyObject,
     EventType,
     GroupCall,
     GroupCallIntent,
@@ -466,7 +467,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
         [roomId: string, eventType: EventType, content: any, statekey: string]
     >();
     public sendToDevice = jest.fn<
-        Promise<{}>,
+        Promise<EmptyObject>,
         [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
     >();
 

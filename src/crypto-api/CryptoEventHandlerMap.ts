@@ -18,6 +18,7 @@ import { CryptoEvent } from "./CryptoEvent.ts";
 import { VerificationRequest } from "./verification.ts";
 import { UserVerificationStatus } from "./index.ts";
 import { RustBackupCryptoEventMap } from "../rust-crypto/backup.ts";
+import { EmptyObject } from "../@types/common.ts";
 
 /**
  * A map of the {@link CryptoEvent} fired by the {@link CryptoApi} and their payloads.
@@ -26,7 +27,7 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.VerificationRequestReceived]: (request: VerificationRequest) => void;
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, userTrustLevel: UserVerificationStatus) => void;
     [CryptoEvent.KeyBackupDecryptionKeyCached]: (version: string) => void;
-    [CryptoEvent.KeysChanged]: (data: {}) => void;
+    [CryptoEvent.KeysChanged]: (data: EmptyObject) => void;
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;

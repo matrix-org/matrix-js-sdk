@@ -134,6 +134,7 @@ export type AuthDict =
     | RecaptchaDict
     | EmailIdentityDict
     | { type: Exclude<string, AuthType>; [key: string]: any }
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     | {};
 
 export class NoAuthFlowFoundError extends Error {
@@ -421,10 +422,12 @@ export class InteractiveAuth<T> {
         // use the sessionid from the last request, if one is present.
         let auth: AuthDict;
         if ((this.data as IAuthData)?.session) {
-            auth = {
-                session: (this.data as IAuthData).session,
-            };
-            Object.assign(auth, authData);
+            auth = Object.assign(
+                {
+                    session: (this.data as IAuthData).session,
+                },
+                authData,
+            );
         } else {
             auth = authData;
         }

@@ -29,6 +29,7 @@ import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts"
 import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
 import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
 import { AccountDataEvents, SecretStorageAccountDataEvents } from "./@types/event.ts";
+import { EmptyObject } from "./@types/common.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -151,7 +152,7 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
     setAccountData: <K extends keyof AccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
-    ) => Promise<{}>;
+    ) => Promise<EmptyObject>;
 }
 
 /**
