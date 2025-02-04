@@ -1116,7 +1116,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
         });
 
-        it("does not enable a backup signed by an untrusted device and does not have decryption key", async () => {
+        it("does not enable a backup signed by an untrusted device when we do not have the decryption key", async () => {
             aliceClient = await initTestClient();
             const aliceCrypto = aliceClient.getCrypto()!;
 
