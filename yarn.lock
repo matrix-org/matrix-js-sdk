@@ -6192,9 +6192,9 @@ typedoc-plugin-coverage@^3.0.0:
   integrity sha512-V23DAwinAMpGMGcL1R1s8Snr26hrjfIdwGf+4jR/65ZdmeAN+yRX0onfx5JlembTQhR6AePQ/parfQNS0AZ64A==
 
 typedoc-plugin-mdn-links@^4.0.0:
-  version "4.0.9"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-4.0.9.tgz#5f91000d11e2fd0c6271fc05e76e08813184812a"
-  integrity sha512-udtolnpREnT+SB3xZnWHIyN2KtzjlohBOtOOYw+ofKMZKTCaYzHElSyaP2oS/7w/cZtFvrXr/m+35458XUcSLQ==
+  version "4.0.11"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-mdn-links/-/typedoc-plugin-mdn-links-4.0.11.tgz#004d55fcaea10b97925b6fce4f730da18d47c344"
+  integrity sha512-xx9at8P8ABWYG9CLi04Y/uMcy3URIIzA+vy/JGN15Hn/VqDeapRIglwStS1MaQKwCixwZzoUpIoDaGcHdcoFWg==
 
 typedoc-plugin-missing-exports@^3.0.0:
   version "3.1.0"
