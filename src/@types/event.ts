@@ -34,6 +34,7 @@ import {
     RoomTopicEventContent,
     SpaceChildEventContent,
     SpaceParentEventContent,
+    RoomAnnotationEventContent,
 } from "./state_events.ts";
 import { IGroupCallRoomMemberState, IGroupCallRoomState } from "../webrtc/groupCall.ts";
 import { MSC3089EventContent } from "../models/MSC3089Branch.ts";
@@ -77,7 +78,7 @@ export enum EventType {
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
     RoomPredecessor = "org.matrix.msc3946.room_predecessor",
-
+    RoomAnnotation = "m.room.annotation",
     // Moderation policy lists
     PolicyRuleUser = "m.policy.rule.user",
     PolicyRuleRoom = "m.policy.rule.room",
@@ -350,7 +351,7 @@ export interface StateEvents {
     [EventType.RoomTombstone]: RoomTombstoneEventContent;
     [EventType.SpaceChild]: SpaceChildEventContent;
     [EventType.SpaceParent]: SpaceParentEventContent;
-
+    [EventType.RoomAnnotation]: RoomAnnotationEventContent;
     [EventType.PolicyRuleUser]: XOR<PolicyRuleEventContent, {}>;
     [EventType.PolicyRuleRoom]: XOR<PolicyRuleEventContent, {}>;
     [EventType.PolicyRuleServer]: XOR<PolicyRuleEventContent, {}>;
