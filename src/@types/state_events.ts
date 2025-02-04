@@ -93,6 +93,10 @@ export interface RoomTopicEventContent {
     topic: string;
 }
 
+export interface RoomAnnotationEventContent {
+    annotations: any
+}
+
 export interface RoomAvatarEventContent {
     url?: string;
     // The spec says that an encrypted file can be used for the thumbnail but this isn't true
