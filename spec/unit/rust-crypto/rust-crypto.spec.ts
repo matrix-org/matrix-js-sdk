@@ -33,6 +33,7 @@ import {
     AccountDataEvents,
     Device,
     DeviceVerification,
+    EmptyObject,
     encodeBase64,
     HttpApiEvent,
     HttpApiEventHandlerMap,
@@ -2325,7 +2326,7 @@ class DummyAccountDataClient
         }
     }
 
-    public async setAccountData(eventType: string, content: any): Promise<{}> {
+    public async setAccountData(eventType: string, content: any): Promise<EmptyObject> {
         this.storage.set(eventType, content);
         this.emit(
             ClientEvent.AccountData,

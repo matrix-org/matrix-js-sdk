@@ -55,7 +55,7 @@ import { User } from "./models/user.ts";
 import { Room } from "./models/room.ts";
 import { ToDeviceBatch, ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
-import { TypedEventEmitter } from "./matrix.ts";
+import { EmptyObject, TypedEventEmitter } from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -441,15 +441,16 @@ export class RoomWidgetClient extends MatrixClient {
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
     // eslint-disable-next-line
-    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<{}> {
+    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw Error("Server does not support the delayed events API");
         }
 
-        return await this.widgetApi.updateDelayedEvent(delayId, action);
+        await this.widgetApi.updateDelayedEvent(delayId, action);
+        return {};
     }
 
-    public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<{}> {
+    public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<EmptyObject> {
         await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
         return {};
     }
