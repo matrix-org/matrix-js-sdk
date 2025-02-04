@@ -249,6 +249,7 @@ import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
 import { discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig, validateAuthMetadataAndKeys } from "./oidc/index.ts";
+import { EmptyObject } from "./@types/common.ts";
 
 export type Store = IStore;
 
@@ -4251,7 +4252,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setAccountData<K extends keyof AccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
             $type: eventType,
@@ -4338,8 +4339,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
      */
-    public setIgnoredUsers(userIds: string[]): Promise<{}> {
-        const content = { ignored_users: {} as Record<string, object> };
+    public setIgnoredUsers(userIds: string[]): Promise<EmptyObject> {
+        const content = { ignored_users: {} as Record<string, EmptyObject> };
         userIds.forEach((u) => {
             content.ignored_users[u] = {};
         });
@@ -4520,7 +4521,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<{}> {
+    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -4534,7 +4535,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public deleteRoomTag(roomId: string, tagName: string): Promise<{}> {
+    public deleteRoomTag(roomId: string, tagName: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -4549,7 +4550,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<{}> {
+    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -5449,7 +5450,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
      */
     // eslint-disable-next-line
-    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<{}> {
+    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw Error("Server does not support the delayed events API");
         }
@@ -5480,7 +5481,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         receiptType: ReceiptType,
         body?: Record<string, any>,
         unthreaded = false,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
         }
@@ -5496,7 +5497,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const shouldAddThreadId = !unthreaded && this.supportsThreads();
         const fullBody = shouldAddThreadId ? { ...body, thread_id: threadIdForReceipt(event) } : body;
 
-        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, fullBody || {});
+        const promise = this.http.authedRequest<EmptyObject>(Method.Post, path, undefined, fullBody || {});
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
@@ -5516,7 +5517,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         event: MatrixEvent | null,
         receiptType = ReceiptType.Read,
         unthreaded = false,
-    ): Promise<{} | undefined> {
+    ): Promise<EmptyObject | undefined> {
         if (!event) return;
         const eventId = event.getId()!;
         const room = this.getRoom(event.getRoomId());
@@ -5546,7 +5547,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         rmEventId: string,
         rrEvent?: MatrixEvent,
         rpEvent?: MatrixEvent,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const room = this.getRoom(roomId);
         if (room?.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
@@ -5627,7 +5628,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public sendTyping(roomId: string, isTyping: boolean, timeoutMs: number): Promise<{}> {
+    public sendTyping(roomId: string, isTyping: boolean, timeoutMs: number): Promise<EmptyObject> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send typing notifications so don't bother.
         }
@@ -5745,7 +5746,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public invite(roomId: string, userId: string, reason?: string): Promise<{}> {
+    public invite(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
         return this.membershipChange(roomId, userId, KnownMembership.Invite, reason);
     }
 
@@ -5756,7 +5757,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public inviteByEmail(roomId: string, email: string): Promise<{}> {
+    public inviteByEmail(roomId: string, email: string): Promise<EmptyObject> {
         return this.inviteByThreePid(roomId, "email", email);
     }
 
@@ -5768,7 +5769,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async inviteByThreePid(roomId: string, medium: string, address: string): Promise<{}> {
+    public async inviteByThreePid(roomId: string, medium: string, address: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/invite", { $roomId: roomId });
 
         const identityServerUrl = this.getIdentityServerUrl(true);
@@ -5800,7 +5801,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public leave(roomId: string): Promise<{}> {
+    public leave(roomId: string): Promise<EmptyObject> {
         return this.membershipChange(roomId, undefined, KnownMembership.Leave);
     }
 
@@ -5858,7 +5859,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public ban(roomId: string, userId: string, reason?: string): Promise<{}> {
+    public ban(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
         return this.membershipChange(roomId, userId, KnownMembership.Ban, reason);
     }
 
@@ -5868,12 +5869,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async forget(roomId: string, deleteRoom = true): Promise<{}> {
+    public async forget(roomId: string, deleteRoom = true): Promise<EmptyObject> {
         // API returns an empty object
         const path = utils.encodeUri("/rooms/$room_id/forget", {
             $room_id: roomId,
         });
-        const response = await this.http.authedRequest<{}>(Method.Post, path);
+        const response = await this.http.authedRequest<EmptyObject>(Method.Post, path);
         if (deleteRoom) {
             this.store.removeRoom(roomId);
             this.emit(ClientEvent.DeleteRoom, roomId);
@@ -5885,7 +5886,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Object (currently empty)
      * @returns Rejects: with an error response.
      */
-    public unban(roomId: string, userId: string): Promise<{}> {
+    public unban(roomId: string, userId: string): Promise<EmptyObject> {
         // unbanning != set their state to leave: this used to be
         // the case, but was then changed so that leaving was always
         // a revoking of privilege, otherwise two people racing to
@@ -5905,7 +5906,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public kick(roomId: string, userId: string, reason?: string): Promise<{}> {
+    public kick(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/kick", {
             $roomId: roomId,
         });
@@ -5921,7 +5922,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         userId: string | undefined,
         membership: Membership,
         reason?: string,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         // API returns an empty object
         const path = utils.encodeUri("/rooms/$room_id/$membership", {
             $room_id: roomId,
@@ -5972,9 +5973,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     // eslint-disable-next-line camelcase
-    public setProfileInfo(info: "avatar_url", data: { avatar_url: string }): Promise<{}>;
-    public setProfileInfo(info: "displayname", data: { displayname: string }): Promise<{}>;
-    public setProfileInfo(info: "avatar_url" | "displayname", data: object): Promise<{}> {
+    public setProfileInfo(info: "avatar_url", data: { avatar_url: string }): Promise<EmptyObject>;
+    public setProfileInfo(info: "displayname", data: { displayname: string }): Promise<EmptyObject>;
+    public setProfileInfo(info: "avatar_url" | "displayname", data: object): Promise<EmptyObject> {
         const path = utils.encodeUri("/profile/$userId/$info", {
             $userId: this.credentials.userId!,
             $info: info,
@@ -5986,7 +5987,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async setDisplayName(name: string): Promise<{}> {
+    public async setDisplayName(name: string): Promise<EmptyObject> {
         const prom = await this.setProfileInfo("displayname", { displayname: name });
         // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
         const user = this.getUser(this.getUserId()!);
@@ -6001,7 +6002,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async setAvatarUrl(url: string): Promise<{}> {
+    public async setAvatarUrl(url: string): Promise<EmptyObject> {
         const prom = await this.setProfileInfo("avatar_url", { avatar_url: url });
         // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
         const user = this.getUser(this.getUserId()!);
@@ -8363,7 +8364,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param stopClient - whether to stop the client before calling /logout to prevent invalid token errors.
      * @returns Promise which resolves: On success, the empty object `{}`
      */
-    public async logout(stopClient = false): Promise<{}> {
+    public async logout(stopClient = false): Promise<EmptyObject> {
         if (this.crypto?.backupManager?.getKeyBackupEnabled()) {
             try {
                 while ((await this.crypto.backupManager.backupPendingKeys(200)) > 0);
@@ -8421,7 +8422,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * or UIA auth data.
      */
     public async requestLoginToken(auth?: AuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
-        const body: UIARequest<{}> = { auth };
+        const body: UIARequest<unknown> = { auth };
         return this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
             Method.Post,
             "/login/get_token",
@@ -8662,7 +8663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         rmEventId: string,
         rrEventId?: string,
         rpEventId?: string,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/read_markers", {
             $roomId: roomId,
         });
@@ -8737,7 +8738,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public createAlias(alias: string, roomId: string): Promise<{}> {
+    public createAlias(alias: string, roomId: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -8754,7 +8755,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object `{}`.
      * @returns Rejects: with an error response.
      */
-    public deleteAlias(alias: string): Promise<{}> {
+    public deleteAlias(alias: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -8808,7 +8809,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomDirectoryVisibility(roomId: string, visibility: Visibility): Promise<{}> {
+    public setRoomDirectoryVisibility(roomId: string, visibility: Visibility): Promise<EmptyObject> {
         const path = utils.encodeUri("/directory/list/room/$roomId", {
             $roomId: roomId,
         });
@@ -9083,7 +9084,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
+    public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<EmptyObject> {
         const path = "/account/3pid/add";
         return this.http.authedRequest(Method.Post, path, undefined, data);
     }
@@ -9099,7 +9100,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
+    public async bindThreePid(data: IBindThreePidBody): Promise<EmptyObject> {
         const path = "/account/3pid/bind";
         return this.http.authedRequest(Method.Post, path, undefined, data);
     }
@@ -9153,7 +9154,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setPassword(authDict: AuthDict, newPassword: string, logoutDevices?: boolean): Promise<{}> {
+    public setPassword(authDict: AuthDict, newPassword: string, logoutDevices?: boolean): Promise<EmptyObject> {
         const path = "/account/password";
         const data = {
             auth: authDict,
@@ -9161,7 +9162,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logout_devices: logoutDevices,
         };
 
-        return this.http.authedRequest<{}>(Method.Post, path, undefined, data);
+        return this.http.authedRequest<EmptyObject>(Method.Post, path, undefined, data);
     }
 
     /**
@@ -9195,7 +9196,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     // eslint-disable-next-line camelcase
-    public setDeviceDetails(deviceId: string, body: { display_name: string }): Promise<{}> {
+    public setDeviceDetails(deviceId: string, body: { display_name: string }): Promise<EmptyObject> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -9211,7 +9212,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteDevice(deviceId: string, auth?: AuthDict): Promise<{}> {
+    public deleteDevice(deviceId: string, auth?: AuthDict): Promise<EmptyObject> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -9233,7 +9234,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<{}> {
+    public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<EmptyObject> {
         const body: Body = { devices };
 
         if (auth) {
@@ -9274,7 +9275,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Empty json object on success
      * @returns Rejects: with an error response.
      */
-    public setPusher(pusher: IPusherRequest): Promise<{}> {
+    public setPusher(pusher: IPusherRequest): Promise<EmptyObject> {
         const path = "/pushers/set";
         return this.http.authedRequest(Method.Post, path, undefined, pusher);
     }
@@ -9286,7 +9287,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Empty json object on success
      * @returns Rejects: with an error response.
      */
-    public removePusher(pushKey: string, appId: string): Promise<{}> {
+    public removePusher(pushKey: string, appId: string): Promise<EmptyObject> {
         const path = "/pushers/set";
         const body = {
             pushkey: pushKey,
@@ -9304,7 +9305,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setLocalNotificationSettings(
         deviceId: string,
         notificationSettings: LocalNotificationSettings,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}` as const;
         return this.setAccountData(key, notificationSettings);
     }
@@ -9341,7 +9342,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         kind: PushRuleKind,
         ruleId: Exclude<string, RuleId>,
         body: Pick<IPushRule, "actions" | "conditions" | "pattern">,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -9354,7 +9355,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public deletePushRule(scope: string, kind: PushRuleKind, ruleId: Exclude<string, RuleId>): Promise<{}> {
+    public deletePushRule(scope: string, kind: PushRuleKind, ruleId: Exclude<string, RuleId>): Promise<EmptyObject> {
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -9373,7 +9374,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         kind: PushRuleKind,
         ruleId: RuleId | string,
         enabled: boolean,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
             $kind: kind,
             $ruleId: ruleId,
@@ -9391,7 +9392,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         kind: PushRuleKind,
         ruleId: RuleId | string,
         actions: PushRuleAction[],
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
             $kind: kind,
             $ruleId: ruleId,
@@ -9517,7 +9518,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: AuthDict, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: AuthDict, keys?: CrossSigningKeys): Promise<EmptyObject> {
         // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
@@ -9857,7 +9858,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
               medium: string;
               mxid: string;
           }
-        | {}
+        | EmptyObject
     > {
         // Note: we're using the V2 API by calling this function, but our
         // function contract requires a V1 response. We therefore have to
@@ -9953,7 +9954,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    supplied.
      * @returns Promise which resolves: to an empty object `{}`
      */
-    public sendToDevice(eventType: string, contentMap: SendToDeviceContentMap, txnId?: string): Promise<{}> {
+    public sendToDevice(eventType: string, contentMap: SendToDeviceContentMap, txnId?: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
             $eventType: eventType,
             $txnId: txnId ? txnId : this.makeTxnId(),
@@ -10047,7 +10048,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         baseUrl: string,
         accessToken: string,
         termsUrls: string[],
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const url = this.termsUrlForService(serviceType, baseUrl);
         const headers = {
             Authorization: "Bearer " + accessToken,
@@ -10070,7 +10071,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param reason - The reason the content is being reported. May be blank.
      * @returns Promise which resolves to an empty object if successful
      */
-    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<{}> {
+    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/report/$eventId", {
             $roomId: roomId,
             $eventId: eventId,

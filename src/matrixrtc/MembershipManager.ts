@@ -10,6 +10,7 @@ import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "
 import { Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { MembershipConfig } from "./MatrixRTCSession.ts";
+import { EmptyObject } from "../@types/common.ts";
 /**
  * This interface defines what a MembershipManager uses and exposes.
  * This interface is what we use to write tests and allows to change the actual implementation
@@ -203,7 +204,7 @@ export class LegacyMembershipManager implements IMembershipManager {
             this.updateCallMembershipRunning = false;
         }
     };
-    private makeNewMembership(deviceId: string): SessionMembershipData | {} {
+    private makeNewMembership(deviceId: string): SessionMembershipData | EmptyObject {
         // If we're joined, add our own
         if (this.isJoined()) {
             return this.makeMyMembership(deviceId);
@@ -239,7 +240,7 @@ export class LegacyMembershipManager implements IMembershipManager {
         const localDeviceId = this.client.getDeviceId();
         if (!localUserId || !localDeviceId) throw new Error("User ID or device ID was null!");
 
-        let newContent: {} | SessionMembershipData = {};
+        let newContent: EmptyObject | SessionMembershipData = {};
         // TODO: add back expiary logic to non-legacy events
         // previously we checked here if the event is timed out and scheduled a check if not.
         // maybe there is a better way.
