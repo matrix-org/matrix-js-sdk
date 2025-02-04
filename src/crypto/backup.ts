@@ -285,16 +285,17 @@ export class BackupManager {
         this.checkedForBackup = true;
 
         const trustInfo = await this.isKeyBackupTrusted(backupInfo);
+        const trustedBackup = trustInfo.usable || !!trustInfo.trusted_locally;
 
-        if ((trustInfo.usable || trustInfo.trusted_locally) && !this.backupInfo) {
+        if (trustedBackup && !this.backupInfo) {
             logger.log(`Found usable key backup v${backupInfo!.version}: enabling key backups`);
             await this.enableKeyBackup(backupInfo!);
-        } else if (!trustInfo.usable && !trustInfo.trusted_locally && this.backupInfo) {
+        } else if (!trustedBackup && this.backupInfo) {
             logger.log("No usable key backup: disabling key backup");
             this.disableKeyBackup();
-        } else if (!trustInfo.usable && !trustInfo.trusted_locally && !this.backupInfo) {
+        } else if (!trustedBackup && !this.backupInfo) {
             logger.log("No usable key backup: not enabling key backup");
-        } else if ((trustInfo.usable || trustInfo.trusted_locally) && this.backupInfo) {
+        } else if (trustedBackup && this.backupInfo) {
             // may not be the same version: if not, we should switch
             if (backupInfo!.version !== this.backupInfo.version) {
                 logger.log(
