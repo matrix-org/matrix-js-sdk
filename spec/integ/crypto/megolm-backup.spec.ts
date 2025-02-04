@@ -1101,12 +1101,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             aliceClient = await initTestClient();
             const aliceCrypto = aliceClient.getCrypto()!;
 
+            // download the device list, to match the trusted-device case
             await aliceClient.startClient();
+            await waitForDeviceList();
+            
+            // Alice does *not* trust the device that signed the backup, but *does* have the decryption key.
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
                 testData.SIGNED_BACKUP_DATA.version!,
             );
-            await waitForDeviceList();
 
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
