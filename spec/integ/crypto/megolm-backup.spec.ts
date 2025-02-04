@@ -1104,7 +1104,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             // download the device list, to match the trusted-device case
             await aliceClient.startClient();
             await waitForDeviceList();
-            
+
             // Alice does *not* trust the device that signed the backup, but *does* have the decryption key.
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
