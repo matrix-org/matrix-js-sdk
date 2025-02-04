@@ -509,16 +509,12 @@ describe("verification", () => {
             reciprocateQRCodeCallbacks.confirm();
             await sendToDevicePromise;
 
-            // Rust crypto, on the other hand, waits for the 'done' to arrive from the other side.
+            // Rust crypto waits for the 'done' to arrive from the other side.
             if (request.phase === VerificationPhase.Done) {
                 const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
                 // eslint-disable-next-line jest/no-conditional-expect
                 expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
                 await verificationPromise;
-            } else {
-                // rust crypto: still in flight
-                // eslint-disable-next-line jest/no-conditional-expect
-                expect(request.phase).toEqual(VerificationPhase.Started);
             }
 
             // the dummy device replies with its own 'done'

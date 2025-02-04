@@ -2318,7 +2318,7 @@ describe("crypto", () => {
             // For legacy crypto, these tests only work properly with a proper (indexeddb-based) CryptoStore, so
             // rather than using the existing `aliceClient`, create a new client. Once we drop legacy crypto, we can
             // just use `aliceClient` here.
-            // XXX: Even with the rust-crypto, we need to create to a new client. The tests fail with a timeout error.
+            // XXX: Even with the rust-crypto, we need to create a new client. The tests fail with a timeout error.
             client1 = await makeNewClient(homeserverurl, userId, "client1");
             await client1.startClient({});
         });
