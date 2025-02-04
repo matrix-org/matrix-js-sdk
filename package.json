@@ -81,7 +81,7 @@
         "@babel/preset-typescript": "^7.12.7",
         "@casualbot/jest-sonar-reporter": "2.2.7",
         "@peculiar/webcrypto": "^1.4.5",
-        "@stylistic/eslint-plugin": "^2.9.0",
+        "@stylistic/eslint-plugin": "^3.0.0",
         "@types/bs58": "^4.0.1",
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
