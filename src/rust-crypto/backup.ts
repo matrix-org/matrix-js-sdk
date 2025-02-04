@@ -303,6 +303,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         const trustInfo = await this.isKeyBackupTrusted(backupInfo);
 
+        // Per the spec, we should enable key upload if either (a) the backup is signed by a trusted key, or
+        // (b) the public key matches the private decryption key that we have received from 4S.
         if (!trustInfo.matchesDecryptionKey && !trustInfo.trusted) {
             if (activeVersion !== null) {
                 logger.log("Key backup present on server but not trusted: disabling key backup");
