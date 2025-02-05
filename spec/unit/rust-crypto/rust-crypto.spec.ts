@@ -2247,6 +2247,7 @@ describe("RustCrypto", () => {
                 hasKey: jest.fn().mockResolvedValue(false),
                 getKey: jest.fn().mockResolvedValue(null),
                 store: jest.fn(),
+                getDefaultKeyId: jest.fn().mockResolvedValue("defaultKeyId"),
             } as unknown as ServerSideSecretStorage;
 
             fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
@@ -2290,6 +2291,7 @@ describe("RustCrypto", () => {
             expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.self_signing", null);
             expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.user_signing", null);
             expect(secretStorage.store).toHaveBeenCalledWith("m.megolm_backup.v1", null);
+            expect(secretStorage.store).toHaveBeenCalledWith("m.secret_storage.key.defaultKeyId", null);
             // A new key backup should be created
             expect(newKeyBackupInfo.auth_data).toBeTruthy();
             // The new cross signing keys should be uploaded
