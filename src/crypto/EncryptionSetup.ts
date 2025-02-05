@@ -16,22 +16,17 @@ limitations under the License.
 
 import { logger } from "../logger.ts";
 import { MatrixEvent } from "../models/event.ts";
-import { createCryptoStoreCacheCallbacks, type ICacheCallbacks } from "./CrossSigning.ts";
+import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
 import { Method, ClientPrefix } from "../http-api/index.ts";
-import { type Crypto, type ICryptoCallbacks } from "./index.ts";
-import {
-    ClientEvent,
-    type ClientEventHandlerMap,
-    type CrossSigningKeys,
-    type ISignedKey,
-    type KeySignatures,
-} from "../client.ts";
-import { type IKeyBackupInfo } from "./keybackup.ts";
+import { Crypto, ICryptoCallbacks } from "./index.ts";
+import { ClientEvent, ClientEventHandlerMap, CrossSigningKeys, ISignedKey, KeySignatures } from "../client.ts";
+import { IKeyBackupInfo } from "./keybackup.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { type AccountDataClient, type SecretStorageKeyDescription } from "../secret-storage.ts";
-import { type BootstrapCrossSigningOpts, type CrossSigningKeyInfo } from "../crypto-api/index.ts";
-import { type AccountDataEvents } from "../@types/event.ts";
+import { AccountDataClient, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { BootstrapCrossSigningOpts, CrossSigningKeyInfo } from "../crypto-api/index.ts";
+import { AccountDataEvents } from "../@types/event.ts";
+import { EmptyObject } from "../@types/common.ts";
 
 interface ICrossSigningKeys {
     authUpload: BootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
@@ -273,7 +268,7 @@ class AccountDataClientAdapter
     public setAccountData<K extends keyof AccountDataEvents>(
         type: K,
         content: AccountDataEvents[K] | Record<string, never>,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const event = new MatrixEvent({ type, content });
         const lastEvent = this.values.get(type);
         this.values.set(type, event);

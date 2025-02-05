@@ -33,6 +33,7 @@ import {
     type AccountDataEvents,
     type Device,
     DeviceVerification,
+    EmptyObject,
     encodeBase64,
     type HttpApiEvent,
     type HttpApiEventHandlerMap,
@@ -2246,6 +2247,8 @@ describe("RustCrypto", () => {
                 setDefaultKeyId: jest.fn(),
                 hasKey: jest.fn().mockResolvedValue(false),
                 getKey: jest.fn().mockResolvedValue(null),
+                store: jest.fn(),
+                getDefaultKeyId: jest.fn().mockResolvedValue("defaultKeyId"),
             } as unknown as ServerSideSecretStorage;
 
             fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
@@ -2284,6 +2287,12 @@ describe("RustCrypto", () => {
             const authUploadDeviceSigningKeys = jest.fn();
             await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
 
+            // The secrets in 4S should be deleted
+            expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.master", null);
+            expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.self_signing", null);
+            expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.user_signing", null);
+            expect(secretStorage.store).toHaveBeenCalledWith("m.megolm_backup.v1", null);
+            expect(secretStorage.store).toHaveBeenCalledWith("m.secret_storage.key.defaultKeyId", null);
             // A new key backup should be created
             expect(newKeyBackupInfo.auth_data).toBeTruthy();
             // The new cross signing keys should be uploaded
@@ -2348,7 +2357,7 @@ class DummyAccountDataClient
         }
     }
 
-    public async setAccountData(eventType: string, content: any): Promise<{}> {
+    public async setAccountData(eventType: string, content: any): Promise<EmptyObject> {
         this.storage.set(eventType, content);
         this.emit(
             ClientEvent.AccountData,

@@ -18,151 +18,125 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { type Optional } from "matrix-events-sdk";
+import { Optional } from "matrix-events-sdk";
 
 import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto.ts";
-import { type ISyncStateData, type SetPresence, SyncApi, type SyncApiOptions, SyncState } from "./sync.ts";
+import { ISyncStateData, SetPresence, SyncApi, SyncApiOptions, SyncState } from "./sync.ts";
 import {
     EventStatus,
-    type IContent,
-    type IDecryptOptions,
-    type IEvent,
+    IContent,
+    IDecryptOptions,
+    IEvent,
     MatrixEvent,
     MatrixEventEvent,
-    type MatrixEventHandlerMap,
-    type PushDetails,
+    MatrixEventHandlerMap,
+    PushDetails,
 } from "./models/event.ts";
 import { StubStore } from "./store/stub.ts";
-import {
-    type CallEvent,
-    type CallEventHandlerMap,
-    createNewMatrixCall,
-    type MatrixCall,
-    supportsMatrixCall,
-} from "./webrtc/call.ts";
-import { Filter, type IFilterDefinition, type IRoomEventFilter } from "./filter.ts";
-import {
-    CallEventHandler,
-    type CallEventHandlerEvent,
-    type CallEventHandlerEventHandlerMap,
-} from "./webrtc/callEventHandler.ts";
+import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call.ts";
+import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter.ts";
+import { CallEventHandler, CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "./webrtc/callEventHandler.ts";
 import {
     GroupCallEventHandler,
-    type GroupCallEventHandlerEvent,
-    type GroupCallEventHandlerEventHandlerMap,
+    GroupCallEventHandlerEvent,
+    GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler.ts";
 import * as utils from "./utils.ts";
-import { noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
+import { noUnsafeEventProps, QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
-import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
-import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
+import { IActionsObject, PushProcessor } from "./pushprocessor.ts";
+import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery.ts";
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
-import { type IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
-import { type IOlmDevice } from "./crypto/algorithms/megolm.ts";
+import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice.ts";
+import { IOlmDevice } from "./crypto/algorithms/megolm.ts";
 import { TypedReEmitter } from "./ReEmitter.ts";
-import { type IRoomEncryption } from "./crypto/RoomList.ts";
-import { logger, type Logger } from "./logger.ts";
+import { IRoomEncryption } from "./crypto/RoomList.ts";
+import { logger, Logger } from "./logger.ts";
 import { SERVICE_TYPES } from "./service-types.ts";
 import {
-    type Body,
+    Body,
     ClientPrefix,
-    type FileType,
-    type HttpApiEvent,
-    type HttpApiEventHandlerMap,
-    type HTTPError,
+    FileType,
+    HttpApiEvent,
+    HttpApiEventHandlerMap,
+    HTTPError,
     IdentityPrefix,
-    type IHttpOpts,
-    type IRequestOpts,
+    IHttpOpts,
+    IRequestOpts,
     MatrixError,
     MatrixHttpApi,
     MediaPrefix,
     Method,
     retryNetworkOperation,
-    type TokenRefreshFunction,
-    type Upload,
-    type UploadOpts,
-    type UploadResponse,
+    TokenRefreshFunction,
+    Upload,
+    UploadOpts,
+    UploadResponse,
 } from "./http-api/index.ts";
 import {
     Crypto,
     CryptoEvent as LegacyCryptoEvent,
-    type CryptoEventHandlerMap as LegacyCryptoEventHandlerMap,
+    CryptoEventHandlerMap as LegacyCryptoEventHandlerMap,
     fixBackupKey,
-    type ICheckOwnCrossSigningTrustOpts,
-    type IRoomKeyRequestBody,
+    ICheckOwnCrossSigningTrustOpts,
+    IRoomKeyRequestBody,
     isCryptoAvailable,
 } from "./crypto/index.ts";
-import { type DeviceInfo } from "./crypto/deviceinfo.ts";
-import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
+import { DeviceInfo } from "./crypto/deviceinfo.ts";
+import { User, UserEvent, UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
-import { DEHYDRATION_ALGORITHM, type IDehydratedDevice, type IDehydratedDeviceKeyInfo } from "./crypto/dehydration.ts";
+import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration.ts";
 import {
-    type IKeyBackupInfo,
-    type IKeyBackupPrepareOpts,
-    type IKeyBackupRestoreOpts,
-    type IKeyBackupRestoreResult,
-    type IKeyBackupRoomSessions,
-    type IKeyBackupSession,
+    IKeyBackupInfo,
+    IKeyBackupPrepareOpts,
+    IKeyBackupRestoreOpts,
+    IKeyBackupRestoreResult,
+    IKeyBackupRoomSessions,
+    IKeyBackupSession,
 } from "./crypto/keybackup.ts";
-import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
-import { type MatrixScheduler } from "./scheduler.ts";
-import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
-import { type AuthDict } from "./interactive-auth.ts";
-import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
-import {
-    CrossSigningKey,
-    type ICreateSecretStorageOpts,
-    type IEncryptedEventInfo,
-    type IRecoveryKey,
-} from "./crypto/api.ts";
-import { type EventTimelineSet } from "./models/event-timeline-set.ts";
-import { type VerificationRequest } from "./crypto/verification/request/VerificationRequest.ts";
-import { type VerificationBase as Verification } from "./crypto/verification/Base.ts";
+import { IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
+import { MatrixScheduler } from "./scheduler.ts";
+import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon.ts";
+import { AuthDict } from "./interactive-auth.ts";
+import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator.ts";
+import { CrossSigningKey, ICreateSecretStorageOpts, IEncryptedEventInfo, IRecoveryKey } from "./crypto/api.ts";
+import { EventTimelineSet } from "./models/event-timeline-set.ts";
+import { VerificationRequest } from "./crypto/verification/request/VerificationRequest.ts";
+import { VerificationBase as Verification } from "./crypto/verification/Base.ts";
 import * as ContentHelpers from "./content-helpers.ts";
+import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning.ts";
+import { NotificationCountType, Room, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room.ts";
+import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member.ts";
+import { IPowerLevelsContent, RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
-    type CrossSigningInfo,
-    type DeviceTrustLevel,
-    type ICacheCallbacks,
-    type UserTrustLevel,
-} from "./crypto/CrossSigning.ts";
-import {
-    NotificationCountType,
-    type Room,
-    type RoomEvent,
-    type RoomEventHandlerMap,
-    type RoomNameState,
-} from "./models/room.ts";
-import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
-import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
-import {
-    type DelayedEventInfo,
-    type IAddThreePidOnlyBody,
-    type IBindThreePidBody,
-    type IContextResponse,
-    type ICreateRoomOpts,
-    type IEventSearchOpts,
-    type IFilterResponse,
-    type IGuestAccessOpts,
-    type IJoinRoomOpts,
-    type INotificationsResponse,
-    type IPaginateOpts,
-    type IPresenceOpts,
-    type IRedactOpts,
-    type IRelationsRequestOpts,
-    type IRelationsResponse,
-    type IRoomDirectoryOptions,
-    type ISearchOpts,
-    type ISendEventResponse,
-    type IStatusResponse,
-    type ITagsResponse,
-    type KnockRoomOpts,
-    type SendDelayedEventRequestOpts,
-    type SendDelayedEventResponse,
-    type UpdateDelayedEventAction,
+    DelayedEventInfo,
+    IAddThreePidOnlyBody,
+    IBindThreePidBody,
+    IContextResponse,
+    ICreateRoomOpts,
+    IEventSearchOpts,
+    IFilterResponse,
+    IGuestAccessOpts,
+    IJoinRoomOpts,
+    INotificationsResponse,
+    IPaginateOpts,
+    IPresenceOpts,
+    IRedactOpts,
+    IRelationsRequestOpts,
+    IRelationsResponse,
+    IRoomDirectoryOptions,
+    ISearchOpts,
+    ISendEventResponse,
+    IStatusResponse,
+    ITagsResponse,
+    KnockRoomOpts,
+    SendDelayedEventRequestOpts,
+    SendDelayedEventResponse,
+    UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
-    type AccountDataEvents,
+    AccountDataEvents,
     EventType,
     LOCAL_NOTIFICATION_SETTINGS_PREFIX,
     MSC3912_RELATION_BASED_REDACTIONS_PROP,
@@ -171,8 +145,8 @@ import {
     RelationType,
     RoomCreateTypeField,
     RoomType,
-    type StateEvents,
-    type TimelineEvents,
+    StateEvents,
+    TimelineEvents,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
@@ -180,65 +154,54 @@ import {
 import {
     GuestAccess,
     HistoryVisibility,
-    type IdServerUnbindResult,
-    type JoinRule,
+    IdServerUnbindResult,
+    JoinRule,
     Preset,
-    type Terms,
-    type Visibility,
+    Terms,
+    Visibility,
 } from "./@types/partials.ts";
-import { type EventMapper, eventMapperFor, type MapperOpts } from "./event-mapper.ts";
+import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper.ts";
 import { secureRandomString } from "./randomstring.ts";
-import {
-    BackupManager,
-    type IKeyBackup,
-    type IKeyBackupCheck,
-    type IPreparedKeyBackupVersion,
-    type TrustInfo,
-} from "./crypto/backup.ts";
+import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup.ts";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
-import { type ISignatures } from "./@types/signed.ts";
-import { type IStore } from "./store/index.ts";
-import { type ISecretRequest } from "./crypto/SecretStorage.ts";
+import { ISignatures } from "./@types/signed.ts";
+import { IStore } from "./store/index.ts";
+import { ISecretRequest } from "./crypto/SecretStorage.ts";
 import {
-    type IEventWithRoomId,
-    type ISearchRequestBody,
-    type ISearchResponse,
-    type ISearchResults,
-    type IStateEventWithRoomId,
+    IEventWithRoomId,
+    ISearchRequestBody,
+    ISearchResponse,
+    ISearchResults,
+    IStateEventWithRoomId,
     SearchOrderBy,
 } from "./@types/search.ts";
-import { type ISynapseAdminDeactivateResponse, type ISynapseAdminWhoisResponse } from "./@types/synapse.ts";
-import { type IHierarchyRoom } from "./@types/spaces.ts";
+import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse.ts";
+import { IHierarchyRoom } from "./@types/spaces.ts";
 import {
-    type IPusher,
-    type IPusherRequest,
-    type IPushRule,
-    type IPushRules,
-    type PushRuleAction,
+    IPusher,
+    IPusherRequest,
+    IPushRule,
+    IPushRules,
+    PushRuleAction,
     PushRuleActionName,
     PushRuleKind,
-    type RuleId,
+    RuleId,
 } from "./@types/PushRules.ts";
-import { type IThreepid } from "./@types/threepids.ts";
-import { type CryptoStore, type OutgoingRoomKeyRequest } from "./crypto/store/base.ts";
-import {
-    GroupCall,
-    type GroupCallIntent,
-    type GroupCallType,
-    type IGroupCallDataChannelOptions,
-} from "./webrtc/groupCall.ts";
+import { IThreepid } from "./@types/threepids.ts";
+import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base.ts";
+import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./webrtc/groupCall.ts";
 import { MediaHandler } from "./webrtc/mediaHandler.ts";
 import {
-    type ILoginFlowsResponse,
-    type IRefreshTokenResponse,
-    type LoginRequest,
-    type LoginResponse,
-    type LoginTokenPostResponse,
-    type SSOAction,
+    ILoginFlowsResponse,
+    IRefreshTokenResponse,
+    LoginRequest,
+    LoginResponse,
+    LoginTokenPostResponse,
+    SSOAction,
 } from "./@types/auth.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts.ts";
-import { type MSC3575SlidingSyncRequest, type MSC3575SlidingSyncResponse, type SlidingSync } from "./sliding-sync.ts";
+import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
 import {
     determineFeatureSupport,
@@ -248,48 +211,45 @@ import {
     ThreadFilterType,
     threadFilterTypeToFilter,
 } from "./models/thread.ts";
-import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
+import { M_BEACON_INFO, MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
-import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
+import { ToDeviceBatch } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
-import { type UIARequest, type UIAResponse } from "./@types/uia.ts";
-import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
+import { UIARequest, UIAResponse } from "./@types/uia.ts";
+import { LocalNotificationSettings } from "./@types/local_notifications.ts";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature.ts";
-import { type BackupDecryptor, type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
+import { BackupDecryptor, CryptoBackend } from "./common-crypto/CryptoBackend.ts";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
 import {
-    type BootstrapCrossSigningOpts,
-    type CrossSigningKeyInfo,
-    type CryptoApi,
+    BootstrapCrossSigningOpts,
+    CrossSigningKeyInfo,
+    CryptoApi,
     decodeRecoveryKey,
-    type ImportRoomKeysOpts,
+    ImportRoomKeysOpts,
     CryptoEvent,
-    type CryptoEventHandlerMap,
-    type CryptoCallbacks,
+    CryptoEventHandlerMap,
+    CryptoCallbacks,
 } from "./crypto-api/index.ts";
-import { type DeviceInfoMap } from "./crypto/DeviceList.ts";
+import { DeviceInfoMap } from "./crypto/DeviceList.ts";
 import {
-    type AddSecretStorageKeyOpts,
-    type SecretStorageKey,
-    type SecretStorageKeyDescription,
-    type ServerSideSecretStorage,
+    AddSecretStorageKeyOpts,
+    SecretStorageKey,
+    SecretStorageKeyDescription,
+    ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
 } from "./secret-storage.ts";
-import { type RegisterRequest, type RegisterResponse } from "./@types/registration.ts";
+import { RegisterRequest, RegisterResponse } from "./@types/registration.ts";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager.ts";
 import { getRelationsThreadFilter } from "./thread-utils.ts";
-import { KnownMembership, type Membership } from "./@types/membership.ts";
-import { type RoomMessageEventContent, type StickerEventContent } from "./@types/events.ts";
-import { type ImageInfo } from "./@types/media.ts";
-import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
+import { KnownMembership, Membership } from "./@types/membership.ts";
+import { RoomMessageEventContent, StickerEventContent } from "./@types/events.ts";
+import { ImageInfo } from "./@types/media.ts";
+import { Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { keyFromAuthData } from "./common-crypto/key-passphrase.ts";
-import {
-    discoverAndValidateOIDCIssuerWellKnown,
-    type OidcClientConfig,
-    validateAuthMetadataAndKeys,
-} from "./oidc/index.ts";
+import { discoverAndValidateOIDCIssuerWellKnown, OidcClientConfig, validateAuthMetadataAndKeys } from "./oidc/index.ts";
+import { EmptyObject } from "./@types/common.ts";
 
 export type Store = IStore;
 
@@ -4292,7 +4252,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setAccountData<K extends keyof AccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
             $userId: this.credentials.userId!,
             $type: eventType,
@@ -4379,8 +4339,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
      */
-    public setIgnoredUsers(userIds: string[]): Promise<{}> {
-        const content = { ignored_users: {} as Record<string, object> };
+    public setIgnoredUsers(userIds: string[]): Promise<EmptyObject> {
+        const content = { ignored_users: {} as Record<string, EmptyObject> };
         userIds.forEach((u) => {
             content.ignored_users[u] = {};
         });
@@ -4561,7 +4521,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<{}> {
+    public setRoomTag(roomId: string, tagName: string, metadata: ITagMetadata = {}): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -4575,7 +4535,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
      */
-    public deleteRoomTag(roomId: string, tagName: string): Promise<{}> {
+    public deleteRoomTag(roomId: string, tagName: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -4590,7 +4550,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<{}> {
+    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -5490,7 +5450,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
      */
     // eslint-disable-next-line
-    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<{}> {
+    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw Error("Server does not support the delayed events API");
         }
@@ -5521,7 +5481,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         receiptType: ReceiptType,
         body?: Record<string, any>,
         unthreaded = false,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
         }
@@ -5537,7 +5497,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const shouldAddThreadId = !unthreaded && this.supportsThreads();
         const fullBody = shouldAddThreadId ? { ...body, thread_id: threadIdForReceipt(event) } : body;
 
-        const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, fullBody || {});
+        const promise = this.http.authedRequest<EmptyObject>(Method.Post, path, undefined, fullBody || {});
 
         const room = this.getRoom(event.getRoomId());
         if (room && this.credentials.userId) {
@@ -5557,7 +5517,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         event: MatrixEvent | null,
         receiptType = ReceiptType.Read,
         unthreaded = false,
-    ): Promise<{} | undefined> {
+    ): Promise<EmptyObject | undefined> {
         if (!event) return;
         const eventId = event.getId()!;
         const room = this.getRoom(event.getRoomId());
@@ -5587,7 +5547,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         rmEventId: string,
         rrEvent?: MatrixEvent,
         rpEvent?: MatrixEvent,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const room = this.getRoom(roomId);
         if (room?.hasPendingEvent(rmEventId)) {
             throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
@@ -5668,7 +5628,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public sendTyping(roomId: string, isTyping: boolean, timeoutMs: number): Promise<{}> {
+    public sendTyping(roomId: string, isTyping: boolean, timeoutMs: number): Promise<EmptyObject> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send typing notifications so don't bother.
         }
@@ -5786,7 +5746,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public invite(roomId: string, userId: string, reason?: string): Promise<{}> {
+    public invite(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
         return this.membershipChange(roomId, userId, KnownMembership.Invite, reason);
     }
 
@@ -5797,7 +5757,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public inviteByEmail(roomId: string, email: string): Promise<{}> {
+    public inviteByEmail(roomId: string, email: string): Promise<EmptyObject> {
         return this.inviteByThreePid(roomId, "email", email);
     }
 
@@ -5809,7 +5769,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async inviteByThreePid(roomId: string, medium: string, address: string): Promise<{}> {
+    public async inviteByThreePid(roomId: string, medium: string, address: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/invite", { $roomId: roomId });
 
         const identityServerUrl = this.getIdentityServerUrl(true);
@@ -5841,7 +5801,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public leave(roomId: string): Promise<{}> {
+    public leave(roomId: string): Promise<EmptyObject> {
         return this.membershipChange(roomId, undefined, KnownMembership.Leave);
     }
 
@@ -5899,7 +5859,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public ban(roomId: string, userId: string, reason?: string): Promise<{}> {
+    public ban(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
         return this.membershipChange(roomId, userId, KnownMembership.Ban, reason);
     }
 
@@ -5909,12 +5869,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async forget(roomId: string, deleteRoom = true): Promise<{}> {
+    public async forget(roomId: string, deleteRoom = true): Promise<EmptyObject> {
         // API returns an empty object
         const path = utils.encodeUri("/rooms/$room_id/forget", {
             $room_id: roomId,
         });
-        const response = await this.http.authedRequest<{}>(Method.Post, path);
+        const response = await this.http.authedRequest<EmptyObject>(Method.Post, path);
         if (deleteRoom) {
             this.store.removeRoom(roomId);
             this.emit(ClientEvent.DeleteRoom, roomId);
@@ -5926,7 +5886,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Object (currently empty)
      * @returns Rejects: with an error response.
      */
-    public unban(roomId: string, userId: string): Promise<{}> {
+    public unban(roomId: string, userId: string): Promise<EmptyObject> {
         // unbanning != set their state to leave: this used to be
         // the case, but was then changed so that leaving was always
         // a revoking of privilege, otherwise two people racing to
@@ -5946,7 +5906,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public kick(roomId: string, userId: string, reason?: string): Promise<{}> {
+    public kick(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/kick", {
             $roomId: roomId,
         });
@@ -5962,7 +5922,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         userId: string | undefined,
         membership: Membership,
         reason?: string,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         // API returns an empty object
         const path = utils.encodeUri("/rooms/$room_id/$membership", {
             $room_id: roomId,
@@ -6013,9 +5973,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     // eslint-disable-next-line camelcase
-    public setProfileInfo(info: "avatar_url", data: { avatar_url: string }): Promise<{}>;
-    public setProfileInfo(info: "displayname", data: { displayname: string }): Promise<{}>;
-    public setProfileInfo(info: "avatar_url" | "displayname", data: object): Promise<{}> {
+    public setProfileInfo(info: "avatar_url", data: { avatar_url: string }): Promise<EmptyObject>;
+    public setProfileInfo(info: "displayname", data: { displayname: string }): Promise<EmptyObject>;
+    public setProfileInfo(info: "avatar_url" | "displayname", data: object): Promise<EmptyObject> {
         const path = utils.encodeUri("/profile/$userId/$info", {
             $userId: this.credentials.userId!,
             $info: info,
@@ -6027,7 +5987,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async setDisplayName(name: string): Promise<{}> {
+    public async setDisplayName(name: string): Promise<EmptyObject> {
         const prom = await this.setProfileInfo("displayname", { displayname: name });
         // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
         const user = this.getUser(this.getUserId()!);
@@ -6042,7 +6002,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
-    public async setAvatarUrl(url: string): Promise<{}> {
+    public async setAvatarUrl(url: string): Promise<EmptyObject> {
         const prom = await this.setProfileInfo("avatar_url", { avatar_url: url });
         // XXX: synthesise a profile update for ourselves because Synapse is broken and won't
         const user = this.getUser(this.getUserId()!);
@@ -8404,7 +8364,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param stopClient - whether to stop the client before calling /logout to prevent invalid token errors.
      * @returns Promise which resolves: On success, the empty object `{}`
      */
-    public async logout(stopClient = false): Promise<{}> {
+    public async logout(stopClient = false): Promise<EmptyObject> {
         if (this.crypto?.backupManager?.getKeyBackupEnabled()) {
             try {
                 while ((await this.crypto.backupManager.backupPendingKeys(200)) > 0);
@@ -8462,7 +8422,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * or UIA auth data.
      */
     public async requestLoginToken(auth?: AuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
-        const body: UIARequest<{}> = { auth };
+        const body: UIARequest<unknown> = { auth };
         return this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
             Method.Post,
             "/login/get_token",
@@ -8703,7 +8663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         rmEventId: string,
         rrEventId?: string,
         rpEventId?: string,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/read_markers", {
             $roomId: roomId,
         });
@@ -8778,7 +8738,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public createAlias(alias: string, roomId: string): Promise<{}> {
+    public createAlias(alias: string, roomId: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -8795,7 +8755,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object `{}`.
      * @returns Rejects: with an error response.
      */
-    public deleteAlias(alias: string): Promise<{}> {
+    public deleteAlias(alias: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -8849,7 +8809,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomDirectoryVisibility(roomId: string, visibility: Visibility): Promise<{}> {
+    public setRoomDirectoryVisibility(roomId: string, visibility: Visibility): Promise<EmptyObject> {
         const path = utils.encodeUri("/directory/list/room/$roomId", {
             $roomId: roomId,
         });
@@ -9124,7 +9084,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
+    public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<EmptyObject> {
         const path = "/account/3pid/add";
         return this.http.authedRequest(Method.Post, path, undefined, data);
     }
@@ -9140,7 +9100,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
+    public async bindThreePid(data: IBindThreePidBody): Promise<EmptyObject> {
         const path = "/account/3pid/bind";
         return this.http.authedRequest(Method.Post, path, undefined, data);
     }
@@ -9194,7 +9154,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setPassword(authDict: AuthDict, newPassword: string, logoutDevices?: boolean): Promise<{}> {
+    public setPassword(authDict: AuthDict, newPassword: string, logoutDevices?: boolean): Promise<EmptyObject> {
         const path = "/account/password";
         const data = {
             auth: authDict,
@@ -9202,7 +9162,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logout_devices: logoutDevices,
         };
 
-        return this.http.authedRequest<{}>(Method.Post, path, undefined, data);
+        return this.http.authedRequest<EmptyObject>(Method.Post, path, undefined, data);
     }
 
     /**
@@ -9236,7 +9196,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     // eslint-disable-next-line camelcase
-    public setDeviceDetails(deviceId: string, body: { display_name: string }): Promise<{}> {
+    public setDeviceDetails(deviceId: string, body: { display_name: string }): Promise<EmptyObject> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -9252,7 +9212,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteDevice(deviceId: string, auth?: AuthDict): Promise<{}> {
+    public deleteDevice(deviceId: string, auth?: AuthDict): Promise<EmptyObject> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,
         });
@@ -9274,7 +9234,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: result object
      * @returns Rejects: with an error response.
      */
-    public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<{}> {
+    public deleteMultipleDevices(devices: string[], auth?: AuthDict): Promise<EmptyObject> {
         const body: Body = { devices };
 
         if (auth) {
@@ -9315,7 +9275,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Empty json object on success
      * @returns Rejects: with an error response.
      */
-    public setPusher(pusher: IPusherRequest): Promise<{}> {
+    public setPusher(pusher: IPusherRequest): Promise<EmptyObject> {
         const path = "/pushers/set";
         return this.http.authedRequest(Method.Post, path, undefined, pusher);
     }
@@ -9327,7 +9287,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: Empty json object on success
      * @returns Rejects: with an error response.
      */
-    public removePusher(pushKey: string, appId: string): Promise<{}> {
+    public removePusher(pushKey: string, appId: string): Promise<EmptyObject> {
         const path = "/pushers/set";
         const body = {
             pushkey: pushKey,
@@ -9345,7 +9305,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setLocalNotificationSettings(
         deviceId: string,
         notificationSettings: LocalNotificationSettings,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}` as const;
         return this.setAccountData(key, notificationSettings);
     }
@@ -9382,7 +9342,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         kind: PushRuleKind,
         ruleId: Exclude<string, RuleId>,
         body: Pick<IPushRule, "actions" | "conditions" | "pattern">,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -9395,7 +9355,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public deletePushRule(scope: string, kind: PushRuleKind, ruleId: Exclude<string, RuleId>): Promise<{}> {
+    public deletePushRule(scope: string, kind: PushRuleKind, ruleId: Exclude<string, RuleId>): Promise<EmptyObject> {
         // NB. Scope not uri encoded because devices need the '/'
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
             $kind: kind,
@@ -9414,7 +9374,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         kind: PushRuleKind,
         ruleId: RuleId | string,
         enabled: boolean,
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
             $kind: kind,
             $ruleId: ruleId,
@@ -9432,7 +9392,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         kind: PushRuleKind,
         ruleId: RuleId | string,
         actions: PushRuleAction[],
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
             $kind: kind,
             $ruleId: ruleId,
@@ -9558,7 +9518,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Get, "/keys/changes", qps);
     }
 
-    public uploadDeviceSigningKeys(auth?: AuthDict, keys?: CrossSigningKeys): Promise<{}> {
+    public uploadDeviceSigningKeys(auth?: AuthDict, keys?: CrossSigningKeys): Promise<EmptyObject> {
         // API returns empty object
         const data = Object.assign({}, keys);
         if (auth) Object.assign(data, { auth });
@@ -9898,7 +9858,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
               medium: string;
               mxid: string;
           }
-        | {}
+        | EmptyObject
     > {
         // Note: we're using the V2 API by calling this function, but our
         // function contract requires a V1 response. We therefore have to
@@ -9994,7 +9954,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    supplied.
      * @returns Promise which resolves: to an empty object `{}`
      */
-    public sendToDevice(eventType: string, contentMap: SendToDeviceContentMap, txnId?: string): Promise<{}> {
+    public sendToDevice(eventType: string, contentMap: SendToDeviceContentMap, txnId?: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
             $eventType: eventType,
             $txnId: txnId ? txnId : this.makeTxnId(),
@@ -10088,7 +10048,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         baseUrl: string,
         accessToken: string,
         termsUrls: string[],
-    ): Promise<{}> {
+    ): Promise<EmptyObject> {
         const url = this.termsUrlForService(serviceType, baseUrl);
         const headers = {
             Authorization: "Bearer " + accessToken,
@@ -10111,7 +10071,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param reason - The reason the content is being reported. May be blank.
      * @returns Promise which resolves to an empty object if successful
      */
-    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<{}> {
+    public reportEvent(roomId: string, eventId: string, score: number, reason: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/report/$eventId", {
             $roomId: roomId,
             $eventId: eventId,
