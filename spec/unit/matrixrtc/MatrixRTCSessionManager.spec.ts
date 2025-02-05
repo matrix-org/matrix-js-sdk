@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mock } from "jest-mock";
+import { type Mock } from "jest-mock";
 
 import {
     ClientEvent,
     EventTimeline,
     EventType,
-    IRoomTimelineData,
+    type IRoomTimelineData,
     MatrixClient,
-    MatrixEvent,
+    type MatrixEvent,
     RoomEvent,
 } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";

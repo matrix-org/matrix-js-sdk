@@ -16,21 +16,21 @@ limitations under the License.
 
 import "../../olm-loader";
 import * as olmlib from "../../../src/crypto/olmlib";
-import { IObject } from "../../../src/crypto/olmlib";
+import { type IObject } from "../../../src/crypto/olmlib";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from "../../TestClient";
 import { makeTestClients } from "./verification/util";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from "../../../src/logger";
-import { ClientEvent, ICreateClientOpts, MatrixClient } from "../../../src/client";
+import { ClientEvent, type ICreateClientOpts, type MatrixClient } from "../../../src/client";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
-import { ISignatures } from "../../../src/@types/signed";
-import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
-import { SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
+import { type ISignatures } from "../../../src/@types/signed";
+import { type ICurve25519AuthData } from "../../../src/crypto/keybackup";
+import { type SecretStorageKeyDescription, SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
 import { decodeBase64 } from "../../../src/base64";
-import { CrossSigningKeyInfo } from "../../../src/crypto-api";
-import { SecretInfo } from "../../../src/secret-storage.ts";
+import { type CrossSigningKeyInfo } from "../../../src/crypto-api";
+import { type SecretInfo } from "../../../src/secret-storage.ts";
 
 async function makeTestClient(
     userInfo: { userId: string; deviceId: string },

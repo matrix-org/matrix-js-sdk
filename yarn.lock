@@ -3155,10 +3155,10 @@ eslint-plugin-jsdoc@^50.0.0:
     spdx-expression-parse "^4.0.0"
     synckit "^0.9.1"
 
-eslint-plugin-matrix-org@^2.0.1:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-2.0.2.tgz#95b86b0f16704ab19740f7c3c62eae69e20365e6"
-  integrity sha512-cQy5Rjeq6uyu1mLXlPZwEJdyM0NmclrnEz68y792FSuuxzMyJNNYLGDQ5CkYW8H+PrD825HUFZ34pNXnjMOzOw==
+eslint-plugin-matrix-org@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-2.1.0.tgz#9053726119f107154f5210665c2f84219425c190"
+  integrity sha512-YjVQ0qunzVV34tpUchLWhOrOalGfRLm0tclS4dPYnXS8Ui+p12o/YtRHt+26Mg5tJ0QH76HsGC0LJKLVLNoqfg==
 
 eslint-plugin-n@^14.0.0:
   version "14.0.0"

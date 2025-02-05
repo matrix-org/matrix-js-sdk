@@ -22,27 +22,27 @@ import type { IMegolmSessionData } from "../@types/crypto.ts";
 import { MatrixClient } from "../client.ts";
 import { logger } from "../logger.ts";
 import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib.ts";
-import { DeviceInfo } from "./deviceinfo.ts";
-import { DeviceTrustLevel } from "./CrossSigning.ts";
+import { type DeviceInfo } from "./deviceinfo.ts";
+import { type DeviceTrustLevel } from "./CrossSigning.ts";
 import { keyFromPassphrase } from "./key_passphrase.ts";
 import { encodeUri, safeSet, sleep } from "../utils.ts";
 import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store.ts";
 import {
-    Curve25519SessionData,
-    IAes256AuthData,
-    ICurve25519AuthData,
-    IKeyBackupInfo,
-    IKeyBackupSession,
+    type Curve25519SessionData,
+    type IAes256AuthData,
+    type ICurve25519AuthData,
+    type IKeyBackupInfo,
+    type IKeyBackupSession,
 } from "./keybackup.ts";
 import { UnstableValue } from "../NamespacedValue.ts";
 import { CryptoEvent } from "./index.ts";
-import { ClientPrefix, HTTPError, MatrixError, Method } from "../http-api/index.ts";
-import { BackupTrustInfo } from "../crypto-api/keybackup.ts";
-import { BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { ClientPrefix, type HTTPError, MatrixError, Method } from "../http-api/index.ts";
+import { type BackupTrustInfo } from "../crypto-api/keybackup.ts";
+import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
 import { encodeRecoveryKey } from "../crypto-api/index.ts";
 import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
-import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { calculateKeyCheck } from "../secret-storage.ts";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;

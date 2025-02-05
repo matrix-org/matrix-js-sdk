@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { KeyBackupInfo } from "../../../../src/crypto-api/keybackup";
-import { DumpDataSetInfo } from "../index";
+import { type KeyBackupInfo } from "../../../../src/crypto-api/keybackup";
+import { type DumpDataSetInfo } from "../index";
 
 /**
  * A key query response containing the current keys of the tested user.

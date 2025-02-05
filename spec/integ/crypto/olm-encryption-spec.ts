@@ -33,8 +33,20 @@ import type { IDeviceKeys, IOneTimeKey } from "../../../src/@types/crypto";
 import { logger } from "../../../src/logger";
 import * as testUtils from "../../test-utils/test-utils";
 import { TestClient } from "../../TestClient";
-import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../../src/client";
-import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent, MsgType } from "../../../src/matrix";
+import {
+    CRYPTO_ENABLED,
+    type IClaimKeysRequest,
+    type IQueryKeysRequest,
+    type IUploadKeysRequest,
+} from "../../../src/client";
+import {
+    ClientEvent,
+    type IContent,
+    type ISendEventResponse,
+    type MatrixClient,
+    MatrixEvent,
+    MsgType,
+} from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { KnownMembership } from "../../../src/@types/membership";
 

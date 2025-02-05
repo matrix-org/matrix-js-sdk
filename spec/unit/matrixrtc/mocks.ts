@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, MatrixEvent, Room } from "../../../src";
-import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { EventType, type MatrixEvent, type Room } from "../../../src";
+import { type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 
 type MembershipData = SessionMembershipData[] | SessionMembershipData | {};

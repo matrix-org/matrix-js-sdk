@@ -20,7 +20,7 @@ import {
     LocationAssetType,
     M_LOCATION,
     M_TIMESTAMP,
-    LocationEventWireContent,
+    type LocationEventWireContent,
 } from "../../src/@types/location";
 import { M_TEXT } from "../../src/@types/extensible_events";
 import { MsgType } from "../../src/@types/event";

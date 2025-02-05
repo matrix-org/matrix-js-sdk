@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../../src/client";
+import { type MatrixClient } from "../../src/client";
 import { logger } from "../../src/logger";
 import { InteractiveAuth, AuthType } from "../../src/interactive-auth";
 import { HTTPError, MatrixError } from "../../src/http-api";

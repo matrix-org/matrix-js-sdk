@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
-import { Logger } from "../logger.ts";
-import { defer, IDeferred, logDuration } from "../utils.ts";
+import { type OutgoingRequest, type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type Logger } from "../logger.ts";
+import { defer, type IDeferred, logDuration } from "../utils.ts";
 
 /**
  * OutgoingRequestsManager: responsible for processing outgoing requests from the OlmMachine.

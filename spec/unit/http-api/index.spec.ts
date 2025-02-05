@@ -16,7 +16,7 @@ limitations under the License.
 
 import { mocked } from "jest-mock";
 
-import { ClientPrefix, MatrixHttpApi, Method, UploadResponse } from "../../../src";
+import { ClientPrefix, MatrixHttpApi, Method, type UploadResponse } from "../../../src";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 
 type Writeable<T> = { -readonly [P in keyof T]: T[P] };

@@ -20,9 +20,9 @@ import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
 import { logger } from "../logger.ts";
-import { Crypto } from "./index.ts";
+import { type Crypto } from "./index.ts";
 import { Method } from "../http-api/index.ts";
-import { SecretStorageKeyDescription } from "../secret-storage.ts";
+import { type SecretStorageKeyDescription } from "../secret-storage.ts";
 import decryptAESSecretStorageItem from "../utils/decryptAESSecretStorageItem.ts";
 import encryptAESSecretStorageItem from "../utils/encryptAESSecretStorageItem.ts";
 

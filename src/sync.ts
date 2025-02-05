@@ -23,43 +23,49 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
-import { Optional } from "matrix-events-sdk";
+import { type Optional } from "matrix-events-sdk";
 
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
 import { User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
-import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
+import { deepCopy, defer, type IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
 import { logger } from "./logger.ts";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client.ts";
 import {
-    IEphemeral,
-    IInvitedRoom,
-    IInviteState,
-    IJoinedRoom,
-    ILeftRoom,
-    IKnockedRoom,
-    IMinimalEvent,
-    IRoomEvent,
-    IStateEvent,
-    IStrippedState,
-    ISyncResponse,
-    ITimeline,
-    IToDeviceEvent,
+    ClientEvent,
+    type IStoredClientOpts,
+    type MatrixClient,
+    PendingEventOrdering,
+    type ResetTimelineCallback,
+} from "./client.ts";
+import {
+    type IEphemeral,
+    type IInvitedRoom,
+    type IInviteState,
+    type IJoinedRoom,
+    type ILeftRoom,
+    type IKnockedRoom,
+    type IMinimalEvent,
+    type IRoomEvent,
+    type IStateEvent,
+    type IStrippedState,
+    type ISyncResponse,
+    type ITimeline,
+    type IToDeviceEvent,
 } from "./sync-accumulator.ts";
-import { MatrixEvent } from "./models/event.ts";
-import { MatrixError, Method } from "./http-api/index.ts";
-import { ISavedSync } from "./store/index.ts";
+import { type MatrixEvent } from "./models/event.ts";
+import { type MatrixError, Method } from "./http-api/index.ts";
+import { type ISavedSync } from "./store/index.ts";
 import { EventType } from "./@types/event.ts";
-import { IPushRules } from "./@types/PushRules.ts";
-import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state.ts";
+import { type IPushRules } from "./@types/PushRules.ts";
+import { RoomStateEvent, type IMarkerFoundOptions } from "./models/room-state.ts";
 import { RoomMemberEvent } from "./models/room-member.ts";
 import { BeaconEvent } from "./models/beacon.ts";
-import { IEventsResponse } from "./@types/requests.ts";
+import { type IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
-import { Crypto } from "./crypto/index.ts";
+import { type Crypto } from "./crypto/index.ts";
 import { KnownMembership } from "./@types/membership.ts";
 
 const DEBUG = true;

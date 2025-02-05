@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd, UnstableValue } from "matrix-events-sdk";
+import { type EitherAnd, UnstableValue } from "matrix-events-sdk";
 
 import {
-    ExtensibleAnyMessageEventContent,
-    REFERENCE_RELATION,
-    RelatesToRelationship,
-    TSNamespace,
+    type ExtensibleAnyMessageEventContent,
+    type REFERENCE_RELATION,
+    type RelatesToRelationship,
+    type TSNamespace,
 } from "./extensible_events.ts";
-import { EmptyObject } from "./common.ts";
+import { type EmptyObject } from "./common.ts";
 
 /**
  * Identifier for a disclosed poll.

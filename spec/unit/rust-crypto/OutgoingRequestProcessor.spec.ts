@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import MockHttpBackend from "matrix-mock-request";
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import {
     KeysBackupRequest,
@@ -31,7 +31,13 @@ import {
 import fetchMock from "fetch-mock-jest";
 
 import { TypedEventEmitter } from "../../../src";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, MatrixHttpApi, UIAuthCallback } from "../../../src";
+import {
+    type HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    type IHttpOpts,
+    MatrixHttpApi,
+    type UIAuthCallback,
+} from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { defer } from "../../../src/utils";
 

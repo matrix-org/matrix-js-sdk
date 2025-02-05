@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { TransportStatsBuilder } from "../../../../src/webrtc/stats/transportStatsBuilder";
-import { TransportStats } from "../../../../src/webrtc/stats/transportStats";
+import { type TransportStats } from "../../../../src/webrtc/stats/transportStats";
 
 describe("TransportStatsReporter", () => {
     describe("should on build report", () => {

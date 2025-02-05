@@ -19,18 +19,18 @@ limitations under the License.
  */
 
 import type { PkSigning } from "@matrix-org/olm";
-import { IObject, pkSign, pkVerify } from "./olmlib.ts";
+import { type IObject, pkSign, pkVerify } from "./olmlib.ts";
 import { logger } from "../logger.ts";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store.ts";
-import { DeviceInfo } from "./deviceinfo.ts";
-import { ISignedKey, MatrixClient } from "../client.ts";
-import { OlmDevice } from "./OlmDevice.ts";
-import { ICryptoCallbacks } from "./index.ts";
-import { ISignatures } from "../@types/signed.ts";
-import { CryptoStore, SecretStorePrivateKeys } from "./store/base.ts";
-import { ServerSideSecretStorage, SecretStorageKeyDescription } from "../secret-storage.ts";
+import { type DeviceInfo } from "./deviceinfo.ts";
+import { type ISignedKey, type MatrixClient } from "../client.ts";
+import { type OlmDevice } from "./OlmDevice.ts";
+import { type ICryptoCallbacks } from "./index.ts";
+import { type ISignatures } from "../@types/signed.ts";
+import { type CryptoStore, type SecretStorePrivateKeys } from "./store/base.ts";
+import { type ServerSideSecretStorage, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import {
-    CrossSigningKeyInfo,
+    type CrossSigningKeyInfo,
     DeviceVerificationStatus,
     UserVerificationStatus as UserTrustLevel,
 } from "../crypto-api/index.ts";

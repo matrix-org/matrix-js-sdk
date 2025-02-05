@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IContent, MatrixClient, MatrixEvent } from "../../../src";
-import { Room } from "../../../src/models/room";
+import { type IContent, type MatrixClient, type MatrixEvent } from "../../../src";
+import { type Room } from "../../../src/models/room";
 import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../../../src/@types/event";
-import { EventTimelineSet } from "../../../src/models/event-timeline-set";
-import { EventTimeline } from "../../../src/models/event-timeline";
+import { type EventTimelineSet } from "../../../src/models/event-timeline-set";
+import { type EventTimeline } from "../../../src/models/event-timeline";
 import { MSC3089Branch } from "../../../src/models/MSC3089Branch";
 import { MSC3089TreeSpace } from "../../../src/models/MSC3089TreeSpace";
-import { EncryptedFile } from "../../../src/@types/media";
+import { type EncryptedFile } from "../../../src/@types/media";
 
 describe("MSC3089Branch", () => {
     let client: MatrixClient;

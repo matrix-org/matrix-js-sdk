@@ -18,19 +18,19 @@ limitations under the License.
  * This is an internal module. See {@link MemoryStore} for the public class.
  */
 
-import { EventType } from "../@types/event.ts";
-import { Room } from "../models/room.ts";
-import { User } from "../models/user.ts";
-import { IEvent, MatrixEvent } from "../models/event.ts";
-import { RoomState, RoomStateEvent } from "../models/room-state.ts";
-import { RoomMember } from "../models/room-member.ts";
-import { Filter } from "../filter.ts";
-import { ISavedSync, IStore, UserCreator } from "./index.ts";
-import { RoomSummary } from "../models/room-summary.ts";
-import { ISyncResponse } from "../sync-accumulator.ts";
-import { IStateEventWithRoomId } from "../@types/search.ts";
-import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
-import { IStoredClientOpts } from "../client.ts";
+import { type EventType } from "../@types/event.ts";
+import { type Room } from "../models/room.ts";
+import { type User } from "../models/user.ts";
+import { type IEvent, type MatrixEvent } from "../models/event.ts";
+import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { type RoomMember } from "../models/room-member.ts";
+import { type Filter } from "../filter.ts";
+import { type ISavedSync, type IStore, type UserCreator } from "./index.ts";
+import { type RoomSummary } from "../models/room-summary.ts";
+import { type ISyncResponse } from "../sync-accumulator.ts";
+import { type IStateEventWithRoomId } from "../@types/search.ts";
+import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { type IStoredClientOpts } from "../client.ts";
 import { MapWithDefault } from "../utils.ts";
 import { KnownMembership } from "../@types/membership.ts";
 

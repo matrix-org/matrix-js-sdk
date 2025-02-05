@@ -16,10 +16,10 @@ limitations under the License.
 
 import { logger } from "../../../src/logger";
 import {
-    RendezvousFailureListener,
-    RendezvousFailureReason,
-    RendezvousTransport,
-    RendezvousTransportDetails,
+    type RendezvousFailureListener,
+    type RendezvousFailureReason,
+    type RendezvousTransport,
+    type RendezvousTransportDetails,
 } from "../../../src/rendezvous";
 import { sleep } from "../../../src/utils";
 

@@ -3,7 +3,7 @@ import { mocked } from "jest-mock";
 import * as utils from "../test-utils/test-utils";
 import { Direction, EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src/models/room-state";
-import { MatrixClient } from "../../src/matrix";
+import { type MatrixClient } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { RoomMember } from "../../src/models/room-member";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";

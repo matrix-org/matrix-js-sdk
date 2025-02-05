@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
+import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
+import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
 import { logger, LogSpan } from "../../../src/logger";
 
 afterEach(() => {

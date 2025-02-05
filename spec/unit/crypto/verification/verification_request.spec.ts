@@ -21,9 +21,9 @@ import {
 } from "../../../../src/crypto/verification/request/VerificationRequest";
 import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
 import { ToDeviceChannel } from "../../../../src/crypto/verification/request/ToDeviceChannel";
-import { IContent, MatrixEvent } from "../../../../src/models/event";
-import { MatrixClient } from "../../../../src/client";
-import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
+import { type IContent, MatrixEvent } from "../../../../src/models/event";
+import { type MatrixClient } from "../../../../src/client";
+import { type IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { VerificationBase } from "../../../../src/crypto/verification/Base";
 import { MapWithDefault } from "../../../../src/utils";
 

@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
     ClientPrefix,
     HttpApiEvent,
-    HttpApiEventHandlerMap,
+    type HttpApiEventHandlerMap,
     IdentityPrefix,
-    IHttpOpts,
+    type IHttpOpts,
     MatrixError,
     Method,
 } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { defer, QueryDict } from "../../../src/utils";
-import { Logger } from "../../../src/logger";
+import { defer, type QueryDict } from "../../../src/utils";
+import { type Logger } from "../../../src/logger";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";

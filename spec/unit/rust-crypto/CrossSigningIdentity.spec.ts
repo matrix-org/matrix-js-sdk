@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { CrossSigningIdentity } from "../../../src/rust-crypto/CrossSigningIdentity";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import { ServerSideSecretStorage } from "../../../src/secret-storage";
+import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { type ServerSideSecretStorage } from "../../../src/secret-storage";
 
 describe("CrossSigningIdentity", () => {
     describe("bootstrapCrossSigning", () => {

@@ -1,7 +1,7 @@
-import { IRecoveryKey } from "../../../src/crypto/api";
-import { CrossSigningLevel } from "../../../src/crypto/CrossSigning";
+import { type IRecoveryKey } from "../../../src/crypto/api";
+import { type CrossSigningLevel } from "../../../src/crypto/CrossSigning";
 import { IndexedDBCryptoStore } from "../../../src/crypto/store/indexeddb-crypto-store";
-import { MatrixClient } from "../../../src";
+import { type MatrixClient } from "../../../src";
 import { CryptoEvent } from "../../../src/crypto";
 
 // needs to be phased out and replaced with bootstrapSecretStorage,

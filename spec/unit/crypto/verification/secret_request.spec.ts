@@ -15,12 +15,12 @@ limitations under the License.
 */
 
 import "../../../olm-loader";
-import { MatrixClient, MatrixEvent } from "../../../../src/matrix";
+import { type MatrixClient, type MatrixEvent } from "../../../../src/matrix";
 import { encodeBase64 } from "../../../../src/base64";
 import "../../../../src/crypto"; // import this to cycle-break
 import { CrossSigningInfo } from "../../../../src/crypto/CrossSigning";
-import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
-import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
+import { type VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
+import { type IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { VerificationBase } from "../../../../src/crypto/verification/Base";
 
 jest.useFakeTimers();

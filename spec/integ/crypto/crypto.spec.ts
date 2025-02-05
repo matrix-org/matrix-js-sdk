@@ -19,16 +19,16 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import FetchMock from "fetch-mock";
-import Olm from "@matrix-org/olm";
 
+import type FetchMock from "fetch-mock";
+import type Olm from "@matrix-org/olm";
 import * as testUtils from "../../test-utils/test-utils";
 import {
     advanceTimersUntil,
     CRYPTO_BACKENDS,
     emitPromise,
     getSyncResponse,
-    InitCrypto,
+    type InitCrypto,
     mkEventCustom,
     mkMembershipCustom,
     syncPromise,
@@ -52,24 +52,24 @@ import {
     createClient,
     CryptoEvent,
     HistoryVisibility,
-    IClaimOTKsResult,
-    IContent,
-    IDownloadKeyResult,
-    IEvent,
+    type IClaimOTKsResult,
+    type IContent,
+    type IDownloadKeyResult,
+    type IEvent,
     IndexedDBCryptoStore,
-    IStartClientOpts,
-    MatrixClient,
+    type IStartClientOpts,
+    type MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     MsgType,
     PendingEventOrdering,
     Room,
-    RoomMember,
+    type RoomMember,
     RoomStateEvent,
 } from "../../../src/matrix";
 import { DeviceInfo } from "../../../src/crypto/deviceinfo";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
-import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
+import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { defer, escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
@@ -78,15 +78,15 @@ import {
     mockSetupCrossSigningRequests,
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
-import { SecretStorageKeyDescription } from "../../../src/secret-storage";
+import { type SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
-    CryptoCallbacks,
+    type CryptoCallbacks,
     DecryptionFailureCode,
-    DeviceIsolationMode,
+    type DeviceIsolationMode,
     EventShieldColour,
     EventShieldReason,
-    KeyBackupInfo,
+    type KeyBackupInfo,
     AllDevicesIsolationMode,
     OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
@@ -101,11 +101,11 @@ import {
     establishOlmSession,
     getTestOlmAccountKeys,
 } from "./olm-utils";
-import { ToDevicePayload } from "../../../src/models/ToDeviceMessage";
+import { type ToDevicePayload } from "../../../src/models/ToDeviceMessage";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
-import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
+import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections

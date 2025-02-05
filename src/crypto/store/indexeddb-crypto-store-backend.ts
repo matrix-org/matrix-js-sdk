@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Logger, logger } from "../../logger.ts";
+import { type Logger, logger } from "../../logger.ts";
 import { deepCompare } from "../../utils.ts";
 import {
-    CryptoStore,
-    IDeviceData,
-    IProblem,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type IDeviceData,
+    type IProblem,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
-    SecretStorePrivateKeys,
+    type Mode,
+    type OutgoingRoomKeyRequest,
+    type ParkedSharedHistory,
+    type SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
 } from "./base.ts";
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
-import { IOlmDevice } from "../algorithms/megolm.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
+import { type IRoomKeyRequestBody, type IRoomKeyRequestRecipient } from "../index.ts";
+import { type IOlmDevice } from "../algorithms/megolm.ts";
+import { type IRoomEncryption } from "../RoomList.ts";
+import { type InboundGroupSessionData } from "../OlmDevice.ts";
 import { IndexedDBCryptoStore } from "./indexeddb-crypto-store.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 const PROFILE_TRANSACTIONS = false;
 

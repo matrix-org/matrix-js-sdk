@@ -16,7 +16,7 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 
-import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 import { IndexedDBStoreWorker } from "../../../src/store/indexeddb-store-worker";
 import { defer } from "../../../src/utils";
 

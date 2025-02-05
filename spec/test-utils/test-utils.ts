@@ -1,25 +1,31 @@
-// eslint-disable-next-line no-restricted-imports
-import EventEmitter from "events";
-
 // load olm before the sdk if possible
 import "../olm-loader";
 
+// eslint-disable-next-line no-restricted-imports
+import type EventEmitter from "events";
 import { logger } from "../../src/logger";
-import { IContent, IEvent, IEventRelation, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import {
+    type IContent,
+    type IEvent,
+    type IEventRelation,
+    type IUnsigned,
+    MatrixEvent,
+    MatrixEventEvent,
+} from "../../src/models/event";
 import {
     ClientEvent,
     EventType,
-    IJoinedRoom,
-    IPusher,
-    ISyncResponse,
-    MatrixClient,
+    type IJoinedRoom,
+    type IPusher,
+    type ISyncResponse,
+    type MatrixClient,
     MsgType,
     RelationType,
 } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 import { TEST_ROOM_ID } from "./test-data";
-import { KnownMembership, Membership } from "../../src/@types/membership";
+import { KnownMembership, type Membership } from "../../src/@types/membership";
 
 /**
  * Return a promise that is resolved when the client next emits a

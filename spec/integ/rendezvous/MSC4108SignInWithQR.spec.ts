@@ -30,9 +30,9 @@ import { defer } from "../../../src/utils";
 import {
     ClientPrefix,
     DEVICE_CODE_SCOPE,
-    IHttpOpts,
-    IMyDevice,
-    MatrixClient,
+    type IHttpOpts,
+    type IMyDevice,
+    type MatrixClient,
     MatrixError,
     MatrixHttpApi,
 } from "../../../src";
