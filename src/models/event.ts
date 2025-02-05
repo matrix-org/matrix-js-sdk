@@ -1079,7 +1079,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * signing the public curve25519 key with the ed25519 key.
      *
      * In general, applications should not use this method directly, but should
-     * instead use CryptoApi#getEncryptionInfoForEvent.
+     * instead use {@link crypto-api!CryptoApi#getEncryptionInfoForEvent}.
      */
     public getClaimedEd25519Key(): string | null {
         return this.claimedEd25519Key;

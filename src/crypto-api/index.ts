@@ -584,7 +584,7 @@ export interface CryptoApi {
     /**
      * Determine if a key backup can be trusted.
      *
-     * @param info - key backup info.
+     * @param info - key backup info dict from {@link CryptoApi.getKeyBackupInfo}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 
