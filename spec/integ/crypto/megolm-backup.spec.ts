@@ -37,7 +37,7 @@ import * as testData from "../../test-utils/test-data";
 import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer, type IDeferred } from "../../../src/utils";
-import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent, CryptoApi } from "../../../src/crypto-api";
+import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent, type CryptoApi } from "../../../src/crypto-api";
 import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;

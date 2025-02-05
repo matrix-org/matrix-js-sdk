@@ -88,9 +88,15 @@ import { type MatrixScheduler } from "./scheduler.ts";
 import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
 import { type AuthDict } from "./interactive-auth.ts";
 import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
-import { EventTimelineSet } from "./models/event-timeline-set.ts";
+import type { EventTimelineSet } from "./models/event-timeline-set.ts";
 import * as ContentHelpers from "./content-helpers.ts";
-import { NotificationCountType, type Room, type RoomEvent, type RoomEventHandlerMap, type RoomNameState } from "./models/room.ts";
+import {
+    NotificationCountType,
+    type Room,
+    type RoomEvent,
+    type RoomEventHandlerMap,
+    type RoomNameState,
+} from "./models/room.ts";
 import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
 import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
@@ -171,7 +177,12 @@ import {
 } from "./@types/PushRules.ts";
 import { type IThreepid } from "./@types/threepids.ts";
 import { type CryptoStore } from "./crypto/store/base.ts";
-import { GroupCall, type GroupCallIntent, type GroupCallType, type IGroupCallDataChannelOptions } from "./webrtc/groupCall.ts";
+import {
+    GroupCall,
+    type GroupCallIntent,
+    type GroupCallType,
+    type IGroupCallDataChannelOptions,
+} from "./webrtc/groupCall.ts";
 import { MediaHandler } from "./webrtc/mediaHandler.ts";
 import {
     type ILoginFlowsResponse,
@@ -210,7 +221,11 @@ import {
     type CryptoEventHandlerMap,
     type CryptoCallbacks,
 } from "./crypto-api/index.ts";
-import { type SecretStorageKeyDescription, type ServerSideSecretStorage, type ServerSideSecretStorageImpl } from "./secret-storage.ts";
+import {
+    type SecretStorageKeyDescription,
+    type ServerSideSecretStorage,
+    ServerSideSecretStorageImpl,
+} from "./secret-storage.ts";
 import { type RegisterRequest, type RegisterResponse } from "./@types/registration.ts";
 import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager.ts";
 import { getRelationsThreadFilter } from "./thread-utils.ts";
@@ -219,7 +234,11 @@ import { type RoomMessageEventContent, type StickerEventContent } from "./@types
 import { type ImageInfo } from "./@types/media.ts";
 import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
-import { discoverAndValidateOIDCIssuerWellKnown, type OidcClientConfig, validateAuthMetadataAndKeys } from "./oidc/index.ts";
+import {
+    discoverAndValidateOIDCIssuerWellKnown,
+    type OidcClientConfig,
+    validateAuthMetadataAndKeys,
+} from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 
 export type Store = IStore;

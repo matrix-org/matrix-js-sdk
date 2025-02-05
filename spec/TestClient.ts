@@ -29,7 +29,12 @@ import type { IE2EKeyReceiver } from "./test-utils/E2EKeyReceiver";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
 import { createClient, type IStartClientOpts } from "../src/matrix";
-import { type ICreateClientOpts, type IDownloadKeyResult, type MatrixClient, PendingEventOrdering } from "../src/client";
+import {
+    type ICreateClientOpts,
+    type IDownloadKeyResult,
+    type MatrixClient,
+    PendingEventOrdering,
+} from "../src/client";
 import { type IKeysUploadResponse, type IUploadKeysRequest } from "../src/client";
 import { type ISyncResponder } from "./test-utils/SyncResponder";
 

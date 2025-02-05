@@ -53,7 +53,7 @@ import {
     type IEvent,
     type IStartClientOpts,
     type MatrixClient,
-    MatrixEvent,
+    type MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
 } from "../../../src/matrix";

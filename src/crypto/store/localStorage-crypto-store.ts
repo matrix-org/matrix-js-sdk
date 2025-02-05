@@ -26,8 +26,8 @@ import {
     type Mode,
     type SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
-    InboundGroupSessionData,
-    IRoomEncryption,
+    type InboundGroupSessionData,
+    type IRoomEncryption,
 } from "./base.ts";
 import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 

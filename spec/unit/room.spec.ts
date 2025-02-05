@@ -58,7 +58,7 @@ import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-ut
 import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import type { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 describe("Room", function () {
     const roomId = "!foo:bar";

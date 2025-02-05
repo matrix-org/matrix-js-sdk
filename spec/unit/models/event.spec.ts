@@ -27,7 +27,11 @@ import {
     TweakName,
 } from "../../../src";
 import { DecryptionFailureCode } from "../../../src/crypto-api";
-import { CryptoBackend, DecryptionError, EventDecryptionResult } from "../../../src/common-crypto/CryptoBackend";
+import {
+    type CryptoBackend,
+    DecryptionError,
+    type EventDecryptionResult,
+} from "../../../src/common-crypto/CryptoBackend";
 
 describe("MatrixEvent", () => {
     it("should create copies of itself", () => {
