@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { expect } from "vitest";
+
 import { RelationType } from "../../src/@types/event";
 import { MatrixClient } from "../../src/client";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";

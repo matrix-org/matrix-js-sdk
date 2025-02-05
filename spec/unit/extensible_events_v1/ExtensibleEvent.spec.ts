@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { describe, expect, it } from "vitest";
+
 import { ExtensibleEventType, IPartialEvent } from "../../../src/@types/extensible_events";
 import { ExtensibleEvent } from "../../../src/extensible_events_v1/ExtensibleEvent";
 

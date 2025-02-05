@@ -16,6 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { TestClient } from "../TestClient";
 import * as testUtils from "../test-utils/test-utils";
 import { logger } from "../../src/logger";

@@ -14,13 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    ExtensibleAnyMessageEventContent,
-    IPartialEvent,
-    M_HTML,
-    M_MESSAGE,
-    M_TEXT,
-} from "../../../src/@types/extensible_events";
+import { describe, expect, it } from "vitest";
+
+import { ExtensibleAnyMessageEventContent, IPartialEvent, M_HTML, M_MESSAGE, M_TEXT } from "../../../src/@types/extensible_events";
 import { MessageEvent } from "../../../src/extensible_events_v1/MessageEvent";
 import { InvalidEventError } from "../../../src/extensible_events_v1/InvalidEventError";
 

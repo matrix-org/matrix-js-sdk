@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ClientPrefix, MatrixHttpApi, Method, UploadResponse } from "../../../src";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
+import { mocked } from "../../test-utils";
 
 type Writeable<T> = { -readonly [P in keyof T]: T[P] };
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe("MatrixHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -35,17 +36,17 @@ describe("MatrixHttpApi", () => {
     beforeEach(() => {
         xhr = {
             upload: {} as XMLHttpRequestUpload,
-            open: jest.fn(),
-            send: jest.fn(),
-            abort: jest.fn(),
-            setRequestHeader: jest.fn(),
+            open: vi.fn(),
+            send: vi.fn(),
+            abort: vi.fn(),
+            setRequestHeader: vi.fn(),
             onreadystatechange: undefined,
-            getResponseHeader: jest.fn(),
-            getAllResponseHeaders: jest.fn(),
+            getResponseHeader: vi.fn(),
+            getAllResponseHeaders: vi.fn(),
         } as unknown as XMLHttpRequest;
         // We stub out XHR here as it is not available in JSDOM
         // @ts-ignore
-        globalThis.XMLHttpRequest = jest.fn().mockReturnValue(xhr);
+        globalThis.XMLHttpRequest = vi.fn().mockReturnValue(xhr);
         // @ts-ignore
         globalThis.XMLHttpRequest.DONE = DONE;
     });
@@ -61,14 +62,14 @@ describe("MatrixHttpApi", () => {
 
     it("should fall back to `fetch` where xhr is unavailable", () => {
         globalThis.XMLHttpRequest = undefined!;
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({}) });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
         upload = api.uploadContent({} as File);
         expect(fetchFn).toHaveBeenCalled();
     });
 
     it("should prefer xhr where available", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
         upload = api.uploadContent({} as File);
         expect(fetchFn).not.toHaveBeenCalled();
@@ -127,18 +128,18 @@ describe("MatrixHttpApi", () => {
     it("should timeout if no progress in 30s", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
         upload = api.uploadContent({} as File);
-        jest.advanceTimersByTime(25000);
+        vi.advanceTimersByTime(25000);
         // @ts-ignore
         xhr.upload.onprogress(new Event("progress", { loaded: 1, total: 100 }));
-        jest.advanceTimersByTime(25000);
+        vi.advanceTimersByTime(25000);
         expect(xhr.abort).not.toHaveBeenCalled();
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
         expect(xhr.abort).toHaveBeenCalled();
     });
 
     it("should call progressHandler", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
-        const progressHandler = jest.fn();
+        const progressHandler = vi.fn();
         upload = api.uploadContent({} as File, { progressHandler });
         const progressEvent = new Event("progress") as ProgressEvent;
         Object.assign(progressEvent, { loaded: 1, total: 100 });

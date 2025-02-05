@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked, mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import { it, describe, beforeEach, afterEach, expect, Mocked, vi, beforeAll, afterAll } from "vitest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { logger } from "../../src/logger";
 import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
@@ -40,6 +40,7 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
+    Body,
     ClientPrefix,
     ConditionKind,
     ContentHelpers,
@@ -78,12 +79,13 @@ import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { KnownMembership } from "../../src/@types/membership";
 import { RoomMessageEventContent } from "../../src/@types/events";
 import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
+import { mocked } from "../test-utils";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
-jest.mock("../../src/webrtc/call", () => ({
-    ...jest.requireActual("../../src/webrtc/call"),
-    supportsMatrixCall: jest.fn(() => false),
+vi.mock("../../src/webrtc/call", async () => ({
+    ...(await vi.importActual("../../src/webrtc/call")),
+    supportsMatrixCall: vi.fn(() => false),
 }));
 
 // Utility function to ease the transition from our QueryDict type to a Map
@@ -208,7 +210,7 @@ describe("MatrixClient", function () {
         method: Method,
         path: string,
         queryParams?: QueryDict,
-        body?: BodyInit,
+        body?: Body,
         requestOpts: IRequestOpts = {},
     ) {
         const { prefix } = requestOpts;
@@ -314,7 +316,7 @@ describe("MatrixClient", function () {
         client.http = (
             ["authedRequest", "getContentUri", "request", "uploadContent", "idServerRequest"] as const
         ).reduce((r, k) => {
-            r[k] = jest.fn();
+            r[k] = vi.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
         mocked(client.http.authedRequest).mockImplementation(httpReq);
@@ -324,7 +326,7 @@ describe("MatrixClient", function () {
     beforeEach(function () {
         scheduler = (["getQueueForEvent", "queueEvent", "removeEventFromQueue", "setProcessFunction"] as const).reduce(
             (r, k) => {
-                r[k] = jest.fn();
+                r[k] = vi.fn();
                 return r;
             },
             {} as MatrixScheduler,
@@ -351,15 +353,15 @@ describe("MatrixClient", function () {
                 "setUserCreator",
             ] as const
         ).reduce((r, k) => {
-            r[k] = jest.fn();
+            r[k] = vi.fn();
             return r;
         }, {} as Store);
-        store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.getClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
+        store.getSavedSync = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.getSavedSyncToken = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.setSyncData = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.getClientOptions = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.storeClientOptions = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.isNewlyCreated = vi.fn().mockReturnValue(Promise.resolve(true));
 
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
@@ -1164,7 +1166,7 @@ describe("MatrixClient", function () {
         const roomId = "!room:example.org";
         const roomName = "Test Tree";
         const mockRoom = {} as unknown as Room;
-        const fn = jest.fn().mockImplementation((opts) => {
+        const fn = vi.fn().mockImplementation((opts) => {
             expect(opts).toMatchObject({
                 name: roomName,
                 preset: Preset.PrivateChat,
@@ -1216,7 +1218,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1235,7 +1236,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1278,7 +1278,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1297,7 +1296,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1315,7 +1313,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1333,7 +1330,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1355,7 +1351,6 @@ describe("MatrixClient", function () {
         const syncPromise = new Promise<void>((resolve, reject) => {
             client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "SYNCING") {
-                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(httpLookups.length).toEqual(0);
                     client.removeListener(ClientEvent.Sync, syncListener);
                     resolve();
@@ -1442,11 +1437,10 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(2);
                         expect(client.retryImmediately()).toBe(true);
-                        jest.advanceTimersByTime(1);
+                        vi.advanceTimersByTime(1);
                     } else if (state === "PREPARED" && httpLookups.length === 0) {
                         client.removeListener(ClientEvent.Sync, syncListener);
                         resolve(null);
@@ -1454,7 +1448,6 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -1476,13 +1469,11 @@ describe("MatrixClient", function () {
             const isSyncingPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
                     if (state === "ERROR" && httpLookups.length > 0) {
-                        /* eslint-disable jest/no-conditional-expect */
                         expect(httpLookups.length).toEqual(1);
                         expect(client.retryImmediately()).toBe(true);
-                        /* eslint-enable jest/no-conditional-expect */
-                        jest.advanceTimersByTime(1);
+                        vi.advanceTimersByTime(1);
                     } else if (state === "RECONNECTING" && httpLookups.length > 0) {
-                        jest.advanceTimersByTime(10000);
+                        vi.advanceTimersByTime(10000);
                     } else if (state === "SYNCING" && httpLookups.length === 0) {
                         client.removeListener(ClientEvent.Sync, syncListener);
                         resolve(null);
@@ -1506,11 +1497,10 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(3);
                         expect(client.retryImmediately()).toBe(true);
-                        jest.advanceTimersByTime(1);
+                        vi.advanceTimersByTime(1);
                     } else if (state === "PREPARED" && httpLookups.length === 0) {
                         client.removeListener(ClientEvent.Sync, syncListener);
                         resolve(null);
@@ -1518,7 +1508,6 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -1542,7 +1531,7 @@ describe("MatrixClient", function () {
                     done();
                 }
                 // standard retry time is 5 to 10 seconds
-                jest.advanceTimersByTime(10000);
+                vi.advanceTimersByTime(10000);
             };
         }
 
@@ -1783,11 +1772,11 @@ describe("MatrixClient", function () {
                     }
                 },
             } as Room["currentState"],
-            getThread: jest.fn(),
-            addPendingEvent: jest.fn(),
-            updatePendingEvent: jest.fn(),
+            getThread: vi.fn(),
+            addPendingEvent: vi.fn(),
+            updatePendingEvent: vi.fn(),
             reEmitter: {
-                reEmit: jest.fn(),
+                reEmit: vi.fn(),
             },
         } as unknown as Room;
 
@@ -1913,7 +1902,7 @@ describe("MatrixClient", function () {
         const mockRoom = {
             getMyMembership: () => KnownMembership.Join,
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
+            hasEncryptionStateEvent: vi.fn().mockReturnValue(true),
         } as unknown as Room;
 
         let mockCrypto: Mocked<Crypto>;
@@ -1933,9 +1922,9 @@ describe("MatrixClient", function () {
                 return mockRoom;
             };
             mockCrypto = {
-                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
-                encryptEvent: jest.fn(),
-                stop: jest.fn(),
+                isEncryptionEnabledInRoom: vi.fn().mockResolvedValue(true),
+                encryptEvent: vi.fn(),
+                stop: vi.fn(),
             } as unknown as Mocked<Crypto>;
             client.crypto = client["cryptoBackend"] = mockCrypto;
         });
@@ -2030,10 +2019,10 @@ describe("MatrixClient", function () {
 
     describe("read-markers and read-receipts", () => {
         it("setRoomReadMarkers", () => {
-            client.setRoomReadMarkersHttpRequest = jest.fn();
+            client.setRoomReadMarkersHttpRequest = vi.fn();
             const room = {
-                hasPendingEvent: jest.fn().mockReturnValue(false),
-                addLocalEchoReceipt: jest.fn(),
+                hasPendingEvent: vi.fn().mockReturnValue(false),
+                addLocalEchoReceipt: vi.fn(),
             } as unknown as Room;
             const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
             const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
@@ -2101,7 +2090,7 @@ describe("MatrixClient", function () {
         describe("processBeaconEvents()", () => {
             it("does nothing when events is falsy", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
+                const roomStateProcessSpy = vi.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, undefined);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
@@ -2109,7 +2098,7 @@ describe("MatrixClient", function () {
 
             it("does nothing when events is of length 0", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
+                const roomStateProcessSpy = vi.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, []);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
@@ -2117,7 +2106,7 @@ describe("MatrixClient", function () {
 
             it("calls room states processBeaconEvents with events", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
+                const roomStateProcessSpy = vi.spyOn(room.currentState, "processBeaconEvents");
 
                 const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
                 const beaconEvent = makeBeaconEvent(userId);
@@ -2131,7 +2120,7 @@ describe("MatrixClient", function () {
     describe("setRoomTopic", () => {
         const roomId = "!foofoofoofoofoofoo:matrix.org";
         const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
-            return jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+            return vi.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(roomId);
                 expect(eventType).toEqual(EventType.RoomTopic);
                 expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
@@ -2278,7 +2267,7 @@ describe("MatrixClient", function () {
                 username: "1443779631:@user:example.com",
                 password: "JlKfBy1QwLrO20385QyAtEyIv0=",
             } as unknown as ITurnServerResponse;
-            jest.spyOn(client, "turnServer").mockResolvedValue(turnServer);
+            vi.spyOn(client, "turnServer").mockResolvedValue(turnServer);
 
             const events: any[][] = [];
             const onTurnServers = (...args: any[]) => events.push(args);
@@ -2300,7 +2289,7 @@ describe("MatrixClient", function () {
 
         it("emits an event when an error occurs", async () => {
             const error = new Error(":(");
-            jest.spyOn(client, "turnServer").mockRejectedValue(error);
+            vi.spyOn(client, "turnServer").mockRejectedValue(error);
 
             const events: any[][] = [];
             const onTurnServersError = (...args: any[]) => events.push(args);
@@ -2312,7 +2301,7 @@ describe("MatrixClient", function () {
 
         it("considers 403 errors fatal", async () => {
             const error = { httpStatus: 403 };
-            jest.spyOn(client, "turnServer").mockRejectedValue(error);
+            vi.spyOn(client, "turnServer").mockRejectedValue(error);
 
             const events: any[][] = [];
             const onTurnServersError = (...args: any[]) => events.push(args);
@@ -2673,8 +2662,9 @@ describe("MatrixClient", function () {
 
     describe("delete account data", () => {
         afterEach(() => {
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
+            vi.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
         });
+
         it("makes correct request when deletion is supported by server in unstable versions", async () => {
             const eventType = "im.vector.test";
             const versionsResponse = {
@@ -2683,7 +2673,7 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": true,
                 },
             };
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
+            const requestSpy = vi.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
             const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
@@ -2702,8 +2692,8 @@ describe("MatrixClient", function () {
             // so mock the support map to fake stable support
             const stableSupportedDeletionMap = new Map();
             stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(new Map());
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            vi.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(new Map());
+            const requestSpy = vi.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
             // populate version support
@@ -2721,7 +2711,7 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": false,
                 },
             };
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
+            const requestSpy = vi.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
             // populate version support
@@ -3192,9 +3182,9 @@ describe("MatrixClient", function () {
 
         beforeEach(() => {
             mockSecretStorage = {
-                getDefaultKeyId: jest.fn(),
-                hasKey: jest.fn(),
-                isStored: jest.fn(),
+                getDefaultKeyId: vi.fn(),
+                hasKey: vi.fn(),
+                isStored: vi.fn(),
             } as unknown as Mocked<ServerSideSecretStorageImpl>;
             client["_secretStorage"] = mockSecretStorage;
         });
@@ -3245,10 +3235,10 @@ describe("MatrixClient", function () {
 
             beforeEach(() => {
                 mockCryptoBackend = {
-                    isCrossSigningReady: jest.fn(),
-                    bootstrapCrossSigning: jest.fn(),
-                    isSecretStorageReady: jest.fn(),
-                    stop: jest.fn().mockResolvedValue(undefined),
+                    isCrossSigningReady: vi.fn(),
+                    bootstrapCrossSigning: vi.fn(),
+                    isSecretStorageReady: vi.fn(),
+                    stop: vi.fn().mockResolvedValue(undefined),
                 } as unknown as Mocked<CryptoBackend>;
                 client["cryptoBackend"] = mockCryptoBackend;
             });
@@ -3388,7 +3378,7 @@ describe("MatrixClient", function () {
             });
 
             it("defaults limit to 30 events", async () => {
-                jest.spyOn(client.http, "authedRequest");
+                vi.spyOn(client.http, "authedRequest");
                 const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
                 await client.paginateEventTimeline(timeline, { backwards: true });
 
@@ -3457,7 +3447,7 @@ describe("MatrixClient", function () {
                 data: {},
             };
             httpLookups = [response];
-            jest.spyOn(client.http, "authedRequest").mockClear();
+            vi.spyOn(client.http, "authedRequest").mockClear();
         });
 
         it("should make correct request to set pusher", async () => {
@@ -3556,7 +3546,7 @@ describe("MatrixClient", function () {
         it("should return hashed lookup results", async () => {
             const ID_ACCESS_TOKEN = "hello_id_server_please_let_me_make_a_request";
 
-            client.http.idServerRequest = jest.fn().mockImplementation((method, path, params) => {
+            client.http.idServerRequest = vi.fn().mockImplementation((method, path, params) => {
                 if (method === "GET" && path === "/hash_details") {
                     return { algorithms: ["sha256"], lookup_pepper: "carrot" };
                 } else if (method === "POST" && path === "/lookup") {

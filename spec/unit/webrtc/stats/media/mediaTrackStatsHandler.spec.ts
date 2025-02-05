@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { MediaTrackHandler } from "../../../../../src/webrtc/stats/media/mediaTrackHandler";
 import { MediaTrackStatsHandler } from "../../../../../src/webrtc/stats/media/mediaTrackStatsHandler";
 import { MediaSsrcHandler } from "../../../../../src/webrtc/stats/media/mediaSsrcHandler";
@@ -24,10 +26,10 @@ describe("MediaTrackStatsHandler", () => {
     beforeEach(() => {
         ssrcHandler = {} as MediaSsrcHandler;
         trackHandler = {} as MediaTrackHandler;
-        trackHandler.getLocalTrackIdByMid = jest.fn().mockReturnValue("2222");
-        trackHandler.getRemoteTrackIdByMid = jest.fn().mockReturnValue("5555");
-        trackHandler.getLocalTracks = jest.fn().mockReturnValue([{ id: "2222" } as MediaStreamTrack]);
-        trackHandler.getTackById = jest.fn().mockReturnValue([{ id: "2222", kind: "audio" } as MediaStreamTrack]);
+        trackHandler.getLocalTrackIdByMid = vi.fn().mockReturnValue("2222");
+        trackHandler.getRemoteTrackIdByMid = vi.fn().mockReturnValue("5555");
+        trackHandler.getLocalTracks = vi.fn().mockReturnValue([{ id: "2222" } as MediaStreamTrack]);
+        trackHandler.getTackById = vi.fn().mockReturnValue([{ id: "2222", kind: "audio" } as MediaStreamTrack]);
         statsHandler = new MediaTrackStatsHandler(ssrcHandler, trackHandler);
     });
     describe("should find track stats", () => {
@@ -43,17 +45,17 @@ describe("MediaTrackStatsHandler", () => {
         });
         it("and returns undefined if `ssrc` exists in report but not on connection", () => {
             const report = { ssrc: "142443", type: "inbound-rtp" };
-            ssrcHandler.findMidBySsrc = jest.fn().mockReturnValue(undefined);
+            ssrcHandler.findMidBySsrc = vi.fn().mockReturnValue(undefined);
             expect(statsHandler.findTrack2Stats(report, "local")?.trackId).toBeUndefined();
         });
         it("and returns undefined if `ssrc` exists in inbound-rtp report", () => {
             const report = { ssrc: "142443", type: "inbound-rtp" };
-            ssrcHandler.findMidBySsrc = jest.fn().mockReturnValue("2");
+            ssrcHandler.findMidBySsrc = vi.fn().mockReturnValue("2");
             expect(statsHandler.findTrack2Stats(report, "remote")?.trackId).toEqual("5555");
         });
         it("and returns undefined if `ssrc` exists in outbound-rtp report", () => {
             const report = { ssrc: "142443", type: "outbound-rtp" };
-            ssrcHandler.findMidBySsrc = jest.fn().mockReturnValue("2");
+            ssrcHandler.findMidBySsrc = vi.fn().mockReturnValue("2");
             expect(statsHandler.findTrack2Stats(report, "local")?.trackId).toEqual("2222");
         });
         it("and returns undefined if needed property not existing", () => {
@@ -72,7 +74,7 @@ describe("MediaTrackStatsHandler", () => {
         });
         it("and returns undefined if `ssrc` exists", () => {
             const report = { ssrc: "142443", type: "outbound-rtp" };
-            ssrcHandler.findMidBySsrc = jest.fn().mockReturnValue("2");
+            ssrcHandler.findMidBySsrc = vi.fn().mockReturnValue("2");
             expect(statsHandler.findTrack2Stats(report, "local")?.trackId).toEqual("2222");
         });
         it("and returns undefined if needed property not existing", async () => {
@@ -83,13 +85,13 @@ describe("MediaTrackStatsHandler", () => {
 
     describe("should find a Transceiver by Track id", () => {
         it("and returns undefined if Transceiver not existing", async () => {
-            trackHandler.getTransceiverByTrackId = jest.fn().mockReturnValue(undefined);
+            trackHandler.getTransceiverByTrackId = vi.fn().mockReturnValue(undefined);
             expect(statsHandler.findTransceiverByTrackId("12")).toBeUndefined();
         });
 
         it("and returns Transceiver if existing", async () => {
             const ts = {} as RTCRtpTransceiver;
-            trackHandler.getTransceiverByTrackId = jest.fn().mockReturnValue(ts);
+            trackHandler.getTransceiverByTrackId = vi.fn().mockReturnValue(ts);
             expect(statsHandler.findTransceiverByTrackId("12")).toEqual(ts);
         });
     });

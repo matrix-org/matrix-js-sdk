@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { jwtDecode } from "jwt-decode";
 
 import { logger } from "../../../src/logger";
 import { ValidatedAuthMetadata, validateIdToken, validateAuthMetadata } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
+import { mocked } from "../../test-utils";
 
-jest.mock("jwt-decode");
+vi.mock("jwt-decode");
 
 describe("validateOIDCIssuerWellKnown", () => {
     const validWk: ValidatedAuthMetadata = {
@@ -38,7 +40,7 @@ describe("validateOIDCIssuerWellKnown", () => {
     };
     beforeEach(() => {
         // stub to avoid console litter
-        jest.spyOn(logger, "error")
+        vi.spyOn(logger, "error")
             .mockClear()
             .mockImplementation(() => {});
     });
@@ -137,7 +139,7 @@ describe("validateIdToken()", () => {
     beforeEach(() => {
         mocked(jwtDecode).mockClear().mockReturnValue(validDecodedIdToken);
 
-        jest.spyOn(logger, "error").mockClear();
+        vi.spyOn(logger, "error").mockClear();
     });
 
     it("should throw when idToken is falsy", () => {

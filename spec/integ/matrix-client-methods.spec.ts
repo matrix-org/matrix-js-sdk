@@ -13,8 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { afterEach, beforeEach, describe, expect, it, Mocked, vi } from "vitest";
+
 import HttpBackend from "matrix-mock-request";
-import { Mocked } from "jest-mock";
 
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
@@ -305,23 +306,16 @@ describe("MatrixClient", function () {
                 [
                     403,
                     { errcode: "M_FORBIDDEN", error: "You don't have permission to knock" },
-                    "[M_FORBIDDEN: MatrixError: [403] You don't have permission to knock]",
+                    "MatrixError: [403] You don't have permission to knock",
                 ],
-                [
-                    500,
-                    { errcode: "INTERNAL_SERVER_ERROR" },
-                    "[INTERNAL_SERVER_ERROR: MatrixError: [500] Unknown message]",
-                ],
+                [500, { errcode: "INTERNAL_SERVER_ERROR" }, "MatrixError: [500] Unknown message"],
             ];
 
             it.each(testCases)("should handle %s error", async (code, { errcode, error }, snapshot) => {
                 httpBackend.when("POST", "/knock/" + encodeURIComponent(roomId)).respond(code, { errcode, error });
 
                 const prom = client.knockRoom(roomId);
-                await Promise.all([
-                    httpBackend.flushAllExpected(),
-                    expect(prom).rejects.toMatchInlineSnapshot(snapshot),
-                ]);
+                await Promise.all([httpBackend.flushAllExpected(), expect(prom).rejects.toThrow(snapshot)]);
             });
         });
     });
@@ -1243,7 +1237,7 @@ describe("MatrixClient", function () {
     describe("logout", () => {
         it("should abort pending requests when called with stopClient=true", async () => {
             httpBackend.when("POST", "/logout").respond(200, {});
-            const fn = jest.fn();
+            const fn = vi.fn();
             client.http.request(Method.Get, "/test").catch(fn);
             client.logout(true);
             await httpBackend.flush(undefined);
@@ -1371,7 +1365,7 @@ describe("MatrixClient", function () {
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("should always fetch capabilities and then cache", async () => {
@@ -1642,7 +1636,7 @@ describe("MatrixClient", function () {
 
         it("should proxy to the crypto backend", async () => {
             const mockBackend = {
-                getTrustCrossSignedDevices: jest.fn().mockReturnValue(true),
+                getTrustCrossSignedDevices: vi.fn().mockReturnValue(true),
             } as unknown as Mocked<CryptoBackend>;
             client["cryptoBackend"] = mockBackend;
 
@@ -1659,7 +1653,7 @@ describe("MatrixClient", function () {
 
         it("should proxy to the crypto backend", async () => {
             const mockBackend = {
-                setTrustCrossSignedDevices: jest.fn(),
+                setTrustCrossSignedDevices: vi.fn(),
             } as unknown as Mocked<CryptoBackend>;
             client["cryptoBackend"] = mockBackend;
 
@@ -1673,7 +1667,7 @@ describe("MatrixClient", function () {
 
     describe("setSyncPresence", () => {
         it("should pass calls through to the underlying sync api", () => {
-            const setPresence = jest.fn();
+            const setPresence = vi.fn();
             // @ts-ignore
             client.syncApi = { setPresence };
             client.setSyncPresence(SetPresence.Unavailable);

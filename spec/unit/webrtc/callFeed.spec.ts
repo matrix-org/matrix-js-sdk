@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { TestClient } from "../../TestClient";
@@ -93,7 +95,7 @@ describe("CallFeed", () => {
         it.each([true, false])("should always be connected, if isLocal()", (val: boolean) => {
             // @ts-ignore
             feed._connected = val;
-            jest.spyOn(feed, "isLocal").mockReturnValue(true);
+            vi.spyOn(feed, "isLocal").mockReturnValue(true);
 
             expect(feed.connected).toBeTruthy();
         });

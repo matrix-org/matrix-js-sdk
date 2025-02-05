@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { FeatureSupport, MatrixClient, MatrixEvent, ReceiptContent, THREAD_RELATION_TYPE, Thread } from "../../../src";
 import { Room } from "../../../src/models/room";
 
@@ -29,7 +31,7 @@ describe("RoomReceipts", () => {
     });
 
     afterAll(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     it("reports events unread if there are no receipts", () => {
@@ -429,13 +431,13 @@ describe("RoomReceipts", () => {
 
 function createFakeClient(): MatrixClient {
     return {
-        getUserId: jest.fn(),
-        getEventMapper: jest.fn().mockReturnValue(jest.fn()),
-        isInitialSyncComplete: jest.fn().mockReturnValue(true),
-        supportsThreads: jest.fn().mockReturnValue(true),
-        fetchRoomEvent: jest.fn().mockResolvedValue({}),
-        paginateEventTimeline: jest.fn(),
-        canSupport: { get: jest.fn() },
+        getUserId: vi.fn(),
+        getEventMapper: vi.fn().mockReturnValue(vi.fn()),
+        isInitialSyncComplete: vi.fn().mockReturnValue(true),
+        supportsThreads: vi.fn().mockReturnValue(true),
+        fetchRoomEvent: vi.fn().mockResolvedValue({}),
+        paginateEventTimeline: vi.fn(),
+        canSupport: { get: vi.fn() },
     } as unknown as MatrixClient;
 }
 

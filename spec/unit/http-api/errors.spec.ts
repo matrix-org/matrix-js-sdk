@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { MatrixError } from "../../../src";
 
 type IErrorJson = MatrixError["data"];
@@ -57,7 +59,7 @@ describe("MatrixError", () => {
 
     it("should retrieve Date Retry-After header from rate-limit error", () => {
         headers.set("Retry-After", `${new Date(160000).toUTCString()}`);
-        jest.spyOn(globalThis.Date, "now").mockImplementationOnce(() => 100000);
+        vi.spyOn(globalThis.Date, "now").mockImplementationOnce(() => 100000);
         const err = makeMatrixError(429, { errcode: "M_LIMIT_EXCEEDED", retry_after_ms: 150000 });
         expect(err.isRateLimitError()).toBe(true);
         // prefer Retry-After header over retry_after_ms

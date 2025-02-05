@@ -14,8 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-jest.mock("../src/http-api/utils", () => ({
-    ...jest.requireActual("../src/http-api/utils"),
-    // We mock timeoutSignal otherwise it causes tests to leave timers running
-    timeoutSignal: () => new AbortController().signal,
-}));
+import { vi } from "vitest";
+import { manageFetchMockGlobally } from "@fetch-mock/vitest";
+
+export default function setup() {
+    manageFetchMockGlobally();
+
+    vi.mock("../src/http-api/utils", async () => ({
+        ...(await vi.importActual("../src/http-api/utils")),
+        // We mock timeoutSignal otherwise it causes tests to leave timers running
+        timeoutSignal: () => new AbortController().signal,
+    }));
+}

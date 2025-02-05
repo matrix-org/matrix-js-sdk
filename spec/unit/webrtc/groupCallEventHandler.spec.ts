@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { afterEach, beforeEach, describe, expect, it, vi, MockedFunction } from "vitest";
 
 import { ClientEvent } from "../../../src/client";
 import { RoomMember } from "../../../src/models/room-member";
@@ -61,7 +61,7 @@ describe("Group Call Event Handler", function () {
             off: () => {},
             roomId: FAKE_ROOM_ID,
             currentState: {
-                getStateEvents: jest.fn((type, key) => {
+                getStateEvents: vi.fn((type, key) => {
                     if (type === mockEvent.getType()) {
                         return key === undefined ? [mockEvent] : mockEvent;
                     } else {
@@ -72,7 +72,7 @@ describe("Group Call Event Handler", function () {
             getMember: (userId: string) => (userId === FAKE_USER_ID ? mockMember : null),
         } as unknown as Room;
 
-        mockClient.getRoom = jest.fn().mockReturnValue(mockRoom);
+        mockClient.getRoom = vi.fn().mockReturnValue(mockRoom);
         mockClient.getFoci.mockReturnValue([{}]);
     });
 
@@ -145,7 +145,7 @@ describe("Group Call Event Handler", function () {
     });
 
     it("finds existing group calls when started", async () => {
-        const mockClientEmit = (mockClient.emit = jest.fn());
+        const mockClientEmit = (mockClient.emit = vi.fn());
 
         mockClient.getRooms.mockReturnValue([mockRoom]);
         await groupCallEventHandler.start();
@@ -181,7 +181,7 @@ describe("Group Call Event Handler", function () {
     });
 
     it("fires events for incoming calls", async () => {
-        const onIncomingGroupCall = jest.fn();
+        const onIncomingGroupCall = vi.fn();
         mockClient.on(GroupCallEventHandlerEvent.Incoming, onIncomingGroupCall);
         await groupCallEventHandler.start();
 
@@ -229,20 +229,20 @@ describe("Group Call Event Handler", function () {
     });
 
     describe("ignoring invalid group call state events", () => {
-        let mockClientEmit: jest.Func;
+        let mockClientEmit: MockedFunction;
 
         beforeEach(() => {
-            mockClientEmit = mockClient.emit = jest.fn();
+            mockClientEmit = mockClient.emit = vi.fn();
         });
 
         afterEach(() => {
             groupCallEventHandler.stop();
 
-            jest.clearAllMocks();
+            vi.clearAllMocks();
         });
 
         const setupCallAndStart = async (content?: IContent, redacted?: boolean) => {
-            mocked(mockRoom.currentState.getStateEvents).mockReturnValue([
+            mockRoom.currentState.getStateEvents.mockReturnValue([
                 makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, content, redacted),
             ] as unknown as MatrixEvent);
             mockClient.getRooms.mockReturnValue([mockRoom]);

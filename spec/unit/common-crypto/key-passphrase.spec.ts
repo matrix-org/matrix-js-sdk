@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { describe, expect, it } from "vitest";
+
 import { keyFromAuthData } from "../../../src/common-crypto/key-passphrase.ts";
 
 describe("key-passphrase", () => {

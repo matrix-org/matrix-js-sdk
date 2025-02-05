@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientPrefix, IHttpOpts, MatrixClient, MatrixHttpApi } from "../../../src";
 import { ClientRendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
@@ -40,13 +42,7 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
     return client;
 }
 
-fetchMock.config.overwriteRoutes = true;
-
 describe("MSC4108RendezvousSession", () => {
-    beforeEach(() => {
-        fetchMock.reset();
-    });
-
     async function postAndCheckLocation(msc4108Enabled: boolean, fallbackRzServer: string, locationResponse: string) {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled });
         const transport = new MSC4108RendezvousSession({ client, fallbackRzServer });
@@ -78,7 +74,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("should use custom fetchFn if provided", async () => {
         const sandbox = fetchMock.sandbox();
-        const fetchFn = jest.fn().mockImplementation(sandbox);
+        const fetchFn = vi.fn().mockImplementation(sandbox);
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
         const transport = new MSC4108RendezvousSession({
             client,
@@ -299,7 +295,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("404 failure callback", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const onFailure = jest.fn();
+        const onFailure = vi.fn();
         const transport = new MSC4108RendezvousSession({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
@@ -313,7 +309,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("404 failure callback mapped to expired", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const onFailure = jest.fn();
+        const onFailure = vi.fn();
         const transport = new MSC4108RendezvousSession({
             client,
             fallbackRzServer: "https://fallbackserver/rz",

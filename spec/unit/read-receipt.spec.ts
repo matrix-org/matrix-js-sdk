@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import MockHttpBackend from "matrix-mock-request";
 
 import { MAIN_ROOM_TIMELINE, ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
@@ -240,7 +242,7 @@ describe("Read receipt", () => {
         it("should not allow an older unthreaded receipt to clobber a `main` threaded one", () => {
             const userId = client.getSafeUserId();
             const room = new Room(ROOM_ID, client, userId);
-            room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
+            room.findEventById = vi.fn().mockReturnValue({} as MatrixEvent);
 
             const unthreadedReceipt: WrappedReceipt = {
                 eventId: "$olderEvent",

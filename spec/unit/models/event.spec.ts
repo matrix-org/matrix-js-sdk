@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { beforeEach, describe, expect, it, MockedObject, vi } from "vitest";
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
@@ -249,9 +249,9 @@ describe("MatrixEvent", () => {
 
         function createMockClient(): MatrixClient {
             return {
-                supportsThreads: jest.fn().mockReturnValue(true),
-                decryptEventIfNeeded: jest.fn().mockReturnThis(),
-                getUserId: jest.fn().mockReturnValue("@user:server"),
+                supportsThreads: vi.fn().mockReturnValue(true),
+                decryptEventIfNeeded: vi.fn().mockReturnThis(),
+                getUserId: vi.fn().mockReturnValue("@user:server"),
             } as unknown as MockedObject<MatrixClient>;
         }
 
@@ -363,12 +363,12 @@ describe("MatrixEvent", () => {
         });
 
         it("should report unknown decryption errors", async () => {
-            const decryptionListener = jest.fn();
+            const decryptionListener = vi.fn();
             encryptedEvent.addListener(MatrixEventEvent.Decrypted, decryptionListener);
 
             const testError = new Error("test error");
             const crypto = {
-                decryptEvent: jest.fn().mockRejectedValue(testError),
+                decryptEvent: vi.fn().mockRejectedValue(testError),
             } as unknown as Crypto;
 
             await encryptedEvent.attemptDecryption(crypto);
@@ -385,12 +385,12 @@ describe("MatrixEvent", () => {
         });
 
         it("should report known decryption errors", async () => {
-            const decryptionListener = jest.fn();
+            const decryptionListener = vi.fn();
             encryptedEvent.addListener(MatrixEventEvent.Decrypted, decryptionListener);
 
             const testError = new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, "uisi");
             const crypto = {
-                decryptEvent: jest.fn().mockRejectedValue(testError),
+                decryptEvent: vi.fn().mockRejectedValue(testError),
             } as unknown as Crypto;
 
             await encryptedEvent.attemptDecryption(crypto);
@@ -410,7 +410,7 @@ describe("MatrixEvent", () => {
 
         it(`should report "DecryptionError: The sender has disabled encrypting to unverified devices."`, async () => {
             const crypto = {
-                decryptEvent: jest
+                decryptEvent: vi
                     .fn()
                     .mockRejectedValue(
                         new DecryptionError(
@@ -432,10 +432,10 @@ describe("MatrixEvent", () => {
         });
 
         it("should retry decryption if a retry is queued", async () => {
-            const eventAttemptDecryptionSpy = jest.spyOn(encryptedEvent, "attemptDecryption");
+            const eventAttemptDecryptionSpy = vi.spyOn(encryptedEvent, "attemptDecryption");
 
             const crypto = {
-                decryptEvent: jest
+                decryptEvent: vi
                     .fn()
                     .mockImplementationOnce(() => {
                         // schedule a second decryption attempt while
@@ -477,7 +477,7 @@ describe("MatrixEvent", () => {
             });
 
             const crypto = {
-                decryptEvent: jest.fn().mockImplementationOnce(() => {
+                decryptEvent: vi.fn().mockImplementationOnce(() => {
                     return Promise.resolve<IEventDecryptionResult>({
                         clearEvent: {
                             type: "m.room.message",

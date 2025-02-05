@@ -1,3 +1,4 @@
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "../olm-loader";
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
@@ -110,7 +111,7 @@ describe("Crypto", function () {
     });
 
     afterEach(() => {
-        jest.useRealTimers();
+        vi.useRealTimers();
     });
 
     it("Crypto exposes the correct olm library version", function () {
@@ -386,10 +387,10 @@ describe("Crypto", function () {
             );
 
             mockBaseApis = {
-                sendToDevice: jest.fn(),
-                getKeyBackupVersion: jest.fn(),
-                isGuest: jest.fn(),
-                emit: jest.fn(),
+                sendToDevice: vi.fn(),
+                getKeyBackupVersion: vi.fn(),
+                isGuest: vi.fn(),
+                emit: vi.fn(),
             } as unknown as MatrixClient;
 
             fakeEmitter = new EventEmitter();
@@ -412,16 +413,16 @@ describe("Crypto", function () {
             });
 
             fakeEmitter.emit("toDeviceEvent", {
-                getId: jest.fn().mockReturnValue("$wedged"),
-                getType: jest.fn().mockReturnValue("m.room.message"),
-                getContent: jest.fn().mockReturnValue({
+                getId: vi.fn().mockReturnValue("$wedged"),
+                getType: vi.fn().mockReturnValue("m.room.message"),
+                getContent: vi.fn().mockReturnValue({
                     msgtype: "m.bad.encrypted",
                 }),
-                getWireContent: jest.fn().mockReturnValue({
+                getWireContent: vi.fn().mockReturnValue({
                     algorithm: "m.olm.v1.curve25519-aes-sha2",
                     sender_key: "this is a key",
                 }),
-                getSender: jest.fn().mockReturnValue("@bob:home.server"),
+                getSender: vi.fn().mockReturnValue("@bob:home.server"),
             });
 
             await prom;
@@ -620,7 +621,7 @@ describe("Crypto", function () {
 
             const ksEvent = await keyshareEventForEvent(aliceClient, event, 1);
             ksEvent.getContent().sender_key = undefined; // test
-            bobClient.crypto!.olmDevice.addInboundGroupSession = jest.fn();
+            bobClient.crypto!.olmDevice.addInboundGroupSession = vi.fn();
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             expect(bobClient.crypto!.olmDevice.addInboundGroupSession).not.toHaveBeenCalled();
         });
@@ -649,7 +650,7 @@ describe("Crypto", function () {
         });
 
         it("uses a new txnid for re-requesting keys", async function () {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const event = new MatrixEvent({
                 sender: "@bob:example.com",
@@ -661,7 +662,7 @@ describe("Crypto", function () {
                 },
             });
             // replace Alice's sendToDevice function with a mock
-            const aliceSendToDevice = jest.fn().mockResolvedValue(undefined);
+            const aliceSendToDevice = vi.fn().mockResolvedValue(undefined);
             aliceClient.sendToDevice = aliceSendToDevice;
             aliceClient.startClient();
 
@@ -673,7 +674,7 @@ describe("Crypto", function () {
             // to force it to send now.
             // @ts-ignore
             aliceClient.crypto!.outgoingRoomKeyRequestManager.sendQueuedRequests();
-            jest.runAllTimers();
+            vi.runAllTimers();
             await Promise.resolve();
             expect(aliceSendToDevice).toHaveBeenCalledTimes(1);
             const txnId = aliceSendToDevice.mock.calls[0][2];
@@ -684,7 +685,7 @@ describe("Crypto", function () {
 
             // cancel and resend the room key request
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            jest.runAllTimers();
+            vi.runAllTimers();
             await Promise.resolve();
             // cancelAndResend will call sendToDevice twice:
             // the first call to sendToDevice will be the cancellation
@@ -1108,15 +1109,15 @@ describe("Crypto", function () {
 
     describe("Secret storage", function () {
         it("creates secret storage even if there is no keyInfo", async function () {
-            jest.spyOn(logger, "debug").mockImplementation(() => {});
-            jest.setTimeout(10000);
+            vi.spyOn(logger, "debug").mockImplementation(() => {});
+            vi.setTimeout(10000);
             const client = new TestClient("@a:example.com", "dev").client;
             await client.initLegacyCrypto();
             client.crypto!.isCrossSigningReady = async () => false;
-            client.crypto!.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
-            client.crypto!.baseApis.setAccountData = jest.fn().mockResolvedValue(null);
-            client.crypto!.baseApis.uploadKeySignatures = jest.fn();
-            client.crypto!.baseApis.http.authedRequest = jest.fn();
+            client.crypto!.baseApis.uploadDeviceSigningKeys = vi.fn().mockResolvedValue(null);
+            client.crypto!.baseApis.setAccountData = vi.fn().mockResolvedValue(null);
+            client.crypto!.baseApis.uploadKeySignatures = vi.fn();
+            client.crypto!.baseApis.http.authedRequest = vi.fn();
             const createSecretStorageKey = async () => {
                 return {
                     keyInfo: undefined, // Returning undefined here used to cause a crash
@@ -1138,9 +1139,9 @@ describe("Crypto", function () {
         let encryptedPayload: object;
 
         beforeEach(async () => {
-            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices = vi.spyOn(olmlib, "ensureOlmSessionsForDevices");
             ensureOlmSessionsForDevices.mockResolvedValue(new Map());
-            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice = vi.spyOn(olmlib, "encryptMessageForDevice");
             encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
                 result.plaintext = { type: 0, body: JSON.stringify(payload) };
             });
@@ -1255,9 +1256,9 @@ describe("Crypto", function () {
         let crypto: Crypto;
 
         beforeEach(async () => {
-            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices = vi.spyOn(olmlib, "ensureOlmSessionsForDevices");
             ensureOlmSessionsForDevices.mockResolvedValue(new Map());
-            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice = vi.spyOn(olmlib, "encryptMessageForDevice");
             encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
                 result.plaintext = { type: 0, body: JSON.stringify(payload) };
             });
@@ -1294,7 +1295,7 @@ describe("Crypto", function () {
                 ],
                 ["@carol:example.org", new Map([["caroldesktop", new DeviceInfo("caroldesktop")]])],
             ]);
-            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(deviceInfoMap);
+            vi.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(deviceInfoMap);
             // const deviceInfoMap = await this.downloadKeys(Array.from(userIds), false);
 
             const batch = await client.client.getCrypto()?.encryptToDeviceMessages(
@@ -1342,7 +1343,7 @@ describe("Crypto", function () {
         });
 
         it("returns empty batch if no devices known", async () => {
-            jest.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(new Map());
+            vi.spyOn(crypto.deviceList, "downloadKeys").mockResolvedValue(new Map());
             const batch = await crypto.encryptToDeviceMessages(
                 "m.test.type",
                 [
@@ -1370,11 +1371,11 @@ describe("Crypto", function () {
         });
 
         it("should free PkDecryption", () => {
-            const free = jest.fn();
-            jest.spyOn(Olm, "PkDecryption").mockImplementation(
+            const free = vi.fn();
+            vi.spyOn(Olm, "PkDecryption").mockImplementation(
                 () =>
                     ({
-                        init_with_private_key: jest.fn(),
+                        init_with_private_key: vi.fn(),
                         free,
                     }) as unknown as PkDecryption,
             );
@@ -1396,11 +1397,11 @@ describe("Crypto", function () {
         });
 
         it("should free PkSigning", () => {
-            const free = jest.fn();
-            jest.spyOn(Olm, "PkSigning").mockImplementation(
+            const free = vi.fn();
+            vi.spyOn(Olm, "PkSigning").mockImplementation(
                 () =>
                     ({
-                        init_with_seed: jest.fn(),
+                        init_with_seed: vi.fn(),
                         free,
                     }) as unknown as PkSigning,
             );
@@ -1440,8 +1441,8 @@ describe("Crypto", function () {
             const cryptoStore = new MemoryCryptoStore();
 
             mockRoomList = {
-                getRoomEncryption: jest.fn().mockReturnValue(null),
-                setRoomEncryption: jest.fn().mockResolvedValue(undefined),
+                getRoomEncryption: vi.fn().mockReturnValue(null),
+                setRoomEncryption: vi.fn().mockResolvedValue(undefined),
             } as unknown as RoomList;
 
             crypto = new Crypto(mockClient, "@alice:home.server", "FLIBBLE", clientStore, cryptoStore, []);
@@ -1454,7 +1455,7 @@ describe("Crypto", function () {
             await clientStore.storeRoom(room);
             await crypto.setRoomEncryption("!room:id", { algorithm: "m.megolm.v1.aes-sha2" } as IRoomEncryption);
             expect(mockRoomList!.setRoomEncryption).toHaveBeenCalledTimes(1);
-            expect(jest.mocked(mockRoomList!.setRoomEncryption).mock.calls[0][0]).toEqual("!room:id");
+            expect(vi.mocked(mockRoomList!.setRoomEncryption).mock.calls[0][0]).toEqual("!room:id");
         });
 
         it("should raise if called for an unknown room", async () => {

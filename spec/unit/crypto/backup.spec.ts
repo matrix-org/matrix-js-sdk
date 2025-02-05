@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeAll, beforeEach, describe, expect, it, test, vi } from "vitest";
+
 import "../../olm-loader";
 import { logger } from "../../../src/logger";
 import * as olmlib from "../../../src/crypto/olmlib";
@@ -125,7 +127,7 @@ function saveCrossSigningKeys(k: Record<string, Uint8Array>) {
 function makeTestScheduler(): MatrixScheduler {
     return (["getQueueForEvent", "queueEvent", "removeEventFromQueue", "setProcessFunction"] as const).reduce(
         (r, k) => {
-            r[k] = jest.fn();
+            r[k] = vi.fn();
             return r;
         },
         {} as MatrixScheduler,
@@ -140,7 +142,7 @@ function makeTestClient(cryptoStore: CryptoStore) {
         baseUrl: "https://my.home.server",
         idBaseUrl: "https://identity.server",
         accessToken: "my.access.token",
-        fetchFn: jest.fn(), // NOP
+        fetchFn: vi.fn(), // NOP
         store: store,
         scheduler: scheduler,
         userId: "@alice:bar",
@@ -150,7 +152,7 @@ function makeTestClient(cryptoStore: CryptoStore) {
     });
 
     // initialising the crypto library will trigger a key upload request, which we can stub out
-    client.uploadKeysRequest = jest.fn();
+    client.uploadKeysRequest = vi.fn();
     return client;
 }
 
@@ -181,8 +183,8 @@ describe("MegolmBackup", function () {
 
         // we stub out the olm encryption bits
         mockOlmLib = {} as unknown as typeof olmlib;
-        mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
-        mockOlmLib.encryptMessageForDevice = jest.fn().mockResolvedValue(undefined);
+        mockOlmLib.ensureOlmSessionsForDevices = vi.fn();
+        mockOlmLib.encryptMessageForDevice = vi.fn().mockResolvedValue(undefined);
     });
 
     describe("backup", function () {
@@ -206,13 +208,13 @@ describe("MegolmBackup", function () {
             // ideally we would use lolex, but we have no oportunity
             // to tick the clock between the first try and the retry.
             const realSetTimeout = globalThis.setTimeout;
-            jest.spyOn(globalThis, "setTimeout").mockImplementation(function (f, n) {
+            vi.spyOn(globalThis, "setTimeout").mockImplementation(function (f, n) {
                 return realSetTimeout(f!, n! / 100);
             });
         });
 
         afterEach(function () {
-            jest.spyOn(globalThis, "setTimeout").mockRestore();
+            vi.spyOn(globalThis, "setTimeout").mockRestore();
         });
 
         test("fail if crypto not enabled", async () => {
@@ -281,7 +283,7 @@ describe("MegolmBackup", function () {
 
             // @ts-ignore readonly field write
             mockCrypto.backupManager = {
-                backupGroupSession: jest.fn(),
+                backupGroupSession: vi.fn(),
             };
 
             return event
@@ -539,7 +541,7 @@ describe("MegolmBackup", function () {
                 baseUrl: "https://my.home.server",
                 idBaseUrl: "https://identity.server",
                 accessToken: "my.access.token",
-                fetchFn: jest.fn(), // NOP
+                fetchFn: vi.fn(), // NOP
                 store: store,
                 scheduler: scheduler,
                 userId: "@alice:bar",
@@ -547,7 +549,7 @@ describe("MegolmBackup", function () {
                 cryptoStore: cryptoStore,
             });
             // initialising the crypto library will trigger a key upload request, which we can stub out
-            client.uploadKeysRequest = jest.fn();
+            client.uploadKeysRequest = vi.fn();
 
             megolmDecryption = new MegolmDecryption({
                 userId: "@user:id",
@@ -763,7 +765,7 @@ describe("MegolmBackup", function () {
                 baseUrl: "https://my.home.server",
                 idBaseUrl: "https://identity.server",
                 accessToken: "my.access.token",
-                fetchFn: jest.fn(), // NOP
+                fetchFn: vi.fn(), // NOP
                 store,
                 scheduler,
                 userId: "@alice:bar",
@@ -771,11 +773,11 @@ describe("MegolmBackup", function () {
                 cryptoStore,
             });
             // initialising the crypto library will trigger a key upload request, which we can stub out
-            client.uploadKeysRequest = jest.fn();
+            client.uploadKeysRequest = vi.fn();
 
             await client.initLegacyCrypto();
 
-            cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
+            cryptoStore.countSessionsNeedingBackup = vi.fn().mockReturnValue(6);
             await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
             client.stopClient();
         });

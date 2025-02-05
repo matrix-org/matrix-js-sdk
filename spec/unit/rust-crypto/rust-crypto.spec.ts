@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, Mocked } from "vitest";
+
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import {
     BaseMigrationData,
@@ -24,8 +26,7 @@ import {
     PickledSession,
     StoreHandle,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { mocked, Mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
@@ -77,6 +78,7 @@ import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStor
 import { CryptoStore, SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 import { RustBackupManager } from "../../../src/rust-crypto/backup.ts";
+import { mocked } from "../../test-utils";
 
 const TEST_USER = "@alice:example.com";
 const TEST_DEVICE_ID = "TEST_DEVICE";
@@ -88,35 +90,34 @@ beforeAll(async () => {
 }, 15000);
 
 afterEach(() => {
-    fetchMock.reset();
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
 });
 
 describe("initRustCrypto", () => {
     function makeTestOlmMachine(): Mocked<OlmMachine> {
         return {
-            registerRoomKeyUpdatedCallback: jest.fn(),
-            registerUserIdentityUpdatedCallback: jest.fn(),
-            getSecretsFromInbox: jest.fn().mockResolvedValue([]),
-            deleteSecretsFromInbox: jest.fn(),
-            registerReceiveSecretCallback: jest.fn(),
-            registerDevicesUpdatedCallback: jest.fn(),
-            registerRoomKeysWithheldCallback: jest.fn(),
-            outgoingRequests: jest.fn(),
-            isBackupEnabled: jest.fn().mockResolvedValue(false),
-            verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
-            getBackupKeys: jest.fn(),
-            getIdentity: jest.fn().mockResolvedValue(null),
-            trackedUsers: jest.fn(),
+            registerRoomKeyUpdatedCallback: vi.fn(),
+            registerUserIdentityUpdatedCallback: vi.fn(),
+            getSecretsFromInbox: vi.fn().mockResolvedValue([]),
+            deleteSecretsFromInbox: vi.fn(),
+            registerReceiveSecretCallback: vi.fn(),
+            registerDevicesUpdatedCallback: vi.fn(),
+            registerRoomKeysWithheldCallback: vi.fn(),
+            outgoingRequests: vi.fn(),
+            isBackupEnabled: vi.fn().mockResolvedValue(false),
+            verifyBackup: vi.fn().mockResolvedValue({ trusted: vi.fn().mockReturnValue(false) }),
+            getBackupKeys: vi.fn(),
+            getIdentity: vi.fn().mockResolvedValue(null),
+            trackedUsers: vi.fn(),
         } as unknown as Mocked<OlmMachine>;
     }
 
     it("passes through the store params (passphrase)", async () => {
-        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-        jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -134,11 +135,11 @@ describe("initRustCrypto", () => {
     });
 
     it("passes through the store params (key)", async () => {
-        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-        jest.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         const storeKey = new Uint8Array(32);
         await initRustCrypto({
@@ -157,11 +158,11 @@ describe("initRustCrypto", () => {
     });
 
     it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
-        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-        jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -180,11 +181,11 @@ describe("initRustCrypto", () => {
     });
 
     it("Should get secrets from inbox on start", async () => {
-        const mockStore = { free: jest.fn() } as unknown as StoreHandle;
-        jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
         const testOlmMachine = makeTestOlmMachine();
-        jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
 
         await initRustCrypto({
             logger,
@@ -205,16 +206,16 @@ describe("initRustCrypto", () => {
 
         beforeEach(() => {
             // Stub out a bunch of stuff in the Rust library
-            mockStore = { free: jest.fn() } as unknown as StoreHandle;
-            jest.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+            mockStore = { free: vi.fn() } as unknown as StoreHandle;
+            vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
 
-            jest.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
-            jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
+            vi.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
+            vi.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
+            vi.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
 
             const testOlmMachine = makeTestOlmMachine();
             testOlmMachine.trackedUsers.mockResolvedValue([]);
-            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+            vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
         });
 
         it("migrates data from a legacy crypto store", async () => {
@@ -249,7 +250,7 @@ describe("initRustCrypto", () => {
                     publicKeyBase64: "backup_key_public",
                 },
             };
-            jest.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
+            vi.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
 
             function legacyMigrationProgressListener(progress: number, total: number): void {
                 logger.log(`migrated ${progress} of ${total}`);
@@ -611,7 +612,7 @@ describe("RustCrypto", () => {
                 sender: testData.TEST_USER_ID,
             };
 
-            const onEvent = jest.fn();
+            const onEvent = vi.fn();
             rustCrypto.on(CryptoEvent.VerificationRequestReceived, onEvent);
             await rustCrypto.preprocessToDeviceMessages([toDeviceEvent]);
             expect(onEvent).toHaveBeenCalledTimes(1);
@@ -629,8 +630,8 @@ describe("RustCrypto", () => {
     describe("getCrossSigningStatus", () => {
         it("returns sensible values on a default client", async () => {
             const secretStorage = {
-                isStored: jest.fn().mockResolvedValue(null),
-                getDefaultKeyId: jest.fn().mockResolvedValue("key"),
+                isStored: vi.fn().mockResolvedValue(null),
+                getDefaultKeyId: vi.fn().mockResolvedValue("key"),
             } as unknown as Mocked<ServerSideSecretStorage>;
             const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
 
@@ -650,8 +651,8 @@ describe("RustCrypto", () => {
 
         it("throws if `stop` is called mid-call", async () => {
             const secretStorage = {
-                isStored: jest.fn().mockResolvedValue(null),
-                getDefaultKeyId: jest.fn().mockResolvedValue(null),
+                isStored: vi.fn().mockResolvedValue(null),
+                getDefaultKeyId: vi.fn().mockResolvedValue(null),
             } as unknown as Mocked<ServerSideSecretStorage>;
             const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, secretStorage);
 
@@ -669,7 +670,7 @@ describe("RustCrypto", () => {
     it("bootstrapCrossSigning delegates to CrossSigningIdentity", async () => {
         const rustCrypto = await makeTestRustCrypto();
         const mockCrossSigningIdentity = {
-            bootstrapCrossSigning: jest.fn().mockResolvedValue(undefined),
+            bootstrapCrossSigning: vi.fn().mockResolvedValue(undefined),
         };
         // @ts-ignore private property
         rustCrypto.crossSigningIdentity = mockCrossSigningIdentity;
@@ -686,7 +687,7 @@ describe("RustCrypto", () => {
         const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
 
         const outgoingRequestProcessor = {
-            makeOutgoingRequest: jest.fn(),
+            makeOutgoingRequest: vi.fn(),
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
         const rustCrypto = await makeTestRustCrypto(
@@ -704,7 +705,7 @@ describe("RustCrypto", () => {
             return null;
         };
         (rustCrypto["crossSigningIdentity"] as any)["outgoingRequestProcessor"] = outgoingRequestProcessor;
-        const resetKeyBackup = (rustCrypto["resetKeyBackup"] = jest.fn());
+        const resetKeyBackup = (rustCrypto["resetKeyBackup"] = vi.fn());
 
         async function createSecretStorageKey() {
             return {
@@ -745,7 +746,7 @@ describe("RustCrypto", () => {
         let backupAlg: string;
 
         const fetchMock = {
-            authedRequest: jest.fn().mockImplementation((method, path, query, body) => {
+            authedRequest: vi.fn().mockImplementation((method, path, query, body) => {
                 if (path === "/room_keys/version") {
                     if (method === "POST") {
                         backupAuthData = body["auth_data"];
@@ -783,7 +784,7 @@ describe("RustCrypto", () => {
 
             await rustCrypto.resetKeyBackup();
 
-            const storeSpy = jest.spyOn(secretStorage, "store");
+            const storeSpy = vi.spyOn(secretStorage, "store");
 
             await rustCrypto.bootstrapSecretStorage({
                 createSecretStorageKey,
@@ -796,23 +797,23 @@ describe("RustCrypto", () => {
 
         it("bootstrapSecretStorage doesn't try to save megolm backup key not in cache", async () => {
             const mockOlmMachine = {
-                isBackupEnabled: jest.fn().mockResolvedValue(false),
-                sign: jest.fn().mockResolvedValue({
-                    asJSON: jest.fn().mockReturnValue("{}"),
+                isBackupEnabled: vi.fn().mockResolvedValue(false),
+                sign: vi.fn().mockResolvedValue({
+                    asJSON: vi.fn().mockReturnValue("{}"),
                 }),
-                saveBackupDecryptionKey: jest.fn(),
-                crossSigningStatus: jest.fn().mockResolvedValue({
+                saveBackupDecryptionKey: vi.fn(),
+                crossSigningStatus: vi.fn().mockResolvedValue({
                     hasMaster: true,
                     hasSelfSigning: true,
                     hasUserSigning: true,
                 }),
-                exportCrossSigningKeys: jest.fn().mockResolvedValue({
+                exportCrossSigningKeys: vi.fn().mockResolvedValue({
                     masterKey: "sosecret",
                     userSigningKey: "secrets",
                     self_signing_key: "ssshhh",
                 }),
-                getBackupKeys: jest.fn().mockResolvedValue({}),
-                verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(false) }),
+                getBackupKeys: vi.fn().mockResolvedValue({}),
+                verifyBackup: vi.fn().mockResolvedValue({ trusted: vi.fn().mockReturnValue(false) }),
             } as unknown as OlmMachine;
 
             const rustCrypto = new RustCrypto(
@@ -834,7 +835,7 @@ describe("RustCrypto", () => {
 
             await rustCrypto.resetKeyBackup();
 
-            const storeSpy = jest.spyOn(secretStorage, "store");
+            const storeSpy = vi.spyOn(secretStorage, "store");
 
             await rustCrypto.bootstrapSecretStorage({
                 createSecretStorageKey,
@@ -848,7 +849,7 @@ describe("RustCrypto", () => {
 
     it("isSecretStorageReady", async () => {
         const mockSecretStorage = {
-            getDefaultKeyId: jest.fn().mockResolvedValue(null),
+            getDefaultKeyId: vi.fn().mockResolvedValue(null),
         } as unknown as Mocked<ServerSideSecretStorage>;
         const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, mockSecretStorage);
         await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
@@ -891,14 +892,14 @@ describe("RustCrypto", () => {
             // returns objects from outgoingRequestQueue
             outgoingRequestQueue = [];
             olmMachine = {
-                outgoingRequests: jest.fn().mockImplementation(() => {
+                outgoingRequests: vi.fn().mockImplementation(() => {
                     return Promise.resolve(outgoingRequestQueue.shift() ?? []);
                 }),
-                close: jest.fn(),
+                close: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
             outgoingRequestProcessor = {
-                makeOutgoingRequest: jest.fn(),
+                makeOutgoingRequest: vi.fn(),
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
             const outgoingRequestsManager = new OutgoingRequestsManager(logger, olmMachine, outgoingRequestProcessor);
@@ -972,7 +973,7 @@ describe("RustCrypto", () => {
             let keysUploadCount = 0;
             let deviceKeys: object;
             let deviceKeysAbsent = false;
-            outgoingRequestProcessor.makeOutgoingRequest = jest.fn(async (request, uiaCallback?) => {
+            outgoingRequestProcessor.makeOutgoingRequest = vi.fn(async (request, uiaCallback?) => {
                 let resp: any = {};
                 if (request instanceof RustSdkCryptoJs.KeysUploadRequest) {
                     if (keysUploadCount == 0) {
@@ -1043,7 +1044,7 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
-                getRoomEventEncryptionInfo: jest.fn(),
+                getRoomEventEncryptionInfo: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
                 logger,
@@ -1121,7 +1122,7 @@ describe("RustCrypto", () => {
             [RustSdkCryptoJs.ShieldColor.Red, EventShieldColour.RED],
         ])("gets the right shield color (%i)", async (rustShield, expectedShield) => {
             const mockEncryptionInfo = {
-                shieldState: jest.fn().mockReturnValue({ color: rustShield, message: undefined }),
+                shieldState: vi.fn().mockReturnValue({ color: rustShield, message: undefined }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
             olmMachine.getRoomEventEncryptionInfo.mockResolvedValue(mockEncryptionInfo);
 
@@ -1161,10 +1162,10 @@ describe("RustCrypto", () => {
             ],
         ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {
             // suppress the warning from the unknown shield reason
-            jest.spyOn(console, "warn").mockImplementation(() => {});
+            vi.spyOn(console, "warn").mockImplementation(() => {});
 
             const mockEncryptionInfo = {
-                shieldState: jest
+                shieldState: vi
                     .fn()
                     .mockReturnValue({ color: RustSdkCryptoJs.ShieldColor.None, code: rustCode, message: rustReason }),
             } as unknown as RustSdkCryptoJs.EncryptionInfo;
@@ -1256,7 +1257,7 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
-                getDevice: jest.fn(),
+                getDevice: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
                 logger,
@@ -1271,10 +1272,10 @@ describe("RustCrypto", () => {
 
         it("should call getDevice", async () => {
             olmMachine.getDevice.mockResolvedValue({
-                free: jest.fn(),
-                isCrossSigningTrusted: jest.fn().mockReturnValue(false),
-                isLocallyTrusted: jest.fn().mockReturnValue(false),
-                isCrossSignedByOwner: jest.fn().mockReturnValue(false),
+                free: vi.fn(),
+                isCrossSigningTrusted: vi.fn().mockReturnValue(false),
+                isLocallyTrusted: vi.fn().mockReturnValue(false),
+                isCrossSignedByOwner: vi.fn().mockReturnValue(false),
             } as unknown as RustSdkCryptoJs.Device);
             const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");
             expect(olmMachine.getDevice.mock.calls[0][0].toString()).toEqual("@user:domain");
@@ -1384,7 +1385,7 @@ describe("RustCrypto", () => {
 
     it("should wait for a keys/query before returning devices", async () => {
         // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
@@ -1410,7 +1411,7 @@ describe("RustCrypto", () => {
     });
 
     it("should emit events on device changes", async () => {
-        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
         fetchMock.post("path:/_matrix/client/v3/keys/query", {
@@ -1422,9 +1423,9 @@ describe("RustCrypto", () => {
         });
 
         const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), testData.TEST_USER_ID);
-        const willUpdateCallback = jest.fn();
+        const willUpdateCallback = vi.fn();
         rustCrypto.on(CryptoEvent.WillUpdateDevices, willUpdateCallback);
-        const devicesUpdatedCallback = jest.fn();
+        const devicesUpdatedCallback = vi.fn();
         rustCrypto.on(CryptoEvent.DevicesUpdated, devicesUpdatedCallback);
 
         rustCrypto.onSyncCompleted({});
@@ -1499,7 +1500,7 @@ describe("RustCrypto", () => {
 
         beforeEach(() => {
             olmMachine = {
-                getIdentity: jest.fn(),
+                getIdentity: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             rustCrypto = new RustCrypto(
                 logger,
@@ -1522,9 +1523,9 @@ describe("RustCrypto", () => {
 
         it("returns a verified UserVerificationStatus when the UserIdentity is verified", async () => {
             olmMachine.getIdentity.mockResolvedValue({
-                free: jest.fn(),
-                isVerified: jest.fn().mockReturnValue(true),
-                wasPreviouslyVerified: jest.fn().mockReturnValue(true),
+                free: vi.fn(),
+                isVerified: vi.fn().mockReturnValue(true),
+                wasPreviouslyVerified: vi.fn().mockReturnValue(true),
             });
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
@@ -1564,7 +1565,7 @@ describe("RustCrypto", () => {
         });
 
         it("throws an error for our own user", async () => {
-            jest.useRealTimers();
+            vi.useRealTimers();
             const e2eKeyReceiver = new E2EKeyReceiver("http://server");
             const e2eKeyResponder = new E2EKeyResponder("http://server");
             e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
@@ -1586,7 +1587,7 @@ describe("RustCrypto", () => {
     describe("withdraw verification", () => {
         function createTestSetup(): { olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>; rustCrypto: RustCrypto } {
             const olmMachine = {
-                getIdentity: jest.fn(),
+                getIdentity: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             const rustCrypto = new RustCrypto(
                 logger,
@@ -1610,7 +1611,7 @@ describe("RustCrypto", () => {
         it("Calls withdraw for other identity", async () => {
             const { olmMachine, rustCrypto } = createTestSetup();
             const identity = {
-                withdrawVerification: jest.fn(),
+                withdrawVerification: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OtherUserIdentity>;
 
             olmMachine.getIdentity.mockResolvedValue(identity);
@@ -1623,7 +1624,7 @@ describe("RustCrypto", () => {
         it("Calls withdraw for own identity", async () => {
             const { olmMachine, rustCrypto } = createTestSetup();
             const ownIdentity = {
-                withdrawVerification: jest.fn(),
+                withdrawVerification: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OwnUserIdentity>;
 
             olmMachine.getIdentity.mockResolvedValue(ownIdentity);
@@ -1638,7 +1639,7 @@ describe("RustCrypto", () => {
         it("is started when rust crypto is created", async () => {
             // `RustCrypto.checkKeyBackupAndEnable` async call is made in background in the RustCrypto constructor.
             // We don't have an instance of the rust crypto yet, we spy directly in the prototype.
-            const spyCheckKeyBackupAndEnable = jest
+            const spyCheckKeyBackupAndEnable = vi
                 .spyOn(RustCrypto.prototype, "checkKeyBackupAndEnable")
                 .mockResolvedValue({} as KeyBackupCheck);
 
@@ -1652,12 +1653,12 @@ describe("RustCrypto", () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
             const olmMachine = {
-                getIdentity: jest.fn(),
+                getIdentity: vi.fn(),
                 // Force the backup to be trusted by the olmMachine
-                verifyBackup: jest.fn().mockResolvedValue({ trusted: jest.fn().mockReturnValue(true) }),
-                isBackupEnabled: jest.fn().mockReturnValue(true),
-                getBackupKeys: jest.fn(),
-                enableBackupV1: jest.fn(),
+                verifyBackup: vi.fn().mockResolvedValue({ trusted: vi.fn().mockReturnValue(true) }),
+                isBackupEnabled: vi.fn().mockReturnValue(true),
+                getBackupKeys: vi.fn(),
+                enableBackupV1: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
             const rustCrypto = new RustCrypto(
@@ -1734,7 +1735,7 @@ describe("RustCrypto", () => {
             const backup = Array.from(testData.MEGOLM_SESSION_DATA_ARRAY);
             // in addition to correct keys, we restore an invalid key
             backup.push({ room_id: "!roomid", session_id: "sessionid" } as IMegolmSessionData);
-            const progressCallback = jest.fn();
+            const progressCallback = vi.fn();
             await rustCrypto.importBackedUpRoomKeys(backup, backupVersion, { progressCallback });
             expect(progressCallback).toHaveBeenCalledWith({
                 total: 3,
@@ -1768,7 +1769,6 @@ describe("RustCrypto", () => {
     describe("device dehydration", () => {
         it("should detect if dehydration is supported", async () => {
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
-            fetchMock.config.overwriteRoutes = true;
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
                 body: {
@@ -1793,8 +1793,6 @@ describe("RustCrypto", () => {
         });
 
         it("should load the dehydration key from SSSS if available", async () => {
-            fetchMock.config.overwriteRoutes = true;
-
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
                     return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
@@ -1903,7 +1901,7 @@ describe("RustCrypto", () => {
 
             // Function that is called when `GET /dehydrated_device` is called
             // (i.e. when we try to rehydrate a device)
-            const getDehydratedDeviceMock = jest.fn(() => {
+            const getDehydratedDeviceMock = vi.fn(() => {
                 if (dehydratedDeviceInfo) {
                     return {
                         status: 200,
@@ -1921,7 +1919,7 @@ describe("RustCrypto", () => {
             });
             // Function that is called when `PUT /dehydrated_device` is called
             // (i.e. when we create a new dehydrated device)
-            const putDehydratedDeviceMock = jest.fn((path, opts) => {
+            const putDehydratedDeviceMock = vi.fn((path, opts) => {
                 const content = JSON.parse(opts.body as string);
                 dehydratedDeviceInfo = {
                     device_id: content.device_id,
@@ -2131,7 +2129,7 @@ describe("RustCrypto", () => {
                 new RustSdkCryptoJs.UserId(testData.TEST_USER_ID),
                 new RustSdkCryptoJs.DeviceId(testData.TEST_DEVICE_ID),
             );
-            jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
+            vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
             rustCrypto = await makeTestRustCrypto();
             expect(OlmMachine.initFromStore).toHaveBeenCalled();
         });
@@ -2143,8 +2141,8 @@ describe("RustCrypto", () => {
         const payload = { hello: "world" };
 
         it("returns empty batch if devices not known", async () => {
-            const getMissingSessions = jest.spyOn(testOlmMachine, "getMissingSessions");
-            const getDevice = jest.spyOn(testOlmMachine, "getDevice");
+            const getMissingSessions = vi.spyOn(testOlmMachine, "getMissingSessions");
+            const getDevice = vi.spyOn(testOlmMachine, "getDevice");
             const batch = await rustCrypto.encryptToDeviceMessages(
                 "m.test.type",
                 [
@@ -2244,11 +2242,11 @@ describe("RustCrypto", () => {
         let secretStorage: ServerSideSecretStorage;
         beforeEach(() => {
             secretStorage = {
-                setDefaultKeyId: jest.fn(),
-                hasKey: jest.fn().mockResolvedValue(false),
-                getKey: jest.fn().mockResolvedValue(null),
-                store: jest.fn(),
-                getDefaultKeyId: jest.fn().mockResolvedValue("defaultKeyId"),
+                setDefaultKeyId: vi.fn(),
+                hasKey: vi.fn().mockResolvedValue(false),
+                getKey: vi.fn().mockResolvedValue(null),
+                store: vi.fn(),
+                getDefaultKeyId: vi.fn().mockResolvedValue("defaultKeyId"),
             } as unknown as ServerSideSecretStorage;
 
             fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
@@ -2275,7 +2273,7 @@ describe("RustCrypto", () => {
             });
 
             // We consider the key backup as trusted
-            jest.spyOn(RustBackupManager.prototype, "isKeyBackupTrusted").mockResolvedValue({
+            vi.spyOn(RustBackupManager.prototype, "isKeyBackupTrusted").mockResolvedValue({
                 trusted: true,
                 matchesDecryptionKey: true,
             });
@@ -2284,7 +2282,7 @@ describe("RustCrypto", () => {
             // We have a key backup
             expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull();
 
-            const authUploadDeviceSigningKeys = jest.fn();
+            const authUploadDeviceSigningKeys = vi.fn();
             await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
 
             // The secrets in 4S should be deleted

@@ -448,7 +448,7 @@ To build a browser version from scratch when developing:
  $ yarn build
 ```
 
-To run tests (Jest):
+To run tests:
 
 ```
  $ yarn test

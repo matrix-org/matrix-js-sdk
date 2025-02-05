@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked, MockedObject } from "jest-mock";
+import { beforeAll, beforeEach, describe, expect, it, MockedObject, vi } from "vitest";
 
 import type { DeviceInfoMap } from "../../../../src/crypto/DeviceList";
 import "../../../olm-loader";
@@ -37,6 +37,7 @@ import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypt
 import { recursiveMapToObject } from "../../../../src/utils";
 import { sleep } from "../../../../src/utils";
 import { KnownMembership } from "../../../../src/@types/membership";
+import { mocked } from "../../../test-utils";
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
@@ -69,9 +70,9 @@ describe("MegolmDecryption", function () {
         };
 
         mockBaseApis = {
-            claimOneTimeKeys: jest.fn(),
-            sendToDevice: jest.fn(),
-            queueToDevice: jest.fn(),
+            claimOneTimeKeys: vi.fn(),
+            sendToDevice: vi.fn(),
+            queueToDevice: vi.fn(),
         } as unknown as MockedObject<MatrixClient>;
 
         const cryptoStore = new MemoryCryptoStore();
@@ -88,14 +89,14 @@ describe("MegolmDecryption", function () {
 
         // we stub out the olm encryption bits
         mockOlmLib = {
-            encryptMessageForDevice: jest.fn().mockResolvedValue(undefined),
-            ensureOlmSessionsForDevices: jest.fn(),
+            encryptMessageForDevice: vi.fn().mockResolvedValue(undefined),
+            ensureOlmSessionsForDevices: vi.fn(),
         } as unknown as MockedObject<typeof olmlib>;
 
         // @ts-ignore illegal assignment that makes these tests work :/
         megolmDecryption.olmlib = mockOlmLib;
 
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     describe("receives some keys:", function () {
@@ -165,7 +166,7 @@ describe("MegolmDecryption", function () {
         it("can respond to a key request event", function () {
             const keyRequest: IncomingRoomKeyRequest = {
                 requestId: "123",
-                share: jest.fn(),
+                share: vi.fn(),
                 userId: "@alice:foo",
                 deviceId: "alidevice",
                 requestBody: {
@@ -263,8 +264,8 @@ describe("MegolmDecryption", function () {
                 origin_server_ts: 1507753886000,
             });
 
-            const successHandler = jest.fn();
-            const failureHandler = jest.fn((err) => {
+            const successHandler = vi.fn();
+            const failureHandler = vi.fn((err) => {
                 expect(err.toString()).toMatch(/Duplicate message index, possible replay attack/);
             });
 
@@ -335,7 +336,7 @@ describe("MegolmDecryption", function () {
                 const cryptoStore = new MemoryCryptoStore();
 
                 olmDevice = new OlmDevice(cryptoStore);
-                olmDevice.verifySignature = jest.fn();
+                olmDevice.verifySignature = vi.fn();
                 await olmDevice.init();
 
                 mockBaseApis.claimOneTimeKeys.mockResolvedValue({
@@ -360,10 +361,10 @@ describe("MegolmDecryption", function () {
 
                 aliceDeviceInfo = {
                     deviceId: "aliceDevice",
-                    isBlocked: jest.fn().mockReturnValue(false),
-                    isUnverified: jest.fn().mockReturnValue(false),
-                    getIdentityKey: jest.fn().mockReturnValue("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE"),
-                    getFingerprint: jest.fn().mockReturnValue(""),
+                    isBlocked: vi.fn().mockReturnValue(false),
+                    isUnverified: vi.fn().mockReturnValue(false),
+                    getIdentityKey: vi.fn().mockReturnValue("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE"),
+                    getFingerprint: vi.fn().mockReturnValue(""),
                 } as unknown as DeviceInfo;
 
                 mockCrypto.downloadKeys.mockReturnValue(
@@ -398,9 +399,9 @@ describe("MegolmDecryption", function () {
 
                 mockRoom = {
                     roomId: ROOM_ID,
-                    getEncryptionTargetMembers: jest.fn().mockReturnValue([{ userId: "@alice:home.server" }]),
-                    getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
-                    shouldEncryptForInvitedMembers: jest.fn().mockReturnValue(false),
+                    getEncryptionTargetMembers: vi.fn().mockReturnValue([{ userId: "@alice:home.server" }]),
+                    getBlacklistUnverifiedDevices: vi.fn().mockReturnValue(false),
+                    shouldEncryptForInvitedMembers: vi.fn().mockReturnValue(false),
                 } as unknown as Room;
             });
 
@@ -427,7 +428,7 @@ describe("MegolmDecryption", function () {
                 megolmEncryption.setupPromise = Promise.resolve(session);
 
                 // @ts-ignore - private method access
-                const prepareNewSessionSpy = jest.spyOn(megolmEncryption, "prepareNewSession");
+                const prepareNewSessionSpy = vi.spyOn(megolmEncryption, "prepareNewSession");
                 await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
                     body: "Some text",
                 });
@@ -488,9 +489,7 @@ describe("MegolmDecryption", function () {
                     body: "Some text",
                 });
 
-                aliceDeviceInfo.getIdentityKey = jest
-                    .fn()
-                    .mockReturnValue("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWI");
+                aliceDeviceInfo.getIdentityKey = vi.fn().mockReturnValue("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWI");
 
                 mockBaseApis.queueToDevice.mockClear();
                 await megolmEncryption.reshareKeyWithDevice!(
@@ -527,7 +526,7 @@ describe("MegolmDecryption", function () {
 
     describe("prepareToEncrypt", () => {
         let megolm: MegolmEncryptionClass;
-        let room: jest.Mocked<Room>;
+        let room: MockedObject<Room>;
 
         const deviceMap: DeviceInfoMap = new Map([
             [
@@ -557,7 +556,7 @@ describe("MegolmDecryption", function () {
         ]);
 
         beforeEach(() => {
-            room = testUtils.mock(Room, "Room") as jest.Mocked<Room>;
+            room = testUtils.mock(Room, "Room") as MockedObject<Room>;
             room.getEncryptionTargetMembers.mockImplementation(async () => [
                 new RoomMember(room.roomId, "@user:example.org"),
             ]);
@@ -660,7 +659,7 @@ describe("MegolmDecryption", function () {
             return this.getDevicesFromStore(userIds);
         };
 
-        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
+        aliceClient.sendToDevice = vi.fn().mockResolvedValue({});
 
         const event = new MatrixEvent({
             type: "m.room.message",
@@ -758,7 +757,7 @@ describe("MegolmDecryption", function () {
             }
         }
 
-        aliceClient.claimOneTimeKeys = jest.fn().mockResolvedValue({
+        aliceClient.claimOneTimeKeys = vi.fn().mockResolvedValue({
             one_time_keys: {
                 "@bob:example.com": {
                     bobdevice: signedOneTimeKeys,
@@ -767,7 +766,7 @@ describe("MegolmDecryption", function () {
             failures: {},
         });
 
-        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
+        aliceClient.sendToDevice = vi.fn().mockResolvedValue({});
 
         const event = new MatrixEvent({
             type: "m.key.verification.start",
@@ -808,7 +807,7 @@ describe("MegolmDecryption", function () {
         await aliceClient.setRoomEncryption(roomId, encryptionCfg);
         await bobClient.setRoomEncryption(roomId, encryptionCfg);
 
-        aliceRoom.getEncryptionTargetMembers = jest.fn().mockResolvedValue([
+        aliceRoom.getEncryptionTargetMembers = vi.fn().mockResolvedValue([
             {
                 userId: "@alice:example.com",
                 membership: KnownMembership.Join,
@@ -838,13 +837,13 @@ describe("MegolmDecryption", function () {
             return this.getDevicesFromStore(userIds);
         };
 
-        aliceClient.claimOneTimeKeys = jest.fn().mockResolvedValue({
+        aliceClient.claimOneTimeKeys = vi.fn().mockResolvedValue({
             // Bob has no one-time keys
             one_time_keys: {},
             failures: {},
         });
 
-        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
+        aliceClient.sendToDevice = vi.fn().mockResolvedValue({});
 
         const event = new MatrixEvent({
             type: "m.room.message",
@@ -964,7 +963,7 @@ describe("MegolmDecryption", function () {
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
         aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 
-        aliceClient.crypto!.downloadKeys = jest.fn();
+        aliceClient.crypto!.downloadKeys = vi.fn();
         const bobDevice = bobClient.crypto!.olmDevice;
 
         const roomId = "!someroom";
@@ -1060,7 +1059,7 @@ describe("MegolmDecryption", function () {
         aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 
         const bobDevice = bobClient.crypto!.olmDevice;
-        aliceClient.crypto!.downloadKeys = jest.fn();
+        aliceClient.crypto!.downloadKeys = vi.fn();
 
         const roomId = "!someroom";
 

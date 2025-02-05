@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { M_POLL_START } from "../../src/@types/polls";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
@@ -25,7 +27,7 @@ import { logger } from "../../src/logger";
 
 describe("Relations", function () {
     afterEach(() => {
-        jest.spyOn(logger, "error").mockRestore();
+        vi.spyOn(logger, "error").mockRestore();
     });
 
     it("should deduplicate annotations", function () {
@@ -90,9 +92,9 @@ describe("Relations", function () {
 
         it("should not add events without a relation", async () => {
             // dont pollute console
-            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
             const relations = new Relations(relationType, eventType, room);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
             const event = new MatrixEvent({ type: eventType });
 
             await relations.addEvent(event);
@@ -104,9 +106,9 @@ describe("Relations", function () {
 
         it("should not add events of incorrect event type", async () => {
             // dont pollute console
-            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
             const relations = new Relations(relationType, eventType, room);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
             const event = new MatrixEvent({
                 type: "different-event-type",
                 content: {
@@ -127,7 +129,7 @@ describe("Relations", function () {
 
         it("adds events that match alt event types", async () => {
             const relations = new Relations(relationType, eventType, room, altEventTypes);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
             const event = new MatrixEvent({
                 type: M_POLL_START.unstable!,
                 content: {
@@ -146,7 +148,7 @@ describe("Relations", function () {
         });
 
         it("should not add events of incorrect relation type", async () => {
-            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
             const relations = new Relations(relationType, eventType, room);
             const event = new MatrixEvent({
                 type: eventType,
@@ -159,7 +161,7 @@ describe("Relations", function () {
             });
 
             await relations.addEvent(event);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
 
             expect(logSpy).toHaveBeenCalledWith(`Event relation info doesn't match this container`);
             // event not added

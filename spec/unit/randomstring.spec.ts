@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { decodeBase64 } from "../../src/base64";
 import {
     secureRandomString,
@@ -25,7 +27,7 @@ import {
 
 describe("Random strings", () => {
     afterEach(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     it.each([8, 16, 32])("secureRandomBase64 generates %i valid base64 bytes", (n: number) => {
@@ -102,7 +104,7 @@ describe("Random strings", () => {
         // mock once to fill with 255 the first time: 255 should be unusable because
         // we give 10 possible characters below and 256 is not evenly divisible by 10, so
         // this should force it to call for more entropy.
-        jest.spyOn(globalThis.crypto, "getRandomValues").mockImplementationOnce((arr) => {
+        vi.spyOn(globalThis.crypto, "getRandomValues").mockImplementationOnce((arr) => {
             if (arr === null) throw new Error("Buffer is null");
             new Uint8Array(arr.buffer).fill(255);
             return arr;

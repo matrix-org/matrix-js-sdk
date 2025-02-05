@@ -1,4 +1,5 @@
-import fetchMock from "fetch-mock-jest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientPrefix, MatrixClient } from "../../src";
 import { SSOAction } from "../../src/@types/auth";

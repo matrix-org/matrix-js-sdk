@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { REFERENCE_RELATION } from "../../../src/@types/extensible_events";
 import { MatrixEvent } from "../../../src";
 import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import { isTimestampInDuration, Beacon, BeaconEvent } from "../../../src/models/beacon";
 import { makeBeaconEvent, makeBeaconInfoEvent } from "../../test-utils/beacon";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe("Beacon", () => {
     describe("isTimestampInDuration()", () => {
@@ -70,9 +72,9 @@ describe("Beacon", () => {
 
         const advanceDateAndTime = (ms: number) => {
             // bc liveness check uses Date.now we have to advance this mock
-            jest.spyOn(globalThis.Date, "now").mockReturnValue(Date.now() + ms);
+            vi.spyOn(globalThis.Date, "now").mockReturnValue(Date.now() + ms);
             // then advance time for the interval by the same amount
-            jest.advanceTimersByTime(ms);
+            vi.advanceTimersByTime(ms);
         };
 
         beforeEach(() => {
@@ -108,11 +110,11 @@ describe("Beacon", () => {
             );
 
             // back to 'now'
-            jest.spyOn(globalThis.Date, "now").mockReturnValue(now);
+            vi.spyOn(globalThis.Date, "now").mockReturnValue(now);
         });
 
         afterAll(() => {
-            jest.spyOn(globalThis.Date, "now").mockRestore();
+            vi.spyOn(globalThis.Date, "now").mockRestore();
         });
 
         it("creates beacon from event", () => {
@@ -250,7 +252,7 @@ describe("Beacon", () => {
 
             it("does not update with an older event", () => {
                 const beacon = new Beacon(liveBeaconEvent);
-                const emitSpy = jest.spyOn(beacon, "emit").mockClear();
+                const emitSpy = vi.spyOn(beacon, "emit").mockClear();
                 expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
 
                 const oldUpdateEvent = makeBeaconInfoEvent(userId, roomId);
@@ -265,7 +267,7 @@ describe("Beacon", () => {
 
             it("updates event", () => {
                 const beacon = new Beacon(liveBeaconEvent);
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 expect(beacon.isLive).toEqual(true);
 
@@ -283,7 +285,7 @@ describe("Beacon", () => {
 
             it("emits livenesschange event when beacon liveness changes", () => {
                 const beacon = new Beacon(liveBeaconEvent);
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 expect(beacon.isLive).toEqual(true);
 
@@ -305,7 +307,7 @@ describe("Beacon", () => {
                 // beacon was created an hour ago
                 // and has a 3hr duration
                 const beacon = new Beacon(notLiveBeaconEvent);
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 beacon.monitorLiveness();
 
@@ -332,7 +334,7 @@ describe("Beacon", () => {
 
                 const beacon = new Beacon(futureBeaconEvent);
                 expect(beacon.isLive).toBeFalsy();
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 beacon.monitorLiveness();
 
@@ -356,7 +358,7 @@ describe("Beacon", () => {
                 // and has a 3hr duration
                 const beacon = new Beacon(liveBeaconEvent);
                 expect(beacon.isLive).toBeTruthy();
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 beacon.monitorLiveness();
                 advanceDateAndTime(HOUR_MS * 2 + 1);
@@ -386,7 +388,7 @@ describe("Beacon", () => {
                 // and has a 3hr duration
                 const beacon = new Beacon(liveBeaconEvent);
                 expect(beacon.isLive).toBeTruthy();
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 beacon.monitorLiveness();
 
@@ -406,7 +408,7 @@ describe("Beacon", () => {
         describe("addLocations", () => {
             it("ignores locations when beacon is not live", () => {
                 const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: false }));
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 beacon.addLocations([
                     makeBeaconEvent(userId, { beaconInfoId: beacon.beaconInfoId, timestamp: now + 1 }),
@@ -418,7 +420,7 @@ describe("Beacon", () => {
 
             it("ignores locations outside the beacon live duration", () => {
                 const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 beacon.addLocations([
                     // beacon has now + 60000 live period
@@ -431,7 +433,7 @@ describe("Beacon", () => {
 
             it("should ignore invalid beacon events", () => {
                 const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 const ev = new MatrixEvent({
                     type: M_BEACON_INFO.name,
@@ -460,7 +462,7 @@ describe("Beacon", () => {
                             timestamp: startTimestamp,
                         }),
                     );
-                    const emitSpy = jest.spyOn(beacon, "emit");
+                    const emitSpy = vi.spyOn(beacon, "emit");
 
                     beacon.addLocations([
                         // beacon has now + 60000 live period
@@ -483,7 +485,7 @@ describe("Beacon", () => {
                             timestamp: startTimestamp,
                         }),
                     );
-                    const emitSpy = jest.spyOn(beacon, "emit");
+                    const emitSpy = vi.spyOn(beacon, "emit");
 
                     beacon.addLocations([
                         // beacon has now + 600000 live period
@@ -501,7 +503,7 @@ describe("Beacon", () => {
 
             it("sets latest location state to most recent location", () => {
                 const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
-                const emitSpy = jest.spyOn(beacon, "emit");
+                const emitSpy = vi.spyOn(beacon, "emit");
 
                 const locations = [
                     // older
@@ -553,7 +555,7 @@ describe("Beacon", () => {
                 );
                 expect(beacon.latestLocationEvent).toEqual(newerLocation);
 
-                const emitSpy = jest.spyOn(beacon, "emit").mockClear();
+                const emitSpy = vi.spyOn(beacon, "emit").mockClear();
 
                 // add older location
                 beacon.addLocations([olderLocation]);

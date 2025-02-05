@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -18,10 +18,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
-import { mocked } from "jest-mock";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import fetchMock from "@fetch-mock/vitest";
 import { jwtDecode } from "jwt-decode";
-import { Crypto } from "@peculiar/webcrypto";
 import { getRandomValues } from "node:crypto";
 import { TextEncoder } from "node:util";
 
@@ -35,8 +35,9 @@ import {
 } from "../../../src/oidc/authorize";
 import { OidcError } from "../../../src/oidc/error";
 import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
+import { mocked } from "../../test-utils";
 
-jest.mock("jwt-decode");
+vi.mock("jwt-decode");
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
@@ -49,8 +50,8 @@ describe("oidc authorization", () => {
     const now = 1647270879403;
 
     beforeAll(() => {
-        jest.spyOn(logger, "warn");
-        jest.setSystemTime(now);
+        vi.spyOn(logger, "warn");
+        vi.setSystemTime(now);
 
         fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
         globalThis.TextEncoder = TextEncoder;
@@ -61,7 +62,7 @@ describe("oidc authorization", () => {
         Object.defineProperty(window, "crypto", {
             value: {
                 getRandomValues,
-                randomUUID: jest.fn().mockReturnValue("not-random-uuid"),
+                randomUUID: vi.fn().mockReturnValue("not-random-uuid"),
                 subtle: webCrypto.subtle,
             },
         });
@@ -196,14 +197,14 @@ describe("oidc authorization", () => {
         };
 
         const mockSessionStorage = (state: Record<string, unknown>): void => {
-            jest.spyOn(sessionStorage.__proto__, "getItem").mockImplementation((key: unknown) => {
+            vi.spyOn(sessionStorage.__proto__, "getItem").mockImplementation((key: unknown) => {
                 return state[key as string] ?? null;
             });
-            jest.spyOn(sessionStorage.__proto__, "setItem").mockImplementation(
+            vi.spyOn(sessionStorage.__proto__, "setItem").mockImplementation(
                 // @ts-ignore mock type
                 (key: string, value: unknown) => (state[key] = value),
             );
-            jest.spyOn(sessionStorage.__proto__, "removeItem").mockImplementation((key: unknown) => {
+            vi.spyOn(sessionStorage.__proto__, "removeItem").mockImplementation((key: unknown) => {
                 const { [key as string]: value, ...newState } = state;
                 state = newState;
                 return value;
@@ -251,7 +252,7 @@ describe("oidc authorization", () => {
 
         beforeEach(() => {
             fetchMock.mockClear();
-            fetchMock.resetBehavior();
+            fetchMock.mockReset();
 
             fetchMock.get(`${metadata.issuer}.well-known/openid-configuration`, metadata);
             fetchMock.get(`${metadata.issuer}jwks`, {
@@ -285,8 +286,8 @@ describe("oidc authorization", () => {
             );
 
             // check body is correctly formed
-            const queryParams = fetchMock.mock.calls.find(([endpoint]) => endpoint === metadata.token_endpoint)![1]!
-                .body as URLSearchParams;
+            const queryParams = fetchMock.callHistory.lastCall((callLog) => callLog.url === metadata.token_endpoint)!
+                .request!.body as URLSearchParams;
             expect(queryParams.get("grant_type")).toEqual("authorization_code");
             expect(queryParams.get("client_id")).toEqual(clientId);
             expect(queryParams.get("code_verifier")).toEqual(codeVerifier);
@@ -327,16 +328,12 @@ describe("oidc authorization", () => {
                 scope,
                 token_type: "bearer",
             };
-            fetchMock.post(
-                tokenEndpoint,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    ...tokenResponse,
+            fetchMock.post(tokenEndpoint, {
+                headers: {
+                    "Content-Type": "application/json",
                 },
-                { overwriteRoutes: true },
-            );
+                ...tokenResponse,
+            });
 
             const result = await completeAuthorizationCodeGrant(code, state);
 
@@ -366,13 +363,9 @@ describe("oidc authorization", () => {
         it("should throw when state is not found in storage", async () => {
             // don't setup sessionStorage with expected state
             const state = "abc123";
-            fetchMock.post(
-                metadata.token_endpoint,
-                {
-                    status: 500,
-                },
-                { overwriteRoutes: true },
-            );
+            fetchMock.post(metadata.token_endpoint, {
+                status: 500,
+            });
             await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
                 new Error(OidcError.MissingOrInvalidStoredState),
             );
@@ -380,13 +373,9 @@ describe("oidc authorization", () => {
 
         it("should throw with code exchange failed error when request fails", async () => {
             const state = await setupState();
-            fetchMock.post(
-                metadata.token_endpoint,
-                {
-                    status: 500,
-                },
-                { overwriteRoutes: true },
-            );
+            fetchMock.post(metadata.token_endpoint, {
+                status: 500,
+            });
             await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
                 new Error(OidcError.CodeExchangeFailed),
             );
@@ -398,16 +387,12 @@ describe("oidc authorization", () => {
                 ...validBearerTokenResponse,
                 access_token: null,
             };
-            fetchMock.post(
-                metadata.token_endpoint,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    ...invalidBearerTokenResponse,
+            fetchMock.post(metadata.token_endpoint, {
+                headers: {
+                    "Content-Type": "application/json",
                 },
-                { overwriteRoutes: true },
-            );
+                ...invalidBearerTokenResponse,
+            });
             await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
                 new Error(OidcError.InvalidBearerTokenResponse),
             );

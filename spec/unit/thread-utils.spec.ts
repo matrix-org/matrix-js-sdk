@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { describe, expect, it } from "vitest";
+
 import { IEvent } from "../../src";
 import { secureRandomString } from "../../src/randomstring";
 import { getRelationsThreadFilter } from "../../src/thread-utils";

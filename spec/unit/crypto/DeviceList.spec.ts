@@ -16,6 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { logger } from "../../../src/logger";
 import * as utils from "../../../src/utils";
 import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
@@ -86,7 +88,7 @@ describe("DeviceList", function () {
     beforeEach(function () {
         deviceLists = [];
 
-        downloadSpy = jest.fn();
+        downloadSpy = vi.fn();
         cryptoStore = new MemoryCryptoStore();
     });
 

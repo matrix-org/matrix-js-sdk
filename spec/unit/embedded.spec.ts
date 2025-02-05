@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment jsdom
  */
 
 /*
@@ -21,8 +21,9 @@ limitations under the License.
 // We have to use EventEmitter here to mock part of the matrix-widget-api
 // project, which doesn't know about our TypeEventEmitter implementation at all
 // eslint-disable-next-line no-restricted-imports
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, MockedObject, vi } from "vitest";
+
 import { EventEmitter } from "events";
-import { MockedObject } from "jest-mock";
 import {
     WidgetApi,
     WidgetApiToWidgetAction,
@@ -50,25 +51,25 @@ const testOIDCToken = {
     token_type: "Bearer",
 };
 class MockWidgetApi extends EventEmitter {
-    public start = jest.fn();
-    public requestCapability = jest.fn();
-    public requestCapabilities = jest.fn();
-    public requestCapabilityForRoomTimeline = jest.fn();
-    public requestCapabilityToSendEvent = jest.fn();
-    public requestCapabilityToReceiveEvent = jest.fn();
-    public requestCapabilityToSendMessage = jest.fn();
-    public requestCapabilityToReceiveMessage = jest.fn();
-    public requestCapabilityToSendState = jest.fn();
-    public requestCapabilityToReceiveState = jest.fn();
-    public requestCapabilityToSendToDevice = jest.fn();
-    public requestCapabilityToReceiveToDevice = jest.fn();
-    public sendRoomEvent = jest.fn(
+    public start = vi.fn();
+    public requestCapability = vi.fn();
+    public requestCapabilities = vi.fn();
+    public requestCapabilityForRoomTimeline = vi.fn();
+    public requestCapabilityToSendEvent = vi.fn();
+    public requestCapabilityToReceiveEvent = vi.fn();
+    public requestCapabilityToSendMessage = vi.fn();
+    public requestCapabilityToReceiveMessage = vi.fn();
+    public requestCapabilityToSendState = vi.fn();
+    public requestCapabilityToReceiveState = vi.fn();
+    public requestCapabilityToSendToDevice = vi.fn();
+    public requestCapabilityToReceiveToDevice = vi.fn();
+    public sendRoomEvent = vi.fn(
         (eventType: string, content: unknown, roomId?: string, delay?: number, parentDelayId?: string) =>
             delay === undefined && parentDelayId === undefined
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public sendStateEvent = jest.fn(
+    public sendStateEvent = vi.fn(
         (
             eventType: string,
             stateKey: string,
@@ -81,22 +82,22 @@ class MockWidgetApi extends EventEmitter {
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public updateDelayedEvent = jest.fn();
-    public sendToDevice = jest.fn();
-    public requestOpenIDConnectToken = jest.fn(() => {
+    public updateDelayedEvent = vi.fn();
+    public sendToDevice = vi.fn();
+    public requestOpenIDConnectToken = vi.fn(() => {
         return testOIDCToken;
         return new Promise<IOpenIDCredentials>(() => {
             return testOIDCToken;
         });
     });
-    public readStateEvents = jest.fn(() => []);
-    public getTurnServers = jest.fn(() => []);
-    public sendContentLoaded = jest.fn();
+    public readStateEvents = vi.fn(() => []);
+    public getTurnServers = vi.fn(() => []);
+    public sendContentLoaded = vi.fn();
 
     public transport = {
-        reply: jest.fn(),
-        send: jest.fn(),
-        sendComplete: jest.fn(),
+        reply: vi.fn(),
+        send: vi.fn(),
+        sendComplete: vi.fn(),
     };
 }
 
@@ -115,11 +116,13 @@ declare module "../../src/types" {
 }
 
 describe("RoomWidgetClient", () => {
-    let widgetApi: MockedObject<WidgetApi>;
+    let widgetApi: MockedObject<WidgetApi> & { transport: MockedObject<WidgetApi["transport"]> };
     let client: MatrixClient;
 
     beforeEach(() => {
-        widgetApi = new MockWidgetApi() as unknown as MockedObject<WidgetApi>;
+        widgetApi = new MockWidgetApi() as unknown as MockedObject<WidgetApi> & {
+            transport: MockedObject<WidgetApi["transport"]>;
+        };
     });
 
     afterEach(() => {
@@ -213,7 +216,7 @@ describe("RoomWidgetClient", () => {
                 );
                 expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
                 expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
-                const injectSpy = jest.spyOn((client as any).syncApi, "injectRoomEvents");
+                const injectSpy = vi.spyOn((client as any).syncApi, "injectRoomEvents");
                 const widgetSendEmitter = new EventEmitter();
                 const widgetSendPromise = new Promise<void>((resolve) =>
                     widgetSendEmitter.once("send", () => resolve()),
@@ -381,7 +384,7 @@ describe("RoomWidgetClient", () => {
 
     describe("delayed events", () => {
         describe("when supported", () => {
-            const doesServerSupportUnstableFeatureMock = jest.fn((feature) =>
+            const doesServerSupportUnstableFeatureMock = vi.fn((feature) =>
                 Promise.resolve(feature === "org.matrix.msc4140"),
             );
 

@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { EstablishedEcies, QrCodeData, QrCodeMode, Ecies } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { mocked } from "jest-mock";
 
 import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
+import { mocked } from "../../../test-utils";
 
 describe("MSC4108SecureChannel", () => {
     const baseUrl = "https://example.com";
@@ -38,8 +40,8 @@ describe("MSC4108SecureChannel", () => {
 
     it("should throw error if attempt to connect multiple times", async () => {
         const mockSession = {
-            send: jest.fn(),
-            receive: jest.fn(),
+            send: vi.fn(),
+            receive: vi.fn(),
             url,
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
@@ -56,8 +58,8 @@ describe("MSC4108SecureChannel", () => {
 
     it("should throw error on invalid initiate response", async () => {
         const mockSession = {
-            send: jest.fn(),
-            receive: jest.fn(),
+            send: vi.fn(),
+            receive: vi.fn(),
             url,
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
@@ -82,8 +84,8 @@ describe("MSC4108SecureChannel", () => {
 
         beforeEach(async () => {
             mockSession = {
-                send: jest.fn(),
-                receive: jest.fn(),
+                send: vi.fn(),
+                receive: vi.fn(),
                 url,
             } as unknown as MSC4108RendezvousSession;
             channel = new MSC4108SecureChannel(mockSession);

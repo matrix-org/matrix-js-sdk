@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { it, describe, expect } from "vitest";
+
 import * as utils from "../../src/utils";
 import {
     alphabetPad,
@@ -149,11 +151,9 @@ describe("utils", function () {
     describe("deepCompare", function () {
         const assert = {
             isTrue: function (x: any) {
-                // eslint-disable-next-line jest/no-standalone-expect
                 expect(x).toBe(true);
             },
             isFalse: function (x: any) {
-                // eslint-disable-next-line jest/no-standalone-expect
                 expect(x).toBe(false);
             },
         };

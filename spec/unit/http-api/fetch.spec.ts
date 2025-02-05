@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked } from "jest-mock";
+import { describe, expect, it, vi, Mocked } from "vitest";
 
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
@@ -37,7 +37,7 @@ describe("FetchHttpApi", () => {
     const prefix = ClientPrefix.V3;
 
     it("should support aborting multiple times", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
 
         api.request(Method.Get, "/foo");
@@ -60,7 +60,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should fall back to global fetch if fetchFn not provided", () => {
-        globalThis.fetch = jest.fn();
+        globalThis.fetch = vi.fn();
         expect(globalThis.fetch).not.toHaveBeenCalled();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
         api.fetch("test");
@@ -83,7 +83,7 @@ describe("FetchHttpApi", () => {
         });
 
         it("should send params as query string for GET requests", () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+            const fetchFn = vi.fn().mockResolvedValue({ ok: true });
             const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, idBaseUrl, prefix, fetchFn });
             api.idServerRequest(Method.Get, "/test", { foo: "bar", via: ["a", "b"] }, IdentityPrefix.V2);
             expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).toBe("bar");
@@ -91,7 +91,7 @@ describe("FetchHttpApi", () => {
         });
 
         it("should send params as body for non-GET requests", () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+            const fetchFn = vi.fn().mockResolvedValue({ ok: true });
             const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, idBaseUrl, prefix, fetchFn });
             const params = { foo: "bar", via: ["a", "b"] };
             api.idServerRequest(Method.Post, "/test", params, IdentityPrefix.V2);
@@ -100,7 +100,7 @@ describe("FetchHttpApi", () => {
         });
 
         it("should add Authorization header if token provided", () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+            const fetchFn = vi.fn().mockResolvedValue({ ok: true });
             const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, idBaseUrl, prefix, fetchFn });
             api.idServerRequest(Method.Post, "/test", {}, IdentityPrefix.V2, "token");
             expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
@@ -109,14 +109,14 @@ describe("FetchHttpApi", () => {
 
     it("should return the Response object if onlyData=false", async () => {
         const res = { ok: true };
-        const fetchFn = jest.fn().mockResolvedValue(res);
+        const fetchFn = vi.fn().mockResolvedValue(res);
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: false });
         await expect(api.requestOtherUrl(Method.Get, "http://url")).resolves.toBe(res);
     });
 
     it("should return text if json=false", async () => {
         const text = "418 I'm a teapot";
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, text: jest.fn().mockResolvedValue(text) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue(text) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(
             api.requestOtherUrl(Method.Get, "http://url", undefined, {
@@ -126,7 +126,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should send token via query params if useAuthorizationHeader=false", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
@@ -139,7 +139,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should send token via headers by default", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
@@ -151,7 +151,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not send a token if not calling `authedRequest`", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
@@ -164,7 +164,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should ensure no token is leaked out via query params if sending via headers", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
@@ -178,7 +178,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not override manually specified access token via query params", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
@@ -191,7 +191,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not override manually specified access token via header", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
@@ -206,7 +206,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not override Accept header", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
         api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Accept: "text/html" },
@@ -215,14 +215,14 @@ describe("FetchHttpApi", () => {
     });
 
     it("should emit NoConsent when given errcode=M_CONTENT_NOT_GIVEN", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({
+        const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             headers: {
                 get(name: string): string | null {
                     return name === "Content-Type" ? "application/json" : null;
                 },
             },
-            text: jest.fn().mockResolvedValue(
+            text: vi.fn().mockResolvedValue(
                 JSON.stringify({
                     errcode: "M_CONSENT_NOT_GIVEN",
                     error: "Ye shall ask for consent",
@@ -240,7 +240,7 @@ describe("FetchHttpApi", () => {
 
     describe("authedRequest", () => {
         it("should not include token if unset", async () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+            const fetchFn = vi.fn().mockResolvedValue({ ok: true });
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
             await api.authedRequest(Method.Post, "/account/password");
@@ -266,7 +266,7 @@ describe("FetchHttpApi", () => {
                             return name === "Content-Type" ? "application/json" : null;
                         },
                     },
-                    text: jest.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
+                    text: vi.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
                 };
                 const okayResponse = {
                     ok: true,
@@ -275,9 +275,9 @@ describe("FetchHttpApi", () => {
 
                 describe("without a tokenRefreshFunction", () => {
                     it("should emit logout and throw", async () => {
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, accessToken, refreshToken });
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
@@ -289,10 +289,10 @@ describe("FetchHttpApi", () => {
                 describe("with a tokenRefreshFunction", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
                         const error = new Error("uh oh");
-                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const tokenRefreshFunction = vi.fn().mockRejectedValue(error);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -311,16 +311,16 @@ describe("FetchHttpApi", () => {
                     it("should refresh token and retry request", async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
+                        const tokenRefreshFunction = vi.fn().mockResolvedValue({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
                         });
-                        const fetchFn = jest
+                        const fetchFn = vi
                             .fn()
                             .mockResolvedValueOnce(unknownTokenResponse)
                             .mockResolvedValueOnce(okayResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -342,16 +342,16 @@ describe("FetchHttpApi", () => {
                     it("should only try to refresh the token once", async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
+                        const tokenRefreshFunction = vi.fn().mockResolvedValue({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
                         });
 
                         // fetch doesn't like our new or old tokens
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -384,7 +384,7 @@ describe("FetchHttpApi", () => {
         const localBaseUrl = "http://baseurl";
         const baseUrlWithTrailingSlash = "http://baseurl/";
         const makeApi = (thisBaseUrl = baseUrl): FetchHttpApi<any> => {
-            const fetchFn = jest.fn();
+            const fetchFn = vi.fn();
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             return new FetchHttpApi(emitter, { baseUrl: thisBaseUrl, prefix, fetchFn });
         };
@@ -437,11 +437,11 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not log query parameters", async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         const deferred = defer<Response>();
-        const fetchFn = jest.fn().mockReturnValue(deferred.promise);
+        const fetchFn = vi.fn().mockReturnValue(deferred.promise);
         const mockLogger = {
-            debug: jest.fn(),
+            debug: vi.fn(),
         } as unknown as Mocked<Logger>;
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -450,7 +450,7 @@ describe("FetchHttpApi", () => {
             logger: mockLogger,
         });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
-        jest.advanceTimersByTime(1234);
+        vi.advanceTimersByTime(1234);
         deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");

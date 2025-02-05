@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { TestClient } from "../../TestClient";
 import {
     ClientEvent,
@@ -46,7 +48,7 @@ describe("CallEventHandler", () => {
         client.callEventHandler.start();
         client.groupCallEventHandler = new GroupCallEventHandler(client);
         client.groupCallEventHandler.start();
-        client.sendStateEvent = jest.fn().mockResolvedValue({});
+        client.sendStateEvent = vi.fn().mockResolvedValue({});
     });
 
     afterEach(() => {
@@ -55,7 +57,7 @@ describe("CallEventHandler", () => {
     });
 
     const sync = async () => {
-        client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
+        client.getSyncState = vi.fn().mockReturnValue(SyncState.Syncing);
         client.emit(ClientEvent.Sync, SyncState.Syncing, SyncState.Prepared);
 
         // We can't await the event processing
@@ -149,10 +151,10 @@ describe("CallEventHandler", () => {
         });
         client.emit(RoomEvent.Timeline, callHangup, room, false, false, timelineData);
 
-        const incomingCallEmitted = jest.fn();
+        const incomingCallEmitted = vi.fn();
         client.on(CallEventHandlerEvent.Incoming, incomingCallEmitted);
 
-        client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
+        client.getSyncState = vi.fn().mockReturnValue(SyncState.Syncing);
         client.emit(ClientEvent.Sync, SyncState.Syncing, null);
 
         expect(incomingCallEmitted).not.toHaveBeenCalled();
@@ -160,8 +162,8 @@ describe("CallEventHandler", () => {
 
     it("should ignore non-call events", async () => {
         // @ts-ignore Mock handleCallEvent is private
-        jest.spyOn(client.callEventHandler, "handleCallEvent");
-        jest.spyOn(client, "checkTurnServers").mockReturnValue(Promise.resolve(true));
+        vi.spyOn(client.callEventHandler, "handleCallEvent");
+        vi.spyOn(client, "checkTurnServers").mockReturnValue(Promise.resolve(true));
 
         const room = new Room("!room:id", client, "@user:id");
         const timelineData: IRoomTimelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
@@ -187,7 +189,7 @@ describe("CallEventHandler", () => {
     });
 
     describe("handleCallEvent()", () => {
-        const incomingCallListener = jest.fn();
+        const incomingCallListener = vi.fn();
         let timelineData: IRoomTimelineData;
         let room: Room;
 
@@ -195,16 +197,16 @@ describe("CallEventHandler", () => {
             room = new Room("!room:id", client, client.getUserId()!);
             timelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
 
-            jest.spyOn(client, "checkTurnServers").mockReturnValue(Promise.resolve(true));
-            jest.spyOn(client, "getRoom").mockReturnValue(room);
-            jest.spyOn(room, "getMember").mockReturnValue({ user_id: client.getUserId() } as unknown as RoomMember);
+            vi.spyOn(client, "checkTurnServers").mockReturnValue(Promise.resolve(true));
+            vi.spyOn(client, "getRoom").mockReturnValue(room);
+            vi.spyOn(room, "getMember").mockReturnValue({ user_id: client.getUserId() } as unknown as RoomMember);
 
             client.on(CallEventHandlerEvent.Incoming, incomingCallListener);
         });
 
         afterEach(() => {
             MockRTCPeerConnection.resetInstances();
-            jest.resetAllMocks();
+            vi.resetAllMocks();
         });
 
         it("should create a call when receiving an invite", async () => {
@@ -240,9 +242,9 @@ describe("CallEventHandler", () => {
             const DEVICE_ID = "device_id";
 
             incomingCallListener.mockImplementation((c) => (call = c));
-            jest.spyOn(client.groupCallEventHandler!, "getGroupCallById").mockReturnValue(groupCall);
+            vi.spyOn(client.groupCallEventHandler!, "getGroupCallById").mockReturnValue(groupCall);
             // @ts-ignore Mock onIncomingCall is private
-            jest.spyOn(groupCall, "onIncomingCall");
+            vi.spyOn(groupCall, "onIncomingCall");
 
             await groupCall.enter();
             client.emit(

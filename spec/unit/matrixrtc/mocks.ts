@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { vi } from "vitest";
+
 import { EventType, MatrixEvent, Room } from "../../../src";
 import { SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
@@ -46,11 +48,11 @@ export function makeMockRoom(membershipData: MembershipData): Room {
     const roomState = makeMockRoomState(membershipData, roomId);
     const room = {
         roomId: roomId,
-        hasMembershipState: jest.fn().mockReturnValue(true),
-        getLiveTimeline: jest.fn().mockReturnValue({
-            getState: jest.fn().mockReturnValue(roomState),
+        hasMembershipState: vi.fn().mockReturnValue(true),
+        getLiveTimeline: vi.fn().mockReturnValue({
+            getState: vi.fn().mockReturnValue(roomState),
         }),
-        getVersion: jest.fn().mockReturnValue("default"),
+        getVersion: vi.fn().mockReturnValue("default"),
     } as unknown as Room;
     return room;
 }
@@ -65,8 +67,8 @@ export function makeMockRoomState(membershipData: MembershipData, roomId: string
     });
 
     return {
-        on: jest.fn(),
-        off: jest.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
         getStateEvents: (_: string, stateKey: string) => {
             if (stateKey !== undefined) return keysAndEvents.find(([k]) => k === stateKey)?.[1];
             return events;
@@ -90,14 +92,14 @@ export function makeMockRoomState(membershipData: MembershipData, roomId: string
 
 export function mockRTCEvent(membershipData: MembershipData, roomId: string): MatrixEvent {
     return {
-        getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-        getContent: jest.fn().mockReturnValue(membershipData),
-        getSender: jest.fn().mockReturnValue("@mock:user.example"),
-        getTs: jest.fn().mockReturnValue(Date.now()),
-        getRoomId: jest.fn().mockReturnValue(roomId),
+        getType: vi.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+        getContent: vi.fn().mockReturnValue(membershipData),
+        getSender: vi.fn().mockReturnValue("@mock:user.example"),
+        getTs: vi.fn().mockReturnValue(Date.now()),
+        getRoomId: vi.fn().mockReturnValue(roomId),
         sender: {
             userId: "@mock:user.example",
         },
-        isDecryptionFailure: jest.fn().mockReturnValue(false),
+        isDecryptionFailure: vi.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
 }

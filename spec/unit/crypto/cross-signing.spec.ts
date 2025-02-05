@@ -95,7 +95,7 @@ describe("Cross Signing", function () {
 
     it("should sign the master key with the device key", async function () {
         const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
-        alice.uploadDeviceSigningKeys = jest.fn().mockImplementation(async (auth, keys) => {
+        alice.uploadDeviceSigningKeys = vi.fn().mockImplementation(async (auth, keys) => {
             await olmlib.verifySignature(
                 alice.crypto!.olmDevice,
                 keys.master_key,
@@ -234,7 +234,7 @@ describe("Cross Signing", function () {
         });
 
         const uploadSigsPromise = new Promise<void>((resolve, reject) => {
-            alice.uploadKeySignatures = jest.fn().mockImplementation(async (content) => {
+            alice.uploadKeySignatures = vi.fn().mockImplementation(async (content) => {
                 try {
                     await olmlib.verifySignature(
                         alice.crypto!.olmDevice,

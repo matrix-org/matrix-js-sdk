@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ReceiptType } from "../../src/@types/read_receipts";
 import {
     Category,
@@ -795,7 +797,7 @@ describe("SyncAccumulator", function () {
         }
 
         afterEach(() => {
-            jest.spyOn(globalThis.Date, "now").mockRestore();
+            vi.spyOn(globalThis.Date, "now").mockRestore();
         });
 
         it("should copy summary properties", function () {
@@ -852,11 +854,11 @@ describe("SyncAccumulator", function () {
             const delta = 1000;
             const startingTs = 1000;
 
-            jest.spyOn(globalThis.Date, "now").mockReturnValue(startingTs);
+            vi.spyOn(globalThis.Date, "now").mockReturnValue(startingTs);
 
             sa.accumulate(RES_WITH_AGE);
 
-            jest.spyOn(globalThis.Date, "now").mockReturnValue(startingTs + delta);
+            vi.spyOn(globalThis.Date, "now").mockReturnValue(startingTs + delta);
 
             const output = sa.getJSON();
             expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned?.age).toEqual(

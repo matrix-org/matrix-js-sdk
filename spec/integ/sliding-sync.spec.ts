@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import EventEmitter from "events";
 import MockHttpBackend from "matrix-mock-request";
 
@@ -1197,7 +1199,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "B" }); // missing txn_id
             await httpBackend!.flushAllExpected();
 
-            // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
+            // attach rejection handlers now else if we do it later Vitest treats that as an unhandled rejection
             // which is a fail.
 
             const C = slidingSync.setListRanges("a", [[0, 20]]);

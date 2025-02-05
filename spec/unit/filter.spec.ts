@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import { Filter, IFilterDefinition } from "../../src/filter";
 import { mkEvent } from "../test-utils/test-utils";

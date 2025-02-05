@@ -16,7 +16,7 @@ limitations under the License.
 
 import debugFunc from "debug";
 import { Debugger } from "debug";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
 

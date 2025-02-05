@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
+
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
@@ -85,7 +87,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         async () => {
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
 
             const homeserverUrl = "https://alice-server.com";
             aliceClient = createClient({
@@ -139,8 +140,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             await bootstrapCrossSigning(authDict);
 
             // check the cross-signing keys upload
-            expect(fetchMock.called("upload-keys")).toBeTruthy();
-            const [, keysOpts] = fetchMock.lastCall("upload-keys")!;
+            expect(fetchMock.callHistory.called("upload-keys")).toBeTruthy();
+            const [, keysOpts] = fetchMock.callHistory.lastCall("upload-keys")!;
             const keysBody = JSON.parse(keysOpts!.body as string);
             expect(keysBody.auth).toEqual(authDict); // check uia dict was passed
             // there should be a key of each type
@@ -153,8 +154,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             const sskId = Object.keys(keysBody.self_signing_key.keys)[0];
 
             // check the publish call
-            expect(fetchMock.called("upload-sigs")).toBeTruthy();
-            const [, sigsOpts] = fetchMock.lastCall("upload-sigs")!;
+            expect(fetchMock.callHistory.called("upload-sigs")).toBeTruthy();
+            const [, sigsOpts] = fetchMock.callHistory.lastCall("upload-sigs")!;
             const body = JSON.parse(sigsOpts!.body as string);
             // there should be a signature for our device, by our self-signing key.
             expect(body).toHaveProperty(
@@ -227,7 +228,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             await syncPromise(aliceClient);
 
             // we expect a request to upload signatures for our device ...
-            fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
+            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {}, { name: "upload-sigs" });
 
             // we expect the UserTrustStatusChanged event to be fired after the cross signing keys import
             const userTrustStatusChangedPromise = new Promise<string>((resolve) =>
@@ -241,8 +242,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(await userTrustStatusChangedPromise).toBe(aliceClient.getUserId());
 
             // Expect the signature to be uploaded
-            expect(fetchMock.called("upload-sigs")).toBeTruthy();
-            const [, sigsOpts] = fetchMock.lastCall("upload-sigs")!;
+            expect(fetchMock.callHistory.called("upload-sigs")).toBeTruthy();
+            const [, sigsOpts] = fetchMock.callHistory.lastCall("upload-sigs")!;
             const body = JSON.parse(sigsOpts!.body as string);
             // the device should have a signature with the public self cross signing keys.
             expect(body).toHaveProperty(
@@ -259,7 +260,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             // a second call should do nothing except GET requests
             fetchMock.mockClear();
             await bootstrapCrossSigning(authDict);
-            const calls = fetchMock.calls((url, opts) => opts.method != "GET");
+            const calls = fetchMock.callHistory.calls((callLog) => callLog.request?.method != "GET");
             expect(calls.length).toEqual(0);
         });
 
@@ -421,17 +422,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             return new Promise<any>((resolve) => {
                 fetchMock.post(
                     // legacy crypto uses /unstable/; /v3/ is correct
-                    {
-                        url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
-                        name: "upload-keys",
-                    },
-                    (url, options) => {
-                        const content = JSON.parse(options.body as string);
+                    new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
+                    async (callLog) => {
+                        const content = await callLog.request?.json();
                         resolve(content);
                         return {};
                     },
                     // Override the routes define in `mockSetupCrossSigningRequests`
-                    { overwriteRoutes: true },
+                    { name: "upload-keys" },
                 );
             });
         }
@@ -464,7 +462,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
     describe("crossSignDevice", () => {
         beforeEach(async () => {
             // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ toFake: ["setTimeout", "setInterval", "setImmediate"] });
 
             // make sure that there is another device which we can sign
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
@@ -476,14 +474,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             await syncPromise(aliceClient);
 
             // Wait for legacy crypto to find the device
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([aliceClient.getSafeUserId()]);
             expect(devices.get(aliceClient.getSafeUserId())!.has(testData.TEST_DEVICE_ID)).toBeTruthy();
         });
 
         afterEach(async () => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("fails for an unknown device", async () => {
@@ -498,9 +496,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             await aliceClient.getCrypto()!.crossSignDevice(testData.TEST_DEVICE_ID);
 
             // check that a sig for the device was uploaded
-            const calls = fetchMock.calls("upload-sigs");
+            const calls = fetchMock.callHistory.calls("upload-sigs");
             expect(calls.length).toEqual(1);
-            const body = JSON.parse(calls[0][1]!.body as string);
+            const body = await calls[0].request?.json();
             const deviceSig = body[aliceClient.getSafeUserId()][testData.TEST_DEVICE_ID];
             expect(deviceSig).toHaveProperty("signatures");
         });

@@ -1,4 +1,14 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MatrixHttpApi > should return expected object from \`getContentUri\` 1`] = `
+{
+  "base": "http://baseUrl",
+  "params": {
+    "access_token": "token",
+  },
+  "path": "/_matrix/media/v3/upload",
+}
+`;
 
 exports[`MatrixHttpApi should return expected object from \`getContentUri\` 1`] = `
 {

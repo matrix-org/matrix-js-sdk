@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { beforeEach, describe, expect, it } from "vitest";
+
 import { Mid, Ssrc, MediaSsrcHandler } from "../../../../../src/webrtc/stats/media/mediaSsrcHandler";
 import { REMOTE_SFU_DESCRIPTION } from "../../../../test-utils/webrtc";
 

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { describe, expect, it, vi } from "vitest";
+
 import "fake-indexeddb/auto";
 
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
@@ -28,7 +30,7 @@ function setupWorker(worker: IndexedDBStoreWorker): void {
 describe("IndexedDBStore Worker", () => {
     it("should pass 'closed' event via postMessage", async () => {
         const deferred = defer<void>();
-        const postMessage = jest.fn().mockImplementation(({ seq, command }) => {
+        const postMessage = vi.fn().mockImplementation(({ seq, command }) => {
             if (seq === 1 && command === "cmd_success") {
                 deferred.resolve();
             }

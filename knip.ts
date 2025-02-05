@@ -31,10 +31,6 @@ export default {
         "husky",
         // Used in script which only runs in environment with `@octokit/rest` installed
         "@octokit/rest",
-        // Used by jest
-        "jest-environment-jsdom",
-        "babel-jest",
-        "ts-node",
         // Used by `@babel/plugin-transform-runtime`
         "@babel/runtime",
     ],

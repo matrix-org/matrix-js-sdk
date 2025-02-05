@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { Feature, ServerSupport } from "../../src/feature";
 import {
@@ -53,11 +55,11 @@ describe("fixNotificationCountOnDecryption", () => {
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
             ...mockClientMethodsUser(),
-            isInitialSyncComplete: jest.fn().mockReturnValue(false),
-            getPushActionsForEvent: jest.fn().mockReturnValue(mkPushAction(true, true)),
-            getRoom: jest.fn().mockImplementation(() => room),
-            decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-            supportsThreads: jest.fn().mockReturnValue(true),
+            isInitialSyncComplete: vi.fn().mockReturnValue(false),
+            getPushActionsForEvent: vi.fn().mockReturnValue(mkPushAction(true, true)),
+            getRoom: vi.fn().mockImplementation(() => room),
+            decryptEventIfNeeded: vi.fn().mockResolvedValue(void 0),
+            supportsThreads: vi.fn().mockReturnValue(true),
         });
         mockClient.reEmitter = mock(ReEmitter, "ReEmitter");
         mockClient.canSupport = new Map();
@@ -127,8 +129,8 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 1);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
-        event.getPushActions = jest.fn().mockReturnValue(mkPushAction(false, false));
-        threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(false, false));
+        event.getPushActions = vi.fn().mockReturnValue(mkPushAction(false, false));
+        threadEvent.getPushActions = vi.fn().mockReturnValue(mkPushAction(false, false));
     });
 
     it("changes the room count to highlight on decryption", () => {
@@ -200,8 +202,8 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setUnreadNotificationCount(NotificationCountType.Total, 0);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
-        event.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
-        mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
+        event.getPushActions = vi.fn().mockReturnValue(mkPushAction(true, false));
+        mockClient.getPushActionsForEvent = vi.fn().mockReturnValue(mkPushAction(false, false));
 
         fixNotificationCountOnDecryption(mockClient, event);
         expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
@@ -212,8 +214,8 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
-        threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
-        mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
+        threadEvent.getPushActions = vi.fn().mockReturnValue(mkPushAction(true, false));
+        mockClient.getPushActionsForEvent = vi.fn().mockReturnValue(mkPushAction(false, false));
 
         fixNotificationCountOnDecryption(mockClient, event);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
@@ -221,7 +223,7 @@ describe("fixNotificationCountOnDecryption", () => {
     });
 
     it("emits events", () => {
-        const cb = jest.fn();
+        const cb = vi.fn();
         room.on(RoomEvent.UnreadNotifications, cb);
 
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);

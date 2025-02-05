@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { describe, expect, it } from "vitest";
+
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { ReceiptAccumulator } from "../../src/receipt-accumulator";
 

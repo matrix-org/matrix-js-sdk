@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
 import "../../../olm-loader";
 import { MatrixClient, MatrixEvent } from "../../../../src/matrix";
 import { encodeBase64 } from "../../../../src/base64";
@@ -23,7 +25,7 @@ import { VerificationRequest } from "../../../../src/crypto/verification/request
 import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { VerificationBase } from "../../../../src/crypto/verification/Base";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 // Private key for tests only
 const testKey = new Uint8Array([
@@ -41,8 +43,8 @@ describe("self-verifications", () => {
         const userId = "@test:localhost";
 
         const cacheCallbacks = {
-            getCrossSigningKeyCache: jest.fn().mockReturnValue(null),
-            storeCrossSigningKeyCache: jest.fn(),
+            getCrossSigningKeyCache: vi.fn().mockReturnValue(null),
+            storeCrossSigningKeyCache: vi.fn(),
         };
 
         const crossSigningInfo = new CrossSigningInfo(userId, {}, cacheCallbacks);
@@ -65,13 +67,13 @@ describe("self-verifications", () => {
         };
 
         const secretStorage = {
-            request: jest.fn().mockReturnValue({
+            request: vi.fn().mockReturnValue({
                 promise: Promise.resolve(encodeBase64(testKey)),
             }),
         };
 
-        const storeSessionBackupPrivateKey = jest.fn();
-        const restoreKeyBackupWithCache = jest.fn(() => Promise.resolve());
+        const storeSessionBackupPrivateKey = vi.fn();
+        const restoreKeyBackupWithCache = vi.fn(() => Promise.resolve());
 
         const client = {
             crypto: {

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeAll, describe, expect, it } from "vitest";
+
 import "../../olm-loader";
 import { TestClient } from "../../TestClient";
 import { logger } from "../../../src/logger";

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MethodLikeKeys, mocked, MockedObject } from "jest-mock";
+import { MockedObject, vi } from "vitest";
 
 import { ClientEventHandlerMap, EmittedEvents, MatrixClient } from "../../src/client";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
@@ -26,7 +26,7 @@ import { User } from "../../src/models/user";
  * to MatrixClient events
  */
 export class MockClientWithEventEmitter extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
-    constructor(mockProperties: Partial<Record<MethodLikeKeys<MatrixClient>, unknown>> = {}) {
+    constructor(mockProperties: Partial<Record<keyof MatrixClient, unknown>> = {}) {
         super();
         Object.assign(this, mockProperties);
     }
@@ -39,15 +39,14 @@ export class MockClientWithEventEmitter extends TypedEventEmitter<EmittedEvents,
  * eg
  * ```
  * const mockClient = getMockClientWithEventEmitter({
-        getUserId: jest.fn().mockReturnValue(aliceId),
+        getUserId: vi.fn().mockReturnValue(aliceId),
     });
  * ```
  */
 export const getMockClientWithEventEmitter = (
-    mockProperties: Partial<Record<MethodLikeKeys<MatrixClient>, unknown>>,
+    mockProperties: Partial<Record<keyof MatrixClient, unknown>>,
 ): MockedObject<MatrixClient> => {
-    const mock = mocked(new MockClientWithEventEmitter(mockProperties) as unknown as MatrixClient);
-    return mock;
+    return new MockClientWithEventEmitter(mockProperties) as MockedObject<MatrixClient>;
 };
 
 /**
@@ -59,14 +58,14 @@ export const getMockClientWithEventEmitter = (
  * ```
  */
 export const mockClientMethodsUser = (userId = "@alice:domain") => ({
-    getUserId: jest.fn().mockReturnValue(userId),
-    getSafeUserId: jest.fn().mockReturnValue(userId),
-    getUser: jest.fn().mockReturnValue(new User(userId)),
-    isGuest: jest.fn().mockReturnValue(false),
-    mxcUrlToHttp: jest.fn().mockReturnValue("mock-mxcUrlToHttp"),
+    getUserId: vi.fn().mockReturnValue(userId),
+    getSafeUserId: vi.fn().mockReturnValue(userId),
+    getUser: vi.fn().mockReturnValue(new User(userId)),
+    isGuest: vi.fn().mockReturnValue(false),
+    mxcUrlToHttp: vi.fn().mockReturnValue("mock-mxcUrlToHttp"),
     credentials: { userId },
-    getThreePids: jest.fn().mockResolvedValue({ threepids: [] }),
-    getAccessToken: jest.fn(),
+    getThreePids: vi.fn().mockResolvedValue({ threepids: [] }),
+    getAccessToken: vi.fn(),
 });
 
 /**
@@ -78,16 +77,16 @@ export const mockClientMethodsUser = (userId = "@alice:domain") => ({
  * ```
  */
 export const mockClientMethodsEvents = () => ({
-    decryptEventIfNeeded: jest.fn(),
-    getPushActionsForEvent: jest.fn(),
+    decryptEventIfNeeded: vi.fn(),
+    getPushActionsForEvent: vi.fn(),
 });
 
 /**
  * Returns basic mocked client methods related to server support
  */
-export const mockClientMethodsServer = (): Partial<Record<MethodLikeKeys<MatrixClient>, unknown>> => ({
-    getIdentityServerUrl: jest.fn(),
-    getHomeserverUrl: jest.fn(),
-    getCachedCapabilities: jest.fn().mockReturnValue({}),
-    doesServerSupportUnstableFeature: jest.fn().mockResolvedValue(false),
+export const mockClientMethodsServer = (): Partial<Record<keyof MatrixClient, unknown>> => ({
+    getIdentityServerUrl: vi.fn(),
+    getHomeserverUrl: vi.fn(),
+    getCachedCapabilities: vi.fn().mockReturnValue({}),
+    doesServerSupportUnstableFeature: vi.fn().mockResolvedValue(false),
 });

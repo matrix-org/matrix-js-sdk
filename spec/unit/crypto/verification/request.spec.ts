@@ -14,6 +14,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
 import "../../../olm-loader";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
@@ -22,7 +24,7 @@ import { makeTestClients } from "./util";
 
 const Olm = globalThis.Olm;
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe("verification request integration tests with crypto layer", function () {
     if (!globalThis.Olm) {
@@ -56,8 +58,8 @@ describe("verification request integration tests with crypto layer", function ()
                 },
             };
         };
-        alice.client.downloadKeys = jest.fn().mockResolvedValue({});
-        bob.client.downloadKeys = jest.fn().mockResolvedValue({});
+        alice.client.downloadKeys = vi.fn().mockResolvedValue({});
+        bob.client.downloadKeys = vi.fn().mockResolvedValue({});
         bob.client.on(CryptoEvent.VerificationRequest, (request) => {
             const bobVerifier = request.beginKeyVerification(verificationMethods.SAS);
             bobVerifier.verify();

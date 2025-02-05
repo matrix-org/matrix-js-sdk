@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import fetchMock from "@fetch-mock/vitest";
 
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
@@ -212,7 +214,7 @@ describe("RoomMember", function () {
         });
 
         it("should no-op if given a non-state or unrelated event", () => {
-            const fn = jest.spyOn(member, "emit");
+            const fn = vi.spyOn(member, "emit");
             expect(fn).not.toHaveBeenCalledWith(RoomMemberEvent.PowerLevel);
             member.setPowerLevelEvent(
                 utils.mkEvent({

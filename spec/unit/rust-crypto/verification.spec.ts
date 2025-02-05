@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, vi, Mocked } from "vitest";
+
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { Mocked } from "jest-mock";
 
 import {
     isVerificationEvent,
@@ -78,7 +79,7 @@ describe("VerificationRequest", () => {
 
         beforeEach(() => {
             inner = makeMockedInner();
-            machine = { getDevice: jest.fn() } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            machine = { getDevice: vi.fn() } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
             request = makeTestRequest(inner, machine);
         });
 
@@ -95,7 +96,7 @@ describe("VerificationRequest", () => {
         });
 
         it("raises an error if starting verification does not produce a verifier", async () => {
-            jest.spyOn(inner, "otherDeviceId", "get").mockReturnValue(new RustSdkCryptoJs.DeviceId("other_device"));
+            vi.spyOn(inner, "otherDeviceId", "get").mockReturnValue(new RustSdkCryptoJs.DeviceId("other_device"));
             machine.getDevice.mockResolvedValue({} as RustSdkCryptoJs.Device);
             await expect(request.startVerification("m.sas.v1")).rejects.toThrow(
                 "Still no verifier after startSas() call",
@@ -501,11 +502,11 @@ function makeTestRequest(
 /** Mock up a rust-side VerificationRequest */
 function makeMockedInner(): Mocked<RustSdkCryptoJs.VerificationRequest> {
     return {
-        registerChangesCallback: jest.fn(),
-        startSas: jest.fn(),
-        phase: jest.fn().mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Created),
-        isPassive: jest.fn().mockReturnValue(false),
-        timeRemainingMillis: jest.fn(),
+        registerChangesCallback: vi.fn(),
+        startSas: vi.fn(),
+        phase: vi.fn().mockReturnValue(RustSdkCryptoJs.VerificationRequestPhase.Created),
+        isPassive: vi.fn().mockReturnValue(false),
+        timeRemainingMillis: vi.fn(),
         get otherDeviceId() {
             return undefined;
         },

@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { GroupCallStats } from "../../../../src/webrtc/stats/groupCallStats";
 import { CallStatsReportSummary } from "../../../../src/webrtc/stats/callStatsReportSummary";
 
@@ -62,17 +64,17 @@ describe("GroupCallStats", () => {
 
     describe("should on start", () => {
         beforeEach(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("starting processing stats as well without stats collectors", async () => {
             // @ts-ignore
-            stats.processStats = jest.fn();
+            stats.processStats = vi.fn();
             stats.start();
-            jest.advanceTimersByTime(TIME_INTERVAL);
+            vi.advanceTimersByTime(TIME_INTERVAL);
             // @ts-ignore
             expect(stats.processStats).toHaveBeenCalled();
         });
@@ -80,9 +82,9 @@ describe("GroupCallStats", () => {
         it("not starting processing stats if interval 0", async () => {
             const statsDisabled = new GroupCallStats(GROUP_CALL_ID, LOCAL_USER_ID, 0);
             // @ts-ignore
-            statsDisabled.processStats = jest.fn();
+            statsDisabled.processStats = vi.fn();
             statsDisabled.start();
-            jest.advanceTimersByTime(TIME_INTERVAL);
+            vi.advanceTimersByTime(TIME_INTERVAL);
             // @ts-ignore
             expect(statsDisabled.processStats).not.toHaveBeenCalled();
         });
@@ -90,7 +92,7 @@ describe("GroupCallStats", () => {
         it("starting processing and calling the collectors", async () => {
             stats.addStatsReportGatherer("CALL_ID", "USER_ID", mockRTCPeerConnection());
             const collector = stats.getStatsReportGatherer("CALL_ID");
-            stats.reports.emitSummaryStatsReport = jest.fn();
+            stats.reports.emitSummaryStatsReport = vi.fn();
             const summaryStats = {
                 isFirstCollection: true,
                 receivedMedia: 0,
@@ -115,9 +117,9 @@ describe("GroupCallStats", () => {
             } as CallStatsReportSummary;
             let processStatsSpy;
             if (collector) {
-                processStatsSpy = jest.spyOn(collector, "processStats").mockResolvedValue(summaryStats);
+                processStatsSpy = vi.spyOn(collector, "processStats").mockResolvedValue(summaryStats);
                 stats.start();
-                jest.advanceTimersByTime(TIME_INTERVAL);
+                vi.advanceTimersByTime(TIME_INTERVAL);
             } else {
                 throw new Error("Test failed, because no Collector found!");
             }
@@ -126,7 +128,7 @@ describe("GroupCallStats", () => {
 
         it("doing nothing if process already running", async () => {
             // @ts-ignore
-            jest.spyOn(globalThis, "setInterval").mockReturnValue(22);
+            vi.spyOn(globalThis, "setInterval").mockReturnValue(22);
             stats.start();
             expect(setInterval).toHaveBeenCalledTimes(1);
             stats.start();
@@ -139,15 +141,15 @@ describe("GroupCallStats", () => {
 
     describe("should on stop", () => {
         beforeEach(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
         it("finish stats process if was started", async () => {
             // @ts-ignore
-            jest.spyOn(globalThis, "setInterval").mockReturnValue(22);
-            jest.spyOn(globalThis, "clearInterval");
+            vi.spyOn(globalThis, "setInterval").mockReturnValue(22);
+            vi.spyOn(globalThis, "clearInterval");
             stats.start();
             expect(setInterval).toHaveBeenCalledTimes(1);
             stats.stop();
@@ -155,7 +157,7 @@ describe("GroupCallStats", () => {
         });
 
         it("do nothing if stats process was not started", async () => {
-            jest.spyOn(globalThis, "clearInterval");
+            vi.spyOn(globalThis, "clearInterval");
             stats.stop();
             expect(clearInterval).not.toHaveBeenCalled();
         });
@@ -164,7 +166,7 @@ describe("GroupCallStats", () => {
 
 const mockRTCPeerConnection = (): RTCPeerConnection => {
     const pc = {} as RTCPeerConnection;
-    pc.addEventListener = jest.fn();
-    pc.getStats = jest.fn().mockResolvedValue(null);
+    pc.addEventListener = vi.fn();
+    pc.getStats = vi.fn().mockResolvedValue(null);
     return pc;
 };

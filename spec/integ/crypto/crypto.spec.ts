@@ -15,8 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
+
 import anotherjson from "another-json";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import FetchMock from "fetch-mock";
@@ -113,7 +115,7 @@ afterEach(() => {
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 
-    jest.useRealTimers();
+    vi.useRealTimers();
 });
 
 /**
@@ -398,7 +400,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await aliceClient.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         fetchMock.mockReset();
     });
@@ -474,7 +476,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("Unable to decrypt error codes", function () {
         beforeEach(() => {
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
         it("Decryption fails with UISI error", async () => {
@@ -1374,7 +1376,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             // We need to fake the timers to advance the time, but the wasm bindings of matrix-sdk-crypto rely on a
             // working `queueMicrotask`
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -1406,7 +1408,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expect(sessionId).toBeDefined();
 
             // Advance the time by 1h
-            jest.advanceTimersByTime(oneHourInMs);
+            vi.advanceTimersByTime(oneHourInMs);
 
             // Send a second message to bob and get the encrypted message
             const [secondEncryptedMessage] = await Promise.all([
@@ -2576,7 +2578,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     describe("key upload request", () => {
         beforeEach(() => {
             // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
         });
 
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
@@ -2628,7 +2630,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             // Advance local date to 2 minutes
             // The old crypto only runs the upload every 60 seconds
-            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+            vi.setSystemTime(Date.now() + 2 * 60 * 1000);
 
             await syncPromise(aliceClient);
 
@@ -2770,7 +2772,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("Get devices from tracked users", async () => {
             // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -2782,12 +2784,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             // Advance local date to 2 minutes
             // The old crypto only runs the upload every 60 seconds
-            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+            vi.setSystemTime(Date.now() + 2 * 60 * 1000);
 
             await syncPromise(aliceClient);
 
             // Old crypto: for alice: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
-            jest.runAllTimers();
+            vi.runAllTimers();
             // Old crypto: for alice: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
             await flushPromises();
 
@@ -2795,7 +2797,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await queryPromise;
 
             // Old crypto: for `user`: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
-            jest.runAllTimers();
+            vi.runAllTimers();
             // Old crypto: for `user`: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
             // It will add `@testing_florian1:matrix.org` devices to the DeviceList
             await flushPromises();
@@ -2819,7 +2821,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
          * Create a fake secret storage key
          * Async because `bootstrapSecretStorage` expect an async method
          */
-        const createSecretStorageKey = jest.fn().mockResolvedValue({
+        const createSecretStorageKey = vi.fn().mockResolvedValue({
             keyInfo: {}, // Returning undefined here used to cause a crash
             privateKey: Uint8Array.of(32, 33),
         });
@@ -3152,7 +3154,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         describe("Manage Key Backup", () => {
             beforeEach(async () => {
                 // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-                jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+                vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
             });
 
             it("Should be able to restore from 4S after bootstrap", async () => {
@@ -3187,7 +3189,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 await aliceClient.getCrypto()!.importRoomKeys([newKey]);
 
                 // The backup loop waits a random amount of time to avoid different clients firing at the same time.
-                jest.runAllTimers();
+                vi.runAllTimers();
 
                 const keyBackupData = await awaitKeyUploaded;
 
@@ -3263,7 +3265,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
                 // Track calls to scheduleAllGroupSessionsForBackup. This is
                 // only relevant on legacy encryption.
-                const scheduleAllGroupSessionsForBackup = jest.fn();
+                const scheduleAllGroupSessionsForBackup = vi.fn();
                 if (backend === "libolm") {
                     aliceClient.crypto!.backupManager.scheduleAllGroupSessionsForBackup =
                         scheduleAllGroupSessionsForBackup;
@@ -3329,7 +3331,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         it("Cross signing keys are available for a tracked user", async () => {
             // Process Alice keys, old crypto has a sleep(5ms) during the process
-            await jest.advanceTimersByTimeAsync(5);
+            await vi.advanceTimersByTimeAsync(5);
             await flushPromises();
 
             // Alice is the local user and should be tracked !

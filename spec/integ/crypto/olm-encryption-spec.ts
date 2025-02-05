@@ -26,6 +26,8 @@ limitations under the License.
  */
 
 // load olm before the sdk if possible
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import "../../olm-loader";
 
 import type { Session } from "@matrix-org/olm";

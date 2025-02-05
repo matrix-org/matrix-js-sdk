@@ -18,7 +18,8 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { mocked } from "jest-mock";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, Optional, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
@@ -59,6 +60,7 @@ import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-ut
 import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
+import { mocked } from "../test-utils";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -227,7 +229,7 @@ describe("Room", function () {
         // @ts-ignore
         room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
 
-        jest.spyOn(logger, "warn");
+        vi.spyOn(logger, "warn");
     });
 
     describe("getCreator", () => {
@@ -492,7 +494,7 @@ describe("Room", function () {
             remoteEvent.event.unsigned = { transaction_id: "TXN_ID" };
             const remoteEventId = remoteEvent.getId();
 
-            const stub = jest.fn();
+            const stub = vi.fn();
             room.on(RoomEvent.LocalEchoUpdated, stub);
 
             // first add the local echo
@@ -1244,7 +1246,7 @@ describe("Room", function () {
             });
 
             it("emits an update event", function () {
-                const spy = jest.fn();
+                const spy = vi.fn();
                 const summary = {
                     "m.heroes": [],
                     "m.invited_member_count": 1,
@@ -1499,8 +1501,8 @@ describe("Room", function () {
 
                 it("should reset the unread count when our non-synthetic receipt points to the latest event", () => {
                     // Given a room with 2 events, and an unread count set.
-                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
+                    room.client.isInitialSyncComplete = vi.fn().mockReturnValue(true);
+                    vi.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1518,8 +1520,8 @@ describe("Room", function () {
 
                 it("should not reset the unread count when someone else's receipt points to the latest event", () => {
                     // Given a room with 2 events, and an unread count set.
-                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
+                    room.client.isInitialSyncComplete = vi.fn().mockReturnValue(true);
+                    vi.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1537,8 +1539,8 @@ describe("Room", function () {
 
                 it("should not reset the unread count when our non-synthetic receipt points to an earlier event", () => {
                     // Given a room with 2 events, and an unread count set.
-                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
+                    room.client.isInitialSyncComplete = vi.fn().mockReturnValue(true);
+                    vi.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1556,8 +1558,8 @@ describe("Room", function () {
 
                 it("should not reset the unread count when our a synthetic receipt points to the latest event", () => {
                     // Given a room with 2 events, and an unread count set.
-                    room.client.isInitialSyncComplete = jest.fn().mockReturnValue(true);
-                    jest.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
+                    room.client.isInitialSyncComplete = vi.fn().mockReturnValue(true);
+                    vi.spyOn(room, "timeline", "get").mockReturnValue([event1, event2]);
                     room.setUnread(NotificationCountType.Total, 45);
                     room.setUnread(NotificationCountType.Highlight, 57);
                     // Sanity check:
@@ -1589,7 +1591,7 @@ describe("Room", function () {
             });
 
             it("should emit an event when a receipt is added", function () {
-                const listener = jest.fn();
+                const listener = vi.fn();
                 room.on(RoomEvent.Receipt, listener);
 
                 const ts = 13787898424;
@@ -1787,7 +1789,7 @@ describe("Room", function () {
                 const ts = 13787898424;
                 room.addLiveEvents([eventToAck], { addToState: false });
                 room.addReceipt(mkReceipt(roomId, [mkRecord(eventToAck.getId()!, "m.read", userB, ts)]));
-                room.findEventById = jest.fn().mockReturnValue({ getThread: jest.fn() } as unknown as MatrixEvent);
+                room.findEventById = vi.fn().mockReturnValue({ getThread: vi.fn() } as unknown as MatrixEvent);
                 expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
 
@@ -1825,11 +1827,11 @@ describe("Room", function () {
 
             describe("threads enabled", () => {
                 beforeEach(() => {
-                    jest.spyOn(room.client, "supportsThreads").mockReturnValue(true);
+                    vi.spyOn(room.client, "supportsThreads").mockReturnValue(true);
                 });
 
                 afterEach(() => {
-                    jest.restoreAllMocks();
+                    vi.restoreAllMocks();
                 });
 
                 it("returns true if there is an unthreaded receipt for a later event in a thread", async () => {
@@ -1873,7 +1875,7 @@ describe("Room", function () {
             );
 
             it("should emit Room.tags event when new tags are " + "received on the event stream", function () {
-                const listener = jest.fn();
+                const listener = vi.fn();
                 room.on(RoomEvent.Tags, listener);
 
                 const tags = { "m.foo": { order: 0.5 } };
@@ -2073,7 +2075,7 @@ describe("Room", function () {
                 isRoomEncrypted: function () {
                     return false;
                 },
-                members: jest.fn().mockImplementation(() => {
+                members: vi.fn().mockImplementation(() => {
                     if (serverResponse instanceof Error) {
                         return Promise.reject(serverResponse);
                     } else {
@@ -2095,8 +2097,8 @@ describe("Room", function () {
                         return Promise.resolve();
                     },
                     getSyncToken: () => "sync_token",
-                    getPendingEvents: jest.fn().mockResolvedValue([]),
-                    setPendingEvents: jest.fn().mockResolvedValue(undefined),
+                    getPendingEvents: vi.fn().mockResolvedValue([]),
+                    setPendingEvents: vi.fn().mockResolvedValue(undefined),
                 },
             };
         }
@@ -2928,7 +2930,7 @@ describe("Room", function () {
 
             await room.addLiveEvents([threadRoot], { addToState: false });
 
-            const onEvent = jest.fn();
+            const onEvent = vi.fn();
             room.on(RoomEvent.Timeline, onEvent);
 
             await room.addLiveEvents([threadResponse1], { addToState: false });
@@ -3042,7 +3044,7 @@ describe("Room", function () {
                     },
                 });
 
-            room.client.fetchRelations = jest.fn().mockResolvedValue({
+            room.client.fetchRelations = vi.fn().mockResolvedValue({
                 chunk: [threadResponse2Reaction.event, threadResponse2.event, threadResponse1.event],
             });
 
@@ -3426,7 +3428,7 @@ describe("Room", function () {
         describe("invalid receipts", () => {
             beforeEach(() => {
                 // Clear the spies on logger.warn
-                jest.clearAllMocks();
+                vi.clearAllMocks();
             });
 
             it("ignores receipts pointing at missing events", () => {
@@ -3435,7 +3437,7 @@ describe("Room", function () {
                     return { eventId: "missingEventId" } as WrappedReceipt;
                 };
                 // But the event ID it contains does not refer to an event we have
-                room.findEventById = jest.fn().mockReturnValue(null);
+                room.findEventById = vi.fn().mockReturnValue(null);
 
                 // When we ask what they have read
                 // Then we say "nothing"
@@ -3448,7 +3450,7 @@ describe("Room", function () {
                     return { eventId: "wrongThreadEventId", data: { ts: 0, thread_id: "thread1" } } as WrappedReceipt;
                 };
                 // But the event it refers to is in a thread
-                room.findEventById = jest.fn().mockReturnValue({ threadRootId: "thread2" } as MatrixEvent);
+                room.findEventById = vi.fn().mockReturnValue({ threadRootId: "thread2" } as MatrixEvent);
 
                 // When we ask what they have read
                 // Then we say "nothing"
@@ -3465,7 +3467,7 @@ describe("Room", function () {
                     return { eventId: "inThreadEventId" } as WrappedReceipt;
                 };
                 // And the event it refers to is in a thread
-                room.findEventById = jest.fn().mockReturnValue({ threadRootId: "thread2" } as MatrixEvent);
+                room.findEventById = vi.fn().mockReturnValue({ threadRootId: "thread2" } as MatrixEvent);
 
                 // When we ask what they have read
                 // Then we say the event
@@ -3478,7 +3480,7 @@ describe("Room", function () {
                     return { eventId: "mainThreadEventId", data: { ts: 12, thread_id: "main" } } as WrappedReceipt;
                 };
                 // And the event it refers to is in a thread
-                room.findEventById = jest.fn().mockReturnValue({ threadRootId: undefined } as MatrixEvent);
+                room.findEventById = vi.fn().mockReturnValue({ threadRootId: undefined } as MatrixEvent);
 
                 // When we ask what they have read
                 // Then we say the event
@@ -3491,7 +3493,7 @@ describe("Room", function () {
                     return { eventId: "rootId", data: { ts: 12, thread_id: "main" } } as WrappedReceipt;
                 };
                 // And the event it refers to is in a thread, because it is a thread root
-                room.findEventById = jest
+                room.findEventById = vi
                     .fn()
                     .mockReturnValue({ isThreadRoot: true, threadRootId: "thread1" } as MatrixEvent);
 
@@ -3504,7 +3506,7 @@ describe("Room", function () {
         describe("valid receipts", () => {
             beforeEach(() => {
                 // When we look up the event referred to by the receipt, it exists
-                room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
+                room.findEventById = vi.fn().mockReturnValue({} as MatrixEvent);
             });
 
             it("handles missing receipt type", () => {
@@ -3532,7 +3534,7 @@ describe("Room", function () {
                                 compareEventOrdering: (event1: string, _event2: string) => {
                                     return event1 === `eventId${i}` ? 1 : -1;
                                 },
-                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                                findEventById: vi.fn().mockReturnValue({} as MatrixEvent),
                             }) as unknown as EventTimelineSet;
 
                         expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
@@ -3545,7 +3547,7 @@ describe("Room", function () {
                             room.getUnfilteredTimelineSet = () =>
                                 ({
                                     compareEventOrdering: () => null,
-                                    findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                                    findEventById: vi.fn().mockReturnValue({} as MatrixEvent),
                                 }) as unknown as EventTimelineSet;
                             room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                                 if (receiptType === ReceiptType.ReadPrivate) {
@@ -3565,7 +3567,7 @@ describe("Room", function () {
                         room.getUnfilteredTimelineSet = () =>
                             ({
                                 compareEventOrdering: () => null,
-                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                                findEventById: vi.fn().mockReturnValue({} as MatrixEvent),
                             }) as unknown as EventTimelineSet;
                         room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                             if (receiptType === ReceiptType.Read) {
@@ -3583,7 +3585,7 @@ describe("Room", function () {
                         room.getUnfilteredTimelineSet = () =>
                             ({
                                 compareEventOrdering: () => null,
-                                findEventById: jest.fn().mockReturnValue({} as MatrixEvent),
+                                findEventById: vi.fn().mockReturnValue({} as MatrixEvent),
                             }) as unknown as EventTimelineSet;
                     });
 
@@ -3618,11 +3620,11 @@ describe("Room", function () {
 
     describe("roomNameGenerator", () => {
         const client = new TestClient(userA).client;
-        client.roomNameGenerator = jest.fn().mockReturnValue(null);
+        client.roomNameGenerator = vi.fn().mockReturnValue(null);
         const room = new Room(roomId, client, userA);
 
         it("should call fn when recalculating room name", () => {
-            (client.roomNameGenerator as jest.Mock).mockClear();
+            mocked(client.roomNameGenerator!).mockClear();
             room.recalculate();
             expect(client.roomNameGenerator).toHaveBeenCalled();
         });
@@ -3677,7 +3679,7 @@ describe("Room", function () {
         });
 
         it("emits event on notifications reset", () => {
-            const cb = jest.fn();
+            const cb = vi.fn();
 
             room.on(RoomEvent.UnreadNotifications, cb);
 
@@ -3745,7 +3747,7 @@ describe("Room", function () {
         });
 
         it("retains highlight for encrypted rooms on reset", () => {
-            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+            room.hasEncryptionStateEvent = vi.fn().mockReturnValue(true);
 
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
             room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
@@ -3758,7 +3760,7 @@ describe("Room", function () {
         });
 
         it("resets highlight for unencrypted rooms on reset", () => {
-            room.hasEncryptionStateEvent = jest.fn().mockReturnValue(false);
+            room.hasEncryptionStateEvent = vi.fn().mockReturnValue(false);
 
             room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 2);
             room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
@@ -3775,9 +3777,9 @@ describe("Room", function () {
     it("should load pending events from from the store and decrypt if needed", async () => {
         const client = new TestClient(userA).client;
         client.crypto = client["cryptoBackend"] = {
-            decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
+            decryptEvent: vi.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
         } as unknown as Crypto;
-        client.store.getPendingEvents = jest.fn(async (roomId) => [
+        client.store.getPendingEvents = vi.fn(async (roomId) => [
             {
                 event_id: "$1:server",
                 type: "m.room.message",
@@ -3830,10 +3832,10 @@ describe("Room", function () {
 
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
-                decryptEventIfNeeded: jest.fn(),
+                decryptEventIfNeeded: vi.fn(),
             });
             room = new Room(roomId, client, userA);
-            jest.spyOn(room, "emit").mockClear();
+            vi.spyOn(room, "emit").mockClear();
         });
 
         const makePollStart = (id: string): MatrixEvent => {
@@ -3896,8 +3898,8 @@ describe("Room", function () {
 
             const poll = room.polls.get(pollStartEvent.getId()!)!;
             const poll2 = room.polls.get(pollStartEvent2.getId()!)!;
-            jest.spyOn(poll, "onNewRelation");
-            jest.spyOn(poll2, "onNewRelation");
+            vi.spyOn(poll, "onNewRelation");
+            vi.spyOn(poll2, "onNewRelation");
 
             await room.processPollEvents([errorEvent, messageEvent, pollResponseEvent]);
 
@@ -3915,7 +3917,7 @@ describe("Room", function () {
             const pollStartEventId = "poll1";
             const pollStartEvent = makePollStart(pollStartEventId);
             // simulate decryption failure
-            const isDecryptionFailureSpy = jest.spyOn(pollStartEvent, "isDecryptionFailure").mockReturnValue(true);
+            const isDecryptionFailureSpy = vi.spyOn(pollStartEvent, "isDecryptionFailure").mockReturnValue(true);
 
             await room.processPollEvents([pollStartEvent]);
             // do not expect a poll to show up for the room
@@ -3958,8 +3960,8 @@ describe("Room", function () {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
-                isInitialSyncComplete: jest.fn().mockReturnValue(false),
-                supportsThreads: jest.fn().mockReturnValue(true),
+                isInitialSyncComplete: vi.fn().mockReturnValue(false),
+                supportsThreads: vi.fn().mockReturnValue(true),
             });
         });
 
@@ -4177,7 +4179,7 @@ describe("Room", function () {
     describe("getRecommendedVersion", () => {
         it("returns the server's recommended version from capabilities", async () => {
             const client = new TestClient(userA).client;
-            client.getCapabilities = jest.fn().mockReturnValue({
+            client.getCapabilities = vi.fn().mockReturnValue({
                 ["m.room_versions"]: {
                     default: "1",
                     available: ["1", "2"],
@@ -4193,14 +4195,14 @@ describe("Room", function () {
 
         it("force-refreshes versions to make sure an upgrade is necessary", async () => {
             const client = new TestClient(userA).client;
-            client.getCapabilities = jest.fn().mockReturnValue({
+            client.getCapabilities = vi.fn().mockReturnValue({
                 ["m.room_versions"]: {
                     default: "5",
                     available: ["5"],
                 },
             });
 
-            client.fetchCapabilities = jest.fn().mockResolvedValue({
+            client.fetchCapabilities = vi.fn().mockResolvedValue({
                 ["m.room_versions"]: {
                     default: "1",
                     available: ["1"],

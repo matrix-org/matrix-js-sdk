@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
 import "../../olm-loader";
 import { CrossSigningInfo, createCryptoStoreCacheCallbacks } from "../../../src/crypto/CrossSigning";
 import { IndexedDBCryptoStore } from "../../../src/crypto/store/indexeddb-crypto-store";
@@ -91,14 +93,14 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
     it.each(types)(
         "should request a key from the cache callback (if set)" + " and does not call app if one is found" + " %o",
         async ({ type, shouldCache }) => {
-            const getCrossSigningKey = jest.fn().mockImplementation(() => {
+            const getCrossSigningKey = vi.fn().mockImplementation(() => {
                 if (shouldCache) {
                     return Promise.reject(new Error("Regular callback called"));
                 } else {
                     return Promise.resolve(testKey);
                 }
             });
-            const getCrossSigningKeyCache = jest.fn().mockResolvedValue(testKey);
+            const getCrossSigningKeyCache = vi.fn().mockResolvedValue(testKey);
             const info = new CrossSigningInfo(userId, { getCrossSigningKey }, { getCrossSigningKeyCache });
             const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
             expect(pubKey).toEqual(masterKeyPub);
@@ -111,8 +113,8 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
     );
 
     it.each(types)("should store a key with the cache callback (if set)", async ({ type, shouldCache }) => {
-        const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
-        const storeCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
+        const getCrossSigningKey = vi.fn().mockResolvedValue(testKey);
+        const storeCrossSigningKeyCache = vi.fn().mockResolvedValue(undefined);
         const info = new CrossSigningInfo(userId, { getCrossSigningKey }, { storeCrossSigningKeyCache });
         const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
@@ -124,23 +126,23 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
     });
 
     it.each(types)("does not store a bad key to the cache", async ({ type, shouldCache }) => {
-        const getCrossSigningKey = jest.fn().mockResolvedValue(badKey);
-        const storeCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
+        const getCrossSigningKey = vi.fn().mockResolvedValue(badKey);
+        const storeCrossSigningKeyCache = vi.fn().mockResolvedValue(undefined);
         const info = new CrossSigningInfo(userId, { getCrossSigningKey }, { storeCrossSigningKeyCache });
         await expect(info.getCrossSigningKey(type, masterKeyPub)).rejects.toThrow();
         expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(0);
     });
 
     it.each(types)("does not store a value to the cache if it came from the cache", async ({ type, shouldCache }) => {
-        const getCrossSigningKey = jest.fn().mockImplementation(() => {
+        const getCrossSigningKey = vi.fn().mockImplementation(() => {
             if (shouldCache) {
                 return Promise.reject(new Error("Regular callback called"));
             } else {
                 return Promise.resolve(testKey);
             }
         });
-        const getCrossSigningKeyCache = jest.fn().mockResolvedValue(testKey);
-        const storeCrossSigningKeyCache = jest.fn().mockRejectedValue(new Error("Tried to store a value from cache"));
+        const getCrossSigningKeyCache = vi.fn().mockResolvedValue(testKey);
+        const storeCrossSigningKeyCache = vi.fn().mockRejectedValue(new Error("Tried to store a value from cache"));
         const info = new CrossSigningInfo(
             userId,
             { getCrossSigningKey },
@@ -154,9 +156,9 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
     it.each(types)(
         "requests a key from the cache callback (if set) and then calls app" + " if one is not found",
         async ({ type, shouldCache }) => {
-            const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
-            const getCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
-            const storeCrossSigningKeyCache = jest.fn();
+            const getCrossSigningKey = vi.fn().mockResolvedValue(testKey);
+            const getCrossSigningKeyCache = vi.fn().mockResolvedValue(undefined);
+            const storeCrossSigningKeyCache = vi.fn();
             const info = new CrossSigningInfo(
                 userId,
                 { getCrossSigningKey },
@@ -175,9 +177,9 @@ describe("CrossSigningInfo.getCrossSigningKey", function () {
     it.each(types)(
         "requests a key from the cache callback (if set) and then" + " calls app if that key doesn't match",
         async ({ type, shouldCache }) => {
-            const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
-            const getCrossSigningKeyCache = jest.fn().mockResolvedValue(badKey);
-            const storeCrossSigningKeyCache = jest.fn();
+            const getCrossSigningKey = vi.fn().mockResolvedValue(testKey);
+            const getCrossSigningKeyCache = vi.fn().mockResolvedValue(badKey);
+            const storeCrossSigningKeyCache = vi.fn();
             const info = new CrossSigningInfo(
                 userId,
                 { getCrossSigningKey },

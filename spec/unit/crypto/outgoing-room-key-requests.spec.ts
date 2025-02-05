@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeAll, describe, expect, it, test } from "vitest";
+
 import { CryptoStore } from "../../../src/crypto/store/base";
 import { IndexedDBCryptoStore } from "../../../src/crypto/store/indexeddb-crypto-store";
 import { LocalStorageCryptoStore } from "../../../src/crypto/store/localStorage-crypto-store";

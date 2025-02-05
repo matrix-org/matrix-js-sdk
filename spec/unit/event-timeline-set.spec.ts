@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
+import { beforeEach, describe, expect, it, MockInstance, vi } from "vitest";
 
 import * as utils from "../test-utils/test-utils";
 import {
@@ -31,6 +31,7 @@ import {
 } from "../../src";
 import { Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
+import { mocked } from "../test-utils";
 
 describe("EventTimelineSet", () => {
     const roomId = "!foo:bar";
@@ -228,7 +229,7 @@ describe("EventTimelineSet", () => {
         let thread: Thread;
 
         beforeEach(() => {
-            (client.supportsThreads as jest.Mock).mockReturnValue(true);
+            mocked(client.supportsThreads).mockReturnValue(true);
             thread = new Thread("!thread_id:server", messageEvent, { room, client });
         });
 
@@ -306,20 +307,20 @@ describe("EventTimelineSet", () => {
         });
 
         describe("with events to be decrypted", () => {
-            let messageEventShouldAttemptDecryptionSpy: jest.SpyInstance;
-            let messageEventIsDecryptionFailureSpy: jest.SpyInstance;
+            let messageEventShouldAttemptDecryptionSpy: MockInstance;
+            let messageEventIsDecryptionFailureSpy: MockInstance;
 
-            let replyEventShouldAttemptDecryptionSpy: jest.SpyInstance;
-            let replyEventIsDecryptionFailureSpy: jest.SpyInstance;
+            let replyEventShouldAttemptDecryptionSpy: MockInstance;
+            let replyEventIsDecryptionFailureSpy: MockInstance;
 
             beforeEach(() => {
-                messageEventShouldAttemptDecryptionSpy = jest.spyOn(messageEvent, "shouldAttemptDecryption");
+                messageEventShouldAttemptDecryptionSpy = vi.spyOn(messageEvent, "shouldAttemptDecryption");
                 messageEventShouldAttemptDecryptionSpy.mockReturnValue(true);
-                messageEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, "isDecryptionFailure");
+                messageEventIsDecryptionFailureSpy = vi.spyOn(messageEvent, "isDecryptionFailure");
 
-                replyEventShouldAttemptDecryptionSpy = jest.spyOn(replyEvent, "shouldAttemptDecryption");
+                replyEventShouldAttemptDecryptionSpy = vi.spyOn(replyEvent, "shouldAttemptDecryption");
                 replyEventShouldAttemptDecryptionSpy.mockReturnValue(true);
-                replyEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, "isDecryptionFailure");
+                replyEventIsDecryptionFailureSpy = vi.spyOn(messageEvent, "isDecryptionFailure");
 
                 eventTimelineSet.addEventsToTimeline([messageEvent, replyEvent], true, false, eventTimeline, "foo");
             });
@@ -384,7 +385,7 @@ describe("EventTimelineSet", () => {
         let thread: Thread;
 
         beforeEach(() => {
-            (client.supportsThreads as jest.Mock).mockReturnValue(true);
+            mocked(client.supportsThreads).mockReturnValue(true);
             thread = new Thread("!thread_id:server", messageEvent, { room, client });
         });
 

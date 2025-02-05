@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mock } from "jest-mock";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     ClientEvent,
@@ -28,6 +28,7 @@ import {
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
 import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
+import { mocked } from "../../test-utils";
 
 describe("MatrixRTCSessionManager", () => {
     let client: MatrixClient;
@@ -43,12 +44,12 @@ describe("MatrixRTCSessionManager", () => {
     });
 
     it("Fires event when session starts", () => {
-        const onStarted = jest.fn();
+        const onStarted = vi.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
         try {
             const room1 = makeMockRoom([membershipTemplate]);
-            jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+            vi.spyOn(client, "getRooms").mockReturnValue([room1]);
 
             client.emit(ClientEvent.Room, room1);
             expect(onStarted).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
@@ -58,16 +59,16 @@ describe("MatrixRTCSessionManager", () => {
     });
 
     it("Fires event when session ends", () => {
-        const onEnded = jest.fn();
+        const onEnded = vi.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
         const room1 = makeMockRoom(membershipTemplate);
-        jest.spyOn(client, "getRooms").mockReturnValue([room1]);
-        jest.spyOn(client, "getRoom").mockReturnValue(room1);
+        vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+        vi.spyOn(client, "getRoom").mockReturnValue(room1);
 
         client.emit(ClientEvent.Room, room1);
 
-        (room1.getLiveTimeline as Mock).mockReturnValue({
-            getState: jest.fn().mockReturnValue(makeMockRoomState([{}], room1.roomId)),
+        mocked(room1.getLiveTimeline).mockReturnValue({
+            getState: vi.fn().mockReturnValue(makeMockRoomState([{}], room1.roomId)),
         });
 
         const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
@@ -80,19 +81,19 @@ describe("MatrixRTCSessionManager", () => {
 
     it("Calls onCallEncryption on encryption keys event", async () => {
         const room1 = makeMockRoom([membershipTemplate]);
-        jest.spyOn(client, "getRooms").mockReturnValue([room1]);
-        jest.spyOn(client, "getRoom").mockReturnValue(room1);
+        vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+        vi.spyOn(client, "getRoom").mockReturnValue(room1);
 
         client.emit(ClientEvent.Room, room1);
-        const onCallEncryptionMock = jest.fn();
+        const onCallEncryptionMock = vi.fn();
         client.matrixRTC.getRoomSession(room1).onCallEncryption = onCallEncryptionMock;
         client.decryptEventIfNeeded = () => Promise.resolve();
         const timelineEvent = {
-            getType: jest.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
-            getContent: jest.fn().mockReturnValue({}),
-            getSender: jest.fn().mockReturnValue("@mock:user.example"),
-            getRoomId: jest.fn().mockReturnValue("!room:id"),
-            isDecryptionFailure: jest.fn().mockReturnValue(false),
+            getType: vi.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
+            getContent: vi.fn().mockReturnValue({}),
+            getSender: vi.fn().mockReturnValue("@mock:user.example"),
+            getRoomId: vi.fn().mockReturnValue("!room:id"),
+            isDecryptionFailure: vi.fn().mockReturnValue(false),
             sender: {
                 userId: "@mock:user.example",
             },
@@ -105,16 +106,16 @@ describe("MatrixRTCSessionManager", () => {
     describe("event decryption", () => {
         it("Retries decryption and processes success", async () => {
             try {
-                jest.useFakeTimers();
+                vi.useFakeTimers();
                 const room1 = makeMockRoom([membershipTemplate]);
-                jest.spyOn(client, "getRooms").mockReturnValue([room1]);
-                jest.spyOn(client, "getRoom").mockReturnValue(room1);
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
 
                 client.emit(ClientEvent.Room, room1);
-                const onCallEncryptionMock = jest.fn();
+                const onCallEncryptionMock = vi.fn();
                 client.matrixRTC.getRoomSession(room1).onCallEncryption = onCallEncryptionMock;
                 let isDecryptionFailure = true;
-                client.decryptEventIfNeeded = jest
+                client.decryptEventIfNeeded = vi
                     .fn()
                     .mockReturnValueOnce(Promise.resolve())
                     .mockImplementation(() => {
@@ -122,12 +123,12 @@ describe("MatrixRTCSessionManager", () => {
                         return Promise.resolve();
                     });
                 const timelineEvent = {
-                    getType: jest.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
-                    getContent: jest.fn().mockReturnValue({}),
-                    getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                    getRoomId: jest.fn().mockReturnValue("!room:id"),
-                    isDecryptionFailure: jest.fn().mockImplementation(() => isDecryptionFailure),
-                    getId: jest.fn().mockReturnValue("event_id"),
+                    getType: vi.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
+                    getContent: vi.fn().mockReturnValue({}),
+                    getSender: vi.fn().mockReturnValue("@mock:user.example"),
+                    getRoomId: vi.fn().mockReturnValue("!room:id"),
+                    isDecryptionFailure: vi.fn().mockImplementation(() => isDecryptionFailure),
+                    getId: vi.fn().mockReturnValue("event_id"),
                     sender: {
                         userId: "@mock:user.example",
                     },
@@ -138,33 +139,33 @@ describe("MatrixRTCSessionManager", () => {
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
 
                 // should retry after one second:
-                await jest.advanceTimersByTimeAsync(1500);
+                await vi.advanceTimersByTimeAsync(1500);
 
                 expect(client.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(1);
             } finally {
-                jest.useRealTimers();
+                vi.useRealTimers();
             }
         });
 
         it("Retries decryption and processes failure", async () => {
             try {
-                jest.useFakeTimers();
+                vi.useFakeTimers();
                 const room1 = makeMockRoom([membershipTemplate]);
-                jest.spyOn(client, "getRooms").mockReturnValue([room1]);
-                jest.spyOn(client, "getRoom").mockReturnValue(room1);
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
 
                 client.emit(ClientEvent.Room, room1);
-                const onCallEncryptionMock = jest.fn();
+                const onCallEncryptionMock = vi.fn();
                 client.matrixRTC.getRoomSession(room1).onCallEncryption = onCallEncryptionMock;
-                client.decryptEventIfNeeded = jest.fn().mockReturnValue(Promise.resolve());
+                client.decryptEventIfNeeded = vi.fn().mockReturnValue(Promise.resolve());
                 const timelineEvent = {
-                    getType: jest.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
-                    getContent: jest.fn().mockReturnValue({}),
-                    getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                    getRoomId: jest.fn().mockReturnValue("!room:id"),
-                    isDecryptionFailure: jest.fn().mockReturnValue(true), // always fail
-                    getId: jest.fn().mockReturnValue("event_id"),
+                    getType: vi.fn().mockReturnValue(EventType.CallEncryptionKeysPrefix),
+                    getContent: vi.fn().mockReturnValue({}),
+                    getSender: vi.fn().mockReturnValue("@mock:user.example"),
+                    getRoomId: vi.fn().mockReturnValue("!room:id"),
+                    isDecryptionFailure: vi.fn().mockReturnValue(true), // always fail
+                    getId: vi.fn().mockReturnValue("event_id"),
                     sender: {
                         userId: "@mock:user.example",
                     },
@@ -175,18 +176,18 @@ describe("MatrixRTCSessionManager", () => {
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
 
                 // should retry after one second:
-                await jest.advanceTimersByTimeAsync(1500);
+                await vi.advanceTimersByTimeAsync(1500);
 
                 expect(client.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
 
                 // doesn't retry again:
-                await jest.advanceTimersByTimeAsync(1500);
+                await vi.advanceTimersByTimeAsync(1500);
 
                 expect(client.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
             } finally {
-                jest.useRealTimers();
+                vi.useRealTimers();
             }
         });
     });

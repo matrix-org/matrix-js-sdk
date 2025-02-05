@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { SummaryStatsReportGatherer } from "../../../../src/webrtc/stats/summaryStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
 import { groupCallParticipantsFourOtherDevices } from "../../../test-utils/webrtc";
@@ -22,7 +24,7 @@ describe("SummaryStatsReportGatherer", () => {
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         emitter = new StatsReportEmitter();
-        emitter.emitSummaryStatsReport = jest.fn();
+        emitter.emitSummaryStatsReport = vi.fn();
         reporter = new SummaryStatsReportGatherer(emitter);
     });
 

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { vi } from "vitest";
+
 import {
     ClientEvent,
     ClientEventHandlerMap,
@@ -269,7 +271,7 @@ export class MockRTCRtpTransceiver {
         this.peerConn.needsNegotiation = true;
     }
 
-    public setCodecPreferences = jest.fn<void, RTCRtpCodec[]>();
+    public setCodecPreferences = vi.fn<void, RTCRtpCodec[]>();
 }
 
 export class MockMediaStreamTrack {
@@ -279,7 +281,7 @@ export class MockMediaStreamTrack {
         public enabled = true,
     ) {}
 
-    public stop = jest.fn<void, []>();
+    public stop = vi.fn();
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -391,7 +393,7 @@ export class MockMediaHandler {
     public stopUserMediaStream(stream: MockMediaStream) {
         stream.isStopped = true;
     }
-    public getScreensharingStream = jest.fn((opts?: IScreensharingOpts) => {
+    public getScreensharingStream = vi.fn((opts?: IScreensharingOpts) => {
         const tracks = [new MockMediaStreamTrack("screenshare_video_track", "video")];
         if (opts?.audio) tracks.push(new MockMediaStreamTrack("screenshare_audio_track", "audio"));
 
@@ -416,18 +418,18 @@ export class MockMediaHandler {
 }
 
 export class MockMediaDevices {
-    public enumerateDevices = jest
+    public enumerateDevices = vi
         .fn<Promise<MediaDeviceInfo[]>, []>()
         .mockResolvedValue([
             new MockMediaDeviceInfo("audioinput").typed(),
             new MockMediaDeviceInfo("videoinput").typed(),
         ]);
 
-    public getUserMedia = jest
+    public getUserMedia = vi
         .fn<Promise<MediaStream>, [MediaStreamConstraints]>()
         .mockReturnValue(Promise.resolve(new MockMediaStream("local_stream").typed()));
 
-    public getDisplayMedia = jest
+    public getDisplayMedia = vi
         .fn<Promise<MediaStream>, [MediaStreamConstraints]>()
         .mockReturnValue(Promise.resolve(new MockMediaStream("local_display_stream").typed()));
 
@@ -462,11 +464,11 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
         calls: new Map<string, MatrixCall>(),
     };
 
-    public sendStateEvent = jest.fn<
+    public sendStateEvent = vi.fn<
         Promise<ISendEventResponse>,
         [roomId: string, eventType: EventType, content: any, statekey: string]
     >();
-    public sendToDevice = jest.fn<
+    public sendToDevice = vi.fn<
         Promise<EmptyObject>,
         [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
     >();
@@ -499,11 +501,11 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     public getUseE2eForGroupCall = () => false;
     public checkTurnServers = () => null;
 
-    public getSyncState = jest.fn<SyncState | null, []>().mockReturnValue(SyncState.Syncing);
+    public getSyncState = vi.fn<SyncState | null, []>().mockReturnValue(SyncState.Syncing);
 
-    public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
-    public getRoom = jest.fn();
-    public getFoci = jest.fn();
+    public getRooms = vi.fn<Room[], []>().mockReturnValue([]);
+    public getRoom = vi.fn();
+    public getFoci = vi.fn();
 
     public supportsThreads(): boolean {
         return true;
@@ -534,20 +536,20 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public opponentMember = { userId: this.opponentUserId };
     public callId = "1";
     public localUsermediaFeed = {
-        setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
-        isAudioMuted: jest.fn().mockReturnValue(false),
-        isVideoMuted: jest.fn().mockReturnValue(false),
+        setAudioVideoMuted: vi.fn<void, [boolean, boolean]>(),
+        isAudioMuted: vi.fn().mockReturnValue(false),
+        isVideoMuted: vi.fn().mockReturnValue(false),
         stream: new MockMediaStream("stream"),
     } as unknown as CallFeed;
     public remoteUsermediaFeed?: CallFeed;
     public remoteScreensharingFeed?: CallFeed;
 
-    public reject = jest.fn<void, []>();
-    public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
-    public hangup = jest.fn<void, []>();
-    public initStats = jest.fn<void, []>();
+    public reject = vi.fn<void, []>();
+    public answerWithCallFeeds = vi.fn<void, [CallFeed[]]>();
+    public hangup = vi.fn<void, []>();
+    public initStats = vi.fn<void, []>();
 
-    public sendMetadataUpdate = jest.fn<void, []>();
+    public sendMetadataUpdate = vi.fn<void, []>();
 
     public getOpponentMember(): Partial<RoomMember> {
         return this.opponentMember;
@@ -586,40 +588,30 @@ export class MockCallFeed {
 }
 
 export function installWebRTCMocks() {
-    globalThis.navigator = {
+    vi.stubGlobal("navigator", {
         mediaDevices: new MockMediaDevices().typed(),
-    } as unknown as Navigator;
+    });
 
-    globalThis.window = {
-        // @ts-ignore Mock
+    vi.stubGlobal("window", {
         RTCPeerConnection: MockRTCPeerConnection,
-        // @ts-ignore Mock
         RTCSessionDescription: {},
-        // @ts-ignore Mock
         RTCIceCandidate: {},
         getUserMedia: () => new MockMediaStream("local_stream"),
-    };
-    // @ts-ignore Mock
-    globalThis.document = {};
+    });
 
-    // @ts-ignore Mock
-    globalThis.AudioContext = MockAudioContext;
-
-    // @ts-ignore Mock
-    globalThis.RTCRtpReceiver = {
-        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+    vi.stubGlobal("AudioContext", MockAudioContext);
+    vi.stubGlobal("RTCRtpReceiver", {
+        getCapabilities: vi.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
         }),
-    };
-
-    // @ts-ignore Mock
-    globalThis.RTCRtpSender = {
-        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+    });
+    vi.stubGlobal("RTCRtpSender", {
+        getCapabilities: vi.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
         }),
-    };
+    });
 }
 
 export function makeMockGroupCallStateEvent(
@@ -632,22 +624,22 @@ export function makeMockGroupCallStateEvent(
     redacted?: boolean,
 ): MatrixEvent {
     return {
-        getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
-        getRoomId: jest.fn().mockReturnValue(roomId),
-        getTs: jest.fn().mockReturnValue(0),
-        getContent: jest.fn().mockReturnValue(content),
-        getStateKey: jest.fn().mockReturnValue(groupCallId),
-        isRedacted: jest.fn().mockReturnValue(redacted ?? false),
+        getType: vi.fn().mockReturnValue(EventType.GroupCallPrefix),
+        getRoomId: vi.fn().mockReturnValue(roomId),
+        getTs: vi.fn().mockReturnValue(0),
+        getContent: vi.fn().mockReturnValue(content),
+        getStateKey: vi.fn().mockReturnValue(groupCallId),
+        isRedacted: vi.fn().mockReturnValue(redacted ?? false),
     } as unknown as MatrixEvent;
 }
 
 export function makeMockGroupCallMemberStateEvent(roomId: string, groupCallId: string): MatrixEvent {
     return {
-        getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-        getRoomId: jest.fn().mockReturnValue(roomId),
-        getTs: jest.fn().mockReturnValue(0),
-        getContent: jest.fn().mockReturnValue({}),
-        getStateKey: jest.fn().mockReturnValue(groupCallId),
+        getType: vi.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+        getRoomId: vi.fn().mockReturnValue(roomId),
+        getTs: vi.fn().mockReturnValue(0),
+        getContent: vi.fn().mockReturnValue({}),
+        getStateKey: vi.fn().mockReturnValue(groupCallId),
     } as unknown as MatrixEvent;
 }
 

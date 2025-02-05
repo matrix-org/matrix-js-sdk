@@ -64,7 +64,7 @@ describe("SAS verification", function () {
                 content: {},
             }),
         );
-        const spy = jest.fn();
+        const spy = vi.fn();
         await sas.verify().catch(spy);
         expect(spy).toHaveBeenCalled();
 
@@ -411,10 +411,10 @@ describe("SAS verification", function () {
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice.client.setDeviceVerified = jest.fn();
-        alice.client.downloadKeys = jest.fn().mockResolvedValue({});
-        bob.client.setDeviceVerified = jest.fn();
-        bob.client.downloadKeys = jest.fn().mockResolvedValue({});
+        alice.client.setDeviceVerified = vi.fn();
+        alice.client.downloadKeys = vi.fn().mockResolvedValue({});
+        bob.client.setDeviceVerified = vi.fn();
+        bob.client.downloadKeys = vi.fn().mockResolvedValue({});
 
         const bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
             bob.client.on(CryptoEvent.VerificationRequest, (request) => {
@@ -431,8 +431,8 @@ describe("SAS verification", function () {
             bob.client.deviceId!,
         );
 
-        const aliceSpy = jest.fn();
-        const bobSpy = jest.fn();
+        const aliceSpy = vi.fn();
+        const bobSpy = vi.fn();
         await Promise.all([
             aliceVerifier.verify().catch(aliceSpy),
             bobPromise.then((verifier) => verifier.verify()).catch(bobSpy),
@@ -467,7 +467,7 @@ describe("SAS verification", function () {
                 },
             );
 
-            alice.client.crypto!.setDeviceVerification = jest.fn();
+            alice.client.crypto!.setDeviceVerification = vi.fn();
             alice.client.getDeviceEd25519Key = () => {
                 return "alice+base64+ed25519+key";
             };
@@ -485,7 +485,7 @@ describe("SAS verification", function () {
                 return Promise.resolve(new Map());
             };
 
-            bob.client.crypto!.setDeviceVerification = jest.fn();
+            bob.client.crypto!.setDeviceVerification = vi.fn();
             bob.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {

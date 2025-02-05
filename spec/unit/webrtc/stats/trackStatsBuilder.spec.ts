@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { describe, expect, it, vi } from "vitest";
+
 import { TrackStatsBuilder } from "../../../../src/webrtc/stats/trackStatsBuilder";
 import { MediaTrackStats } from "../../../../src/webrtc/stats/media/mediaTrackStats";
 
@@ -89,7 +91,7 @@ describe("TrackStatsBuilder", () => {
         it("creating build bitrate send report.", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
             const remote = {} as RTCStatsReport;
-            remote.get = jest.fn().mockReturnValue({ mimeType: "video/v8" });
+            remote.get = vi.fn().mockReturnValue({ mimeType: "video/v8" });
             TrackStatsBuilder.buildCodec(remote, trackStats, { codecId: "codecID" });
             expect(trackStats.getCodec()).toEqual("v8");
         });

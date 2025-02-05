@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterAll, describe, expect, it } from "vitest";
+
 import MockHttpBackend from "matrix-mock-request";
 
 import { AutoDiscoveryAction } from "../../src";
@@ -190,7 +192,7 @@ describe("AutoDiscovery", function () {
         };
         return Promise.all([
             httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(expect(expected).toEqual),
+            AutoDiscovery.findClientConfig("example.org").then((config) => expect(expected).toEqual(config)),
         ]);
     });
 

@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { beforeAll, beforeEach, describe, expect, it, MockedObject } from "vitest";
 
 import "../../../olm-loader";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";

@@ -13,12 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import {
-    VerificationRequest,
-    READY_TYPE,
-    START_TYPE,
-    DONE_TYPE,
-} from "../../../../src/crypto/verification/request/VerificationRequest";
+import { describe, expect, it, vi } from "vitest";
+
+import { VerificationRequest, READY_TYPE, START_TYPE, DONE_TYPE } from "../../../../src/crypto/verification/request/VerificationRequest";
 import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
 import { ToDeviceChannel } from "../../../../src/crypto/verification/request/ToDeviceChannel";
 import { IContent, MatrixEvent } from "../../../../src/models/event";
@@ -144,7 +141,7 @@ async function distributeEvent(
     await theirRequest.channel.handleEvent(event, theirRequest, true);
 }
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe("verification request unit tests", function () {
     it("transition from UNSENT to DONE through happy path", async function () {
@@ -305,7 +302,7 @@ describe("verification request unit tests", function () {
 
         expect(aliceRequest.cancelled).toBe(false);
         expect(aliceRequest._cancellingUserId).toBe(undefined);
-        jest.advanceTimersByTime(10 * 60 * 1000);
+        vi.advanceTimersByTime(10 * 60 * 1000);
         expect(aliceRequest._cancellingUserId).toBe(alice.getUserId());
     });
 
@@ -325,7 +322,7 @@ describe("verification request unit tests", function () {
 
         expect(bobRequest.cancelled).toBe(false);
         expect(bobRequest._cancellingUserId).toBe(undefined);
-        jest.advanceTimersByTime(2 * 60 * 1000);
+        vi.advanceTimersByTime(2 * 60 * 1000);
         expect(bobRequest._cancellingUserId).toBe(bob.getUserId());
     });
 });

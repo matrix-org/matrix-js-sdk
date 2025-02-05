@@ -29,17 +29,17 @@ describe("CallStatsReportGatherer", () => {
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         rtcSpy = { getStats: () => new Promise<RTCStatsReport>(() => null) } as RTCPeerConnection;
-        rtcSpy.addEventListener = jest.fn();
-        rtcSpy.getTransceivers = jest.fn().mockReturnValue([]);
+        rtcSpy.addEventListener = vi.fn();
+        rtcSpy.getTransceivers = vi.fn().mockReturnValue([]);
         emitter = new StatsReportEmitter();
         collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
     });
 
     describe("on process stats", () => {
         it("if active calculate stats reports", async () => {
-            const getStats = jest.spyOn(rtcSpy, "getStats");
+            const getStats = vi.spyOn(rtcSpy, "getStats");
             const report = {} as RTCStatsReport;
-            report.forEach = jest.fn().mockReturnValue([]);
+            report.forEach = vi.fn().mockReturnValue([]);
             getStats.mockResolvedValue(report);
             const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
@@ -70,14 +70,14 @@ describe("CallStatsReportGatherer", () => {
 
         it("if not active do not calculate stats reports", async () => {
             collector.setActive(false);
-            const getStats = jest.spyOn(rtcSpy, "getStats");
+            const getStats = vi.spyOn(rtcSpy, "getStats");
             await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).not.toHaveBeenCalled();
         });
 
         it("if get reports fails, the collector becomes inactive", async () => {
             expect(collector.getActive()).toBeTruthy();
-            const getStats = jest.spyOn(rtcSpy, "getStats");
+            const getStats = vi.spyOn(rtcSpy, "getStats");
             getStats.mockRejectedValue(new Error("unknown"));
             await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe("CallStatsReportGatherer", () => {
         });
 
         it("if active and getStats returns not an RTCStatsReport inside a promise the collector fails and becomes inactive", async () => {
-            const getStats = jest.spyOn(rtcSpy, "getStats");
+            const getStats = vi.spyOn(rtcSpy, "getStats");
             // @ts-ignore
             getStats.mockReturnValue({});
             const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
@@ -116,11 +116,11 @@ describe("CallStatsReportGatherer", () => {
         });
 
         it("if active and the collector runs not the first time the Summery Stats is marked as not fits collection", async () => {
-            const getStats = jest.spyOn(rtcSpy, "getStats");
+            const getStats = vi.spyOn(rtcSpy, "getStats");
             // @ts-ignore
             collector.previousStatsReport = {} as RTCStatsReport;
             const report = {} as RTCStatsReport;
-            report.forEach = jest.fn().mockReturnValue([]);
+            report.forEach = vi.fn().mockReturnValue([]);
             getStats.mockResolvedValue(report);
             const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
             expect(getStats).toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe("CallStatsReportGatherer", () => {
             beforeEach(() => {
                 rtcSpy = new MockRTCPeerConnection() as unknown as RTCPeerConnection;
                 collector = new CallStatsReportGatherer(CALL_ID, USER_ID, rtcSpy, emitter);
-                const getStats = jest.spyOn(rtcSpy, "getStats");
+                const getStats = vi.spyOn(rtcSpy, "getStats");
 
                 const previous = prevChromeReport as unknown as RTCStatsReport;
                 previous.get = (id: string) => {
@@ -194,19 +194,19 @@ describe("CallStatsReportGatherer", () => {
             });
 
             it("emit byteSentStatsReport", async () => {
-                const emitByteSendReport = jest.spyOn(emitter, "emitByteSendReport");
+                const emitByteSendReport = vi.spyOn(emitter, "emitByteSendReport");
                 const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
                 expect(actual).toEqual(wantedSummaryReport);
                 expect(emitByteSendReport).toHaveBeenCalled();
             });
             it("emit emitConnectionStatsReport", async () => {
-                const emitConnectionStatsReport = jest.spyOn(emitter, "emitConnectionStatsReport");
+                const emitConnectionStatsReport = vi.spyOn(emitter, "emitConnectionStatsReport");
                 const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
                 expect(actual).toEqual(wantedSummaryReport);
                 expect(emitConnectionStatsReport).toHaveBeenCalled();
             });
             it("emit callFeedStatsReport", async () => {
-                const emitCallFeedReport = jest.spyOn(emitter, "emitCallFeedReport");
+                const emitCallFeedReport = vi.spyOn(emitter, "emitCallFeedReport");
                 const actual = await collector.processStats("GROUP_CALL_ID", "LOCAL_USER_ID");
                 expect(actual).toEqual(wantedSummaryReport);
                 expect(emitCallFeedReport).toHaveBeenCalled();
@@ -219,7 +219,7 @@ describe("CallStatsReportGatherer", () => {
         beforeEach(() => {
             events = [];
             // Define the addEventListener method with a Jest mock function
-            rtcSpy.addEventListener = jest.fn((event: any, callback: any) => {
+            rtcSpy.addEventListener = vi.fn((event: any, callback: any) => {
                 events[event] = callback;
             });
 
@@ -228,10 +228,10 @@ describe("CallStatsReportGatherer", () => {
         it("in case of stable, parse remote and local description", () => {
             // @ts-ignore
             const mediaSsrcHandler = {
-                parse: jest.fn(),
-                ssrcToMid: jest.fn(),
-                findMidBySsrc: jest.fn(),
-                getSsrcToMidMap: jest.fn(),
+                parse: vi.fn(),
+                ssrcToMid: vi.fn(),
+                findMidBySsrc: vi.fn(),
+                getSsrcToMidMap: vi.fn(),
             } as MediaSsrcHandler;
 
             const remoteSDP = "sdp";

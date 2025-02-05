@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
 import "../../olm-loader";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { IObject } from "../../../src/crypto/olmlib";
@@ -47,7 +49,7 @@ async function makeTestClient(
     await client.initLegacyCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
+    vi.spyOn(client.crypto!, "downloadKeys").mockResolvedValue(new Map());
 
     return client;
 }
@@ -101,7 +103,7 @@ describe("Secrets", function () {
             },
         };
 
-        const getKey = jest.fn().mockImplementation(async (e) => {
+        const getKey = vi.fn().mockImplementation(async (e) => {
             expect(Object.keys(e.keys)).toEqual(["abc"]);
             return ["abc", key];
         });
@@ -121,7 +123,7 @@ describe("Secrets", function () {
 
         const secretStorage = alice.crypto!.secretStorage;
 
-        jest.spyOn(alice, "setAccountData").mockImplementation(async function (eventType, contents) {
+        vi.spyOn(alice, "setAccountData").mockImplementation(async function (eventType, contents) {
             alice.store.storeAccountDataEvents([
                 new MatrixEvent({
                     type: eventType,
@@ -171,7 +173,7 @@ describe("Secrets", function () {
     it("should encrypt with default key if keys is null", async function () {
         const key = new Uint8Array(16);
         for (let i = 0; i < 16; i++) key[i] = i;
-        const getKey = jest.fn().mockImplementation(async (e) => {
+        const getKey = vi.fn().mockImplementation(async (e) => {
             expect(Object.keys(e.keys)).toEqual([newKeyId]);
             return [newKeyId, key];
         });
@@ -292,7 +294,7 @@ describe("Secrets", function () {
         it("bootstraps when no storage or cross-signing keys locally", async function () {
             const key = new Uint8Array(16);
             for (let i = 0; i < 16; i++) key[i] = i;
-            const getKey = jest.fn().mockImplementation(async (e) => {
+            const getKey = vi.fn().mockImplementation(async (e) => {
                 return [Object.keys(e.keys)[0], key];
             });
 
@@ -308,7 +310,7 @@ describe("Secrets", function () {
                 },
             );
             bob.uploadDeviceSigningKeys = async () => ({});
-            bob.uploadKeySignatures = jest.fn().mockResolvedValue(undefined);
+            bob.uploadKeySignatures = vi.fn().mockResolvedValue(undefined);
             bob.setAccountData = async function (eventType, contents) {
                 const event = new MatrixEvent({
                     type: eventType,
@@ -318,7 +320,7 @@ describe("Secrets", function () {
                 this.emit(ClientEvent.AccountData, event);
                 return {};
             };
-            bob.getKeyBackupVersion = jest.fn().mockResolvedValue(null);
+            bob.getKeyBackupVersion = vi.fn().mockResolvedValue(null);
 
             await bob.bootstrapCrossSigning({
                 authUploadDeviceSigningKeys: async (func) => {

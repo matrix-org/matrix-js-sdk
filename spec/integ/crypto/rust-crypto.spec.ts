@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { createClient, CryptoEvent, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
@@ -25,7 +27,7 @@ import { IDENTITY_NOT_TRUSTED_DATASET } from "../../test-utils/test_indexeddb_cr
 import { FULL_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/full_account";
 import { EMPTY_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/empty_account";
 
-jest.setTimeout(15000);
+vi.setTimeout(15000);
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -116,10 +118,6 @@ describe("MatrixClient.initRustCrypto", () => {
     });
 
     describe("Libolm Migration", () => {
-        beforeEach(() => {
-            fetchMock.reset();
-        });
-
         it("should migrate from libolm", async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.backupResponse);
 
@@ -137,7 +135,7 @@ describe("MatrixClient.initRustCrypto", () => {
                 pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
             });
 
-            const progressListener = jest.fn();
+            const progressListener = vi.fn();
             matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
 
             await matrixClient.initRustCrypto();
@@ -308,7 +306,7 @@ describe("MatrixClient.initRustCrypto", () => {
             });
 
             // When we start Rust crypto, potentially triggering an upgrade
-            const progressListener = jest.fn();
+            const progressListener = vi.fn();
             matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
 
             await matrixClient.initRustCrypto();

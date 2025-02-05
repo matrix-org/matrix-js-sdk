@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeAll, beforeEach, describe, expect, it, test, vi } from "vitest";
+
 import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
 import FetchMock from "fetch-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 import Olm from "@matrix-org/olm";
@@ -87,7 +89,7 @@ import { encodeBase64 } from "../../../src/base64";
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
 // to ensure that we don't end up with dangling timeouts.
 // But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
@@ -154,7 +156,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         }
 
         // Allow in-flight things to complete before we tear down the test
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         fetchMock.mockReset();
     });
@@ -253,7 +255,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            jest.advanceTimersByTime(10);
+            vi.advanceTimersByTime(10);
 
             requestBody = await sendToDevicePromise;
             toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
@@ -331,7 +333,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // And now Alice starts a SAS verification
             let sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
@@ -654,7 +656,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.verifier).toBeUndefined();
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // ... but Alice wants to do an SAS verification
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
@@ -699,7 +701,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             expect(request.verifier).toBeUndefined();
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // ... but the dummy device wants to do an SAS verification
             returnToDeviceMessageFromSync(buildSasStartMessage(transactionId));
@@ -778,7 +780,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            jest.advanceTimersByTime(10);
+            vi.advanceTimersByTime(10);
             await sendToDevicePromise;
 
             // now we unceremoniously cancel. We expect the verificatationPromise to reject.
@@ -959,7 +961,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             // In `DeviceList#doQueuedQueries`, the key download response is processed every 5ms
             // 5ms by users, ie Bob and Alice
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             const messageRequestPromise = awaitRoomMessageRequest();
             const verificationRequest = await aliceClient
@@ -1072,7 +1074,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         });
 
         it("ignores old verification requests", async () => {
-            const eventHandler = jest.fn();
+            const eventHandler = vi.fn();
             aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
 
             const verificationRequestEvent = createVerificationRequestEvent();
@@ -1137,7 +1139,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             returnToDeviceMessageFromSync(toDeviceEvent);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // Wait for the request to be decrypted
             const request1 = await requestEventPromise;
@@ -1176,7 +1178,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
                 expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
 
                 // Advance time by 5mins, the verification request should be ignored after that
-                jest.advanceTimersByTime(5 * 60 * 1000);
+                vi.advanceTimersByTime(5 * 60 * 1000);
 
                 // Send Bob the room keys
                 returnToDeviceMessageFromSync(toDeviceEvent);
@@ -1243,7 +1245,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([TEST_USER_ID]));
             await syncPromise(aliceClient);
             // DeviceList has a sleep(5) which we need to make happen
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // The client should now know about the olm device
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
@@ -1255,7 +1257,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             testOlmAccount?.free();
 
             // Allow in-flight things to complete before we tear down the test
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             fetchMock.mockReset();
         });
@@ -1300,11 +1302,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
 
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
+            vi.useRealTimers();
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1324,11 +1326,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, infoCopy);
 
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
+            vi.useRealTimers();
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1349,11 +1351,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             );
 
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
+            vi.useRealTimers();
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1370,11 +1372,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
             await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
 
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
+            vi.useRealTimers();
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
@@ -1493,7 +1495,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
         // user will be one).
         syncResponder.sendOrQueueSyncResponse({});
         // DeviceList has a sleep(5) which we need to make happen
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // The client should now know about the dummy device
         const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);

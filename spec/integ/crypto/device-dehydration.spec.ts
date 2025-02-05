@@ -14,8 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { describe, expect, it, vi } from "vitest";
+
 import "fake-indexeddb/auto";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientEvent, createClient, MatrixClient, MatrixEvent } from "../../../src";
 import { CryptoEvent } from "../../../src/crypto-api/index";
@@ -27,7 +29,7 @@ import { emitPromise, EventCounter } from "../../test-utils/test-utils";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
-        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        vi.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -89,7 +91,7 @@ describe("Device dehydration", () => {
         const dehydrationPromise = new Promise<void>((resolve, reject) => {
             resolveDehydrationPromise = resolve;
         });
-        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
 
         expect(dehydrationKeyCachedEventCounter.counter).toEqual(1);
@@ -103,7 +105,7 @@ describe("Device dehydration", () => {
             device_id: dehydratedDeviceBody.device_id,
             device_data: dehydratedDeviceBody.device_data,
         });
-        const eventsResponse = jest.fn((url, opts) => {
+        const eventsResponse = vi.fn((url, opts) => {
             // rehydrating should make two calls to the /events endpoint.
             // The first time will return a single event, and the second
             // time will return no events (which will signal to the
@@ -141,7 +143,7 @@ describe("Device dehydration", () => {
             },
         });
         const rotationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.DehydratedDeviceRotationError);
-        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await rotationErrorEventPromise;
 
         // Restart dehydration, but return an error for GET /dehydrated_device so that rehydration fails.

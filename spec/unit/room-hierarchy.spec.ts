@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import { describe, expect, it } from "vitest";
+
+import fetchMock from "@fetch-mock/vitest";
 
 import { EventType, MatrixClient, Room } from "../../src";
 import { RoomHierarchy } from "../../src/room-hierarchy";

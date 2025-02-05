@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { QrCodeData, QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import {
     MSC4108FailureReason,
@@ -37,11 +38,12 @@ import {
     MatrixHttpApi,
 } from "../../../src";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
+import { mocked } from "../../test-utils";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const baseUrl = "https://example.com";
     const crypto = {
-        exportSecretsForQrLogin: jest.fn(),
+        exportSecretsForQrLogin: vi.fn(),
     };
     const client = {
         doesServerSupportUnstableFeature(feature: string) {
@@ -55,9 +57,9 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
         },
         baseUrl,
         getDomain: () => "example.com",
-        getDevice: jest.fn(),
-        getCrypto: jest.fn(() => crypto),
-        getAuthMetadata: jest.fn().mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_CODE_SCOPE])),
+        getDevice: vi.fn(),
+        getCrypto: vi.fn(() => crypto),
+        getAuthMetadata: vi.fn().mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_CODE_SCOPE])),
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,
@@ -76,10 +78,6 @@ describe("MSC4108SignInWithQR", () => {
             },
             keys: [],
         });
-    });
-
-    afterEach(() => {
-        fetchMock.reset();
     });
 
     const url = "https://fallbackserver/rz/123";
@@ -116,10 +114,10 @@ describe("MSC4108SignInWithQR", () => {
             let opponentData = defer<string>();
 
             const ourMockSession = {
-                send: jest.fn(async (newData) => {
+                send: vi.fn(async (newData) => {
                     ourData.resolve(newData);
                 }),
-                receive: jest.fn(() => {
+                receive: vi.fn(() => {
                     const prom = opponentData.promise;
                     prom.then(() => {
                         opponentData = defer();
@@ -135,10 +133,10 @@ describe("MSC4108SignInWithQR", () => {
                 },
             } as unknown as MSC4108RendezvousSession;
             const opponentMockSession = {
-                send: jest.fn(async (newData) => {
+                send: vi.fn(async (newData) => {
                     opponentData.resolve(newData);
                 }),
-                receive: jest.fn(() => {
+                receive: vi.fn(() => {
                     const prom = ourData.promise;
                     prom.then(() => {
                         ourData = defer();
@@ -250,7 +248,7 @@ describe("MSC4108SignInWithQR", () => {
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
             };
-            client.getCrypto()!.exportSecretsBundle = jest.fn().mockResolvedValue(secrets);
+            client.getCrypto()!.exportSecretsBundle = vi.fn().mockResolvedValue(secrets);
 
             const payload = {
                 secrets: expect.objectContaining(secrets),
@@ -262,12 +260,12 @@ describe("MSC4108SignInWithQR", () => {
         });
 
         it("should abort if device doesn't come up by timeout", async () => {
-            jest.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
+            vi.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
                 fn();
                 // TODO: mock timers properly
                 return -1 as any;
             });
-            jest.spyOn(Date, "now").mockImplementation(() => {
+            vi.spyOn(Date, "now").mockImplementation(() => {
                 return 12345678 + mocked(setTimeout).mock.calls.length * 1000;
             });
 
@@ -315,7 +313,7 @@ describe("MSC4108SignInWithQR", () => {
         });
 
         it("should not send secrets if user cancels", async () => {
-            jest.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
+            vi.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
                 fn();
                 // TODO: mock timers properly
                 return -1 as any;
@@ -343,7 +341,7 @@ describe("MSC4108SignInWithQR", () => {
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
             };
-            client.getCrypto()!.exportSecretsBundle = jest.fn().mockResolvedValue(secrets);
+            client.getCrypto()!.exportSecretsBundle = vi.fn().mockResolvedValue(secrets);
 
             await Promise.all([
                 expect(ourProm).rejects.toThrow("User cancelled"),

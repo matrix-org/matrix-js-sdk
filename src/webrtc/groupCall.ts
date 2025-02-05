@@ -1006,9 +1006,8 @@ export class GroupCall extends TypedEventEmitter<
         const localDeviceId = this.client.getDeviceId()!;
         return (
             // If a user's ID is less than our own, they'll call us
-            userId >= localUserId &&
-            // If this is another one of our devices, compare device IDs to tell whether it'll call us
-            (userId !== localUserId || deviceId > localDeviceId)
+            (// If this is another one of our devices, compare device IDs to tell whether it'll call us
+            userId >= localUserId && (userId !== localUserId || deviceId > localDeviceId))
         );
     }
 

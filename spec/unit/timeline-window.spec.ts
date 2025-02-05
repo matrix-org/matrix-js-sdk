@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { beforeEach, describe, expect, it, MockedObject, vi } from "vitest";
 
 import { MatrixClient } from "../../src/client";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
@@ -27,10 +27,10 @@ import { MatrixEvent } from "../../src/models/event";
 const ROOM_ID = "roomId";
 const USER_ID = "userId";
 const mockClient = {
-    getEventTimeline: jest.fn(),
-    paginateEventTimeline: jest.fn(),
-    supportsThreads: jest.fn(),
-    getUserId: jest.fn().mockReturnValue(USER_ID),
+    getEventTimeline: vi.fn(),
+    paginateEventTimeline: vi.fn(),
+    supportsThreads: vi.fn(),
+    getUserId: vi.fn().mockReturnValue(USER_ID),
 } as unknown as MockedObject<MatrixClient>;
 
 /*
@@ -40,7 +40,7 @@ const mockClient = {
 function createTimeline(numEvents = 3, baseIndex = 1): EventTimeline {
     const room = new Room(ROOM_ID, mockClient, USER_ID);
     const timelineSet = new EventTimelineSet(room);
-    jest.spyOn(room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
+    vi.spyOn(room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
 
     const timeline = new EventTimeline(timelineSet);
 
@@ -97,7 +97,7 @@ function createLinkedTimelines(): [EventTimeline, EventTimeline] {
 
 describe("TimelineIndex", function () {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockClient.getEventTimeline.mockResolvedValue(undefined);
     });
 
@@ -192,7 +192,7 @@ describe("TimelineWindow", function () {
     }
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockClient.getEventTimeline.mockResolvedValue(undefined);
         mockClient.paginateEventTimeline.mockResolvedValue(false);
     });
@@ -202,7 +202,7 @@ describe("TimelineWindow", function () {
             const liveTimeline = createTimeline();
             const room = new Room(ROOM_ID, mockClient, USER_ID);
             const timelineSet = new EventTimelineSet(room);
-            jest.spyOn(timelineSet, "getLiveTimeline").mockReturnValue(liveTimeline);
+            vi.spyOn(timelineSet, "getLiveTimeline").mockReturnValue(liveTimeline);
 
             const timelineWindow = new TimelineWindow(mockClient, timelineSet);
             await timelineWindow.load(undefined, 2);

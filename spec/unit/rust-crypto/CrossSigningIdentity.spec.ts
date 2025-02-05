@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked } from "jest-mock";
+import { beforeEach, describe, expect, it, vi, Mocked } from "vitest";
+
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { CrossSigningIdentity } from "../../../src/rust-crypto/CrossSigningIdentity";
@@ -39,20 +40,20 @@ describe("CrossSigningIdentity", () => {
             await RustSdkCryptoJs.initAsync();
 
             olmMachine = {
-                crossSigningStatus: jest.fn(),
-                bootstrapCrossSigning: jest.fn(),
-                exportCrossSigningKeys: jest.fn(),
-                close: jest.fn(),
+                crossSigningStatus: vi.fn(),
+                bootstrapCrossSigning: vi.fn(),
+                exportCrossSigningKeys: vi.fn(),
+                close: vi.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
             outgoingRequestProcessor = {
-                makeOutgoingRequest: jest.fn(),
+                makeOutgoingRequest: vi.fn(),
             } as unknown as Mocked<OutgoingRequestProcessor>;
 
             secretStorage = {
-                get: jest.fn(),
-                hasKey: jest.fn(),
-                store: jest.fn(),
+                get: vi.fn(),
+                hasKey: vi.fn(),
+                store: vi.fn(),
             } as unknown as Mocked<ServerSideSecretStorage>;
 
             crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor, secretStorage);

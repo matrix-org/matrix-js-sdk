@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { it, describe, expect, beforeEach, vi } from "vitest";
+
 import { IContent, MatrixClient } from "../../../src";
 import { Room } from "../../../src/models/room";
 import { MatrixEvent } from "../../../src/models/event";
@@ -85,7 +87,7 @@ describe("MSC3089TreeSpace", () => {
 
     it("should support setting the name of the space", async () => {
         const newName = "NEW NAME";
-        const fn = jest
+        const fn = vi
             .fn()
             .mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
                 expect(stateRoomId).toEqual(roomId);
@@ -101,7 +103,7 @@ describe("MSC3089TreeSpace", () => {
 
     it("should support inviting users to the space", async () => {
         const target = targetUser;
-        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+        const fn = vi.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
             expect(userId).toEqual(target);
             return Promise.resolve();
@@ -113,7 +115,7 @@ describe("MSC3089TreeSpace", () => {
 
     it("should retry invites to the space", async () => {
         const target = targetUser;
-        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+        const fn = vi.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
             expect(userId).toEqual(target);
             if (fn.mock.calls.length === 1) return Promise.reject(new Error("Sample Failure"));
@@ -126,7 +128,7 @@ describe("MSC3089TreeSpace", () => {
 
     it("should not retry invite permission errors", async () => {
         const target = targetUser;
-        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+        const fn = vi.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
             expect(userId).toEqual(target);
             return Promise.reject(new MatrixError({ errcode: "M_FORBIDDEN", error: "Sample Failure" }));
@@ -140,7 +142,7 @@ describe("MSC3089TreeSpace", () => {
 
     it("should invite to subspaces", async () => {
         const target = targetUser;
-        const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
+        const fn = vi.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
             expect(userId).toEqual(target);
             return Promise.resolve();
@@ -161,7 +163,7 @@ describe("MSC3089TreeSpace", () => {
 
     async function evaluatePowerLevels(pls: any, role: TreePermissions, expectedPl: number) {
         makePowerLevels(pls);
-        const fn = jest
+        const fn = vi
             .fn()
             .mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
                 expect(stateRoomId).toEqual(roomId);
@@ -294,11 +296,11 @@ describe("MSC3089TreeSpace", () => {
             }
         };
         client.getDomain = () => domain;
-        const createFn = jest.fn().mockImplementation(async (name: string) => {
+        const createFn = vi.fn().mockImplementation(async (name: string) => {
             expect(name).toEqual(subspaceName);
             return new MSC3089TreeSpace(client, subspaceId);
         });
-        const sendStateFn = jest
+        const sendStateFn = vi
             .fn()
             .mockImplementation(async (roomId: string, eventType: EventType, content: any, stateKey: string) => {
                 expect([tree.roomId, subspaceId]).toContain(roomId);
@@ -352,7 +354,7 @@ describe("MSC3089TreeSpace", () => {
         };
         client.getRoom = () => ({}) as Room; // to appease the TreeSpace constructor
 
-        const getFn = jest.fn().mockImplementation((roomId: string) => {
+        const getFn = vi.fn().mockImplementation((roomId: string) => {
             if (roomId === thirdChildRoom) {
                 throw new Error("Mock not-a-space room case called (expected)");
             }
@@ -389,10 +391,10 @@ describe("MSC3089TreeSpace", () => {
     });
 
     it("should be able to delete itself", async () => {
-        const delete1 = jest.fn().mockImplementation(() => Promise.resolve());
+        const delete1 = vi.fn().mockImplementation(() => Promise.resolve());
         const subdir1 = { delete: delete1 } as any as MSC3089TreeSpace; // mock tested bits
 
-        const delete2 = jest.fn().mockImplementation(() => Promise.resolve());
+        const delete2 = vi.fn().mockImplementation(() => Promise.resolve());
         const subdir2 = { delete: delete2 } as any as MSC3089TreeSpace; // mock tested bits
 
         const joinMemberId = "@join:example.org";
@@ -422,8 +424,8 @@ describe("MSC3089TreeSpace", () => {
         };
 
         // These two functions are tested by input expectations, so no expectations in the function bodies
-        const kickFn = jest.fn().mockImplementation((userId) => Promise.resolve());
-        const leaveFn = jest.fn().mockImplementation(() => Promise.resolve());
+        const kickFn = vi.fn().mockImplementation((userId) => Promise.resolve());
+        const leaveFn = vi.fn().mockImplementation(() => Promise.resolve());
         client.kick = kickFn;
         client.leave = leaveFn;
         client.getUserId = () => selfUserId;
@@ -449,7 +451,7 @@ describe("MSC3089TreeSpace", () => {
         let parentRoom: Room;
         let childTrees: MSC3089TreeSpace[];
         let rooms: { [roomId: string]: Room };
-        let clientSendStateFn: jest.MockedFunction<typeof client.sendStateEvent>;
+        let clientSendStateFn: vi.MockedFunction<typeof client.sendStateEvent>;
         const staticDomain = "static.example.org";
 
         function addSubspace(roomId: string, createTs?: number, order?: string) {
@@ -540,7 +542,7 @@ describe("MSC3089TreeSpace", () => {
             (<any>tree).room = parentRoom; // override readonly
             client.getRoom = (r) => rooms[r ?? ""];
 
-            clientSendStateFn = jest
+            clientSendStateFn = vi
                 .fn()
                 .mockImplementation((roomId: string, eventType: EventType, content: any, stateKey: string) => {
                     expect(roomId).toEqual(tree.roomId);
@@ -902,7 +904,7 @@ describe("MSC3089TreeSpace", () => {
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
 
-        const uploadFn = jest.fn().mockImplementation((contents: Buffer, opts: any) => {
+        const uploadFn = vi.fn().mockImplementation((contents: Buffer, opts: any) => {
             expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
@@ -911,7 +913,7 @@ describe("MSC3089TreeSpace", () => {
         });
         client.uploadContent = uploadFn;
 
-        const sendMsgFn = jest.fn().mockImplementation((roomId: string, contents: any) => {
+        const sendMsgFn = vi.fn().mockImplementation((roomId: string, contents: any) => {
             expect(roomId).toEqual(tree.roomId);
             expect(contents).toMatchObject({
                 msgtype: MsgType.File,
@@ -926,7 +928,7 @@ describe("MSC3089TreeSpace", () => {
         });
         client.sendMessage = sendMsgFn;
 
-        const sendStateFn = jest
+        const sendStateFn = vi
             .fn()
             .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(tree.roomId);
@@ -962,7 +964,7 @@ describe("MSC3089TreeSpace", () => {
         const fileName = "My File.txt";
         const fileContents = "This is a test file";
 
-        const uploadFn = jest.fn().mockImplementation((contents: Buffer, opts: any) => {
+        const uploadFn = vi.fn().mockImplementation((contents: Buffer, opts: any) => {
             expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
@@ -971,7 +973,7 @@ describe("MSC3089TreeSpace", () => {
         });
         client.uploadContent = uploadFn;
 
-        const sendMsgFn = jest.fn().mockImplementation((roomId: string, contents: any) => {
+        const sendMsgFn = vi.fn().mockImplementation((roomId: string, contents: any) => {
             expect(roomId).toEqual(tree.roomId);
             const content = {
                 msgtype: MsgType.File,
@@ -989,7 +991,7 @@ describe("MSC3089TreeSpace", () => {
         });
         client.sendMessage = sendMsgFn;
 
-        const sendStateFn = jest
+        const sendStateFn = vi
             .fn()
             .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(tree.roomId);

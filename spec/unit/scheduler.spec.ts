@@ -1,6 +1,8 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { defer, IDeferred } from "../../src/utils";
 import { MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
@@ -8,7 +10,7 @@ import * as utils from "../test-utils/test-utils";
 import { MatrixEvent } from "../../src";
 import { KnownMembership } from "../../src/@types/membership";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
 describe("MatrixScheduler", function () {
     let scheduler: MatrixScheduler<Record<string, boolean>>;
@@ -59,12 +61,10 @@ describe("MatrixScheduler", function () {
         let yieldedA = false;
         scheduler.setProcessFunction(function (event) {
             if (yieldedA) {
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(event).toEqual(eventB);
                 return deferB.promise;
             } else {
                 yieldedA = true;
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(event).toEqual(eventA);
                 return deferA.promise;
             }
@@ -92,7 +92,6 @@ describe("MatrixScheduler", function () {
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
             if (procCount === 1) {
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventA);
                 return deferred.promise;
             } else if (procCount === 2) {
@@ -111,7 +110,7 @@ describe("MatrixScheduler", function () {
         deferred.reject({});
         await retryDefer.promise;
         expect(procCount).toEqual(1);
-        jest.advanceTimersByTime(waitTimeMs);
+        vi.advanceTimersByTime(waitTimeMs);
         await Promise.resolve();
         expect(procCount).toEqual(2);
     });
@@ -133,11 +132,9 @@ describe("MatrixScheduler", function () {
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
             if (procCount === 1) {
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventA);
                 return deferA.promise;
             } else if (procCount === 2) {
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(ev).toEqual(eventB);
                 return deferB.promise;
             }
@@ -200,7 +197,7 @@ describe("MatrixScheduler", function () {
         setTimeout(function () {
             deferA.resolve({});
         }, 1000);
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
         await allExpectedEventsSeenInOrderPromise;
     });
 
