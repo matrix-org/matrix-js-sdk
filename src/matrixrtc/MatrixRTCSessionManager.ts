@@ -48,7 +48,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     // is only ever one single room session object for any given room for the lifetime of the
     // client: that way there can never be any code holding onto a stale object that is no
     // longer the correct session object for the room.
-    private roomSessions = new Map<string, MatrixRTCSession>();
+    private roomSessions = new Map<string, MatrixRTCSession[]>();
 
     public constructor(private client: MatrixClient) {
         super();
@@ -58,9 +58,9 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
         // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
-            const session = MatrixRTCSession.roomSessionForRoom(this.client, room);
-            if (session.memberships.length > 0) {
-                this.roomSessions.set(room.roomId, session);
+            const sessions = this.getRoomSessions(room);
+            if (sessions.length > 0) {
+                this.roomSessions.set(room.roomId, sessions);
             }
         }
 
@@ -70,8 +70,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     public stop(): void {
-        for (const sess of this.roomSessions.values()) {
-            sess.stop();
+        for (const sessions of this.roomSessions.values()) {
+            sessions.forEach((s) => s.stop());
         }
         this.roomSessions.clear();
 
@@ -80,21 +80,21 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.client.off(RoomStateEvent.Events, this.onRoomState);
     }
 
-    /**
-     * Gets the main MatrixRTC session for a room, or undefined if there is
-     * no current session
-     */
-    public getActiveRoomSession(room: Room): MatrixRTCSession | undefined {
-        return this.roomSessions.get(room.roomId)!;
-    }
+    // /**
+    //  * Gets the main MatrixRTC session for a room, or undefined if there is
+    //  * no current session
+    //  */
+    // public getActiveRoomSession(room: Room): MatrixRTCSession | undefined {
+    //     return this.roomSessions.get(room.roomId)!;
+    // }
 
     /**
-     * Gets the main MatrixRTC session for a room, returning an empty session
-     * if no members are currently participating
+     * Gets all active MatrixRTC sessions for a room, returning an empty array
+     * if no members are currently participating in any session.
      */
-    public getRoomSession(room: Room): MatrixRTCSession {
+    public getRoomSessions(room: Room): MatrixRTCSession[] {
         if (!this.roomSessions.has(room.roomId)) {
-            this.roomSessions.set(room.roomId, MatrixRTCSession.roomSessionForRoom(this.client, room));
+            this.roomSessions.set(room.roomId, MatrixRTCSession.sessionsForRoom(this.client, room));
         }
 
         return this.roomSessions.get(room.roomId)!;
@@ -125,7 +125,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
             return Promise.resolve();
         }
 
-        this.getRoomSession(room).onCallEncryption(event);
+        this.getRoomSessions(room).forEach((s) => s.onCallEncryption(event));
     }
     private onTimeline = (event: MatrixEvent): void => {
         this.consumeCallEncryptionEvent(event);
@@ -148,19 +148,17 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private refreshRoom(room: Room): void {
-        const isNewSession = !this.roomSessions.has(room.roomId);
-        const sess = this.getRoomSession(room);
+        const previousSessions = this.roomSessions.get(room.roomId) ?? [];
+        const sessions = this.getRoomSessions(room);
+        sessions.forEach((s) => s.onRTCSessionMemberUpdate());
+        const newSessions = sessions.filter(
+            (s) => !previousSessions.some((oldS) => s.application === oldS.application && s.callId === oldS.callId),
+        );
+        const oldSessions = previousSessions.filter(
+            (s) => !sessions.some((oldS) => s.application === oldS.application && s.callId === oldS.callId),
+        );
 
-        const wasActiveAndKnown = sess.memberships.length > 0 && !isNewSession;
-
-        sess.onRTCSessionMemberUpdate();
-
-        const nowActive = sess.memberships.length > 0;
-
-        if (wasActiveAndKnown && !nowActive) {
-            this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
-        } else if (!wasActiveAndKnown && nowActive) {
-            this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
-        }
+        newSessions.forEach((s) => this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, s));
+        oldSessions.forEach((s) => this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, s));
     }
 }

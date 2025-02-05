@@ -206,7 +206,7 @@ export class LegacyMembershipManager implements IMembershipManager {
     private makeNewMembership(deviceId: string): SessionMembershipData | {} {
         // If we're joined, add our own
         if (this.isJoined()) {
-            return this.makeMyMembership(deviceId);
+            return this.makeMyMembership(deviceId, this.joinConfig?.membershipApplication);
         }
         return {};
     }
@@ -214,11 +214,11 @@ export class LegacyMembershipManager implements IMembershipManager {
     /**
      * Constructs our own membership
      */
-    private makeMyMembership(deviceId: string): SessionMembershipData {
+    private makeMyMembership(deviceId: string, application?: string): SessionMembershipData {
         return {
             call_id: "",
             scope: "m.room",
-            application: "m.call",
+            application: application ?? "m.call",
             device_id: deviceId,
             expires: this.relativeExpiry,
             focus_active: { type: "livekit", focus_selection: "oldest_membership" },

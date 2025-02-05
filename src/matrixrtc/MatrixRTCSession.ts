@@ -55,6 +55,7 @@ export type MatrixRTCSessionEventHandlerMap = {
 };
 
 export interface MembershipConfig {
+    membershipApplication?: string;
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
@@ -123,8 +124,14 @@ export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
     private membershipManager?: IMembershipManager;
     private encryptionManager: IEncryptionManager;
-    // The session Id of the call, this is the call_id of the call Member event.
+    /**The session Id of the call, this is the call_id of the call Member event.
+     * Together with the `application` this forms a unique identifier for an rtc session
+     */
     private _callId: string | undefined;
+    /**The application of the rtc session, this is the application of the call Member event.
+     * Together with the call_id this forms a unique identifier for an rtc session
+     */
+    private _application: string | undefined;
 
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
@@ -140,6 +147,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this.encryptionManager.statistics;
     }
 
+    public get application(): string | undefined {
+        return this._application;
+    }
     /**
      * The callId (sessionId) of the call.
      *
@@ -150,17 +160,23 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return this._callId;
     }
 
-    /**
-     * Returns all the call memberships for a room, oldest first
-     */
-    public static callMembershipsForRoom(room: Room): CallMembership[] {
+    public static rtcMembershipStateEventsForRoom(room: Room): MatrixEvent[] {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
             throw new Error("Could't get state for room " + room.roomId);
         }
-        const callMemberEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
+        return roomState.getStateEvents(EventType.GroupCallMemberPrefix);
+    }
 
+    /**
+     * Returns all the rtc memberships for a room
+     * @param application only provide members who participate in the session with this application
+     * @param callId only return members who participate in the session with this callId
+     * @returns memerbships sorted oldest first
+     */
+    public static rtcMembershipsForSession(room: Room, application: string, callId: string): CallMembership[] {
+        const callMemberEvents = MatrixRTCSession.rtcMembershipStateEventsForRoom(room);
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
             const content = memberEvent.getContent();
@@ -183,6 +199,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             for (const membershipData of membershipContents) {
                 try {
                     const membership = new CallMembership(memberEvent, membershipData);
+
+                    if (membership.application !== application) {
+                        continue;
+                    }
 
                     if (membership.callId !== "" || membership.scope !== "m.room") {
                         // for now, just ignore anything that isn't a room scope call
@@ -215,14 +235,48 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         return callMemberships;
     }
+    // /**
+    //  * Returns all the call memberships for a room, oldest first
+    //  */
+    // public static callMembershipsForRoom(room: Room): CallMembership[] {
+    //     return MatrixRTCSession.rtcMembershipsForSession(room, "m.call", "");
+    // }
+
+    // /**
+    //  * Return the MatrixRTC session for the room, whether there are currently active members or not
+    //  * @deprecated this got renamed to `roomCallSessionForRoom` instead.
+    //  */
+    // public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
+    //     return MatrixRTCSession.roomCallSessionForRoom(client, room);
+    // }
+
+    // public static roomCallSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
+    //     const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
+
+    //     return new MatrixRTCSession(client, room, callMemberships);
+    // }
 
     /**
-     * Return the MatrixRTC session for the room, whether there are currently active members or not
+     * Return the room call MatrixRTC sessions for the room, whether there currently are active members room call members.
      */
-    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
+    public static sessionsForRoom(client: MatrixClient, room: Room): MatrixRTCSession[] {
+        const memberships = MatrixRTCSession.rtcMembershipStateEventsForRoom(room);
 
-        return new MatrixRTCSession(client, room, callMemberships);
+        // array of [call_id, application][]
+        const sessionIdentifiers: [string, string][] = [];
+        for (const c of memberships.map((m) => m.getContent())) {
+            if ("focus_active" in c && "call_id" in c && "application" in c) {
+                if (!sessionIdentifiers.some((i) => i[0] === c.application && i[1] === c.call_id)) {
+                    sessionIdentifiers.push([c.application, c.call_id]);
+                }
+            }
+        }
+
+        return sessionIdentifiers.map(([application, callId]) => {
+            const callMemberships = MatrixRTCSession.rtcMembershipsForSession(room, application, callId);
+
+            return new MatrixRTCSession(client, room, callMemberships);
+        });
     }
 
     private constructor(
@@ -232,6 +286,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     ) {
         super();
         this._callId = memberships[0]?.callId;
+        this._application = memberships[0]?.application;
         const roomState = this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
@@ -446,7 +501,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     private recalculateSessionMembers = (): void => {
         const oldMemberships = this.memberships;
-        this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
+        if (this._application && this._callId) {
+            this.memberships = MatrixRTCSession.rtcMembershipsForSession(this.room, this._application, this._callId);
+        }
 
         this._callId = this._callId ?? this.memberships[0]?.callId;
 
