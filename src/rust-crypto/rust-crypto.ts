@@ -1513,6 +1513,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await this.secretStorage.store("m.cross_signing.self_signing", null);
         await this.secretStorage.store("m.cross_signing.user_signing", null);
         await this.secretStorage.store("m.megolm_backup.v1", null);
+
+        // Remove the recovery key
+        const defaultKeyId = await this.secretStorage.getDefaultKeyId();
+        if (defaultKeyId) await this.secretStorage.store(`m.secret_storage.key.${defaultKeyId}`, null);
         // Disable the recovery key and the secret storage
         await this.secretStorage.setDefaultKeyId(null);
 
