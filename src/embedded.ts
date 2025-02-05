@@ -57,7 +57,7 @@ import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessa
 import { type DeviceInfo } from "./crypto/deviceinfo.ts";
 import { type IOlmDevice } from "./crypto/algorithms/megolm.ts";
 import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
-import { EmptyObject, TypedEventEmitter } from "./matrix.ts";
+import { type EmptyObject, TypedEventEmitter } from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;

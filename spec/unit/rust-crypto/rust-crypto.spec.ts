@@ -33,7 +33,7 @@ import {
     type AccountDataEvents,
     type Device,
     DeviceVerification,
-    EmptyObject,
+    type EmptyObject,
     encodeBase64,
     type HttpApiEvent,
     type HttpApiEventHandlerMap,

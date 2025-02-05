@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 import {
-    ClientEvent,
-    ClientEventHandlerMap,
-    EmptyObject,
+    type ClientEvent,
+    type ClientEventHandlerMap,
+    type EmptyObject,
     EventType,
     type GroupCall,
     GroupCallIntent,

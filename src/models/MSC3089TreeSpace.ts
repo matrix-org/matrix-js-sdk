@@ -35,7 +35,7 @@ import { type FileType } from "../http-api/index.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type RoomPowerLevelsEventContent, type SpaceChildEventContent } from "../@types/state_events.ts";
 import type { EncryptedFile, FileContent } from "../@types/media.ts";
-import { EmptyObject } from "../@types/common.ts";
+import { type EmptyObject } from "../@types/common.ts";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this

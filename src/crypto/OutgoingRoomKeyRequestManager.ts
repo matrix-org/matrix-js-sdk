@@ -22,7 +22,7 @@ import { type IRoomKeyRequestBody, type IRoomKeyRequestRecipient } from "./index
 import { type CryptoStore, type OutgoingRoomKeyRequest } from "./store/base.ts";
 import { EventType, ToDeviceMessageId } from "../@types/event.ts";
 import { MapWithDefault } from "../utils.ts";
-import { EmptyObject } from "../@types/common.ts";
+import { type EmptyObject } from "../@types/common.ts";
 
 /**
  * Internal module. Management of outgoing room key requests.

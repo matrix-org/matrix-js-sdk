@@ -22,7 +22,7 @@ import {
     type RelatesToRelationship,
     type TSNamespace,
 } from "./extensible_events.ts";
-import { EmptyObject } from "./common.ts";
+import { type EmptyObject } from "./common.ts";
 
 /**
  * Identifier for a disclosed poll.
