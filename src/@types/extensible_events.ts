@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd, NamespacedValue, Optional, UnstableValue } from "matrix-events-sdk";
+import { type EitherAnd, NamespacedValue, type Optional, UnstableValue } from "matrix-events-sdk";
 
 import { isProvided } from "../extensible_events_v1/utilities.ts";
 

@@ -16,14 +16,14 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { encodeUri } from "../utils.ts";
-import { IHttpOpts, MatrixError, MatrixHttpApi, Method } from "../http-api/index.ts";
-import { IToDeviceEvent } from "../sync-accumulator.ts";
-import { ServerSideSecretStorage } from "../secret-storage.ts";
+import { type IHttpOpts, type MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
+import { type IToDeviceEvent } from "../sync-accumulator.ts";
+import { type ServerSideSecretStorage } from "../secret-storage.ts";
 import { decodeBase64 } from "../base64.ts";
-import { Logger } from "../logger.ts";
-import { CryptoEvent, CryptoEventHandlerMap, StartDehydrationOpts } from "../crypto-api/index.ts";
+import { type Logger } from "../logger.ts";
+import { CryptoEvent, type CryptoEventHandlerMap, type StartDehydrationOpts } from "../crypto-api/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 /**

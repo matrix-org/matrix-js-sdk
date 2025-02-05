@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ExtensibleEventType, IPartialEvent } from "../../../src/@types/extensible_events";
+import { type ExtensibleEventType, type IPartialEvent } from "../../../src/@types/extensible_events";
 import { ExtensibleEvent } from "../../../src/extensible_events_v1/ExtensibleEvent";
 
 class MockEvent extends ExtensibleEvent<any> {

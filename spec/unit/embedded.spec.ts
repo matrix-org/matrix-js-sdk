@@ -22,24 +22,24 @@ limitations under the License.
 // project, which doesn't know about our TypeEventEmitter implementation at all
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
-import { MockedObject } from "jest-mock";
+import { type MockedObject } from "jest-mock";
 import {
-    WidgetApi,
+    type WidgetApi,
     WidgetApiToWidgetAction,
     MatrixCapabilities,
-    ITurnServer,
-    IRoomEvent,
-    IOpenIDCredentials,
-    ISendEventFromWidgetResponseData,
+    type ITurnServer,
+    type IRoomEvent,
+    type IOpenIDCredentials,
+    type ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
 } from "matrix-widget-api";
 
 import { createRoomWidgetClient, MatrixError, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
-import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
+import { MatrixClient, ClientEvent, type ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
-import { ICapabilities, RoomWidgetClient } from "../../src/embedded";
+import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
-import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
+import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
 
 const testOIDCToken = {

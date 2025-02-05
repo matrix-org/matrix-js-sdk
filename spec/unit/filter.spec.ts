@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
-import { Filter, IFilterDefinition } from "../../src/filter";
+import { Filter, type IFilterDefinition } from "../../src/filter";
 import { mkEvent } from "../test-utils/test-utils";
 import { EventType } from "../../src";
 

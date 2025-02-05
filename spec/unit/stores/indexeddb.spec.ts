@@ -18,9 +18,9 @@ import "fake-indexeddb/auto";
 import "jest-localstorage-mock";
 import { IDBFactory } from "fake-indexeddb";
 
-import { IndexedDBStore, IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
+import { IndexedDBStore, type IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 import { defer } from "../../../src/utils";
 
 describe("IndexedDBStore", () => {

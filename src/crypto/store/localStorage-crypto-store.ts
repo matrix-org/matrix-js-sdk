@@ -17,19 +17,19 @@ limitations under the License.
 import { logger } from "../../logger.ts";
 import { MemoryCryptoStore } from "./memory-crypto-store.ts";
 import {
-    CryptoStore,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    SecretStorePrivateKeys,
+    type Mode,
+    type SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
     InboundGroupSessionData,
     IRoomEncryption,
 } from "./base.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.

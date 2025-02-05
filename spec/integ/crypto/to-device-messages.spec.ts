@@ -19,7 +19,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
-import { createClient, MatrixClient } from "../../../src";
+import { createClient, type MatrixClient } from "../../../src";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { SyncResponder } from "../../test-utils/SyncResponder";

@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
-import { IClearEvent, MatrixEvent } from "../models/event.ts";
-import { Room } from "../models/room.ts";
-import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api/index.ts";
-import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
-import { IMegolmSessionData } from "../@types/crypto.ts";
+import { type IClearEvent, type MatrixEvent } from "../models/event.ts";
+import { type Room } from "../models/room.ts";
+import { type CryptoApi, type DecryptionFailureCode, type ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { type KeyBackupInfo, type KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { type IMegolmSessionData } from "../@types/crypto.ts";
 
 /**
  * Common interface for the crypto implementations

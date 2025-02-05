@@ -14,8 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../../../src";
-import { CallMembership, SessionMembershipData, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
+import { type MatrixEvent } from "../../../src";
+import {
+    CallMembership,
+    type SessionMembershipData,
+    DEFAULT_EXPIRE_DURATION,
+} from "../../../src/matrixrtc/CallMembership";
 import { membershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0): MatrixEvent {

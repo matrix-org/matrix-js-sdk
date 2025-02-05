@@ -15,9 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import HttpBackend from "matrix-mock-request";
-
-import { Direction, MatrixClient, MatrixScheduler } from "../../src/matrix";
+import type HttpBackend from "matrix-mock-request";
+import { Direction, type MatrixClient, MatrixScheduler } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient relations", () => {

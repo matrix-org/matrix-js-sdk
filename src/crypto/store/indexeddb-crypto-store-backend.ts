@@ -14,24 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Logger, logger } from "../../logger.ts";
+import { type Logger, logger } from "../../logger.ts";
 import {
-    CryptoStore,
-    IDeviceData,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type IDeviceData,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    SecretStorePrivateKeys,
+    type Mode,
+    type SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
-    InboundGroupSessionData,
-    IRoomEncryption,
+    type InboundGroupSessionData,
+    type IRoomEncryption,
 } from "./base.ts";
 import { IndexedDBCryptoStore } from "./indexeddb-crypto-store.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 const PROFILE_TRANSACTIONS = false;
 

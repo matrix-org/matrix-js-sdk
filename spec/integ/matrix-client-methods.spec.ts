@@ -13,26 +13,28 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { type Mocked } from "jest-mock";
 import HttpBackend from "matrix-mock-request";
 
+import type HttpBackend from "matrix-mock-request";
 import * as utils from "../test-utils/test-utils";
-import { IStoredClientOpts, MatrixClient } from "../../src/client";
+import { type IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import {
     Filter,
     JoinRule,
-    KnockRoomOpts,
+    type KnockRoomOpts,
     MemoryStore,
     Method,
     Room,
-    RoomSummary,
+    type RoomSummary,
     SERVICE_TYPES,
 } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
-import { IFilterDefinition } from "../../src/filter";
-import { ISearchResults } from "../../src/@types/search";
-import { IStore } from "../../src/store";
+import { type IFilterDefinition } from "../../src/filter";
+import { type ISearchResults } from "../../src/@types/search";
+import { type IStore } from "../../src/store";
 import { SetPresence } from "../../src/sync";
 import { KnownMembership } from "../../src/@types/membership";
 

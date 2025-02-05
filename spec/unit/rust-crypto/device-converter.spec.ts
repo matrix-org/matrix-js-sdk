@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { DeviceKeys, DeviceVerification } from "../../../src";
+import { type DeviceKeys, DeviceVerification } from "../../../src";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 
 describe("device-converter", () => {

@@ -28,9 +28,9 @@ import {
     CallDirection,
 } from "../../../src/webrtc/call";
 import {
-    MCallAnswer,
-    MCallHangupReject,
-    SDPStreamMetadata,
+    type MCallAnswer,
+    type MCallHangupReject,
+    type SDPStreamMetadata,
     SDPStreamMetadataKey,
     SDPStreamMetadataPurpose,
 } from "../../../src/webrtc/callEventTypes";
@@ -46,7 +46,7 @@ import {
     MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
+import { EventType, type IContent, type ISendEventResponse, type MatrixEvent, type Room } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 
 const FAKE_ROOM_ID = "!foo:bar";

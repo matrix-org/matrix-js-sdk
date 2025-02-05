@@ -17,15 +17,15 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 
 import {
     createClient,
     encodeBase64,
-    ICreateClientOpts,
-    IEvent,
-    IMegolmSessionData,
-    MatrixClient,
+    type ICreateClientOpts,
+    type IEvent,
+    type IMegolmSessionData,
+    type MatrixClient,
     TypedEventEmitter,
 } from "../../../src";
 import { SyncResponder } from "../../test-utils/SyncResponder";
@@ -34,11 +34,11 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { advanceTimersUntil, awaitDecryption, syncPromise } from "../../test-utils/test-utils";
 import * as testData from "../../test-utils/test-data";
-import { KeyBackupInfo, KeyBackupSession } from "../../../src/crypto-api/keybackup";
+import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { defer, IDeferred } from "../../../src/utils";
+import { defer, type IDeferred } from "../../../src/utils";
 import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent, CryptoApi } from "../../../src/crypto-api";
-import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
+import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
 

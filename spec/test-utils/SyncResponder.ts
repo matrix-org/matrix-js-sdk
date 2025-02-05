@@ -15,9 +15,10 @@ limitations under the License.
 */
 
 import debugFunc from "debug";
-import { Debugger } from "debug";
+import { type Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
-import FetchMock from "fetch-mock";
+
+import type FetchMock from "fetch-mock";
 
 /** Interface implemented by classes that intercept `/sync` requests from test clients
  *

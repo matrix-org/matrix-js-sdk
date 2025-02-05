@@ -19,9 +19,9 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import FetchMock from "fetch-mock";
-import Olm from "@matrix-org/olm";
 
+import type FetchMock from "fetch-mock";
+import type Olm from "@matrix-org/olm";
 import * as testUtils from "../../test-utils/test-utils";
 import {
     emitPromise,
@@ -47,18 +47,18 @@ import {
     ClientEvent,
     createClient,
     HistoryVisibility,
-    IClaimOTKsResult,
-    IContent,
-    IDownloadKeyResult,
-    IEvent,
-    IStartClientOpts,
-    MatrixClient,
+    type IClaimOTKsResult,
+    type IContent,
+    type IDownloadKeyResult,
+    type IEvent,
+    type IStartClientOpts,
+    type MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
 } from "../../../src/matrix";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
-import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
+import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { defer, escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
@@ -67,15 +67,15 @@ import {
     mockSetupCrossSigningRequests,
     mockSetupMegolmBackupRequests,
 } from "../../test-utils/mockEndpoints";
-import { SecretStorageKeyDescription } from "../../../src/secret-storage";
+import { type SecretStorageKeyDescription } from "../../../src/secret-storage";
 import {
     CrossSigningKey,
-    CryptoCallbacks,
+    type CryptoCallbacks,
     DecryptionFailureCode,
-    DeviceIsolationMode,
+    type DeviceIsolationMode,
     EventShieldColour,
     EventShieldReason,
-    KeyBackupInfo,
+    type KeyBackupInfo,
     AllDevicesIsolationMode,
     OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
@@ -92,7 +92,7 @@ import {
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
-import { KeyBackup } from "../../../src/rust-crypto/backup.ts";
+import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 import { CryptoEvent } from "../../../src/crypto-api";
 
 afterEach(() => {

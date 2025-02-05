@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 import {
-    Curve25519PublicKey,
+    type Curve25519PublicKey,
     Ecies,
-    EstablishedEcies,
+    type EstablishedEcies,
     QrCodeData,
     QrCodeMode,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
@@ -25,11 +25,11 @@ import {
 import {
     ClientRendezvousFailureReason,
     MSC4108FailureReason,
-    MSC4108Payload,
+    type MSC4108Payload,
     RendezvousError,
-    RendezvousFailureListener,
+    type RendezvousFailureListener,
 } from "../index.ts";
-import { MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession.ts";
+import { type MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession.ts";
 import { logger } from "../../logger.ts";
 
 /**

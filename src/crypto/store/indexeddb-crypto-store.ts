@@ -14,26 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, Logger } from "../../logger.ts";
+import { logger, type Logger } from "../../logger.ts";
 import { LocalStorageCryptoStore } from "./localStorage-crypto-store.ts";
 import { MemoryCryptoStore } from "./memory-crypto-store.ts";
 import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend.ts";
 import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors.ts";
 import * as IndexedDBHelpers from "../../indexeddb-helpers.ts";
 import {
-    CryptoStore,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    SecretStorePrivateKeys,
+    type Mode,
+    type SecretStorePrivateKeys,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
-    InboundGroupSessionData,
-    IRoomEncryption,
+    type InboundGroupSessionData,
+    type IRoomEncryption,
 } from "./base.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /*
  * Internal module. indexeddb storage for e2e.

@@ -14,20 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import HttpBackend from "matrix-mock-request";
-
+import type HttpBackend from "matrix-mock-request";
 import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
 import {
     MatrixError,
     ClientEvent,
-    IEvent,
-    MatrixClient,
+    type IEvent,
+    type MatrixClient,
     RoomEvent,
-    ISyncResponse,
-    IMinimalEvent,
-    IRoomEvent,
-    Room,
+    type ISyncResponse,
+    type IMinimalEvent,
+    type IRoomEvent,
+    type Room,
 } from "../../src";
 import { TestClient } from "../TestClient";
 import { KnownMembership } from "../../src/@types/membership";

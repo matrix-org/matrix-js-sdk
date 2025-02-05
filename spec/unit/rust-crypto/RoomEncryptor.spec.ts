@@ -18,21 +18,25 @@
 
 import {
     CollectStrategy,
-    Curve25519PublicKey,
-    Ed25519PublicKey,
+    type Curve25519PublicKey,
+    type Ed25519PublicKey,
     HistoryVisibility as RustHistoryVisibility,
-    IdentityKeys,
-    OlmMachine,
+    type IdentityKeys,
+    type OlmMachine,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 
-import { HistoryVisibility, MatrixEvent, Room, RoomMember } from "../../../src";
+import { HistoryVisibility, type MatrixEvent, type Room, type RoomMember } from "../../../src";
 import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
-import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
+import { type KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { defer } from "../../../src/utils";
-import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
+import { type OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { KnownMembership } from "../../../src/@types/membership";
-import { DeviceIsolationMode, AllDevicesIsolationMode, OnlySignedDevicesIsolationMode } from "../../../src/crypto-api";
+import {
+    type DeviceIsolationMode,
+    AllDevicesIsolationMode,
+    OnlySignedDevicesIsolationMode,
+} from "../../../src/crypto-api";
 
 describe("RoomEncryptor", () => {
     describe("History Visibility", () => {

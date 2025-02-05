@@ -14,11 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked, mocked } from "jest-mock";
+import { type Mocked, mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
 import { logger } from "../../src/logger";
-import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
+import {
+    ClientEvent,
+    type IMatrixClientCreateOpts,
+    type ITurnServerResponse,
+    MatrixClient,
+    type Store,
+} from "../../src/client";
 import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
@@ -45,12 +51,12 @@ import {
     EventTimeline,
     EventTimelineSet,
     getHttpUriForMxc,
-    ICreateRoomOpts,
-    IPushRule,
-    IRequestOpts,
+    type ICreateRoomOpts,
+    type IPushRule,
+    type IRequestOpts,
     MatrixError,
-    MatrixHttpApi,
-    MatrixScheduler,
+    type MatrixHttpApi,
+    type MatrixScheduler,
     Method,
     PushRuleActionName,
     Room,
@@ -66,15 +72,15 @@ import {
     PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
-import { defer, QueryDict } from "../../src/utils";
-import { SyncState } from "../../src/sync";
+import { defer, type QueryDict } from "../../src/utils";
+import { type SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
-import { ServerSideSecretStorageImpl } from "../../src/secret-storage";
+import { type ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
-import { RoomMessageEventContent } from "../../src/@types/events";
+import { type RoomMessageEventContent } from "../../src/@types/events";
 import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 jest.useFakeTimers();
 

@@ -15,9 +15,16 @@ limitations under the License.
 */
 
 import { FetchHttpApi } from "./fetch.ts";
-import { FileType, IContentUri, IHttpOpts, Upload, UploadOpts, UploadResponse } from "./interface.ts";
+import {
+    type FileType,
+    type IContentUri,
+    type IHttpOpts,
+    type Upload,
+    type UploadOpts,
+    type UploadResponse,
+} from "./interface.ts";
 import { MediaPrefix } from "./prefix.ts";
-import { defer, QueryDict, removeElement } from "../utils.ts";
+import { defer, type QueryDict, removeElement } from "../utils.ts";
 import * as callbacks from "../realtime-callbacks.ts";
 import { Method } from "./method.ts";
 import { ConnectionError } from "./errors.ts";

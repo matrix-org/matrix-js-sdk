@@ -17,30 +17,30 @@ limitations under the License.
 import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
-import FetchMock from "fetch-mock";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 import Olm from "@matrix-org/olm";
 
+import type FetchMock from "fetch-mock";
 import {
     createClient,
     DeviceVerification,
-    IContent,
-    ICreateClientOpts,
-    IEvent,
-    MatrixClient,
+    type IContent,
+    type ICreateClientOpts,
+    type IEvent,
+    type MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
 } from "../../../src";
 import {
     canAcceptVerificationRequest,
-    ShowQrCodeCallbacks,
-    ShowSasCallbacks,
+    type ShowQrCodeCallbacks,
+    type ShowSasCallbacks,
     VerificationPhase,
-    VerificationRequest,
+    type VerificationRequest,
     VerificationRequestEvent,
-    Verifier,
+    type Verifier,
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
 import { defer, escapeRegExp } from "../../../src/utils";
@@ -71,9 +71,9 @@ import {
     encryptMegolmEvent,
     encryptSecretSend,
     getTestOlmAccountKeys,
-    ToDeviceEvent,
+    type ToDeviceEvent,
 } from "./olm-utils";
-import { KeyBackupInfo, CryptoEvent } from "../../../src/crypto-api";
+import { type KeyBackupInfo, CryptoEvent } from "../../../src/crypto-api";
 import { encodeBase64 } from "../../../src/base64";
 
 // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations

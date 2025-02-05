@@ -23,15 +23,15 @@ import {
     EventTimelineSet,
     EventType,
     Filter,
-    IEvent,
-    MatrixClient,
+    type IEvent,
+    type MatrixClient,
     MatrixEvent,
     PendingEventOrdering,
     RelationType,
     Room,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
-import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
+import { encodeParams, encodeUri, type QueryDict, replaceParam } from "../../src/utils";
 import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";

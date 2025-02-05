@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { LocalNotificationSettings } from "../../src/@types/local_notifications";
-import { LOCAL_NOTIFICATION_SETTINGS_PREFIX, MatrixClient } from "../../src/matrix";
+import { type LocalNotificationSettings } from "../../src/@types/local_notifications";
+import { LOCAL_NOTIFICATION_SETTINGS_PREFIX, type MatrixClient } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 
 let client: MatrixClient;

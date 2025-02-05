@@ -16,19 +16,19 @@ limitations under the License.
 
 import { safeSet } from "../../utils.ts";
 import {
-    CryptoStore,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    SecretStorePrivateKeys,
+    type Mode,
+    type SecretStorePrivateKeys,
     SESSION_BATCH_SIZE,
-    InboundGroupSessionData,
-    IRoomEncryption,
+    type InboundGroupSessionData,
+    type IRoomEncryption,
 } from "./base.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 function encodeSessionKey(senderCurve25519Key: string, sessionId: string): string {
     return encodeURIComponent(senderCurve25519Key) + "/" + encodeURIComponent(sessionId);

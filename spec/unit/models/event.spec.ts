@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { type MockedObject } from "jest-mock";
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import {
-    IAnnotatedPushRule,
-    MatrixClient,
+    type IAnnotatedPushRule,
+    type MatrixClient,
     PushRuleActionName,
     Room,
     THREAD_RELATION_TYPE,

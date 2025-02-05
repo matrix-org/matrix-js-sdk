@@ -16,7 +16,7 @@ limitations under the License.
 
 import { CallStatsReportGatherer } from "../../../../src/webrtc/stats/callStatsReportGatherer";
 import { StatsReportEmitter } from "../../../../src/webrtc/stats/statsReportEmitter";
-import { MediaSsrcHandler } from "../../../../src/webrtc/stats/media/mediaSsrcHandler";
+import { type MediaSsrcHandler } from "../../../../src/webrtc/stats/media/mediaSsrcHandler";
 import { currentChromeReport, prevChromeReport } from "../../../test-utils/webrtcReports";
 import { MockRTCPeerConnection } from "../../../test-utils/webrtc";
 

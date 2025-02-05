@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import { UnstableValue } from "../NamespacedValue.ts";
-import { IMessageRendering } from "./extensible_events.ts";
+import { type IMessageRendering } from "./extensible_events.ts";
 
 /**
  * Extensible topic event type based on MSC3765
