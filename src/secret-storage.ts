@@ -280,14 +280,18 @@ export interface ServerSideSecretStorage {
      * Store an encrypted secret on the server.
      *
      * Details of the encryption keys to be used must previously have been stored in account data
-     * (for example, via {@link ServerSideSecretStorage#addKey}.
+     * (for example, via {@link ServerSideSecretStorageImpl#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
+     * key to decrypt the secret.
+     *
+     * If the secret is `null`, the secret value in the account data will be set to an empty object.
+     * This is considered as "removing" the secret.
      *
      * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
      * @param secret - The secret contents.
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key
      *     (will throw if no default key is set).
      */
-    store(name: string, secret: string, keys?: string[] | null): Promise<void>;
+    store(name: string, secret: string | null, keys?: string[] | null): Promise<void>;
 
     /**
      * Get a secret from storage, and decrypt it.
@@ -504,17 +508,15 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
     }
 
     /**
-     * Store an encrypted secret on the server.
-     *
-     * Details of the encryption keys to be used must previously have been stored in account data
-     * (for example, via {@link ServerSideSecretStorageImpl#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
-     * key to decrypt the secret.
-     *
-     * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
-     * @param secret - The secret contents.
-     * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
+     * Implementation of {@link ServerSideSecretStorage#store}.
      */
-    public async store(name: SecretStorageKey, secret: string, keys?: string[] | null): Promise<void> {
+    public async store(name: SecretStorageKey, secret: string | null, keys?: string[] | null): Promise<void> {
+        if (secret === null) {
+            // remove secret
+            await this.accountDataAdapter.setAccountData(name, {});
+            return;
+        }
+
         const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {
