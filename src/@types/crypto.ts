@@ -16,11 +16,6 @@ limitations under the License.
 
 import type { ISignatures } from "./signed.ts";
 
-export type OlmGroupSessionExtraData = {
-    untrusted?: boolean;
-    sharedHistory?: boolean;
-};
-
 // Backwards compatible re-export
 export type { EventDecryptionResult as IEventDecryptionResult } from "../common-crypto/CryptoBackend.ts";
 
