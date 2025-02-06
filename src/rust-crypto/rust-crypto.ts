@@ -648,7 +648,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         userId: string,
         deviceId: string,
     ): Promise<DeviceVerificationStatus | null> {
-        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+        const device = await this.olmMachine.getDevice(
             new RustSdkCryptoJs.UserId(userId),
             new RustSdkCryptoJs.DeviceId(deviceId),
         );
@@ -854,8 +854,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         ) {
             this.logger.info("bootstrapSecretStorage: cross-signing keys not yet exported; doing so now.");
 
-            const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
-                await this.olmMachine.exportCrossSigningKeys();
+            // We checked that the secrets are cached, so we can safely unwrap
+            const crossSigningPrivateKeys = (await this.olmMachine.exportCrossSigningKeys())!;
 
             if (!crossSigningPrivateKeys.masterKey) {
                 throw new Error("missing master key in cross signing private keys");
@@ -1096,7 +1096,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 verificationMethodIdentifierToMethod(method),
             );
             // Get the request content to send to the DM room
-            const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+            const verificationEventContent: string = userIdentity.verificationRequestContent(methods);
 
             // Send the request content to send to the DM room
             const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
@@ -1878,7 +1878,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param name - The name of the secret received.
      */
     public async checkSecrets(name: string): Promise<void> {
-        const pendingValues: string[] = await this.olmMachine.getSecretsFromInbox(name);
+        const pendingValues = await this.olmMachine.getSecretsFromInbox(name);
         for (const value of pendingValues) {
             if (await this.handleSecretReceived(name, value)) {
                 // If we have a valid secret for that name there is no point of processing the other secrets values.

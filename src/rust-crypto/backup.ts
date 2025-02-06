@@ -386,7 +386,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
             while (!this.stopped) {
                 // Get a batch of room keys to upload
-                let request: RustSdkCryptoJs.KeysBackupRequest | null = null;
+                let request: RustSdkCryptoJs.KeysBackupRequest | undefined = undefined;
                 try {
                     request = await logDuration(
                         logger,

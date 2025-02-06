@@ -126,6 +126,7 @@ describe("RoomEncryptor", () => {
             mockOlmMachine.shareRoomKey.mockImplementationOnce(async () => {
                 insideOlmShareRoom.resolve();
                 await deferredShare.promise;
+                return [];
             });
 
             roomEncryptor.prepareForEncryption(false, defaultDevicesIsolationMode);
@@ -151,7 +152,7 @@ describe("RoomEncryptor", () => {
             const firstTargetMembers = defer<void>();
             const secondTargetMembers = defer<void>();
 
-            mockOlmMachine.shareRoomKey.mockResolvedValue(undefined);
+            mockOlmMachine.shareRoomKey.mockResolvedValue([]);
 
             // Hook into this method to demonstrate the race condition
             mockRoom.getEncryptionTargetMembers
@@ -265,6 +266,7 @@ describe("RoomEncryptor", () => {
                 capturedSettings = undefined;
                 mockOlmMachine.shareRoomKey.mockImplementationOnce(async (roomId, users, encryptionSettings) => {
                     capturedSettings = encryptionSettings.sharingStrategy;
+                    return [];
                 });
             });
 
