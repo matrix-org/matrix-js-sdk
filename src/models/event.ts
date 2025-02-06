@@ -406,9 +406,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public forwardLooking = true;
 
-    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
+    /**
+     *  If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
      * `Crypto` will set this the `VerificationRequest` for the event
      * so it can be easily accessed from the timeline.
+     *
+     * @deprecated Not used by the rust crypto implementation.
      */
     public verificationRequest?: VerificationRequest;
 
@@ -896,6 +899,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param userId - the user who received this event
      *
      * @returns a promise that resolves when the request is queued
+     *
+     * @deprecated Not used by the rust crypto implementation.
      */
     public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
         const wireContent = this.getWireContent();
@@ -1720,6 +1725,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         };
     }
 
+    /**
+     * @deprecated Not used by the rust crypto implementation.
+     */
     public setVerificationRequest(request: VerificationRequest): void {
         this.verificationRequest = request;
     }
