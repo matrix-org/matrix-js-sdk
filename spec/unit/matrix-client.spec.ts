@@ -47,6 +47,7 @@ import {
     ClientPrefix,
     ConditionKind,
     ContentHelpers,
+    createClient,
     Direction,
     EventTimeline,
     EventTimelineSet,
@@ -125,6 +126,18 @@ type WrappedRoom = Room & {
     _state: Map<string, any>;
 };
 
+/** A list of methods to run after the current test */
+const afterTestHooks: (() => Promise<void> | void)[] = [];
+
+afterEach(async () => {
+    fetchMock.reset();
+    jest.restoreAllMocks();
+    for (const hook of afterTestHooks) {
+        await hook();
+    }
+    afterTestHooks.length = 0;
+});
+
 describe("convertQueryDictToMap", () => {
     it("returns an empty map when dict is undefined", () => {
         expect(convertQueryDictToMap(undefined)).toEqual(new Map());
@@ -165,6 +178,11 @@ describe("MatrixClient", function () {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
     const identityServerDomain = "identity.server";
+
+    /**
+     * @deprecated this is hard to use correctly; better to create a regular client with {@link createClient}
+     * and use fetch-mock.
+     */
     let client: MatrixClient;
     let store: Store;
     let scheduler: MatrixScheduler;
@@ -2259,7 +2277,7 @@ describe("MatrixClient", function () {
     });
 
     describe("checkTurnServers", () => {
-        beforeAll(() => {
+        beforeEach(() => {
             mocked(supportsMatrixCall).mockReturnValue(true);
         });
 
@@ -2660,9 +2678,36 @@ describe("MatrixClient", function () {
     });
 
     describe("delete account data", () => {
-        afterEach(() => {
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
-        });
+        const TEST_HOMESERVER_URL = "https://alice-server.com";
+
+        /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
+        async function setUpClient(versionsResponse: object = { versions: ["1"] }): Promise<MatrixClient> {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
+
+            fetchMock.getOnce(new URL("/_matrix/client/versions", TEST_HOMESERVER_URL).toString(), versionsResponse, {
+                overwriteRoutes: true,
+            });
+            fetchMock.getOnce(
+                new URL("/_matrix/client/v3/pushrules/", TEST_HOMESERVER_URL).toString(),
+                {},
+                { overwriteRoutes: true },
+            );
+            fetchMock.postOnce(
+                new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, TEST_HOMESERVER_URL).toString(),
+                { filter_id: "fid" },
+                { overwriteRoutes: true },
+            );
+
+            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
+            await client.startClient();
+
+            // Remember to stop the client again, to stop it spamming logs and HTTP requests
+            afterTestHooks.push(() => client.stopClient());
+            return client;
+        }
+
         it("makes correct request when deletion is supported by server in unstable versions", async () => {
             const eventType = "im.vector.test";
             const versionsResponse = {
@@ -2671,17 +2716,17 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": true,
                 },
             };
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
-            const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
-            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+            const client = await setUpClient(versionsResponse);
 
-            // populate version support
-            await client.getVersions();
+            const url = new URL(
+                `/_matrix/client/unstable/org.matrix.msc3391/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.delete({ url, name: "delete-data" }, {});
+
             await client.deleteAccountData(eventType);
 
-            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, {
-                prefix: unstablePrefix,
-            });
+            expect(fetchMock.calls("delete-data").length).toEqual(1);
         });
 
         it("makes correct request when deletion is supported by server based on matrix version", async () => {
@@ -2690,34 +2735,38 @@ describe("MatrixClient", function () {
             // so mock the support map to fake stable support
             const stableSupportedDeletionMap = new Map();
             stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(new Map());
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
-            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(stableSupportedDeletionMap);
 
-            // populate version support
-            await client.getVersions();
+            const client = await setUpClient();
+
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.delete({ url, name: "delete-data" }, {});
+
             await client.deleteAccountData(eventType);
 
-            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, undefined);
+            expect(fetchMock.calls("delete-data").length).toEqual(1);
         });
 
         it("makes correct request when deletion is not supported by server", async () => {
             const eventType = "im.vector.test";
-            const versionsResponse = {
-                versions: ["1"],
-                unstable_features: {
-                    "org.matrix.msc3391": false,
-                },
-            };
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
-            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
-            // populate version support
-            await client.getVersions();
+            const client = await setUpClient();
+
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.put({ url, name: "put-account-data" }, {});
+
             await client.deleteAccountData(eventType);
 
             // account data updated with empty content
-            expect(requestSpy).toHaveBeenCalledWith(Method.Put, path, undefined, {});
+            const lastCall = fetchMock.lastCall("put-account-data");
+            expect(lastCall).toBeDefined();
+            expect(lastCall?.[1]?.body).toEqual("{}");
         });
     });
 
