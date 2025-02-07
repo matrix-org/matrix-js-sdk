@@ -1318,7 +1318,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("verification (%s)", (backend: st
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            const infoCopy = Object.assign({}, matchingBackupInfo);
+            const infoCopy = Object.assign({}, nonMatchingBackupInfo);
             delete infoCopy.auth_data.signatures;
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, infoCopy);
