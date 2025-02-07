@@ -137,6 +137,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Re-check the key backup and enable/disable it as appropriate.
      *
      * @param force - whether we should force a re-check even if one has already happened.
+     * @returns a promise resolves to `null` if backup is invalid or not trusted, resolve to `KeyBackupCheck` otherwise.
      */
     public checkKeyBackupAndEnable(force: boolean): Promise<KeyBackupCheck | null> {
         if (!force && this.checkedForBackup) {
@@ -164,9 +165,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // We force a check to ensure to have the latest version. We also want to check that the backup is trusted
         // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later from an untrusted backup.
         const backupCheck = await this.checkKeyBackupAndEnable(true);
+        const version = backupCheck?.backupInfo.version;
 
-        if (!backupCheck?.backupInfo?.version || !backupCheck.trustInfo.trusted) {
-            // There is no server-side key backup, or the backup is not signed by a trusted cross-signing key or trusted own device.
+        if (!backupCheck || !version) {
+            // There is no server-side key backup, or the backup is not trusted.
             // This decryption key is useless to us.
             logger.warn(
                 "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
@@ -187,7 +189,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
-            await this.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
+            await this.saveBackupDecryptionKey(backupDecryptionKey, version);
             return true;
         } catch (e) {
             logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
