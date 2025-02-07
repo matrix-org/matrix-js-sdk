@@ -52,7 +52,7 @@ import {
     type GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler.ts";
 import * as utils from "./utils.ts";
-import { noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
+import { deepCompare, defer, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
@@ -2149,14 +2149,72 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set account data event for the current user.
-     * It will retry the request up to 5 times.
+     * Set account data event for the current user, and wait for the result to be echoed over `/sync`.
+     *
+     * Waiting for the remote echo ensures that a subsequent call to {@link getAccountData} will return the updated
+     * value.
+     *
+     * If called before the client is started with {@link startClient}, logs a warning and falls back to
+     * {@link setAccountDataRaw}.
+     *
+     * Retries the request up to 5 times in the case of an {@link ConnectionError}.
+     *
      * @param eventType - The event type
      * @param content - the contents object for the event
-     * @returns Promise which resolves: an empty object
-     * @returns Rejects: with an error response.
      */
-    public setAccountData<K extends keyof AccountDataEvents>(
+    public async setAccountData<K extends keyof AccountDataEvents>(
+        eventType: K,
+        content: AccountDataEvents[K] | Record<string, never>,
+    ): Promise<EmptyObject> {
+        // If the sync loop is not running, fall back to setAccountDataRaw.
+        if (!this.clientRunning) {
+            logger.warn(
+                "Calling `setAccountData` before the client is started: `getAccountData` may return inconsistent results.",
+            );
+            return await retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
+        }
+
+        // If the account data is already correct, then we cannot expect an update over sync, and the operation
+        // is, in any case, a no-op.
+        //
+        // NB that we rely on this operation being synchronous to avoid a race condition: there must be no `await`
+        // between here and `this.addListener` below, in case we miss an update.
+        const existingData = this.store.getAccountData(eventType);
+        if (existingData && deepCompare(existingData.event.content, content)) return {};
+
+        // Create a promise which will resolve when the update is received
+        const updatedDefer = defer<void>();
+        function accountDataListener(event: MatrixEvent): void {
+            // Note that we cannot safely check that the content matches what we expected, because there is a race:
+            //   * We set the new content
+            //   * Another client sets alternative content
+            //   * Then /sync returns, but only reflects the latest content.
+            //
+            // Of course there is room for debate over what we should actually do in that case -- a subsequent
+            // `getAccountData` isn't going to return the expected value, but whose fault is that? Databases are hard.
+            //
+            // Anyway, what we *shouldn't* do is get stuck in a loop. I think the best we can do is check that the event
+            // type matches.
+            if (event.getType() === eventType) updatedDefer.resolve();
+        }
+        this.addListener(ClientEvent.AccountData, accountDataListener);
+
+        try {
+            const setAccountDataPromise = retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
+            const res = await Promise.all([setAccountDataPromise, updatedDefer.promise]);
+            return res[0];
+        } finally {
+            this.removeListener(ClientEvent.AccountData, accountDataListener);
+        }
+    }
+
+    /**
+     * Set account data event for the current user, without waiting for the remote echo.
+     *
+     * @param eventType - The event type
+     * @param content - the contents object for the event
+     */
+    public setAccountDataRaw<K extends keyof AccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
     ): Promise<EmptyObject> {
@@ -2164,9 +2222,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $userId: this.credentials.userId!,
             $type: eventType,
         });
-        return retryNetworkOperation(5, () => {
-            return this.http.authedRequest(Method.Put, path, undefined, content);
-        });
+
+        return this.http.authedRequest(Method.Put, path, undefined, content);
     }
 
     /**

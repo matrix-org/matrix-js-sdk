@@ -82,6 +82,8 @@ import { KnownMembership } from "../../src/@types/membership";
 import { type RoomMessageEventContent } from "../../src/@types/events";
 import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { SyncResponder } from "../test-utils/SyncResponder.ts";
+import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
 
 jest.useFakeTimers();
 
@@ -2677,6 +2679,133 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("setAccountData", () => {
+        const TEST_HOMESERVER_URL = "https://alice-server.com";
+
+        /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
+        async function setUpClient(): Promise<MatrixClient> {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
+
+            mockInitialApiRequests(TEST_HOMESERVER_URL, userId);
+
+            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
+            await client.startClient();
+
+            // Remember to stop the client again, to stop it spamming logs and HTTP requests
+            afterTestHooks.push(() => client.stopClient());
+            return client;
+        }
+
+        it("falls back to raw request if called before the client is started", async () => {
+            // GIVEN a bunch of setup
+            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
+
+            const eventType = "im.vector.test";
+            const content = { a: 1 };
+            const testresponse = { test: 1 };
+
+            // ... including an expected REST request
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+
+            // suppress the expected warning on the console
+            jest.spyOn(console, "warn").mockImplementation();
+
+            // WHEN we call `setAccountData` ...
+            const result = await client.setAccountData(eventType, content);
+
+            // THEN, method should have returned the right thing
+            expect(result).toEqual(testresponse);
+
+            // and the REST call should have happened, and had the correct content
+            const lastCall = fetchMock.lastCall("put-account-data");
+            expect(lastCall).toBeDefined();
+            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+
+            // and a warning should have been logged
+            // eslint-disable-next-line no-console
+            expect(console.warn).toHaveBeenCalledWith(
+                expect.stringContaining("Calling `setAccountData` before the client is started"),
+            );
+        });
+
+        it("makes a request to the server, and waits for the /sync response", async () => {
+            // GIVEN a bunch of setup
+            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+            const client = await setUpClient();
+
+            const eventType = "im.vector.test";
+            const content = { a: 1 };
+            const testresponse = { test: 1 };
+
+            // ... including an expected REST request
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+
+            // WHEN we call `setAccountData` ...
+            const setProm = client.setAccountData(eventType, content);
+
+            // THEN, the REST call should have happened, and had the correct content
+            const lastCall = fetchMock.lastCall("put-account-data");
+            expect(lastCall).toBeDefined();
+            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+
+            // Even after waiting a bit, the method should not yet have returned
+            await jest.advanceTimersByTimeAsync(10);
+            let finished = false;
+            setProm.finally(() => (finished = true));
+            expect(finished).toBeFalsy();
+
+            // ... and `getAccountData` still returns the wrong thing
+            expect(client.getAccountData(eventType)).not.toBeDefined();
+
+            // WHEN the update arrives over /sync
+            const content2 = { a: 2 };
+
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: eventType, content: content2 }] },
+            });
+
+            // THEN the method should complete, and `getAccountData` returns the new data
+            expect(await setProm).toEqual(testresponse);
+            expect(client.getAccountData(eventType)?.event).toEqual({ type: eventType, content: content2 });
+        });
+
+        it("does nothing if the data matches what is there", async () => {
+            // GIVEN a running matrix client ...
+            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+            const client = await setUpClient();
+
+            // ... which has previously received the account data over /sync
+            const eventType = "im.vector.test";
+            const content = { a: 1, b: 2 };
+
+            // Keys in a different order, to check that doesn't matter.
+            const syncedContent = { b: 2, a: 1 };
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: eventType, content: syncedContent }] },
+            });
+            await jest.advanceTimersByTimeAsync(1);
+
+            // Check that getAccountData is ready
+            expect(client.getAccountData(eventType)?.event).toEqual({ type: eventType, content: syncedContent });
+
+            // WHEN we call `setAccountData` ...
+            await client.setAccountData(eventType, content);
+
+            // THEN there should be no REST call
+            expect(fetchMock.calls(/account_data/).length).toEqual(0);
+        });
+    });
+
     describe("delete account data", () => {
         const TEST_HOMESERVER_URL = "https://alice-server.com";
 
@@ -2753,6 +2882,7 @@ describe("MatrixClient", function () {
         it("makes correct request when deletion is not supported by server", async () => {
             const eventType = "im.vector.test";
 
+            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
             const client = await setUpClient();
 
             const url = new URL(
@@ -2761,7 +2891,11 @@ describe("MatrixClient", function () {
             ).toString();
             fetchMock.put({ url, name: "put-account-data" }, {});
 
-            await client.deleteAccountData(eventType);
+            const setProm = client.deleteAccountData(eventType);
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: eventType, content: {} }] },
+            });
+            await setProm;
 
             // account data updated with empty content
             const lastCall = fetchMock.lastCall("put-account-data");
