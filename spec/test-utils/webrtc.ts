@@ -15,32 +15,33 @@ limitations under the License.
 */
 
 import {
-    ClientEvent,
-    ClientEventHandlerMap,
+    type ClientEvent,
+    type ClientEventHandlerMap,
+    type EmptyObject,
     EventType,
-    GroupCall,
+    type GroupCall,
     GroupCallIntent,
     GroupCallType,
-    IContent,
-    ISendEventResponse,
-    MatrixClient,
-    MatrixEvent,
-    Room,
+    type IContent,
+    type ISendEventResponse,
+    type MatrixClient,
+    type MatrixEvent,
+    type Room,
     RoomMember,
-    RoomState,
+    type RoomState,
     RoomStateEvent,
-    RoomStateEventHandlerMap,
-    SendToDeviceContentMap,
+    type RoomStateEventHandlerMap,
+    type SendToDeviceContentMap,
 } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { ReEmitter } from "../../src/ReEmitter";
 import { SyncState } from "../../src/sync";
-import { CallEvent, CallEventHandlerMap, CallState, MatrixCall } from "../../src/webrtc/call";
-import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
-import { CallFeed } from "../../src/webrtc/callFeed";
-import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
-import { GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
-import { IScreensharingOpts, MediaHandler } from "../../src/webrtc/mediaHandler";
+import { type CallEvent, type CallEventHandlerMap, CallState, type MatrixCall } from "../../src/webrtc/call";
+import { type CallEventHandlerEvent, type CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
+import { type CallFeed } from "../../src/webrtc/callFeed";
+import { type GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
+import { type GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
+import { type IScreensharingOpts, type MediaHandler } from "../../src/webrtc/mediaHandler";
 
 export const DUMMY_SDP =
     "v=0\r\n" +
@@ -466,7 +467,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
         [roomId: string, eventType: EventType, content: any, statekey: string]
     >();
     public sendToDevice = jest.fn<
-        Promise<{}>,
+        Promise<EmptyObject>,
         [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
     >();
 

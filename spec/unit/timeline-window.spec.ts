@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
+import { type MockedObject } from "jest-mock";
 
-import { MatrixClient } from "../../src/client";
+import { type MatrixClient } from "../../src/client";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { Room } from "../../src/models/room";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { TimelineIndex, TimelineWindow } from "../../src/timeline-window";
 import { mkMessage } from "../test-utils/test-utils";
-import { MatrixEvent } from "../../src/models/event";
+import { type MatrixEvent } from "../../src/models/event";
 
 const ROOM_ID = "roomId";
 const USER_ID = "userId";

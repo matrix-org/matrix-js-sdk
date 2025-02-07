@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ISigned } from "../@types/signed.ts";
-import { AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
-import { ImportRoomKeyProgressData } from "./index.ts";
+import { type ISigned } from "../@types/signed.ts";
+import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
+import { type ImportRoomKeyProgressData } from "./index.ts";
 
 export interface Curve25519AuthData {
     public_key: string;
@@ -35,8 +35,7 @@ export interface Aes256AuthData {
 /**
  * Information about a server-side key backup.
  *
- * Returned by [`GET /_matrix/client/v3/room_keys/version`](https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3room_keysversion)
- * and hence {@link matrix.MatrixClient.getKeyBackupVersion}.
+ * Returned by [`GET /_matrix/client/v3/room_keys/version`](https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3room_keysversion).
  */
 export interface KeyBackupInfo {
     algorithm: string;

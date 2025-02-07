@@ -13,28 +13,26 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import HttpBackend from "matrix-mock-request";
-import { Mocked } from "jest-mock";
 
+import type HttpBackend from "matrix-mock-request";
 import * as utils from "../test-utils/test-utils";
-import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
+import { type IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import {
     Filter,
     JoinRule,
-    KnockRoomOpts,
+    type KnockRoomOpts,
     MemoryStore,
     Method,
     Room,
-    RoomSummary,
+    type RoomSummary,
     SERVICE_TYPES,
 } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
-import { IFilterDefinition } from "../../src/filter";
-import { ISearchResults } from "../../src/@types/search";
-import { IStore } from "../../src/store";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { type IFilterDefinition } from "../../src/filter";
+import { type ISearchResults } from "../../src/@types/search";
+import { type IStore } from "../../src/store";
 import { SetPresence } from "../../src/sync";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -641,126 +639,6 @@ describe("MatrixClient", function () {
                     data.results[0].context.getTimeline().find((e) => e.getId() === "$flibble:localhost"),
                 ).toBeTruthy();
             });
-        });
-    });
-
-    describe("downloadKeys", function () {
-        if (!CRYPTO_ENABLED) {
-            return;
-        }
-
-        beforeEach(function () {
-            // running initLegacyCrypto should trigger a key upload
-            httpBackend.when("POST", "/keys/upload").respond(200, {});
-            return Promise.all([client.initLegacyCrypto(), httpBackend.flush("/keys/upload", 1)]);
-        });
-
-        afterEach(() => {
-            client.stopClient();
-        });
-
-        it("should do an HTTP request and then store the keys", function () {
-            const ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
-            // ed25519key = client.getDeviceEd25519Key();
-            const borisKeys = {
-                dev1: {
-                    algorithms: ["1"],
-                    device_id: "dev1",
-                    keys: { "ed25519:dev1": ed25519key },
-                    signatures: {
-                        boris: {
-                            "ed25519:dev1":
-                                "RAhmbNDq1efK3hCpBzZDsKoGSsrHUxb25NW5/WbEV9R" +
-                                "JVwLdP032mg5QsKt/pBDUGtggBcnk43n3nBWlA88WAw",
-                        },
-                    },
-                    unsigned: { abc: "def" },
-                    user_id: "boris",
-                },
-            };
-            const chazKeys = {
-                dev2: {
-                    algorithms: ["2"],
-                    device_id: "dev2",
-                    keys: { "ed25519:dev2": ed25519key },
-                    signatures: {
-                        chaz: {
-                            "ed25519:dev2":
-                                "FwslH/Q7EYSb7swDJbNB5PSzcbEO1xRRBF1riuijqvL" +
-                                "EkrK9/XVN8jl4h7thGuRITQ01siBQnNmMK9t45QfcCQ",
-                        },
-                    },
-                    unsigned: { ghi: "def" },
-                    user_id: "chaz",
-                },
-            };
-
-            /*
-            function sign(o) {
-                var anotherjson = require('another-json');
-                var b = JSON.parse(JSON.stringify(o));
-                delete(b.signatures);
-                delete(b.unsigned);
-                return client.crypto.olmDevice.sign(anotherjson.stringify(b));
-            };
-
-            logger.log("Ed25519: " + ed25519key);
-            logger.log("boris:", sign(borisKeys.dev1));
-            logger.log("chaz:", sign(chazKeys.dev2));
-            */
-
-            httpBackend
-                .when("POST", "/keys/query")
-                .check(function (req) {
-                    expect(req.data).toEqual({
-                        device_keys: {
-                            boris: [],
-                            chaz: [],
-                        },
-                    });
-                })
-                .respond(200, {
-                    device_keys: {
-                        boris: borisKeys,
-                        chaz: chazKeys,
-                    },
-                });
-
-            const prom = client.downloadKeys(["boris", "chaz"]).then(function (res) {
-                assertObjectContains(res.get("boris")!.get("dev1")!, {
-                    verified: 0, // DeviceVerification.UNVERIFIED
-                    keys: { "ed25519:dev1": ed25519key },
-                    algorithms: ["1"],
-                    unsigned: { abc: "def" },
-                });
-
-                assertObjectContains(res.get("chaz")!.get("dev2")!, {
-                    verified: 0, // DeviceVerification.UNVERIFIED
-                    keys: { "ed25519:dev2": ed25519key },
-                    algorithms: ["2"],
-                    unsigned: { ghi: "def" },
-                });
-            });
-
-            httpBackend.flush("");
-            return prom;
-        });
-    });
-
-    describe("deleteDevice", function () {
-        const auth = { identifier: 1 };
-        it("should pass through an auth dict", function () {
-            httpBackend
-                .when("DELETE", "/_matrix/client/v3/devices/my_device")
-                .check(function (req) {
-                    expect(req.data).toEqual({ auth: auth });
-                })
-                .respond(200);
-
-            const prom = client.deleteDevice("my_device", auth);
-
-            httpBackend.flush("");
-            return prom;
         });
     });
 
@@ -1628,49 +1506,6 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("uploadKeys", () => {
-        // uploadKeys() is a no-op nowadays, so there's not much to test here.
-        it("should complete successfully", async () => {
-            await client.uploadKeys();
-        });
-    });
-
-    describe("getCryptoTrustCrossSignedDevices", () => {
-        it("should throw if e2e is disabled", () => {
-            expect(() => client.getCryptoTrustCrossSignedDevices()).toThrow("End-to-end encryption disabled");
-        });
-
-        it("should proxy to the crypto backend", async () => {
-            const mockBackend = {
-                getTrustCrossSignedDevices: jest.fn().mockReturnValue(true),
-            } as unknown as Mocked<CryptoBackend>;
-            client["cryptoBackend"] = mockBackend;
-
-            expect(client.getCryptoTrustCrossSignedDevices()).toBe(true);
-            mockBackend.getTrustCrossSignedDevices.mockReturnValue(false);
-            expect(client.getCryptoTrustCrossSignedDevices()).toBe(false);
-        });
-    });
-
-    describe("setCryptoTrustCrossSignedDevices", () => {
-        it("should throw if e2e is disabled", () => {
-            expect(() => client.setCryptoTrustCrossSignedDevices(false)).toThrow("End-to-end encryption disabled");
-        });
-
-        it("should proxy to the crypto backend", async () => {
-            const mockBackend = {
-                setTrustCrossSignedDevices: jest.fn(),
-            } as unknown as Mocked<CryptoBackend>;
-            client["cryptoBackend"] = mockBackend;
-
-            client.setCryptoTrustCrossSignedDevices(true);
-            expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(true);
-
-            client.setCryptoTrustCrossSignedDevices(false);
-            expect(mockBackend.setTrustCrossSignedDevices).toHaveBeenLastCalledWith(false);
-        });
-    });
-
     describe("setSyncPresence", () => {
         it("should pass calls through to the underlying sync api", () => {
             const setPresence = jest.fn();
@@ -2197,11 +2032,3 @@ const buildEventCreate = () =>
         type: "m.room.create",
         unsigned: { age: 80126105 },
     });
-
-function assertObjectContains(obj: Record<string, any>, expected: any): void {
-    for (const k in expected) {
-        if (expected.hasOwnProperty(k)) {
-            expect(obj[k]).toEqual(expected[k]);
-        }
-    }
-}

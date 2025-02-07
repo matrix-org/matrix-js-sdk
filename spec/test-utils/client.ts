@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MethodLikeKeys, mocked, MockedObject } from "jest-mock";
+import { type MethodLikeKeys, mocked, type MockedObject } from "jest-mock";
 
-import { ClientEventHandlerMap, EmittedEvents, MatrixClient } from "../../src/client";
+import { type ClientEventHandlerMap, type EmittedEvents, type MatrixClient } from "../../src/client";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { User } from "../../src/models/user";
 

@@ -18,7 +18,7 @@ import { mocked } from "jest-mock";
 import { jwtDecode } from "jwt-decode";
 
 import { logger } from "../../../src/logger";
-import { ValidatedAuthMetadata, validateIdToken, validateAuthMetadata } from "../../../src/oidc/validate";
+import { type ValidatedAuthMetadata, validateIdToken, validateAuthMetadata } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
 jest.mock("jwt-decode");

@@ -14,23 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 
 import {
-    AccountDataClient,
+    type AccountDataClient,
     calculateKeyCheck,
-    PassphraseInfo,
-    SecretStorageCallbacks,
-    SecretStorageKeyDescriptionAesV1,
-    SecretStorageKeyDescriptionCommon,
-    ServerSideSecretStorage,
+    type PassphraseInfo,
+    type SecretStorageCallbacks,
+    type SecretStorageKeyDescriptionAesV1,
+    type SecretStorageKeyDescriptionCommon,
+    type ServerSideSecretStorage,
     ServerSideSecretStorageImpl,
     trimTrailingEquals,
 } from "../../src/secret-storage";
 import { secureRandomString } from "../../src/randomstring";
-import { SecretInfo } from "../../src/secret-storage.ts";
-import { AccountDataEvents, ClientEvent, MatrixEvent, TypedEventEmitter } from "../../src";
-import { defer, IDeferred } from "../../src/utils";
+import { type SecretInfo } from "../../src/secret-storage.ts";
+import { type AccountDataEvents, ClientEvent, MatrixEvent, TypedEventEmitter } from "../../src";
+import { defer, type IDeferred } from "../../src/utils";
 
 declare module "../../src/@types/event" {
     interface SecretStorageAccountDataEvents {
@@ -243,11 +243,16 @@ describe("ServerSideSecretStorageImpl", function () {
     });
 
     describe("store", () => {
-        it("should ignore keys with unknown algorithm", async function () {
-            const accountDataAdapter = mockAccountDataClient();
-            const mockCallbacks = { getSecretStorageKey: jest.fn() } as Mocked<SecretStorageCallbacks>;
-            const secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, mockCallbacks);
+        let secretStorage: ServerSideSecretStorage;
+        let accountDataAdapter: Mocked<AccountDataClient>;
 
+        beforeEach(() => {
+            accountDataAdapter = mockAccountDataClient();
+            const mockCallbacks = { getSecretStorageKey: jest.fn() } as Mocked<SecretStorageCallbacks>;
+            secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, mockCallbacks);
+        });
+
+        it("should ignore keys with unknown algorithm", async function () {
             // stub out getAccountData to return a key with an unknown algorithm
             const storedKey = { algorithm: "badalg" } as SecretStorageKeyDescriptionCommon;
             async function mockGetAccountData<K extends keyof AccountDataEvents>(
@@ -273,6 +278,11 @@ describe("ServerSideSecretStorageImpl", function () {
             // ... and emitted a warning.
             // eslint-disable-next-line no-console
             expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unknown algorithm"));
+        });
+
+        it("should set the secret with an empty object when the value is null", async function () {
+            await secretStorage.store("mySecret", null);
+            expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith("mySecret", {});
         });
     });
 

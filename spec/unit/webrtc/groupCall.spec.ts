@@ -16,10 +16,18 @@ limitations under the License.
 
 import { mocked } from "jest-mock";
 
-import { EventType, GroupCallIntent, GroupCallType, MatrixCall, MatrixEvent, Room, RoomMember } from "../../../src";
+import {
+    EventType,
+    GroupCallIntent,
+    GroupCallType,
+    type MatrixCall,
+    MatrixEvent,
+    Room,
+    type RoomMember,
+} from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { GroupCall, GroupCallEvent, GroupCallState, GroupCallStatsReportEvent } from "../../../src/webrtc/groupCall";
-import { IMyDevice, MatrixClient } from "../../../src/client";
+import { type IMyDevice, MatrixClient } from "../../../src/client";
 import {
     FAKE_CONF_ID,
     FAKE_DEVICE_ID_1,
@@ -44,9 +52,9 @@ import { CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { CallEvent, CallState } from "../../../src/webrtc/call";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { CallFeedReport } from "../../../src/webrtc/stats/statsReport";
+import { type CallFeedReport } from "../../../src/webrtc/stats/statsReport";
 import { CallFeedStatsReporter } from "../../../src/webrtc/stats/callFeedStatsReporter";
-import { StatsReportEmitter } from "../../../src/webrtc/stats/statsReportEmitter";
+import { type StatsReportEmitter } from "../../../src/webrtc/stats/statsReportEmitter";
 import { KnownMembership } from "../../../src/@types/membership";
 
 const FAKE_STATE_EVENTS = [

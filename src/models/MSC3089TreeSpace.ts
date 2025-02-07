@@ -16,11 +16,11 @@ limitations under the License.
 
 import promiseRetry from "p-retry";
 
-import { MatrixClient } from "../client.ts";
+import { type MatrixClient } from "../client.ts";
 import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../@types/event.ts";
-import { Room } from "./room.ts";
+import { type Room } from "./room.ts";
 import { logger } from "../logger.ts";
-import { IContent, MatrixEvent } from "./event.ts";
+import { type IContent, type MatrixEvent } from "./event.ts";
 import {
     averageBetweenStrings,
     DEFAULT_ALPHABET,
@@ -30,11 +30,12 @@ import {
     simpleRetryOperation,
 } from "../utils.ts";
 import { MSC3089Branch } from "./MSC3089Branch.ts";
-import { ISendEventResponse } from "../@types/requests.ts";
-import { FileType } from "../http-api/index.ts";
+import { type ISendEventResponse } from "../@types/requests.ts";
+import { type FileType } from "../http-api/index.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { RoomPowerLevelsEventContent, SpaceChildEventContent } from "../@types/state_events.ts";
+import { type RoomPowerLevelsEventContent, type SpaceChildEventContent } from "../@types/state_events.ts";
 import type { EncryptedFile, FileContent } from "../@types/media.ts";
+import { type EmptyObject } from "../@types/common.ts";
 
 /**
  * The recommended defaults for a tree space's power levels. Note that this
@@ -81,7 +82,7 @@ export enum TreePermissions {
 
 declare module "../@types/media" {
     interface FileContent {
-        [UNSTABLE_MSC3089_LEAF.name]?: {};
+        [UNSTABLE_MSC3089_LEAF.name]?: EmptyObject;
     }
 }
 

@@ -16,14 +16,13 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 
-import HttpBackend from "matrix-mock-request";
-
+import type HttpBackend from "matrix-mock-request";
 import {
     Category,
     ClientEvent,
     EventType,
-    ISyncResponse,
-    MatrixClient,
+    type ISyncResponse,
+    type MatrixClient,
     MatrixEvent,
     NotificationCountType,
     RelationType,

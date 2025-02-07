@@ -16,8 +16,7 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 
-import HttpBackend from "matrix-mock-request";
-
+import type HttpBackend from "matrix-mock-request";
 import {
     EventTimeline,
     MatrixEvent,
@@ -25,16 +24,15 @@ import {
     RoomStateEvent,
     RoomMemberEvent,
     UNSTABLE_MSC2716_MARKER,
-    MatrixClient,
+    type MatrixClient,
     ClientEvent,
-    IndexedDBCryptoStore,
-    ISyncResponse,
-    IRoomEvent,
-    IJoinedRoom,
-    IStateEvent,
-    IMinimalEvent,
+    type ISyncResponse,
+    type IRoomEvent,
+    type IJoinedRoom,
+    type IStateEvent,
+    type IMinimalEvent,
     NotificationCountType,
-    IEphemeral,
+    type IEphemeral,
     Room,
     IndexedDBStore,
     RelationType,
@@ -47,7 +45,7 @@ import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
-import { IActionsObject } from "../../src/pushprocessor";
+import { type IActionsObject } from "../../src/pushprocessor";
 import { KnownMembership } from "../../src/@types/membership";
 
 declare module "../../src/@types/event" {
@@ -2571,9 +2569,8 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
     };
 
     it("should emit ClientEvent.Room when invited while using indexeddb crypto store", async () => {
-        const idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
-            cryptoStore: new IndexedDBCryptoStore(globalThis.indexedDB, "tests"),
-        });
+        // rust crypto uses by default indexeddb
+        const idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         const idbHttpBackend = idbTestClient.httpBackend;
         const idbClient = idbTestClient.client;
         idbHttpBackend.when("GET", "/versions").respond(200, {});

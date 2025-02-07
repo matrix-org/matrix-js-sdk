@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd, UnstableValue } from "matrix-events-sdk";
+import { type EitherAnd, UnstableValue } from "matrix-events-sdk";
 
 import {
-    ExtensibleAnyMessageEventContent,
-    REFERENCE_RELATION,
-    RelatesToRelationship,
-    TSNamespace,
+    type ExtensibleAnyMessageEventContent,
+    type REFERENCE_RELATION,
+    type RelatesToRelationship,
+    type TSNamespace,
 } from "./extensible_events.ts";
+import { type EmptyObject } from "./common.ts";
 
 /**
  * Identifier for a disclosed poll.
@@ -109,7 +110,7 @@ export const M_POLL_END = new UnstableValue("m.poll.end", "org.matrix.msc3381.po
 /**
  * The event definition for an m.poll.end event (in content)
  */
-export type PollEndEvent = EitherAnd<{ [M_POLL_END.name]: {} }, { [M_POLL_END.altName]: {} }>;
+export type PollEndEvent = EitherAnd<{ [M_POLL_END.name]: EmptyObject }, { [M_POLL_END.altName]: EmptyObject }>;
 
 /**
  * The content for an m.poll.end event

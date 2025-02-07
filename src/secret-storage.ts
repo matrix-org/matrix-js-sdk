@@ -20,15 +20,16 @@ limitations under the License.
  * @see https://spec.matrix.org/v1.6/client-server-api/#storage
  */
 
-import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
-import { ClientEvent, ClientEventHandlerMap } from "./client.ts";
-import { MatrixEvent } from "./models/event.ts";
+import { type TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { ClientEvent, type ClientEventHandlerMap } from "./client.ts";
+import { type MatrixEvent } from "./models/event.ts";
 import { secureRandomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
-import { AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
-import { AccountDataEvents, SecretStorageAccountDataEvents } from "./@types/event.ts";
+import { type AESEncryptedSecretStoragePayload } from "./@types/AESEncryptedSecretStoragePayload.ts";
+import { type AccountDataEvents, type SecretStorageAccountDataEvents } from "./@types/event.ts";
+import { type EmptyObject } from "./@types/common.ts";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -151,7 +152,7 @@ export interface AccountDataClient extends TypedEventEmitter<ClientEvent.Account
     setAccountData: <K extends keyof AccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
-    ) => Promise<{}>;
+    ) => Promise<EmptyObject>;
 }
 
 /**
@@ -279,14 +280,18 @@ export interface ServerSideSecretStorage {
      * Store an encrypted secret on the server.
      *
      * Details of the encryption keys to be used must previously have been stored in account data
-     * (for example, via {@link ServerSideSecretStorage#addKey}.
+     * (for example, via {@link ServerSideSecretStorageImpl#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
+     * key to decrypt the secret.
+     *
+     * If the secret is `null`, the secret value in the account data will be set to an empty object.
+     * This is considered as "removing" the secret.
      *
      * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
      * @param secret - The secret contents.
      * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key
      *     (will throw if no default key is set).
      */
-    store(name: string, secret: string, keys?: string[] | null): Promise<void>;
+    store(name: string, secret: string | null, keys?: string[] | null): Promise<void>;
 
     /**
      * Get a secret from storage, and decrypt it.
@@ -503,17 +508,15 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
     }
 
     /**
-     * Store an encrypted secret on the server.
-     *
-     * Details of the encryption keys to be used must previously have been stored in account data
-     * (for example, via {@link ServerSideSecretStorageImpl#addKey}. {@link SecretStorageCallbacks#getSecretStorageKey} will be called to obtain a secret storage
-     * key to decrypt the secret.
-     *
-     * @param name - The name of the secret - i.e., the "event type" to be stored in the account data
-     * @param secret - The secret contents.
-     * @param keys - The IDs of the keys to use to encrypt the secret, or null/undefined to use the default key.
+     * Implementation of {@link ServerSideSecretStorage#store}.
      */
-    public async store(name: SecretStorageKey, secret: string, keys?: string[] | null): Promise<void> {
+    public async store(name: SecretStorageKey, secret: string | null, keys?: string[] | null): Promise<void> {
+        if (secret === null) {
+            // remove secret
+            await this.accountDataAdapter.setAccountData(name, {});
+            return;
+        }
+
         const encrypted: Record<string, AESEncryptedSecretStoragePayload> = {};
 
         if (!keys) {

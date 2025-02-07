@@ -18,8 +18,8 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, getSyncResponse, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { createClient, MatrixClient } from "../../../src";
+import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
+import { createClient, type MatrixClient } from "../../../src";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { SyncResponder } from "../../test-utils/SyncResponder";
@@ -38,7 +38,7 @@ afterEach(() => {
  * These tests work by intercepting HTTP requests via fetch-mock rather than mocking out bits of the client, so as
  * to provide the most effective integration tests possible.
  */
-describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backend: string, initCrypto: InitCrypto) => {
+describe("to-device-messages", () => {
     let aliceClient: MatrixClient;
 
     /** an object which intercepts `/keys/query` requests on the test homeserver */
@@ -81,7 +81,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("to-device-messages (%s)", (backe
                 { filter_id: "fid" },
             );
 
-            await initCrypto(aliceClient);
+            await aliceClient.initRustCrypto();
         },
         /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
         10000,

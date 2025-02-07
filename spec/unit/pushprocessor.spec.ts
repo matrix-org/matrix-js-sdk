@@ -1,12 +1,12 @@
 import * as utils from "../test-utils/test-utils";
-import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
+import { type IActionsObject, PushProcessor } from "../../src/pushprocessor";
 import {
     ConditionKind,
     EventType,
-    IContent,
-    IPushRule,
-    MatrixClient,
-    MatrixEvent,
+    type IContent,
+    type IPushRule,
+    type MatrixClient,
+    type MatrixEvent,
     PushRuleActionName,
     RuleId,
     TweakName,

@@ -22,14 +22,14 @@ import {
     EventType,
     GroupCallIntent,
     GroupCallType,
-    IRoomTimelineData,
-    MatrixCall,
+    type IRoomTimelineData,
+    type MatrixCall,
     MatrixEvent,
     Room,
     RoomEvent,
-    RoomMember,
+    type RoomMember,
 } from "../../../src";
-import { MatrixClient } from "../../../src/client";
+import { type MatrixClient } from "../../../src/client";
 import { CallEventHandler, CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
 import { GroupCallEventHandler } from "../../../src/webrtc/groupCallEventHandler";
 import { SyncState } from "../../../src/sync";

@@ -15,36 +15,42 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
-import MockHttpBackend from "matrix-mock-request";
 import { fail } from "assert";
 
-import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
-import { TestClient } from "../TestClient";
-import { IRoomEvent, IStateEvent } from "../../src";
+import type MockHttpBackend from "matrix-mock-request";
 import {
-    MatrixClient,
-    MatrixEvent,
+    SlidingSync,
+    SlidingSyncEvent,
+    type MSC3575RoomData,
+    SlidingSyncState,
+    type Extension,
+} from "../../src/sliding-sync";
+import { TestClient } from "../TestClient";
+import { type IRoomEvent, type IStateEvent } from "../../src";
+import {
+    type MatrixClient,
+    type MatrixEvent,
     NotificationCountType,
     JoinRule,
     MatrixError,
     EventType,
-    IPushRules,
+    type IPushRules,
     PushRuleKind,
     TweakName,
     ClientEvent,
     RoomMemberEvent,
     RoomEvent,
-    Room,
-    IRoomTimelineData,
+    type Room,
+    type IRoomTimelineData,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
-import { SyncApiOptions, SyncState } from "../../src/sync";
-import { IStoredClientOpts } from "../../src";
+import { type SyncApiOptions, SyncState } from "../../src/sync";
+import { type IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
 import { KnownMembership } from "../../src/@types/membership";
-import { SyncCryptoCallbacks } from "../../src/common-crypto/CryptoBackend";
+import { type SyncCryptoCallbacks } from "../../src/common-crypto/CryptoBackend";
 
 declare module "../../src/@types/event" {
     interface AccountDataEvents {

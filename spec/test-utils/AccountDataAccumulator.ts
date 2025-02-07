@@ -16,7 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { ISyncResponder } from "./SyncResponder";
+import { type ISyncResponder } from "./SyncResponder";
 
 /**
  *  An object which intercepts `account_data` get and set requests via fetch-mock.

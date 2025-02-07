@@ -14,28 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked, SpyInstance } from "jest-mock";
+import { type Mocked, type SpyInstance } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
 
 import { PerSessionKeyBackupDownloader } from "../../../src/rust-crypto/PerSessionKeyBackupDownloader";
 import { logger } from "../../../src/logger";
-import { defer, IDeferred } from "../../../src/utils";
-import { RustBackupCryptoEventMap, RustBackupCryptoEvents, RustBackupManager } from "../../../src/rust-crypto/backup";
+import { defer, type IDeferred } from "../../../src/utils";
+import {
+    type RustBackupCryptoEventMap,
+    type RustBackupCryptoEvents,
+    type RustBackupManager,
+} from "../../../src/rust-crypto/backup";
 import * as TestData from "../../test-utils/test-data";
 import {
     ConnectionError,
-    HttpApiEvent,
-    HttpApiEventHandlerMap,
-    IHttpOpts,
-    IMegolmSessionData,
+    type HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    type IHttpOpts,
+    type IMegolmSessionData,
     MatrixHttpApi,
     TypedEventEmitter,
 } from "../../../src";
 import * as testData from "../../test-utils/test-data";
-import { BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
-import { KeyBackupSession } from "../../../src/crypto-api/keybackup";
+import { type BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
+import { type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 describe("PerSessionKeyBackupDownloader", () => {

@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import {
-    ExtensibleAnyMessageEventContent,
-    IPartialEvent,
+    type ExtensibleAnyMessageEventContent,
+    type IPartialEvent,
     M_HTML,
     M_MESSAGE,
     M_TEXT,

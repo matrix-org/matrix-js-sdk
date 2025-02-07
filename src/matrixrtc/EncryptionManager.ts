@@ -1,13 +1,13 @@
 import { type MatrixClient } from "../client.ts";
 import { logger as rootLogger } from "../logger.ts";
-import { MatrixEvent } from "../models/event.ts";
-import { Room } from "../models/room.ts";
-import { EncryptionConfig } from "./MatrixRTCSession.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { type Room } from "../models/room.ts";
+import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
-import { EncryptionKeysEventContent } from "./types.ts";
+import { type EncryptionKeysEventContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
-import { MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
-import { CallMembership } from "./CallMembership.ts";
+import { type MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
+import { type CallMembership } from "./CallMembership.ts";
 import { EventType } from "../@types/event.ts";
 const logger = rootLogger.getChild("MatrixRTCSession");
 

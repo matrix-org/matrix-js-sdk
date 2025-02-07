@@ -17,7 +17,7 @@ limitations under the License.
 import fetchMockJest from "fetch-mock-jest";
 
 import { OidcError } from "../../../src/oidc/error";
-import { OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";
+import { type OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 describe("registerOidcClient()", () => {

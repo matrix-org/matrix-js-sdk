@@ -307,8 +307,6 @@ Then visit `http://localhost:8005` to see the API docs.
 
 ## Initialization
 
-**Do not use `matrixClient.initLegacyCrypto()`. This method is deprecated and no longer maintained.**
-
 To initialize the end-to-end encryption support in the matrix client:
 
 ```javascript

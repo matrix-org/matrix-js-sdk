@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import HttpBackend from "matrix-mock-request";
-
+import type HttpBackend from "matrix-mock-request";
 import {
     ClientEvent,
     HttpApiEvent,
-    IEvent,
-    MatrixClient,
+    type IEvent,
+    type MatrixClient,
     RoomEvent,
     RoomMemberEvent,
     RoomStateEvent,

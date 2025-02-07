@@ -17,7 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
 
-import { MatrixClient, ClientEvent, createClient, SyncState } from "../../src";
+import { type MatrixClient, ClientEvent, createClient, SyncState } from "../../src";
 
 const makeQueryablePromise = <T = void>(promise: Promise<T>) => {
     let resolved = false;

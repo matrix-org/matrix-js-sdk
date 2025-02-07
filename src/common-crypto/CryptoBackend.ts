@@ -15,13 +15,11 @@ limitations under the License.
 */
 
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
-import { IClearEvent, MatrixEvent } from "../models/event.ts";
-import { Room } from "../models/room.ts";
-import { CryptoApi, DecryptionFailureCode, ImportRoomKeysOpts } from "../crypto-api/index.ts";
-import { CrossSigningInfo, UserTrustLevel } from "../crypto/CrossSigning.ts";
-import { IEncryptedEventInfo } from "../crypto/api.ts";
-import { KeyBackupInfo, KeyBackupSession } from "../crypto-api/keybackup.ts";
-import { IMegolmSessionData } from "../@types/crypto.ts";
+import { type IClearEvent, type MatrixEvent } from "../models/event.ts";
+import { type Room } from "../models/room.ts";
+import { type CryptoApi, type DecryptionFailureCode, type ImportRoomKeysOpts } from "../crypto-api/index.ts";
+import { type KeyBackupInfo, type KeyBackupSession } from "../crypto-api/keybackup.ts";
+import { type IMegolmSessionData } from "../@types/crypto.ts";
 
 /**
  * Common interface for the crypto implementations
@@ -46,15 +44,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     stop(): void;
 
     /**
-     * Get the verification level for a given user
-     *
-     * @param userId - user to be checked
-     *
-     * @deprecated Superceded by {@link CryptoApi#getUserVerificationStatus}.
-     */
-    checkUserTrust(userId: string): UserTrustLevel;
-
-    /**
      * Encrypt an event according to the configuration of the room.
      *
      * @param event -  event to be sent
@@ -73,35 +62,6 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * Rejects with an error if there is a problem decrypting the event.
      */
     decryptEvent(event: MatrixEvent): Promise<EventDecryptionResult>;
-
-    /**
-     * Get information about the encryption of an event
-     *
-     * @param event - event to be checked
-     * @deprecated Use {@link CryptoApi#getEncryptionInfoForEvent} instead
-     */
-    getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
-
-    /**
-     * Get the cross signing information for a given user.
-     *
-     * The cross-signing API is currently UNSTABLE and may change without notice.
-     *
-     * @param userId - the user ID to get the cross-signing info for.
-     *
-     * @returns the cross signing information for the user.
-     * @deprecated Prefer {@link CryptoApi#userHasCrossSigningKeys}
-     */
-    getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null;
-
-    /**
-     * Check the cross signing trust of the current user
-     *
-     * @param opts - Options object.
-     *
-     * @deprecated Unneeded for the new crypto
-     */
-    checkOwnCrossSigningTrust(opts?: CheckOwnCrossSigningTrustOpts): Promise<void>;
 
     /**
      * Get a backup decryptor capable of decrypting megolm session data encrypted with the given backup information.
@@ -193,13 +153,6 @@ export interface OnSyncCompletedData {
      * True if we are working our way through a backlog of events after connecting.
      */
     catchingUp?: boolean;
-}
-
-/**
- * Options object for {@link CryptoBackend#checkOwnCrossSigningTrust}.
- */
-export interface CheckOwnCrossSigningTrustOpts {
-    allowPrivateKeyRequests?: boolean;
 }
 
 /**

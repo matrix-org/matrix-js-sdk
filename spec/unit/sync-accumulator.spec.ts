@@ -18,21 +18,21 @@ limitations under the License.
 import { ReceiptType } from "../../src/@types/read_receipts";
 import {
     Category,
-    IInvitedRoom,
-    IInviteState,
-    IJoinedRoom,
-    IKnockedRoom,
-    IKnockState,
-    ILeftRoom,
-    IRoomEvent,
-    IStateEvent,
-    IStrippedState,
-    ISyncResponse,
+    type IInvitedRoom,
+    type IInviteState,
+    type IJoinedRoom,
+    type IKnockedRoom,
+    type IKnockState,
+    type ILeftRoom,
+    type IRoomEvent,
+    type IStateEvent,
+    type IStrippedState,
+    type ISyncResponse,
     SyncAccumulator,
 } from "../../src/sync-accumulator";
-import { IRoomSummary } from "../../src";
+import { type IRoomSummary } from "../../src";
 import * as utils from "../test-utils/test-utils";
-import { KnownMembership, Membership } from "../../src/@types/membership";
+import { KnownMembership, type Membership } from "../../src/@types/membership";
 
 // The event body & unsigned object get frozen to assert that they don't get altered
 // by the impl

@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import { logger } from "./logger.ts";
-import { MatrixClient } from "./client.ts";
-import { IRoomEvent, IStateEvent } from "./sync-accumulator.ts";
+import { type MatrixClient } from "./client.ts";
+import { type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
-import { sleep, IDeferred, defer } from "./utils.ts";
-import { HTTPError } from "./http-api/index.ts";
+import { sleep, type IDeferred, defer } from "./utils.ts";
+import { type HTTPError } from "./http-api/index.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -265,7 +265,7 @@ export enum ExtensionState {
 /**
  * An interface that must be satisfied to register extensions
  */
-export interface Extension<Req extends {}, Res extends {}> {
+export interface Extension<Req extends object, Res extends object> {
     /**
      * The extension name to go under 'extensions' in the request body.
      * @returns The JSON key.

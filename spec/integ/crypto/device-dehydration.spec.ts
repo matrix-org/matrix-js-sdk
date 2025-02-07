@@ -17,10 +17,10 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
 
-import { ClientEvent, createClient, MatrixClient, MatrixEvent } from "../../../src";
+import { ClientEvent, createClient, type MatrixClient, MatrixEvent } from "../../../src";
 import { CryptoEvent } from "../../../src/crypto-api/index";
-import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
-import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
+import { type RustCrypto } from "../../../src/rust-crypto/rust-crypto";
+import { type AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { emitPromise, EventCounter } from "../../test-utils/test-utils";
@@ -218,8 +218,8 @@ async function initializeSecretStorage(
             privateKey: new Uint8Array(32),
         };
     }
-    await matrixClient.bootstrapCrossSigning({ setupNewCrossSigning: true });
-    await matrixClient.bootstrapSecretStorage({
+    await matrixClient.getCrypto()!.bootstrapCrossSigning({ setupNewCrossSigning: true });
+    await matrixClient.getCrypto()!.bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage: true,
         setupNewKeyBackup: false,
