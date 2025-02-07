@@ -283,8 +283,6 @@ export interface CryptoApi {
      * @param verified - whether to mark the device as verified. Defaults to 'true'.
      *
      * @throws an error if the device is unknown, or has not published any encryption keys.
-     *
-     * @remarks Fires {@link matrix.CryptoEvent.DeviceVerificationChanged}
      */
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
 
@@ -586,7 +584,7 @@ export interface CryptoApi {
     /**
      * Determine if a key backup can be trusted.
      *
-     * @param info - key backup info dict from {@link matrix.MatrixClient.getKeyBackupVersion}.
+     * @param info - key backup info dict from {@link CryptoApi.getKeyBackupInfo}.
      */
     isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo>;
 
@@ -991,7 +989,7 @@ export class DeviceVerificationStatus {
      * Check if we should consider this device "verified".
      *
      * A device is "verified" if either:
-     *  * it has been manually marked as such via {@link matrix.MatrixClient.setDeviceVerified}.
+     *  * it has been manually marked as such via {@link CryptoApi.setDeviceVerified}.
      *  * it has been cross-signed with a verified signing key, **and** the client has been configured to trust
      *    cross-signed devices via {@link CryptoApi.setTrustCrossSignedDevices}.
      *

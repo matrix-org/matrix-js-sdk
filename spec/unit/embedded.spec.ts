@@ -40,7 +40,6 @@ import { SyncState } from "../../src/sync";
 import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
 import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
-import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { sleep } from "../../src/utils";
 
 const testOIDCToken = {
@@ -728,10 +727,11 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
 
             const payload = { type: "org.example.foo", hello: "world" };
-            await client.encryptAndSendToDevices(
+            const embeddedClient = client as RoomWidgetClient;
+            await embeddedClient.encryptAndSendToDevices(
                 [
-                    { userId: "@alice:example.org", deviceInfo: new DeviceInfo("aliceWeb") },
-                    { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobDesktop") },
+                    { userId: "@alice:example.org", deviceId: "aliceWeb" },
+                    { userId: "@bob:example.org", deviceId: "bobDesktop" },
                 ],
                 payload,
             );

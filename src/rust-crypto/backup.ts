@@ -118,7 +118,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Determine if a key backup can be trusted.
      *
-     * @param info - key backup info dict from {@link MatrixClient#getKeyBackupVersion}.
+     * @param info - key backup info dict from {@link CryptoApi.getKeyBackupInfo}.
      */
     public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
         const signatureVerification: SignatureVerification = await this.olmMachine.verifyBackup(info);
