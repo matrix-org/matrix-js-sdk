@@ -1077,26 +1077,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm-keys backup (%s)", (backe
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
         });
 
-        it("enables a backup signed by trusted devices and have decryption key", async () => {
-            aliceClient = await initTestClient();
-            const aliceCrypto = aliceClient.getCrypto()!;
-
-            await aliceClient.startClient();
-            await aliceCrypto.storeSessionBackupPrivateKey(
-                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
-            );
-            await waitForDeviceList();
-            await aliceCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
-
-            const result = await aliceCrypto.checkKeyBackupAndEnable();
-            expect(result).toBeTruthy();
-            expect(result!.trustInfo).toEqual({ trusted: true, matchesDecryptionKey: true });
-            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
-        });
-
         it("enables a backup not signed by a trusted device, when we have the decryption key", async () => {
             aliceClient = await initTestClient();
             const aliceCrypto = aliceClient.getCrypto()!;
