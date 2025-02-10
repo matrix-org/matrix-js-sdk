@@ -2200,9 +2200,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.addListener(ClientEvent.AccountData, accountDataListener);
 
         try {
-            const setAccountDataPromise = retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
-            const res = await Promise.all([setAccountDataPromise, updatedDefer.promise]);
-            return res[0];
+            const result = await retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
+            await updatedDefer.promise;
+            return result;
         } finally {
             this.removeListener(ClientEvent.AccountData, accountDataListener);
         }
