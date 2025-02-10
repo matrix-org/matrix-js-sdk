@@ -269,7 +269,7 @@ describe("cross-signing", () => {
             // a *different* device. Then, when we call `bootstrapCrossSigning` again, it should do the honours.
 
             mockSetupCrossSigningRequests();
-            const accountDataAccumulator = new AccountDataAccumulator();
+            const accountDataAccumulator = new AccountDataAccumulator(syncResponder);
             accountDataAccumulator.interceptGetAccountData();
 
             const authDict = { type: "test" };
