@@ -1760,7 +1760,7 @@ describe("crypto", () => {
 
         beforeEach(async () => {
             createSecretStorageKey.mockClear();
-            accountDataAccumulator = new AccountDataAccumulator();
+            accountDataAccumulator = new AccountDataAccumulator(syncResponder);
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
         });
@@ -1787,28 +1787,18 @@ describe("crypto", () => {
                     repeat: 1,
                     overwriteRoutes: true,
                 });
-                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
                 if (content.key) {
                     return content.key;
                 }
             }
         }
 
-        function awaitMegolmBackupKeyUpload(): Promise<Record<string, {}>> {
-            return new Promise((resolve) => {
-                // Called when the megolm backup key is uploaded
-                fetchMock.put(
-                    `express:/_matrix/client/v3/user/:userId/account_data/m.megolm_backup.v1`,
-                    (url: string, options: RequestInit) => {
-                        const content = JSON.parse(options.body as string);
-                        // update account data for sync response
-                        accountDataAccumulator.accountDataEvents.set("m.megolm_backup.v1", content);
-                        resolve(content.encrypted);
-                        return {};
-                    },
-                    { overwriteRoutes: true },
-                );
+        async function awaitMegolmBackupKeyUpload(): Promise<Record<string, {}>> {
+            const content = await accountDataAccumulator.interceptSetAccountData("m.megolm_backup.v1", {
+                repeat: 1,
+                overwriteRoutes: true,
             });
+            return content.encrypted;
         }
 
         function awaitAccountDataUpdate(type: string): Promise<void> {
@@ -1865,9 +1855,6 @@ describe("crypto", () => {
 
             // wait for bootstrapSecretStorage to finished
             await bootstrapPromise;
-
-            // Return the newly created key in the sync response
-            accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
             // Finally ensure backup is working
             await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
@@ -1928,9 +1915,6 @@ describe("crypto", () => {
                 expect(keyContent.iv).toBeDefined();
                 expect(keyContent.mac).toBeDefined();
 
-                // Return the newly created key in the sync response
-                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
-
                 // Finally, wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
 
@@ -1950,9 +1934,6 @@ describe("crypto", () => {
                 // Wait for the key to be uploaded in the account data
                 await awaitSecretStorageKeyStoredInAccountData();
 
-                // Return the newly created key in the sync response
-                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
-
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
 
@@ -1971,9 +1952,6 @@ describe("crypto", () => {
                 // Wait for the key to be uploaded in the account data
                 await awaitSecretStorageKeyStoredInAccountData();
 
-                // Return the newly created key in the sync response
-                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
-
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
 
@@ -1984,9 +1962,6 @@ describe("crypto", () => {
 
                 // Wait for the key to be uploaded in the account data
                 await awaitSecretStorageKeyStoredInAccountData();
-
-                // Return the newly created key in the sync response
-                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Wait for bootstrapSecretStorage to finished
                 await bootstrapPromise;
@@ -2008,9 +1983,6 @@ describe("crypto", () => {
 
                 // Wait for the key to be uploaded in the account data
                 const secretStorageKey = await awaitSecretStorageKeyStoredInAccountData();
-
-                // Return the newly created key in the sync response
-                accountDataAccumulator.sendSyncResponseWithUpdatedAccountData(syncResponder);
 
                 // Wait for the cross signing keys to be uploaded
                 const [masterKey, userSigningKey, selfSigningKey] = await Promise.all([
