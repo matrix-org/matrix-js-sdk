@@ -171,7 +171,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
 
         if (!latestBackupInfo?.version) {
-            // There is no server-side key backup, or the backup is not trusted.
+            // There is no server-side key backup.
             // This decryption key is useless to us.
             logger.warn(
                 "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
