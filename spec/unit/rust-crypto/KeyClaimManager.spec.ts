@@ -74,7 +74,8 @@ describe("KeyClaimManager", () => {
                     // ...  and we now resolve the original promise with the resolver for that second promise.
                     resolveCalledPromise(resolveCompletePromise);
                 });
-                return completePromise;
+                await completePromise;
+                return true;
             });
         });
     }
@@ -91,7 +92,7 @@ describe("KeyClaimManager", () => {
         fetchMock.postOnce("https://example.com/_matrix/client/v3/keys/claim", '{ "k": "v" }');
 
         // also stub out olmMachine.markRequestAsSent
-        olmMachine.markRequestAsSent.mockResolvedValueOnce(undefined);
+        olmMachine.markRequestAsSent.mockResolvedValueOnce(true);
 
         // fire off the request
         await keyClaimManager.ensureSessionsForUsers(new LogSpan(logger, "test"), [u1, u2]);

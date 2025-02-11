@@ -95,13 +95,13 @@ describe("Upload keys to backup", () => {
             .mockResolvedValueOnce(mockBackupRequest(100))
             .mockResolvedValueOnce(mockBackupRequest(100))
             .mockResolvedValueOnce(mockBackupRequest(2))
-            .mockResolvedValue(null);
+            .mockResolvedValue(undefined);
 
         mockOlmMachine.roomKeyCounts.mockResolvedValue({
             total: 602,
             // First iteration won't call roomKeyCounts(); it will be called on the second iteration after 200 keys have been saved.
             backedUp: 200,
-        });
+        } as unknown as RustSdkCryptoJs.RoomKeyCounts);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
         await jest.runAllTimersAsync();
@@ -130,7 +130,7 @@ describe("Upload keys to backup", () => {
         });
 
         // Only returns 2 keys on the first call, then none.
-        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(null);
+        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(undefined);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
         await jest.runAllTimersAsync();

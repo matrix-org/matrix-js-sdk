@@ -798,6 +798,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
         ) {
             this.logger.info("bootstrapSecretStorage: cross-signing keys not yet exported; doing so now.");
+
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
             await this.secretStorage.store("m.cross_signing.self_signing", crossSigningPrivateKeys.self_signing_key);
@@ -1807,7 +1808,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param name - The name of the secret received.
      */
     public async checkSecrets(name: string): Promise<void> {
-        const pendingValues: string[] = await this.olmMachine.getSecretsFromInbox(name);
+        const pendingValues: Set<string> = await this.olmMachine.getSecretsFromInbox(name);
         for (const value of pendingValues) {
             if (await this.handleSecretReceived(name, value)) {
                 // If we have a valid secret for that name there is no point of processing the other secrets values.

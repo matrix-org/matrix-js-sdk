@@ -213,7 +213,7 @@ describe("initRustCrypto", () => {
             jest.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
 
             const testOlmMachine = makeTestOlmMachine();
-            testOlmMachine.trackedUsers.mockResolvedValue([]);
+            testOlmMachine.trackedUsers.mockResolvedValue(new Set([]));
             jest.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
         });
 
