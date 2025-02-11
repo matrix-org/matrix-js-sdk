@@ -162,11 +162,16 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // Currently we only receive the decryption key without any key backup version. It is important to
         // check that the secret is valid for the current version before storing it.
         // We force a check to ensure to have the latest version.
-        const backupCheck = await this.checkKeyBackupAndEnable(true);
-        const latestBackupVersion = backupCheck?.backupInfo.version;
+        let latestBackupInfo: KeyBackupInfo | null;
+        try {
+            latestBackupInfo = await this.requestKeyBackupVersion();
+        } catch (e) {
+            logger.warn("handleBackupSecretReceived: Error checking for latest key backup", e);
+            return false;
+        }
 
-        if (!latestBackupVersion) {
-            // There is no server-side key backup.
+        if (!latestBackupInfo?.version) {
+            // There is no server-side key backup, or the backup is not trusted.
             // This decryption key is useless to us.
             logger.warn(
                 "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
@@ -176,7 +181,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         try {
             const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
-            const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(backupCheck.backupInfo, backupDecryptionKey);
+            const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(latestBackupInfo, backupDecryptionKey);
             if (!privateKeyMatches) {
                 logger.warn(
                     `handleBackupSecretReceived: Private decryption key does not match the public key of the current remote backup.`,
@@ -187,7 +192,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
-            await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupVersion);
+            await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
             return true;
         } catch (e) {
             logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
