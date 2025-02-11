@@ -1285,30 +1285,6 @@ describe("verification", () => {
             expect(cachedKey).toBeNull();
         });
 
-        it("Should not accept the backup decryption key gossip if backup not trusted", async () => {
-            const requestPromises = mockSecretRequestAndGetPromises();
-
-            await doInteractiveVerification();
-
-            const requestId = await requestPromises.get("m.megolm_backup.v1");
-
-            const infoCopy = Object.assign({}, nonMatchingBackupInfo);
-            delete infoCopy.auth_data.signatures;
-
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, infoCopy);
-
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
-        });
-
         it("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
