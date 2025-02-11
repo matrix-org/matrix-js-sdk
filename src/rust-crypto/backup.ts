@@ -137,7 +137,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Re-check the key backup and enable/disable it as appropriate.
      *
      * @param force - whether we should force a re-check even if one has already happened.
-     * @returns a promise resolves to `null` if backup is invalid or not trusted, resolve to `KeyBackupCheck` otherwise.
      */
     public checkKeyBackupAndEnable(force: boolean): Promise<KeyBackupCheck | null> {
         if (!force && this.checkedForBackup) {
