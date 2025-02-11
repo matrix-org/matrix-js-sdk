@@ -104,10 +104,10 @@ export class CrossSigningIdentity {
                 }
 
                 // Get the current device
-                const device: RustSdkCryptoJs.Device = await this.olmMachine.getDevice(
+                const device: RustSdkCryptoJs.Device = (await this.olmMachine.getDevice(
                     this.olmMachine.userId,
                     this.olmMachine.deviceId,
-                );
+                ))!;
                 try {
                     // Sign the device with our cross-signing key and upload the signature
                     const request: RustSdkCryptoJs.SignatureUploadRequest = await device.verify();
@@ -172,7 +172,8 @@ export class CrossSigningIdentity {
      * (If secret storage is *not* configured, we assume that the export will happen when it is set up)
      */
     private async exportCrossSigningKeysToStorage(): Promise<void> {
-        const exported: RustSdkCryptoJs.CrossSigningKeyExport | null = await this.olmMachine.exportCrossSigningKeys();
+        const exported: RustSdkCryptoJs.CrossSigningKeyExport | undefined =
+            await this.olmMachine.exportCrossSigningKeys();
         /* istanbul ignore else (this function is only called when we know the olm machine has keys) */
         if (exported?.masterKey) {
             await this.secretStorage.store("m.cross_signing.master", exported.masterKey);

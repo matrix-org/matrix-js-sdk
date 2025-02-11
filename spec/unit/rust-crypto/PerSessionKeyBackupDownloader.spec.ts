@@ -302,7 +302,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         beforeEach(async () => {
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
-            mockOlmMachine.getBackupKeys.mockResolvedValue(null);
+            mockOlmMachine.getBackupKeys.mockResolvedValue({} as RustSdkCryptoJs.BackupKeys);
 
             // @ts-ignore access to private function
             getConfigSpy = jest.spyOn(downloader, "getOrCreateBackupConfiguration");
@@ -349,7 +349,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             // it is trusted
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
             // but the key is not cached
-            mockOlmMachine.getBackupKeys.mockResolvedValue(null);
+            mockOlmMachine.getBackupKeys.mockResolvedValue({} as RustSdkCryptoJs.BackupKeys);
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
@@ -414,7 +414,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // but at this point it's not trusted and we don't have the key
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
-            mockOlmMachine.getBackupKeys.mockResolvedValue(null);
+            mockOlmMachine.getBackupKeys.mockResolvedValue({} as RustSdkCryptoJs.BackupKeys);
 
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey);
 

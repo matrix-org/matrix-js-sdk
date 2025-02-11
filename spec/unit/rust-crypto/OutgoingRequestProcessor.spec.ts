@@ -56,6 +56,7 @@ describe("OutgoingRequestProcessor", () => {
         return new Promise((resolve, _reject) => {
             olmMachine.markRequestAsSent.mockImplementationOnce(async () => {
                 resolve(undefined);
+                return true;
             });
         });
     }

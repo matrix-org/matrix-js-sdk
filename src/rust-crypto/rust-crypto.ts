@@ -783,9 +783,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             await this.addSecretStorageKeyToSecretStorage(recoveryKey);
         }
 
-        const crossSigningStatus: RustSdkCryptoJs.CrossSigningStatus = await this.olmMachine.crossSigningStatus();
+        const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport | undefined =
+            await this.olmMachine.exportCrossSigningKeys();
         const hasPrivateKeys =
-            crossSigningStatus.hasMaster && crossSigningStatus.hasSelfSigning && crossSigningStatus.hasUserSigning;
+            crossSigningPrivateKeys &&
+            crossSigningPrivateKeys.masterKey !== undefined &&
+            crossSigningPrivateKeys.self_signing_key !== undefined &&
+            crossSigningPrivateKeys.userSigningKey !== undefined;
 
         // If we have cross-signing private keys cached, store them in secret
         // storage if they are not there already.
@@ -794,21 +798,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             (isNewSecretStorageKeyNeeded || !(await secretStorageContainsCrossSigningKeys(this.secretStorage)))
         ) {
             this.logger.info("bootstrapSecretStorage: cross-signing keys not yet exported; doing so now.");
-
-            const crossSigningPrivateKeys: RustSdkCryptoJs.CrossSigningKeyExport =
-                await this.olmMachine.exportCrossSigningKeys();
-
-            if (!crossSigningPrivateKeys.masterKey) {
-                throw new Error("missing master key in cross signing private keys");
-            }
-
-            if (!crossSigningPrivateKeys.userSigningKey) {
-                throw new Error("missing user signing key in cross signing private keys");
-            }
-
-            if (!crossSigningPrivateKeys.self_signing_key) {
-                throw new Error("missing self signing key in cross signing private keys");
-            }
 
             await this.secretStorage.store("m.cross_signing.master", crossSigningPrivateKeys.masterKey);
             await this.secretStorage.store("m.cross_signing.user_signing", crossSigningPrivateKeys.userSigningKey);
@@ -1819,7 +1808,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param name - The name of the secret received.
      */
     public async checkSecrets(name: string): Promise<void> {
-        const pendingValues: string[] = await this.olmMachine.getSecretsFromInbox(name);
+        const pendingValues: Set<string> = await this.olmMachine.getSecretsFromInbox(name);
         for (const value of pendingValues) {
             if (await this.handleSecretReceived(name, value)) {
                 // If we have a valid secret for that name there is no point of processing the other secrets values.
