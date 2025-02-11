@@ -162,8 +162,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     public async handleBackupSecretReceived(secret: string): Promise<boolean> {
         // Currently we only receive the decryption key without any key backup version. It is important to
         // check that the secret is valid for the current version before storing it.
-        // We force a check to ensure to have the latest version. We also want to check that the backup is trusted
-        // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later from an untrusted backup.
+        // We force a check to ensure to have the latest version.
         const backupCheck = await this.checkKeyBackupAndEnable(true);
         const latestBackupVersion = backupCheck?.backupInfo.version;
 
