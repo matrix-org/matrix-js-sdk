@@ -806,11 +806,6 @@ describe("RustCrypto", () => {
                     asJSON: jest.fn().mockReturnValue("{}"),
                 }),
                 saveBackupDecryptionKey: jest.fn(),
-                crossSigningStatus: jest.fn().mockResolvedValue({
-                    hasMaster: true,
-                    hasSelfSigning: true,
-                    hasUserSigning: true,
-                }),
                 exportCrossSigningKeys: jest.fn().mockResolvedValue({
                     masterKey: "sosecret",
                     userSigningKey: "secrets",
