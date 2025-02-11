@@ -165,9 +165,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // We force a check to ensure to have the latest version. We also want to check that the backup is trusted
         // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later from an untrusted backup.
         const backupCheck = await this.checkKeyBackupAndEnable(true);
-        const version = backupCheck?.backupInfo.version;
+        const latestBackupVersion = backupCheck?.backupInfo.version;
 
-        if (!backupCheck || !version) {
+        if (!latestBackupVersion) {
             // There is no server-side key backup, or the backup is not trusted.
             // This decryption key is useless to us.
             logger.warn(
@@ -189,7 +189,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
-            await this.saveBackupDecryptionKey(backupDecryptionKey, version);
+            await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupVersion);
             return true;
         } catch (e) {
             logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
