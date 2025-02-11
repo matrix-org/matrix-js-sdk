@@ -18,7 +18,6 @@ import { logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
-import { type MatrixClient } from "../client.ts";
 import { EventType } from "../@types/event.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
@@ -27,6 +26,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { LegacyMembershipManager, type IMembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
+import { type RTCClient, type RTCRoom } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -153,7 +153,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Returns all the call memberships for a room, oldest first
      */
-    public static callMembershipsForRoom(room: Room): CallMembership[] {
+    public static callMembershipsForRoom(room: RTCRoom): CallMembership[] {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
@@ -219,14 +219,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Return the MatrixRTC session for the room, whether there are currently active members or not
      */
-    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
+    public static roomSessionForRoom(
+        client: RTCClient,
+        room: Room): MatrixRTCSession
+    {
         const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
 
         return new MatrixRTCSession(client, room, callMemberships);
     }
 
     private constructor(
-        private readonly client: MatrixClient,
+        private readonly client: RTCClient,
         public readonly room: Room,
         public memberships: CallMembership[],
     ) {
