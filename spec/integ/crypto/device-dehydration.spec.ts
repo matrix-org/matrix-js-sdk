@@ -218,8 +218,8 @@ async function initializeSecretStorage(
             privateKey: new Uint8Array(32),
         };
     }
-    await matrixClient.bootstrapCrossSigning({ setupNewCrossSigning: true });
-    await matrixClient.bootstrapSecretStorage({
+    await matrixClient.getCrypto()!.bootstrapCrossSigning({ setupNewCrossSigning: true });
+    await matrixClient.getCrypto()!.bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage: true,
         setupNewKeyBackup: false,

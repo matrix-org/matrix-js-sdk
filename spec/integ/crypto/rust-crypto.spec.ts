@@ -18,12 +18,13 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import fetchMock from "fetch-mock-jest";
 
-import { createClient, CryptoEvent, IndexedDBCryptoStore } from "../../../src";
+import { createClient, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
 import { MSK_NOT_CACHED_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/no_cached_msk_dump";
 import { IDENTITY_NOT_TRUSTED_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/unverified";
 import { FULL_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/full_account";
 import { EMPTY_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/empty_account";
+import { CryptoEvent } from "../../../src/crypto-api";
 
 jest.setTimeout(15000);
 

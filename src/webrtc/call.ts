@@ -48,7 +48,6 @@ import {
 import { CallFeed } from "./callFeed.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { DeviceInfo } from "../crypto/deviceinfo.ts";
 import { GroupCallUnknownDeviceError } from "./groupCall.ts";
 import { type IScreensharingOpts } from "./mediaHandler.ts";
 import { MatrixError } from "../http-api/index.ts";
@@ -426,7 +425,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private callStartTime?: number;
 
     private opponentDeviceId?: string;
-    private opponentDeviceInfo?: DeviceInfo;
+    private hasOpponentDeviceInfo?: boolean;
     private opponentSessionId?: string;
     public groupCallId?: string;
 
@@ -631,23 +630,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!this.client.getUseE2eForGroupCall()) return;
         // It's possible to want E2EE and yet not have the means to manage E2EE
         // ourselves (for example if the client is a RoomWidgetClient)
-        if (!this.client.isCryptoEnabled()) {
+        if (!this.client.getCrypto()) {
             // All we know is the device ID
-            this.opponentDeviceInfo = new DeviceInfo(this.opponentDeviceId);
+            this.hasOpponentDeviceInfo = true;
             return;
         }
-        // if we've got to this point, we do want to init crypto, so throw if we can't
-        if (!this.client.crypto) throw new Error("Crypto is not initialised.");
-
         const userId = this.invitee || this.getOpponentMember()?.userId;
 
         if (!userId) throw new Error("Couldn't find opponent user ID to init crypto");
 
-        const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
-        this.opponentDeviceInfo = deviceInfoMap.get(userId)?.get(this.opponentDeviceId);
-        if (this.opponentDeviceInfo === undefined) {
-            throw new GroupCallUnknownDeviceError(userId);
-        }
+        // Here we were calling `MatrixClient.crypto.deviceList.downloadKeys` which is not supported by the rust cryptography.
+        this.hasOpponentDeviceInfo = false;
+        throw new GroupCallUnknownDeviceError(userId);
     }
 
     /**
@@ -2511,23 +2505,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember()!.userId;
             if (this.client.getUseE2eForGroupCall()) {
-                if (!this.opponentDeviceInfo) {
+                if (!this.hasOpponentDeviceInfo) {
                     logger.warn(`Call ${this.callId} sendVoipEvent() failed: we do not have opponentDeviceInfo`);
                     return;
                 }
 
-                await this.client.encryptAndSendToDevices(
-                    [
-                        {
-                            userId,
-                            deviceInfo: this.opponentDeviceInfo,
-                        },
-                    ],
-                    {
-                        type: eventType,
-                        content,
-                    },
-                );
+                // TODO: Here we were sending the event to the opponent's device as a to-device message with MatrixClient.encryptAndSendToDevices.
+                // However due to the switch to Rust cryptography we need to migrate to the new encryptToDeviceMessages API.
+                throw new Error("Unimplemented");
             } else {
                 await this.client.sendToDevice(
                     eventType,

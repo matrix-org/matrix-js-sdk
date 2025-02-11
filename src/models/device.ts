@@ -27,7 +27,7 @@ export type DeviceMap = Map<string, Map<string, Device>>;
 type DeviceParameters = Pick<Device, "deviceId" | "userId" | "algorithms" | "keys"> & Partial<Device>;
 
 /**
- *  Information on a user's device, as returned by {@link Crypto.CryptoApi.getUserDeviceInfo}.
+ *  Information on a user's device, as returned by {@link crypto-api!CryptoApi.getUserDeviceInfo}.
  */
 export class Device {
     /** id of the device */

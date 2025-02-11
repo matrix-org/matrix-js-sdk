@@ -430,13 +430,18 @@ describe("initRustCrypto", () => {
             expect(session.senderSigningKey).toBe(undefined);
         }, 10000);
 
-        async function encryptAndStoreSecretKey(type: string, key: Uint8Array, pickleKey: string, store: CryptoStore) {
+        async function encryptAndStoreSecretKey(
+            type: string,
+            key: Uint8Array,
+            pickleKey: string,
+            store: MemoryCryptoStore,
+        ) {
             const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), Buffer.from(pickleKey), type);
             store.storeSecretStorePrivateKey(undefined, type as keyof SecretStorePrivateKeys, encryptedKey);
         }
 
         /** Create a bunch of fake Olm sessions and stash them in the DB. */
-        function createSessions(store: CryptoStore, nDevices: number, nSessionsPerDevice: number) {
+        function createSessions(store: MemoryCryptoStore, nDevices: number, nSessionsPerDevice: number) {
             for (let i = 0; i < nDevices; i++) {
                 for (let j = 0; j < nSessionsPerDevice; j++) {
                     const sessionData = {
@@ -451,7 +456,7 @@ describe("initRustCrypto", () => {
         }
 
         /** Create a bunch of fake Megolm sessions and stash them in the DB. */
-        function createMegolmSessions(store: CryptoStore, nDevices: number, nSessionsPerDevice: number) {
+        function createMegolmSessions(store: MemoryCryptoStore, nDevices: number, nSessionsPerDevice: number) {
             for (let i = 0; i < nDevices; i++) {
                 for (let j = 0; j < nSessionsPerDevice; j++) {
                     store.storeEndToEndInboundGroupSession(
@@ -1006,34 +1011,6 @@ describe("RustCrypto", () => {
             await outgoingRequestsManager.doProcessOutgoingRequests();
 
             expect(deviceKeysAbsent).toBe(true);
-        });
-    });
-
-    describe(".getEventEncryptionInfo", () => {
-        let rustCrypto: RustCrypto;
-
-        beforeEach(async () => {
-            rustCrypto = await makeTestRustCrypto();
-        });
-
-        it("should handle unencrypted events", () => {
-            const event = mkEvent({ event: true, type: "m.room.message", content: { body: "xyz" } });
-            const res = rustCrypto.getEventEncryptionInfo(event);
-            expect(res.encrypted).toBeFalsy();
-        });
-
-        it("should handle encrypted events", async () => {
-            const event = mkEvent({ event: true, type: "m.room.encrypted", content: { algorithm: "fake_alg" } });
-            const mockCryptoBackend = {
-                decryptEvent: () =>
-                    ({
-                        senderCurve25519Key: "1234",
-                    }) as IEventDecryptionResult,
-            } as unknown as CryptoBackend;
-            await event.attemptDecryption(mockCryptoBackend);
-
-            const res = rustCrypto.getEventEncryptionInfo(event);
-            expect(res.encrypted).toBeTruthy();
         });
     });
 

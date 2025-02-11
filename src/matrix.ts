@@ -85,7 +85,6 @@ export * from "./models/related-relations.ts";
 export type { RoomSummary } from "./client.ts";
 export * as ContentHelpers from "./content-helpers.ts";
 export * as SecretStorage from "./secret-storage.ts";
-export type { ICryptoCallbacks } from "./crypto/index.ts"; // used to be located here
 export { createNewMatrixCall, CallEvent } from "./webrtc/call.ts";
 export type { MatrixCall } from "./webrtc/call.ts";
 export {
@@ -97,10 +96,6 @@ export {
     GroupCallStatsReportEvent,
 } from "./webrtc/groupCall.ts";
 
-export {
-    /** @deprecated Use {@link Crypto.CryptoEvent} instead */
-    CryptoEvent,
-} from "./crypto/index.ts";
 export { SyncState, SetPresence } from "./sync.ts";
 export type { ISyncStateData as SyncStateData } from "./sync.ts";
 export { SlidingSyncEvent } from "./sliding-sync.ts";
@@ -114,9 +109,6 @@ export { IdentityProviderBrand, SSOAction } from "./@types/auth.ts";
 export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth.ts";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces.ts";
 export { LocationAssetType } from "./@types/location.ts";
-
-/** @deprecated Backwards-compatibility re-export. Import from `crypto-api` directly. */
-export * as Crypto from "./crypto-api/index.ts";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 

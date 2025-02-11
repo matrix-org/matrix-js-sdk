@@ -26,7 +26,6 @@ import {
     UNSTABLE_MSC2716_MARKER,
     type MatrixClient,
     ClientEvent,
-    IndexedDBCryptoStore,
     type ISyncResponse,
     type IRoomEvent,
     type IJoinedRoom,
@@ -2570,9 +2569,8 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
     };
 
     it("should emit ClientEvent.Room when invited while using indexeddb crypto store", async () => {
-        const idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
-            cryptoStore: new IndexedDBCryptoStore(globalThis.indexedDB, "tests"),
-        });
+        // rust crypto uses by default indexeddb
+        const idbTestClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         const idbHttpBackend = idbTestClient.httpBackend;
         const idbClient = idbTestClient.client;
         idbHttpBackend.when("GET", "/versions").respond(200, {});

@@ -54,14 +54,23 @@ import { MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
-import { type DeviceInfo } from "./crypto/deviceinfo.ts";
-import { type IOlmDevice } from "./crypto/algorithms/megolm.ts";
 import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
 import { type EmptyObject, TypedEventEmitter } from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;
     stateKey?: string;
+}
+
+export interface OlmDevice {
+    /**
+     * The user ID of the device owner.
+     */
+    userId: string;
+    /**
+     * The device ID of the device.
+     */
+    deviceId: string;
 }
 
 export interface ICapabilities {
@@ -128,6 +137,7 @@ export enum RoomWidgetClientEvent {
     PendingEventsChanged = "PendingEvent.pendingEventsChanged",
 }
 export type EventHandlerMap = { [RoomWidgetClientEvent.PendingEventsChanged]: () => void };
+
 /**
  * A MatrixClient that routes its requests through the widget API instead of the
  * real CS API.
@@ -467,13 +477,10 @@ export class RoomWidgetClient extends MatrixClient {
         await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
     }
 
-    public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
+    public async encryptAndSendToDevices(userDeviceInfoArr: OlmDevice[], payload: object): Promise<void> {
         // map: user Id → device Id → payload
         const contentMap: MapWithDefault<string, Map<string, object>> = new MapWithDefault(() => new Map());
-        for (const {
-            userId,
-            deviceInfo: { deviceId },
-        } of userDeviceInfoArr) {
+        for (const { userId, deviceId } of userDeviceInfoArr) {
             contentMap.getOrCreate(userId).set(deviceId, payload);
         }
 

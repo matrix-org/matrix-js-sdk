@@ -23,7 +23,6 @@ import { type ExtensibleEvent, ExtensibleEvents, type Optional } from "matrix-ev
 
 import type { IEventDecryptionResult } from "../@types/crypto.ts";
 import { logger } from "../logger.ts";
-import { type VerificationRequest } from "../crypto/verification/request/VerificationRequest.ts";
 import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     EventType,
@@ -33,7 +32,6 @@ import {
     UNSIGNED_THREAD_ID_FIELD,
     UNSIGNED_MEMBERSHIP_FIELD,
 } from "../@types/event.ts";
-import { type Crypto } from "../crypto/index.ts";
 import { deepSortedObjectEntries, internaliseString } from "../utils.ts";
 import { type RoomMember } from "./room-member.ts";
 import { type Thread, THREAD_RELATION_TYPE, ThreadEvent, type ThreadEventHandlerMap } from "./thread.ts";
@@ -406,12 +404,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public forwardLooking = true;
-
-    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
-     * `Crypto` will set this the `VerificationRequest` for the event
-     * so it can be easily accessed from the timeline.
-     */
-    public verificationRequest?: VerificationRequest;
 
     private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
@@ -891,28 +883,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Cancel any room key request for this event and resend another.
-     *
-     * @param crypto - crypto module
-     * @param userId - the user who received this event
-     *
-     * @returns a promise that resolves when the request is queued
-     */
-    public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
-        const wireContent = this.getWireContent();
-        return crypto.requestRoomKey(
-            {
-                algorithm: wireContent.algorithm,
-                room_id: this.getRoomId()!,
-                session_id: wireContent.session_id,
-                sender_key: wireContent.sender_key,
-            },
-            this.getKeyRequestRecipients(userId),
-            true,
-        );
-    }
-
-    /**
      * Calculate the recipients for keyshare requests.
      *
      * @param userId - the user who received this event.
@@ -1109,7 +1079,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * signing the public curve25519 key with the ed25519 key.
      *
      * In general, applications should not use this method directly, but should
-     * instead use {@link Crypto.CryptoApi#getEncryptionInfoForEvent}.
+     * instead use {@link crypto-api!CryptoApi#getEncryptionInfoForEvent}.
      */
     public getClaimedEd25519Key(): string | null {
         return this.claimedEd25519Key;
@@ -1719,10 +1689,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             decrypted: event,
             encrypted: this.event,
         };
-    }
-
-    public setVerificationRequest(request: VerificationRequest): void {
-        this.verificationRequest = request;
     }
 
     public setTxnId(txnId: string): void {
