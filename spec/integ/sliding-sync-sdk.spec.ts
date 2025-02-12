@@ -649,23 +649,11 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("e2ee");
         });
 
-<<<<<<< HEAD
-        afterAll(async () => {
-            // needed else we do some async operations in the background which can cause Jest to whine:
-            // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
-            // Attempted to log "Saving device tracking data null"."
-            client!.crypto!.stop();
-        });
-
         it("gets enabled all the time", async () => {
             expect(await ext.onRequest(true)).toEqual({
                 enabled: true,
             });
             expect(await ext.onRequest(false)).toEqual({
-=======
-        it("gets enabled on the initial request only", () => {
-            expect(ext.onRequest(true)).toEqual({
->>>>>>> develop
                 enabled: true,
             });
         });
