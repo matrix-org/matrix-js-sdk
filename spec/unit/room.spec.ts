@@ -4276,4 +4276,9 @@ describe("Room", function () {
             expect(filteredEvents[0].getContent().body).toEqual("ev2");
         });
     });
+
+    it("saves and retrieves the bump stamp", () => {
+        room.setBumpStamp(123456789);
+        expect(room.getBumpStamp()).toEqual(123456789);
+    });
 });
