@@ -1234,6 +1234,18 @@ describe("Room", function () {
                 expect(room.name).toEqual(nameB);
             });
 
+            it("supports MSC4186 style heroes", () => {
+                const nameB = "Bertha Bobbington";
+                const nameC = "Clarissa Harissa";
+                addMember(userB, KnownMembership.Join, { name: nameB });
+                addMember(userC, KnownMembership.Join, { name: nameC });
+                room.setSummary({
+                    "m.heroes": [{ userId: userB }, { userId: userC }],
+                });
+                room.recalculate();
+                expect(room.name).toEqual(`${nameB} and ${nameC}`);
+            });
+
             it("reverts to empty room in case of self chat", function () {
                 room.setSummary({
                     "m.heroes": [],
