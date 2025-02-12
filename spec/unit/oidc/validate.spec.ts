@@ -18,17 +18,18 @@ import { mocked } from "jest-mock";
 import { jwtDecode } from "jwt-decode";
 
 import { logger } from "../../../src/logger";
-import { validateIdToken, validateOIDCIssuerWellKnown } from "../../../src/oidc/validate";
+import { type ValidatedAuthMetadata, validateIdToken, validateAuthMetadata } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
 jest.mock("jwt-decode");
 
 describe("validateOIDCIssuerWellKnown", () => {
-    const validWk: any = {
+    const validWk: ValidatedAuthMetadata = {
+        issuer: "https://test.org",
         authorization_endpoint: "https://test.org/authorize",
         token_endpoint: "https://authorize.org/token",
-        registration_endpoint: "https://authorize.org/regsiter",
-        revocation_endpoint: "https://authorize.org/regsiter",
+        registration_endpoint: "https://authorize.org/register",
+        revocation_endpoint: "https://authorize.org/revoke",
         response_types_supported: ["code"],
         grant_types_supported: ["authorization_code"],
         code_challenge_methods_supported: ["S256"],
@@ -44,14 +45,14 @@ describe("validateOIDCIssuerWellKnown", () => {
 
     it("should throw OP support error when wellKnown is not an object", () => {
         expect(() => {
-            validateOIDCIssuerWellKnown([]);
+            validateAuthMetadata([]);
         }).toThrow(OidcError.OpSupport);
         expect(logger.error).toHaveBeenCalledWith("Issuer configuration not found or malformed");
     });
 
     it("should log all errors before throwing", () => {
         expect(() => {
-            validateOIDCIssuerWellKnown({
+            validateAuthMetadata({
                 ...validWk,
                 authorization_endpoint: undefined,
                 response_types_supported: [],
@@ -62,24 +63,31 @@ describe("validateOIDCIssuerWellKnown", () => {
     });
 
     it("should return validated issuer config", () => {
-        expect(validateOIDCIssuerWellKnown(validWk)).toEqual({
-            authorizationEndpoint: validWk.authorization_endpoint,
-            tokenEndpoint: validWk.token_endpoint,
-            registrationEndpoint: validWk.registration_endpoint,
-            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
-            accountManagementEndpoint: "https://authorize.org/account",
-        });
+        expect(validateAuthMetadata(validWk)).toEqual(
+            expect.objectContaining({
+                issuer: validWk.issuer,
+                authorization_endpoint: validWk.authorization_endpoint,
+                token_endpoint: validWk.token_endpoint,
+                registration_endpoint: validWk.registration_endpoint,
+                account_management_actions_supported: ["org.matrix.cross_signing_reset"],
+                account_management_uri: "https://authorize.org/account",
+            }),
+        );
     });
 
-    it("should return validated issuer config without registrationendpoint", () => {
-        const wk = { ...validWk };
-        delete wk.registration_endpoint;
-        expect(validateOIDCIssuerWellKnown(wk)).toEqual({
-            authorizationEndpoint: validWk.authorization_endpoint,
-            tokenEndpoint: validWk.token_endpoint,
-            registrationEndpoint: undefined,
-            accountManagementActionsSupported: ["org.matrix.cross_signing_reset"],
-            accountManagementEndpoint: "https://authorize.org/account",
+    it("should return validated issuer config without registration_endpoint", () => {
+        const { registration_endpoint: _, ...wk } = validWk;
+        expect(validateAuthMetadata(wk)).toEqual({
+            issuer: validWk.issuer,
+            authorization_endpoint: validWk.authorization_endpoint,
+            token_endpoint: validWk.token_endpoint,
+            revocation_endpoint: validWk.revocation_endpoint,
+            registration_endpoint: undefined,
+            account_management_actions_supported: ["org.matrix.cross_signing_reset"],
+            account_management_uri: "https://authorize.org/account",
+            code_challenge_methods_supported: ["S256"],
+            grant_types_supported: ["authorization_code"],
+            response_types_supported: ["code"],
         });
     });
 
@@ -106,7 +114,7 @@ describe("validateOIDCIssuerWellKnown", () => {
             ...validWk,
             [key]: value,
         };
-        expect(() => validateOIDCIssuerWellKnown(wk)).toThrow(OidcError.OpSupport);
+        expect(() => validateAuthMetadata(wk)).toThrow(OidcError.OpSupport);
     });
 });
 
@@ -165,6 +173,23 @@ describe("validateIdToken()", () => {
         mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             aud: `${clientId},uiop,asdf`,
+        });
+        expect(() => validateIdToken(idToken, issuer, clientId, nonce)).toThrow(new Error(OidcError.InvalidIdToken));
+        expect(logger.error).toHaveBeenCalledWith("Invalid ID token", new Error("Invalid audience"));
+    });
+
+    it("should not throw when audience is an array that includes clientId", () => {
+        mocked(jwtDecode).mockReturnValue({
+            ...validDecodedIdToken,
+            aud: [clientId],
+        });
+        expect(() => validateIdToken(idToken, issuer, clientId, nonce)).not.toThrow();
+    });
+
+    it("should throw when audience is an array that does not include clientId", () => {
+        mocked(jwtDecode).mockReturnValue({
+            ...validDecodedIdToken,
+            aud: [`${clientId},uiop`, "asdf"],
         });
         expect(() => validateIdToken(idToken, issuer, clientId, nonce)).toThrow(new Error(OidcError.InvalidIdToken));
         expect(logger.error).toHaveBeenCalledWith("Invalid ID token", new Error("Invalid audience"));

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
+import { type IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
 
-import { AccessTokens } from "../http-api/index.ts";
+import { type AccessTokens } from "../http-api/index.ts";
 import { generateScope } from "./authorize.ts";
 import { discoverAndValidateOIDCIssuerWellKnown } from "./discovery.ts";
 import { logger } from "../logger.ts";
@@ -77,11 +77,12 @@ export class OidcTokenRefresher {
             const scope = generateScope(deviceId);
 
             this.oidcClient = new OidcClient({
-                ...config.metadata,
+                metadata: config,
+                signingKeys: config.signingKeys ?? undefined,
                 client_id: clientId,
                 scope,
                 redirect_uri: redirectUri,
-                authority: config.metadata.issuer,
+                authority: config.issuer,
                 stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
             });
         } catch (error) {

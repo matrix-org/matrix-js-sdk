@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IServerVersions } from "./client.ts";
+import { type IServerVersions } from "./client.ts";
 
 export enum ServerSupport {
     Stable,
@@ -60,6 +60,7 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
     [Feature.RelationsRecursion]: {
         unstablePrefixes: ["org.matrix.msc3981"],
+        matrixVersion: "v1.10",
     },
     [Feature.IntentionalMentions]: {
         unstablePrefixes: ["org.matrix.msc3952_intentional_mentions"],

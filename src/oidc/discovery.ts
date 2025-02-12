@@ -16,9 +16,9 @@ limitations under the License.
 
 import { MetadataService, OidcClientSettingsStore } from "oidc-client-ts";
 
-import { isValidatedIssuerMetadata, validateOIDCIssuerWellKnown } from "./validate.ts";
+import { validateAuthMetadata } from "./validate.ts";
 import { Method, timeoutSignal } from "../http-api/index.ts";
-import { OidcClientConfig } from "./index.ts";
+import { type OidcClientConfig } from "./index.ts";
 
 /**
  * @experimental
@@ -30,6 +30,7 @@ import { OidcClientConfig } from "./index.ts";
  * @param issuer - the OIDC issuer as returned by the /auth_issuer API
  * @returns validated authentication metadata and optionally signing keys
  * @throws when delegated auth config is invalid or unreachable
+ * @deprecated in favour of {@link MatrixClient#getAuthMetadata}
  */
 export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Promise<OidcClientConfig> => {
     const issuerOpenIdConfigUrl = new URL(".well-known/openid-configuration", issuer);
@@ -38,23 +39,29 @@ export const discoverAndValidateOIDCIssuerWellKnown = async (issuer: string): Pr
         signal: timeoutSignal(5000),
     });
     const issuerWellKnown = await issuerWellKnownResponse.json();
-    const validatedIssuerConfig = validateOIDCIssuerWellKnown(issuerWellKnown);
+    return validateAuthMetadataAndKeys(issuerWellKnown);
+};
+
+/**
+ * @experimental
+ * Validate the authentication metadata and fetch the signing keys from the jwks_uri in the metadata
+ * @param authMetadata - the authentication metadata to validate
+ * @returns validated authentication metadata and signing keys
+ */
+export const validateAuthMetadataAndKeys = async (authMetadata: unknown): Promise<OidcClientConfig> => {
+    const validatedIssuerConfig = validateAuthMetadata(authMetadata);
 
     // create a temporary settings store, so we can use metadata service for discovery
     const settings = new OidcClientSettingsStore({
-        authority: issuer,
+        authority: validatedIssuerConfig.issuer,
+        metadata: validatedIssuerConfig,
         redirect_uri: "", // Not known yet, this is here to make the type checker happy
         client_id: "", // Not known yet, this is here to make the type checker happy
     });
     const metadataService = new MetadataService(settings);
-    const metadata = await metadataService.getMetadata();
-    const signingKeys = (await metadataService.getSigningKeys()) ?? undefined;
-
-    isValidatedIssuerMetadata(metadata);
 
     return {
         ...validatedIssuerConfig,
-        metadata,
-        signingKeys,
+        signingKeys: await metadataService.getSigningKeys(),
     };
 };

@@ -15,41 +15,56 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
-import MockHttpBackend from "matrix-mock-request";
 import { fail } from "assert";
 
-import { SlidingSync, SlidingSyncEvent, MSC3575RoomData, SlidingSyncState, Extension } from "../../src/sliding-sync";
-import { TestClient } from "../TestClient";
-import { IRoomEvent, IStateEvent } from "../../src";
+import type MockHttpBackend from "matrix-mock-request";
 import {
-    MatrixClient,
-    MatrixEvent,
+    SlidingSync,
+    SlidingSyncEvent,
+    type MSC3575RoomData,
+    SlidingSyncState,
+    type Extension,
+} from "../../src/sliding-sync";
+import { TestClient } from "../TestClient";
+import { type IRoomEvent, type IStateEvent } from "../../src";
+import {
+    type MatrixClient,
+    type MatrixEvent,
     NotificationCountType,
     JoinRule,
     MatrixError,
     EventType,
-    IPushRules,
+    type IPushRules,
     PushRuleKind,
     TweakName,
     ClientEvent,
     RoomMemberEvent,
     RoomEvent,
-    Room,
-    IRoomTimelineData,
+    type Room,
+    type IRoomTimelineData,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
-import { SyncApiOptions, SyncState } from "../../src/sync";
-import { IStoredClientOpts } from "../../src";
+import { type SyncApiOptions, SyncState } from "../../src/sync";
+import { type IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
 import { defer } from "../../src/utils";
 import { KnownMembership } from "../../src/@types/membership";
+import { type SyncCryptoCallbacks } from "../../src/common-crypto/CryptoBackend";
+
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        global_test: {};
+        tester: {};
+    }
+}
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient | undefined;
     let httpBackend: MockHttpBackend | undefined;
     let sdk: SlidingSyncSdk | undefined;
     let mockSlidingSync: SlidingSync | undefined;
+    let syncCryptoCallback: SyncCryptoCallbacks | undefined;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
 
@@ -119,8 +134,9 @@ describe("SlidingSyncSdk", () => {
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", new Map(), {}, client, 0));
         if (testOpts.withCrypto) {
             httpBackend!.when("GET", "/room_keys/version").respond(404, {});
-            await client!.initLegacyCrypto();
-            syncOpts.cryptoCallbacks = syncOpts.crypto = client!.crypto;
+            await client!.initRustCrypto({ useIndexedDB: false });
+            syncCryptoCallback = client!.getCrypto() as unknown as SyncCryptoCallbacks;
+            syncOpts.cryptoCallbacks = syncCryptoCallback;
         }
         httpBackend!.when("GET", "/_matrix/client/v3/pushrules").respond(200, {});
         sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts, syncOpts);
@@ -633,6 +649,7 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("e2ee");
         });
 
+<<<<<<< HEAD
         afterAll(async () => {
             // needed else we do some async operations in the background which can cause Jest to whine:
             // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
@@ -645,33 +662,37 @@ describe("SlidingSyncSdk", () => {
                 enabled: true,
             });
             expect(await ext.onRequest(false)).toEqual({
+=======
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+>>>>>>> develop
                 enabled: true,
             });
         });
 
         it("can update device lists", () => {
-            client!.crypto!.processDeviceLists = jest.fn();
+            syncCryptoCallback!.processDeviceLists = jest.fn();
             ext.onResponse({
                 device_lists: {
                     changed: ["@alice:localhost"],
                     left: ["@bob:localhost"],
                 },
             });
-            expect(client!.crypto!.processDeviceLists).toHaveBeenCalledWith({
+            expect(syncCryptoCallback!.processDeviceLists).toHaveBeenCalledWith({
                 changed: ["@alice:localhost"],
                 left: ["@bob:localhost"],
             });
         });
 
         it("can update OTK counts and unused fallback keys", () => {
-            client!.crypto!.processKeyCounts = jest.fn();
+            syncCryptoCallback!.processKeyCounts = jest.fn();
             ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },
                 device_unused_fallback_key_types: ["signed_curve25519"],
             });
-            expect(client!.crypto!.processKeyCounts).toHaveBeenCalledWith({ signed_curve25519: 42 }, [
+            expect(syncCryptoCallback!.processKeyCounts).toHaveBeenCalledWith({ signed_curve25519: 42 }, [
                 "signed_curve25519",
             ]);
         });

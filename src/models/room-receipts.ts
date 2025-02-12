@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent } from "../@types/read_receipts.ts";
+import { MAIN_ROOM_TIMELINE, type Receipt, type ReceiptContent } from "../@types/read_receipts.ts";
 import { threadIdForReceipt } from "../client.ts";
-import { Room, RoomEvent } from "./room.ts";
-import { MatrixEvent } from "./event.ts";
+import { type Room, RoomEvent } from "./room.ts";
+import { type MatrixEvent } from "./event.ts";
 import { logger } from "../logger.ts";
 
 /**

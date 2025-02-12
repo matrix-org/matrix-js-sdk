@@ -17,9 +17,9 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
-import { EventEmitter } from "events";
+import { type EventEmitter } from "events";
 
-import { ListenerMap, TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { type ListenerMap, type TypedEventEmitter } from "./models/typed-event-emitter.ts";
 
 export class ReEmitter {
     public constructor(private readonly target: EventEmitter) {}

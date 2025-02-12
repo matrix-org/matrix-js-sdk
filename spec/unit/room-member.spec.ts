@@ -21,8 +21,8 @@ import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
 import {
     createClient,
     EventType,
-    MatrixClient,
-    RoomState,
+    type MatrixClient,
+    type RoomState,
     UNSTABLE_MSC2666_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_SHARED_ROOMS,
@@ -64,6 +64,40 @@ describe("RoomMember", function () {
         it("should return nothing if there is no m.room.member and allowDefault=false", function () {
             const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false, false);
             expect(url).toEqual(null);
+        });
+
+        it("should return unauthenticated media URL if useAuthentication is not set", function () {
+            member.events.member = utils.mkEvent({
+                event: true,
+                type: "m.room.member",
+                skey: userA,
+                room: roomId,
+                user: userA,
+                content: {
+                    membership: KnownMembership.Join,
+                    avatar_url: "mxc://flibble/wibble",
+                },
+            });
+            const url = member.getAvatarUrl(hsUrl, 1, 1, "", false, false);
+            // Check for unauthenticated media prefix
+            expect(url?.indexOf("/_matrix/media/v3/")).not.toEqual(-1);
+        });
+
+        it("should return authenticated media URL if useAuthentication=true", function () {
+            member.events.member = utils.mkEvent({
+                event: true,
+                type: "m.room.member",
+                skey: userA,
+                room: roomId,
+                user: userA,
+                content: {
+                    membership: KnownMembership.Join,
+                    avatar_url: "mxc://flibble/wibble",
+                },
+            });
+            const url = member.getAvatarUrl(hsUrl, 1, 1, "", false, false, true);
+            // Check for authenticated media prefix
+            expect(url?.indexOf("/_matrix/client/v1/media/")).not.toEqual(-1);
         });
     });
 

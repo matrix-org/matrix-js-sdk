@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { CrossSigningIdentity } from "../../../src/rust-crypto/CrossSigningIdentity";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import { ServerSideSecretStorage } from "../../../src/secret-storage";
+import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { type ServerSideSecretStorage } from "../../../src/secret-storage";
 
 describe("CrossSigningIdentity", () => {
     describe("bootstrapCrossSigning", () => {
@@ -63,7 +63,7 @@ describe("CrossSigningIdentity", () => {
                 hasMaster: true,
                 hasSelfSigning: true,
                 hasUserSigning: true,
-            });
+            } as unknown as RustSdkCryptoJs.CrossSigningStatus);
             // in secret storage
             secretStorage.get.mockResolvedValue("base64-saved-in-storage");
             await crossSigning.bootstrapCrossSigning({});
@@ -72,19 +72,23 @@ describe("CrossSigningIdentity", () => {
         });
 
         it("should call bootstrapCrossSigning if a reset is forced", async () => {
-            olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
+            olmMachine.bootstrapCrossSigning.mockResolvedValue(
+                [] as unknown as RustSdkCryptoJs.CrossSigningBootstrapRequests,
+            );
             await crossSigning.bootstrapCrossSigning({ setupNewCrossSigning: true });
             expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
         });
 
         it("Shoud update 4S on reset if 4S is set up", async () => {
-            olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
+            olmMachine.bootstrapCrossSigning.mockResolvedValue(
+                [] as unknown as RustSdkCryptoJs.CrossSigningBootstrapRequests,
+            );
             secretStorage.hasKey.mockResolvedValue(true);
             olmMachine.exportCrossSigningKeys.mockResolvedValue({
                 masterKey: "base64_aaaaaaaaaa",
                 self_signing_key: "base64_bbbbbbbbbbb",
                 userSigningKey: "base64_cccccccc",
-            });
+            } as unknown as RustSdkCryptoJs.CrossSigningKeyExport);
             await crossSigning.bootstrapCrossSigning({ setupNewCrossSigning: true });
             expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
             expect(secretStorage.store).toHaveBeenCalledTimes(3);
@@ -95,8 +99,10 @@ describe("CrossSigningIdentity", () => {
                 hasMaster: false,
                 hasSelfSigning: false,
                 hasUserSigning: false,
-            });
-            olmMachine.bootstrapCrossSigning.mockResolvedValue([]);
+            } as RustSdkCryptoJs.CrossSigningStatus);
+            olmMachine.bootstrapCrossSigning.mockResolvedValue(
+                [] as unknown as RustSdkCryptoJs.CrossSigningBootstrapRequests,
+            );
             await crossSigning.bootstrapCrossSigning({});
             expect(olmMachine.bootstrapCrossSigning).toHaveBeenCalledWith(true);
         });

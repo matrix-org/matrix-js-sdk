@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
+import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
+import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
 import { logger, LogSpan } from "../../../src/logger";
 
 afterEach(() => {
@@ -74,7 +74,8 @@ describe("KeyClaimManager", () => {
                     // ...  and we now resolve the original promise with the resolver for that second promise.
                     resolveCalledPromise(resolveCompletePromise);
                 });
-                return completePromise;
+                await completePromise;
+                return true;
             });
         });
     }
@@ -91,7 +92,7 @@ describe("KeyClaimManager", () => {
         fetchMock.postOnce("https://example.com/_matrix/client/v3/keys/claim", '{ "k": "v" }');
 
         // also stub out olmMachine.markRequestAsSent
-        olmMachine.markRequestAsSent.mockResolvedValueOnce(undefined);
+        olmMachine.markRequestAsSent.mockResolvedValueOnce(true);
 
         // fire off the request
         await keyClaimManager.ensureSessionsForUsers(new LogSpan(logger, "test"), [u1, u2]);

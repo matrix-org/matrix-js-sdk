@@ -1,41 +1,40 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed.ts";
-import { MatrixClient, IMyDevice } from "../client.ts";
+import { type MatrixClient, type IMyDevice } from "../client.ts";
 import {
     CallErrorCode,
     CallEvent,
-    CallEventHandlerMap,
+    type CallEventHandlerMap,
     CallState,
     genCallID,
-    MatrixCall,
+    type MatrixCall,
     setTracksEnabled,
     createNewMatrixCall,
     CallError,
 } from "./call.ts";
-import { RoomMember } from "../models/room-member.ts";
-import { Room } from "../models/room.ts";
+import { type RoomMember } from "../models/room-member.ts";
+import { type Room } from "../models/room.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { logger } from "../logger.ts";
 import { ReEmitter } from "../ReEmitter.ts";
 import { SDPStreamMetadataPurpose } from "./callEventTypes.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
 import { CallEventHandlerEvent } from "./callEventHandler.ts";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler.ts";
-import { IScreensharingOpts } from "./mediaHandler.ts";
+import { type IScreensharingOpts } from "./mediaHandler.ts";
 import { mapsEqual } from "../utils.ts";
 import { GroupCallStats } from "./stats/groupCallStats.ts";
 import {
-    ByteSentStatsReport,
-    CallFeedReport,
-    ConnectionStatsReport,
+    type ByteSentStatsReport,
+    type CallFeedReport,
+    type ConnectionStatsReport,
     StatsReport,
-    SummaryStatsReport,
+    type SummaryStatsReport,
 } from "./stats/statsReport.ts";
 import { SummaryStatsReportGatherer } from "./stats/summaryStatsReportGatherer.ts";
 import { CallFeedStatsReporter } from "./stats/callFeedStatsReporter.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { CallMembershipData } from "../matrixrtc/CallMembership.ts";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -196,11 +195,6 @@ export interface IGroupCallRoomMemberCallState {
 
 export interface IGroupCallRoomMemberState {
     "m.calls": IGroupCallRoomMemberCallState[];
-}
-
-// XXX: this hasn't made it into the MSC yet
-export interface ExperimentalGroupCallRoomMemberState {
-    memberships: CallMembershipData[];
 }
 
 export enum GroupCallState {

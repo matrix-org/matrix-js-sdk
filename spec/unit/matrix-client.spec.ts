@@ -14,10 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mocked, mocked } from "jest-mock";
+import { type Mocked, mocked } from "jest-mock";
+import fetchMock from "fetch-mock-jest";
 
 import { logger } from "../../src/logger";
-import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
+import {
+    ClientEvent,
+    type IMatrixClientCreateOpts,
+    type ITurnServerResponse,
+    MatrixClient,
+    type Store,
+} from "../../src/client";
 import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
@@ -30,8 +37,6 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
-import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
-import { Crypto } from "../../src/crypto";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
@@ -42,16 +47,17 @@ import {
     ClientPrefix,
     ConditionKind,
     ContentHelpers,
+    createClient,
     Direction,
     EventTimeline,
     EventTimelineSet,
     getHttpUriForMxc,
-    ICreateRoomOpts,
-    IPushRule,
-    IRequestOpts,
+    type ICreateRoomOpts,
+    type IPushRule,
+    type IRequestOpts,
     MatrixError,
-    MatrixHttpApi,
-    MatrixScheduler,
+    type MatrixHttpApi,
+    type MatrixScheduler,
     Method,
     PushRuleActionName,
     Room,
@@ -67,15 +73,17 @@ import {
     PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
-import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
-import { defer, QueryDict } from "../../src/utils";
-import { SyncState } from "../../src/sync";
+import { defer, type QueryDict } from "../../src/utils";
+import { type SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
-import { SecretStorageKeyDescriptionAesV1, ServerSideSecretStorageImpl } from "../../src/secret-storage";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { type ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
-import { RoomMessageEventContent } from "../../src/@types/events";
+import { type RoomMessageEventContent } from "../../src/@types/events";
+import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
+import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { SyncResponder } from "../test-utils/SyncResponder.ts";
+import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
 
 jest.useFakeTimers();
 
@@ -92,6 +100,12 @@ function convertQueryDictToMap(queryDict?: QueryDict): Map<string, string> {
     }
 
     return new Map(Object.entries(queryDict).map(([k, v]) => [k, String(v)]));
+}
+
+declare module "../../src/@types/event" {
+    interface AccountDataEvents {
+        "im.vector.test": {};
+    }
 }
 
 type HttpLookup = {
@@ -113,6 +127,18 @@ type WrappedRoom = Room & {
     _options: Options;
     _state: Map<string, any>;
 };
+
+/** A list of methods to run after the current test */
+const afterTestHooks: (() => Promise<void> | void)[] = [];
+
+afterEach(async () => {
+    fetchMock.reset();
+    jest.restoreAllMocks();
+    for (const hook of afterTestHooks) {
+        await hook();
+    }
+    afterTestHooks.length = 0;
+});
 
 describe("convertQueryDictToMap", () => {
     it("returns an empty map when dict is undefined", () => {
@@ -154,6 +180,11 @@ describe("MatrixClient", function () {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
     const identityServerDomain = "identity.server";
+
+    /**
+     * @deprecated this is hard to use correctly; better to create a regular client with {@link createClient}
+     * and use fetch-mock.
+     */
     let client: MatrixClient;
     let store: Store;
     let scheduler: MatrixScheduler;
@@ -259,13 +290,17 @@ describe("MatrixClient", function () {
 
             if (next.error) {
                 // eslint-disable-next-line
-                return Promise.reject({
-                    errcode: (<MatrixError>next.error).errcode,
-                    httpStatus: (<MatrixError>next.error).httpStatus,
-                    name: (<MatrixError>next.error).errcode,
-                    message: "Expected testing error",
-                    data: next.error,
-                });
+                return Promise.reject(
+                    new MatrixError(
+                        {
+                            errcode: (<MatrixError>next.error).errcode,
+                            name: (<MatrixError>next.error).errcode,
+                            message: "Expected testing error",
+                            data: next.error,
+                        },
+                        (<MatrixError>next.error).httpStatus,
+                    ),
+                );
             }
             return Promise.resolve(next.data);
         }
@@ -1178,7 +1213,7 @@ describe("MatrixClient", function () {
                         type: EventType.RoomEncryption,
                         state_key: "",
                         content: {
-                            algorithm: MEGOLM_ALGORITHM,
+                            algorithm: "m.megolm.v1.aes-sha2",
                         },
                     },
                 ],
@@ -1904,7 +1939,7 @@ describe("MatrixClient", function () {
             hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
         } as unknown as Room;
 
-        let mockCrypto: Mocked<Crypto>;
+        let mockCrypto: Mocked<CryptoBackend>;
 
         let event: MatrixEvent;
         beforeEach(async () => {
@@ -1924,8 +1959,8 @@ describe("MatrixClient", function () {
                 isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
                 encryptEvent: jest.fn(),
                 stop: jest.fn(),
-            } as unknown as Mocked<Crypto>;
-            client.crypto = client["cryptoBackend"] = mockCrypto;
+            } as unknown as Mocked<CryptoBackend>;
+            client["cryptoBackend"] = mockCrypto;
         });
 
         function assertCancelled() {
@@ -2244,7 +2279,7 @@ describe("MatrixClient", function () {
     });
 
     describe("checkTurnServers", () => {
-        beforeAll(() => {
+        beforeEach(() => {
             mocked(supportsMatrixCall).mockReturnValue(true);
         });
 
@@ -2308,21 +2343,6 @@ describe("MatrixClient", function () {
             expect(await client.checkTurnServers()).toBe(false);
             client.off(ClientEvent.TurnServersError, onTurnServersError);
             expect(events).toEqual([[error, true]]); // fatal
-        });
-    });
-
-    describe("encryptAndSendToDevices", () => {
-        it("throws an error if crypto is unavailable", () => {
-            client.crypto = undefined;
-            expect(() => client.encryptAndSendToDevices([], {})).toThrow();
-        });
-
-        it("is an alias for the crypto method", async () => {
-            client.crypto = testUtils.mock(Crypto, "Crypto");
-            const deviceInfos: IOlmDevice[] = [];
-            const payload = {};
-            await client.encryptAndSendToDevices(deviceInfos, payload);
-            expect(client.crypto.encryptAndSendToDevices).toHaveBeenLastCalledWith(deviceInfos, payload);
         });
     });
 
@@ -2659,10 +2679,164 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("delete account data", () => {
-        afterEach(() => {
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
+    describe("setAccountData", () => {
+        const TEST_HOMESERVER_URL = "https://alice-server.com";
+
+        /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
+        async function setUpClient(): Promise<MatrixClient> {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
+
+            mockInitialApiRequests(TEST_HOMESERVER_URL, userId);
+
+            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
+            await client.startClient();
+
+            // Remember to stop the client again, to stop it spamming logs and HTTP requests
+            afterTestHooks.push(() => client.stopClient());
+            return client;
+        }
+
+        it("falls back to raw request if called before the client is started", async () => {
+            // GIVEN a bunch of setup
+            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
+
+            const eventType = "im.vector.test";
+            const content = { a: 1 };
+            const testresponse = { test: 1 };
+
+            // ... including an expected REST request
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+
+            // suppress the expected warning on the console
+            jest.spyOn(console, "warn").mockImplementation();
+
+            // WHEN we call `setAccountData` ...
+            const result = await client.setAccountData(eventType, content);
+
+            // THEN, method should have returned the right thing
+            expect(result).toEqual(testresponse);
+
+            // and the REST call should have happened, and had the correct content
+            const lastCall = fetchMock.lastCall("put-account-data");
+            expect(lastCall).toBeDefined();
+            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+
+            // and a warning should have been logged
+            // eslint-disable-next-line no-console
+            expect(console.warn).toHaveBeenCalledWith(
+                expect.stringContaining("Calling `setAccountData` before the client is started"),
+            );
         });
+
+        it("makes a request to the server, and waits for the /sync response", async () => {
+            // GIVEN a bunch of setup
+            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+            const client = await setUpClient();
+
+            const eventType = "im.vector.test";
+            const content = { a: 1 };
+            const testresponse = { test: 1 };
+
+            // ... including an expected REST request
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+
+            // WHEN we call `setAccountData` ...
+            const setProm = client.setAccountData(eventType, content);
+
+            // THEN, the REST call should have happened, and had the correct content
+            const lastCall = fetchMock.lastCall("put-account-data");
+            expect(lastCall).toBeDefined();
+            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+
+            // Even after waiting a bit, the method should not yet have returned
+            await jest.advanceTimersByTimeAsync(10);
+            let finished = false;
+            setProm.finally(() => (finished = true));
+            expect(finished).toBeFalsy();
+
+            // ... and `getAccountData` still returns the wrong thing
+            expect(client.getAccountData(eventType)).not.toBeDefined();
+
+            // WHEN the update arrives over /sync
+            const content2 = { a: 2 };
+
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: eventType, content: content2 }] },
+            });
+
+            // THEN the method should complete, and `getAccountData` returns the new data
+            expect(await setProm).toEqual(testresponse);
+            expect(client.getAccountData(eventType)?.event).toEqual({ type: eventType, content: content2 });
+        });
+
+        it("does nothing if the data matches what is there", async () => {
+            // GIVEN a running matrix client ...
+            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+            const client = await setUpClient();
+
+            // ... which has previously received the account data over /sync
+            const eventType = "im.vector.test";
+            const content = { a: 1, b: 2 };
+
+            // Keys in a different order, to check that doesn't matter.
+            const syncedContent = { b: 2, a: 1 };
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: eventType, content: syncedContent }] },
+            });
+            await jest.advanceTimersByTimeAsync(1);
+
+            // Check that getAccountData is ready
+            expect(client.getAccountData(eventType)?.event).toEqual({ type: eventType, content: syncedContent });
+
+            // WHEN we call `setAccountData` ...
+            await client.setAccountData(eventType, content);
+
+            // THEN there should be no REST call
+            expect(fetchMock.calls(/account_data/).length).toEqual(0);
+        });
+    });
+
+    describe("delete account data", () => {
+        const TEST_HOMESERVER_URL = "https://alice-server.com";
+
+        /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
+        async function setUpClient(versionsResponse: object = { versions: ["1"] }): Promise<MatrixClient> {
+            // anything that we don't have a specific matcher for silently returns a 404
+            fetchMock.catch(404);
+            fetchMock.config.warnOnFallback = false;
+
+            fetchMock.getOnce(new URL("/_matrix/client/versions", TEST_HOMESERVER_URL).toString(), versionsResponse, {
+                overwriteRoutes: true,
+            });
+            fetchMock.getOnce(
+                new URL("/_matrix/client/v3/pushrules/", TEST_HOMESERVER_URL).toString(),
+                {},
+                { overwriteRoutes: true },
+            );
+            fetchMock.postOnce(
+                new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, TEST_HOMESERVER_URL).toString(),
+                { filter_id: "fid" },
+                { overwriteRoutes: true },
+            );
+
+            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
+            await client.startClient();
+
+            // Remember to stop the client again, to stop it spamming logs and HTTP requests
+            afterTestHooks.push(() => client.stopClient());
+            return client;
+        }
+
         it("makes correct request when deletion is supported by server in unstable versions", async () => {
             const eventType = "im.vector.test";
             const versionsResponse = {
@@ -2671,17 +2845,17 @@ describe("MatrixClient", function () {
                     "org.matrix.msc3391": true,
                 },
             };
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
-            const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
-            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+            const client = await setUpClient(versionsResponse);
 
-            // populate version support
-            await client.getVersions();
+            const url = new URL(
+                `/_matrix/client/unstable/org.matrix.msc3391/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.delete({ url, name: "delete-data" }, {});
+
             await client.deleteAccountData(eventType);
 
-            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, {
-                prefix: unstablePrefix,
-            });
+            expect(fetchMock.calls("delete-data").length).toEqual(1);
         });
 
         it("makes correct request when deletion is supported by server based on matrix version", async () => {
@@ -2690,34 +2864,43 @@ describe("MatrixClient", function () {
             // so mock the support map to fake stable support
             const stableSupportedDeletionMap = new Map();
             stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(new Map());
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
-            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(stableSupportedDeletionMap);
 
-            // populate version support
-            await client.getVersions();
+            const client = await setUpClient();
+
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.delete({ url, name: "delete-data" }, {});
+
             await client.deleteAccountData(eventType);
 
-            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, undefined);
+            expect(fetchMock.calls("delete-data").length).toEqual(1);
         });
 
         it("makes correct request when deletion is not supported by server", async () => {
             const eventType = "im.vector.test";
-            const versionsResponse = {
-                versions: ["1"],
-                unstable_features: {
-                    "org.matrix.msc3391": false,
-                },
-            };
-            const requestSpy = jest.spyOn(client.http, "authedRequest").mockResolvedValue(versionsResponse);
-            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
-            // populate version support
-            await client.getVersions();
-            await client.deleteAccountData(eventType);
+            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+            const client = await setUpClient();
+
+            const url = new URL(
+                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
+                TEST_HOMESERVER_URL,
+            ).toString();
+            fetchMock.put({ url, name: "put-account-data" }, {});
+
+            const setProm = client.deleteAccountData(eventType);
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: eventType, content: {} }] },
+            });
+            await setProm;
 
             // account data updated with empty content
-            expect(requestSpy).toHaveBeenCalledWith(Method.Put, path, undefined, {});
+            const lastCall = fetchMock.lastCall("put-account-data");
+            expect(lastCall).toBeDefined();
+            expect(lastCall?.[1]?.body).toEqual("{}");
         });
     });
 
@@ -3187,82 +3370,10 @@ describe("MatrixClient", function () {
             client["_secretStorage"] = mockSecretStorage;
         });
 
-        it("hasSecretStorageKey", async () => {
-            mockSecretStorage.hasKey.mockResolvedValue(false);
-            expect(await client.hasSecretStorageKey("mykey")).toBe(false);
-            expect(mockSecretStorage.hasKey).toHaveBeenCalledWith("mykey");
-        });
-
-        it("isSecretStored", async () => {
-            const mockResult = { key: {} as SecretStorageKeyDescriptionAesV1 };
-            mockSecretStorage.isStored.mockResolvedValue(mockResult);
-            expect(await client.isSecretStored("mysecret")).toBe(mockResult);
-            expect(mockSecretStorage.isStored).toHaveBeenCalledWith("mysecret");
-        });
-
-        it("getDefaultSecretStorageKeyId", async () => {
-            mockSecretStorage.getDefaultKeyId.mockResolvedValue("bzz");
-            expect(await client.getDefaultSecretStorageKeyId()).toEqual("bzz");
-        });
-
         it("isKeyBackupKeyStored", async () => {
             mockSecretStorage.isStored.mockResolvedValue(null);
             expect(await client.isKeyBackupKeyStored()).toBe(null);
             expect(mockSecretStorage.isStored).toHaveBeenCalledWith("m.megolm_backup.v1");
-        });
-    });
-
-    // these wrappers are deprecated, but we need coverage of them to pass the quality gate
-    describe("Crypto wrappers", () => {
-        describe("exception if no crypto", () => {
-            it("isCrossSigningReady", () => {
-                expect(() => client.isCrossSigningReady()).toThrow("End-to-end encryption disabled");
-            });
-
-            it("bootstrapCrossSigning", () => {
-                expect(() => client.bootstrapCrossSigning({})).toThrow("End-to-end encryption disabled");
-            });
-
-            it("isSecretStorageReady", () => {
-                expect(() => client.isSecretStorageReady()).toThrow("End-to-end encryption disabled");
-            });
-        });
-
-        describe("defer to crypto backend", () => {
-            let mockCryptoBackend: Mocked<CryptoBackend>;
-
-            beforeEach(() => {
-                mockCryptoBackend = {
-                    isCrossSigningReady: jest.fn(),
-                    bootstrapCrossSigning: jest.fn(),
-                    isSecretStorageReady: jest.fn(),
-                    stop: jest.fn().mockResolvedValue(undefined),
-                } as unknown as Mocked<CryptoBackend>;
-                client["cryptoBackend"] = mockCryptoBackend;
-            });
-
-            it("isCrossSigningReady", async () => {
-                const testResult = "test";
-                mockCryptoBackend.isCrossSigningReady.mockResolvedValue(testResult as unknown as boolean);
-                expect(await client.isCrossSigningReady()).toBe(testResult);
-                expect(mockCryptoBackend.isCrossSigningReady).toHaveBeenCalledTimes(1);
-            });
-
-            it("bootstrapCrossSigning", async () => {
-                const testOpts = {};
-                mockCryptoBackend.bootstrapCrossSigning.mockResolvedValue(undefined);
-                await client.bootstrapCrossSigning(testOpts);
-                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledTimes(1);
-                expect(mockCryptoBackend.bootstrapCrossSigning).toHaveBeenCalledWith(testOpts);
-            });
-
-            it("isSecretStorageReady", async () => {
-                client["cryptoBackend"] = mockCryptoBackend;
-                const testResult = "test";
-                mockCryptoBackend.isSecretStorageReady.mockResolvedValue(testResult as unknown as boolean);
-                expect(await client.isSecretStorageReady()).toBe(testResult);
-                expect(mockCryptoBackend.isSecretStorageReady).toHaveBeenCalledTimes(1);
-            });
         });
     });
 
@@ -3479,6 +3590,63 @@ describe("MatrixClient", function () {
             ];
 
             await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
+            expect(httpLookups.length).toEqual(0);
+        });
+    });
+
+    describe("getAuthMetadata", () => {
+        beforeEach(() => {
+            fetchMock.mockReset();
+            // This request is made by oidc-client-ts so is not intercepted by httpLookups
+            fetchMock.get("https://auth.org/jwks", {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                keys: [],
+            });
+        });
+
+        it("should use unstable prefix", async () => {
+            const metadata = mockOpenIdConfiguration();
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    data: metadata,
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+
+            await expect(client.getAuthMetadata()).resolves.toEqual({
+                ...metadata,
+                signingKeys: [],
+            });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("should fall back to auth_issuer + openid-configuration", async () => {
+            const metadata = mockOpenIdConfiguration();
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+                {
+                    method: "GET",
+                    path: `/auth_issuer`,
+                    data: { issuer: metadata.issuer },
+                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                },
+            ];
+            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
+
+            await expect(client.getAuthMetadata()).resolves.toEqual({
+                ...metadata,
+                signingKeys: [],
+            });
             expect(httpLookups.length).toEqual(0);
         });
     });

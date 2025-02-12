@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OlmMachine, type UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
-import { LogSpan } from "../logger.ts";
+import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type LogSpan } from "../logger.ts";
 
 /**
  * KeyClaimManager: linearises calls to OlmMachine.getMissingSessions to avoid races

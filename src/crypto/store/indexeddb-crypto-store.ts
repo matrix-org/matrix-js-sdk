@@ -14,32 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, Logger } from "../../logger.ts";
+import { logger, type Logger } from "../../logger.ts";
 import { LocalStorageCryptoStore } from "./localStorage-crypto-store.ts";
 import { MemoryCryptoStore } from "./memory-crypto-store.ts";
 import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend.ts";
 import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors.ts";
 import * as IndexedDBHelpers from "../../indexeddb-helpers.ts";
 import {
-    CryptoStore,
-    IDeviceData,
-    IProblem,
-    ISession,
-    SessionExtended,
-    ISessionInfo,
-    IWithheld,
+    type CryptoStore,
+    type ISession,
+    type SessionExtended,
+    type ISessionInfo,
+    type IWithheld,
     MigrationState,
-    Mode,
-    OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
-    SecretStorePrivateKeys,
+    type Mode,
+    type SecretStorePrivateKeys,
     ACCOUNT_OBJECT_KEY_MIGRATION_STATE,
+    type InboundGroupSessionData,
+    type IRoomEncryption,
 } from "./base.ts";
-import { IRoomKeyRequestBody } from "../index.ts";
-import { IOlmDevice } from "../algorithms/megolm.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 /*
  * Internal module. indexeddb storage for e2e.
@@ -282,110 +276,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return this.backend!.setMigrationState(migrationState);
     }
 
-    /**
-     * Look for an existing outgoing room key request, and if none is found,
-     * add a new one
-     *
-     *
-     * @returns resolves to
-     *    {@link OutgoingRoomKeyRequest}: either the
-     *    same instance as passed in, or the existing one.
-     */
-    public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
-        return this.backend!.getOrAddOutgoingRoomKeyRequest(request);
-    }
-
-    /**
-     * Look for an existing room key request
-     *
-     * @param requestBody - existing request to look for
-     *
-     * @returns resolves to the matching
-     *    {@link OutgoingRoomKeyRequest}, or null if
-     *    not found
-     */
-    public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend!.getOutgoingRoomKeyRequest(requestBody);
-    }
-
-    /**
-     * Look for room key requests by state
-     *
-     * @param wantedStates - list of acceptable states
-     *
-     * @returns resolves to the a
-     *    {@link OutgoingRoomKeyRequest}, or null if
-     *    there are no pending requests in those states. If there are multiple
-     *    requests in those states, an arbitrary one is chosen.
-     */
-    public getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend!.getOutgoingRoomKeyRequestByState(wantedStates);
-    }
-
-    /**
-     * Look for room key requests by state –
-     * unlike above, return a list of all entries in one state.
-     *
-     * @returns Returns an array of requests in the given state
-     */
-    public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
-        return this.backend!.getAllOutgoingRoomKeyRequestsByState(wantedState);
-    }
-
-    /**
-     * Look for room key requests by target device and state
-     *
-     * @param userId - Target user ID
-     * @param deviceId - Target device ID
-     * @param wantedStates - list of acceptable states
-     *
-     * @returns resolves to a list of all the
-     *    {@link OutgoingRoomKeyRequest}
-     */
-    public getOutgoingRoomKeyRequestsByTarget(
-        userId: string,
-        deviceId: string,
-        wantedStates: number[],
-    ): Promise<OutgoingRoomKeyRequest[]> {
-        return this.backend!.getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates);
-    }
-
-    /**
-     * Look for an existing room key request by id and state, and update it if
-     * found
-     *
-     * @param requestId -      ID of request to update
-     * @param expectedState -  state we expect to find the request in
-     * @param updates -        name/value map of updates to apply
-     *
-     * @returns resolves to
-     *    {@link OutgoingRoomKeyRequest}
-     *    updated request, or null if no matching row was found
-     */
-    public updateOutgoingRoomKeyRequest(
-        requestId: string,
-        expectedState: number,
-        updates: Partial<OutgoingRoomKeyRequest>,
-    ): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend!.updateOutgoingRoomKeyRequest(requestId, expectedState, updates);
-    }
-
-    /**
-     * Look for an existing room key request by id and state, and delete it if
-     * found
-     *
-     * @param requestId -      ID of request to update
-     * @param expectedState -  state we expect to find the request in
-     *
-     * @returns resolves once the operation is completed
-     */
-    public deleteOutgoingRoomKeyRequest(
-        requestId: string,
-        expectedState: number,
-    ): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend!.deleteOutgoingRoomKeyRequest(requestId, expectedState);
-    }
-
     // Olm Account
 
     /*
@@ -436,16 +326,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
         type: K,
     ): void {
         this.backend!.getSecretStorePrivateKey(txn, func, type);
-    }
-
-    /**
-     * Write the cross-signing keys back to the store
-     *
-     * @param txn - An active transaction. See doTxn().
-     * @param keys - keys object as getCrossSigningKeys()
-     */
-    public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, CrossSigningKeyInfo>): void {
-        this.backend!.storeCrossSigningKeys(txn, keys);
     }
 
     /**
@@ -515,17 +395,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
     }
 
     /**
-     * Retrieve all end-to-end sessions
-     * @param txn - An active transaction. See doTxn().
-     * @param func - Called one for each session with
-     *     an object with, deviceKey, lastReceivedMessageTs, sessionId
-     *     and session keys.
-     */
-    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
-        this.backend!.getAllEndToEndSessions(txn, func);
-    }
-
-    /**
      * Store a session between the logged-in user and another device
      * @param deviceKey - The public key of the other device.
      * @param sessionId - The ID for this end-to-end session.
@@ -539,18 +408,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
     ): void {
         this.backend!.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
-    }
-
-    public storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
-        return this.backend!.storeEndToEndSessionProblem(deviceKey, type, fixed);
-    }
-
-    public getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
-        return this.backend!.getEndToEndSessionProblem(deviceKey, timestamp);
-    }
-
-    public filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
-        return this.backend!.filterOutNotifiedErrorDevices(devices);
     }
 
     /**
@@ -607,35 +464,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
     }
 
     /**
-     * Fetches all inbound group sessions in the store
-     * @param txn - An active transaction. See doTxn().
-     * @param func - Called once for each group session
-     *     in the store with an object having keys `{senderKey, sessionId, sessionData}`,
-     *     then once with null to indicate the end of the list.
-     */
-    public getAllEndToEndInboundGroupSessions(txn: IDBTransaction, func: (session: ISession | null) => void): void {
-        this.backend!.getAllEndToEndInboundGroupSessions(txn, func);
-    }
-
-    /**
-     * Adds an end-to-end inbound group session to the store.
-     * If there already exists an inbound group session with the same
-     * senderCurve25519Key and sessionID, the session will not be added.
-     * @param senderCurve25519Key - The sender's curve 25519 key
-     * @param sessionId - The ID of the session
-     * @param sessionData - The session data structure
-     * @param txn - An active transaction. See doTxn().
-     */
-    public addEndToEndInboundGroupSession(
-        senderCurve25519Key: string,
-        sessionId: string,
-        sessionData: InboundGroupSessionData,
-        txn: IDBTransaction,
-    ): void {
-        this.backend!.addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
-    }
-
-    /**
      * Writes an end-to-end inbound group session to the store.
      * If there already exists an inbound group session with the same
      * senderCurve25519Key and sessionID, it will be overwritten.
@@ -651,15 +479,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
     ): void {
         this.backend!.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
-    }
-
-    public storeEndToEndInboundGroupSessionWithheld(
-        senderCurve25519Key: string,
-        sessionId: string,
-        sessionData: IWithheld,
-        txn: IDBTransaction,
-    ): void {
-        this.backend!.storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn);
     }
 
     /**
@@ -686,44 +505,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return this.backend!.deleteEndToEndInboundGroupSessionsBatch(sessions);
     }
 
-    // End-to-end device tracking
-
-    /**
-     * Store the state of all tracked devices
-     * This contains devices for each user, a tracking state for each user
-     * and a sync token matching the point in time the snapshot represents.
-     * These all need to be written out in full each time such that the snapshot
-     * is always consistent, so they are stored in one object.
-     *
-     * @param txn - An active transaction. See doTxn().
-     */
-    public storeEndToEndDeviceData(deviceData: IDeviceData, txn: IDBTransaction): void {
-        this.backend!.storeEndToEndDeviceData(deviceData, txn);
-    }
-
-    /**
-     * Get the state of all tracked devices
-     *
-     * @param txn - An active transaction. See doTxn().
-     * @param func - Function called with the
-     *     device data
-     */
-    public getEndToEndDeviceData(txn: IDBTransaction, func: (deviceData: IDeviceData | null) => void): void {
-        this.backend!.getEndToEndDeviceData(txn, func);
-    }
-
-    // End to End Rooms
-
-    /**
-     * Store the end-to-end state for a room.
-     * @param roomId - The room's ID.
-     * @param roomInfo - The end-to-end info for the room.
-     * @param txn - An active transaction. See doTxn().
-     */
-    public storeEndToEndRoom(roomId: string, roomInfo: IRoomEncryption, txn: IDBTransaction): void {
-        this.backend!.storeEndToEndRoom(roomId, roomInfo, txn);
-    }
-
     /**
      * Get an object of `roomId->roomInfo` for all e2e rooms in the store
      * @param txn - An active transaction. See doTxn().
@@ -731,37 +512,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
      */
     public getEndToEndRooms(txn: IDBTransaction, func: (rooms: Record<string, IRoomEncryption>) => void): void {
         this.backend!.getEndToEndRooms(txn, func);
-    }
-
-    // session backups
-
-    /**
-     * Get the inbound group sessions that need to be backed up.
-     * @param limit - The maximum number of sessions to retrieve.  0
-     * for no limit.
-     * @returns resolves to an array of inbound group sessions
-     */
-    public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
-        return this.backend!.getSessionsNeedingBackup(limit);
-    }
-
-    /**
-     * Count the inbound group sessions that need to be backed up.
-     * @param txn - An active transaction. See doTxn(). (optional)
-     * @returns resolves to the number of sessions
-     */
-    public countSessionsNeedingBackup(txn?: IDBTransaction): Promise<number> {
-        return this.backend!.countSessionsNeedingBackup(txn);
-    }
-
-    /**
-     * Unmark sessions as needing to be backed up.
-     * @param sessions - The sessions that need to be backed up.
-     * @param txn - An active transaction. See doTxn(). (optional)
-     * @returns resolves when the sessions are unmarked
-     */
-    public unmarkSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
-        return this.backend!.unmarkSessionsNeedingBackup(sessions, txn);
     }
 
     /**
@@ -772,49 +522,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
      */
     public markSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
         return this.backend!.markSessionsNeedingBackup(sessions, txn);
-    }
-
-    /**
-     * Add a shared-history group session for a room.
-     * @param roomId - The room that the key belongs to
-     * @param senderKey - The sender's curve 25519 key
-     * @param sessionId - The ID of the session
-     * @param txn - An active transaction. See doTxn(). (optional)
-     */
-    public addSharedHistoryInboundGroupSession(
-        roomId: string,
-        senderKey: string,
-        sessionId: string,
-        txn?: IDBTransaction,
-    ): void {
-        this.backend!.addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn);
-    }
-
-    /**
-     * Get the shared-history group session for a room.
-     * @param roomId - The room that the key belongs to
-     * @param txn - An active transaction. See doTxn(). (optional)
-     * @returns Promise which resolves to an array of [senderKey, sessionId]
-     */
-    public getSharedHistoryInboundGroupSessions(
-        roomId: string,
-        txn?: IDBTransaction,
-    ): Promise<[senderKey: string, sessionId: string][]> {
-        return this.backend!.getSharedHistoryInboundGroupSessions(roomId, txn);
-    }
-
-    /**
-     * Park a shared-history group session for a room we may be invited to later.
-     */
-    public addParkedSharedHistory(roomId: string, parkedData: ParkedSharedHistory, txn?: IDBTransaction): void {
-        this.backend!.addParkedSharedHistory(roomId, parkedData, txn);
-    }
-
-    /**
-     * Pop out all shared-history group sessions for a room.
-     */
-    public takeParkedSharedHistory(roomId: string, txn?: IDBTransaction): Promise<ParkedSharedHistory[]> {
-        return this.backend!.takeParkedSharedHistory(roomId, txn);
     }
 
     /**

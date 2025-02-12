@@ -15,12 +15,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../../src/client";
+import { type MatrixClient } from "../../src/client";
 import { logger } from "../../src/logger";
 import { InteractiveAuth, AuthType } from "../../src/interactive-auth";
 import { HTTPError, MatrixError } from "../../src/http-api";
 import { sleep } from "../../src/utils";
-import { randomString } from "../../src/randomstring";
+import { secureRandomString } from "../../src/randomstring";
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)
@@ -502,7 +502,7 @@ describe("InteractiveAuth", () => {
             const doRequest = jest.fn();
             const stateUpdated = jest.fn();
             const requestEmailToken = jest.fn();
-            const sid = randomString(24);
+            const sid = secureRandomString(24);
             requestEmailToken.mockImplementation(() => sleep(500, { sid }));
 
             const ia = new InteractiveAuth({

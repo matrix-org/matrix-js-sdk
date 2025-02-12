@@ -17,11 +17,13 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
 
-import { createClient, ClientEvent, MatrixClient, MatrixEvent } from "../../../src";
-import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
-import { AddSecretStorageKeyOpts } from "../../../src/secret-storage";
+import { ClientEvent, createClient, type MatrixClient, MatrixEvent } from "../../../src";
+import { CryptoEvent } from "../../../src/crypto-api/index";
+import { type RustCrypto } from "../../../src/rust-crypto/rust-crypto";
+import { type AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
+import { emitPromise, EventCounter } from "../../test-utils/test-utils";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
@@ -39,6 +41,12 @@ describe("Device dehydration", () => {
         });
 
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
+
+        const creationEventCounter = new EventCounter(matrixClient, CryptoEvent.DehydratedDeviceCreated);
+        const dehydrationKeyCachedEventCounter = new EventCounter(matrixClient, CryptoEvent.DehydrationKeyCached);
+        const rehydrationStartedCounter = new EventCounter(matrixClient, CryptoEvent.RehydrationStarted);
+        const rehydrationCompletedCounter = new EventCounter(matrixClient, CryptoEvent.RehydrationCompleted);
+        const rehydrationProgressCounter = new EventCounter(matrixClient, CryptoEvent.RehydrationProgress);
 
         // count the number of times the dehydration key gets set
         let setDehydrationCount = 0;
@@ -74,6 +82,8 @@ describe("Device dehydration", () => {
         await crypto.startDehydration();
 
         expect(dehydrationCount).toEqual(1);
+        expect(creationEventCounter.counter).toEqual(1);
+        expect(dehydrationKeyCachedEventCounter.counter).toEqual(1);
 
         // a week later, we should have created another dehydrated device
         const dehydrationPromise = new Promise<void>((resolve, reject) => {
@@ -81,7 +91,10 @@ describe("Device dehydration", () => {
         });
         jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
+
+        expect(dehydrationKeyCachedEventCounter.counter).toEqual(1);
         expect(dehydrationCount).toEqual(2);
+        expect(creationEventCounter.counter).toEqual(2);
 
         // restart dehydration -- rehydrate the device that we created above,
         // and create a new dehydrated device.  We also set `createNewKey`, so
@@ -112,6 +125,39 @@ describe("Device dehydration", () => {
 
         expect(setDehydrationCount).toEqual(2);
         expect(eventsResponse.mock.calls).toHaveLength(2);
+
+        expect(rehydrationStartedCounter.counter).toEqual(1);
+        expect(rehydrationCompletedCounter.counter).toEqual(1);
+        expect(creationEventCounter.counter).toEqual(3);
+        expect(rehydrationProgressCounter.counter).toEqual(1);
+        expect(dehydrationKeyCachedEventCounter.counter).toEqual(2);
+
+        // test that if we get an error when we try to rotate, it emits an event
+        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            status: 500,
+            body: {
+                errcode: "M_UNKNOWN",
+                error: "Unknown error",
+            },
+        });
+        const rotationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.DehydratedDeviceRotationError);
+        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        await rotationErrorEventPromise;
+
+        // Restart dehydration, but return an error for GET /dehydrated_device so that rehydration fails.
+        fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            status: 500,
+            body: {
+                errcode: "M_UNKNOWN",
+                error: "Unknown error",
+            },
+        });
+        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
+            return {};
+        });
+        const rehydrationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.RehydrationError);
+        await crypto.startDehydration(true);
+        await rehydrationErrorEventPromise;
 
         matrixClient.stopClient();
     });
@@ -172,8 +218,8 @@ async function initializeSecretStorage(
             privateKey: new Uint8Array(32),
         };
     }
-    await matrixClient.bootstrapCrossSigning({ setupNewCrossSigning: true });
-    await matrixClient.bootstrapSecretStorage({
+    await matrixClient.getCrypto()!.bootstrapCrossSigning({ setupNewCrossSigning: true });
+    await matrixClient.getCrypto()!.bootstrapSecretStorage({
         createSecretStorageKey,
         setupNewSecretStorage: true,
         setupNewKeyBackup: false,

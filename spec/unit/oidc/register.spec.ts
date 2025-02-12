@@ -17,7 +17,7 @@ limitations under the License.
 import fetchMockJest from "fetch-mock-jest";
 
 import { OidcError } from "../../../src/oidc/error";
-import { OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";
+import { type OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 describe("registerOidcClient()", () => {
@@ -42,13 +42,13 @@ describe("registerOidcClient()", () => {
     });
 
     it("should make correct request to register client", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
+        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
         expect(await registerOidcClient(delegatedAuthConfig, metadata)).toEqual(dynamicClientId);
         expect(fetchMockJest).toHaveBeenCalledWith(
-            delegatedAuthConfig.registrationEndpoint!,
+            delegatedAuthConfig.registration_endpoint,
             expect.objectContaining({
                 headers: {
                     "Accept": "application/json",
@@ -72,7 +72,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should throw when registration request fails", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
+        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
             status: 500,
         });
         await expect(() => registerOidcClient(delegatedAuthConfig, metadata)).rejects.toThrow(
@@ -81,7 +81,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should throw when registration response is invalid", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registrationEndpoint!, {
+        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
             status: 200,
             // no clientId in response
             body: "{}",
@@ -96,7 +96,7 @@ describe("registerOidcClient()", () => {
             registerOidcClient(
                 {
                     ...delegatedAuthConfig,
-                    registrationEndpoint: undefined,
+                    registration_endpoint: undefined,
                 },
                 metadata,
             ),
@@ -108,10 +108,7 @@ describe("registerOidcClient()", () => {
             registerOidcClient(
                 {
                     ...delegatedAuthConfig,
-                    metadata: {
-                        ...delegatedAuthConfig.metadata,
-                        grant_types_supported: [delegatedAuthConfig.metadata.grant_types_supported[0]],
-                    },
+                    grant_types_supported: [delegatedAuthConfig.grant_types_supported[0]],
                 },
                 metadata,
             ),

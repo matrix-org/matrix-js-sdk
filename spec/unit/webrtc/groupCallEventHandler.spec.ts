@@ -17,7 +17,7 @@ limitations under the License.
 import { mocked } from "jest-mock";
 
 import { ClientEvent } from "../../../src/client";
-import { RoomMember } from "../../../src/models/room-member";
+import { type RoomMember } from "../../../src/models/room-member";
 import { SyncState } from "../../../src/sync";
 import {
     GroupCallIntent,
@@ -25,9 +25,9 @@ import {
     GroupCallType,
     GroupCallTerminationReason,
 } from "../../../src/webrtc/groupCall";
-import { IContent, MatrixEvent } from "../../../src/models/event";
-import { Room } from "../../../src/models/room";
-import { RoomState } from "../../../src/models/room-state";
+import { type IContent, type MatrixEvent } from "../../../src/models/event";
+import { type Room } from "../../../src/models/room";
+import { type RoomState } from "../../../src/models/room-state";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockGroupCallStateEvent, MockCallMatrixClient } from "../../test-utils/webrtc";

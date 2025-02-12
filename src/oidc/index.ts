@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import type { SigningKey } from "oidc-client-ts";
-import { ValidatedIssuerConfig, ValidatedIssuerMetadata } from "./validate.ts";
+import { type ValidatedAuthMetadata } from "./validate.ts";
 
 export * from "./authorize.ts";
 export * from "./discovery.ts";
@@ -28,7 +28,6 @@ export * from "./validate.ts";
  * Validated config for native OIDC authentication, as returned by {@link discoverAndValidateOIDCIssuerWellKnown}.
  * Contains metadata and signing keys from the issuer's well-known (https://oidc-issuer.example.com/.well-known/openid-configuration).
  */
-export interface OidcClientConfig extends ValidatedIssuerConfig {
-    metadata: ValidatedIssuerMetadata;
-    signingKeys?: SigningKey[];
+export interface OidcClientConfig extends ValidatedAuthMetadata {
+    signingKeys: SigningKey[] | null;
 }

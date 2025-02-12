@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import { type Optional } from "matrix-events-sdk";
 
 /**
  * Determines if the given optional was provided a value.
  * @param s - The optional to test.
  * @returns True if the value is defined.
  */
-export function isProvided<T>(s: Optional<T>): boolean {
+export function isProvided<T>(s: Optional<T>): s is T {
     return s !== null && s !== undefined;
 }
 

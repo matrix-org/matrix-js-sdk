@@ -14,31 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index.ts";
-import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager.ts";
-import { IOlmDevice } from "../algorithms/megolm.ts";
-import { TrackingStatus } from "../DeviceList.ts";
-import { IRoomEncryption } from "../RoomList.ts";
-import { IDevice } from "../deviceinfo.ts";
-import { ICrossSigningInfo } from "../CrossSigning.ts";
-import { Logger } from "../../logger.ts";
-import { InboundGroupSessionData } from "../OlmDevice.ts";
-import { MatrixEvent } from "../../models/event.ts";
-import { DehydrationManager } from "../dehydration.ts";
-import { CrossSigningKeyInfo } from "../../crypto-api/index.ts";
-import { AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
+import { type Logger } from "../../logger.ts";
+import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
+import { type AESEncryptedSecretStoragePayload } from "../../@types/AESEncryptedSecretStoragePayload.ts";
+import { type ISignatures } from "../../@types/signed.ts";
 
 /**
  * Internal module. Definitions for storage for the crypto module
  */
 
 export interface SecretStorePrivateKeys {
-    "dehydration": {
-        keyInfo: DehydrationManager["keyInfo"];
-        key: AESEncryptedSecretStoragePayload;
-        deviceDisplayName: string;
-        time: number;
-    } | null;
     "m.megolm_backup.v1": AESEncryptedSecretStoragePayload;
 }
 
@@ -81,22 +66,6 @@ export interface CryptoStore {
      */
     setMigrationState(migrationState: MigrationState): Promise<void>;
 
-    getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest>;
-    getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null>;
-    getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null>;
-    getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]>;
-    getOutgoingRoomKeyRequestsByTarget(
-        userId: string,
-        deviceId: string,
-        wantedStates: number[],
-    ): Promise<OutgoingRoomKeyRequest[]>;
-    updateOutgoingRoomKeyRequest(
-        requestId: string,
-        expectedState: number,
-        updates: Partial<OutgoingRoomKeyRequest>,
-    ): Promise<OutgoingRoomKeyRequest | null>;
-    deleteOutgoingRoomKeyRequest(requestId: string, expectedState: number): Promise<OutgoingRoomKeyRequest | null>;
-
     // Olm Account
     getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
     storeAccount(txn: unknown, accountPickle: string): void;
@@ -106,7 +75,6 @@ export interface CryptoStore {
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void;
-    storeCrossSigningKeys(txn: unknown, keys: Record<string, CrossSigningKeyInfo>): void;
     storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         type: K,
@@ -126,11 +94,8 @@ export interface CryptoStore {
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void;
-    getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo | null) => void): void;
+
     storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void;
-    storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void>;
-    getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;
-    filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]>;
 
     /**
      * Get a batch of end-to-end sessions from the database.
@@ -156,23 +121,10 @@ export interface CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void;
-    getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void;
-    addEndToEndInboundGroupSession(
-        senderCurve25519Key: string,
-        sessionId: string,
-        sessionData: InboundGroupSessionData,
-        txn: unknown,
-    ): void;
     storeEndToEndInboundGroupSession(
         senderCurve25519Key: string,
         sessionId: string,
         sessionData: InboundGroupSessionData,
-        txn: unknown,
-    ): void;
-    storeEndToEndInboundGroupSessionWithheld(
-        senderCurve25519Key: string,
-        sessionId: string,
-        sessionData: IWithheld,
         txn: unknown,
     ): void;
 
@@ -201,21 +153,8 @@ export interface CryptoStore {
     deleteEndToEndInboundGroupSessionsBatch(sessions: { senderKey: string; sessionId: string }[]): Promise<void>;
 
     // Device Data
-    getEndToEndDeviceData(txn: unknown, func: (deviceData: IDeviceData | null) => void): void;
-    storeEndToEndDeviceData(deviceData: IDeviceData, txn: unknown): void;
-    storeEndToEndRoom(roomId: string, roomInfo: IRoomEncryption, txn: unknown): void;
     getEndToEndRooms(txn: unknown, func: (rooms: Record<string, IRoomEncryption>) => void): void;
-    getSessionsNeedingBackup(limit: number): Promise<ISession[]>;
-    countSessionsNeedingBackup(txn?: unknown): Promise<number>;
-    unmarkSessionsNeedingBackup(sessions: ISession[], txn?: unknown): Promise<void>;
     markSessionsNeedingBackup(sessions: ISession[], txn?: unknown): Promise<void>;
-    addSharedHistoryInboundGroupSession(roomId: string, senderKey: string, sessionId: string, txn?: unknown): void;
-    getSharedHistoryInboundGroupSessions(
-        roomId: string,
-        txn?: unknown,
-    ): Promise<[senderKey: string, sessionId: string][]>;
-    addParkedSharedHistory(roomId: string, data: ParkedSharedHistory, txn?: unknown): void;
-    takeParkedSharedHistory(roomId: string, txn?: unknown): Promise<ParkedSharedHistory[]>;
 
     // Session key backups
     doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T, log?: Logger): Promise<T>;
@@ -256,12 +195,6 @@ export interface IDeviceData {
     syncToken?: string;
 }
 
-export interface IProblem {
-    type: string;
-    fixed: boolean;
-    time: number;
-}
-
 export interface IWithheld {
     // eslint-disable-next-line camelcase
     room_id: string;
@@ -295,15 +228,6 @@ export interface OutgoingRoomKeyRequest {
      * current state of this request
      */
     state: RoomKeyRequestState;
-}
-
-export interface ParkedSharedHistory {
-    senderId: string;
-    senderKey: string;
-    sessionId: string;
-    sessionKey: string;
-    keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
-    forwardingCurve25519KeyChain: string[];
 }
 
 /**
@@ -346,3 +270,119 @@ export enum MigrationState {
  * {@link CryptoStore#getEndToEndInboundGroupSessionsBatch}.
  */
 export const SESSION_BATCH_SIZE = 50;
+
+export interface InboundGroupSessionData {
+    room_id: string; // eslint-disable-line camelcase
+    /** pickled Olm.InboundGroupSession */
+    session: string;
+    keysClaimed?: Record<string, string>;
+    /** Devices involved in forwarding this session to us (normally empty). */
+    forwardingCurve25519KeyChain: string[];
+    /** whether this session is untrusted. */
+    untrusted?: boolean;
+    /** whether this session exists during the room being set to shared history. */
+    sharedHistory?: boolean;
+}
+
+export interface ICrossSigningInfo {
+    keys: Record<string, CrossSigningKeyInfo>;
+    firstUse: boolean;
+    crossSigningVerifiedBefore: boolean;
+}
+
+/* eslint-disable camelcase */
+export interface IRoomEncryption {
+    algorithm: string;
+    rotation_period_ms?: number;
+    rotation_period_msgs?: number;
+}
+/* eslint-enable camelcase */
+
+export enum TrackingStatus {
+    NotTracked,
+    PendingDownload,
+    DownloadInProgress,
+    UpToDate,
+}
+
+/**
+ *  possible states for a room key request
+ *
+ * The state machine looks like:
+ * ```
+ *
+ *     |         (cancellation sent)
+ *     | .-------------------------------------------------.
+ *     | |                                                 |
+ *     V V       (cancellation requested)                  |
+ *   UNSENT  -----------------------------+                |
+ *     |                                  |                |
+ *     |                                  |                |
+ *     | (send successful)                |  CANCELLATION_PENDING_AND_WILL_RESEND
+ *     V                                  |                Λ
+ *    SENT                                |                |
+ *     |--------------------------------  |  --------------'
+ *     |                                  |  (cancellation requested with intent
+ *     |                                  |   to resend the original request)
+ *     |                                  |
+ *     | (cancellation requested)         |
+ *     V                                  |
+ * CANCELLATION_PENDING                   |
+ *     |                                  |
+ *     | (cancellation sent)              |
+ *     V                                  |
+ * (deleted)  <---------------------------+
+ * ```
+ */
+export enum RoomKeyRequestState {
+    /** request not yet sent */
+    Unsent,
+    /** request sent, awaiting reply */
+    Sent,
+    /** reply received, cancellation not yet sent */
+    CancellationPending,
+    /**
+     * Cancellation not yet sent and will transition to UNSENT instead of
+     * being deleted once the cancellation has been sent.
+     */
+    CancellationPendingAndWillResend,
+}
+
+/* eslint-disable camelcase */
+interface IRoomKey {
+    room_id: string;
+    algorithm: string;
+}
+
+/**
+ * The parameters of a room key request. The details of the request may
+ * vary with the crypto algorithm, but the management and storage layers for
+ * outgoing requests expect it to have 'room_id' and 'session_id' properties.
+ */
+export interface IRoomKeyRequestBody extends IRoomKey {
+    session_id: string;
+    sender_key: string;
+}
+
+/* eslint-enable camelcase */
+
+export interface IRoomKeyRequestRecipient {
+    userId: string;
+    deviceId: string;
+}
+
+interface IDevice {
+    keys: Record<string, string>;
+    algorithms: string[];
+    verified: DeviceVerification;
+    known: boolean;
+    unsigned?: Record<string, any>;
+    signatures?: ISignatures;
+}
+
+/** State of the verification of the device. */
+export enum DeviceVerification {
+    Blocked = -1,
+    Unverified = 0,
+    Verified = 1,
+}

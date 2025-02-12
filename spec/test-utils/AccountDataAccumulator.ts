@@ -16,18 +16,25 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { ISyncResponder } from "./SyncResponder";
+import { type ISyncResponder } from "./SyncResponder";
 
 /**
- *  An object which intercepts `account_data` get and set requests via fetch-mock.
+ * An object which intercepts `account_data` get and set requests via fetch-mock.
+ *
+ * To use this, call {@link interceptSetAccountData} for each type of account date that should be handled. The updated
+ * account data will be stored in {@link accountDataEvents}; it will also trigger a sync response echoing the updated
+ * data.
+ *
+ * Optionally, you can also call {@link interceptGetAccountData}.
  */
 export class AccountDataAccumulator {
     /**
      * The account data events to be returned by the sync.
      * Will be updated when fetchMock intercepts calls to PUT `/_matrix/client/v3/user/:userId/account_data/`.
-     * Will be used by `sendSyncResponseWithUpdatedAccountData`
      */
     public accountDataEvents: Map<string, any> = new Map();
+
+    public constructor(private syncResponder: ISyncResponder) {}
 
     /**
      * Intercept requests to set a particular type of account data.
@@ -53,6 +60,9 @@ export class AccountDataAccumulator {
                     // update account data for sync response
                     this.accountDataEvents.set(type!, content);
                     resolve(content);
+
+                    // return a sync response
+                    this.sendSyncResponseWithUpdatedAccountData();
                     return {};
                 },
                 opts,
@@ -90,9 +100,9 @@ export class AccountDataAccumulator {
     /**
      * Send a sync response the current account data events.
      */
-    public sendSyncResponseWithUpdatedAccountData(syncResponder: ISyncResponder): void {
+    private sendSyncResponseWithUpdatedAccountData(): void {
         try {
-            syncResponder.sendOrQueueSyncResponse({
+            this.syncResponder.sendOrQueueSyncResponse({
                 next_batch: 1,
                 account_data: {
                     events: Array.from(this.accountDataEvents, ([type, content]) => ({

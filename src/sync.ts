@@ -23,43 +23,48 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
-import { Optional } from "matrix-events-sdk";
+import { type Optional } from "matrix-events-sdk";
 
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
 import { User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
-import { deepCopy, defer, IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
+import { deepCopy, defer, type IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
 import { logger } from "./logger.ts";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client.ts";
 import {
-    IEphemeral,
-    IInvitedRoom,
-    IInviteState,
-    IJoinedRoom,
-    ILeftRoom,
-    IKnockedRoom,
-    IMinimalEvent,
-    IRoomEvent,
-    IStateEvent,
-    IStrippedState,
-    ISyncResponse,
-    ITimeline,
-    IToDeviceEvent,
+    ClientEvent,
+    type IStoredClientOpts,
+    type MatrixClient,
+    PendingEventOrdering,
+    type ResetTimelineCallback,
+} from "./client.ts";
+import {
+    type IEphemeral,
+    type IInvitedRoom,
+    type IInviteState,
+    type IJoinedRoom,
+    type ILeftRoom,
+    type IKnockedRoom,
+    type IMinimalEvent,
+    type IRoomEvent,
+    type IStateEvent,
+    type IStrippedState,
+    type ISyncResponse,
+    type ITimeline,
+    type IToDeviceEvent,
 } from "./sync-accumulator.ts";
-import { MatrixEvent } from "./models/event.ts";
-import { MatrixError, Method } from "./http-api/index.ts";
-import { ISavedSync } from "./store/index.ts";
+import { type MatrixEvent } from "./models/event.ts";
+import { type MatrixError, Method } from "./http-api/index.ts";
+import { type ISavedSync } from "./store/index.ts";
 import { EventType } from "./@types/event.ts";
-import { IPushRules } from "./@types/PushRules.ts";
-import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state.ts";
+import { type IPushRules } from "./@types/PushRules.ts";
+import { RoomStateEvent, type IMarkerFoundOptions } from "./models/room-state.ts";
 import { RoomMemberEvent } from "./models/room-member.ts";
 import { BeaconEvent } from "./models/beacon.ts";
-import { IEventsResponse } from "./@types/requests.ts";
+import { type IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
-import { Crypto } from "./crypto/index.ts";
 import { KnownMembership } from "./@types/membership.ts";
 
 const DEBUG = true;
@@ -116,13 +121,6 @@ function debuglog(...params: any[]): void {
  * Options passed into the constructor of SyncApi by MatrixClient
  */
 export interface SyncApiOptions {
-    /**
-     * Crypto manager
-     *
-     * @deprecated in favour of cryptoCallbacks
-     */
-    crypto?: Crypto;
-
     /**
      * If crypto is enabled on our client, callbacks into the crypto module
      */
@@ -642,9 +640,6 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
-        if (this.opts.lazyLoadMembers) {
-            this.syncOpts.crypto?.enableLazyLoading();
-        }
     };
 
     private storeClientOptions = async (): Promise<void> => {
@@ -880,12 +875,6 @@ export class SyncApi {
                 catchingUp: this.catchingUp,
             };
 
-            if (this.syncOpts.crypto) {
-                // tell the crypto module we're about to process a sync
-                // response
-                await this.syncOpts.crypto.onSyncWillProcess(syncEventData);
-            }
-
             try {
                 await this.processSyncResponse(syncEventData, data);
             } catch (e) {
@@ -920,15 +909,6 @@ export class SyncApi {
             this.updateSyncState(SyncState.Syncing, syncEventData);
 
             if (this.client.store.wantsSave()) {
-                // We always save the device list (if it's dirty) before saving the sync data:
-                // this means we know the saved device list data is at least as fresh as the
-                // stored sync data which means we don't have to worry that we may have missed
-                // device changes. We can also skip the delay since we're not calling this very
-                // frequently (and we don't really want to delay the sync for it).
-                if (this.syncOpts.crypto) {
-                    await this.syncOpts.crypto.saveDeviceList(0);
-                }
-
                 // tell databases that everything is now in a consistent state and can be saved.
                 await this.client.store.save();
             }
@@ -1247,27 +1227,6 @@ export class SyncApi {
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
             await this.injectRoomEvents(room, stateEvents, undefined);
-
-            const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId()!)?.getSender();
-
-            const crypto = client.crypto;
-            if (crypto) {
-                const parkedHistory = await crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
-                for (const parked of parkedHistory) {
-                    if (parked.senderId === inviter) {
-                        await crypto.olmDevice.addInboundGroupSession(
-                            room.roomId,
-                            parked.senderKey,
-                            parked.forwardingCurve25519KeyChain,
-                            parked.sessionId,
-                            parked.sessionKey,
-                            parked.keysClaimed,
-                            true,
-                            { sharedHistory: true, untrusted: true },
-                        );
-                    }
-                }
-            }
 
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();

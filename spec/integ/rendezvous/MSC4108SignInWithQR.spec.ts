@@ -30,13 +30,13 @@ import { defer } from "../../../src/utils";
 import {
     ClientPrefix,
     DEVICE_CODE_SCOPE,
-    IHttpOpts,
-    IMyDevice,
-    MatrixClient,
+    type IHttpOpts,
+    type IMyDevice,
+    type MatrixClient,
     MatrixError,
     MatrixHttpApi,
 } from "../../../src";
-import { mockOpenIdConfiguration } from "../../test-utils/oidc";
+import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const baseUrl = "https://example.com";
@@ -57,7 +57,7 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
         getDomain: () => "example.com",
         getDevice: jest.fn(),
         getCrypto: jest.fn(() => crypto),
-        getAuthIssuer: jest.fn().mockResolvedValue({ issuer: "https://issuer/" }),
+        getAuthMetadata: jest.fn().mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_CODE_SCOPE])),
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,
@@ -69,10 +69,6 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
 
 describe("MSC4108SignInWithQR", () => {
     beforeEach(() => {
-        fetchMock.get(
-            "https://issuer/.well-known/openid-configuration",
-            mockOpenIdConfiguration("https://issuer/", [DEVICE_CODE_SCOPE]),
-        );
         fetchMock.get("https://issuer/jwks", {
             status: 200,
             headers: {

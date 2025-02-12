@@ -16,14 +16,15 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { KeyBackupInfo } from "../../src/crypto-api";
+import { type KeyBackupInfo } from "../../src/crypto-api";
 
 /**
  * Mock out the endpoints that the js-sdk calls when we call `MatrixClient.start()`.
  *
  * @param homeserverUrl - the homeserver url for the client under test
+ * @param userId - the local user's ID. Defaults to `@alice:localhost`.
  */
-export function mockInitialApiRequests(homeserverUrl: string) {
+export function mockInitialApiRequests(homeserverUrl: string, userId: string = "@alice:localhost") {
     fetchMock.getOnce(
         new URL("/_matrix/client/versions", homeserverUrl).toString(),
         { versions: ["v1.1"] },
@@ -35,7 +36,7 @@ export function mockInitialApiRequests(homeserverUrl: string) {
         { overwriteRoutes: true },
     );
     fetchMock.postOnce(
-        new URL("/_matrix/client/v3/user/%40alice%3Alocalhost/filter", homeserverUrl).toString(),
+        new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, homeserverUrl).toString(),
         { filter_id: "fid" },
         { overwriteRoutes: true },
     );

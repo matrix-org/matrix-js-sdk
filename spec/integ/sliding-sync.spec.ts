@@ -15,21 +15,20 @@ limitations under the License.
 */
 
 // eslint-disable-next-line no-restricted-imports
-import EventEmitter from "events";
-import MockHttpBackend from "matrix-mock-request";
-
+import type EventEmitter from "events";
+import type MockHttpBackend from "matrix-mock-request";
 import {
     SlidingSync,
     SlidingSyncState,
     ExtensionState,
     SlidingSyncEvent,
-    Extension,
-    SlidingSyncEventHandlerMap,
-    MSC3575RoomData,
+    type Extension,
+    type SlidingSyncEventHandlerMap,
+    type MSC3575RoomData,
 } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
-import { MatrixClient } from "../../src";
+import { type MatrixClient } from "../../src";
 
 /**
  * Tests for sliding sync. These tests are broken down into sub-tests which are reliant upon one another.

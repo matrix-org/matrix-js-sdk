@@ -17,9 +17,9 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 
 import { MapWithDefault } from "../../src/utils";
-import { IDownloadKeyResult } from "../../src";
-import { IDeviceKeys } from "../../src/@types/crypto";
-import { E2EKeyReceiver } from "./E2EKeyReceiver";
+import { type IDownloadKeyResult } from "../../src";
+import { type IDeviceKeys } from "../../src/@types/crypto";
+import { type E2EKeyReceiver } from "./E2EKeyReceiver";
 
 /**
  * An object which intercepts `/keys/query` fetches via fetch-mock.

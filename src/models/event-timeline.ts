@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IMarkerFoundOptions, RoomState } from "./room-state.ts";
-import { EventTimelineSet } from "./event-timeline-set.ts";
-import { MatrixEvent } from "./event.ts";
-import { Filter } from "../filter.ts";
+import { type IMarkerFoundOptions, RoomState } from "./room-state.ts";
+import { type EventTimelineSet } from "./event-timeline-set.ts";
+import { type MatrixEvent } from "./event.ts";
+import { type Filter } from "../filter.ts";
 import { EventType } from "../@types/event.ts";
 
 export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, "timelineWasEmpty"> {
@@ -68,27 +68,7 @@ export class EventTimeline {
      * @param toStartOfTimeline -  if true the event's forwardLooking flag is set false
      */
     public static setEventMetadata(event: MatrixEvent, stateContext: RoomState, toStartOfTimeline: boolean): void {
-        // When we try to generate a sentinel member before we have that member
-        // in the members object, we still generate a sentinel but it doesn't
-        // have a membership event, so test to see if events.member is set. We
-        // check this to avoid overriding non-sentinel members by sentinel ones
-        // when adding the event to a filtered timeline
-        if (!event.sender?.events?.member) {
-            event.sender = stateContext.getSentinelMember(event.getSender()!);
-        }
-        if (!event.target?.events?.member && event.getType() === EventType.RoomMember) {
-            event.target = stateContext.getSentinelMember(event.getStateKey()!);
-        }
-
-        if (event.isState()) {
-            // room state has no concept of 'old' or 'current', but we want the
-            // room state to regress back to previous values if toStartOfTimeline
-            // is set, which means inspecting prev_content if it exists. This
-            // is done by toggling the forwardLooking flag.
-            if (toStartOfTimeline) {
-                event.forwardLooking = false;
-            }
-        }
+        event.setMetadata(stateContext, toStartOfTimeline);
     }
 
     private readonly roomId: string | null;

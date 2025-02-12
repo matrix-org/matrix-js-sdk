@@ -28,9 +28,9 @@ import {
     CallDirection,
 } from "../../../src/webrtc/call";
 import {
-    MCallAnswer,
-    MCallHangupReject,
-    SDPStreamMetadata,
+    type MCallAnswer,
+    type MCallHangupReject,
+    type SDPStreamMetadata,
     SDPStreamMetadataKey,
     SDPStreamMetadataPurpose,
 } from "../../../src/webrtc/callEventTypes";
@@ -46,8 +46,10 @@ import {
     MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
+import { EventType, type IContent, type ISendEventResponse, type MatrixEvent, type Room } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
+import type { CryptoApi } from "../../../src/crypto-api";
+import { GroupCallUnknownDeviceError } from "../../../src/webrtc/groupCall";
 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
@@ -1838,5 +1840,32 @@ describe("Call", function () {
 
         const err = await prom;
         expect(err.code).toBe(CallErrorCode.IceFailed);
+    });
+
+    it("should throw an error when trying to call 'placeCallWithCallFeeds' when crypto is enabled", async () => {
+        jest.spyOn(client.client, "getCrypto").mockReturnValue({} as unknown as CryptoApi);
+        call = new MatrixCall({
+            client: client.client,
+            roomId: FAKE_ROOM_ID,
+            opponentDeviceId: "opponent_device_id",
+            invitee: "invitee",
+        });
+        call.on(CallEvent.Error, jest.fn());
+
+        await expect(
+            call.placeCallWithCallFeeds([
+                new CallFeed({
+                    client: client.client,
+                    stream: new MockMediaStream("local_stream1", [
+                        new MockMediaStreamTrack("track_id", "audio"),
+                    ]) as unknown as MediaStream,
+                    userId: client.getUserId(),
+                    deviceId: undefined,
+                    purpose: SDPStreamMetadataPurpose.Usermedia,
+                    audioMuted: false,
+                    videoMuted: false,
+                }),
+            ]),
+        ).rejects.toThrow(new GroupCallUnknownDeviceError("invitee"));
     });
 });

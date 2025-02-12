@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import { logger as rootLogger } from "../logger.ts";
-import { MatrixClient, ClientEvent } from "../client.ts";
+import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { Room, RoomEvent } from "../models/room.ts";
-import { RoomState, RoomStateEvent } from "../models/room-state.ts";
-import { MatrixEvent } from "../models/event.ts";
+import { type Room, RoomEvent } from "../models/room.ts";
+import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
+import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
 
@@ -153,7 +153,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
         const wasActiveAndKnown = sess.memberships.length > 0 && !isNewSession;
 
-        sess.onMembershipUpdate();
+        sess.onRTCSessionMemberUpdate();
 
         const nowActive = sess.memberships.length > 0;
 

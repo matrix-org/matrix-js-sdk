@@ -16,13 +16,13 @@ limitations under the License.
 
 import { getHttpUriForMxc } from "../content-repo.ts";
 import { removeDirectionOverrideChars, removeHiddenChars } from "../utils.ts";
-import { User } from "./user.ts";
-import { MatrixEvent } from "./event.ts";
-import { RoomState } from "./room-state.ts";
+import { type User } from "./user.ts";
+import { type MatrixEvent } from "./event.ts";
+import { type RoomState } from "./room-state.ts";
 import { logger } from "../logger.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { EventType } from "../@types/event.ts";
-import { KnownMembership, Membership } from "../@types/membership.ts";
+import { KnownMembership, type Membership } from "../@types/membership.ts";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -368,6 +368,11 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * If false, any non-matrix content URLs will be ignored. Setting this option to
      * true will expose URLs that, if fetched, will leak information about the user
      * to anyone who they share a room with.
+     * @param useAuthentication - (optional) If true, the caller supports authenticated
+     * media and wants an authentication-required URL. Note that server support for
+     * authenticated media will not be checked - it is the caller's responsibility
+     * to do so before calling this function. Note also that useAuthentication
+     * implies allowRedirects. Defaults to false (unauthenticated endpoints).
      * @returns the avatar URL or null.
      */
     public getAvatarUrl(
@@ -377,13 +382,23 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         resizeMethod: string,
         allowDefault = true,
         allowDirectLinks: boolean,
+        useAuthentication: boolean = false,
     ): string | null {
         const rawUrl = this.getMxcAvatarUrl();
 
         if (!rawUrl && !allowDefault) {
             return null;
         }
-        const httpUrl = getHttpUriForMxc(baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks);
+        const httpUrl = getHttpUriForMxc(
+            baseUrl,
+            rawUrl,
+            width,
+            height,
+            resizeMethod,
+            allowDirectLinks,
+            undefined,
+            useAuthentication,
+        );
         if (httpUrl) {
             return httpUrl;
         }

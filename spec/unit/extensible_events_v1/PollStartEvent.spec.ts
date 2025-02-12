@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_TEXT, IPartialEvent } from "../../../src/@types/extensible_events";
+import { M_TEXT, type IPartialEvent } from "../../../src/@types/extensible_events";
 import {
     M_POLL_START,
     M_POLL_KIND_DISCLOSED,
-    PollAnswer,
-    PollStartEventContent,
+    type PollAnswer,
+    type PollStartEventContent,
     M_POLL_KIND_UNDISCLOSED,
 } from "../../../src/@types/polls";
 import { PollStartEvent, PollAnswerSubevent } from "../../../src/extensible_events_v1/PollStartEvent";

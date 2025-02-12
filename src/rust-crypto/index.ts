@@ -18,16 +18,16 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { RustCrypto } from "./rust-crypto.ts";
-import { IHttpOpts, MatrixHttpApi } from "../http-api/index.ts";
-import { ServerSideSecretStorage } from "../secret-storage.ts";
-import { Logger } from "../logger.ts";
-import { CryptoStore, MigrationState } from "../crypto/store/base.ts";
+import { type IHttpOpts, type MatrixHttpApi } from "../http-api/index.ts";
+import { type ServerSideSecretStorage } from "../secret-storage.ts";
+import { type Logger } from "../logger.ts";
+import { type CryptoStore, MigrationState } from "../crypto/store/base.ts";
 import {
     migrateFromLegacyCrypto,
     migrateLegacyLocalTrustIfNeeded,
     migrateRoomSettingsFromLegacyCrypto,
 } from "./libolm_migration.ts";
-import { CryptoCallbacks } from "../crypto-api/index.ts";
+import { type CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
  * Create a new `RustCrypto` implementation

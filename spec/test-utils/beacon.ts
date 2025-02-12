@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MatrixEvent } from "../../src";
 import { M_BEACON, M_BEACON_INFO } from "../../src/@types/beacon";
-import { LocationAssetType } from "../../src/@types/location";
+import { type LocationAssetType } from "../../src/@types/location";
 import { makeBeaconContent, makeBeaconInfoContent } from "../../src/content-helpers";
 
 type InfoContentProps = {

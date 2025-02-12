@@ -18,13 +18,13 @@ import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
-import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../../test-utils/test-utils";
-import { AuthDict, createClient, CryptoEvent, MatrixClient } from "../../../src";
+import { syncPromise } from "../../test-utils/test-utils";
+import { type AuthDict, createClient, type MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
-import { CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
+import { type CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/secret-storage";
-import { ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
+import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import {
     MASTER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
@@ -37,6 +37,7 @@ import {
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
+import { CryptoEvent } from "../../../src/crypto-api";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -54,11 +55,7 @@ const TEST_DEVICE_ID = "xzcvb";
  * These tests work by intercepting HTTP requests via fetch-mock rather than mocking out bits of the client, so as
  * to provide the most effective integration tests possible.
  */
-describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: string, initCrypto: InitCrypto) => {
-    // newBackendOnly is the opposite to `oldBackendOnly`: it will skip the test if we are running against the legacy
-    // backend. Once we drop support for legacy crypto, it will go away.
-    const newBackendOnly = backend === "rust-sdk" ? test : test.skip;
-
+describe("cross-signing", () => {
     let aliceClient: MatrixClient;
 
     /** an object which intercepts `/sync` requests from {@link #aliceClient} */
@@ -107,7 +104,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
                 body: { errcode: "M_NOT_FOUND" },
             });
 
-            await initCrypto(aliceClient);
+            await aliceClient.initRustCrypto();
         },
         /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
         10000,
@@ -162,7 +159,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             );
         });
 
-        newBackendOnly("get cross signing keys from secret storage and import them", async () => {
+        it("get cross signing keys from secret storage and import them", async () => {
             // Return public cross signing keys
             e2eKeyResponder.addCrossSigningData(SIGNED_CROSS_SIGNING_KEYS_DATA);
 
@@ -263,7 +260,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             expect(calls.length).toEqual(0);
         });
 
-        newBackendOnly("will upload existing cross-signing keys to an established secret storage", async () => {
+        it("will upload existing cross-signing keys to an established secret storage", async () => {
             // This rather obscure codepath covers the case that:
             //   - 4S is set up and working
             //   - our device has private cross-signing keys, but has not published them to 4S
@@ -272,7 +269,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             // a *different* device. Then, when we call `bootstrapCrossSigning` again, it should do the honours.
 
             mockSetupCrossSigningRequests();
-            const accountDataAccumulator = new AccountDataAccumulator();
+            const accountDataAccumulator = new AccountDataAccumulator(syncResponder);
             accountDataAccumulator.interceptGetAccountData();
 
             const authDict = { type: "test" };
@@ -420,9 +417,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
         function awaitCrossSigningKeysUpload() {
             return new Promise<any>((resolve) => {
                 fetchMock.post(
-                    // legacy crypto uses /unstable/; /v3/ is correct
                     {
-                        url: new RegExp("/_matrix/client/(unstable|v3)/keys/device_signing/upload"),
+                        url: new RegExp("/_matrix/client/v3/keys/device_signing/upload"),
                         name: "upload-keys",
                     },
                     (url, options) => {
@@ -474,9 +470,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("cross-signing (%s)", (backend: s
             syncResponder.sendOrQueueSyncResponse({ next_batch: 1 });
             await aliceClient.startClient();
             await syncPromise(aliceClient);
-
-            // Wait for legacy crypto to find the device
-            await jest.advanceTimersByTimeAsync(10);
 
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([aliceClient.getSafeUserId()]);
             expect(devices.get(aliceClient.getSafeUserId())!.has(testData.TEST_DEVICE_ID)).toBeTruthy();

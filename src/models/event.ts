@@ -19,35 +19,35 @@ limitations under the License.
  * the public classes.
  */
 
-import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
+import { type ExtensibleEvent, ExtensibleEvents, type Optional } from "matrix-events-sdk";
 
 import type { IEventDecryptionResult } from "../@types/crypto.ts";
 import { logger } from "../logger.ts";
-import { VerificationRequest } from "../crypto/verification/request/VerificationRequest.ts";
 import {
     EVENT_VISIBILITY_CHANGE_TYPE,
     EventType,
-    MsgType,
+    type MsgType,
     RelationType,
     ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
     UNSIGNED_MEMBERSHIP_FIELD,
 } from "../@types/event.ts";
-import { Crypto } from "../crypto/index.ts";
 import { deepSortedObjectEntries, internaliseString } from "../utils.ts";
-import { RoomMember } from "./room-member.ts";
-import { Thread, THREAD_RELATION_TYPE, ThreadEvent, ThreadEventHandlerMap } from "./thread.ts";
-import { IActionsObject } from "../pushprocessor.ts";
+import { type RoomMember } from "./room-member.ts";
+import { type Thread, THREAD_RELATION_TYPE, ThreadEvent, type ThreadEventHandlerMap } from "./thread.ts";
+import { type IActionsObject } from "../pushprocessor.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
-import { MatrixError } from "../http-api/index.ts";
+import { type MatrixError } from "../http-api/index.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
-import { EventStatus } from "./event-status.ts";
-import { CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend.ts";
-import { IAnnotatedPushRule } from "../@types/PushRules.ts";
-import { Room } from "./room.ts";
+import { type EventStatus } from "./event-status.ts";
+import { type CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend.ts";
+import { type IAnnotatedPushRule } from "../@types/PushRules.ts";
+import { type Room } from "./room.ts";
 import { EventTimeline } from "./event-timeline.ts";
-import { Membership } from "../@types/membership.ts";
+import { type Membership } from "../@types/membership.ts";
 import { DecryptionFailureCode } from "../crypto-api/index.ts";
+import { type RoomState } from "./room-state.ts";
+import { type EmptyObject } from "../@types/common.ts";
 
 export { EventStatus } from "./event-status.ts";
 
@@ -232,6 +232,7 @@ export enum MatrixEventEvent {
     Status = "Event.status",
     Replaced = "Event.replaced",
     RelationsCreated = "Event.relationsCreated",
+    SentinelUpdated = "Event.sentinelUpdated",
 }
 
 export type MatrixEventEmittedEvents = MatrixEventEvent | ThreadEvent.Update;
@@ -244,6 +245,7 @@ export type MatrixEventHandlerMap = {
     [MatrixEventEvent.Status]: (event: MatrixEvent, status: EventStatus | null) => void;
     [MatrixEventEvent.Replaced]: (event: MatrixEvent) => void;
     [MatrixEventEvent.RelationsCreated]: (relationType: string, eventType: string) => void;
+    [MatrixEventEvent.SentinelUpdated]: () => void;
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
 export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
@@ -328,6 +330,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public sender: RoomMember | null = null;
+
     /**
      * The room member who is the target of this event, e.g.
      * the invitee, the person being banned, etc.
@@ -335,6 +338,51 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public target: RoomMember | null = null;
+
+    /**
+     * Update the sentinels and forwardLooking flag for this event.
+     * @param stateContext -  the room state to be queried
+     * @param toStartOfTimeline -  if true the event's forwardLooking flag is set false
+     * @internal
+     */
+    public setMetadata(stateContext: RoomState, toStartOfTimeline: boolean): void {
+        // If an event is an m.room.member state event then we should set the sentinels again in case setEventMetadata
+        // was already called before the state was applied and thus the sentinel points at the member from before this event.
+        const affectsSelf =
+            this.isState() && this.getType() === EventType.RoomMember && this.getSender() === this.getStateKey();
+
+        let changed = false;
+        // When we try to generate a sentinel member before we have that member
+        // in the members object, we still generate a sentinel but it doesn't
+        // have a membership event, so test to see if events.member is set. We
+        // check this to avoid overriding non-sentinel members by sentinel ones
+        // when adding the event to a filtered timeline
+        if (affectsSelf || !this.sender?.events?.member) {
+            const newSender = stateContext.getSentinelMember(this.getSender()!);
+            if (newSender !== this.sender) changed = true;
+            this.sender = newSender;
+        }
+        if (affectsSelf || (!this.target?.events?.member && this.getType() === EventType.RoomMember)) {
+            const newTarget = stateContext.getSentinelMember(this.getStateKey()!);
+            if (newTarget !== this.target) changed = true;
+            this.target = newTarget;
+        }
+
+        if (this.isState()) {
+            // room state has no concept of 'old' or 'current', but we want the
+            // room state to regress back to previous values if toStartOfTimeline
+            // is set, which means inspecting prev_content if it exists. This
+            // is done by toggling the forwardLooking flag.
+            if (toStartOfTimeline) {
+                this.forwardLooking = false;
+            }
+        }
+
+        if (changed) {
+            this.emit(MatrixEventEvent.SentinelUpdated);
+        }
+    }
+
     /**
      * The sending status of the event.
      * @privateRemarks
@@ -356,12 +404,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Should be read-only
      */
     public forwardLooking = true;
-
-    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
-     * `Crypto` will set this the `VerificationRequest` for the event
-     * so it can be easily accessed from the timeline.
-     */
-    public verificationRequest?: VerificationRequest;
 
     private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
@@ -841,28 +883,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Cancel any room key request for this event and resend another.
-     *
-     * @param crypto - crypto module
-     * @param userId - the user who received this event
-     *
-     * @returns a promise that resolves when the request is queued
-     */
-    public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
-        const wireContent = this.getWireContent();
-        return crypto.requestRoomKey(
-            {
-                algorithm: wireContent.algorithm,
-                room_id: this.getRoomId()!,
-                session_id: wireContent.session_id,
-                sender_key: wireContent.sender_key,
-            },
-            this.getKeyRequestRecipients(userId),
-            true,
-        );
-    }
-
-    /**
      * Calculate the recipients for keyshare requests.
      *
      * @param userId - the user who received this event.
@@ -1059,7 +1079,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * signing the public curve25519 key with the ed25519 key.
      *
      * In general, applications should not use this method directly, but should
-     * instead use {@link Crypto.CryptoApi#getEncryptionInfoForEvent}.
+     * instead use {@link crypto-api!CryptoApi#getEncryptionInfoForEvent}.
      */
     public getClaimedEd25519Key(): string | null {
         return this.claimedEd25519Key;
@@ -1327,7 +1347,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @returns The redaction event JSON, or an empty object
      */
-    public getRedactionEvent(): IEvent | {} | null {
+    public getRedactionEvent(): IEvent | EmptyObject | null {
         if (!this.isRedacted()) return null;
 
         if (this.clearEvent?.unsigned) {
@@ -1669,10 +1689,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             decrypted: event,
             encrypted: this.event,
         };
-    }
-
-    public setVerificationRequest(request: VerificationRequest): void {
-        this.verificationRequest = request;
     }
 
     public setTxnId(txnId: string): void {

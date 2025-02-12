@@ -17,11 +17,11 @@ limitations under the License.
 */
 
 import { logger } from "./logger.ts";
-import { MatrixClient } from "./client.ts";
-import { defer, IDeferred } from "./utils.ts";
+import { type MatrixClient } from "./client.ts";
+import { defer, type IDeferred } from "./utils.ts";
 import { MatrixError } from "./http-api/index.ts";
-import { UIAResponse } from "./@types/uia.ts";
-import { UserIdentifier } from "./@types/auth.ts";
+import { type UIAResponse } from "./@types/uia.ts";
+import { type UserIdentifier } from "./@types/auth.ts";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -134,6 +134,7 @@ export type AuthDict =
     | RecaptchaDict
     | EmailIdentityDict
     | { type: Exclude<string, AuthType>; [key: string]: any }
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     | {};
 
 export class NoAuthFlowFoundError extends Error {
@@ -421,10 +422,12 @@ export class InteractiveAuth<T> {
         // use the sessionid from the last request, if one is present.
         let auth: AuthDict;
         if ((this.data as IAuthData)?.session) {
-            auth = {
-                session: (this.data as IAuthData).session,
-            };
-            Object.assign(auth, authData);
+            auth = Object.assign(
+                {
+                    session: (this.data as IAuthData).session,
+                },
+                authData,
+            );
         } else {
             auth = authData;
         }

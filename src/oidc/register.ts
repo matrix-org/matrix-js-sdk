@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OidcClientConfig } from "./index.ts";
+import { type OidcClientConfig } from "./index.ts";
 import { OidcError } from "./error.ts";
 import { Method } from "../http-api/index.ts";
 import { logger } from "../logger.ts";
-import { NonEmptyArray } from "../@types/common.ts";
+import { type NonEmptyArray } from "../@types/common.ts";
 
 /**
  * Client metadata passed to registration endpoint
@@ -65,12 +65,12 @@ export const registerOidcClient = async (
     delegatedAuthConfig: OidcClientConfig,
     clientMetadata: OidcRegistrationClientMetadata,
 ): Promise<string> => {
-    if (!delegatedAuthConfig.registrationEndpoint) {
+    if (!delegatedAuthConfig.registration_endpoint) {
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
     const grantTypes: NonEmptyArray<string> = ["authorization_code", "refresh_token"];
-    if (grantTypes.some((scope) => !delegatedAuthConfig.metadata.grant_types_supported.includes(scope))) {
+    if (grantTypes.some((scope) => !delegatedAuthConfig.grant_types_supported.includes(scope))) {
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
@@ -95,7 +95,7 @@ export const registerOidcClient = async (
     };
 
     try {
-        const response = await fetch(delegatedAuthConfig.registrationEndpoint, {
+        const response = await fetch(delegatedAuthConfig.registration_endpoint, {
             method: Method.Post,
             headers,
             body: JSON.stringify(metadata),

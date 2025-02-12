@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient, MatrixEvent, MatrixEventEvent, MatrixScheduler, Room } from "../../src";
+import { MatrixClient, MatrixEvent, MatrixEventEvent, type MatrixScheduler, Room } from "../../src";
 import { eventMapperFor } from "../../src/event-mapper";
-import { IStore } from "../../src/store";
+import { type IStore } from "../../src/store";
 
 describe("eventMapperFor", function () {
     let rooms: Room[] = [];

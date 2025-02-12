@@ -23,6 +23,7 @@ import {
     EventTimelineSet,
     EventType,
     Filter,
+    KnownMembership,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
@@ -137,6 +138,31 @@ describe("EventTimelineSet", () => {
             const eventsInLiveTimeline = liveTimeline.getEvents();
             expect(eventsInLiveTimeline.length).toStrictEqual(1);
             expect(eventsInLiveTimeline[0]).toStrictEqual(duplicateMessageEvent);
+        });
+
+        it("should set event.target after applying the membership state update", () => {
+            const eventTimelineSet = room.getUnfilteredTimelineSet();
+
+            const ev1 = utils.mkMembership({
+                room: roomId,
+                mship: KnownMembership.Invite,
+                user: "@sender:server",
+                skey: userA,
+                event: true,
+            });
+            const ev2 = utils.mkMembership({
+                room: roomId,
+                mship: KnownMembership.Join,
+                user: userA,
+                skey: userA,
+                name: "This is my displayname",
+                event: true,
+            });
+
+            eventTimelineSet.addLiveEvent(ev1, { addToState: true });
+            expect(ev1.target?.name).toBe(userA);
+            eventTimelineSet.addLiveEvent(ev2, { addToState: true });
+            expect(ev2.target?.name).toBe("This is my displayname");
         });
     });
 

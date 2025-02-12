@@ -19,46 +19,46 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, Optional, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, type Optional, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
-import { emitPromise, IMessageOpts } from "../test-utils/test-utils";
+import { emitPromise, type IMessageOpts } from "../test-utils/test-utils";
 import {
     Direction,
     DuplicateStrategy,
     EventStatus,
-    EventTimelineSet,
+    type EventTimelineSet,
     EventType,
     Filter,
     FILTER_RELATED_BY_REL_TYPES,
     FILTER_RELATED_BY_SENDERS,
-    IContent,
-    IEvent,
-    IRelationsRequestOpts,
-    IStateEventWithRoomId,
+    type IContent,
+    type IEvent,
+    type IRelationsRequestOpts,
+    type IStateEventWithRoomId,
     JoinRule,
-    MatrixClient,
+    type MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
     PollEvent,
     RelationType,
     RoomEvent,
-    RoomMember,
+    type RoomMember,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { NotificationCountType, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
-import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
+import { ReceiptType, type WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
-import { Crypto } from "../../src/crypto";
 import * as threadUtils from "../test-utils/thread";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
+import type { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -298,6 +298,48 @@ describe("Room", function () {
         it("should return nothing if there is no m.room.avatar and allowDefault=false", function () {
             const url = room.getAvatarUrl(hsUrl, 64, 64, "crop", false);
             expect(url).toEqual(null);
+        });
+
+        it("should return unauthenticated media URL if useAuthentication is not set", function () {
+            // @ts-ignore - mocked doesn't handle overloads sanely
+            mocked(room.currentState.getStateEvents).mockImplementation(function (type, key) {
+                if (type === EventType.RoomAvatar && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: EventType.RoomAvatar,
+                        skey: "",
+                        room: roomId,
+                        user: userA,
+                        content: {
+                            url: "mxc://flibble/wibble",
+                        },
+                    });
+                }
+            });
+            const url = room.getAvatarUrl(hsUrl, 100, 100, "scale");
+            // Check for unauthenticated media prefix
+            expect(url?.indexOf("/_matrix/media/v3/")).not.toEqual(-1);
+        });
+
+        it("should return authenticated media URL if useAuthentication=true", function () {
+            // @ts-ignore - mocked doesn't handle overloads sanely
+            mocked(room.currentState.getStateEvents).mockImplementation(function (type, key) {
+                if (type === EventType.RoomAvatar && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: EventType.RoomAvatar,
+                        skey: "",
+                        room: roomId,
+                        user: userA,
+                        content: {
+                            url: "mxc://flibble/wibble",
+                        },
+                    });
+                }
+            });
+            const url = room.getAvatarUrl(hsUrl, 100, 100, "scale", undefined, true);
+            // Check for authenticated media prefix
+            expect(url?.indexOf("/_matrix/client/v1/media/")).not.toEqual(-1);
         });
     });
 
@@ -3732,9 +3774,9 @@ describe("Room", function () {
 
     it("should load pending events from from the store and decrypt if needed", async () => {
         const client = new TestClient(userA).client;
-        client.crypto = client["cryptoBackend"] = {
+        client["cryptoBackend"] = {
             decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
-        } as unknown as Crypto;
+        } as unknown as CryptoBackend;
         client.store.getPendingEvents = jest.fn(async (roomId) => [
             {
                 event_id: "$1:server",

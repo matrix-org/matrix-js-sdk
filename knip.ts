@@ -6,11 +6,21 @@ export default {
         "src/types.ts",
         "src/browser-index.ts",
         "src/indexeddb-worker.ts",
+        "src/crypto-api/index.ts",
+        "src/testing.ts",
+        "src/matrix.ts",
         "scripts/**",
         "spec/**",
-        "release.sh",
-        // For now, we include all source files as entrypoints as we have been bad about gutwrenched imports
-        "src/**",
+        // XXX: these look entirely unused
+        "src/crypto/aes.ts",
+        "src/crypto/crypto.ts",
+        "src/crypto/recoverykey.ts",
+        // XXX: these should be re-exported by one of the supported exports
+        "src/matrixrtc/index.ts",
+        "src/sliding-sync.ts",
+        "src/webrtc/groupCall.ts",
+        "src/webrtc/stats/media/mediaTrackStats.ts",
+        "src/rendezvous/RendezvousChannel.ts",
     ],
     project: ["**/*.{js,ts}"],
     ignore: ["examples/**"],
@@ -33,4 +43,6 @@ export default {
         "dist",
     ],
     ignoreExportsUsedInFile: true,
+    includeEntryExports: false,
+    exclude: ["enumMembers"],
 } satisfies KnipConfig;

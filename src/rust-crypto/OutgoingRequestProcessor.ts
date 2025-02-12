@@ -19,7 +19,7 @@ import {
     KeysClaimRequest,
     KeysQueryRequest,
     KeysUploadRequest,
-    OlmMachine,
+    type OlmMachine,
     PutDehydratedDeviceRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
@@ -28,10 +28,10 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { logger } from "../logger.ts";
-import { calculateRetryBackoff, IHttpOpts, MatrixHttpApi, Method } from "../http-api/index.ts";
-import { logDuration, QueryDict, sleep } from "../utils.ts";
-import { AuthDict, UIAuthCallback } from "../interactive-auth.ts";
-import { UIAResponse } from "../@types/uia.ts";
+import { calculateRetryBackoff, type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts";
+import { logDuration, type QueryDict, sleep } from "../utils.ts";
+import { type AuthDict, type UIAuthCallback } from "../interactive-auth.ts";
+import { type UIAResponse } from "../@types/uia.ts";
 import { ToDeviceMessageId } from "../@types/event.ts";
 import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager.ts";
 

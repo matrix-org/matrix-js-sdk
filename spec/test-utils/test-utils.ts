@@ -1,25 +1,31 @@
-// eslint-disable-next-line no-restricted-imports
-import EventEmitter from "events";
-
 // load olm before the sdk if possible
 import "../olm-loader";
 
+// eslint-disable-next-line no-restricted-imports
+import type EventEmitter from "events";
 import { logger } from "../../src/logger";
-import { IContent, IEvent, IEventRelation, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import {
+    type IContent,
+    type IEvent,
+    type IEventRelation,
+    type IUnsigned,
+    MatrixEvent,
+    MatrixEventEvent,
+} from "../../src/models/event";
 import {
     ClientEvent,
     EventType,
-    IJoinedRoom,
-    IPusher,
-    ISyncResponse,
-    MatrixClient,
+    type IJoinedRoom,
+    type IPusher,
+    type ISyncResponse,
+    type MatrixClient,
     MsgType,
     RelationType,
 } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 import { TEST_ROOM_ID } from "./test-data";
-import { KnownMembership, Membership } from "../../src/@types/membership";
+import { KnownMembership, type Membership } from "../../src/@types/membership";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -552,19 +558,20 @@ export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
     ...extra,
 });
 
-/**
- * a list of the supported crypto implementations, each with a callback to initialise that implementation
- * for the given client
- */
-export const CRYPTO_BACKENDS: Record<string, InitCrypto> = {};
-export type InitCrypto = (_: MatrixClient) => Promise<void>;
-
-CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
-if (globalThis.Olm) {
-    CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initLegacyCrypto();
-}
-
 export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
+
+/**
+ * Counts the number of times that an event was emitted.
+ */
+export class EventCounter {
+    public counter;
+    constructor(emitter: EventEmitter, event: string) {
+        this.counter = 0;
+        emitter.on(event, () => {
+            this.counter++;
+        });
+    }
+}
 
 /**
  * Advance the fake timers in a loop until the given promise resolves or rejects.

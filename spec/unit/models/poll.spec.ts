@@ -16,7 +16,7 @@ limitations under the License.
 
 import { M_POLL_START } from "matrix-events-sdk";
 
-import { EventType, IEvent, MatrixEvent, PollEvent, Room } from "../../../src";
+import { EventType, type IEvent, MatrixEvent, PollEvent, Room } from "../../../src";
 import { REFERENCE_RELATION } from "../../../src/@types/extensible_events";
 import { M_POLL_END, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE } from "../../../src/@types/polls";
 import { PollStartEvent } from "../../../src/extensible_events_v1/PollStartEvent";

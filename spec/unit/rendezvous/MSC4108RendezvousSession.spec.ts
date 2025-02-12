@@ -16,7 +16,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { ClientPrefix, IHttpOpts, MatrixClient, MatrixHttpApi } from "../../../src";
+import { ClientPrefix, type IHttpOpts, type MatrixClient, MatrixHttpApi } from "../../../src";
 import { ClientRendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {

@@ -15,18 +15,33 @@ limitations under the License.
 */
 
 import { jwtDecode } from "jwt-decode";
-import { IdTokenClaims, OidcMetadata, SigninResponse } from "oidc-client-ts";
+import { type IdTokenClaims, type OidcMetadata, type SigninResponse } from "oidc-client-ts";
 
 import { logger } from "../logger.ts";
 import { OidcError } from "./error.ts";
 
-export type ValidatedIssuerConfig = {
-    authorizationEndpoint: string;
-    tokenEndpoint: string;
-    registrationEndpoint?: string;
-    accountManagementEndpoint?: string;
-    accountManagementActionsSupported?: string[];
-};
+/**
+ * Metadata from OIDC authority discovery
+ * With validated properties required in type
+ */
+export type ValidatedAuthMetadata = Partial<OidcMetadata> &
+    Pick<
+        OidcMetadata,
+        | "issuer"
+        | "authorization_endpoint"
+        | "token_endpoint"
+        | "revocation_endpoint"
+        | "response_types_supported"
+        | "grant_types_supported"
+        | "code_challenge_methods_supported"
+    > & {
+        // MSC2965 extensions to the OIDC spec
+        account_management_uri?: string;
+        account_management_actions_supported?: string[];
+        // The OidcMetadata type from oidc-client-ts does not include `prompt_values_supported`
+        // even though it is part of the OIDC spec
+        prompt_values_supported?: string[];
+    };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === "object" && !Array.isArray(value);
@@ -67,77 +82,38 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
  * Validates issuer `.well-known/openid-configuration`
  * As defined in RFC5785 https://openid.net/specs/openid-connect-discovery-1_0.html
  * validates that OP is compatible with Element's OIDC flow
- * @param wellKnown - json object
+ * @param authMetadata - json object
  * @returns valid issuer config
  * @throws Error - when issuer config is not found or is invalid
  */
-export const validateOIDCIssuerWellKnown = (wellKnown: unknown): ValidatedIssuerConfig => {
-    if (!isRecord(wellKnown)) {
+export const validateAuthMetadata = (authMetadata: unknown): ValidatedAuthMetadata => {
+    if (!isRecord(authMetadata)) {
         logger.error("Issuer configuration not found or malformed");
         throw new Error(OidcError.OpSupport);
     }
 
     const isInvalid = [
-        requiredStringProperty(wellKnown, "authorization_endpoint"),
-        requiredStringProperty(wellKnown, "token_endpoint"),
-        requiredStringProperty(wellKnown, "revocation_endpoint"),
-        optionalStringProperty(wellKnown, "registration_endpoint"),
-        optionalStringProperty(wellKnown, "account_management_uri"),
-        optionalStringProperty(wellKnown, "device_authorization_endpoint"),
-        optionalStringArrayProperty(wellKnown, "account_management_actions_supported"),
-        requiredArrayValue(wellKnown, "response_types_supported", "code"),
-        requiredArrayValue(wellKnown, "grant_types_supported", "authorization_code"),
-        requiredArrayValue(wellKnown, "code_challenge_methods_supported", "S256"),
+        requiredStringProperty(authMetadata, "issuer"),
+        requiredStringProperty(authMetadata, "authorization_endpoint"),
+        requiredStringProperty(authMetadata, "token_endpoint"),
+        requiredStringProperty(authMetadata, "revocation_endpoint"),
+        optionalStringProperty(authMetadata, "registration_endpoint"),
+        optionalStringProperty(authMetadata, "account_management_uri"),
+        optionalStringProperty(authMetadata, "device_authorization_endpoint"),
+        optionalStringArrayProperty(authMetadata, "account_management_actions_supported"),
+        requiredArrayValue(authMetadata, "response_types_supported", "code"),
+        requiredArrayValue(authMetadata, "grant_types_supported", "authorization_code"),
+        requiredArrayValue(authMetadata, "code_challenge_methods_supported", "S256"),
+        optionalStringArrayProperty(authMetadata, "prompt_values_supported"),
     ].some((isValid) => !isValid);
 
     if (!isInvalid) {
-        return {
-            authorizationEndpoint: <string>wellKnown["authorization_endpoint"],
-            tokenEndpoint: <string>wellKnown["token_endpoint"],
-            registrationEndpoint: <string>wellKnown["registration_endpoint"],
-            accountManagementEndpoint: <string>wellKnown["account_management_uri"],
-            accountManagementActionsSupported: <string[]>wellKnown["account_management_actions_supported"],
-        };
+        return authMetadata as ValidatedAuthMetadata;
     }
 
     logger.error("Issuer configuration not valid");
     throw new Error(OidcError.OpSupport);
 };
-
-/**
- * Metadata from OIDC authority discovery
- * With validated properties required in type
- */
-export type ValidatedIssuerMetadata = Partial<OidcMetadata> &
-    Pick<
-        OidcMetadata,
-        | "issuer"
-        | "authorization_endpoint"
-        | "token_endpoint"
-        | "registration_endpoint"
-        | "revocation_endpoint"
-        | "response_types_supported"
-        | "grant_types_supported"
-        | "code_challenge_methods_supported"
-        | "device_authorization_endpoint"
-    > & {
-        // MSC2965 extensions to the OIDC spec
-        account_management_uri?: string;
-        account_management_actions_supported?: string[];
-    };
-
-/**
- * Wraps validateOIDCIssuerWellKnown in a type assertion
- * that asserts expected properties are present
- * (Typescript assertions cannot be arrow functions)
- * @param metadata - issuer openid-configuration response
- * @throws when metadata validation fails
- */
-export function isValidatedIssuerMetadata(
-    metadata: Partial<OidcMetadata>,
-): asserts metadata is ValidatedIssuerMetadata {
-    validateOIDCIssuerWellKnown(metadata);
-}
 
 export const decodeIdToken = (token: string): IdTokenClaims => {
     try {
@@ -179,7 +155,8 @@ export const validateIdToken = (
          * The ID Token MUST be rejected if the ID Token does not list the Client as a valid audience, or if it contains additional audiences not trusted by the Client.
          * EW: Don't accept tokens with other untrusted audiences
          * */
-        if (claims.aud !== clientId) {
+        const sanitisedAuds = typeof claims.aud === "string" ? [claims.aud] : claims.aud;
+        if (!sanitisedAuds.includes(clientId)) {
             throw new Error("Invalid audience");
         }
 

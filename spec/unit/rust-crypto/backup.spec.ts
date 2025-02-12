@@ -1,13 +1,13 @@
-import { Mocked } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { HttpApiEvent, HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
-import { CryptoEvent, KeyBackupSession } from "../../../src/crypto-api/index.ts";
-import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
+import { CryptoEvent, type KeyBackupSession } from "../../../src/crypto-api/index.ts";
+import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import * as testData from "../../test-utils/test-data";
 import * as TestData from "../../test-utils/test-data";
-import { RustBackupManager, KeyBackup } from "../../../src/rust-crypto/backup";
+import { RustBackupManager, type KeyBackup } from "../../../src/rust-crypto/backup";
 
 describe("Upload keys to backup", () => {
     /** The backup manager under test */
@@ -95,13 +95,13 @@ describe("Upload keys to backup", () => {
             .mockResolvedValueOnce(mockBackupRequest(100))
             .mockResolvedValueOnce(mockBackupRequest(100))
             .mockResolvedValueOnce(mockBackupRequest(2))
-            .mockResolvedValue(null);
+            .mockResolvedValue(undefined);
 
         mockOlmMachine.roomKeyCounts.mockResolvedValue({
             total: 602,
             // First iteration won't call roomKeyCounts(); it will be called on the second iteration after 200 keys have been saved.
             backedUp: 200,
-        });
+        } as unknown as RustSdkCryptoJs.RoomKeyCounts);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
         await jest.runAllTimersAsync();
@@ -130,7 +130,7 @@ describe("Upload keys to backup", () => {
         });
 
         // Only returns 2 keys on the first call, then none.
-        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(null);
+        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(undefined);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
         await jest.runAllTimersAsync();
