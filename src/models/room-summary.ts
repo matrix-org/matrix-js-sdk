@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Hero } from "./room.ts";
+import type { Hero } from "./room.ts";
 
 export interface IRoomSummary {
     "m.heroes": string[];
