@@ -209,7 +209,7 @@ import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
 import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
-import { type UIARequest, type UIAResponse } from "./@types/uia.ts";
+import { type UIARequest } from "./@types/uia.ts";
 import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature.ts";
 import { type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
@@ -6363,9 +6363,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: On success, the token response
      * or UIA auth data.
      */
-    public async requestLoginToken(auth?: AuthDict): Promise<UIAResponse<LoginTokenPostResponse>> {
+    public async requestLoginToken(auth?: AuthDict): Promise<LoginTokenPostResponse> {
         const body: UIARequest<unknown> = { auth };
-        return this.http.authedRequest<UIAResponse<LoginTokenPostResponse>>(
+        return this.http.authedRequest<LoginTokenPostResponse>(
             Method.Post,
             "/login/get_token",
             undefined, // no query params

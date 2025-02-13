@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type AuthDict, type IAuthData } from "../interactive-auth.ts";
+import { type AuthDict } from "../interactive-auth.ts";
 
 /**
  * Helper type to represent HTTP request body for a UIA enabled endpoint
@@ -22,8 +22,3 @@ import { type AuthDict, type IAuthData } from "../interactive-auth.ts";
 export type UIARequest<T> = T & {
     auth?: AuthDict;
 };
-
-/**
- * Helper type to represent HTTP response body for a UIA enabled endpoint
- */
-export type UIAResponse<T> = T | IAuthData;
