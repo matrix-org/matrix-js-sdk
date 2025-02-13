@@ -501,7 +501,7 @@ describe("RustCrypto", () => {
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
                 progressCallback: (progress) => {
-                    if (progress.stage === 'load_keys') {
+                    if (progress.stage === "load_keys") {
                         importTotal = progress.total;
                     }
                 },
@@ -526,7 +526,7 @@ describe("RustCrypto", () => {
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
                 progressCallback: (progress) => {
-                    if (progress.stage === 'load_keys') {
+                    if (progress.stage === "load_keys") {
                         importTotal = progress.total;
                     }
                 },

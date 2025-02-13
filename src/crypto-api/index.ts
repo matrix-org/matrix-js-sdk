@@ -1001,8 +1001,8 @@ export class DeviceVerificationStatus {
 }
 
 export enum ImportRoomKeyStage {
-    Fetch = 'fetch',
-    LoadKeys = 'load_keys'
+    Fetch = "fetch",
+    LoadKeys = "load_keys",
 }
 
 export type ImportRoomKeyFetchProgress = {
@@ -1022,7 +1022,7 @@ export type ImportRoomKeyLoadProgress = {
  * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
-export type ImportRoomKeyProgressData =  ImportRoomKeyFetchProgress | ImportRoomKeyLoadProgress;
+export type ImportRoomKeyProgressData = ImportRoomKeyFetchProgress | ImportRoomKeyLoadProgress;
 
 /**
  * Options object for {@link CryptoApi#importRoomKeys} and

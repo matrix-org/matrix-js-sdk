@@ -35,7 +35,12 @@ import { encodeUri, logDuration } from "../utils.ts";
 import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
-import { type ImportRoomKeyProgressData, type ImportRoomKeysOpts, CryptoEvent, ImportRoomKeyStage } from "../crypto-api/index.ts";
+import {
+    type ImportRoomKeyProgressData,
+    type ImportRoomKeysOpts,
+    CryptoEvent,
+    ImportRoomKeyStage,
+} from "../crypto-api/index.ts";
 import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { type IMegolmSessionData } from "../@types/crypto.ts";
 
