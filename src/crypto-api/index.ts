@@ -1000,18 +1000,29 @@ export class DeviceVerificationStatus {
     }
 }
 
+export enum ImportRoomKeyStage {
+    Fetch = 'fetch',
+    LoadKeys = 'load_keys'
+}
+
+export type ImportRoomKeyFetchProgress = {
+    stage: ImportRoomKeyStage.Fetch;
+};
+
+export type ImportRoomKeyLoadProgress = {
+    stage: ImportRoomKeyStage.LoadKeys;
+    successes: number;
+    failures: number;
+    total: number;
+};
+
 /**
  * Room key import progress report.
  * Used when calling {@link CryptoApi#importRoomKeys},
  * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
-export interface ImportRoomKeyProgressData {
-    stage: string; // TODO: Enum
-    successes?: number;
-    failures?: number;
-    total?: number;
-}
+export type ImportRoomKeyProgressData =  ImportRoomKeyFetchProgress | ImportRoomKeyLoadProgress;
 
 /**
  * Options object for {@link CryptoApi#importRoomKeys} and
