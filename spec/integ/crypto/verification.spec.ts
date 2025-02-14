@@ -1354,7 +1354,7 @@ describe("verification", () => {
         });
 
         /**
-         * Waits briefly to ensure the secret key has been received before retrieving the backup private key.
+         * Waits briefly for secrets to be gossipped, then fetches the backup private key from the crypto stack.
          */
         async function retrieveBackupPrivateKeyWithDelay(): Promise<Uint8Array | null> {
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
