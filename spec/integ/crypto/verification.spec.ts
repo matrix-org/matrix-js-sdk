@@ -1272,10 +1272,17 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, new MatrixError({
-                errcode: "M_NOT_FOUND",
-                error: "No backup found",
-            }, 401));
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                new MatrixError(
+                    {
+                        errcode: "M_NOT_FOUND",
+                        error: "No backup found",
+                    },
+                    401,
+                ),
+            );
 
             // the backup secret should not be cached
             const cachedKey = await retrieveBackupPrivateKeyWithDelay();
@@ -1289,7 +1296,11 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, new Error("Network Error!"));
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                new Error("Network Error!"),
+            );
 
             // the backup secret should not be cached
             const cachedKey = await retrieveBackupPrivateKeyWithDelay();
@@ -1355,7 +1366,7 @@ describe("verification", () => {
 
             return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
         }
-        
+
         /**
          * Common test setup for gossiping secrets.
          * Creates a peer to peer session, sends the secret, mockup the version API, send the secret back from sync, then await for the backup check.
