@@ -1370,7 +1370,8 @@ describe("verification", () => {
         /**
          * Common test setup for gossiping secrets.
          * Creates a peer to peer session, sends the secret, mockup the version API, send the secret back from sync, then await for the backup check.
-         * @param expectBackup - The expected result for the key backup request.
+         *
+         * @param expectBackup - The result to be returned from the `/room_keys/version` request.
          * - **KeyBackupInfo**: Indicates a successful request, where the response contains the key backup information (HTTP 200).
          * - **MatrixError**: Represents an error response from the server, indicating an unsuccessful request (non-200 HTTP status).
          * - **Error**: Indicates an error during the request process itself (e.g., network issues or unexpected failures).
