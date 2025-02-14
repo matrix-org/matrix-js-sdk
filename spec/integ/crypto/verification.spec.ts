@@ -1288,6 +1288,27 @@ describe("verification", () => {
             expect(cachedKey).toBeNull();
         });
 
+        it("Should not accept the backup decryption key gossip when server-side key backup request error", async () => {
+            const requestPromises = mockSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, undefined);
+
+            // We are lacking a way to signal that the secret has been received, so we wait a bit..
+            jest.useRealTimers();
+            await new Promise((resolve) => {
+                setTimeout(resolve, 500);
+            });
+            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+
+            // the backup secret should not be cached
+            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeNull();
+        });
+
         it("Should not accept the backup decryption key gossip if private key do not match", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
@@ -1362,7 +1383,7 @@ describe("verification", () => {
         async function sendBackupGossipAndExpectVersion(
             requestId: string,
             secret: string,
-            expectBackup: KeyBackupInfo | { errcode?: string; error?: string },
+            expectBackup?: KeyBackupInfo | { errcode?: string; error?: string },
         ) {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
 
@@ -1382,6 +1403,9 @@ describe("verification", () => {
                     "express:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
                         resolve(undefined);
+                        if (!expectBackup) {
+                            return Promise.reject(new Error("Network Error!"));
+                        }
 
                         if ('errcode' in expectBackup) {
                             return {
