@@ -1288,7 +1288,7 @@ describe("verification", () => {
             expect(cachedKey).toBeNull();
         });
 
-        it("Should not accept the backup decryption key gossip when server-side key backup request error", async () => {
+        it("Should not accept the backup decryption key gossip when server-side key backup request errors", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
             await doInteractiveVerification();
