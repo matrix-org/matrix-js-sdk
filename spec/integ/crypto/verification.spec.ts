@@ -1272,8 +1272,8 @@ describe("verification", () => {
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, {
-                errcode: 'M_NOT_FOUND',
-                error: 'No backup found'
+                errcode: "M_NOT_FOUND",
+                error: "No backup found",
             });
 
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
@@ -1407,7 +1407,7 @@ describe("verification", () => {
                             return Promise.reject(new Error("Network Error!"));
                         }
 
-                        if ('errcode' in expectBackup) {
+                        if ("errcode" in expectBackup) {
                             return {
                                 status: 404,
                                 body: expectBackup,
