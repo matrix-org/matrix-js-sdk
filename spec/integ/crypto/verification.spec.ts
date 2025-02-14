@@ -1276,16 +1276,7 @@ describe("verification", () => {
                 error: "No backup found",
             });
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
+            expectBackupPrivateKeyToBeNull();
         });
 
         it("Should not accept the backup decryption key gossip when server-side key backup request errors", async () => {
@@ -1297,16 +1288,7 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, undefined);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
+            expectBackupPrivateKeyToBeNull();
         });
 
         it("Should not accept the backup decryption key gossip if private key do not match", async () => {
@@ -1318,16 +1300,7 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
+            expectBackupPrivateKeyToBeNull();
         });
 
         it("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
@@ -1343,16 +1316,7 @@ describe("verification", () => {
                 unknownAlgorithmBackupInfo,
             );
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
+            expectBackupPrivateKeyToBeNull();
         });
 
         it("Should not accept an invalid backup decryption key", async () => {
@@ -1364,6 +1328,13 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
 
+            expectBackupPrivateKeyToBeNull();
+        });
+
+        /**
+         * Test to verify that the backup private key is not accepted after secrets gossip
+         */
+        async function expectBackupPrivateKeyToBeNull() {
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
             jest.useRealTimers();
             await new Promise((resolve) => {
@@ -1374,8 +1345,8 @@ describe("verification", () => {
             // the backup secret should not be cached
             const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
             expect(cachedKey).toBeNull();
-        });
-
+        }
+        
         /**
          * Common test setup for gossiping secrets.
          * Creates a peer to peer session, sends the secret, mockup the version API, send the secret back from sync, then await for the backup check.
