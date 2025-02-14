@@ -1356,7 +1356,7 @@ describe("verification", () => {
         /**
          * Waits briefly to ensure the secret key has been received before retrieving the backup private key.
          */
-        async function retrieveBackupPrivateKeyWithDelay() {
+        async function retrieveBackupPrivateKeyWithDelay(): Promise<Uint8Array | null> {
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
             jest.useRealTimers();
             await new Promise((resolve) => {
