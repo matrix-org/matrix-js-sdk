@@ -1277,7 +1277,9 @@ describe("verification", () => {
                 error: "No backup found",
             }, 401));
 
-            expectBackupPrivateKeyToBeNull();
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
         });
 
         it("Should not accept the backup decryption key gossip when server-side key backup request errors", async () => {
@@ -1289,7 +1291,9 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, new Error("Network Error!"));
 
-            expectBackupPrivateKeyToBeNull();
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
         });
 
         it("Should not accept the backup decryption key gossip if private key do not match", async () => {
@@ -1301,7 +1305,9 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
 
-            expectBackupPrivateKeyToBeNull();
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
         });
 
         it("Should not accept the backup decryption key gossip if backup algorithm unknown", async () => {
@@ -1317,7 +1323,9 @@ describe("verification", () => {
                 unknownAlgorithmBackupInfo,
             );
 
-            expectBackupPrivateKeyToBeNull();
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
         });
 
         it("Should not accept an invalid backup decryption key", async () => {
@@ -1329,13 +1337,15 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
 
-            expectBackupPrivateKeyToBeNull();
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
         });
 
         /**
-         * Test to verify that the backup private key is not accepted after secrets gossip
+         * Waits briefly to ensure the secret key has been received before retrieving the backup private key.
          */
-        async function expectBackupPrivateKeyToBeNull() {
+        async function retrieveBackupPrivateKeyWithDelay() {
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
             jest.useRealTimers();
             await new Promise((resolve) => {
@@ -1343,9 +1353,7 @@ describe("verification", () => {
             });
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
+            return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
         }
         
         /**
