@@ -30,6 +30,7 @@ import {
     type ICreateClientOpts,
     type IEvent,
     type MatrixClient,
+    MatrixError,
     MatrixEvent,
     MatrixEventEvent,
 } from "../../../src";
@@ -1271,10 +1272,10 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, {
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, new MatrixError({
                 errcode: "M_NOT_FOUND",
                 error: "No backup found",
-            });
+            }, 401));
 
             expectBackupPrivateKeyToBeNull();
         });
@@ -1286,7 +1287,7 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, undefined);
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, new Error("Network Error!"));
 
             expectBackupPrivateKeyToBeNull();
         });
@@ -1350,11 +1351,15 @@ describe("verification", () => {
         /**
          * Common test setup for gossiping secrets.
          * Creates a peer to peer session, sends the secret, mockup the version API, send the secret back from sync, then await for the backup check.
+         * @param expectBackup - The expected result for the key backup request.
+         * - **KeyBackupInfo**: Indicates a successful request, where the response contains the key backup information (HTTP 200).
+         * - **MatrixError**: Represents an error response from the server, indicating an unsuccessful request (non-200 HTTP status).
+         * - **Error**: Indicates an error during the request process itself (e.g., network issues or unexpected failures).
          */
         async function sendBackupGossipAndExpectVersion(
             requestId: string,
             secret: string,
-            expectBackup?: KeyBackupInfo | { errcode?: string; error?: string },
+            expectBackup: KeyBackupInfo | MatrixError | Error,
         ) {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
 
@@ -1374,16 +1379,17 @@ describe("verification", () => {
                     "express:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
                         resolve(undefined);
-                        if (!expectBackup) {
-                            return Promise.reject(new Error("Network Error!"));
-                        }
-
-                        if ("errcode" in expectBackup) {
+                        if (expectBackup instanceof MatrixError) {
                             return {
-                                status: 404,
-                                body: expectBackup,
+                                status: expectBackup.httpStatus,
+                                body: expectBackup.data,
                             };
                         }
+
+                        if (expectBackup instanceof Error) {
+                            return Promise.reject(expectBackup);
+                        }
+
                         return expectBackup;
                     },
                     {
