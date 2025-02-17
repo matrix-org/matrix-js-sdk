@@ -20,7 +20,6 @@ import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
 import { defer, type IDeferred } from "./utils.ts";
 import { MatrixError } from "./http-api/index.ts";
-import { type UIAResponse } from "./@types/uia.ts";
 import { type UserIdentifier } from "./@types/auth.ts";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
@@ -159,7 +158,7 @@ export class NoAuthFlowFoundError extends Error {
  *
  * The generic parameter `T` is the type of the response of the endpoint, once it is eventually successful.
  */
-export type UIAuthCallback<T> = (makeRequest: (authData: AuthDict | null) => Promise<UIAResponse<T>>) => Promise<T>;
+export type UIAuthCallback<T> = (makeRequest: (authData: AuthDict | null) => Promise<T>) => Promise<T>;
 
 interface IOpts<T> {
     /**

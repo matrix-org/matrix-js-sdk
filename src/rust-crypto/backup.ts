@@ -161,12 +161,17 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     public async handleBackupSecretReceived(secret: string): Promise<boolean> {
         // Currently we only receive the decryption key without any key backup version. It is important to
         // check that the secret is valid for the current version before storing it.
-        // We force a check to ensure to have the latest version. We also want to check that the backup is trusted
-        // as we don't want to store the secret if the backup is not trusted, and eventually import megolm keys later from an untrusted backup.
-        const backupCheck = await this.checkKeyBackupAndEnable(true);
+        // We force a check to ensure to have the latest version.
+        let latestBackupInfo: KeyBackupInfo | null;
+        try {
+            latestBackupInfo = await this.requestKeyBackupVersion();
+        } catch (e) {
+            logger.warn("handleBackupSecretReceived: Error checking for latest key backup", e);
+            return false;
+        }
 
-        if (!backupCheck?.backupInfo?.version || !backupCheck.trustInfo.trusted) {
-            // There is no server-side key backup, or the backup is not signed by a trusted cross-signing key or trusted own device.
+        if (!latestBackupInfo?.version) {
+            // There is no server-side key backup.
             // This decryption key is useless to us.
             logger.warn(
                 "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
@@ -176,7 +181,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         try {
             const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
-            const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(backupCheck.backupInfo, backupDecryptionKey);
+            const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(latestBackupInfo, backupDecryptionKey);
             if (!privateKeyMatches) {
                 logger.warn(
                     `handleBackupSecretReceived: Private decryption key does not match the public key of the current remote backup.`,
@@ -187,7 +192,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
-            await this.saveBackupDecryptionKey(backupDecryptionKey, backupCheck.backupInfo.version);
+            await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
             return true;
         } catch (e) {
             logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
@@ -303,7 +308,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         const trustInfo = await this.isKeyBackupTrusted(backupInfo);
 
-        if (!trustInfo.trusted) {
+        // Per the spec, we should enable key upload if either (a) the backup is signed by a trusted key, or
+        // (b) the public key matches the private decryption key that we have received from 4S.
+        if (!trustInfo.matchesDecryptionKey && !trustInfo.trusted) {
             if (activeVersion !== null) {
                 logger.log("Key backup present on server but not trusted: disabling key backup");
                 await this.disableKeyBackup();
