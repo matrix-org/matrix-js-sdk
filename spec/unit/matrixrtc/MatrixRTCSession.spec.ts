@@ -406,10 +406,10 @@ describe("MatrixRTCSession", () => {
             jest.useRealTimers();
         });
 
-        it("uses membershipExpiryTimeout from join config", async () => {
+        it("uses membershipEventExpiry from join config", async () => {
             const realSetTimeout = setTimeout;
             jest.useFakeTimers();
-            sess!.joinRoomSession([mockFocus], mockFocus, { membershipExpiryTimeout: 60000 });
+            sess!.joinRoomSession([mockFocus], mockFocus, { membershipEventExpiry: 60000 });
             await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
             expect(client.sendStateEvent).toHaveBeenCalledWith(
                 mockRoom!.roomId,
@@ -483,7 +483,7 @@ describe("MatrixRTCSession", () => {
                 });
 
                 sess!.joinRoomSession([activeFocusConfig], activeFocus, {
-                    membershipServerSideExpiryTimeout: 9000,
+                    delayedLeaveEventDelay: 9000,
                 });
 
                 await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches

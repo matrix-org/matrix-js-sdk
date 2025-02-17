@@ -57,7 +57,7 @@ export interface IMembershipManager {
  *  - send that sate event
  *  - send the delayed leave event
  *  - update the delayed leave event while connected
- *  - update the state event when it times out (for calls longer than membershipExpiryTimeout ~ 4h)
+ *  - update the state event when it times out (for calls longer than membershipEventExpiry ~ 4h)
  *
  * It is possible to test this class on its own. The api surface (to use for tests) is
  * defined in `MembershipManagerInterface`.
@@ -83,30 +83,26 @@ export class LegacyMembershipManager implements IMembershipManager {
     private updateCallMembershipRunning = false;
     private needCallMembershipUpdate = false;
     /**
-     * If the server disallows the configured {@link membershipServerSideExpiryTimeout},
+     * If the server disallows the configured {@link delayedLeaveEventDelay},
      * this stores a delay that the server does allow.
      */
-    private membershipServerSideExpiryTimeoutOverride?: number;
+    private delayedLeaveEventDelayOverride?: number;
     private disconnectDelayId: string | undefined;
 
-    private get callMemberEventRetryDelayMinimum(): number {
-        return this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
+    private get membershipEventLocalRateLimit(): number {
+        return this.joinConfig?.membershipEventLocalRateLimit ?? 3_000;
     }
-    private get membershipExpiryTimeout(): number {
-        return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
+    private get membershipEventExpiry(): number {
+        return this.joinConfig?.membershipEventExpiry ?? DEFAULT_EXPIRE_DURATION;
     }
-    private get membershipServerSideExpiryTimeout(): number {
-        return (
-            this.membershipServerSideExpiryTimeoutOverride ??
-            this.joinConfig?.membershipServerSideExpiryTimeout ??
-            8_000
-        );
+    private get delayedLeaveEventDelay(): number {
+        return this.delayedLeaveEventDelayOverride ?? this.joinConfig?.delayedLeaveEventDelay ?? 8_000;
     }
-    private get membershipKeepAlivePeriod(): number {
-        return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
+    private get delayedLeaveEventRestartPeriod(): number {
+        return this.joinConfig?.delayedLeaveEventRestartPeriod ?? 5_000;
     }
-    private get callMemberEventRetryJitter(): number {
-        return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
+    private get membershipEventJitter(): number {
+        return this.joinConfig?.membershipEventJitter ?? 2_000;
     }
 
     public constructor(
@@ -131,7 +127,7 @@ export class LegacyMembershipManager implements IMembershipManager {
     public join(fociPreferred: Focus[], fociActive?: Focus): void {
         this.ownFocusActive = fociActive;
         this.ownFociPreferred = fociPreferred;
-        this.relativeExpiry = this.membershipExpiryTimeout;
+        this.relativeExpiry = this.membershipEventExpiry;
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
         this.triggerCallMembershipEventUpdate();
@@ -255,7 +251,7 @@ export class LegacyMembershipManager implements IMembershipManager {
                             this.client._unstable_sendDelayedStateEvent(
                                 this.room.roomId,
                                 {
-                                    delay: this.membershipServerSideExpiryTimeout,
+                                    delay: this.delayedLeaveEventDelay,
                                 },
                                 EventType.GroupCallMemberPrefix,
                                 {}, // leave event
@@ -270,11 +266,8 @@ export class LegacyMembershipManager implements IMembershipManager {
                             e.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
                         ) {
                             const maxDelayAllowed = e.data["org.matrix.msc4140.max_delay"];
-                            if (
-                                typeof maxDelayAllowed === "number" &&
-                                this.membershipServerSideExpiryTimeout > maxDelayAllowed
-                            ) {
-                                this.membershipServerSideExpiryTimeoutOverride = maxDelayAllowed;
+                            if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelay > maxDelayAllowed) {
+                                this.delayedLeaveEventDelayOverride = maxDelayAllowed;
                                 return prepareDelayedDisconnection();
                             }
                         }
@@ -343,7 +336,7 @@ export class LegacyMembershipManager implements IMembershipManager {
             }
             logger.info("Sent updated call member event.");
         } catch (e) {
-            const resendDelay = this.callMemberEventRetryDelayMinimum + Math.random() * this.callMemberEventRetryJitter;
+            const resendDelay = this.membershipEventLocalRateLimit + Math.random() * this.membershipEventJitter;
             logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
             await sleep(resendDelay);
             await this.triggerCallMembershipEventUpdate();
@@ -351,7 +344,7 @@ export class LegacyMembershipManager implements IMembershipManager {
     }
 
     private scheduleDelayDisconnection(): void {
-        this.memberEventTimeout = setTimeout(this.delayDisconnection, this.membershipKeepAlivePeriod);
+        this.memberEventTimeout = setTimeout(this.delayDisconnection, this.delayedLeaveEventRestartPeriod);
     }
 
     private readonly delayDisconnection = async (): Promise<void> => {
