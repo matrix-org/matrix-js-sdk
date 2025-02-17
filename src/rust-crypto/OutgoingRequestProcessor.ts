@@ -31,7 +31,6 @@ import { logger } from "../logger.ts";
 import { calculateRetryBackoff, type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { logDuration, type QueryDict, sleep } from "../utils.ts";
 import { type AuthDict, type UIAuthCallback } from "../interactive-auth.ts";
-import { type UIAResponse } from "../@types/uia.ts";
 import { ToDeviceMessageId } from "../@types/event.ts";
 import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager.ts";
 
@@ -176,7 +175,7 @@ export class OutgoingRequestProcessor {
         }
 
         const parsedBody = JSON.parse(body);
-        const makeRequest = async (auth: AuthDict | null): Promise<UIAResponse<T>> => {
+        const makeRequest = async (auth: AuthDict | null): Promise<T> => {
             const newBody: Record<string, any> = {
                 ...parsedBody,
             };
