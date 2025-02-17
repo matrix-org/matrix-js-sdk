@@ -321,11 +321,9 @@ describe("MatrixRTCSession", () => {
         let sendStateEventMock: jest.Mock;
         let sendDelayedStateMock: jest.Mock;
         let sendEventMock: jest.Mock;
-        let updateDelayedEventMock: jest.Mock;
 
         let sentStateEvent: Promise<void>;
         let sentDelayedState: Promise<void>;
-        let updatedDelayedEvent: Promise<void>;
 
         beforeEach(() => {
             sentStateEvent = new Promise((resolve) => {
@@ -339,15 +337,12 @@ describe("MatrixRTCSession", () => {
                     };
                 });
             });
-            updatedDelayedEvent = new Promise((r) => {
-                updateDelayedEventMock = jest.fn(r);
-            });
             sendEventMock = jest.fn();
             client.sendStateEvent = sendStateEventMock;
             client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
             client.sendEvent = sendEventMock;
 
-            client._unstable_updateDelayedEvent = updateDelayedEventMock;
+            client._unstable_updateDelayedEvent = jest.fn();
 
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
