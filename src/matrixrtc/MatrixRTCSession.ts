@@ -55,56 +55,43 @@ export type MatrixRTCSessionEventHandlerMap = {
 };
 
 export interface MembershipConfig {
-    // The proposed name changes follow the following pattern:
-    // - use membershipEvent for the join event
-    // - use timeout for anything that is a destructive time period
-    // - use duration for anything that is a constructive time period
-    // - use delayedLeaveEvent for anything related to the delayed event login
-    // - dont use `delay` for anything that is not related to the delayed event login
-
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
      *
      * This is what goes into the m.rtc.member event expiry field.
      */
-    // membershipEventExpiryTTL
     membershipExpiryTimeout?: number; // hours
 
     /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
      * server. If it is not found we create it again.
      */
-    // This is currently not used. I also think we do not need it since this information should come down via sync?
     memberEventCheckPeriod?: number;
 
     /**
      * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
      * failed to send.
      */
-    // rename to: membershipEventMinimumRetryDuration
-    // membershipEventRateLimit
     callMemberEventRetryDelayMinimum?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
-    // I would like to rename this to `delayedLeaveEventDelay` (having the word delayed, event, and leave is helpful i think)
-    membershipServerSideExpiryTimeout?: number; // 15s
+    membershipServerSideExpiryTimeout?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
-    // rename to: delayedLeaveEventRestartPeriod
-    membershipKeepAlivePeriod?: number; // 5s
+    membershipKeepAlivePeriod?: number;
 
     /**
      * @deprecated It should be possible to make it stable without this.
      */
-    // membershipEventJitter
     callMemberEventRetryJitter?: number;
 }
+
 export interface EncryptionConfig {
     /**
      *  If true, generate and share a media key for this participant,
