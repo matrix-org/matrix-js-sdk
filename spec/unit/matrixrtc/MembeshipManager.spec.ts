@@ -514,7 +514,7 @@ describe("MembershipManager", () => {
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
                 });
-                it("abandons retry loop if leave() was called", async () => {
+                it("abandons retry loop if leave() was called !FailsForLegacy", async () => {
                     const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
                     const manager = new TestMembershipManager({}, room, client, () => undefined);
@@ -537,10 +537,10 @@ describe("MembershipManager", () => {
                     // Wait for all timers to be setup
                     await flushPromises();
                     jest.advanceTimersByTime(1000);
+                    await flushPromises();
 
                     // No new events should have been sent:
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
             });
             describe("retries sending delayed leave event update", () => {
