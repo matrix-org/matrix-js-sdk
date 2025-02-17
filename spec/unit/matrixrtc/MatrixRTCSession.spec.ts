@@ -20,7 +20,6 @@ import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../sr
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
-import { flushPromises } from "../../test-utils/flushPromises";
 import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 
 const mockFocus = { type: "mock" };
