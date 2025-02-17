@@ -55,7 +55,6 @@ export type MatrixRTCSessionEventHandlerMap = {
 };
 
 export interface MembershipConfig {
-
     // The proposed name changes follow the following pattern:
     // - use membershipEvent for the join event
     // - use timeout for anything that is a destructive time period
@@ -66,9 +65,11 @@ export interface MembershipConfig {
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
+     *
+     * This is what goes into the m.rtc.member event expiry field.
      */
-    // membershipEventExpiryTimeout
-    membershipExpiryTimeout?: number;
+    // membershipEventExpiryTTL
+    membershipExpiryTimeout?: number; // hours
 
     /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
@@ -82,24 +83,26 @@ export interface MembershipConfig {
      * failed to send.
      */
     // rename to: membershipEventMinimumRetryDuration
+    // membershipEventRateLimit
     callMemberEventRetryDelayMinimum?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
-    // I would like to rename this to `delayedLeaveEventTimeout` (having the word delayed, event, and leave is helpful i think)
-    membershipServerSideExpiryTimeout?: number;
+    // I would like to rename this to `delayedLeaveEventDelay` (having the word delayed, event, and leave is helpful i think)
+    membershipServerSideExpiryTimeout?: number; // 15s
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
-    // rename to: delayedLeaveEventRestartDuration
-    membershipKeepAlivePeriod?: number;
+    // rename to: delayedLeaveEventRestartPeriod
+    membershipKeepAlivePeriod?: number; // 5s
 
     /**
      * @deprecated It should be possible to make it stable without this.
      */
+    // membershipEventJitter
     callMemberEventRetryJitter?: number;
 }
 export interface EncryptionConfig {

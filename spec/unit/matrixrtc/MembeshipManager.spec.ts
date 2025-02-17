@@ -396,6 +396,7 @@ describe("MembershipManager", () => {
                 (client._unstable_sendDelayedStateEvent as Mock).mockClear();
                 waitForMockCall(client._unstable_sendDelayedStateEvent, { delay_id: "id" });
 
+                // our own membership is removed:
                 manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
                 await flushPromises();
                 expect(client.sendStateEvent).toHaveBeenCalled();
@@ -409,7 +410,7 @@ describe("MembershipManager", () => {
         describe("background timers", () => {
             it("sends only one keep-alive for delayed leave event per `membershipKeepAlivePeriod`", async () => {
                 const manager = new TestMembershipManager(
-                    { membershipKeepAlivePeriod: 10_000 },
+                    { membershipKeepAlivePeriod: 10_000, membershipServerSideExpiryTimeout: 30_000 },
                     room,
                     client,
                     () => undefined,
@@ -424,12 +425,16 @@ describe("MembershipManager", () => {
                 // so it does not need a `advanceTimersByTime`
                 await flushPromises();
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+                // TODO: check that update delayed event is called with the correct HTTP request timeout
+                // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
 
                 for (let i = 2; i <= 12; i++) {
                     // flush promises before advancing the timers to make sure schdulers are setup
                     await flushPromises();
                     jest.advanceTimersByTime(10_000);
                     expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(i);
+                    // TODO: check that update delayed event is called with the correct HTTP request timeout
+                    // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
                 }
             });
 
@@ -458,6 +463,7 @@ describe("MembershipManager", () => {
         });
 
         describe("server error handling", () => {
+            // Types of server error: 429 rate limit with no retry-after header, 429 with retry-after, 50x server error (maybe retry every second), connection/socket timeout
             // Those tests might have been targeted at sending delayed restart events?
             describe("retries sending delayed leave event", () => {
                 it("sends retry if call membership event is still valid at time of retry", async () => {
@@ -499,6 +505,7 @@ describe("MembershipManager", () => {
 
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                     // Remove our own membership so that there is no reason the send the delayed leave anymore.
+                    // the membership is no longer present on the homeserver
                     manager.onRTCSessionMemberUpdate([]);
                     // Wait for all timers to be setup
                     await flushPromises();
@@ -506,6 +513,34 @@ describe("MembershipManager", () => {
                     // We should send a new own membership and a new delayed event after the rate limit timeout.
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+                });
+                it("abandons retry loop if leave() was called", async () => {
+                    const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+
+                    const manager = new TestMembershipManager({}, room, client, () => undefined);
+                    manager.join([focus], focusActive);
+                    handle.reject?.(
+                        new MatrixError(
+                            { errcode: "M_LIMIT_EXCEEDED" },
+                            429,
+                            undefined,
+                            undefined,
+                            new Headers({ "Retry-After": "1" }),
+                        ),
+                    );
+                    await flushPromises();
+
+                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                    // the user terminated the call locally
+                    manager.leave();
+
+                    // Wait for all timers to be setup
+                    await flushPromises();
+                    jest.advanceTimersByTime(1000);
+
+                    // No new events should have been sent:
+                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
             });
             describe("retries sending delayed leave event update", () => {
