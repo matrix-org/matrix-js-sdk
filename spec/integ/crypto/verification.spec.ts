@@ -30,6 +30,7 @@ import {
     type ICreateClientOpts,
     type IEvent,
     type MatrixClient,
+    MatrixError,
     MatrixEvent,
     MatrixEventEvent,
 } from "../../../src";
@@ -1264,6 +1265,42 @@ describe("verification", () => {
             expect(encodeBase64(cachedKey!)).toEqual(BACKUP_DECRYPTION_KEY_BASE64);
         });
 
+        it("Should not accept the backup decryption key gossip when there is no server-side key backup", async () => {
+            const requestPromises = mockSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                new MatrixError({ errcode: "M_NOT_FOUND", error: "No backup found" }, 404),
+            );
+
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
+        });
+
+        it("Should not accept the backup decryption key gossip when server-side key backup request errors", async () => {
+            const requestPromises = mockSecretRequestAndGetPromises();
+
+            await doInteractiveVerification();
+
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                new Error("Network Error!"),
+            );
+
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
+        });
+
         it("Should not accept the backup decryption key gossip if private key do not match", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
@@ -1273,39 +1310,8 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
             // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
-        });
-
-        it("Should not accept the backup decryption key gossip if backup not trusted", async () => {
-            const requestPromises = mockSecretRequestAndGetPromises();
-
-            await doInteractiveVerification();
-
-            const requestId = await requestPromises.get("m.megolm_backup.v1");
-
-            const infoCopy = Object.assign({}, matchingBackupInfo);
-            delete infoCopy.auth_data.signatures;
-
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, infoCopy);
-
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
             expect(cachedKey).toBeNull();
         });
 
@@ -1322,15 +1328,8 @@ describe("verification", () => {
                 unknownAlgorithmBackupInfo,
             );
 
-            // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
-            await new Promise((resolve) => {
-                setTimeout(resolve, 500);
-            });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
             // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
             expect(cachedKey).toBeNull();
         });
 
@@ -1343,6 +1342,15 @@ describe("verification", () => {
 
             await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
 
+            // the backup secret should not be cached
+            const cachedKey = await retrieveBackupPrivateKeyWithDelay();
+            expect(cachedKey).toBeNull();
+        });
+
+        /**
+         * Waits briefly for secrets to be gossipped, then fetches the backup private key from the crypto stack.
+         */
+        async function retrieveBackupPrivateKeyWithDelay(): Promise<Uint8Array | null> {
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
             jest.useRealTimers();
             await new Promise((resolve) => {
@@ -1350,19 +1358,22 @@ describe("verification", () => {
             });
             jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
-            // the backup secret should not be cached
-            const cachedKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();
-            expect(cachedKey).toBeNull();
-        });
+            return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
+        }
 
         /**
          * Common test setup for gossiping secrets.
          * Creates a peer to peer session, sends the secret, mockup the version API, send the secret back from sync, then await for the backup check.
+         *
+         * @param expectBackup - The result to be returned from the `/room_keys/version` request.
+         * - **KeyBackupInfo**: Indicates a successful request, where the response contains the key backup information (HTTP 200).
+         * - **MatrixError**: Represents an error response from the server, indicating an unsuccessful request (non-200 HTTP status).
+         * - **Error**: Indicates an error during the request process itself (e.g., network issues or unexpected failures).
          */
         async function sendBackupGossipAndExpectVersion(
             requestId: string,
             secret: string,
-            expectBackup: KeyBackupInfo,
+            expectBackup: KeyBackupInfo | MatrixError | Error,
         ) {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
 
@@ -1382,6 +1393,17 @@ describe("verification", () => {
                     "express:/_matrix/client/v3/room_keys/version",
                     (url, request) => {
                         resolve(undefined);
+                        if (expectBackup instanceof MatrixError) {
+                            return {
+                                status: expectBackup.httpStatus,
+                                body: expectBackup.data,
+                            };
+                        }
+
+                        if (expectBackup instanceof Error) {
+                            return Promise.reject(expectBackup);
+                        }
+
                         return expectBackup;
                     },
                     {

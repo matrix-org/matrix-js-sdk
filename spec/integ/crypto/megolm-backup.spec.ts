@@ -945,7 +945,29 @@ describe("megolm-keys backup", () => {
             expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
         });
 
-        it("does not enable a backup signed by an untrusted device", async () => {
+        it("enables a backup not signed by a trusted device, when we have the decryption key", async () => {
+            aliceClient = await initTestClient();
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            // download the device list, to match the trusted-device case
+            await aliceClient.startClient();
+            await waitForDeviceList();
+
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
+            // Alice does *not* trust the device that signed the backup, but *does* have the decryption key.
+            await aliceCrypto.storeSessionBackupPrivateKey(
+                Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
+                testData.SIGNED_BACKUP_DATA.version!,
+            );
+
+            const result = await aliceCrypto.checkKeyBackupAndEnable();
+            expect(result).toBeTruthy();
+            expect(result!.trustInfo).toEqual({ trusted: false, matchesDecryptionKey: true });
+            expect(await aliceCrypto.getActiveSessionBackupVersion()).toEqual(testData.SIGNED_BACKUP_DATA.version);
+        });
+
+        it("does not enable a backup signed by an untrusted device when we do not have the decryption key", async () => {
             aliceClient = await initTestClient();
             const aliceCrypto = aliceClient.getCrypto()!;
 
