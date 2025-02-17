@@ -38,7 +38,7 @@ export interface IMembershipManager {
      * @returns It resolves with true in case the leave was sent successfully.
      * It resolves with false in case we hit the timeout before sending successfully.
      */
-    leave(timeout: number | undefined): Promise<boolean>;
+    leave(timeout?: number): Promise<boolean>;
     /**
      * Call this if the MatrixRTC session members have changed.
      */
@@ -50,6 +50,36 @@ export interface IMembershipManager {
     getActiveFocus(): Focus | undefined;
 }
 
+export class MembershipManager implements IMembershipManager {
+    public constructor(
+        private joinConfig: MembershipConfig | undefined,
+        private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
+        private client: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedStateEvent"
+            | "_unstable_updateDelayedEvent"
+        >,
+        private getOldestMembership: () => CallMembership | undefined,
+    ) {}
+    public isJoined(): boolean {
+        throw new Error("Method not implemented.");
+    }
+    public join(fociPreferred: Focus[], fociActive?: Focus): void {
+        throw new Error("Method not implemented.");
+    }
+    public leave(timeout?: number): Promise<boolean> {
+        throw new Error("Method not implemented.");
+    }
+    public onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
+    public getActiveFocus(): Focus | undefined {
+        throw new Error("Method not implemented.");
+    }
+}
 /**
  * This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
  *
@@ -117,7 +147,6 @@ export class LegacyMembershipManager implements IMembershipManager {
             | "getUserId"
             | "getDeviceId"
             | "sendStateEvent"
-            | "_unstable_sendDelayedEvent"
             | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
         >,
@@ -312,6 +341,7 @@ export class LegacyMembershipManager implements IMembershipManager {
                 if (this.disconnectDelayId !== undefined) {
                     this.scheduleDelayDisconnection();
                 }
+                // TODO throw or log an error if this.disconnectDelayId === undefined
             } else {
                 // Not joined
                 let sentDelayedDisconnect = false;

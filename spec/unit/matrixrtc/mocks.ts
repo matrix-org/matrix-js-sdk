@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, type MatrixEvent, type Room } from "../../../src";
-import { type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { EventType, type MatrixClient, type MatrixEvent, type Room } from "../../../src";
+import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 
 type MembershipData = SessionMembershipData[] | SessionMembershipData | {};
@@ -39,6 +39,31 @@ export const membershipTemplate: SessionMembershipData = {
         },
     ],
 };
+
+export type MockClient = Pick<
+    MatrixClient,
+    | "getUserId"
+    | "getDeviceId"
+    | "sendEvent"
+    | "sendStateEvent"
+    | "_unstable_sendDelayedStateEvent"
+    | "_unstable_updateDelayedEvent"
+    | "cancelPendingEvent"
+>;
+/**
+ * Mocks a object that has all required methods for a matrixRTC session client.
+ */
+export function makeMockClient(userId: string, deviceId: string): MockClient {
+    return {
+        getDeviceId: () => deviceId,
+        getUserId: () => userId,
+        sendEvent: jest.fn(),
+        sendStateEvent: jest.fn(),
+        cancelPendingEvent: jest.fn(),
+        _unstable_updateDelayedEvent: jest.fn(),
+        _unstable_sendDelayedStateEvent: jest.fn(),
+    };
+}
 
 export function makeMockRoom(membershipData: MembershipData): Room {
     const roomId = secureRandomString(8);
@@ -88,16 +113,17 @@ export function makeMockRoomState(membershipData: MembershipData, roomId: string
     };
 }
 
-export function mockRTCEvent(membershipData: MembershipData, roomId: string): MatrixEvent {
+export function mockRTCEvent(membershipData: MembershipData, roomId: string, customSender?: string): MatrixEvent {
+    const sender = customSender ?? "@mock:user.example";
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
         getContent: jest.fn().mockReturnValue(membershipData),
-        getSender: jest.fn().mockReturnValue("@mock:user.example"),
+        getSender: jest.fn().mockReturnValue(sender),
         getTs: jest.fn().mockReturnValue(Date.now()),
         getRoomId: jest.fn().mockReturnValue(roomId),
-        sender: {
-            userId: "@mock:user.example",
-        },
         isDecryptionFailure: jest.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
+}
+export function mockCallMembership(membershipData: MembershipData, roomId: string, sender?: string): CallMembership {
+    return new CallMembership(mockRTCEvent(membershipData, roomId, sender), membershipData);
 }

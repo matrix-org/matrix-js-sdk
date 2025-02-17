@@ -124,7 +124,8 @@
         "typedoc-plugin-coverage": "^3.0.0",
         "typedoc-plugin-mdn-links": "^4.0.0",
         "typedoc-plugin-missing-exports": "^3.0.0",
-        "typescript": "^5.4.2"
+        "typescript": "^5.4.2",
+        "wait-for-expect": "^3.0.2"
     },
     "@casualbot/jest-sonar-reporter": {
         "outputDirectory": "coverage",

@@ -55,33 +55,46 @@ export type MatrixRTCSessionEventHandlerMap = {
 };
 
 export interface MembershipConfig {
+
+    // The proposed name changes follow the following pattern:
+    // - use membershipEvent for the join event
+    // - use timeout for anything that is a destructive time period
+    // - use duration for anything that is a constructive time period
+    // - use delayedLeaveEvent for anything related to the delayed event login
+    // - dont use `delay` for anything that is not related to the delayed event login
+
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
      */
+    // membershipEventExpiryTimeout
     membershipExpiryTimeout?: number;
 
     /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
      * server. If it is not found we create it again.
      */
+    // This is currently not used. I also think we do not need it since this information should come down via sync?
     memberEventCheckPeriod?: number;
 
     /**
      * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
      * failed to send.
      */
+    // rename to: membershipEventMinimumRetryDuration
     callMemberEventRetryDelayMinimum?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
+    // I would like to rename this to `delayedLeaveEventTimeout` (having the word delayed, event, and leave is helpful i think)
     membershipServerSideExpiryTimeout?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
+    // rename to: delayedLeaveEventRestartDuration
     membershipKeepAlivePeriod?: number;
 
     /**
@@ -153,7 +166,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Returns all the call memberships for a room, oldest first
      */
-    public static callMembershipsForRoom(room: Room): CallMembership[] {
+    public static callMembershipsForRoom(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+    ): CallMembership[] {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
@@ -225,9 +240,29 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return new MatrixRTCSession(client, room, callMemberships);
     }
 
-    private constructor(
-        private readonly client: MatrixClient,
-        public readonly room: Room,
+    /**
+     * This constructs a room session. When using matrixRTC inside the js-sdk this is expected
+     * to be used with the MatrixRTCSessionManager exclusively.
+     *
+     * In cases where you dont use the js-sdk but build ontop of another matrix stack this class can be used stand alone
+     * to manage a joined matrixRTC session.
+     *
+     * @param client A subset of the MatrixClient that lets the session interact with the matrix world.
+     * @param room The room this sessoin is attached to. A subset of a js-sdk Room that the session needs.
+     * @param memberships The list of memberships this sessions currently has.
+     */
+    public constructor(
+        private readonly client: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedStateEvent"
+            | "_unstable_updateDelayedEvent"
+            | "sendEvent"
+            | "cancelPendingEvent"
+        >,
+        public readonly room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState">,
         public memberships: CallMembership[],
     ) {
         super();
