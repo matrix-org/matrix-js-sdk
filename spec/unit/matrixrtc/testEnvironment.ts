@@ -27,7 +27,7 @@ It is very specific to the MembershipManager.spec.ts file and introduces the fol
 */
 
 import { TestEnvironment } from "jest-environment-node";
-import { JestEnvironmentConfig, EnvironmentContext } from "@jest/environment";
+import { type JestEnvironmentConfig, type EnvironmentContext } from "@jest/environment";
 
 import { logger } from "../../../src/logger";
 

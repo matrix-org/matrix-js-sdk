@@ -17,13 +17,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Mock } from "jest-mock";
+import { type Mock } from "jest-mock";
 import waitForExpect from "wait-for-expect";
 
-import { EventType, HTTPError, MatrixError, Room } from "../../../src";
-import { Focus, LivekitFocusActive, SessionMembershipData } from "../../../src/matrixrtc";
+import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
+import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
 import { LegacyMembershipManager } from "../../../src/matrixrtc/MembershipManager";
-import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, MockClient } from "./mocks";
+import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { flushPromises } from "../../test-utils/flushPromises";
 function waitForMockCall(method: any, returnVal?: any) {
     return new Promise<void>((resolve) => {
