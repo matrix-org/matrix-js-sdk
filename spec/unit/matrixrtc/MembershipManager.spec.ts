@@ -25,6 +25,7 @@ import { type Focus, type LivekitFocusActive, type SessionMembershipData } from 
 import { LegacyMembershipManager } from "../../../src/matrixrtc/MembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { flushPromises } from "../../test-utils/flushPromises";
+
 function waitForMockCall(method: any, returnVal?: any) {
     return new Promise<void>((resolve) => {
         (method as Mock).mockImplementation(() => {
