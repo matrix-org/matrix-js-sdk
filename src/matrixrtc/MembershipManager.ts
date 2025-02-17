@@ -50,25 +50,6 @@ export interface IMembershipManager {
     getActiveFocus(): Focus | undefined;
 }
 
-export class MembershipManager implements IMembershipManager {
-    public constructor() {}
-    public isJoined(): boolean {
-        throw new Error("Method not implemented.");
-    }
-    public join(fociPreferred: Focus[], fociActive?: Focus): void {
-        throw new Error("Method not implemented.");
-    }
-    public leave(timeout?: number): Promise<boolean> {
-        throw new Error("Method not implemented.");
-    }
-    public onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
-        throw new Error("Method not implemented.");
-    }
-    public getActiveFocus(): Focus | undefined {
-        throw new Error("Method not implemented.");
-    }
-}
-
 /**
  * This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
  *
