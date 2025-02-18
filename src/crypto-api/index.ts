@@ -1035,6 +1035,8 @@ export type ImportRoomKeyFetchProgress = {
 
 /**
  * Type representing the progress during the 'load_keys' stage of the room key import process.
+ *
+ * @see {@link ImportRoomKeyProgressData}.
  */
 export type ImportRoomKeyLoadProgress = {
     /**
