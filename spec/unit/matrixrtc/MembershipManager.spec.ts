@@ -449,7 +449,6 @@ describe("MembershipManager", () => {
                 manager.join([focus], focusActive);
                 await waitForMockCall(client.sendStateEvent);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                // TODO make this check the expire ts and also check it after each update.
                 const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
                 expect(sentMembership.expires).toBe(10_000);
                 for (let i = 2; i <= 12; i++) {
@@ -465,7 +464,6 @@ describe("MembershipManager", () => {
 
         describe("server error handling", () => {
             // Types of server error: 429 rate limit with no retry-after header, 429 with retry-after, 50x server error (maybe retry every second), connection/socket timeout
-            // Those tests might have been targeted at sending delayed restart events?
             describe("retries sending delayed leave event", () => {
                 it("sends retry if call membership event is still valid at time of retry", async () => {
                     const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
@@ -544,7 +542,7 @@ describe("MembershipManager", () => {
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                 });
             });
-            describe("retries sending delayed leave event update", () => {
+            describe("retries sending update delayed leave event restart", () => {
                 it("resends the initial check delayed update event", async () => {
                     (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
                     const handle = createAsyncHandle(client._unstable_updateDelayedEvent);
@@ -560,20 +558,23 @@ describe("MembershipManager", () => {
                             new Headers({ "Retry-After": "1" }),
                         ),
                     );
-                    // Hit rate limit
-                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-                    await flushPromises();
-                    jest.advanceTimersByTime(1000);
                     await flushPromises();
 
-                    // hit second rate limit.
-                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
-                    const handleSuccess = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+                    // Hit rate limit
+                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+                    jest.advanceTimersByTime(1000);
+
+                    // Hit second rate limit.
                     await flushPromises();
-                    handleSuccess.resolve?.();
                     expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
+
+                    // Setup resolve
+                    const handleSuccess = createAsyncHandle(client._unstable_updateDelayedEvent);
+                    await flushPromises();
                     jest.advanceTimersByTime(1000);
                     await flushPromises();
+                    handleSuccess.resolve?.();
+                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
                     expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
                 });
             });
