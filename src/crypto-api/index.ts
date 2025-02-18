@@ -1041,7 +1041,7 @@ export type ImportRoomKeyFetchProgress = {
 export type ImportRoomKeyLoadProgress = {
     /**
      * Indicates the current stage of the import process.
-     * For this type, it should be `ImportRoomKeyStage.LoadKeys`.
+     * For this type, it should be {@link ImportRoomKeyStage.LoadKeys}.
      */
     stage: ImportRoomKeyStage.LoadKeys;
 
