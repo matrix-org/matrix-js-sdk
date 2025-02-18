@@ -1014,6 +1014,8 @@ export enum ImportRoomKeyStage {
     Fetch = "fetch",
     /**
      * The stage where room keys are being loaded.
+     *
+     * @see {@link ImportRoomKeyLoadProgress}.
      */
     LoadKeys = "load_keys",
 }
