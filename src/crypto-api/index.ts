@@ -1022,6 +1022,8 @@ export enum ImportRoomKeyStage {
 
 /**
  * Type representing the progress during the 'fetch' stage of the room key import process.
+ *
+ * @see {@link ImportRoomKeyProgressData}.
  */
 export type ImportRoomKeyFetchProgress = {
     /**
