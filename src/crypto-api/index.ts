@@ -1002,6 +1002,8 @@ export class DeviceVerificationStatus {
 
 /**
  * Enum representing the different stages of importing room keys.
+ *
+ * This is the type of the `stage` property of {@link ImportRoomKeyProgressData}.
  */
 export enum ImportRoomKeyStage {
     /**
