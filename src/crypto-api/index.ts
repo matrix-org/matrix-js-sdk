@@ -1000,19 +1000,54 @@ export class DeviceVerificationStatus {
     }
 }
 
+/**
+ * Enum representing the different stages of importing room keys.
+ */
 export enum ImportRoomKeyStage {
+    /**
+     * The stage where room keys are being fetched.
+     */
     Fetch = "fetch",
+    /**
+     * The stage where room keys are being loaded.
+     */
     LoadKeys = "load_keys",
 }
 
+/**
+ * Type representing the progress during the 'fetch' stage of the room key import process.
+ */
 export type ImportRoomKeyFetchProgress = {
+    /**
+     * Indicates the current stage of the import process.
+     * For this type, it should be `ImportRoomKeyStage.Fetch`.
+     */
     stage: ImportRoomKeyStage.Fetch;
 };
 
+/**
+ * Type representing the progress during the 'load_keys' stage of the room key import process.
+ */
 export type ImportRoomKeyLoadProgress = {
+    /**
+     * Indicates the current stage of the import process.
+     * For this type, it should be `ImportRoomKeyStage.LoadKeys`.
+     */
     stage: ImportRoomKeyStage.LoadKeys;
+
+    /**
+     * The number of successfully loaded room keys so far.
+     */
     successes: number;
+
+    /**
+     * The number of room keys that failed to load so far.
+     */
     failures: number;
+
+    /**
+     * The total number of room keys being loaded.
+     */
     total: number;
 };
 
