@@ -459,6 +459,10 @@ describe("MembershipManager", () => {
                 }
             });
 
+            // The expires logic was removed for the legacy call manager.
+            // Delayed events should replace it entirely but before they have wide adoption
+            // the expiration logic still makes sense.
+            // TODO: add git commit when we removed it.
             it("extends `expires` when call still active !FailsForLegacy", async () => {
                 const manager = new TestMembershipManager(
                     { membershipExpiryTimeout: 10_000 },
