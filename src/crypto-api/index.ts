@@ -1027,8 +1027,7 @@ export enum ImportRoomKeyStage {
  */
 export type ImportRoomKeyFetchProgress = {
     /**
-     * Indicates the current stage of the import process.
-     * For this type, it should be {@link ImportRoomKeyStage.Fetch}.
+     * The current stage of the import process.
      */
     stage: ImportRoomKeyStage.Fetch;
 };
