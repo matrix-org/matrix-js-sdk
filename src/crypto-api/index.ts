@@ -1001,17 +1001,71 @@ export class DeviceVerificationStatus {
 }
 
 /**
+ * Enum representing the different stages of importing room keys.
+ *
+ * This is the type of the `stage` property of {@link ImportRoomKeyProgressData}.
+ */
+export enum ImportRoomKeyStage {
+    /**
+     * The stage where room keys are being fetched.
+     *
+     * @see {@link ImportRoomKeyFetchProgress}.
+     */
+    Fetch = "fetch",
+    /**
+     * The stage where room keys are being loaded.
+     *
+     * @see {@link ImportRoomKeyLoadProgress}.
+     */
+    LoadKeys = "load_keys",
+}
+
+/**
+ * Type representing the progress during the 'fetch' stage of the room key import process.
+ *
+ * @see {@link ImportRoomKeyProgressData}.
+ */
+export type ImportRoomKeyFetchProgress = {
+    /**
+     * The current stage of the import process.
+     */
+    stage: ImportRoomKeyStage.Fetch;
+};
+
+/**
+ * Type representing the progress during the 'load_keys' stage of the room key import process.
+ *
+ * @see {@link ImportRoomKeyProgressData}.
+ */
+export type ImportRoomKeyLoadProgress = {
+    /**
+     * The current stage of the import process.
+     */
+    stage: ImportRoomKeyStage.LoadKeys;
+
+    /**
+     * The number of successfully loaded room keys so far.
+     */
+    successes: number;
+
+    /**
+     * The number of room keys that failed to load so far.
+     */
+    failures: number;
+
+    /**
+     * The total number of room keys being loaded.
+     */
+    total: number;
+};
+
+/**
  * Room key import progress report.
  * Used when calling {@link CryptoApi#importRoomKeys},
  * {@link CryptoApi#importRoomKeysAsJson} or {@link CryptoApi#restoreKeyBackup} as the parameter of
  * the progressCallback. Used to display feedback.
  */
-export interface ImportRoomKeyProgressData {
-    stage: string; // TODO: Enum
-    successes?: number;
-    failures?: number;
-    total?: number;
-}
+export type ImportRoomKeyProgressData = ImportRoomKeyFetchProgress | ImportRoomKeyLoadProgress;
 
 /**
  * Options object for {@link CryptoApi#importRoomKeys} and

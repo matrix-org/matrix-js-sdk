@@ -67,6 +67,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type StartDehydrationOpts,
+    ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { type IDownloadKeyResult, type IQueryKeysRequest } from "../client.ts";
@@ -1340,7 +1341,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         try {
             opts?.progressCallback?.({
-                stage: "fetch",
+                stage: ImportRoomKeyStage.Fetch,
             });
 
             return await this.backupManager.restoreKeyBackup(backupVersion, backupDecryptor, opts);

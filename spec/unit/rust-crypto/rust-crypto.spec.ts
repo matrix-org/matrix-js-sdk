@@ -500,8 +500,10 @@ describe("RustCrypto", () => {
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
-                progressCallback: (stage) => {
-                    importTotal = stage.total ?? 0;
+                progressCallback: (progress) => {
+                    if (progress.stage === "load_keys") {
+                        importTotal = progress.total;
+                    }
                 },
             };
             await rustCrypto.importRoomKeys(someRoomKeys, opt);
@@ -523,8 +525,10 @@ describe("RustCrypto", () => {
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
             let importTotal = 0;
             const opt: ImportRoomKeysOpts = {
-                progressCallback: (stage) => {
-                    importTotal = stage.total ?? 0;
+                progressCallback: (progress) => {
+                    if (progress.stage === "load_keys") {
+                        importTotal = progress.total;
+                    }
                 },
             };
             await rustCrypto.importRoomKeysAsJson(JSON.stringify(someRoomKeys), opt);
