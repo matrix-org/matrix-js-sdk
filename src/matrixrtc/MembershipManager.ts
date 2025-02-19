@@ -1,16 +1,15 @@
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
-import type { MatrixClient } from "../client.ts";
 import { HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger } from "../logger.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
-import { type Room } from "../models/room.ts";
 import { sleep } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 import { type EmptyObject } from "../@types/common.ts";
+import { type RTCClient, type RTCRoom } from "./types.ts";
 /**
  * This interface defines what a MembershipManager uses and exposes.
  * This interface is what we use to write tests and allows to change the actual implementation
@@ -111,16 +110,8 @@ export class LegacyMembershipManager implements IMembershipManager {
 
     public constructor(
         private joinConfig: MembershipConfig | undefined,
-        private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
-        private client: Pick<
-            MatrixClient,
-            | "getUserId"
-            | "getDeviceId"
-            | "sendStateEvent"
-            | "_unstable_sendDelayedEvent"
-            | "_unstable_sendDelayedStateEvent"
-            | "_unstable_updateDelayedEvent"
-        >,
+        private room: RTCRoom,
+        private client: RTCClient,
         private getOldestMembership: () => CallMembership | undefined,
     ) {}
 
