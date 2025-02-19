@@ -61,7 +61,7 @@ export interface MembershipConfig {
      *
      * This is what goes into the m.rtc.member event expiry field.
      */
-    membershipEventExpiry?: number; // hours
+    membershipEventExpiry?: number;
 
     /**
      * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
@@ -73,13 +73,12 @@ export interface MembershipConfig {
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
-    // I would like to rename this to `delayedLeaveEventDelay` (having the word delayed, event, and leave is helpful i think)
-    delayedLeaveEventDelay?: number; // 15s
+    delayedLeaveEventDelay?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
-    delayedLeaveEventRestartPeriod?: number; // 5s
+    delayedLeaveEventRestartPeriod?: number;
 
     /**
      * @deprecated It should be possible to make it stable without this.
