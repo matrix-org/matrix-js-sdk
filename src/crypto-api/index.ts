@@ -1008,7 +1008,7 @@ export class DeviceVerificationStatus {
 export enum ImportRoomKeyStage {
     /**
      * The stage where room keys are being fetched.
-     * 
+     *
      * @see {@link ImportRoomKeyFetchProgress}.
      */
     Fetch = "fetch",
