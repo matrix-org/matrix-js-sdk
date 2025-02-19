@@ -51,7 +51,7 @@ export type MockClient = Pick<
     | "cancelPendingEvent"
 >;
 /**
- * Mocks a object that has all required methods for a matrixRTC session client.
+ * Mocks a object that has all required methods for a MatrixRTC session client.
  */
 export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
