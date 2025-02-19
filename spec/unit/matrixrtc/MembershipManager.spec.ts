@@ -570,7 +570,7 @@ describe("MembershipManager", () => {
             });
             describe("retries sending update delayed leave event restart", () => {
                 it("resends the initial check delayed update event !FailsForLegacy", async () => {
-                    (client._unstable_updateDelayedEvent as any).mockRejectedValue(
+                    (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue(
                         new MatrixError(
                             { errcode: "M_LIMIT_EXCEEDED" },
                             429,
@@ -599,6 +599,50 @@ describe("MembershipManager", () => {
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
             });
+        });
+        describe("unrecoverable errors", () => {
+            // !FailsForLegacy because legacy does not have a retry limit and no mechanism to communicate unrecoverable errors.
+            it("throws, when reaching maximum number of retires for initial delayed event creation !FailsForLegacy", async () => {
+                const delayEventSendError = jest.fn();
+                (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "2" }),
+                    ),
+                );
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                manager.join([focus], focusActive).catch(delayEventSendError);
+                await flushPromises();
+                for (let i = 0; i < 5; i++) {
+                    jest.advanceTimersByTime(2000);
+                    await flushPromises();
+                }
+                expect(delayEventSendError).toHaveBeenCalled();
+            });
+            // !FailsForLegacy because legacy does not have a retry limit and no mechanism to communicate unrecoverable errors.
+            it("throws, when reaching maximum number of retires !FailsForLegacy", async () => {
+                const delayEventRestartError = jest.fn();
+                (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    ),
+                );
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                manager.join([focus], focusActive).catch(delayEventRestartError);
+                await flushPromises();
+                for (let i = 0; i < 5; i++) {
+                    jest.advanceTimersByTime(1000);
+                    await flushPromises();
+                }
+                expect(delayEventRestartError).toHaveBeenCalled();
+            }, 5000);
         });
     });
 });

@@ -91,6 +91,10 @@ export interface MembershipConfig {
      * @deprecated It should be possible to make it stable without this.
      */
     callMemberEventRetryJitter?: number;
+    /**
+     * The maximum rate limit retries the manager will do for delayed event sending/updating and state event sending.
+     */
+    maximumRateLimitRetryCount?: number;
 }
 
 export interface EncryptionConfig {
@@ -319,7 +323,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         // Join!
-        this.membershipManager!.join(fociPreferred, fociActive);
+        this.membershipManager!.join(fociPreferred, fociActive).catch((e) =>
+            // TODO: Consider exposing this as a signal from the RTCSession so it can be used in the UI.
+            logger.error("MembershipManager encountered an unrecoverable error: ", e),
+        );
         this.encryptionManager!.join(joinConfig);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);

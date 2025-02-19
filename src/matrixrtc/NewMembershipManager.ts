@@ -29,8 +29,9 @@ export interface IMembershipManager {
      * Start sending all necessary events to make this user participant in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
      * @param fociActive the active focus to use in the joined RTC membership event.
+     * @throws can throw if it exceeds a configured maximum retry.
      */
-    join(fociPreferred: Focus[], fociActive?: Focus): void;
+    join(fociPreferred: Focus[], fociActive?: Focus): Promise<void>;
     /**
      * Send all necessary events to make this user leave the RTC session.
      * @param timeout the maximum duration in ms until the promise is forced to resolve.
@@ -48,11 +49,6 @@ export interface IMembershipManager {
      */
     getActiveFocus(): Focus | undefined;
 }
-
-// CONFIG:
-const ALLOWED_MEMBERSHIP_SEND_RETRIES = 5;
-const ALLOWED_DELAYED_EVENT_UPDATE_RETRIES = 5;
-const ALLOWED_DELAYED_EVENT_SEND_RETRIES = 5;
 
 // SCHEDULER TYPES:
 enum MembershipActionType {
@@ -99,10 +95,6 @@ interface Action {
      * can also be thought of as the type of the action
      */
     type: DelayedLeaveActionType | MembershipActionType | DirectMemberhsipManagerActions;
-    // An id to reference the action,
-    // that can be used in case there is a chance this action should be altered or removed.
-    // TODO: can we drop this?
-    id?: string;
 }
 
 /**
@@ -215,13 +207,14 @@ export class MembershipManager implements IMembershipManager {
      * @param fociPreferred
      * @param focusActive
      */
-    public join(fociPreferred: Focus[], focusActive?: Focus): void {
+    public join(fociPreferred: Focus[], focusActive?: Focus): Promise<void> {
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
         if (!this.scheduler.state.running) {
             this.scheduler.state.running = true;
-            this.scheduler.startWithActions([{ ts: Date.now(), type: DirectMemberhsipManagerActions.Join }]);
+            return this.scheduler.startWithActions([{ ts: Date.now(), type: DirectMemberhsipManagerActions.Join }]);
         }
+        return Promise.resolve();
     }
 
     public leave(timeout?: number): Promise<boolean> {
@@ -328,6 +321,9 @@ export class MembershipManager implements IMembershipManager {
     private get membershipKeepAlivePeriod(): number {
         return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
+    private get maximumRateLimitRetryCount(): number {
+        return this.joinConfig?.maximumRateLimitRetryCount ?? 5;
+    }
 
     // Scheduler:
     private scheduler = new ActionScheduler(
@@ -361,7 +357,6 @@ export class MembershipManager implements IMembershipManager {
                     } catch (e) {
                         this.handleRateLimitError(
                             e,
-                            ALLOWED_DELAYED_EVENT_UPDATE_RETRIES,
                             state.updateDelayedEventRetries,
                             (retryIn) => {
                                 state.updateDelayedEventRetries++;
@@ -412,7 +407,6 @@ export class MembershipManager implements IMembershipManager {
                     });
                     this.handleRateLimitError(
                         e,
-                        ALLOWED_DELAYED_EVENT_SEND_RETRIES,
                         state.sendDelayedEventRetries,
                         (retryIn) => {
                             logger.warn("Retry sending delayed disconnection due to rate limit:", e);
@@ -444,6 +438,7 @@ export class MembershipManager implements IMembershipManager {
                 }
                 try {
                     await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Restart);
+                    state.updateDelayedEventRetries = 0;
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipKeepAlivePeriod,
                         type: DelayedLeaveActionType.RestartDelayedEvent,
@@ -456,9 +451,9 @@ export class MembershipManager implements IMembershipManager {
                     });
                     this.handleRateLimitError(
                         e,
-                        ALLOWED_DELAYED_EVENT_UPDATE_RETRIES,
                         state.updateDelayedEventRetries,
                         (retryIn) => {
+                            state.updateDelayedEventRetries++;
                             this.scheduler.addAction({
                                 ts: Date.now() + retryIn,
                                 type: DelayedLeaveActionType.RestartDelayedEvent,
@@ -499,7 +494,6 @@ export class MembershipManager implements IMembershipManager {
                     this.handleRateLimitError(
                         e,
                         state.sendMembershipRetries,
-                        ALLOWED_MEMBERSHIP_SEND_RETRIES,
                         (retryIn) => {
                             logger.warn("Retry sending delayed disconnection due to rate limit:", e);
                             state.sendMembershipRetries++;
@@ -521,6 +515,7 @@ export class MembershipManager implements IMembershipManager {
                     try {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send);
                         state.hasMemberStateEvent = false;
+                        state.updateDelayedEventRetries = 0;
                         this.leavePromiseHandle.resolve?.(true);
                     } catch (e) {
                         const notFoundHandled = this.handleNotFoundError(e, () => {
@@ -529,9 +524,9 @@ export class MembershipManager implements IMembershipManager {
                         });
                         const rateLimitHandled = this.handleRateLimitError(
                             e,
-                            ALLOWED_DELAYED_EVENT_UPDATE_RETRIES,
                             state.updateDelayedEventRetries,
                             (retryIn) => {
+                                state.updateDelayedEventRetries++;
                                 this.scheduler.addAction({
                                     ts: Date.now() + retryIn,
                                     type: DelayedLeaveActionType.SendScheduledDelayedLeaveEvent,
@@ -573,7 +568,6 @@ export class MembershipManager implements IMembershipManager {
                     const rateLimitHandled = this.handleRateLimitError(
                         e,
                         state.sendMembershipRetries,
-                        ALLOWED_MEMBERSHIP_SEND_RETRIES,
                         (retryIn) => {
                             logger.warn("Retry sending membership state event due to rate limit:", e);
                             state.sendMembershipRetries++;
@@ -606,6 +600,7 @@ export class MembershipManager implements IMembershipManager {
                     );
                     state.nextRelativeExpiry += this.membershipExpiryTimeout;
                     state.hasMemberStateEvent = true;
+                    state.sendMembershipRetries = 0;
                     this.scheduler.addAction({ ts: Date.now(), type: DelayedLeaveActionType.RestartDelayedEvent });
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipExpiryTimeout,
@@ -614,13 +609,12 @@ export class MembershipManager implements IMembershipManager {
                 } catch (e) {
                     this.handleRateLimitError(
                         e,
-                        ALLOWED_MEMBERSHIP_SEND_RETRIES,
                         state.sendMembershipRetries,
                         (resendDelay) => {
                             state.sendMembershipRetries++;
                             this.scheduler.addAction({
                                 ts: Date.now() + resendDelay,
-                                type: DelayedLeaveActionType.RestartDelayedEvent,
+                                type: MembershipActionType.SendJoinEvent,
                             });
                         },
                         () => {
@@ -707,12 +701,11 @@ export class MembershipManager implements IMembershipManager {
      */
     private handleRateLimitError(
         e: unknown,
-        allowedRetries: number,
         currentRetries: number,
         onRetry: (retryIn: number) => void,
         onAbort: () => void,
     ): boolean {
-        if (currentRetries < allowedRetries && e instanceof HTTPError && e.isRateLimitError()) {
+        if (currentRetries < this.maximumRateLimitRetryCount && e instanceof HTTPError && e.isRateLimitError()) {
             let resendDelay: number;
             const defaultMs = 5000;
             try {
