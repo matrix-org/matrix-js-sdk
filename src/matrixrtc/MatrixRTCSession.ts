@@ -58,36 +58,32 @@ export interface MembershipConfig {
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
+     *
+     * This is what goes into the m.rtc.member event expiry field.
      */
-    membershipExpiryTimeout?: number;
-
-    /**
-     * The period (in milliseconds) with which we check that our membership event still exists on the
-     * server. If it is not found we create it again.
-     */
-    memberEventCheckPeriod?: number;
+    membershipEventExpiry?: number;
 
     /**
      * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
      * failed to send.
      */
-    callMemberEventRetryDelayMinimum?: number;
+    membershipEventLocalRateLimit?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
-    membershipServerSideExpiryTimeout?: number;
+    delayedLeaveEventDelay?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
-    membershipKeepAlivePeriod?: number;
+    delayedLeaveEventRestartPeriod?: number;
 
     /**
      * @deprecated It should be possible to make it stable without this.
      */
-    callMemberEventRetryJitter?: number;
+    membershipEventJitter?: number;
 }
 export interface EncryptionConfig {
     /**
