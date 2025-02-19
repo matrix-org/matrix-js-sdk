@@ -53,8 +53,6 @@ function createAsyncHandle(method: MockedFunction<any>) {
 describe("MembershipManager", () => {
     describe.each([
         { TestMembershipManager: LegacyMembershipManager, description: "LegacyMembershipManager" },
-        // Here we will add the new implementation of the MembershipManager.
-        // It is not yet tested since it would currently fail all tests. Adding the MembershipManger looks like this:
         { TestMembershipManager: MembershipManager, description: "MembershipManager" },
     ])("$description", ({ TestMembershipManager }) => {
         let client: MockClient;
@@ -70,7 +68,7 @@ describe("MembershipManager", () => {
         };
 
         beforeEach(() => {
-            // Default to fake timers
+            // Default to fake timers.
             jest.useFakeTimers();
             client = makeMockClient("@alice:example.org", "AAAAAAA");
             room = makeMockRoom(membershipTemplate);
@@ -80,7 +78,7 @@ describe("MembershipManager", () => {
 
         afterEach(() => {
             jest.useRealTimers();
-            // no need to clean up mocks since we will recreate the client
+            // There is no need to clean up mocks since we will recreate the client.
         });
 
         describe("isJoined()", () => {
@@ -418,7 +416,7 @@ describe("MembershipManager", () => {
                 (client._unstable_updateDelayedEvent as Mock).mockClear();
                 (client._unstable_sendDelayedStateEvent as Mock).mockClear();
 
-                // our own membership is removed:
+                // Our own membership is removed:
                 manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
                 await flushPromises();
                 expect(client.sendStateEvent).toHaveBeenCalled();
@@ -428,7 +426,7 @@ describe("MembershipManager", () => {
             });
         });
 
-        // TODO: not sure about this name
+        // TODO: Not sure about this name
         describe("background timers", () => {
             it("sends only one keep-alive for delayed leave event per `membershipKeepAlivePeriod`", async () => {
                 const manager = new TestMembershipManager(
@@ -444,7 +442,7 @@ describe("MembershipManager", () => {
                 // so it does not need a `advanceTimersByTime`
                 await flushPromises();
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-                // TODO: check that update delayed event is called with the correct HTTP request timeout
+                // TODO: Check that update delayed event is called with the correct HTTP request timeout
                 // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
 
                 for (let i = 2; i <= 12; i++) {
@@ -454,7 +452,7 @@ describe("MembershipManager", () => {
                     await flushPromises();
 
                     expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(i);
-                    // TODO: check that update delayed event is called with the correct HTTP request timeout
+                    // TODO: Check that update delayed event is called with the correct HTTP request timeout
                     // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
                 }
             });
@@ -462,7 +460,7 @@ describe("MembershipManager", () => {
             // The expires logic was removed for the legacy call manager.
             // Delayed events should replace it entirely but before they have wide adoption
             // the expiration logic still makes sense.
-            // TODO: add git commit when we removed it.
+            // TODO: Add git commit when we removed it.
             it("extends `expires` when call still active !FailsForLegacy", async () => {
                 const manager = new TestMembershipManager(
                     { membershipExpiryTimeout: 10_000 },
@@ -511,7 +509,7 @@ describe("MembershipManager", () => {
                     await flushPromises();
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
                 });
-                // FailsForLegacy as implementation does not re-check membership before retrying
+                // FailsForLegacy as implementation does not re-check membership before retrying.
                 it("abandons retry loop and sends new own membership if not present anymore !FailsForLegacy", async () => {
                     (client._unstable_sendDelayedStateEvent as any).mockRejectedValue(
                         new MatrixError(
@@ -540,7 +538,7 @@ describe("MembershipManager", () => {
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
-                // FailsForLegacy as implementation does not re-check membership before retrying
+                // FailsForLegacy as implementation does not re-check membership before retrying.
                 it("abandons retry loop if leave() was called !FailsForLegacy", async () => {
                     const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
@@ -601,11 +599,6 @@ describe("MembershipManager", () => {
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
             });
-
-            // describe: "retries sending membership event"
-            //     it: "sends it if still joined at time of retry"
-            //         // TODO: see what this is doing and how its different to: "recreates membership if it is missing"
-            //     it: "abandons it if call no longer joined at time of retry"
         });
     });
 });
