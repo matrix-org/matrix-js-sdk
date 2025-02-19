@@ -21,11 +21,10 @@ import { type MockedFunction, type Mock } from "jest-mock";
 
 import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
-import { LegacyMembershipManager } from "../../../src/matrixrtc/MembershipManager";
+import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { defer } from "../../../src/utils";
-// import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
+import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 
 function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
     return new Promise<void>((resolve) => {
@@ -35,7 +34,7 @@ function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
         });
     });
 }
-defer
+
 function createAsyncHandle(method: MockedFunction<any>) {
     const handle: { resolve?: (...args: unknown[]) => void; reject?: (...args: any[]) => void } = {};
     method.mockImplementation(() => {
@@ -56,7 +55,7 @@ describe("MembershipManager", () => {
         { TestMembershipManager: LegacyMembershipManager, description: "LegacyMembershipManager" },
         // Here we will add the new implementation of the MembershipManager.
         // It is not yet tested since it would currently fail all tests. Adding the MembershipManger looks like this:
-        // { TestMembershipManager: MembershipManager, description: "MembershipManager" },
+        { TestMembershipManager: MembershipManager, description: "MembershipManager" },
     ])("$description", ({ TestMembershipManager }) => {
         let client: MockClient;
         let room: Room;
