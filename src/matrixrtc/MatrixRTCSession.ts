@@ -25,8 +25,9 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { LegacyMembershipManager, type IMembershipManager } from "./MembershipManager.ts";
+import { type IMembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
+import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
