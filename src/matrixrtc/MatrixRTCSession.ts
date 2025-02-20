@@ -65,6 +65,15 @@ export interface MembershipConfig {
     membershipExpiryTimeout?: number;
 
     /**
+     * The slack in (in milliseconds) which the manager will leave of the meberhsip `expires` time to make sure it
+     * sends the updated state event early enough.
+     *
+     * A slack of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in a memberhsip event update every 9s and
+     * a memberhsip event that would be considered expired after 10s.
+     */
+    membershipExpiryTimeoutSlack?: number;
+
+    /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
      * server. If it is not found we create it again.
      */

@@ -311,6 +311,9 @@ export class MembershipManager implements IMembershipManager {
     private get membershipExpiryTimeout(): number {
         return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
     }
+    private get membershipExpiryTimeoutSlack(): number {
+        return this.joinConfig?.membershipExpiryTimeoutSlack ?? 10_000;
+    }
     private get membershipServerSideExpiryTimeout(): number {
         return (
             this.membershipServerSideExpiryTimeoutOverride ??
@@ -561,7 +564,7 @@ export class MembershipManager implements IMembershipManager {
                     // Success, we reset retries and schedule update.
                     state.sendMembershipRetries = 0;
                     this.scheduler.addAction({
-                        ts: Date.now() + this.membershipExpiryTimeout,
+                        ts: Date.now() + this.membershipExpiryTimeout - this.membershipExpiryTimeoutSlack,
                         type: MembershipActionType.Update,
                     });
                 } catch (e) {
