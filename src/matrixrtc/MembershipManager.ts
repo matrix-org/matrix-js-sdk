@@ -162,8 +162,9 @@ export class LegacyMembershipManager implements IMembershipManager {
 
         if (this.isJoined() && !memberships.some(isMyMembership)) {
             logger.warn("Missing own membership: force re-join");
+            window.alert("You lost network connect. Please reload the tab when your network is stable again.");
             // TODO: Should this be awaited? And is there anything to tell the focus?
-            return this.triggerCallMembershipEventUpdate();
+            // return this.triggerCallMembershipEventUpdate();
         }
     }
 
