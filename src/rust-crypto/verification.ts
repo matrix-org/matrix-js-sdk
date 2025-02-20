@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OutgoingRequest, QrState } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
     type GeneratedSas,
@@ -30,7 +30,7 @@ import {
     type VerifierEventHandlerMap,
 } from "../crypto-api/verification.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { type OutgoingRequest, type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { EventType, MsgType } from "../@types/event.ts";
