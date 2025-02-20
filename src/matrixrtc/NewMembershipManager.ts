@@ -52,34 +52,59 @@ export interface IMembershipManager {
 
 // SCHEDULER TYPES:
 enum MembershipActionType {
-    SendJoinEvent = "SendJoinEvent", // -> DelayedLeaveActionType.SendFirstDelayedEvent
-    Update = "Update", // -> MembershipActionType.Update
-    SendLeaveEvent = "SendLeaveEvent",
+    SendJoinEvent = "SendJoinEvent",
+    //  -> MembershipActionType.SendJoinEvent if we run in a rate limit and need to retry
+    //  -> MembershipActionType.Update if we successfully send it to schedule the expire event update
+    //  -> DelayedLeaveActionType.RestartDelayedEvent to recheck the delayed event
+    Update = "Update",
+    //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
+    SendLeaveEvent = "SendLeaveEvent", // -> MembershipActionType.SendLeaveEvent
 }
 function isMembershipActionType(val: any): val is MembershipActionType {
     return val in MembershipActionType;
 }
 
 enum DelayedLeaveActionType {
-    SendFirstDelayedEvent = "SendFirstDelayedEvent", // -> MembershipActionType.SendJoinEvent
-    SendMainDelayedEvent = "SendMainDelayedEvent", // -> DelayedLeaveActionType.RestartDelayedEvent
-    RestartDelayedEvent = "RestartDelayedEvent", // -> DelayedLeaveActionType.SendJoinEvent, DelayedLeaveActionType.RestartDelayedEvent
-    SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent", // -> MembershipActionType.SendLeaveEvent
+    SendFirstDelayedEvent = "SendFirstDelayedEvent",
+    //  -> MembershipActionType.SendJoinEvent if successful
+    //  -> DelayedLeaveActionType.SendFirstDelayedEvent on error, retry sending the first delayed event.
+    SendMainDelayedEvent = "SendMainDelayedEvent",
+    //  -> DelayedLeaveActionType.RestartDelayedEvent on success start updating the delayed event
+    //  -> DelayedLeaveActionType.SendMainDelayedEvent on error try again
+    RestartDelayedEvent = "RestartDelayedEvent",
+    //  -> DelayedLeaveActionType.SendMainDelayedEvent on missing delay id but there is a rtc state event
+    //  -> DelayedLeaveActionType.SendFirstDelayedEvent on missing delay id and there is no state event
+    //  -> DelayedLeaveActionType.RestartDelayedEvent on success we schedule the next restart
+    SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent",
+    //  -> MembershipActionType.SendLeaveEvent on failiour (not found) we need to send the leave manually and cannot use the scheduled delayed event
+    //  -> DelayedLeaveActionType.SendScheduledDelayedLeaveEvent on error we try again.
 }
 
 function isDelayedLeaveActionType(val: any): val is DelayedLeaveActionType {
     return val in DelayedLeaveActionType;
 }
 
+/**
+ * Actions that are supposed to be used from outside the main handle methods.
+ */
 enum DirectMemberhsipManagerActions {
     Join = DelayedLeaveActionType.SendFirstDelayedEvent,
     Leave = DelayedLeaveActionType.SendScheduledDelayedLeaveEvent,
 }
 interface ActionSchedulerState {
+    /** The delayId we got when successfully sending the delayed leave event.
+     * Gets set to undefined if the server claims it cannot find the delayed event anymore. */
     delayId?: string;
+    /** Stores the value we want to use for the `expires` field in the next own membership update. */
     nextRelativeExpiry: number;
+    /** Flag that gets set once join is called.
+     * The manager tries its best to get the user into the call.
+     * Does not imply the user is actually joined via room state. */
     running: boolean;
+    /** The manager is in the state where its actually connected to the session. */
     hasMemberStateEvent: boolean;
+    // Retry counters that get used to limit the maximum rate limit retires we want to do.
+    // They get reused for each rate limit loop we run into and reset to 0 on unrecoverable failiour or success.
     sendMembershipRetries: number;
     sendDelayedEventRetries: number;
     updateDelayedEventRetries: number;
@@ -244,6 +269,7 @@ export class MembershipManager implements IMembershipManager {
 
         if (this.isJoined() && !memberships.some(isMyMembership)) {
             logger.warn("Missing own membership: force re-join");
+            this.scheduler.state.hasMemberStateEvent = false;
             this.scheduler.addAction({ ts: Date.now(), type: DirectMemberhsipManagerActions.Join });
         }
     }
@@ -327,7 +353,6 @@ export class MembershipManager implements IMembershipManager {
     private get maximumRateLimitRetryCount(): number {
         return this.joinConfig?.maximumRateLimitRetryCount ?? 5;
     }
-
     // Scheduler:
     private scheduler = new ActionScheduler(
         {
@@ -347,6 +372,7 @@ export class MembershipManager implements IMembershipManager {
         switch (type) {
             case DelayedLeaveActionType.SendFirstDelayedEvent:
                 // Remove all running updates and restarts
+                this.scheduler.resetActions([]);
                 // Before we start we check if we come from a state where we have a delay id.
                 if (state.delayId) {
                     try {
@@ -385,47 +411,47 @@ export class MembershipManager implements IMembershipManager {
                             });
                         });
                     }
-                    return;
-                }
-                try {
-                    const response = await this.client._unstable_sendDelayedStateEvent(
-                        this.room.roomId,
-                        {
-                            delay: this.membershipServerSideExpiryTimeout,
-                        },
-                        EventType.GroupCallMemberPrefix,
-                        {}, // leave event
-                        this.stateKey,
-                    );
-                    // Success we reset retires and set delayId.
-                    state.sendDelayedEventRetries = 0;
-                    state.delayId = response.delay_id;
-                    this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
-                } catch (e) {
-                    this.handleMaxDelayeExceededError(e, () => {
-                        this.scheduler.addAction({
-                            ts: Date.now(),
-                            type: DelayedLeaveActionType.SendFirstDelayedEvent,
-                        });
-                    });
-                    this.handleRateLimitError(
-                        e,
-                        state.sendDelayedEventRetries,
-                        (retryIn) => {
-                            logger.warn("Retry sending delayed disconnection due to rate limit:", e);
-                            state.sendDelayedEventRetries++;
+                } else {
+                    try {
+                        const response = await this.client._unstable_sendDelayedStateEvent(
+                            this.room.roomId,
+                            {
+                                delay: this.membershipServerSideExpiryTimeout,
+                            },
+                            EventType.GroupCallMemberPrefix,
+                            {}, // leave event
+                            this.stateKey,
+                        );
+                        // Success we reset retires and set delayId.
+                        state.sendDelayedEventRetries = 0;
+                        state.delayId = response.delay_id;
+                        this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
+                    } catch (e) {
+                        this.handleMaxDelayeExceededError(e, () => {
                             this.scheduler.addAction({
-                                ts: Date.now() + retryIn,
+                                ts: Date.now(),
                                 type: DelayedLeaveActionType.SendFirstDelayedEvent,
                             });
-                        },
-                        () => {
-                            throw Error(
-                                "Exceeded maximum delayed event send attempts (client._unstable_sendDelayedStateEvent): " +
-                                    e,
-                            );
-                        },
-                    );
+                        });
+                        this.handleRateLimitError(
+                            e,
+                            state.sendDelayedEventRetries,
+                            (retryIn) => {
+                                logger.warn("Retry sending delayed disconnection due to rate limit:", e);
+                                state.sendDelayedEventRetries++;
+                                this.scheduler.addAction({
+                                    ts: Date.now() + retryIn,
+                                    type: DelayedLeaveActionType.SendFirstDelayedEvent,
+                                });
+                            },
+                            () => {
+                                throw Error(
+                                    "Exceeded maximum delayed event send attempts (client._unstable_sendDelayedStateEvent): " +
+                                        e,
+                                );
+                            },
+                        );
+                    }
                 }
                 break;
             case DelayedLeaveActionType.RestartDelayedEvent:
@@ -502,12 +528,13 @@ export class MembershipManager implements IMembershipManager {
                             state.sendMembershipRetries++;
                             this.scheduler.addAction({
                                 ts: Date.now() + Math.max(retryIn, this.callMemberEventRetryDelayMinimum),
-                                type: MembershipActionType.Update,
+                                type: DelayedLeaveActionType.SendMainDelayedEvent,
                             });
                         },
                         () => {
                             throw Error(
-                                "Exceeded maximum own Membership state update attempts (client.sendStateEvent): " + e,
+                                "Exceeded maximum send delayed event attempts (client._unstable_sendDelayedStateEvent): " +
+                                    e,
                             );
                         },
                     );
@@ -519,6 +546,7 @@ export class MembershipManager implements IMembershipManager {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send);
                         state.hasMemberStateEvent = false;
                         state.updateDelayedEventRetries = 0;
+                        this.scheduler.resetActions([]);
                         this.leavePromiseHandle.resolve?.(true);
                     } catch (e) {
                         const notFoundHandled = this.handleNotFoundError(e, () => {
@@ -536,11 +564,11 @@ export class MembershipManager implements IMembershipManager {
                                 });
                             },
                             () => {
-                                this.leavePromiseHandle.reject?.(e);
+                                this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                             },
                         );
                         if (!(notFoundHandled || rateLimitHandled)) {
-                            this.leavePromiseHandle.reject?.(e);
+                            this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                         }
                     }
                 } else {
@@ -629,7 +657,7 @@ export class MembershipManager implements IMembershipManager {
                 }
                 break;
             case MembershipActionType.SendLeaveEvent:
-                // we are good already
+                // We are good already
                 if (!state.hasMemberStateEvent) return;
 
                 // This is only a fallback in case we do not have working delayed events support.
@@ -641,8 +669,25 @@ export class MembershipManager implements IMembershipManager {
                         {},
                         this.makeMembershipStateKey(this.userId, this.deviceId),
                     );
+                    state.updateDelayedEventRetries = 0;
+                    this.scheduler.resetActions([]);
+                    this.leavePromiseHandle.resolve?.(true);
                     state.hasMemberStateEvent = false;
-                } catch {}
+                } catch (e) {
+                    this.handleRateLimitError(
+                        e,
+                        state.sendMembershipRetries,
+                        (retryIn) => {
+                            this.scheduler.addAction({
+                                ts: Date.now() + retryIn,
+                                type: MembershipActionType.SendLeaveEvent,
+                            });
+                        },
+                        () => {
+                            throw Error("could not send final leave event due to max rate limit retries" + e);
+                        },
+                    );
+                }
         }
     }
 
