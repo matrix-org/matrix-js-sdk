@@ -252,14 +252,15 @@ describe.each([
                 delayedHandle.reject?.(Error("Server does not support the delayed events API"));
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
             });
-            it("does try to schedule a delayed leave event again if rate limited", () => {
+            it("does try to schedule a delayed leave event again if rate limited", async () => {
                 const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
                 manager.join([focus], focusActive);
                 delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
-                waitForExpect(() => {
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
-                });
+                await flushPromises();
+                jest.advanceTimersByTime(5000);
+                await flushPromises();
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
             it("uses membershipServerSideExpiryTimeout from config", async () => {
                 const manager = new TestMembershipManager(
