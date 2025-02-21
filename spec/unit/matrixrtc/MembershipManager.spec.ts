@@ -1,5 +1,5 @@
 /**
- * @jest-environment ./spec/unit/matrixrtc/testEnvironment.ts
+ * @jest-environment ./spec/unit/matrixrtc/memberManagerTestEnvironment.ts
  */
 /*
 Copyright 2025 The Matrix.org Foundation C.I.C.
@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mock } from "jest-mock";
+import { type MockedFunction, type Mock } from "jest-mock";
 
 import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
@@ -26,18 +26,18 @@ import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, t
 import { flushPromises } from "../../test-utils/flushPromises";
 // import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 
-function waitForMockCall(method: any, returnVal?: any) {
+function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
     return new Promise<void>((resolve) => {
-        (method as Mock).mockImplementation(() => {
+        method.mockImplementation(() => {
             resolve();
             return returnVal;
         });
     });
 }
 
-function createAsyncHandle(method: any) {
+function createAsyncHandle(method: MockedFunction<any>) {
     const handle: { resolve?: (...args: unknown[]) => void; reject?: (...args: any[]) => void } = {};
-    (method as Mock).mockImplementation(() => {
+    method.mockImplementation(() => {
         return new Promise((resolve, reject) => {
             handle.reject = reject;
             handle.resolve = resolve;
@@ -50,562 +50,556 @@ function createAsyncHandle(method: any) {
  * Tests different MembershipManager implementations. Some tests don't apply to `LegacyMembershipManager`
  * use !FailsForLegacy to skip those. See: testEnvironment for more details.
  */
-describe("MembershipManager", () => {
-    describe.each([
-        { TestMembershipManager: LegacyMembershipManager, description: "LegacyMembershipManager" },
-        // Here we will add the new implementation of the MembershipManager.
-        // It is not yet tested since it would currently fail all tests. Adding the MembershipManger looks like this:
-        // { TestMembershipManager: MembershipManager, description: "MembershipManager" },
-    ])("$description", ({ TestMembershipManager }) => {
-        let client: MockClient;
-        let room: Room;
-        const focusActive: LivekitFocusActive = {
-            focus_selection: "oldest_membership",
-            type: "livekit",
-        };
-        const focus: Focus = {
-            type: "livekit",
-            livekit_service_url: "https://active.url",
-            livekit_alias: "!active:active.url",
-        };
+describe.each([
+    { TestMembershipManager: LegacyMembershipManager, description: "LegacyMembershipManager" },
+    // Here we will add the new implementation of the MembershipManager.
+    // It is not yet tested since it would currently fail all tests. Adding the MembershipManger looks like this:
+    // { TestMembershipManager: MembershipManager, description: "MembershipManager" },
+])("$description", ({ TestMembershipManager }) => {
+    let client: MockClient;
+    let room: Room;
+    const focusActive: LivekitFocusActive = {
+        focus_selection: "oldest_membership",
+        type: "livekit",
+    };
+    const focus: Focus = {
+        type: "livekit",
+        livekit_service_url: "https://active.url",
+        livekit_alias: "!active:active.url",
+    };
 
-        beforeEach(() => {
-            // default to fake timers
-            jest.useFakeTimers();
-            client = makeMockClient("@alice:example.org", "AAAAAAA");
-            room = makeMockRoom(membershipTemplate);
-            // provide a default mock that is like the default "non error" server behaviour.
-            (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
+    beforeEach(() => {
+        // Default to fake timers
+        jest.useFakeTimers();
+        client = makeMockClient("@alice:example.org", "AAAAAAA");
+        room = makeMockRoom(membershipTemplate);
+        // Provide a default mock. Representing the default "non error" server behaviour.
+        (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
+        // no need to clean up mocks since we will recreate the client
+    });
+
+    describe("isJoined()", () => {
+        it("defaults to false", () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            expect(manager.isJoined()).toEqual(false);
         });
 
-        afterEach(() => {
-            jest.useRealTimers();
-            // no need to clean up mocks since we will recreate the client
+        it("returns true after join()", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([]);
+            expect(manager.isJoined()).toEqual(true);
         });
+    });
 
-        describe("isJoined()", () => {
-            it("defaults to false", () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                expect(manager.isJoined()).toEqual(false);
+    describe("join()", () => {
+        describe("sends a membership event", () => {
+            it("sends a membership event and schedules delayed leave when joining a call", async () => {
+                // Spys/Mocks
+
+                const updateDelayedEventHandle = createAsyncHandle(client._unstable_updateDelayedEvent as Mock);
+
+                // Test
+                const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
+                memberManager.join([focus], focusActive);
+
+                // expects
+                await waitForMockCall(client.sendStateEvent);
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    room.roomId,
+                    "org.matrix.msc3401.call.member",
+                    {
+                        application: "m.call",
+                        call_id: "",
+                        device_id: "AAAAAAA",
+                        expires: 14400000,
+                        foci_preferred: [focus],
+                        focus_active: focusActive,
+                        scope: "m.room",
+                    },
+                    "_@alice:example.org_AAAAAAA",
+                );
+                updateDelayedEventHandle.resolve?.();
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
+                    room.roomId,
+                    { delay: 8000 },
+                    "org.matrix.msc3401.call.member",
+                    {},
+                    "_@alice:example.org_AAAAAAA",
+                );
             });
 
-            it("returns true after join()", async () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.join([]);
-                expect(manager.isJoined()).toEqual(true);
-            });
-        });
-
-        describe("join()", () => {
-            describe("sends a membership event", () => {
-                it("sends a membership event and schedules delayed leave when joining a call", async () => {
-                    // Spys/Mocks
-
-                    // eslint-disable-next-line camelcase
-                    const _unstable_updateDelayedEventHandle = createAsyncHandle(
-                        client._unstable_updateDelayedEvent as Mock,
-                    );
-
-                    // Test
-                    const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
-                    memberManager.join([focus], focusActive);
-
-                    // expects
-                    await waitForMockCall(client.sendStateEvent);
-                    expect(client.sendStateEvent).toHaveBeenCalledWith(
-                        room.roomId,
-                        "org.matrix.msc3401.call.member",
-                        {
-                            application: "m.call",
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            expires: 14400000,
-                            foci_preferred: [focus],
-                            focus_active: focusActive,
-                            scope: "m.room",
-                        },
-                        "_@alice:example.org_AAAAAAA",
-                    );
-                    // eslint-disable-next-line camelcase
-                    _unstable_updateDelayedEventHandle.resolve?.();
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
-                        room.roomId,
-                        { delay: 8000 },
-                        "org.matrix.msc3401.call.member",
-                        {},
-                        "_@alice:example.org_AAAAAAA",
-                    );
-                });
-
-                describe("does not prefix the state key with _ for rooms that support user-owned state events", () => {
-                    async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
-                        if (useOwnedStateEvents) {
-                            room.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
-                        }
-
-                        const updatedDelayedEvent = waitForMockCall(client._unstable_updateDelayedEvent);
-                        const sentDelayedState = waitForMockCall(client._unstable_sendDelayedStateEvent, {
-                            delay_id: "id",
-                        });
-
-                        // preparing the delayed disconnect should handle the delay being too long
-                        const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
-                            const error = new MatrixError({
-                                "errcode": "M_UNKNOWN",
-                                "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
-                                "org.matrix.msc4140.max_delay": 7500,
-                            });
-                            (client._unstable_sendDelayedStateEvent as Mock).mockImplementationOnce(() => {
-                                resolve();
-                                return Promise.reject(error);
-                            });
-                        });
-
-                        const userStateKey = `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`;
-                        // preparing the delayed disconnect should handle ratelimiting
-                        const sendDelayedStateAttempt = new Promise<void>((resolve) => {
-                            const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
-                            (client._unstable_sendDelayedStateEvent as Mock).mockImplementationOnce(() => {
-                                resolve();
-                                return Promise.reject(error);
-                            });
-                        });
-
-                        // setting the membership state should handle ratelimiting (also with a retry-after value)
-                        const sendStateEventAttempt = new Promise<void>((resolve) => {
-                            const error = new MatrixError(
-                                { errcode: "M_LIMIT_EXCEEDED" },
-                                429,
-                                undefined,
-                                undefined,
-                                new Headers({ "Retry-After": "1" }),
-                            );
-                            (client.sendStateEvent as Mock).mockImplementationOnce(() => {
-                                resolve();
-                                return Promise.reject(error);
-                            });
-                        });
-                        const manager = new TestMembershipManager(
-                            {
-                                membershipServerSideExpiryTimeout: 9000,
-                            },
-                            room,
-                            client,
-                            () => undefined,
-                        );
-                        manager.join([focus], focusActive);
-
-                        await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
-                        await sendDelayedStateAttempt;
-                        const callProps = (d: number) => {
-                            return [room!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
-                        };
-                        expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(1, ...callProps(9000));
-                        expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(2, ...callProps(7500));
-
-                        jest.advanceTimersByTime(5000);
-
-                        await sendStateEventAttempt.then(); // needed to resolve after resendIfRateLimited catches
-                        jest.advanceTimersByTime(1000);
-
-                        expect(client.sendStateEvent).toHaveBeenCalledWith(
-                            room!.roomId,
-                            EventType.GroupCallMemberPrefix,
-                            {
-                                application: "m.call",
-                                scope: "m.room",
-                                call_id: "",
-                                expires: 14400000,
-                                device_id: "AAAAAAA",
-                                foci_preferred: [focus],
-                                focus_active: focusActive,
-                            } satisfies SessionMembershipData,
-                            userStateKey,
-                        );
-                        await sentDelayedState;
-
-                        // should have prepared the heartbeat to keep delaying the leave event while still connected
-                        await updatedDelayedEvent;
-                        expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-
-                        // ensures that we reach the code that schedules the timeout for the next delay update before we advance the timers.
-                        await flushPromises();
-                        jest.advanceTimersByTime(5000);
-                        await flushPromises();
-                        // should update delayed disconnect
-                        expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
+            describe("does not prefix the state key with _ for rooms that support user-owned state events", () => {
+                async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
+                    // TODO: this test does quiet a bit. Its more a like a test story summarizing to:
+                    // - send delay with too long timeout and get server error (test delayedEventTimeout gets overwritten)
+                    // - run into rate limit for sending delayed event
+                    // - run into rate limit when setting membership state.
+                    if (useOwnedStateEvents) {
+                        room.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
                     }
 
-                    it("sends a membership event after rate limits during delayed event setup when joining a call", async () => {
-                        await testJoin(false);
+                    const updatedDelayedEvent = waitForMockCall(client._unstable_updateDelayedEvent);
+                    const sentDelayedState = waitForMockCall(client._unstable_sendDelayedStateEvent, {
+                        delay_id: "id",
                     });
 
-                    it("does not prefix the state key with _ for rooms that support user-owned state events", async () => {
-                        await testJoin(true);
+                    // preparing the delayed disconnect should handle the delay being too long
+                    const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
+                        const error = new MatrixError({
+                            "errcode": "M_UNKNOWN",
+                            "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
+                            "org.matrix.msc4140.max_delay": 7500,
+                        });
+                        (client._unstable_sendDelayedStateEvent as Mock).mockImplementationOnce(() => {
+                            resolve();
+                            return Promise.reject(error);
+                        });
                     });
-                });
-            });
 
-            describe("delayed leave event", () => {
-                it("does not try again to schedule a delayed leave event if not supported", () => {
-                    const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
-                    const manager = new TestMembershipManager({}, room, client, () => undefined);
-                    manager.join([focus], focusActive);
-                    delayedHandle.reject?.(Error("Server does not support the delayed events API"));
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-                });
-                it("does try to schedule a delayed leave event again if rate limited", async () => {
-                    const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
-                    const manager = new TestMembershipManager({}, room, client, () => undefined);
-                    manager.join([focus], focusActive);
-                    delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
-                    await flushPromises();
-                    jest.advanceTimersByTime(5000);
-                    await flushPromises();
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
-                });
-                it("uses membershipServerSideExpiryTimeout from config", async () => {
+                    const userStateKey = `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`;
+                    // preparing the delayed disconnect should handle ratelimiting
+                    const sendDelayedStateAttempt = new Promise<void>((resolve) => {
+                        const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
+                        (client._unstable_sendDelayedStateEvent as Mock).mockImplementationOnce(() => {
+                            resolve();
+                            return Promise.reject(error);
+                        });
+                    });
+
+                    // setting the membership state should handle ratelimiting (also with a retry-after value)
+                    const sendStateEventAttempt = new Promise<void>((resolve) => {
+                        const error = new MatrixError(
+                            { errcode: "M_LIMIT_EXCEEDED" },
+                            429,
+                            undefined,
+                            undefined,
+                            new Headers({ "Retry-After": "1" }),
+                        );
+                        (client.sendStateEvent as Mock).mockImplementationOnce(() => {
+                            resolve();
+                            return Promise.reject(error);
+                        });
+                    });
                     const manager = new TestMembershipManager(
-                        { membershipServerSideExpiryTimeout: 123456 },
+                        {
+                            membershipServerSideExpiryTimeout: 9000,
+                        },
                         room,
                         client,
                         () => undefined,
                     );
                     manager.join([focus], focusActive);
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
-                        room.roomId,
-                        { delay: 123456 },
-                        "org.matrix.msc3401.call.member",
-                        {},
-                        "_@alice:example.org_AAAAAAA",
+
+                    await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
+                    await sendDelayedStateAttempt;
+                    const callProps = (d: number) => {
+                        return [room!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
+                    };
+                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(1, ...callProps(9000));
+                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(2, ...callProps(7500));
+
+                    jest.advanceTimersByTime(5000);
+
+                    await sendStateEventAttempt.then(); // needed to resolve after resendIfRateLimited catches
+                    jest.advanceTimersByTime(1000);
+
+                    expect(client.sendStateEvent).toHaveBeenCalledWith(
+                        room!.roomId,
+                        EventType.GroupCallMemberPrefix,
+                        {
+                            application: "m.call",
+                            scope: "m.room",
+                            call_id: "",
+                            expires: 14400000,
+                            device_id: "AAAAAAA",
+                            foci_preferred: [focus],
+                            focus_active: focusActive,
+                        } satisfies SessionMembershipData,
+                        userStateKey,
                     );
+                    await sentDelayedState;
+
+                    // should have prepared the heartbeat to keep delaying the leave event while still connected
+                    await updatedDelayedEvent;
+                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+
+                    // ensures that we reach the code that schedules the timeout for the next delay update before we advance the timers.
+                    await flushPromises();
+                    jest.advanceTimersByTime(5000);
+                    await flushPromises();
+                    // should update delayed disconnect
+                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
+                }
+
+                it("sends a membership event after rate limits during delayed event setup when joining a call", async () => {
+                    await testJoin(false);
+                });
+
+                it("does not prefix the state key with _ for rooms that support user-owned state events", async () => {
+                    await testJoin(true);
                 });
             });
+        });
 
-            it("uses membershipExpiryTimeout from config", async () => {
+        describe("delayed leave event", () => {
+            it("does not try again to schedule a delayed leave event if not supported", () => {
+                const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                manager.join([focus], focusActive);
+                delayedHandle.reject?.(Error("Server does not support the delayed events API"));
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            });
+            it("does try to schedule a delayed leave event again if rate limited", async () => {
+                const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                manager.join([focus], focusActive);
+                delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
+                await flushPromises();
+                jest.advanceTimersByTime(5000);
+                await flushPromises();
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+            });
+            it("uses membershipServerSideExpiryTimeout from config", async () => {
                 const manager = new TestMembershipManager(
-                    { membershipExpiryTimeout: 1234567 },
+                    { membershipServerSideExpiryTimeout: 123456 },
                     room,
                     client,
                     () => undefined,
                 );
-
                 manager.join([focus], focusActive);
-                await waitForMockCall(client.sendStateEvent);
-                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    EventType.GroupCallMemberPrefix,
-                    {
-                        application: "m.call",
-                        scope: "m.room",
-                        call_id: "",
-                        device_id: "AAAAAAA",
-                        expires: 1234567,
-                        foci_preferred: [focus],
-                        focus_active: {
-                            focus_selection: "oldest_membership",
-                            type: "livekit",
-                        },
-                    },
+                    { delay: 123456 },
+                    "org.matrix.msc3401.call.member",
+                    {},
                     "_@alice:example.org_AAAAAAA",
                 );
             });
-
-            it("does nothing if join called when already joined", async () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.join([focus], focusActive);
-                await waitForMockCall(client.sendStateEvent);
-                expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                manager.join([focus], focusActive);
-                expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-            });
         });
 
-        describe("leave()", () => {
-            // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
-            it("does nothing if not joined !FailsForLegacy", () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.leave();
-                expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
-                expect(client.sendStateEvent).not.toHaveBeenCalled();
-            });
+        it("uses membershipExpiryTimeout from config", async () => {
+            const manager = new TestMembershipManager(
+                { membershipExpiryTimeout: 1234567 },
+                room,
+                client,
+                () => undefined,
+            );
+
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                {
+                    application: "m.call",
+                    scope: "m.room",
+                    call_id: "",
+                    device_id: "AAAAAAA",
+                    expires: 1234567,
+                    foci_preferred: [focus],
+                    focus_active: {
+                        focus_selection: "oldest_membership",
+                        type: "livekit",
+                    },
+                },
+                "_@alice:example.org_AAAAAAA",
+            );
         });
 
-        describe("getsActiveFocus", () => {
-            it("gets the correct active focus with oldest_membership", () => {
-                const getOldestMembership = jest.fn();
-                const manager = new TestMembershipManager({}, room, client, getOldestMembership);
-                // Before joining the active focus should be undefined (see FocusInUse on MatrixRTCSession)
-                expect(manager.getActiveFocus()).toBe(undefined);
-                manager.join([focus], focusActive);
-                // After joining we want our own focus to be the one we select.
-                getOldestMembership.mockReturnValue(
-                    mockCallMembership(
-                        {
-                            ...membershipTemplate,
-                            foci_preferred: [
-                                {
-                                    livekit_alias: "!active:active.url",
-                                    livekit_service_url: "https://active.url",
-                                    type: "livekit",
-                                },
-                            ],
-                            device_id: client.getDeviceId(),
-                            created_ts: 1000,
-                        },
-                        room.roomId,
-                        client.getUserId()!,
-                    ),
-                );
-                expect(manager.getActiveFocus()).toStrictEqual(focus);
-                getOldestMembership.mockReturnValue(
-                    mockCallMembership(
-                        Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
-                        room.roomId,
-                    ),
-                );
-                // If there is an older member we use its focus.
-                expect(manager.getActiveFocus()).toBe(membershipTemplate.foci_preferred[0]);
-            });
+        it("does nothing if join called when already joined", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            manager.join([focus], focusActive);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+        });
+    });
 
-            it("does not provide focus if the selection method is unknown", () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.join([focus], Object.assign(focusActive, { type: "unknown_type" }));
-                expect(manager.getActiveFocus()).toBe(undefined);
-            });
+    describe("leave()", () => {
+        // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
+        it("does nothing if not joined !FailsForLegacy", () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.leave();
+            expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("getsActiveFocus", () => {
+        it("gets the correct active focus with oldest_membership", () => {
+            const getOldestMembership = jest.fn();
+            const manager = new TestMembershipManager({}, room, client, getOldestMembership);
+            // Before joining the active focus should be undefined (see FocusInUse on MatrixRTCSession)
+            expect(manager.getActiveFocus()).toBe(undefined);
+            manager.join([focus], focusActive);
+            // After joining we want our own focus to be the one we select.
+            getOldestMembership.mockReturnValue(
+                mockCallMembership(
+                    {
+                        ...membershipTemplate,
+                        foci_preferred: [
+                            {
+                                livekit_alias: "!active:active.url",
+                                livekit_service_url: "https://active.url",
+                                type: "livekit",
+                            },
+                        ],
+                        device_id: client.getDeviceId(),
+                        created_ts: 1000,
+                    },
+                    room.roomId,
+                    client.getUserId()!,
+                ),
+            );
+            expect(manager.getActiveFocus()).toStrictEqual(focus);
+            getOldestMembership.mockReturnValue(
+                mockCallMembership(
+                    Object.assign({}, membershipTemplate, { device_id: "old", created_ts: 1000 }),
+                    room.roomId,
+                ),
+            );
+            // If there is an older member we use its focus.
+            expect(manager.getActiveFocus()).toBe(membershipTemplate.foci_preferred[0]);
         });
 
-        describe("onRTCSessionMemberUpdate()", () => {
-            it("does nothing if not joined", async () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
-                await flushPromises();
-                expect(client.sendStateEvent).not.toHaveBeenCalled();
-                expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
-                expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
-            });
-            it("does nothing if own membership still present", async () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.join([focus], focusActive);
+        it("does not provide focus if the selection method is unknown", () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], Object.assign(focusActive, { type: "unknown_type" }));
+            expect(manager.getActiveFocus()).toBe(undefined);
+        });
+    });
 
-                await waitForMockCall(client.sendStateEvent);
-                await flushPromises();
-                const myMembership = (client.sendStateEvent as Mock).mock.calls[0][2];
-                // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
-                (client.sendStateEvent as Mock).mockReset();
-                (client._unstable_updateDelayedEvent as Mock).mockReset();
-                (client._unstable_sendDelayedStateEvent as Mock).mockReset();
+    describe("onRTCSessionMemberUpdate()", () => {
+        it("does nothing if not joined", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await flushPromises();
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
+            expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
+            expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
+        });
+        it("does nothing if own membership still present", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive);
 
-                manager.onRTCSessionMemberUpdate([
-                    mockCallMembership(membershipTemplate, room.roomId),
-                    mockCallMembership(
-                        myMembership as SessionMembershipData,
-                        room.roomId,
-                        client.getUserId() ?? undefined,
-                    ),
-                ]);
-                await flushPromises();
-                expect(client.sendStateEvent).not.toHaveBeenCalled();
-                expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
-                expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
-            });
-            it("recreates membership if it is missing", async () => {
-                const manager = new TestMembershipManager({}, room, client, () => undefined);
-                manager.join([focus], focusActive);
-                await flushPromises();
-                // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
-                (client.sendStateEvent as Mock).mockClear();
-                (client._unstable_updateDelayedEvent as Mock).mockClear();
-                (client._unstable_sendDelayedStateEvent as Mock).mockClear();
+            await waitForMockCall(client.sendStateEvent);
+            await flushPromises();
+            const myMembership = (client.sendStateEvent as Mock).mock.calls[0][2];
+            // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
+            (client.sendStateEvent as Mock).mockReset();
+            (client._unstable_updateDelayedEvent as Mock).mockReset();
+            (client._unstable_sendDelayedStateEvent as Mock).mockReset();
 
-                // our own membership is removed:
-                manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
-                await flushPromises();
-                expect(client.sendStateEvent).toHaveBeenCalled();
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
+            manager.onRTCSessionMemberUpdate([
+                mockCallMembership(membershipTemplate, room.roomId),
+                mockCallMembership(myMembership as SessionMembershipData, room.roomId, client.getUserId() ?? undefined),
+            ]);
+            await flushPromises();
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
+            expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
+            expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
+        });
+        it("recreates membership if it is missing", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive);
+            await flushPromises();
+            // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
+            (client.sendStateEvent as Mock).mockClear();
+            (client._unstable_updateDelayedEvent as Mock).mockClear();
+            (client._unstable_sendDelayedStateEvent as Mock).mockClear();
 
-                expect(client._unstable_updateDelayedEvent).toHaveBeenCalled();
-            });
+            // our own membership is removed:
+            manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await flushPromises();
+            expect(client.sendStateEvent).toHaveBeenCalled();
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
+
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalled();
+        });
+    });
+
+    // TODO: not sure about this name
+    describe("background timers", () => {
+        it("sends only one keep-alive for delayed leave event per `membershipKeepAlivePeriod`", async () => {
+            const manager = new TestMembershipManager(
+                { membershipKeepAlivePeriod: 10_000, membershipServerSideExpiryTimeout: 30_000 },
+                room,
+                client,
+                () => undefined,
+            );
+            manager.join([focus], focusActive);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+
+            // The first call is from checking id the server deleted the delayed event
+            // so it does not need a `advanceTimersByTime`
+            await flushPromises();
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+            // TODO: check that update delayed event is called with the correct HTTP request timeout
+            // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
+
+            for (let i = 2; i <= 12; i++) {
+                // flush promises before advancing the timers to make sure schedulers are setup
+                await flushPromises();
+                jest.advanceTimersByTime(10_000);
+                await flushPromises();
+
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(i);
+                // TODO: check that update delayed event is called with the correct HTTP request timeout
+                // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
+            }
         });
 
-        // TODO: not sure about this name
-        describe("background timers", () => {
-            it("sends only one keep-alive for delayed leave event per `membershipKeepAlivePeriod`", async () => {
-                const manager = new TestMembershipManager(
-                    { membershipKeepAlivePeriod: 10_000, membershipServerSideExpiryTimeout: 30_000 },
-                    room,
-                    client,
-                    () => undefined,
-                );
+        // The expires logic was removed for the legacy call manager.
+        // Delayed events should replace it entirely but before they have wide adoption
+        // the expiration logic still makes sense.
+        // TODO: add git commit when we removed it.
+        it("extends `expires` when call still active !FailsForLegacy", async () => {
+            const manager = new TestMembershipManager(
+                { membershipExpiryTimeout: 10_000 },
+                room,
+                client,
+                () => undefined,
+            );
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
+            expect(sentMembership.expires).toBe(10_000);
+            for (let i = 2; i <= 12; i++) {
+                // flush promises before advancing the timers to make sure schedulers are setup
+                await flushPromises();
+                jest.advanceTimersByTime(10_000);
+                await flushPromises();
+                expect(client.sendStateEvent).toHaveBeenCalledTimes(i);
+                const sentMembership = (client.sendStateEvent as Mock).mock.lastCall![2] as SessionMembershipData;
+                expect(sentMembership.expires).toBe(10_000 * i);
+            }
+        });
+    });
+
+    describe("server error handling", () => {
+        // Types of server error: 429 rate limit with no retry-after header, 429 with retry-after, 50x server error (maybe retry every second), connection/socket timeout
+        describe("retries sending delayed leave event", () => {
+            it("sends retry if call membership event is still valid at time of retry", async () => {
+                const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
                 manager.join([focus], focusActive);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
 
-                // The first call is from checking id the server deleted the delayed event
-                // so it does not need a `advanceTimersByTime`
+                handle.reject?.(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    ),
+                );
+                await flushPromises();
+                jest.advanceTimersByTime(1000);
+                await flushPromises();
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+            });
+            // FailsForLegacy as implementation does not re-check membership before retrying
+            it("abandons retry loop and sends new own membership if not present anymore !FailsForLegacy", async () => {
+                (client._unstable_sendDelayedStateEvent as any).mockRejectedValue(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    ),
+                );
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                // Should call _unstable_sendDelayedStateEvent but not sendStateEvent because of the
+                // RateLimit error.
+                manager.join([focus], focusActive);
+
+                await flushPromises();
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
+                // Remove our own membership so that there is no reason the send the delayed leave anymore.
+                // the membership is no longer present on the homeserver
+                manager.onRTCSessionMemberUpdate([]);
+                // Wait for all timers to be setup
+                await flushPromises();
+                jest.advanceTimersByTime(1000);
+                // We should send the first own membership and a new delayed event after the rate limit timeout.
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+                expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            });
+            // FailsForLegacy as implementation does not re-check membership before retrying
+            it("abandons retry loop if leave() was called !FailsForLegacy", async () => {
+                const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                manager.join([focus], focusActive);
+                handle.reject?.(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    ),
+                );
+                await flushPromises();
+
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                // the user terminated the call locally
+                manager.leave();
+
+                // Wait for all timers to be setup
+                await flushPromises();
+                jest.advanceTimersByTime(1000);
+                await flushPromises();
+
+                // No new events should have been sent:
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            });
+        });
+        describe("retries sending update delayed leave event restart", () => {
+            it("resends the initial check delayed update event !FailsForLegacy", async () => {
+                (client._unstable_updateDelayedEvent as any).mockRejectedValue(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "1" }),
+                    ),
+                );
+                const manager = new TestMembershipManager({}, room, client, () => undefined);
+                manager.join([focus], focusActive);
+
+                // Hit rate limit
                 await flushPromises();
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-                // TODO: check that update delayed event is called with the correct HTTP request timeout
-                // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
 
-                for (let i = 2; i <= 12; i++) {
-                    // flush promises before advancing the timers to make sure schedulers are setup
-                    await flushPromises();
-                    jest.advanceTimersByTime(10_000);
-                    await flushPromises();
+                // Hit second rate limit.
+                jest.advanceTimersByTime(1000);
+                await flushPromises();
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
 
-                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(i);
-                    // TODO: check that update delayed event is called with the correct HTTP request timeout
-                    // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
-                }
-            });
-
-            // The expires logic was removed for the legacy call manager.
-            // Delayed events should replace it entirely but before they have wide adoption
-            // the expiration logic still makes sense.
-            // TODO: add git commit when we removed it.
-            it("extends `expires` when call still active !FailsForLegacy", async () => {
-                const manager = new TestMembershipManager(
-                    { membershipExpiryTimeout: 10_000 },
-                    room,
-                    client,
-                    () => undefined,
-                );
-                manager.join([focus], focusActive);
-                await waitForMockCall(client.sendStateEvent);
+                // Setup resolve
+                (client._unstable_updateDelayedEvent as Mock).mockImplementation(() => {});
+                jest.advanceTimersByTime(1000);
+                await flushPromises();
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
-                expect(sentMembership.expires).toBe(10_000);
-                for (let i = 2; i <= 12; i++) {
-                    // flush promises before advancing the timers to make sure schedulers are setup
-                    await flushPromises();
-                    jest.advanceTimersByTime(10_000);
-                    await flushPromises();
-                    expect(client.sendStateEvent).toHaveBeenCalledTimes(i);
-                    const sentMembership = (client.sendStateEvent as Mock).mock.lastCall![2] as SessionMembershipData;
-                    expect(sentMembership.expires).toBe(10_000 * i);
-                }
             });
         });
 
-        describe("server error handling", () => {
-            // Types of server error: 429 rate limit with no retry-after header, 429 with retry-after, 50x server error (maybe retry every second), connection/socket timeout
-            describe("retries sending delayed leave event", () => {
-                it("sends retry if call membership event is still valid at time of retry", async () => {
-                    const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
-
-                    const manager = new TestMembershipManager({}, room, client, () => undefined);
-                    manager.join([focus], focusActive);
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-
-                    handle.reject?.(
-                        new MatrixError(
-                            { errcode: "M_LIMIT_EXCEEDED" },
-                            429,
-                            undefined,
-                            undefined,
-                            new Headers({ "Retry-After": "1" }),
-                        ),
-                    );
-                    await flushPromises();
-                    jest.advanceTimersByTime(1000);
-                    await flushPromises();
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
-                });
-                // FailsForLegacy as implementation does not re-check membership before retrying
-                it("abandons retry loop and sends new own membership if not present anymore !FailsForLegacy", async () => {
-                    (client._unstable_sendDelayedStateEvent as any).mockRejectedValue(
-                        new MatrixError(
-                            { errcode: "M_LIMIT_EXCEEDED" },
-                            429,
-                            undefined,
-                            undefined,
-                            new Headers({ "Retry-After": "1" }),
-                        ),
-                    );
-                    const manager = new TestMembershipManager({}, room, client, () => undefined);
-                    // Should call _unstable_sendDelayedStateEvent but not sendStateEvent because of the
-                    // RateLimit error.
-                    manager.join([focus], focusActive);
-
-                    await flushPromises();
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-                    (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
-                    // Remove our own membership so that there is no reason the send the delayed leave anymore.
-                    // the membership is no longer present on the homeserver
-                    manager.onRTCSessionMemberUpdate([]);
-                    // Wait for all timers to be setup
-                    await flushPromises();
-                    jest.advanceTimersByTime(1000);
-                    // We should send the first own membership and a new delayed event after the rate limit timeout.
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
-                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                });
-                // FailsForLegacy as implementation does not re-check membership before retrying
-                it("abandons retry loop if leave() was called !FailsForLegacy", async () => {
-                    const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
-
-                    const manager = new TestMembershipManager({}, room, client, () => undefined);
-                    manager.join([focus], focusActive);
-                    handle.reject?.(
-                        new MatrixError(
-                            { errcode: "M_LIMIT_EXCEEDED" },
-                            429,
-                            undefined,
-                            undefined,
-                            new Headers({ "Retry-After": "1" }),
-                        ),
-                    );
-                    await flushPromises();
-
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-                    // the user terminated the call locally
-                    manager.leave();
-
-                    // Wait for all timers to be setup
-                    await flushPromises();
-                    jest.advanceTimersByTime(1000);
-                    await flushPromises();
-
-                    // No new events should have been sent:
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-                });
-            });
-            describe("retries sending update delayed leave event restart", () => {
-                it("resends the initial check delayed update event !FailsForLegacy", async () => {
-                    (client._unstable_updateDelayedEvent as any).mockRejectedValue(
-                        new MatrixError(
-                            { errcode: "M_LIMIT_EXCEEDED" },
-                            429,
-                            undefined,
-                            undefined,
-                            new Headers({ "Retry-After": "1" }),
-                        ),
-                    );
-                    const manager = new TestMembershipManager({}, room, client, () => undefined);
-                    manager.join([focus], focusActive);
-
-                    // Hit rate limit
-                    await flushPromises();
-                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-
-                    // Hit second rate limit.
-                    jest.advanceTimersByTime(1000);
-                    await flushPromises();
-                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
-
-                    // Setup resolve
-                    (client._unstable_updateDelayedEvent as Mock).mockImplementation(() => {});
-                    jest.advanceTimersByTime(1000);
-                    await flushPromises();
-                    expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
-                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                });
-            });
-
-            // describe: "retries sending membership event"
-            //     it: "sends it if still joined at time of retry"
-            //         // TODO: see what this is doing and how its different to: "recreates membership if it is missing"
-            //     it: "abandons it if call no longer joined at time of retry"
-        });
+        // describe: "retries sending membership event"
+        //     it: "sends it if still joined at time of retry"
+        //         // TODO: see what this is doing and how its different to: "recreates membership if it is missing"
+        //     it: "abandons it if call no longer joined at time of retry"
     });
 });
