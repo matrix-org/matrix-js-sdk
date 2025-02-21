@@ -334,11 +334,29 @@ export class MembershipManager implements IMembershipManager {
     private get callMemberEventRetryDelayMinimum(): number {
         return this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
     }
-    private get membershipExpiryTimeout(): number {
+    private get membershipEventExpiryTimeout(): number {
         return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
     }
-    private get membershipExpiryTimeoutSlack(): number {
-        return this.joinConfig?.membershipExpiryTimeoutSlack ?? 10_000;
+    private get membershipTimerExpiryTimeout(): number {
+        let expiryTimeout = this.membershipEventExpiryTimeout;
+        const expiryTimeoutSlack = this.joinConfig?.membershipExpiryTimeoutSlack;
+        if (expiryTimeoutSlack) {
+            if (expiryTimeout > expiryTimeoutSlack) {
+                expiryTimeout = expiryTimeout - expiryTimeoutSlack;
+            } else {
+                logger.warn(
+                    "The membershipExpiryTimeoutSlack is misconfigured. It cannot be less than the membershipExpiryTimeout",
+                    "membershipExpiryTimeout:",
+                    expiryTimeout,
+                    "membershipExpiryTimeoutSlack:",
+                    expiryTimeoutSlack,
+                );
+            }
+        } else {
+            // Default Slack
+            expiryTimeout -= 5_000;
+        }
+        return Math.max(expiryTimeout, 1000);
     }
     private get membershipServerSideExpiryTimeout(): number {
         return (
@@ -358,7 +376,7 @@ export class MembershipManager implements IMembershipManager {
         {
             hasMemberStateEvent: false,
             running: false,
-            nextRelativeExpiry: this.membershipExpiryTimeout,
+            nextRelativeExpiry: this.membershipEventExpiryTimeout,
             delayId: undefined,
             sendMembershipRetries: 0,
             sendDelayedEventRetries: 0,
@@ -588,11 +606,12 @@ export class MembershipManager implements IMembershipManager {
                         this.makeMyMembership(state.nextRelativeExpiry),
                         this.stateKey,
                     );
-                    state.nextRelativeExpiry += this.membershipExpiryTimeout;
+                    state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
                     // Success, we reset retries and schedule update.
                     state.sendMembershipRetries = 0;
+
                     this.scheduler.addAction({
-                        ts: Date.now() + this.membershipExpiryTimeout - this.membershipExpiryTimeoutSlack,
+                        ts: Date.now() + this.membershipTimerExpiryTimeout,
                         type: MembershipActionType.Update,
                     });
                 } catch (e) {
@@ -629,12 +648,12 @@ export class MembershipManager implements IMembershipManager {
                         this.makeMyMembership(state.nextRelativeExpiry),
                         this.stateKey,
                     );
-                    state.nextRelativeExpiry += this.membershipExpiryTimeout;
+                    state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
                     state.hasMemberStateEvent = true;
                     state.sendMembershipRetries = 0;
                     this.scheduler.addAction({ ts: Date.now(), type: DelayedLeaveActionType.RestartDelayedEvent });
                     this.scheduler.addAction({
-                        ts: Date.now() + this.membershipExpiryTimeout,
+                        ts: Date.now() + this.membershipTimerExpiryTimeout,
                         type: MembershipActionType.Update,
                     });
                 } catch (e) {
