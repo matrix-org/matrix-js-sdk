@@ -25,7 +25,7 @@ export const membershipTemplate: SessionMembershipData = {
     call_id: "",
     device_id: "AAAAAAA",
     scope: "m.room",
-    focus_active: { type: "livekit", livekit_service_url: "https://lk.url" },
+    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
     foci_preferred: [
         {
             livekit_alias: "!alias:something.org",

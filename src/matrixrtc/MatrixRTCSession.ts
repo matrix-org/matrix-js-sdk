@@ -25,8 +25,9 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { LegacyMembershipManager, type IMembershipManager } from "./MembershipManager.ts";
+import { MembershipManager, type IMembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
+import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -56,12 +57,27 @@ export type MatrixRTCSessionEventHandlerMap = {
 
 export interface MembershipConfig {
     /**
+     * Use Legacy Manager
+     * @deprecated
+     */
+    useLegacyMembershipManager?: boolean;
+
+    /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
      *
      * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
      */
     membershipExpiryTimeout?: number;
+
+    /**
+     * The slack in (in milliseconds) which the manager will leave of the meberhsip `expires` time to make sure it
+     * sends the updated state event early enough.
+     *
+     * A slack of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in a memberhsip event update every 9s and
+     * a memberhsip event that would be considered expired after 10s.
+     */
+    membershipExpiryTimeoutSlack?: number;
 
     /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
@@ -90,6 +106,10 @@ export interface MembershipConfig {
      * @deprecated It should be possible to make it stable without this.
      */
     callMemberEventRetryJitter?: number;
+    /**
+     * The maximum rate limit retries the manager will do for delayed event sending/updating and state event sending.
+     */
+    maximumRateLimitRetryCount?: number;
 }
 
 export interface EncryptionConfig {
@@ -307,18 +327,27 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param joinConfig - Additional configuration for the joined session.
      */
     public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
-        // create MembershipManager
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         } else {
-            this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
-                this.getOldestMembership(),
-            );
+            // Create MembershipManager
+            if (joinConfig?.useLegacyMembershipManager ?? true) {
+                this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
+                    this.getOldestMembership(),
+                );
+            } else {
+                this.membershipManager = new MembershipManager(joinConfig, this.room, this.client, () =>
+                    this.getOldestMembership(),
+                );
+            }
         }
 
         // Join!
-        this.membershipManager!.join(fociPreferred, fociActive);
+        this.membershipManager!.join(fociPreferred, fociActive).catch((e) =>
+            // TODO: Consider exposing this as a signal from the RTCSession so it can be used in the UI.
+            logger.error("MembershipManager encountered an unrecoverable error: ", e),
+        );
         this.encryptionManager!.join(joinConfig);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
