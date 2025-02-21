@@ -58,6 +58,8 @@ export interface MembershipConfig {
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
+     *
+     * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
      */
     membershipExpiryTimeout?: number;
 
@@ -89,6 +91,7 @@ export interface MembershipConfig {
      */
     callMemberEventRetryJitter?: number;
 }
+
 export interface EncryptionConfig {
     /**
      *  If true, generate and share a media key for this participant,
@@ -153,7 +156,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * Returns all the call memberships for a room, oldest first
      */
-    public static callMembershipsForRoom(room: Room): CallMembership[] {
+    public static callMembershipsForRoom(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+    ): CallMembership[] {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
@@ -225,9 +230,29 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         return new MatrixRTCSession(client, room, callMemberships);
     }
 
-    private constructor(
-        private readonly client: MatrixClient,
-        public readonly room: Room,
+    /**
+     * This constructs a room session. When using MatrixRTC inside the js-sdk this is expected
+     * to be used with the MatrixRTCSessionManager exclusively.
+     *
+     * In cases where you don't use the js-sdk but build on top of another Matrix stack this class can be used standalone
+     * to manage a joined MatrixRTC session.
+     *
+     * @param client A subset of the {@link MatrixClient} that lets the session interact with the Matrix room.
+     * @param room The room this session is attached to. A subset of a js-sdk Room that the session needs.
+     * @param memberships The list of memberships this session currently has.
+     */
+    public constructor(
+        private readonly client: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedStateEvent"
+            | "_unstable_updateDelayedEvent"
+            | "sendEvent"
+            | "cancelPendingEvent"
+        >,
+        public readonly room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState">,
         public memberships: CallMembership[],
     ) {
         super();
