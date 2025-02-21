@@ -2058,6 +2058,41 @@ describe("RustCrypto", () => {
                 expect(await secretStorage.get("org.matrix.msc3814")).not.toEqual(origDehydrationKey);
             });
         });
+
+        it("should handle errors when deleting a dehydrated device", async () => {
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+            const dehydratedDeviceManager = rustCrypto["dehydratedDeviceManager"];
+            fetchMock.config.overwriteRoutes = true;
+            // if the server doesn't support dehydrated devices, delete should succeed without throwing an error
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_UNRECOGNIZED",
+                    error: "Unknown endpoint",
+                },
+            });
+            await dehydratedDeviceManager.delete();
+
+            // if there is no dehydrated device, delete should succeed without throwing an error
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            await dehydratedDeviceManager.delete();
+
+            // for any other error response, delete should throw an error
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 400,
+                body: {
+                    errcode: "M_UNKNOWN",
+                    error: "Unknown error",
+                },
+            });
+            await expect(dehydratedDeviceManager.delete()).rejects.toThrow();
+        });
     });
 
     describe("import & export secrets bundle", () => {
@@ -2231,7 +2266,7 @@ describe("RustCrypto", () => {
             fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
         });
 
-        it("reset should reset 4S, backup and cross-signing", async () => {
+        it("reset should reset 4S, backup, cross-signing, and dehydrated device", async () => {
             // When we will delete the key backup
             let backupIsDeleted = false;
             fetchMock.delete("path:/_matrix/client/v3/room_keys/version/1", () => {
@@ -2241,6 +2276,12 @@ describe("RustCrypto", () => {
             // If the backup is deleted, we will return an empty object
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
                 return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+            });
+
+            let dehydratedDeviceIsDeleted = false;
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
+                dehydratedDeviceIsDeleted = true;
+                return { device_id: "ADEVICEID" };
             });
 
             // A new key backup should be created after the reset
@@ -2273,6 +2314,8 @@ describe("RustCrypto", () => {
             expect(newKeyBackupInfo.auth_data).toBeTruthy();
             // The new cross signing keys should be uploaded
             expect(authUploadDeviceSigningKeys).toHaveBeenCalledWith(expect.any(Function));
+            // The dehydrated device was deleted
+            expect(dehydratedDeviceIsDeleted).toBeTruthy();
         });
     });
 });

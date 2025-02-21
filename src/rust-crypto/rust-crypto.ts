@@ -1440,6 +1440,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async resetEncryption(authUploadDeviceSigningKeys: UIAuthCallback<void>): Promise<void> {
         this.logger.debug("resetEncryption: resetting encryption");
 
+        // Delete the dehydrated device, since any existing one will be signed
+        // by the wrong cross-signing key
+        this.dehydratedDeviceManager.delete();
+
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
 

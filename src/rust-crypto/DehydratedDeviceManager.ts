@@ -340,6 +340,35 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
             this.intervalId = undefined;
         }
     }
+
+    /**
+     * Delete the current dehydrated device and stop the dehydrated device manager.
+     */
+    public async delete(): Promise<void> {
+        this.stop();
+        try {
+            await this.http.authedRequest(
+                Method.Delete,
+                "/dehydrated_device",
+                undefined,
+                {},
+                {
+                    prefix: UnstablePrefix,
+                },
+            );
+        } catch (error) {
+            const err = error as MatrixError;
+            // If dehydrated devices aren't supported, or no dehydrated device
+            // is found, we don't consider it an error, because we we'll end up
+            // with no dehydrated device.
+            if (err.errcode === "M_UNRECOGNIZED") {
+                return;
+            } else if (err.errcode === "M_NOT_FOUND") {
+                return;
+            }
+            throw error;
+        }
+    }
 }
 
 /**

@@ -436,10 +436,16 @@ export interface CryptoApi {
 
     /**
      * Reset the encryption of the user by going through the following steps:
+     * - Remove the dehydrated device and stop the periodic creation of dehydrated devices.
      * - Disable backing up room keys and delete any existing backups.
      * - Remove the default secret storage key from the account data (ie: the recovery key).
      * - Reset the cross-signing keys.
      * - Create a new key backup.
+     *
+     * Note that the dehydrated device will be removed, but will not be replaced
+     * and it will not schedule creating new dehydrated devices.  To do this,
+     * {@link startDehydration} should be called after a new secret storage key
+     * is created.
      *
      * @param authUploadDeviceSigningKeys - Callback to authenticate the upload of device signing keys.
      *      Used when resetting the cross signing keys.
