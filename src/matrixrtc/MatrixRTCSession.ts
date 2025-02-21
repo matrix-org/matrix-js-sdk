@@ -25,7 +25,7 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { type IMembershipManager } from "./NewMembershipManager.ts";
+import { MembershipManager, type IMembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 
@@ -56,6 +56,12 @@ export type MatrixRTCSessionEventHandlerMap = {
 };
 
 export interface MembershipConfig {
+    /**
+     * Use Legacy Manager
+     * @deprecated
+     */
+    useLegacyMembershipManager?: boolean;
+
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
@@ -321,14 +327,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param joinConfig - Additional configuration for the joined session.
      */
     public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
-        // create MembershipManager
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.room.roomId}: ignoring join call`);
             return;
         } else {
-            this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
-                this.getOldestMembership(),
-            );
+            // Create MembershipManager
+            if (joinConfig?.useLegacyMembershipManager ?? true) {
+                this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
+                    this.getOldestMembership(),
+                );
+            } else {
+                this.membershipManager = new MembershipManager(joinConfig, this.room, this.client, () =>
+                    this.getOldestMembership(),
+                );
+            }
         }
 
         // Join!
