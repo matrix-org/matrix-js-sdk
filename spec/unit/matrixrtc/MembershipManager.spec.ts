@@ -1,5 +1,5 @@
 /**
- * @jest-environment ./spec/unit/matrixrtc/testEnvironment.ts
+ * @jest-environment ./spec/unit/matrixrtc/memberManagerTestEnvironment.ts
  */
 /*
 Copyright 2025 The Matrix.org Foundation C.I.C.
@@ -17,27 +17,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mock } from "jest-mock";
+import { type MockedFunction, type Mock } from "jest-mock";
 
 import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
 import { LegacyMembershipManager } from "../../../src/matrixrtc/MembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { flushPromises } from "../../test-utils/flushPromises";
+import { defer } from "../../../src/utils";
 // import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 
-function waitForMockCall(method: any, returnVal?: any) {
+function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
     return new Promise<void>((resolve) => {
-        (method as Mock).mockImplementation(() => {
+        method.mockImplementation(() => {
             resolve();
             return returnVal;
         });
     });
 }
-
-function createAsyncHandle(method: any) {
+defer
+function createAsyncHandle(method: MockedFunction<any>) {
     const handle: { resolve?: (...args: unknown[]) => void; reject?: (...args: any[]) => void } = {};
-    (method as Mock).mockImplementation(() => {
+    method.mockImplementation(() => {
         return new Promise((resolve, reject) => {
             handle.reject = reject;
             handle.resolve = resolve;
@@ -70,11 +71,11 @@ describe("MembershipManager", () => {
         };
 
         beforeEach(() => {
-            // default to fake timers
+            // Default to fake timers
             jest.useFakeTimers();
             client = makeMockClient("@alice:example.org", "AAAAAAA");
             room = makeMockRoom(membershipTemplate);
-            // provide a default mock that is like the default "non error" server behaviour.
+            // Provide a default mock. Representing the default "non error" server behaviour.
             (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
         });
 
@@ -101,10 +102,7 @@ describe("MembershipManager", () => {
                 it("sends a membership event and schedules delayed leave when joining a call", async () => {
                     // Spys/Mocks
 
-                    // eslint-disable-next-line camelcase
-                    const _unstable_updateDelayedEventHandle = createAsyncHandle(
-                        client._unstable_updateDelayedEvent as Mock,
-                    );
+                    const updateDelayedEventHandle = createAsyncHandle(client._unstable_updateDelayedEvent as Mock);
 
                     // Test
                     const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
@@ -126,8 +124,7 @@ describe("MembershipManager", () => {
                         },
                         "_@alice:example.org_AAAAAAA",
                     );
-                    // eslint-disable-next-line camelcase
-                    _unstable_updateDelayedEventHandle.resolve?.();
+                    updateDelayedEventHandle.resolve?.();
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                         room.roomId,
                         { delay: 8000 },
@@ -139,6 +136,10 @@ describe("MembershipManager", () => {
 
                 describe("does not prefix the state key with _ for rooms that support user-owned state events", () => {
                     async function testJoin(useOwnedStateEvents: boolean): Promise<void> {
+                        // TODO: this test does quiet a bit. Its more a like a test story summarizing to:
+                        // - send delay with too long timeout and get server error (test delayedEventTimeout gets overwritten)
+                        // - run into rate limit for sending delayed event
+                        // - run into rate limit when setting membership state.
                         if (useOwnedStateEvents) {
                             room.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
                         }

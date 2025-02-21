@@ -18,7 +18,7 @@ limitations under the License.
 This file adds a custom test environment for the MembershipManager.spec.ts
 It can be used with the comment at the top of the file:
 
-@jest-environment ./spec/unit/matrixrtc/testEnvironment.ts
+@jest-environment ./spec/unit/matrixrtc/membermanagerTestEnvironment.ts
 
 It is very specific to the MembershipManager.spec.ts file and introduces the following behaviour:
  - The describe each block in the MembershipManager.spec.ts will go through describe block names `LegacyMembershipManager` and `MembershipManager`
