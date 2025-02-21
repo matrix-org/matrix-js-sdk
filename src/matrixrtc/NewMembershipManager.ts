@@ -176,14 +176,14 @@ class ActionScheduler {
                 }
             }
 
-            this.actions = this.actions.filter((a) => a !== nextAction);
-            this.actions.push(...this.insertions);
-            this.insertions = [];
-
             if (this.resetWith) {
                 this.actions = this.resetWith;
                 this.resetWith = undefined;
             }
+
+            this.actions = this.actions.filter((a) => a !== nextAction);
+            this.actions.push(...this.insertions);
+            this.insertions = [];
         }
     }
 
@@ -191,7 +191,8 @@ class ActionScheduler {
         // Dont add any other actions if we have a leave scheduled
         if (this.actions.some((a) => a.type === DirectMemberhsipManagerActions.Leave)) return;
         this.insertions.push(action);
-        if (this.actions[0].ts > action.ts) {
+        const nextTs = this.actions[0]?.ts;
+        if (!nextTs || nextTs > action.ts) {
             this.didWakeUp = true;
             this.wakeup?.();
         }
@@ -389,10 +390,10 @@ export class MembershipManager implements IMembershipManager {
     public async delayedLeaveLoopHandler(state: ActionSchedulerState, type: DelayedLeaveActionType): Promise<void> {
         switch (type) {
             case DelayedLeaveActionType.SendFirstDelayedEvent:
-                // Remove all running updates and restarts
-                this.scheduler.resetActions([]);
                 // Before we start we check if we come from a state where we have a delay id.
                 if (state.delayId) {
+                    // Remove all running updates and restarts
+                    this.scheduler.resetActions([]);
                     try {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel);
                         state.delayId = undefined;
