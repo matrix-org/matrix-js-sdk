@@ -27,7 +27,8 @@ import { type IMembershipManager } from "./NewMembershipManager.ts";
  *
  * It is recommended to only use this interface for testing to allow replacing this class.
  *
- *  @internal
+ * @internal
+ * @deprecated
  */
 export class LegacyMembershipManager implements IMembershipManager {
     private relativeExpiry: number | undefined;
