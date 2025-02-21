@@ -2058,6 +2058,41 @@ describe("RustCrypto", () => {
                 expect(await secretStorage.get("org.matrix.msc3814")).not.toEqual(origDehydrationKey);
             });
         });
+
+        it("should handle errors when deleting a dehydrated device", async () => {
+            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
+            const dehydratedDeviceManager = rustCrypto["dehydratedDeviceManager"];
+            fetchMock.config.overwriteRoutes = true;
+            // if the server doesn't support dehydrated devices, delete should succeed without throwing an error
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_UNRECOGNIZED",
+                    error: "Unknown endpoint",
+                },
+            });
+            await dehydratedDeviceManager.delete();
+
+            // if there is no dehydrated device, delete should succeed without throwing an error
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            await dehydratedDeviceManager.delete();
+
+            // for any other error response, delete should throw an error
+            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+                status: 400,
+                body: {
+                    errcode: "M_UNKNOWN",
+                    error: "Unknown error",
+                },
+            });
+            await expect(dehydratedDeviceManager.delete()).rejects.toThrow();
+        });
     });
 
     describe("import & export secrets bundle", () => {
