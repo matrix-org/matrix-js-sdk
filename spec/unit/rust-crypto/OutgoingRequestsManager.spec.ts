@@ -16,8 +16,9 @@ limitations under the License.
 
 import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { type OutgoingRequest, type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { defer, type IDeferred } from "../../../src/utils";
 import { logger } from "../../../src/logger";
@@ -72,7 +73,7 @@ describe("OutgoingRequestsManager", () => {
             const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
 
             olmMachine.outgoingRequests
-                .mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
+                .mockImplementationOnce(async () => {
                     return firstOutgoingRequestDefer.promise;
                 })
                 .mockImplementationOnce(async () => {
