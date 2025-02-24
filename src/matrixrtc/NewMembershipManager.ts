@@ -47,7 +47,7 @@ export interface IMembershipManager {
      * @param fociActive the active focus to use in the joined RTC membership event.
      * @throws can throw if it exceeds a configured maximum retry.
      */
-    join(fociPreferred: Focus[], fociActive?: Focus): Promise<void>;
+    join(fociPreferred: Focus[], fociActive?: Focus, onError?: (error: unknown) => void): void;
     /**
      * Send all necessary events to make this user leave the RTC session.
      * @param timeout the maximum duration in ms until the promise is forced to resolve.
@@ -244,14 +244,22 @@ export class MembershipManager implements IMembershipManager {
      * @param fociPreferred
      * @param focusActive
      */
-    public join(fociPreferred: Focus[], focusActive?: Focus): Promise<void> {
+    public join(fociPreferred: Focus[], focusActive?: Focus, onError?: (error: unknown) => void): void {
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
         if (!this.scheduler.state.running) {
             this.scheduler.state.running = true;
-            return this.scheduler.startWithActions([{ ts: Date.now(), type: DirectMembershipManagerActions.Join }]);
+            const f = async (): Promise<void> => {
+                try {
+                    await this.scheduler.startWithActions([
+                        { ts: Date.now(), type: DirectMembershipManagerActions.Join },
+                    ]);
+                } catch (e) {
+                    onError?.(e);
+                }
+            };
+            f();
         }
-        return Promise.resolve();
     }
 
     public leave(timeout?: number): Promise<boolean> {
@@ -610,6 +618,41 @@ export class MembershipManager implements IMembershipManager {
 
     public async membershipLoopHandler(state: ActionSchedulerState, type: MembershipActionType): Promise<void> {
         switch (type) {
+            case MembershipActionType.SendJoinEvent:
+                try {
+                    await this.client.sendStateEvent(
+                        this.room.roomId,
+                        EventType.GroupCallMemberPrefix,
+                        this.makeMyMembership(state.nextRelativeExpiry),
+                        this.stateKey,
+                    );
+                    state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
+                    state.hasMemberStateEvent = true;
+                    state.sendMembershipRetries = 0;
+                    this.scheduler.addAction({ ts: Date.now(), type: DelayedLeaveActionType.RestartDelayedEvent });
+                    this.scheduler.addAction({
+                        ts: Date.now() + this.membershipTimerExpiryTimeout,
+                        type: MembershipActionType.Update,
+                    });
+                } catch (e) {
+                    this.handleRateLimitError(
+                        e,
+                        state.sendMembershipRetries,
+                        (resendDelay) => {
+                            state.sendMembershipRetries++;
+                            this.scheduler.addAction({
+                                ts: Date.now() + resendDelay,
+                                type: MembershipActionType.SendJoinEvent,
+                            });
+                        },
+                        () => {
+                            throw Error(
+                                "Exceeded maximum Own Membership state update attempts (client.sendStateEvent): " + e,
+                            );
+                        },
+                    );
+                }
+                break;
             case MembershipActionType.Update:
                 try {
                     await this.client.sendStateEvent(
@@ -652,41 +695,6 @@ export class MembershipManager implements IMembershipManager {
                     }
                 }
                 break;
-            case MembershipActionType.SendJoinEvent:
-                try {
-                    await this.client.sendStateEvent(
-                        this.room.roomId,
-                        EventType.GroupCallMemberPrefix,
-                        this.makeMyMembership(state.nextRelativeExpiry),
-                        this.stateKey,
-                    );
-                    state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
-                    state.hasMemberStateEvent = true;
-                    state.sendMembershipRetries = 0;
-                    this.scheduler.addAction({ ts: Date.now(), type: DelayedLeaveActionType.RestartDelayedEvent });
-                    this.scheduler.addAction({
-                        ts: Date.now() + this.membershipTimerExpiryTimeout,
-                        type: MembershipActionType.Update,
-                    });
-                } catch (e) {
-                    this.handleRateLimitError(
-                        e,
-                        state.sendMembershipRetries,
-                        (resendDelay) => {
-                            state.sendMembershipRetries++;
-                            this.scheduler.addAction({
-                                ts: Date.now() + resendDelay,
-                                type: MembershipActionType.SendJoinEvent,
-                            });
-                        },
-                        () => {
-                            throw Error(
-                                "Exceeded maximum Own Membership state update attempts (client.sendStateEvent): " + e,
-                            );
-                        },
-                    );
-                }
-                break;
             case MembershipActionType.SendLeaveEvent:
                 // We are good already
                 if (!state.hasMemberStateEvent) return;
@@ -694,11 +702,11 @@ export class MembershipManager implements IMembershipManager {
                 // This is only a fallback in case we do not have working delayed events support.
                 // first we should try to just send the scheduled leave event
                 try {
-                    this.client.sendStateEvent(
+                    await this.client.sendStateEvent(
                         this.room.roomId,
                         EventType.GroupCallMemberPrefix,
                         {},
-                        this.makeMembershipStateKey(this.userId, this.deviceId),
+                        this.stateKey,
                     );
                     state.updateDelayedEventRetries = 0;
                     this.scheduler.resetActions([]);

@@ -107,7 +107,7 @@ export class LegacyMembershipManager implements IMembershipManager {
         return this.relativeExpiry !== undefined;
     }
 
-    public async join(fociPreferred: Focus[], fociActive?: Focus): Promise<void> {
+    public join(fociPreferred: Focus[], fociActive?: Focus): void {
         this.ownFocusActive = fociActive;
         this.ownFociPreferred = fociPreferred;
         this.relativeExpiry = this.membershipExpiryTimeout;
