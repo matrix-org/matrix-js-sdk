@@ -52,3 +52,13 @@ export class ClientStoppedError extends Error {
         super("MatrixClient has been stopped");
     }
 }
+
+export class UnsupportedEndpointError extends Error {
+    public constructor(
+        message: string,
+        public clientEndpoint: "sendDelayedEvent" | "updateDelayedEvent" | "sendDelayedStateEvent" | "getDelayedEvents",
+    ) {
+        super(message);
+        this.name = "UnsupportedEndpointError";
+    }
+}
