@@ -168,9 +168,9 @@ class ActionScheduler {
         this.actions = initialActions;
 
         while (this.actions.length > 0) {
-            this.actions.sort((a, b) => a.ts - b.ts);
+            this.actions.sort((a, b) => b.ts - a.ts);
             logger.debug("Current MembershipManager action queue: ", this.actions, "\nDate.now: ", +Date.now());
-            const nextAction = this.actions[0];
+            const nextAction = this.actions.pop()!;
 
             this.wakeupPromise = new Promise((resolve) => {
                 this.wakeup = resolve;
@@ -197,7 +197,6 @@ class ActionScheduler {
                 this.resetWith = undefined;
             }
 
-            this.actions = this.actions.filter((a) => a !== nextAction);
             this.actions.push(...this.insertions);
             this.insertions = [];
         }
