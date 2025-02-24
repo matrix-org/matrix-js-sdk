@@ -270,6 +270,7 @@ export class MembershipManager implements IMembershipManager {
         this.focusActive = focusActive;
         if (!this.scheduler.state.running) {
             this.scheduler.state.running = true;
+
             void (async (): Promise<void> => {
                 try {
                     await this.scheduler.startWithActions([
@@ -278,7 +279,7 @@ export class MembershipManager implements IMembershipManager {
                 } catch (e) {
                     onError?.(e);
                 }
-            });
+            })();
         }
     }
 

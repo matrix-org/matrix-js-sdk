@@ -630,7 +630,7 @@ describe.each([
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive, delayEventSendError);
             await flushPromises();
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 10; i++) {
                 jest.advanceTimersByTime(2000);
                 await flushPromises();
             }
@@ -651,7 +651,7 @@ describe.each([
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive, delayEventRestartError);
             await flushPromises();
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 10; i++) {
                 jest.advanceTimersByTime(1000);
                 await flushPromises();
             }
