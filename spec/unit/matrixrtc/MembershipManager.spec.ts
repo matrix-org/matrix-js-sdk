@@ -25,6 +25,7 @@ import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembership
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
+import { defer } from "../../../src/utils";
 
 function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
     return new Promise<void>((resolve) => {
@@ -36,14 +37,9 @@ function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
 }
 
 function createAsyncHandle(method: MockedFunction<any>) {
-    const handle: { resolve?: (...args: unknown[]) => void; reject?: (...args: any[]) => void } = {};
-    method.mockImplementation(() => {
-        return new Promise((resolve, reject) => {
-            handle.reject = reject;
-            handle.resolve = resolve;
-        });
-    });
-    return handle;
+    const { reject, resolve, promise } = defer();
+    method.mockImplementation(() => promise);
+    return { reject, resolve };
 }
 
 /**
@@ -475,7 +471,7 @@ describe.each([
             }
         });
 
-        // The expires logic was removed for the legacy call manager.
+        // !FailsForLegacy because the expires logic was removed for the legacy call manager.
         // Delayed events should replace it entirely but before they have wide adoption
         // the expiration logic still makes sense.
         // TODO: Add git commit when we removed it.

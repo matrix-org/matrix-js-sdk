@@ -16,6 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type Mocked } from "jest-mock";
+import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
     isVerificationEvent,
@@ -28,7 +29,7 @@ import {
     type Verifier,
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
-import { type OutgoingRequest, type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { type IDeviceKeys } from "../../../src/@types/crypto";
 import { EventType, MatrixEvent, MsgType } from "../../../src";
 
