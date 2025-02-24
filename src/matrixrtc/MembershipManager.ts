@@ -134,7 +134,7 @@ export class LegacyMembershipManager implements IMembershipManager {
         this.relativeExpiry = this.membershipExpiryTimeout;
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
-        this.triggerCallMembershipEventUpdate();
+        void this.triggerCallMembershipEventUpdate();
     }
 
     public async leave(timeout: number | undefined = undefined): Promise<boolean> {
@@ -351,7 +351,9 @@ export class LegacyMembershipManager implements IMembershipManager {
     }
 
     private scheduleDelayDisconnection(): void {
-        this.memberEventTimeout = setTimeout(this.delayDisconnection, this.membershipKeepAlivePeriod);
+        this.memberEventTimeout = setTimeout(() => {
+            void this.delayDisconnection;
+        }, this.membershipKeepAlivePeriod);
     }
 
     private readonly delayDisconnection = async (): Promise<void> => {

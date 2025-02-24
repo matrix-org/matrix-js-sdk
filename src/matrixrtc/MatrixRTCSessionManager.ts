@@ -71,7 +71,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
     public stop(): void {
         for (const sess of this.roomSessions.values()) {
-            sess.stop();
+            void sess.stop();
         }
         this.roomSessions.clear();
 
@@ -108,7 +108,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
                     `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
                 );
                 // retry after 1 second. After this we give up.
-                setTimeout(() => this.consumeCallEncryptionEvent(event, true), 1000);
+                setTimeout(() => void this.consumeCallEncryptionEvent(event, true), 1000);
             } else {
                 logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
             }
@@ -128,7 +128,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.getRoomSession(room).onCallEncryption(event);
     }
     private onTimeline = (event: MatrixEvent): void => {
-        this.consumeCallEncryptionEvent(event);
+        void this.consumeCallEncryptionEvent(event);
     };
 
     private onRoom = (room: Room): void => {
