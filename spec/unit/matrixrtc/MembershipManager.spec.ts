@@ -321,6 +321,29 @@ describe.each([
     });
 
     describe("leave()", () => {
+        // TODO add rate limit cases.
+        it("resolves delayed leave event when leave is called", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive);
+            await flushPromises();
+            await manager.leave();
+            expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", "send");
+            expect(client.sendStateEvent).toHaveBeenCalled();
+        });
+        it("send leave event when leave is called and resolving delayed leave fails", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive);
+            await flushPromises();
+            (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue("unknown");
+            await manager.leave();
+            // We send a normal leave event since we failed using updateDelayedEvent with the "send" action.
+            expect(client.sendStateEvent).toHaveBeenLastCalledWith(
+                room.roomId,
+                "org.matrix.msc3401.call.member",
+                {},
+                "_@alice:example.org_AAAAAAA",
+            );
+        });
         // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
         it("does nothing if not joined !FailsForLegacy", () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
