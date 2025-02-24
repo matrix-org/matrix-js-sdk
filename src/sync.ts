@@ -54,7 +54,7 @@ import {
     type ITimeline,
     type IToDeviceEvent,
 } from "./sync-accumulator.ts";
-import { type MatrixEvent } from "./models/event.ts";
+import { MatrixEvent, type IEvent } from "./models/event.ts";
 import { type MatrixError, Method } from "./http-api/index.ts";
 import { type ISavedSync } from "./store/index.ts";
 import { EventType } from "./@types/event.ts";
@@ -1152,7 +1152,7 @@ export class SyncApi {
 
             const cancelledKeyVerificationTxns: string[] = [];
             toDeviceMessages
-                .map(client.getEventMapper({ toDevice: true }))
+                .map(mapToDeviceEvent)
                 .map((toDeviceEvent) => {
                     // map is a cheap inline forEach
                     // We want to flag m.key.verification.start events as cancelled
@@ -1944,4 +1944,10 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
     });
 
     return room;
+}
+
+export function mapToDeviceEvent(plainOldJsObject: Partial<IEvent>): MatrixEvent {
+    // to-device events should not have a `room_id` property, but let's be sure
+    delete plainOldJsObject.room_id;
+    return new MatrixEvent(plainOldJsObject);
 }
