@@ -188,8 +188,6 @@ class ActionScheduler {
     }
 
     public addAction(action: Action): void {
-        // Dont add any other actions if we have a leave scheduled
-        if (this.actions.some((a) => a.type === DirectMemberhsipManagerActions.Leave)) return;
         this.insertions.push(action);
         const nextTs = this.actions[0]?.ts;
         if (!nextTs || nextTs > action.ts) {
@@ -205,9 +203,6 @@ class ActionScheduler {
             this.didWakeUp = true;
             this.wakeup?.();
         }
-    }
-    public hasAction(condition: (action: Action) => boolean): boolean {
-        return this.actions.some(condition);
     }
 }
 /**
@@ -246,17 +241,17 @@ export class MembershipManager implements IMembershipManager {
     public leave(timeout?: number): Promise<boolean> {
         this.scheduler.state.running = false;
 
-        if (this.leavePromise && this.scheduler.hasAction((a) => a.type === DirectMemberhsipManagerActions.Leave)) {
-            return this.leavePromise;
+        if (!this.leavePromise) {
+            // reset scheduled actions so we will not do any new actions.
+            this.scheduler.resetActions([{ type: DirectMemberhsipManagerActions.Leave, ts: Date.now() }]);
+            this.leavePromise = new Promise<boolean>((resolve, reject) => {
+                this.leavePromiseHandle.reject = reject;
+                this.leavePromiseHandle.resolve = resolve;
+                if (timeout) setTimeout(() => resolve(false), timeout);
+            });
         }
 
-        // reset scheduled actions so we will not do any new actions.
-        this.scheduler.resetActions([{ type: DirectMemberhsipManagerActions.Leave, ts: Date.now() }]);
-        return new Promise<boolean>((resolve, reject) => {
-            this.leavePromiseHandle.reject = reject;
-            this.leavePromiseHandle.resolve = resolve;
-            if (timeout) setTimeout(() => resolve(false), timeout);
-        });
+        return this.leavePromise;
     }
     private leavePromise?: Promise<boolean>;
     private leavePromiseHandle: {
@@ -586,7 +581,7 @@ export class MembershipManager implements IMembershipManager {
                                 this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                             },
                         );
-                        if (!(notFoundHandled || rateLimitHandled)) {
+                        if (!notFoundHandled && !rateLimitHandled) {
                             this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                         }
                     }
