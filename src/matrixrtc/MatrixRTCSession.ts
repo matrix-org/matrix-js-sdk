@@ -71,11 +71,11 @@ export interface MembershipConfig {
     membershipExpiryTimeout?: number;
 
     /**
-     * The slack in (in milliseconds) which the manager will leave of the meberhsip `expires` time to make sure it
+     * The slack in (in milliseconds) which the manager will allow before the membership `expires` time to make sure it
      * sends the updated state event early enough.
      *
-     * A slack of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in a memberhsip event update every 9s and
-     * a memberhsip event that would be considered expired after 10s.
+     * A slack of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in a membership event update every 9s and
+     * a membership event that would be considered expired after 10s.
      */
     membershipExpiryTimeoutSlack?: number;
 
@@ -107,7 +107,7 @@ export interface MembershipConfig {
      */
     callMemberEventRetryJitter?: number;
     /**
-     * The maximum rate limit retries the manager will do for delayed event sending/updating and state event sending.
+     * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a server rate limit has been hit.
      */
     maximumRateLimitRetryCount?: number;
 }

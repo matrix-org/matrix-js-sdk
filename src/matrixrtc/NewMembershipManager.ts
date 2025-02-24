@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import type { MatrixClient } from "../client.ts";
@@ -53,8 +69,8 @@ export interface IMembershipManager {
 // SCHEDULER TYPES:
 enum MembershipActionType {
     SendJoinEvent = "SendJoinEvent",
-    //  -> MembershipActionType.SendJoinEvent if we run in a rate limit and need to retry
-    //  -> MembershipActionType.Update if we successfully send it to schedule the expire event update
+    //  -> MembershipActionType.SendJoinEvent if we run into a rate limit and need to retry
+    //  -> MembershipActionType.Update if we successfully send the join event then schedule the expire event update
     //  -> DelayedLeaveActionType.RestartDelayedEvent to recheck the delayed event
     Update = "Update",
     //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
@@ -87,7 +103,7 @@ function isDelayedLeaveActionType(val: any): val is DelayedLeaveActionType {
 /**
  * Actions that are supposed to be used from outside the main handle methods.
  */
-enum DirectMemberhsipManagerActions {
+enum DirectMembershipManagerActions {
     Join = DelayedLeaveActionType.SendFirstDelayedEvent,
     Leave = DelayedLeaveActionType.SendScheduledDelayedLeaveEvent,
 }
@@ -119,7 +135,7 @@ interface Action {
      * The state of the different loops
      * can also be thought of as the type of the action
      */
-    type: DelayedLeaveActionType | MembershipActionType | DirectMemberhsipManagerActions;
+    type: DelayedLeaveActionType | MembershipActionType | DirectMembershipManagerActions;
 }
 
 /**
@@ -233,7 +249,7 @@ export class MembershipManager implements IMembershipManager {
         this.focusActive = focusActive;
         if (!this.scheduler.state.running) {
             this.scheduler.state.running = true;
-            return this.scheduler.startWithActions([{ ts: Date.now(), type: DirectMemberhsipManagerActions.Join }]);
+            return this.scheduler.startWithActions([{ ts: Date.now(), type: DirectMembershipManagerActions.Join }]);
         }
         return Promise.resolve();
     }
@@ -243,7 +259,7 @@ export class MembershipManager implements IMembershipManager {
 
         if (!this.leavePromise) {
             // reset scheduled actions so we will not do any new actions.
-            this.scheduler.resetActions([{ type: DirectMemberhsipManagerActions.Leave, ts: Date.now() }]);
+            this.scheduler.resetActions([{ type: DirectMembershipManagerActions.Leave, ts: Date.now() }]);
             this.leavePromise = new Promise<boolean>((resolve, reject) => {
                 this.leavePromiseHandle.reject = reject;
                 this.leavePromiseHandle.resolve = resolve;
@@ -266,7 +282,7 @@ export class MembershipManager implements IMembershipManager {
         if (this.isJoined() && !memberships.some(isMyMembership)) {
             logger.warn("Missing own membership: force re-join");
             this.scheduler.state.hasMemberStateEvent = false;
-            this.scheduler.addAction({ ts: Date.now(), type: DirectMemberhsipManagerActions.Join });
+            this.scheduler.addAction({ ts: Date.now(), type: DirectMembershipManagerActions.Join });
         }
     }
 
