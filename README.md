@@ -321,6 +321,8 @@ const matrixClient = sdk.createClient({
 await matrixClient.initRustCrypto();
 ```
 
+Note that by default it will attempt to use the Indexed DB provided by the browser as a crypto store. If running outside the browser, you will need to pass [an options object](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#initrustcrypto) which includes `useIndexedDB: false`, to use an ephemeral in-memory store instead. Note that without a persistent store, you'll need to create a new device on the server side (with [`MatrixClient.loginRequest`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#loginrequest)) each time your application starts.
+
 After calling `initRustCrypto`, you can obtain a reference to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html) interface, which is the main entry point for end-to-end encryption, by calling [`MatrixClient.getCrypto`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#getCrypto).
 
 **WARNING**: the cryptography stack is not thread-safe. Having multiple `MatrixClient` instances connected to the same Indexed DB will cause data corruption and decryption failures. The application layer is responsible for ensuring that only one `MatrixClient` issue is instantiated at a time.

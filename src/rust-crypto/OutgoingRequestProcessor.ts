@@ -20,6 +20,7 @@ import {
     KeysQueryRequest,
     KeysUploadRequest,
     type OlmMachine,
+    type OutgoingRequest,
     PutDehydratedDeviceRequest,
     RoomMessageRequest,
     SignatureUploadRequest,
@@ -33,16 +34,6 @@ import { logDuration, type QueryDict, sleep } from "../utils.ts";
 import { type AuthDict, type UIAuthCallback } from "../interactive-auth.ts";
 import { ToDeviceMessageId } from "../@types/event.ts";
 import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceManager.ts";
-
-/**
- * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
- *
- * @internal
- */
-export interface OutgoingRequest {
-    readonly id: string | undefined;
-    readonly type: number;
-}
 
 /**
  * OutgoingRequestManager: turns `OutgoingRequest`s from the rust sdk into HTTP requests

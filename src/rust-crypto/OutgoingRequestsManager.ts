@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OlmMachine, type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { type OutgoingRequest, type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
+import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { type Logger } from "../logger.ts";
 import { defer, type IDeferred, logDuration } from "../utils.ts";
 

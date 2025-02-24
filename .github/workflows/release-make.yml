@@ -279,6 +279,9 @@ jobs:
         needs: release
         if: inputs.npm
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+        permissions:
+            contents: read
+            id-token: write
         secrets:
             NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 

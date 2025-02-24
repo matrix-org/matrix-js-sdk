@@ -14,7 +14,9 @@ jobs:
         steps:
             - uses: actions/stale@v9
               with:
-                  operations-per-run: 100
+                  operations-per-run: 250
+                  days-before-issue-stale: -1
+                  days-before-issue-close: -1
                   days-before-pr-stale: 180
                   days-before-pr-close: 0
                   close-pr-message: "This PR has been automatically closed because it has been stale for 180 days. If you wish to continue working on this PR, please ping a maintainer to reopen it."

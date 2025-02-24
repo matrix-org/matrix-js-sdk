@@ -35,7 +35,12 @@ import { encodeUri, logDuration } from "../utils.ts";
 import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
-import { type ImportRoomKeyProgressData, type ImportRoomKeysOpts, CryptoEvent } from "../crypto-api/index.ts";
+import {
+    type ImportRoomKeyProgressData,
+    type ImportRoomKeysOpts,
+    CryptoEvent,
+    ImportRoomKeyStage,
+} from "../crypto-api/index.ts";
 import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { type IMegolmSessionData } from "../@types/crypto.ts";
 
@@ -235,7 +240,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             const importOpt: ImportRoomKeyProgressData = {
                 total: Number(total),
                 successes: Number(progress),
-                stage: "load_keys",
+                stage: ImportRoomKeyStage.LoadKeys,
                 failures: 0,
             };
             opts?.progressCallback?.(importOpt);
@@ -264,7 +269,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 const importOpt: ImportRoomKeyProgressData = {
                     total: Number(total),
                     successes: Number(progress),
-                    stage: "load_keys",
+                    stage: ImportRoomKeyStage.LoadKeys,
                     failures: Number(failures),
                 };
                 opts?.progressCallback?.(importOpt);
@@ -619,9 +624,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         opts?: KeyBackupRestoreOpts,
     ): Promise<KeyBackupRestoreResult> {
         const keyBackup = await this.downloadKeyBackup(backupVersion);
-        opts?.progressCallback?.({
-            stage: "load_keys",
-        });
 
         return this.importKeyBackup(keyBackup, backupVersion, backupDecryptor, opts);
     }
@@ -672,6 +674,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         let totalImported = 0;
         let totalFailures = 0;
 
+        opts?.progressCallback?.({
+            total: totalKeyCount,
+            successes: totalImported,
+            stage: ImportRoomKeyStage.LoadKeys,
+            failures: totalFailures,
+        });
+
         /**
          * This method is called when we have enough chunks to decrypt.
          * It will decrypt the chunks and try to import the room keys.
@@ -704,7 +713,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             opts?.progressCallback?.({
                 total: totalKeyCount,
                 successes: totalImported,
-                stage: "load_keys",
+                stage: ImportRoomKeyStage.LoadKeys,
                 failures: totalFailures,
             });
         };

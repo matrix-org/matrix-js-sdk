@@ -67,6 +67,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type StartDehydrationOpts,
+    ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { type IDownloadKeyResult, type IQueryKeysRequest } from "../client.ts";
@@ -1340,7 +1341,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         try {
             opts?.progressCallback?.({
-                stage: "fetch",
+                stage: ImportRoomKeyStage.Fetch,
             });
 
             return await this.backupManager.restoreKeyBackup(backupVersion, backupDecryptor, opts);
@@ -1438,6 +1439,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     public async resetEncryption(authUploadDeviceSigningKeys: UIAuthCallback<void>): Promise<void> {
         this.logger.debug("resetEncryption: resetting encryption");
+
+        // Delete the dehydrated device, since any existing one will be signed
+        // by the wrong cross-signing key
+        this.dehydratedDeviceManager.delete();
 
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
