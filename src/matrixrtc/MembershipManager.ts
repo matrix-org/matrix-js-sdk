@@ -351,9 +351,7 @@ export class LegacyMembershipManager implements IMembershipManager {
     }
 
     private scheduleDelayDisconnection(): void {
-        this.memberEventTimeout = setTimeout(() => {
-            void this.delayDisconnection;
-        }, this.membershipKeepAlivePeriod);
+        this.memberEventTimeout = setTimeout(() => void this.delayDisconnection(), this.membershipKeepAlivePeriod);
     }
 
     private readonly delayDisconnection = async (): Promise<void> => {

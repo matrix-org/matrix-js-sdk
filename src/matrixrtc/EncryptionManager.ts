@@ -230,9 +230,10 @@ export class EncryptionManager implements IEncryptionManager {
         ) {
             logger.info("Last encryption key event sent too recently: postponing");
             if (this.keysEventUpdateTimeout === undefined) {
-                this.keysEventUpdateTimeout = setTimeout(() => {
-                    void this.sendEncryptionKeysEvent;
-                }, this.updateEncryptionKeyThrottle);
+                this.keysEventUpdateTimeout = setTimeout(
+                    () => void this.sendEncryptionKeysEvent(),
+                    this.updateEncryptionKeyThrottle,
+                );
             }
             return;
         }
@@ -317,7 +318,7 @@ export class EncryptionManager implements IEncryptionManager {
             if (this.keysEventUpdateTimeout === undefined) {
                 const resendDelay = safeGetRetryAfterMs(matrixError, 5000);
                 logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
-                this.keysEventUpdateTimeout = setTimeout(() => void this.sendEncryptionKeysEvent, resendDelay);
+                this.keysEventUpdateTimeout = setTimeout(() => void this.sendEncryptionKeysEvent(), resendDelay);
             } else {
                 logger.info("Not scheduling key resend as another re-send is already pending");
             }
