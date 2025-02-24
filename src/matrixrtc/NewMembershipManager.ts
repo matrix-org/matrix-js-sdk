@@ -146,11 +146,7 @@ interface ActionSchedulerState {
     running: boolean;
     /** The manager is in the state where its actually connected to the session. */
     hasMemberStateEvent: boolean;
-    // Retry counters that get used to limit the maximum rate limit retires we want to do.
-    // They get reused for each rate limit loop we run into and reset to 0 on unrecoverable failiour or success.
-    sendMembershipRetries: number;
-    sendDelayedEventRetries: number;
-    updateDelayedEventRetries: number;
+    // Retry counter
     retries: number;
 }
 
@@ -411,7 +407,7 @@ export class MembershipManager implements IMembershipManager {
         return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
     private get maximumRateLimitRetryCount(): number {
-        return this.joinConfig?.maximumRateLimitRetryCount ?? 5;
+        return this.joinConfig?.maximumRateLimitRetryCount ?? 10;
     }
     // Scheduler:
     private scheduler = new ActionScheduler(
@@ -420,9 +416,6 @@ export class MembershipManager implements IMembershipManager {
             running: false,
             nextRelativeExpiry: this.membershipEventExpiryTimeout,
             delayId: undefined,
-            sendMembershipRetries: 0,
-            sendDelayedEventRetries: 0,
-            updateDelayedEventRetries: 0,
             retries: 0,
         },
         this,
@@ -439,7 +432,7 @@ export class MembershipManager implements IMembershipManager {
                     try {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel);
                         state.delayId = undefined;
-                        state.updateDelayedEventRetries = 0;
+                        state.retries = 0;
                         this.scheduler.addAction({
                             ts: Date.now(),
                             type: MembershipActionType.SendFirstDelayedEvent,
@@ -468,7 +461,7 @@ export class MembershipManager implements IMembershipManager {
                             this.stateKey,
                         );
                         // Success we reset retires and set delayId.
-                        state.sendDelayedEventRetries = 0;
+                        state.retries = 0;
                         state.delayId = response.delay_id;
                         this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
                     } catch (e) {
@@ -495,7 +488,7 @@ export class MembershipManager implements IMembershipManager {
                 }
                 try {
                     await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Restart);
-                    state.updateDelayedEventRetries = 0;
+                    state.retries = 0;
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipKeepAlivePeriod,
                         type: MembershipActionType.RestartDelayedEvent,
@@ -521,6 +514,7 @@ export class MembershipManager implements IMembershipManager {
                         this.stateKey,
                     );
                     state.delayId = response.delay_id;
+                    state.retries = 0;
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipKeepAlivePeriod,
                         type: MembershipActionType.RestartDelayedEvent,
@@ -540,7 +534,7 @@ export class MembershipManager implements IMembershipManager {
                     try {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send);
                         state.hasMemberStateEvent = false;
-                        state.updateDelayedEventRetries = 0;
+                        state.retries = 0;
                         this.scheduler.resetActions([]);
                         this.leavePromiseHandle.resolve?.(true);
                     } catch (e) {
@@ -568,7 +562,7 @@ export class MembershipManager implements IMembershipManager {
                     );
                     state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
                     state.hasMemberStateEvent = true;
-                    state.sendMembershipRetries = 0;
+                    state.retries = 0;
                     this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.RestartDelayedEvent });
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipTimerExpiryTimeout,
@@ -588,7 +582,7 @@ export class MembershipManager implements IMembershipManager {
                     );
                     state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
                     // Success, we reset retries and schedule update.
-                    state.sendMembershipRetries = 0;
+                    state.retries = 0;
 
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipTimerExpiryTimeout,
@@ -616,7 +610,7 @@ export class MembershipManager implements IMembershipManager {
                         {},
                         this.stateKey,
                     );
-                    state.updateDelayedEventRetries = 0;
+                    state.retries = 0;
                     this.scheduler.resetActions([]);
                     this.leavePromiseHandle.resolve?.(true);
                     state.hasMemberStateEvent = false;
