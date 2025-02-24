@@ -66,7 +66,43 @@ export interface IMembershipManager {
     getActiveFocus(): Focus | undefined;
 }
 
-// SCHEDULER TYPES:
+/* SCHEDULER TYPES:
+
+            DirectMembershipManagerAction.Join              
+                           ▼                                
+                 ┌─────────────────────┐                    
+                 │SendFirstDelayedEvent│                    
+                 └─────────────────────┘                    
+                           │                                
+                           ▼                                
+                    ┌─────────────┐                         
+       ┌────────────│SendJoinEvent│────────────┐            
+       │            └─────────────┘            │            
+       │  ┌─────┐                  ┌──────┐    │    ┌──────┐
+       ▼  ▼     │                  │      ▼    ▼    ▼      │
+┌────────────┐  │                  │ ┌───────────────────┐ │
+│UpdateExpiry│  │                  │ │RestartDelayedEvent│ │
+└────────────┘  │                  │ └───────────────────┘ │
+          │     │                  │      │    │           │
+          └─────┘                  └──────┘    │           │
+                                               │           │
+                 ┌────────────────────┐        │           │
+                 │SendMainDelayedEvent│◄───────┘           │
+                 └───────────────────┬┘                    │
+                                     │                     │
+                                     └─────────────────────┘
+                     STOP ALL ABOVE                         
+           DirectMembershipManagerAction.Leave              
+                           ▼                                
+            ┌───────────────────────────────┐               
+            │ SendScheduledDelayedLeaveEvent│               
+            └───────────────────────────────┘               
+                           │                                
+                           ▼                                
+                    ┌──────────────┐                        
+                    │SendLeaveEvent│                        
+                    └──────────────┘                        
+*/
 enum MembershipActionType {
     SendFirstDelayedEvent = "SendFirstDelayedEvent",
     //  -> MembershipActionType.SendJoinEvent if successful
