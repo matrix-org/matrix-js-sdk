@@ -269,7 +269,7 @@ export class MembershipManager implements IMembershipManager {
         this.focusActive = focusActive;
         if (!this.scheduler.state.running) {
             this.scheduler.state.running = true;
-            const f = async (): Promise<void> => {
+            void (async (): Promise<void> => {
                 try {
                     await this.scheduler.startWithActions([
                         { ts: Date.now(), type: DirectMembershipManagerAction.Join },
@@ -277,8 +277,7 @@ export class MembershipManager implements IMembershipManager {
                 } catch (e) {
                     onError?.(e);
                 }
-            };
-            f();
+            });
         }
     }
 
@@ -312,6 +311,7 @@ export class MembershipManager implements IMembershipManager {
             this.scheduler.state.hasMemberStateEvent = false;
             this.scheduler.addAction({ ts: Date.now(), type: DirectMembershipManagerAction.Join });
         }
+        return Promise.resolve();
     }
 
     public getActiveFocus(): Focus | undefined {
