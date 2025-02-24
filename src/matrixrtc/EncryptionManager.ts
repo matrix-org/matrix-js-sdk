@@ -41,7 +41,7 @@ export type Statistics = {
 export interface IEncryptionManager {
     join(joinConfig: EncryptionConfig | undefined): void;
     leave(): void;
-    onMembershipsUpdate(oldMemberships: CallMembership[]): Promise<void>;
+    onMembershipsUpdate(oldMemberships: CallMembership[]): void;
     /**
      * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
      * This should be called each time the relevant event is received from a room timeline.
@@ -150,7 +150,7 @@ export class EncryptionManager implements IEncryptionManager {
     private isMyMembership = (m: CallMembership): boolean =>
         m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
-    public async onMembershipsUpdate(oldMemberships: CallMembership[]): Promise<void> {
+    public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
         if (this.manageMediaKeys && this.joined) {
             const oldMembershipIds = new Set(
                 oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
@@ -231,14 +231,14 @@ export class EncryptionManager implements IEncryptionManager {
             logger.info("Last encryption key event sent too recently: postponing");
             if (this.keysEventUpdateTimeout === undefined) {
                 this.keysEventUpdateTimeout = setTimeout(
-                    this.sendEncryptionKeysEvent,
+                    () => void this.sendEncryptionKeysEvent(),
                     this.updateEncryptionKeyThrottle,
                 );
             }
             return;
         }
 
-        this.sendEncryptionKeysEvent();
+        void this.sendEncryptionKeysEvent();
     }
 
     /**
@@ -318,7 +318,7 @@ export class EncryptionManager implements IEncryptionManager {
             if (this.keysEventUpdateTimeout === undefined) {
                 const resendDelay = safeGetRetryAfterMs(matrixError, 5000);
                 logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
-                this.keysEventUpdateTimeout = setTimeout(this.sendEncryptionKeysEvent, resendDelay);
+                this.keysEventUpdateTimeout = setTimeout(() => void this.sendEncryptionKeysEvent(), resendDelay);
             } else {
                 logger.info("Not scheduling key resend as another re-send is already pending");
             }
@@ -488,7 +488,7 @@ export class EncryptionManager implements IEncryptionManager {
         const newKeyIndex = this.makeNewSenderKey(true);
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
-        this.sendEncryptionKeysEvent(newKeyIndex);
+        void this.sendEncryptionKeysEvent(newKeyIndex);
     };
 }
 
