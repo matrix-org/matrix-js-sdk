@@ -344,10 +344,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
 
         // Join!
-        this.membershipManager!.join(fociPreferred, fociActive).catch((e) =>
+        this.membershipManager!.join(fociPreferred, fociActive, (e) => {
             // TODO: Consider exposing this as a signal from the RTCSession so it can be used in the UI.
-            logger.error("MembershipManager encountered an unrecoverable error: ", e),
-        );
+            logger.error("MembershipManager encountered an unrecoverable error: ", e);
+        });
         this.encryptionManager!.join(joinConfig);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
