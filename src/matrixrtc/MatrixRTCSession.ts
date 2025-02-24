@@ -512,11 +512,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             logger.info(`Memberships for call in room ${this.room.roomId} have changed: emitting`);
             this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
 
-            this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+            void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        this.encryptionManager.onMembershipsUpdate(oldMemberships);
+        void this.encryptionManager.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
     };
