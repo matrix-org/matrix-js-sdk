@@ -29,6 +29,7 @@ jobs:
             contents: write
             issues: write
             pull-requests: read
+            id-token: write
         secrets: inherit
         with:
             final: ${{ inputs.mode == 'final' }}
