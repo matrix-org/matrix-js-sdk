@@ -434,8 +434,8 @@ export class MembershipManager implements IMembershipManager {
                 // Before we start we check if we come from a state where we have a delay id.
                 if (!state.delayId) {
                     // Normal case without any previous delayed id.
-                    try {
-                        const response = await this.client._unstable_sendDelayedStateEvent(
+                    await this.client
+                        ._unstable_sendDelayedStateEvent(
                             this.room.roomId,
                             {
                                 delay: this.membershipServerSideExpiryTimeout,
@@ -443,63 +443,69 @@ export class MembershipManager implements IMembershipManager {
                             EventType.GroupCallMemberPrefix,
                             {}, // leave event
                             this.stateKey,
+                        )
+                        .then(
+                            (response) => {
+                                // Success we reset retires and set delayId.
+                                state.rateLimitRetries = 0;
+                                state.retries = 0;
+                                state.delayId = response.delay_id;
+                                this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
+                            },
+                            (e) => {
+                                if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                                if (this.maxDelayeExceededErrorHandler(e)) {
+                                    this.scheduler.addAction({
+                                        ts: Date.now(),
+                                        type: MembershipActionType.SendFirstDelayedEvent,
+                                    });
+                                    return;
+                                }
+                                if (this.unsupportedDelayedEndpoint(e)) {
+                                    this.scheduler.addAction({
+                                        ts: Date.now(),
+                                        type: MembershipActionType.SendJoinEvent,
+                                    });
+                                    return;
+                                }
+                            },
                         );
-                        // Success we reset retires and set delayId.
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
-                        state.delayId = response.delay_id;
-                        this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
-                    } catch (e) {
-                        if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) break;
-                        if (this.maxDelayeExceededErrorHandler(e)) {
-                            this.scheduler.addAction({
-                                ts: Date.now(),
-                                type: MembershipActionType.SendFirstDelayedEvent,
-                            });
-                            break;
-                        }
-                        if (this.unsupportedDelayedEndpoint(e)) {
-                            this.scheduler.addAction({
-                                ts: Date.now(),
-                                type: MembershipActionType.SendJoinEvent,
-                            });
-                            break;
-                        }
-                        // On any other error we fall back to not using delayed events and send the state event immediately
-                    }
+                    // On any other error we fall back to not using delayed events and send the state event immediately
                 } else {
                     // Restart case with delayed id.
                     // Remove all running updates and restarts
                     this.scheduler.resetActions([]);
-                    try {
-                        await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel);
-                        state.delayId = undefined;
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
-                        this.scheduler.addAction({
-                            ts: Date.now(),
-                            type: MembershipActionType.SendFirstDelayedEvent,
-                        });
-                    } catch (e) {
-                        if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) break;
-                        if (this.notFoundError(e)) {
-                            // If we get a M_NOT_FOUND we know that the delayed event got already removed.
-                            // This means we are good and can set it to undefined and run this again.
+                    await this.client
+                        ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel)
+                        .then(() => {
                             state.delayId = undefined;
+                            state.rateLimitRetries = 0;
+                            state.retries = 0;
                             this.scheduler.addAction({
                                 ts: Date.now(),
                                 type: MembershipActionType.SendFirstDelayedEvent,
                             });
-                            break;
-                        }
-                        if (this.unsupportedDelayedEndpoint(e)) {
-                            this.scheduler.addAction({
-                                ts: Date.now(),
-                                type: MembershipActionType.SendJoinEvent,
-                            });
-                            break;
-                        }
-                    }
+                        })
+                        .catch((e) => {
+                            if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                            if (this.notFoundError(e)) {
+                                // If we get a M_NOT_FOUND we know that the delayed event got already removed.
+                                // This means we are good and can set it to undefined and run this again.
+                                state.delayId = undefined;
+                                this.scheduler.addAction({
+                                    ts: Date.now(),
+                                    type: MembershipActionType.SendFirstDelayedEvent,
+                                });
+                                return;
+                            }
+                            if (this.unsupportedDelayedEndpoint(e)) {
+                                this.scheduler.addAction({
+                                    ts: Date.now(),
+                                    type: MembershipActionType.SendJoinEvent,
+                                });
+                                return;
+                            }
+                        });
                 }
                 break;
             case MembershipActionType.RestartDelayedEvent:
