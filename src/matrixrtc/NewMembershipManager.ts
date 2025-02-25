@@ -148,6 +148,7 @@ interface ActionSchedulerState {
     /** The manager is in the state where its actually connected to the session. */
     hasMemberStateEvent: boolean;
     // Retry counter
+    rateLimitRetries: number;
     retries: number;
 }
 
@@ -257,6 +258,8 @@ class ActionScheduler {
  *   - Stop the timer for updateint the state event
  */
 export class MembershipManager implements IMembershipManager {
+    // PUBLIC:
+
     public isJoined(): boolean {
         return this.scheduler.state.running;
     }
@@ -363,6 +366,8 @@ export class MembershipManager implements IMembershipManager {
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
     }
 
+    // PRIVATE:
+
     // Membership Event parameters:
     private deviceId: string;
     private stateKey: string;
@@ -412,6 +417,10 @@ export class MembershipManager implements IMembershipManager {
     private get maximumRateLimitRetryCount(): number {
         return this.joinConfig?.maximumRateLimitRetryCount ?? 10;
     }
+    private get maximumRetryCount(): number {
+        // TODO allow configuring this via `MembershipConfig`.
+        return 10;
+    }
     // Scheduler:
     private scheduler = new ActionScheduler(
         {
@@ -419,6 +428,7 @@ export class MembershipManager implements IMembershipManager {
             running: false,
             nextRelativeExpiry: this.membershipEventExpiryTimeout,
             delayId: undefined,
+            rateLimitRetries: 0,
             retries: 0,
         },
         this,
@@ -442,6 +452,7 @@ export class MembershipManager implements IMembershipManager {
                             this.stateKey,
                         );
                         // Success we reset retires and set delayId.
+                        state.rateLimitRetries = 0;
                         state.retries = 0;
                         state.delayId = response.delay_id;
                         this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
@@ -470,6 +481,7 @@ export class MembershipManager implements IMembershipManager {
                     try {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel);
                         state.delayId = undefined;
+                        state.rateLimitRetries = 0;
                         state.retries = 0;
                         this.scheduler.addAction({
                             ts: Date.now(),
@@ -510,6 +522,7 @@ export class MembershipManager implements IMembershipManager {
                 }
                 try {
                     await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Restart);
+                    state.rateLimitRetries = 0;
                     state.retries = 0;
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipKeepAlivePeriod,
@@ -541,6 +554,7 @@ export class MembershipManager implements IMembershipManager {
                         this.stateKey,
                     );
                     state.delayId = response.delay_id;
+                    state.rateLimitRetries = 0;
                     state.retries = 0;
                     this.scheduler.addAction({
                         ts: Date.now() + this.membershipKeepAlivePeriod,
@@ -565,6 +579,7 @@ export class MembershipManager implements IMembershipManager {
                     try {
                         await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send);
                         state.hasMemberStateEvent = false;
+                        state.rateLimitRetries = 0;
                         state.retries = 0;
                         this.scheduler.resetActions([]);
                         this.leavePromiseHandle.resolve?.(true);
@@ -594,6 +609,7 @@ export class MembershipManager implements IMembershipManager {
                     );
                     state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
                     state.hasMemberStateEvent = true;
+                    state.rateLimitRetries = 0;
                     state.retries = 0;
                     this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.RestartDelayedEvent });
                     this.scheduler.addAction({
@@ -602,6 +618,10 @@ export class MembershipManager implements IMembershipManager {
                     });
                 } catch (e) {
                     if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) break;
+
+                    // Event sending retry (different to rate limit retries)
+                    if (this.retryOnAnyErrorHandler(e, type)) break;
+
                     throw Error("Could not send state event because of unrecoverable error: " + e);
                 }
                 break;
@@ -615,6 +635,7 @@ export class MembershipManager implements IMembershipManager {
                     );
                     state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
                     // Success, we reset retries and schedule update.
+                    state.rateLimitRetries = 0;
                     state.retries = 0;
 
                     this.scheduler.addAction({
@@ -623,8 +644,11 @@ export class MembershipManager implements IMembershipManager {
                     });
                 } catch (e) {
                     if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) break;
+                    // TODO add timeout/netowrk error (or just the below)
 
-                    // TODO add timeout/netowrk error
+                    // Event sending retry (different to rate limit retries)
+                    if (this.retryOnAnyErrorHandler(e, type)) break;
+
                     throw Error("Could not update state event with new expiry ts because of unrecoverable error: " + e);
                 }
                 break;
@@ -641,12 +665,17 @@ export class MembershipManager implements IMembershipManager {
                         {},
                         this.stateKey,
                     );
+                    state.rateLimitRetries = 0;
                     state.retries = 0;
                     this.scheduler.resetActions([]);
                     this.leavePromiseHandle.resolve?.(true);
                     state.hasMemberStateEvent = false;
                 } catch (e) {
                     if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) break;
+
+                    // Event sending retry (different to rate limit retries)
+                    if (this.retryOnAnyErrorHandler(e, type)) break;
+
                     throw Error("Failed to send Leave event because of: " + e);
                 }
         }
@@ -677,9 +706,21 @@ export class MembershipManager implements IMembershipManager {
     }
 
     // Error checks and handlers
+
+    /**
+     * Check if its a NOT_FOUND error
+     * @param e the error causing this handler check/execution
+     * @returns true if its a not found error
+     */
     private notFoundError(e: unknown): boolean {
         return e instanceof MatrixError && e.errcode === "M_NOT_FOUND";
     }
+
+    /**
+     * Check if this is a DelayExceeded timeout and update the TimeoutOverride for the next try
+     * @param e the error causing this handler check/execution
+     * @returns true if its a delay exceeded error and we updated the local TimeoutOverride
+     */
     private maxDelayeExceededErrorHandler(e: unknown): boolean {
         if (
             e instanceof MatrixError &&
@@ -696,15 +737,15 @@ export class MembershipManager implements IMembershipManager {
         return false;
     }
     /**
-     *
-     * @param e
-     * @param method
-     * @param type
+     * Check if we have a rate limit error and schedule the same action again if we dont exceed the rate limit retry count yet.
+     * @param e the error causing this handler check/execution
+     * @param method the method used for the throw message
+     * @param type which MembershipActionType we reschedule because of a rate limit.
      * @returns Returns true if handled the error and rescheduled the correct next action did anything.
      */
     private rateLimitErrorHandler(e: unknown, method: string, type: MembershipActionType): boolean {
         if (
-            this.scheduler.state.retries < this.maximumRateLimitRetryCount &&
+            this.scheduler.state.rateLimitRetries < this.maximumRateLimitRetryCount &&
             e instanceof HTTPError &&
             e.isRateLimitError()
         ) {
@@ -721,7 +762,7 @@ export class MembershipManager implements IMembershipManager {
                 resendDelay = defaultMs;
             }
 
-            this.scheduler.state.retries++;
+            this.scheduler.state.rateLimitRetries++;
             this.scheduler.addAction({ ts: Date.now() + resendDelay, type });
 
             return true;
@@ -730,6 +771,29 @@ export class MembershipManager implements IMembershipManager {
         }
         return false;
     }
+
+    /**
+     * Don't Check the error and retry the same MembershipAction again in the configured time and for the configured retry count.
+     * @param e the error causing this handler check/execution
+     * @param type the action type that we need to repeat because of the error
+     * @returns Returns true if we handled the error by rescheduling the correct next action.
+     */
+    private retryOnAnyErrorHandler(e: unknown, type: MembershipActionType): boolean {
+        if (this.scheduler.state.retries < this.maximumRetryCount) {
+            this.scheduler.state.retries++;
+            this.scheduler.addAction({ ts: Date.now() + this.callMemberEventRetryDelayMinimum, type });
+
+            return true;
+        } else {
+            throw Error("Reached maximum (" + this.maximumRetryCount + ") retries cause by: " + e);
+        }
+    }
+
+    /**
+     * Check if its a UnsupportedEndpointError and which implies that we cannot do any delayed event logic
+     * @param e The error to check
+     * @returns true it its a UnsupportedEndpointError
+     */
     private unsupportedDelayedEndpoint(e: unknown): boolean {
         return e instanceof UnsupportedEndpointError;
     }
