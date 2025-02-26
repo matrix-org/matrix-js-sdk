@@ -838,7 +838,29 @@ export class MembershipManager implements IMembershipManager {
      */
     private retryOnNetworkError(e: unknown, type: MembershipActionType): boolean {
         return false;
-        // FIXME: ConnectionError || AbortError;
+        /*
+        handle HTTPError with status = 5xx || ConnectionError || AbortError;
+        const retries = this.scheduler.state.retries.get(type) ?? 0;
+
+
+        if (e instanceof HTTPError && typeof e.httpStatus === "number" && e.httpStatus >= 500 && e.httpStatus < 600) {
+            logger.warn("Network error while sending state event, retrying in 5s", e);
+            this.scheduler.state.retries.set(type, retries + 1);
+            this.scheduler.addAction({ ts: Date.now() + this.callMemberEventRetryDelayMinimum, type });
+
+            return true;
+        }
+
+        // timeout
+
+        if (retries < this.maximumRetryCount) {
+            this.scheduler.state.retries.set(type, retries + 1);
+
+            return true;
+        } else {
+            throw Error("Reached maximum (" + this.maximumRetryCount + ") retries cause by: " + e);
+        }
+            */
     }
 
     /**
