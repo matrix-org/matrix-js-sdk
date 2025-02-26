@@ -153,9 +153,12 @@ interface ActionSchedulerState {
     running: boolean;
     /** The manager is in the state where its actually connected to the session. */
     hasMemberStateEvent: boolean;
-    // Retry counter
-    rateLimitRetries: number;
-    retries: number;
+    // There can be multiple retries at once so we need to store counters per action
+    // e.g. the send update membership and the restart delayed could be rate limited at the same time.
+    /** Retry counter for rate limits */
+    rateLimitRetries: Map<MembershipActionType, number>;
+    /** Retry counter for other errors */
+    retries: Map<MembershipActionType, number>;
 }
 
 interface Action {
@@ -187,8 +190,8 @@ class ActionScheduler {
             running: false,
             startTime: 0,
             delayId: undefined,
-            rateLimitRetries: 0,
-            retries: 0,
+            rateLimitRetries: new Map(),
+            retries: new Map(),
             expireUpdateIterations: 0,
         };
     }
@@ -266,6 +269,10 @@ class ActionScheduler {
     }
     public resetState(): void {
         this.state = ActionScheduler.defaultState;
+    }
+    public resetRateLimitCounter(type: MembershipActionType): void {
+        this.state.rateLimitRetries.set(type, 0);
+        this.state.retries.set(type, 0);
     }
 }
 
@@ -414,7 +421,7 @@ export class MembershipManager implements IMembershipManager {
     private get membershipEventExpiryTimeoutHeadroom(): number {
         return this.joinConfig?.membershipExpiryTimeoutHeadroom ?? 5_000;
     }
-    private computeNextExpiryTs(iteration: number): number {
+    private computeNextExpiryActionTs(iteration: number): number {
         return (
             this.scheduler.state.startTime +
             this.membershipEventExpiryTimeout * iteration -
@@ -460,8 +467,8 @@ export class MembershipManager implements IMembershipManager {
                         )
                         .then((response) => {
                             // Success we reset retires and set delayId.
-                            state.rateLimitRetries = 0;
-                            state.retries = 0;
+                            state.rateLimitRetries.set(MembershipActionType.SendFirstDelayedEvent, 0);
+                            state.retries.set(MembershipActionType.SendFirstDelayedEvent, 0);
                             state.delayId = response.delay_id;
                             this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
                         })
@@ -500,8 +507,7 @@ export class MembershipManager implements IMembershipManager {
                         ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel)
                         .then(() => {
                             state.delayId = undefined;
-                            state.rateLimitRetries = 0;
-                            state.retries = 0;
+                            this.scheduler.resetRateLimitCounter(MembershipActionType.SendFirstDelayedEvent);
                             this.scheduler.addAction({
                                 ts: Date.now(),
                                 type: MembershipActionType.SendFirstDelayedEvent,
@@ -555,8 +561,7 @@ export class MembershipManager implements IMembershipManager {
                 const error = await this.client
                     ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Restart)
                     .then(() => {
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
+                        this.scheduler.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
                         this.scheduler.addAction({
                             ts: Date.now() + this.membershipKeepAlivePeriod,
                             type: MembershipActionType.RestartDelayedEvent,
@@ -594,8 +599,7 @@ export class MembershipManager implements IMembershipManager {
                     )
                     .then((response) => {
                         state.delayId = response.delay_id;
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
+                        this.scheduler.resetRateLimitCounter(MembershipActionType.SendMainDelayedEvent);
                         this.scheduler.addAction({
                             ts: Date.now() + this.membershipKeepAlivePeriod,
                             type: MembershipActionType.RestartDelayedEvent,
@@ -612,6 +616,8 @@ export class MembershipManager implements IMembershipManager {
                         if (this.rateLimitErrorHandler(e, "sendDelayedStateEvent", type)) return;
                         // Don't do any other delayed event work if its not supported.
                         if (this.unsupportedDelayedEndpoint(e)) return;
+                        // after that
+                        if (this.retryOnAnyErrorHandler(e, type)) return;
                         return Error("Could not send delayed event, even though delayed events are supported. " + e);
                     });
                 if (error) throw error;
@@ -623,8 +629,7 @@ export class MembershipManager implements IMembershipManager {
                         ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send)
                         .then(() => {
                             state.hasMemberStateEvent = false;
-                            state.rateLimitRetries = 0;
-                            state.retries = 0;
+                            this.scheduler.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
                             this.scheduler.resetActions([]);
                             this.leavePromiseHandle.resolve?.(true);
                         })
@@ -638,7 +643,7 @@ export class MembershipManager implements IMembershipManager {
                             if (this.unsupportedDelayedEndpoint(e)) return;
                             return e;
                         });
-                    // On any other error we fall back to SendLeaveEvent
+                    // On any other error we fall back to SendLeaveEvent (this includes hard errors from rate limiting)
                     if (error) this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                 } else {
                     this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
@@ -658,13 +663,12 @@ export class MembershipManager implements IMembershipManager {
                         // The next update should already use twice the membershipEventExpiryTimeout
                         this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.RestartDelayedEvent });
                         this.scheduler.addAction({
-                            ts: this.computeNextExpiryTs(1),
+                            ts: this.computeNextExpiryActionTs(1),
                             type: MembershipActionType.UpdateExpiry,
                         });
                         state.expireUpdateIterations = 2;
                         state.hasMemberStateEvent = true;
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
+                        this.scheduler.resetRateLimitCounter(MembershipActionType.SendJoinEvent);
                     })
                     .catch((e) => {
                         if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) return;
@@ -688,12 +692,11 @@ export class MembershipManager implements IMembershipManager {
                     .then(() => {
                         // Success, we reset retries and schedule update.
                         this.scheduler.addAction({
-                            ts: this.computeNextExpiryTs(state.expireUpdateIterations),
+                            ts: this.computeNextExpiryActionTs(state.expireUpdateIterations),
                             type: MembershipActionType.UpdateExpiry,
                         });
                         state.expireUpdateIterations++;
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
+                        this.scheduler.resetRateLimitCounter(MembershipActionType.UpdateExpiry);
                     })
                     .catch((e) => {
                         if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) return;
@@ -720,8 +723,7 @@ export class MembershipManager implements IMembershipManager {
                 const error = await this.client
                     .sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {}, this.stateKey)
                     .then(() => {
-                        state.rateLimitRetries = 0;
-                        state.retries = 0;
+                        this.scheduler.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                         this.scheduler.resetActions([]);
                         this.leavePromiseHandle.resolve?.(true);
                         state.hasMemberStateEvent = false;
@@ -802,12 +804,9 @@ export class MembershipManager implements IMembershipManager {
      * @param type which MembershipActionType we reschedule because of a rate limit.
      * @returns Returns true if handled the error and rescheduled the correct next action did anything.
      */
-    private rateLimitErrorHandler(e: unknown, method: string, type: MembershipActionType): boolean {
-        if (
-            this.scheduler.state.rateLimitRetries < this.maximumRateLimitRetryCount &&
-            e instanceof HTTPError &&
-            e.isRateLimitError()
-        ) {
+    private rateLimitErrorHandler(e: unknown, method: string, type: MembershipActionType): boolean | Error {
+        const rateLimitRetries = this.scheduler.state.rateLimitRetries.get(type) ?? 0;
+        if (rateLimitRetries < this.maximumRateLimitRetryCount && e instanceof HTTPError && e.isRateLimitError()) {
             let resendDelay: number;
             const defaultMs = 5000;
             try {
@@ -820,8 +819,7 @@ export class MembershipManager implements IMembershipManager {
                 );
                 resendDelay = defaultMs;
             }
-
-            this.scheduler.state.rateLimitRetries++;
+            this.scheduler.state.rateLimitRetries.set(type, rateLimitRetries + 1);
             this.scheduler.addAction({ ts: Date.now() + resendDelay, type });
 
             return true;
@@ -838,8 +836,10 @@ export class MembershipManager implements IMembershipManager {
      * @returns Returns true if we handled the error by rescheduling the correct next action.
      */
     private retryOnAnyErrorHandler(e: unknown, type: MembershipActionType): boolean {
-        if (this.scheduler.state.retries < this.maximumRetryCount) {
-            this.scheduler.state.retries++;
+        const retries = this.scheduler.state.retries.get(type) ?? 0;
+
+        if (retries < this.maximumRetryCount) {
+            this.scheduler.state.retries.set(type, retries + 1);
             this.scheduler.addAction({ ts: Date.now() + this.callMemberEventRetryDelayMinimum, type });
 
             return true;
@@ -849,7 +849,7 @@ export class MembershipManager implements IMembershipManager {
     }
 
     /**
-     * Check if its a UnsupportedEndpointError and which implies that we cannot do any delayed event logic
+     * Check if its an UnsupportedEndpointError and which implies that we cannot do any delayed event logic
      * @param e The error to check
      * @returns true it its a UnsupportedEndpointError
      */
