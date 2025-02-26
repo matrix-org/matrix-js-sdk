@@ -156,7 +156,7 @@ module.exports = {
         },
         {
             // Enable stricter promise rules for the MatrixRTC codebase
-            files: ["src/matrixrtc/**/*.ts"],
+            files: ["src/matrixrtc/**/*.ts","spec/unit/matrixrtc/*.ts"],
             rules: {
                 // Encourage proper usage of Promises:
                 "@typescript-eslint/no-floating-promises": "error",
