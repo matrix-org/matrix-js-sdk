@@ -342,6 +342,7 @@ describe.each([
         it("does nothing if not joined !FailsForLegacy", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             await manager.leave();
+            expect(async () => await manager.leave()).not.toThrow();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
@@ -652,7 +653,7 @@ describe.each([
             }
             expect(delayEventRestartError).toHaveBeenCalled();
         });
-        it("Errors while sending delayed events dont result in an unrecoverable error. We use the manager without delayed events !FailsForLegacy", async () => {
+        it("falls back to using pure state events when some error occurs while sending delayed events !FailsForLegacy", async () => {
             const unrecoverableError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
             const manager = new TestMembershipManager({}, room, client, () => undefined);
@@ -662,7 +663,7 @@ describe.each([
             expect(unrecoverableError).not.toHaveBeenCalledWith();
             expect(client.sendStateEvent).toHaveBeenCalled();
         });
-        it("UnsupportedEndpointError does not in an unrecoverable error. We use the manager without delayed events !FailsForLegacy", async () => {
+        it("falls back to using pure state events when UnsupportedEndpointError encountered for delayed events !FailsForLegacy", async () => {
             const unrecoverableError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
                 new UnsupportedEndpointError("not supported", "sendDelayedStateEvent"),

@@ -27,7 +27,7 @@ import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 
-const logger = rootLogger.getChild("MatrixRTCSessionManager");
+const logger = rootLogger.getChild("MatrixRTCSession");
 
 /**
  * This interface defines what a MembershipManager uses and exposes.
