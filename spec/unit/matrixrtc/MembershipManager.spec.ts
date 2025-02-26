@@ -23,7 +23,6 @@ import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
 import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
-import { flushPromises } from "../../test-utils/flushPromises";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 import { defer } from "../../../src/utils";
 
@@ -255,9 +254,7 @@ describe.each([
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
                 manager.join([focus], focusActive);
                 delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
-                await flushPromises();
-                jest.advanceTimersByTime(5000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(5000);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
             it("uses membershipServerSideExpiryTimeout from config", () => {
@@ -322,7 +319,7 @@ describe.each([
         it("resolves delayed leave event when leave is called", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
-            await flushPromises();
+            await jest.advanceTimersToNextTimerAsync();
             await manager.leave();
             expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", "send");
             expect(client.sendStateEvent).toHaveBeenCalled();
@@ -330,7 +327,7 @@ describe.each([
         it("send leave event when leave is called and resolving delayed leave fails", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
-            await flushPromises();
+            await jest.advanceTimersByTimeAsync(100);
             (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue("unknown");
             await manager.leave();
             // We send a normal leave event since we failed using updateDelayedEvent with the "send" action.
@@ -400,7 +397,7 @@ describe.each([
         it("does nothing if not joined", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
-            await flushPromises();
+            await jest.advanceTimersToNextTimerAsync();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
@@ -408,9 +405,7 @@ describe.each([
         it("does nothing if own membership still present", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
-
-            await waitForMockCall(client.sendStateEvent);
-            await flushPromises();
+            await jest.advanceTimersByTimeAsync(1);
             const myMembership = (client.sendStateEvent as Mock).mock.calls[0][2];
             // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
             (client.sendStateEvent as Mock).mockClear();
@@ -421,7 +416,9 @@ describe.each([
                 mockCallMembership(membershipTemplate, room.roomId),
                 mockCallMembership(myMembership as SessionMembershipData, room.roomId, client.getUserId() ?? undefined),
             ]);
-            await flushPromises();
+
+            await jest.advanceTimersByTimeAsync(1);
+
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
@@ -429,7 +426,7 @@ describe.each([
         it("recreates membership if it is missing", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
-            await flushPromises();
+            await jest.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
             (client.sendStateEvent as Mock).mockClear();
             (client._unstable_updateDelayedEvent as Mock).mockClear();
@@ -437,7 +434,7 @@ describe.each([
 
             // Our own membership is removed:
             await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
-            await flushPromises();
+            await jest.advanceTimersByTimeAsync(1);
             expect(client.sendStateEvent).toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
 
@@ -455,20 +452,18 @@ describe.each([
                 () => undefined,
             );
             manager.join([focus], focusActive);
+            await jest.advanceTimersByTimeAsync(1);
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
 
             // The first call is from checking id the server deleted the delayed event
             // so it does not need a `advanceTimersByTime`
-            await flushPromises();
             expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
             // TODO: Check that update delayed event is called with the correct HTTP request timeout
             // expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", 10_000, { localTimeoutMs: 20_000 });
 
             for (let i = 2; i <= 12; i++) {
                 // flush promises before advancing the timers to make sure schedulers are setup
-                await flushPromises();
-                jest.advanceTimersByTime(10_000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(10_000);
 
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(i);
                 // TODO: Check that update delayed event is called with the correct HTTP request timeout
@@ -489,14 +484,11 @@ describe.each([
             );
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
-            await flushPromises();
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
             expect(sentMembership.expires).toBe(expire);
             for (let i = 2; i <= 12; i++) {
-                // flush promises before advancing the timers to make sure schedulers are setup
-                jest.advanceTimersByTime(expire);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(expire);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(i);
                 const sentMembership = (client.sendStateEvent as Mock).mock.lastCall![2] as SessionMembershipData;
                 expect(sentMembership.expires).toBe(expire * i);
@@ -529,9 +521,8 @@ describe.each([
                         new Headers({ "Retry-After": "1" }),
                     ),
                 );
-                await flushPromises();
-                jest.advanceTimersByTime(1000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(1000);
+
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
             // FailsForLegacy as implementation does not re-check membership before retrying.
@@ -549,16 +540,15 @@ describe.each([
                 // Should call _unstable_sendDelayedStateEvent but not sendStateEvent because of the
                 // RateLimit error.
                 manager.join([focus], focusActive);
+                await jest.advanceTimersByTimeAsync(1);
 
-                await flushPromises();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                 (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
                 // Remove our own membership so that there is no reason the send the delayed leave anymore.
                 // the membership is no longer present on the homeserver
                 await manager.onRTCSessionMemberUpdate([]);
                 // Wait for all timers to be setup
-                await flushPromises();
-                jest.advanceTimersByTime(1000);
+                await jest.advanceTimersByTimeAsync(1000);
                 // We should send the first own membership and a new delayed event after the rate limit timeout.
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
@@ -578,16 +568,15 @@ describe.each([
                         new Headers({ "Retry-After": "1" }),
                     ),
                 );
-                await flushPromises();
 
+                await jest.advanceTimersByTimeAsync(1);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                 // the user terminated the call locally
                 void manager.leave();
 
                 // Wait for all timers to be setup
-                await flushPromises();
-                jest.advanceTimersByTime(1000);
-                await flushPromises();
+                // await flushPromises();
+                await jest.advanceTimersByTimeAsync(1000);
 
                 // No new events should have been sent:
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
@@ -608,18 +597,17 @@ describe.each([
                 manager.join([focus], focusActive);
 
                 // Hit rate limit
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(1);
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
 
                 // Hit second rate limit.
-                jest.advanceTimersByTime(1000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(1000);
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
 
                 // Setup resolve
                 (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
-                jest.advanceTimersByTime(1000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(1000);
+
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             });
@@ -640,10 +628,9 @@ describe.each([
             );
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive, delayEventSendError);
-            await flushPromises();
+
             for (let i = 0; i < 10; i++) {
-                jest.advanceTimersByTime(2000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(2000);
             }
             expect(delayEventSendError).toHaveBeenCalled();
         });
@@ -661,10 +648,9 @@ describe.each([
             );
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive, delayEventRestartError);
-            await flushPromises();
+
             for (let i = 0; i < 10; i++) {
-                jest.advanceTimersByTime(1000);
-                await flushPromises();
+                await jest.advanceTimersByTimeAsync(1000);
             }
             expect(delayEventRestartError).toHaveBeenCalled();
         }, 5000);
