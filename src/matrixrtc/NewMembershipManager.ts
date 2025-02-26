@@ -181,15 +181,17 @@ interface Action {
  */
 class ActionScheduler {
     public state: ActionSchedulerState;
-    public static defaultState: ActionSchedulerState = {
-        hasMemberStateEvent: false,
-        running: false,
-        startTime: 0,
-        delayId: undefined,
-        rateLimitRetries: 0,
-        retries: 0,
-        expireUpdateIterations: 0,
-    };
+    public static get defaultState(): ActionSchedulerState {
+        return {
+            hasMemberStateEvent: false,
+            running: false,
+            startTime: 0,
+            delayId: undefined,
+            rateLimitRetries: 0,
+            retries: 0,
+            expireUpdateIterations: 0,
+        };
+    }
     public constructor(
         state: ActionSchedulerState,
         private manager: Pick<MembershipManager, "membershipLoopHandler">,
