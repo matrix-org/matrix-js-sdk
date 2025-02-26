@@ -139,8 +139,12 @@ interface ActionSchedulerState {
     /** The delayId we got when successfully sending the delayed leave event.
      * Gets set to undefined if the server claims it cannot find the delayed event anymore. */
     delayId?: string;
-    /** Stores the value we want to use for the `expires` field in the next own membership update. */
-    nextRelativeExpiry: number;
+    /** Stores how often we have update the `expires` field.
+     * `expireUpdateIterations` * `membershipEventExpiryTimeout` resolves to the value the expires field should contain next */
+    expireUpdateIterations: number;
+    /** The time at which we send the first state event. The time the call started from the DAG point of view.
+     * This is used to compute the local sleep timestamps when to next update the member event with a new expires value. */
+    startTime: number;
     /** Flag that gets set once join is called.
      * The manager tries its best to get the user into the call.
      * Does not imply the user is actually joined via room state. */
@@ -376,26 +380,15 @@ export class MembershipManager implements IMembershipManager {
     private get membershipEventExpiryTimeout(): number {
         return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
     }
-    private get membershipTimerExpiryTimeout(): number {
-        let expiryTimeout = this.membershipEventExpiryTimeout;
-        const expiryTimeoutSlack = this.joinConfig?.membershipExpiryTimeoutSlack;
-        if (expiryTimeoutSlack) {
-            if (expiryTimeout > expiryTimeoutSlack) {
-                expiryTimeout = expiryTimeout - expiryTimeoutSlack;
-            } else {
-                logger.warn(
-                    "The membershipExpiryTimeoutSlack is misconfigured. It cannot be less than the membershipExpiryTimeout",
-                    "membershipExpiryTimeout:",
-                    expiryTimeout,
-                    "membershipExpiryTimeoutSlack:",
-                    expiryTimeoutSlack,
-                );
-            }
-        } else {
-            // Default Slack
-            expiryTimeout -= 5_000;
-        }
-        return Math.max(expiryTimeout, 1000);
+    private get membershipEventExpiryTimeoutHeadroom(): number {
+        return this.joinConfig?.membershipExpiryTimeoutHeadroom ?? 5_000;
+    }
+    private computeNextExpiryTs(iteration: number): number {
+        return (
+            this.scheduler.state.startTime +
+            this.membershipEventExpiryTimeout * iteration -
+            this.membershipEventExpiryTimeoutHeadroom
+        );
     }
     private get membershipServerSideExpiryTimeout(): number {
         return (
@@ -419,10 +412,11 @@ export class MembershipManager implements IMembershipManager {
         {
             hasMemberStateEvent: false,
             running: false,
-            nextRelativeExpiry: this.membershipEventExpiryTimeout,
+            startTime: 0,
             delayId: undefined,
             rateLimitRetries: 0,
             retries: 0,
+            expireUpdateIterations: 0,
         },
         this,
     );
@@ -430,7 +424,7 @@ export class MembershipManager implements IMembershipManager {
     // Loop Handler:
     public async membershipLoopHandler(state: ActionSchedulerState, type: MembershipActionType): Promise<void> {
         switch (type) {
-            case MembershipActionType.SendFirstDelayedEvent:
+            case MembershipActionType.SendFirstDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
                 if (!state.delayId) {
                     // Normal case without any previous delayed id.
@@ -508,7 +502,8 @@ export class MembershipManager implements IMembershipManager {
                         });
                 }
                 break;
-            case MembershipActionType.RestartDelayedEvent:
+            }
+            case MembershipActionType.RestartDelayedEvent: {
                 if (!state.delayId) {
                     // Delay id got reset. This action was used to check if the hs canceled the delayed event when the join state got sent.
                     this.scheduler.addAction({
@@ -519,31 +514,38 @@ export class MembershipManager implements IMembershipManager {
                     });
                     break;
                 }
-                try {
-                    await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Restart);
-                    state.rateLimitRetries = 0;
-                    state.retries = 0;
-                    this.scheduler.addAction({
-                        ts: Date.now() + this.membershipKeepAlivePeriod,
-                        type: MembershipActionType.RestartDelayedEvent,
+                const error = await this.client
+                    ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Restart)
+                    .then(() => {
+                        state.rateLimitRetries = 0;
+                        state.retries = 0;
+                        this.scheduler.addAction({
+                            ts: Date.now() + this.membershipKeepAlivePeriod,
+                            type: MembershipActionType.RestartDelayedEvent,
+                        });
+                    })
+                    .catch((e) => {
+                        if (this.notFoundError(e)) {
+                            state.delayId = undefined;
+                            this.scheduler.addAction({
+                                ts: Date.now(),
+                                type: MembershipActionType.SendMainDelayedEvent,
+                            });
+                            return;
+                        }
+                        // TODO this also needs a test: get rate limit while checking id delayed event is scheduled
+                        if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                        // If the HS does not support delayed events we wont reschedule.
+                        if (this.unsupportedDelayedEndpoint(e)) return;
+                        // In other error cases we have no idea what is happening
+                        return Error("Could not restart delayed event, even though delayed events are supported. " + e);
                     });
-                } catch (e) {
-                    if (this.notFoundError(e)) {
-                        state.delayId = undefined;
-                        this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendMainDelayedEvent });
-                        break;
-                    }
-                    // TODO this also needs a test: get rate limit while checking id delayed event is scheduled
-                    if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) break;
-                    // If the HS does not support delayed events we wont reschedule.
-                    if (this.unsupportedDelayedEndpoint(e)) break;
-                    // In other error cases we have no idea what is happening
-                    throw Error("Could not restart delayed event, even though delayed events are supported. " + e);
-                }
+                if (error instanceof Error) throw error;
                 break;
-            case MembershipActionType.SendMainDelayedEvent:
-                try {
-                    const response = await this.client._unstable_sendDelayedStateEvent(
+            }
+            case MembershipActionType.SendMainDelayedEvent: {
+                const error = await this.client
+                    ._unstable_sendDelayedStateEvent(
                         this.room.roomId,
                         {
                             delay: this.membershipServerSideExpiryTimeout,
@@ -551,132 +553,150 @@ export class MembershipManager implements IMembershipManager {
                         EventType.GroupCallMemberPrefix,
                         {}, // leave event
                         this.stateKey,
-                    );
-                    state.delayId = response.delay_id;
-                    state.rateLimitRetries = 0;
-                    state.retries = 0;
-                    this.scheduler.addAction({
-                        ts: Date.now() + this.membershipKeepAlivePeriod,
-                        type: MembershipActionType.RestartDelayedEvent,
-                    });
-                } catch (e) {
-                    if (this.maxDelayeExceededErrorHandler(e)) {
-                        this.scheduler.addAction({
-                            ts: Date.now(),
-                            type: MembershipActionType.SendMainDelayedEvent,
-                        });
-                        break;
-                    }
-                    if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) break;
-                    // Don't do any other delayed event work if its not supported.
-                    if (this.unsupportedDelayedEndpoint(e)) break;
-                    throw Error("Could not send delayed event, even though delayed events are supported. " + e);
-                }
-                break;
-            case MembershipActionType.SendScheduledDelayedLeaveEvent:
-                if (state.delayId) {
-                    try {
-                        await this.client._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send);
-                        state.hasMemberStateEvent = false;
+                    )
+                    .then((response) => {
+                        state.delayId = response.delay_id;
                         state.rateLimitRetries = 0;
                         state.retries = 0;
-                        this.scheduler.resetActions([]);
-                        this.leavePromiseHandle.resolve?.(true);
-                    } catch (e) {
-                        if (this.notFoundError(e)) {
-                            state.delayId = undefined;
-                            this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
-                            break;
+                        this.scheduler.addAction({
+                            ts: Date.now() + this.membershipKeepAlivePeriod,
+                            type: MembershipActionType.RestartDelayedEvent,
+                        });
+                    })
+                    .catch((e) => {
+                        if (this.maxDelayeExceededErrorHandler(e)) {
+                            this.scheduler.addAction({
+                                ts: Date.now(),
+                                type: MembershipActionType.SendMainDelayedEvent,
+                            });
+                            return;
                         }
-                        if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) break;
-                        if (this.unsupportedDelayedEndpoint(e)) break;
+                        if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                        // Don't do any other delayed event work if its not supported.
+                        if (this.unsupportedDelayedEndpoint(e)) return;
+                        return Error("Could not send delayed event, even though delayed events are supported. " + e);
+                    });
+                if (error instanceof Error) throw error;
+                break;
+            }
+            case MembershipActionType.SendScheduledDelayedLeaveEvent: {
+                if (state.delayId) {
+                    await this.client
+                        ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send)
+                        .then(() => {
+                            state.hasMemberStateEvent = false;
+                            state.rateLimitRetries = 0;
+                            state.retries = 0;
+                            this.scheduler.resetActions([]);
+                            this.leavePromiseHandle.resolve?.(true);
+                        })
+                        .catch((e) => {
+                            if (this.notFoundError(e)) {
+                                state.delayId = undefined;
+                                this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
+                                return;
+                            }
+                            if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                            if (this.unsupportedDelayedEndpoint(e)) return;
 
-                        // On any other error we fall back to SendLeaveEvent
-                        this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
-                    }
+                            // On any other error we fall back to SendLeaveEvent
+                            this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
+                        });
                 } else {
                     this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                 }
                 break;
-            case MembershipActionType.SendJoinEvent:
-                try {
-                    await this.client.sendStateEvent(
+            }
+            case MembershipActionType.SendJoinEvent: {
+                const error = await this.client
+                    .sendStateEvent(
                         this.room.roomId,
                         EventType.GroupCallMemberPrefix,
-                        this.makeMyMembership(state.nextRelativeExpiry),
+                        this.makeMyMembership(this.membershipEventExpiryTimeout),
                         this.stateKey,
-                    );
-                    state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
-                    state.hasMemberStateEvent = true;
-                    state.rateLimitRetries = 0;
-                    state.retries = 0;
-                    this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.RestartDelayedEvent });
-                    this.scheduler.addAction({
-                        ts: Date.now() + this.membershipTimerExpiryTimeout,
-                        type: MembershipActionType.UpdateExpiry,
+                    )
+                    .then(() => {
+                        state.startTime = Date.now();
+                        // The next update should already use twice the membershipEventExpiryTimeout
+                        this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.RestartDelayedEvent });
+                        this.scheduler.addAction({
+                            ts: this.computeNextExpiryTs(1),
+                            type: MembershipActionType.UpdateExpiry,
+                        });
+                        state.expireUpdateIterations = 2;
+                        state.hasMemberStateEvent = true;
+                        state.rateLimitRetries = 0;
+                        state.retries = 0;
+                    })
+                    .catch((e) => {
+                        if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) return;
+
+                        // Event sending retry (different to rate limit retries)
+                        if (this.retryOnAnyErrorHandler(e, type)) return;
+
+                        return Error("Could not send state event because of unrecoverable error: " + e);
                     });
-                } catch (e) {
-                    if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) break;
-
-                    // Event sending retry (different to rate limit retries)
-                    if (this.retryOnAnyErrorHandler(e, type)) break;
-
-                    throw Error("Could not send state event because of unrecoverable error: " + e);
-                }
+                if (error instanceof Error) throw error;
                 break;
-            case MembershipActionType.UpdateExpiry:
-                try {
-                    await this.client.sendStateEvent(
+            }
+            case MembershipActionType.UpdateExpiry: {
+                const error = await this.client
+                    .sendStateEvent(
                         this.room.roomId,
                         EventType.GroupCallMemberPrefix,
-                        this.makeMyMembership(state.nextRelativeExpiry),
+                        this.makeMyMembership(this.membershipEventExpiryTimeout * state.expireUpdateIterations),
                         this.stateKey,
-                    );
-                    state.nextRelativeExpiry += this.membershipEventExpiryTimeout;
-                    // Success, we reset retries and schedule update.
-                    state.rateLimitRetries = 0;
-                    state.retries = 0;
+                    )
+                    .then(() => {
+                        // Success, we reset retries and schedule update.
+                        this.scheduler.addAction({
+                            ts: this.computeNextExpiryTs(state.expireUpdateIterations),
+                            type: MembershipActionType.UpdateExpiry,
+                        });
+                        state.expireUpdateIterations++;
+                        state.rateLimitRetries = 0;
+                        state.retries = 0;
+                    })
+                    .catch((e) => {
+                        if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) return;
+                        // TODO add timeout/netowrk error (or just the below)
 
-                    this.scheduler.addAction({
-                        ts: Date.now() + this.membershipTimerExpiryTimeout,
-                        type: MembershipActionType.UpdateExpiry,
+                        // Event sending retry (different to rate limit retries)
+                        if (this.retryOnAnyErrorHandler(e, type)) return;
+
+                        return Error(
+                            "Could not update state event with new expiry ts because of unrecoverable error: " + e,
+                        );
                     });
-                } catch (e) {
-                    if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) break;
-                    // TODO add timeout/netowrk error (or just the below)
-
-                    // Event sending retry (different to rate limit retries)
-                    if (this.retryOnAnyErrorHandler(e, type)) break;
-
-                    throw Error("Could not update state event with new expiry ts because of unrecoverable error: " + e);
-                }
+                if (error instanceof Error) throw error;
                 break;
-            case MembershipActionType.SendLeaveEvent:
+            }
+            case MembershipActionType.SendLeaveEvent: {
                 // We are good already
                 if (!state.hasMemberStateEvent) return;
 
                 // This is only a fallback in case we do not have working delayed events support.
                 // first we should try to just send the scheduled leave event
-                try {
-                    await this.client.sendStateEvent(
-                        this.room.roomId,
-                        EventType.GroupCallMemberPrefix,
-                        {},
-                        this.stateKey,
-                    );
-                    state.rateLimitRetries = 0;
-                    state.retries = 0;
-                    this.scheduler.resetActions([]);
-                    this.leavePromiseHandle.resolve?.(true);
-                    state.hasMemberStateEvent = false;
-                } catch (e) {
-                    if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) break;
+                const error = await this.client
+                    .sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {}, this.stateKey)
+                    .then(() => {
+                        state.rateLimitRetries = 0;
+                        state.retries = 0;
+                        this.scheduler.resetActions([]);
+                        this.leavePromiseHandle.resolve?.(true);
+                        state.hasMemberStateEvent = false;
+                    })
+                    .catch((e) => {
+                        if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) return;
 
-                    // Event sending retry (different to rate limit retries)
-                    if (this.retryOnAnyErrorHandler(e, type)) break;
+                        // Event sending retry (different to rate limit retries)
+                        if (this.retryOnAnyErrorHandler(e, type)) return;
 
-                    throw Error("Failed to send Leave event because of: " + e);
-                }
+                        return Error("Failed to send Leave event because of: " + e);
+                    });
+                if (error instanceof Error) throw error;
+                break;
+            }
         }
     }
 

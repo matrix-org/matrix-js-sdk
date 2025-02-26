@@ -31,7 +31,7 @@ function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) 
     return new Promise<void>((resolve) => {
         method.mockImplementation(() => {
             resolve();
-            return returnVal;
+            return returnVal ?? Promise.resolve();
         });
     });
 }
@@ -71,6 +71,7 @@ describe.each([
         // Provide a default mock that is like the default "non error" server behaviour.
         (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
         (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
+        (client.sendStateEvent as Mock<any>).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -193,17 +194,17 @@ describe.each([
 
                     await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
                     await sendDelayedStateAttempt;
-                    await flushPromises();
                     const callProps = (d: number) => {
                         return [room!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
                     };
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(1, ...callProps(9000));
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(2, ...callProps(7500));
 
-                    jest.advanceTimersByTime(5000);
+                    await jest.advanceTimersByTimeAsync(5000);
 
                     await sendStateEventAttempt.then(); // needed to resolve after resendIfRateLimited catches
-                    jest.advanceTimersByTime(1000);
+
+                    await jest.advanceTimersByTimeAsync(1000);
 
                     expect(client.sendStateEvent).toHaveBeenCalledWith(
                         room!.roomId,
@@ -226,9 +227,7 @@ describe.each([
                     expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
 
                     // ensures that we reach the code that schedules the timeout for the next delay update before we advance the timers.
-                    await flushPromises();
-                    jest.advanceTimersByTime(5000);
-                    await flushPromises();
+                    await jest.advanceTimersByTimeAsync(5000);
                     // should update delayed disconnect
                     expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
                 }
@@ -481,27 +480,33 @@ describe.each([
         // Delayed events should replace it entirely but before they have wide adoption
         // the expiration logic still makes sense.
         // TODO: Add git commit when we removed it.
-        it("extends `expires` when call still active !FailsForLegacy", async () => {
+        async function testExpires(expire: number, headroom?: number) {
             const manager = new TestMembershipManager(
-                { membershipExpiryTimeout: 10_000 },
+                { membershipExpiryTimeout: expire, membershipExpiryTimeoutHeadroom: headroom },
                 room,
                 client,
                 () => undefined,
             );
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
+            await flushPromises();
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
-            expect(sentMembership.expires).toBe(10_000);
+            expect(sentMembership.expires).toBe(expire);
             for (let i = 2; i <= 12; i++) {
                 // flush promises before advancing the timers to make sure schedulers are setup
-                await flushPromises();
-                jest.advanceTimersByTime(10_000);
+                jest.advanceTimersByTime(expire);
                 await flushPromises();
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(i);
                 const sentMembership = (client.sendStateEvent as Mock).mock.lastCall![2] as SessionMembershipData;
-                expect(sentMembership.expires).toBe(10_000 * i);
+                expect(sentMembership.expires).toBe(expire * i);
             }
+        }
+        it("extends `expires` when call still active !FailsForLegacy", async () => {
+            await testExpires(10_000);
+        });
+        it("extends `expires` using headroom configuration !FailsForLegacy", async () => {
+            await testExpires(10_000, 1_000);
         });
     });
 
@@ -612,7 +617,7 @@ describe.each([
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(2);
 
                 // Setup resolve
-                (client._unstable_updateDelayedEvent as Mock).mockImplementation(() => {});
+                (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
                 jest.advanceTimersByTime(1000);
                 await flushPromises();
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);

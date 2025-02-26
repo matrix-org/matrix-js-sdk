@@ -71,13 +71,15 @@ export interface MembershipConfig {
     membershipExpiryTimeout?: number;
 
     /**
-     * The slack in (in milliseconds) which the manager will allow before the membership `expires` time to make sure it
+     * The time in (in milliseconds) which the manager will prematurely send the updated state event before the membership `expires` time to make sure it
      * sends the updated state event early enough.
      *
-     * A slack of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in a membership event update every 9s and
+     * A headroom of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in the first membership event update after 9s and
      * a membership event that would be considered expired after 10s.
+     *
+     * This value does not have an effect on the value of `SessionMembershipData.expires`.
      */
-    membershipExpiryTimeoutSlack?: number;
+    membershipExpiryTimeoutHeadroom?: number;
 
     /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
