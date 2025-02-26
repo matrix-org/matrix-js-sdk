@@ -197,7 +197,7 @@ class ActionScheduler {
     }
     public constructor(
         state: ActionSchedulerState,
-        private manager: Pick<MembershipManager, "membershipLoopHandler">,
+        private membershipLoopHandler: (state: ActionSchedulerState, type: MembershipActionType) => Promise<void>,
     ) {
         this.state = state;
     }
@@ -234,7 +234,7 @@ class ActionScheduler {
                 this.didWakeUp = false;
             } else {
                 try {
-                    await this.manager.membershipLoopHandler(this.state, nextAction.type as MembershipActionType);
+                    await this.membershipLoopHandler(this.state, nextAction.type as MembershipActionType);
                 } catch (e) {
                     throw Error("The MembershipManager has to shut down because of the end condition: " + e);
                 }
@@ -447,10 +447,10 @@ export class MembershipManager implements IMembershipManager {
         return 10;
     }
     // Scheduler:
-    private scheduler = new ActionScheduler(ActionScheduler.defaultState, this);
+    private scheduler = new ActionScheduler(ActionScheduler.defaultState, this.membershipLoopHandler.bind(this));
 
     // Loop Handler:
-    public async membershipLoopHandler(state: ActionSchedulerState, type: MembershipActionType): Promise<void> {
+    private async membershipLoopHandler(state: ActionSchedulerState, type: MembershipActionType): Promise<void> {
         switch (type) {
             case MembershipActionType.SendFirstDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
