@@ -19,13 +19,15 @@ import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import type { MatrixClient } from "../client.ts";
 import { UnsupportedEndpointError } from "../errors.ts";
 import { HTTPError, MatrixError } from "../http-api/errors.ts";
-import { logger } from "../logger.ts";
+import { logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { sleep } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
+
+const logger = rootLogger.getChild("MatrixRTCSessionManager");
 
 /**
  * This interface defines what a MembershipManager uses and exposes.
