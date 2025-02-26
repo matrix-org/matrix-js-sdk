@@ -57,10 +57,9 @@ export type MatrixRTCSessionEventHandlerMap = {
 
 export interface MembershipConfig {
     /**
-     * Use Legacy Manager
-     * @deprecated
+     * Use the new Manager
      */
-    useLegacyMembershipManager?: boolean;
+    useNewMembershipManager?: boolean;
 
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
@@ -334,12 +333,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         } else {
             // Create MembershipManager
-            if (joinConfig?.useLegacyMembershipManager ?? true) {
-                this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
+            if (joinConfig?.useNewMembershipManager ?? false) {
+                this.membershipManager = new MembershipManager(joinConfig, this.room, this.client, () =>
                     this.getOldestMembership(),
                 );
             } else {
-                this.membershipManager = new MembershipManager(joinConfig, this.room, this.client, () =>
+                this.membershipManager = new LegacyMembershipManager(joinConfig, this.room, this.client, () =>
                     this.getOldestMembership(),
                 );
             }
