@@ -210,9 +210,10 @@ class ActionScheduler {
     private insertions: Action[] = [];
     private resetWith?: Action[];
     /**
-     * This starts the main loop of the memberhsip manager that handles event sending, delayed event sending and delayed event restarting.
+     * This starts the main loop of the membership manager that handles event sending, delayed event sending and delayed event restarting.
      * @param initialActions The initial actions the manager will start with. It should be enough to pass: DelayedLeaveActionType.Initial
-     * @throws This throws an error only if the memberhsip cannot run anymore. For example it reached the maximum retires.
+     * @returns Promise that resolves once all actions have run and no more are scheduled.
+     * @throws This throws an error if one of the actions throws.
      * In most other error cases the manager will try to handle any server errors by itself.
      */
     public async startWithActions(initialActions: Action[]): Promise<void> {
@@ -235,7 +236,7 @@ class ActionScheduler {
                 try {
                     await this.manager.membershipLoopHandler(this.state, nextAction.type as MembershipActionType);
                 } catch (e) {
-                    throw Error("The MemberhsipManager has to shut down because of the end condition: " + e);
+                    throw Error("The MembershipManager has to shut down because of the end condition: " + e);
                 }
             }
 
@@ -279,7 +280,7 @@ class ActionScheduler {
 /**
  * This class takes care of the membership management.
  * It has the following tasks:
- *  - Send the users leave delayed event before sending the memberhsip
+ *  - Send the users leave delayed event before sending the membership
  *  - Sent the users membership if the state machine is started
  *  - Check if the delayed event was canceled due to sending the membership
  *  - update the delayed event (`restart`)
@@ -287,7 +288,7 @@ class ActionScheduler {
  *  - When the state machine is stopped:
  *   - Disconnect the member
  *   - Stop the timer for the delay refresh
- *   - Stop the timer for updateint the state event
+ *   - Stop the timer for updating the state event
  */
 export class MembershipManager implements IMembershipManager {
     // PUBLIC:
@@ -300,7 +301,7 @@ export class MembershipManager implements IMembershipManager {
      * It will send delayed events and membership events
      * @param fociPreferred
      * @param focusActive
-     * @param onError This will be called once the membership menager encounters an unrecoverable error.
+     * @param onError This will be called once the membership manager encounters an unrecoverable error.
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      */
     public join(fociPreferred: Focus[], focusActive?: Focus, onError?: (error: unknown) => void): void {
@@ -466,7 +467,7 @@ export class MembershipManager implements IMembershipManager {
                             this.stateKey,
                         )
                         .then((response) => {
-                            // Success we reset retires and set delayId.
+                            // Success we reset retries and set delayId.
                             state.rateLimitRetries.set(MembershipActionType.SendFirstDelayedEvent, 0);
                             state.retries.set(MembershipActionType.SendFirstDelayedEvent, 0);
                             state.delayId = response.delay_id;
@@ -482,7 +483,7 @@ export class MembershipManager implements IMembershipManager {
                                 return;
                             }
                             if (this.unsupportedDelayedEndpoint(e)) {
-                                logger.info("Not using deleayed event because the endpoint is not supported");
+                                logger.info("Not using delayed event because the endpoint is not supported");
                                 this.scheduler.addAction({
                                     ts: Date.now(),
                                     type: MembershipActionType.SendJoinEvent,
@@ -493,7 +494,7 @@ export class MembershipManager implements IMembershipManager {
                         });
                     // On any other error we fall back to not using delayed events and send the join state event immediately
                     if (error) {
-                        logger.info("Not using deleayed event because: " + error);
+                        logger.info("Not using delayed event because: " + error);
                         this.scheduler.addAction({
                             ts: Date.now(),
                             type: MembershipActionType.SendJoinEvent,
