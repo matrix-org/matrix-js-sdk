@@ -240,6 +240,7 @@ import {
     validateAuthMetadataAndKeys,
 } from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
+import { UnsupportedEndpointError } from "./errors.ts";
 
 export type Store = IStore;
 
@@ -3351,7 +3352,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         txnId?: string,
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw Error("Server does not support the delayed events API");
+            throw new UnsupportedEndpointError("Server does not support the delayed events API", "sendDelayedEvent");
         }
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
@@ -3374,7 +3375,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         opts: IRequestOpts = {},
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw Error("Server does not support the delayed events API");
+            throw new UnsupportedEndpointError(
+                "Server does not support the delayed events API",
+                "sendDelayedStateEvent",
+            );
         }
 
         const pathParams = {
@@ -3398,7 +3402,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // eslint-disable-next-line
     public async _unstable_getDelayedEvents(fromToken?: string): Promise<DelayedEventInfo> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw Error("Server does not support the delayed events API");
+            throw new UnsupportedEndpointError("Server does not support the delayed events API", "getDelayedEvents");
         }
 
         const queryDict = fromToken ? { from: fromToken } : undefined;
@@ -3420,7 +3424,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw Error("Server does not support the delayed events API");
+            throw new UnsupportedEndpointError("Server does not support the delayed events API", "updateDelayedEvent");
         }
 
         const path = utils.encodeUri("/delayed_events/$delayId", {
