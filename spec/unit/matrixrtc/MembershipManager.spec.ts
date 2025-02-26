@@ -26,13 +26,11 @@ import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, t
 import { flushPromises } from "../../test-utils/flushPromises";
 import { defer } from "../../../src/utils";
 
-// import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
-
-function waitForMockCall(method: MockedFunction<any>, returnVal?: any) {
+function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) {
     return new Promise<void>((resolve) => {
         method.mockImplementation(() => {
             resolve();
-            return returnVal;
+            return returnVal ?? Promise.resolve();
         });
     });
 }
@@ -70,13 +68,15 @@ describe.each([
         jest.useFakeTimers();
         client = makeMockClient("@alice:example.org", "AAAAAAA");
         room = makeMockRoom(membershipTemplate);
-        // Provide a default mock. Representing the default "non error" server behaviour.
-        (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
+        // Provide a default mock that is like the default "non error" server behaviour.
+        (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
+        (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
+        (client.sendStateEvent as Mock<any>).mockResolvedValue(undefined);
     });
 
     afterEach(() => {
         jest.useRealTimers();
-        // no need to clean up mocks since we will recreate the client
+        // There is no need to clean up mocks since we will recreate the client.
     });
 
     describe("isJoined()", () => {
@@ -85,7 +85,7 @@ describe.each([
             expect(manager.isJoined()).toEqual(false);
         });
 
-        it("returns true after join()", async () => {
+        it("returns true after join()", () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([]);
             expect(manager.isJoined()).toEqual(true);
@@ -102,7 +102,6 @@ describe.each([
                 // Test
                 const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
                 memberManager.join([focus], focusActive);
-
                 // expects
                 await waitForMockCall(client.sendStateEvent);
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
@@ -138,11 +137,13 @@ describe.each([
                     if (useOwnedStateEvents) {
                         room.getVersion = jest.fn().mockReturnValue("org.matrix.msc3757.default");
                     }
-
                     const updatedDelayedEvent = waitForMockCall(client._unstable_updateDelayedEvent);
-                    const sentDelayedState = waitForMockCall(client._unstable_sendDelayedStateEvent, {
-                        delay_id: "id",
-                    });
+                    const sentDelayedState = waitForMockCall(
+                        client._unstable_sendDelayedStateEvent,
+                        Promise.resolve({
+                            delay_id: "id",
+                        }),
+                    );
 
                     // preparing the delayed disconnect should handle the delay being too long
                     const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
@@ -260,7 +261,7 @@ describe.each([
                 await flushPromises();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
-            it("uses membershipServerSideExpiryTimeout from config", async () => {
+            it("uses membershipServerSideExpiryTimeout from config", () => {
                 const manager = new TestMembershipManager(
                     { membershipServerSideExpiryTimeout: 123456 },
                     room,
@@ -411,11 +412,11 @@ describe.each([
             await flushPromises();
             const myMembership = (client.sendStateEvent as Mock).mock.calls[0][2];
             // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
-            (client.sendStateEvent as Mock).mockReset();
-            (client._unstable_updateDelayedEvent as Mock).mockReset();
-            (client._unstable_sendDelayedStateEvent as Mock).mockReset();
+            (client.sendStateEvent as Mock).mockClear();
+            (client._unstable_updateDelayedEvent as Mock).mockClear();
+            (client._unstable_sendDelayedStateEvent as Mock).mockClear();
 
-            manager.onRTCSessionMemberUpdate([
+            await manager.onRTCSessionMemberUpdate([
                 mockCallMembership(membershipTemplate, room.roomId),
                 mockCallMembership(myMembership as SessionMembershipData, room.roomId, client.getUserId() ?? undefined),
             ]);
@@ -547,7 +548,7 @@ describe.each([
                 (client._unstable_sendDelayedStateEvent as Mock).mockReturnValue({ delay_id: "id" });
                 // Remove our own membership so that there is no reason the send the delayed leave anymore.
                 // the membership is no longer present on the homeserver
-                manager.onRTCSessionMemberUpdate([]);
+                await manager.onRTCSessionMemberUpdate([]);
                 // Wait for all timers to be setup
                 await flushPromises();
                 jest.advanceTimersByTime(1000);
@@ -574,7 +575,7 @@ describe.each([
 
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                 // the user terminated the call locally
-                manager.leave();
+                await manager.leave();
 
                 // Wait for all timers to be setup
                 await flushPromises();
