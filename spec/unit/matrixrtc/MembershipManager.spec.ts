@@ -327,7 +327,7 @@ describe.each([
             expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", "send");
             expect(client.sendStateEvent).toHaveBeenCalled();
         });
-        it("send leave event when leave is called and resolving delayed leave fails", async () => {
+        it("sends leave event when leave is called and resolving delayed leave fails", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
             await flushPromises();

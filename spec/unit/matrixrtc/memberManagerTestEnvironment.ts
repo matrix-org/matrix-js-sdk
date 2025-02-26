@@ -27,15 +27,10 @@ It is very specific to the MembershipManager.spec.ts file and introduces the fol
 */
 
 import { TestEnvironment } from "jest-environment-jsdom";
-import { type JestEnvironmentConfig, type EnvironmentContext } from "@jest/environment";
 
 import { logger } from "../../../src/logger";
 
 class CustomEnvironment extends TestEnvironment {
-    constructor(config: JestEnvironmentConfig, context: EnvironmentContext) {
-        super(config, context);
-    }
-
     async handleTestEvent(event: any) {
         if (event.name === "test_start" && event.test.name.includes("!FailsForLegacy")) {
             let parent = event.test.parent;
