@@ -1,10 +1,8 @@
-import { type MatrixClient } from "../client.ts";
 import { logger as rootLogger } from "../logger.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { type Room } from "../models/room.ts";
 import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
-import { type EncryptionKeysEventContent } from "./types.ts";
+import { type RTCClient, type RTCRoom, type EncryptionKeysEventContent } from "./types.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { type MatrixError, safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
@@ -99,8 +97,8 @@ export class EncryptionManager implements IEncryptionManager {
     private joinConfig: EncryptionConfig | undefined;
 
     public constructor(
-        private client: Pick<MatrixClient, "sendEvent" | "getDeviceId" | "getUserId" | "cancelPendingEvent">,
-        private room: Pick<Room, "roomId">,
+        private client: RTCClient,
+        private room: RTCRoom,
         private getMemberships: () => CallMembership[],
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array<ArrayBufferLike>,

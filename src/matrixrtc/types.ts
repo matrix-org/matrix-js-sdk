@@ -13,7 +13,28 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { type IMentions } from "../matrix.ts";
+import { type MatrixClient, type IMentions, type Room } from "../matrix.ts";
+
+export type RTCClient = Pick<
+    MatrixClient,
+    | "cancelPendingEvent"
+    | "getUserId"
+    | "getDeviceId"
+    | "sendEvent"
+    | "sendStateEvent"
+    | "_unstable_sendDelayedEvent"
+    | "_unstable_sendDelayedStateEvent"
+    | "_unstable_updateDelayedEvent"
+>;
+
+export type RTCRoom = Pick<
+    Room,
+    | "getLiveTimeline"
+    | "getVersion"
+    | "hasMembershipState"
+    | "roomId"
+>;
+
 export interface EncryptionKeyEntry {
     index: number;
     key: string;
