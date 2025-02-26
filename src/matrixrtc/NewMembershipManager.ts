@@ -169,6 +169,12 @@ interface Action {
 }
 
 /**
+ * This state machine tracks the state of the current membership participation
+ * and runs one central timer that wakes up a handler callback with the correct action
+ * whenever necessary.
+ *
+ * It can also be awakened whenever a new action is added which is
+ * earlier then the current "next awake".
  * @internal
  */
 class ActionScheduler {
@@ -268,9 +274,12 @@ export class MembershipManager implements IMembershipManager {
         return this.scheduler.state.running;
     }
     /**
-     * @throws can throw if it exceeds a configured maximum retry.
+     * Puts the MembershipManager in a state where it tries to be joined.
+     * It will send delayed events and membership events
      * @param fociPreferred
      * @param focusActive
+     * @param onError This will be called once the membership menager encounters an unrecoverable error.
+     * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      */
     public join(fociPreferred: Focus[], focusActive?: Focus, onError?: (error: unknown) => void): void {
         this.fociPreferred = fociPreferred;
@@ -434,7 +443,7 @@ export class MembershipManager implements IMembershipManager {
                 // Before we start we check if we come from a state where we have a delay id.
                 if (!state.delayId) {
                     // Normal case without any previous delayed id.
-                    await this.client
+                    const error = await this.client
                         ._unstable_sendDelayedStateEvent(
                             this.room.roomId,
                             {
@@ -444,32 +453,39 @@ export class MembershipManager implements IMembershipManager {
                             {}, // leave event
                             this.stateKey,
                         )
-                        .then(
-                            (response) => {
-                                // Success we reset retires and set delayId.
-                                state.rateLimitRetries = 0;
-                                state.retries = 0;
-                                state.delayId = response.delay_id;
-                                this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
-                            },
-                            (e) => {
-                                if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
-                                if (this.maxDelayeExceededErrorHandler(e)) {
-                                    this.scheduler.addAction({
-                                        ts: Date.now(),
-                                        type: MembershipActionType.SendFirstDelayedEvent,
-                                    });
-                                    return;
-                                }
-                                if (this.unsupportedDelayedEndpoint(e)) {
-                                    this.scheduler.addAction({
-                                        ts: Date.now(),
-                                        type: MembershipActionType.SendJoinEvent,
-                                    });
-                                    return;
-                                }
-                            },
-                        );
+                        .then((response) => {
+                            // Success we reset retires and set delayId.
+                            state.rateLimitRetries = 0;
+                            state.retries = 0;
+                            state.delayId = response.delay_id;
+                            this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
+                        })
+                        .catch((e) => {
+                            if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                            if (this.maxDelayeExceededErrorHandler(e)) {
+                                this.scheduler.addAction({
+                                    ts: Date.now(),
+                                    type: MembershipActionType.SendFirstDelayedEvent,
+                                });
+                                return;
+                            }
+                            if (this.unsupportedDelayedEndpoint(e)) {
+                                logger.info("Not using deleayed event because the endpoint is not supported");
+                                this.scheduler.addAction({
+                                    ts: Date.now(),
+                                    type: MembershipActionType.SendJoinEvent,
+                                });
+                                return;
+                            }
+                            return e;
+                        });
+                    if (error) {
+                        logger.info("Not using deleayed event because: " + error);
+                        this.scheduler.addAction({
+                            ts: Date.now(),
+                            type: MembershipActionType.SendJoinEvent,
+                        });
+                    }
                     // On any other error we fall back to not using delayed events and send the state event immediately
                 } else {
                     // Restart case with delayed id.

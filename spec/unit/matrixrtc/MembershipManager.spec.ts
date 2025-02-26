@@ -19,7 +19,7 @@ limitations under the License.
 
 import { type MockedFunction, type Mock } from "jest-mock";
 
-import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
+import { EventType, HTTPError, MatrixError, UnsupportedEndpointError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
 import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
@@ -339,10 +339,10 @@ describe.each([
             );
         });
         // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
-        it("does nothing if not joined !FailsForLegacy", () => {
+        it("does nothing if not joined !FailsForLegacy", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             const errorFn = jest.fn();
-            manager.leave().catch(errorFn);
+            await manager.leave().catch(errorFn);
             expect(errorFn).not.toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
@@ -572,7 +572,7 @@ describe.each([
                 await jest.advanceTimersByTimeAsync(1);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
                 // the user terminated the call locally
-                void manager.leave();
+                await manager.leave();
 
                 // Wait for all timers to be setup
                 // await flushPromises();
@@ -653,6 +653,28 @@ describe.each([
                 await jest.advanceTimersByTimeAsync(1000);
             }
             expect(delayEventRestartError).toHaveBeenCalled();
-        }, 5000);
+        });
+        it("Errors while sending delayed events dont result in an unrecoverable error. We use the manager without delayed events !FailsForLegacy", async () => {
+            const unrecoverableError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive, unrecoverableError);
+            await jest.advanceTimersByTimeAsync(1);
+
+            expect(unrecoverableError).not.toHaveBeenCalledWith();
+            expect(client.sendStateEvent).toHaveBeenCalled();
+        });
+        it("UnsupportedEndpointError does not in an unrecoverable error. We use the manager without delayed events !FailsForLegacy", async () => {
+            const unrecoverableError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
+                new UnsupportedEndpointError("not supported", "sendDelayedStateEvent"),
+            );
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive, unrecoverableError);
+            await jest.advanceTimersByTimeAsync(1);
+
+            expect(unrecoverableError).not.toHaveBeenCalledWith();
+            expect(client.sendStateEvent).toHaveBeenCalled();
+        });
     });
 });
