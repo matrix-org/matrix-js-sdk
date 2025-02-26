@@ -3414,7 +3414,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
      */
     // eslint-disable-next-line
-    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
+    public async _unstable_updateDelayedEvent(
+        delayId: string,
+        action: UpdateDelayedEventAction,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw Error("Server does not support the delayed events API");
         }
@@ -3426,6 +3430,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             action,
         };
         return await this.http.authedRequest(Method.Post, path, undefined, data, {
+            ...requestOptions,
             prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
         });
     }
