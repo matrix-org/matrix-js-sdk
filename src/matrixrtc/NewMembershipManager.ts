@@ -465,7 +465,7 @@ export class MembershipManager implements IMembershipManager {
                         })
                         .catch((e) => {
                             if (this.rateLimitErrorHandler(e, "sendDelayedStateEvent", type)) return;
-                            if (this.maxDelayeExceededErrorHandler(e)) {
+                            if (this.maxDelayExceededErrorHandler(e)) {
                                 this.scheduler.addAction({
                                     ts: Date.now(),
                                     type: MembershipActionType.SendFirstDelayedEvent,
@@ -529,6 +529,8 @@ export class MembershipManager implements IMembershipManager {
                     if (error) {
                         // This becomes an unhandle-able error case since sth is signifciantly off if we dont hit any of the above cases
                         // when state.delayId !== undefined
+                        // We do not use ignore and log this error since we would also need to reset the delayId.
+                        // It is cleaner if we the frontend rejoines instead of resetting the delayId here and behaving like in the success case.
                         throw Error(
                             "We failed to cancel a delayed event where we already had a delay id with an error we cannot automatically handle" +
                                 error,
@@ -598,14 +600,14 @@ export class MembershipManager implements IMembershipManager {
                         });
                     })
                     .catch((e) => {
-                        if (this.maxDelayeExceededErrorHandler(e)) {
+                        if (this.maxDelayExceededErrorHandler(e)) {
                             this.scheduler.addAction({
                                 ts: Date.now(),
                                 type: MembershipActionType.SendMainDelayedEvent,
                             });
                             return;
                         }
-                        if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                        if (this.rateLimitErrorHandler(e, "sendDelayedStateEvent", type)) return;
                         // Don't do any other delayed event work if its not supported.
                         if (this.unsupportedDelayedEndpoint(e)) return;
                         return Error("Could not send delayed event, even though delayed events are supported. " + e);
@@ -776,7 +778,7 @@ export class MembershipManager implements IMembershipManager {
      * @param e the error causing this handler check/execution
      * @returns true if its a delay exceeded error and we updated the local TimeoutOverride
      */
-    private maxDelayeExceededErrorHandler(e: unknown): boolean {
+    private maxDelayExceededErrorHandler(e: unknown): boolean {
         if (
             e instanceof MatrixError &&
             e.errcode === "M_UNKNOWN" &&
