@@ -231,6 +231,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
+     * WARN: this can in theory only be a subset of the room with the properties required by
+     * this class.
+     * Outside of tests this most likely will be a full room however.
+     * @deprecated
+     */
+    public get room(): Room {
+        return this.roomSubset as Room;
+    }
+    /**
      * This constructs a room session. When using MatrixRTC inside the js-sdk this is expected
      * to be used with the MatrixRTCSessionManager exclusively.
      *
@@ -252,7 +261,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             | "sendEvent"
             | "cancelPendingEvent"
         >,
-        public readonly room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState">,
+        private roomSubset: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState">,
         public memberships: CallMembership[],
     ) {
         super();
