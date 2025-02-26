@@ -283,7 +283,13 @@ export class MembershipManager implements IMembershipManager {
         }
     }
 
+    /**
+     * Leave from the call (Send an rtc session event with content: `{}`)
+     * @param timeout the maximum duration this promise will take to resolve
+     * @returns true if it managed to leave and false if the timeout condition happened.
+     */
     public leave(timeout?: number): Promise<boolean> {
+        if (!this.scheduler.state.running) return Promise.resolve(true);
         this.scheduler.state.running = false;
 
         if (!this.leavePromise) {
@@ -673,8 +679,10 @@ export class MembershipManager implements IMembershipManager {
             }
             case MembershipActionType.SendLeaveEvent: {
                 // We are good already
-                if (!state.hasMemberStateEvent) return;
-
+                if (!state.hasMemberStateEvent) {
+                    this.leavePromiseHandle.resolve?.(true);
+                    return;
+                }
                 // This is only a fallback in case we do not have working delayed events support.
                 // first we should try to just send the scheduled leave event
                 const error = await this.client
