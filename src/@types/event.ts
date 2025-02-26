@@ -138,6 +138,8 @@ export enum EventType {
     RoomKeyRequest = "m.room_key_request",
     ForwardedRoomKey = "m.forwarded_room_key",
     Dummy = "m.dummy",
+    SecretRequest = "m.secret.request",
+    SecretSend = "m.secret.send",
 
     // Group call events
     GroupCallPrefix = "org.matrix.msc3401.call",

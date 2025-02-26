@@ -1,3 +1,27 @@
+Changes in [37.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.0.0) (2025-02-25)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Remove deprecated `PrefixedLogger` interface ([#4705](https://github.com/matrix-org/matrix-js-sdk/pull/4705)). Contributed by @richvdh.
+* Remove legacy crypto ([#4653](https://github.com/matrix-org/matrix-js-sdk/pull/4653)). Contributed by @florianduros.
+
+## 🦖 Deprecations
+
+* Improve types around User Interactive Auth ([#4709](https://github.com/matrix-org/matrix-js-sdk/pull/4709)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Fix typos in client.ts ([#4715](https://github.com/matrix-org/matrix-js-sdk/pull/4715)). Contributed by @toger5.
+* Enable key upload to backups where we have the decryption key ([#4677](https://github.com/matrix-org/matrix-js-sdk/pull/4677)). Contributed by @ajbura.
+* Remove deprecated `PrefixedLogger` interface ([#4705](https://github.com/matrix-org/matrix-js-sdk/pull/4705)). Contributed by @richvdh.
+* `MatrixClient.setAccountData`: await remote echo. ([#4695](https://github.com/matrix-org/matrix-js-sdk/pull/4695)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Improve types around User Interactive Auth ([#4709](https://github.com/matrix-org/matrix-js-sdk/pull/4709)). Contributed by @t3chguy.
+* Fix `resetEncryption` to remove secrets in 4S ([#4683](https://github.com/matrix-org/matrix-js-sdk/pull/4683)). Contributed by @florianduros.
+
+
 Changes in [36.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v36.2.0) (2025-02-11)
 ==================================================================================================
 ## 🦖 Deprecations
