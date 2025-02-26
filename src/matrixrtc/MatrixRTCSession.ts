@@ -40,6 +40,8 @@ export enum MatrixRTCSessionEvent {
     JoinStateChanged = "join_state_changed",
     // The key used to encrypt media has changed
     EncryptionKeyChanged = "encryption_key_changed",
+    /** The membership manager had to shut down caused by an unrecoverable error */
+    MembershipManagerError = "membership_manager_error",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -53,6 +55,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         encryptionKeyIndex: number,
         participantId: string,
     ) => void;
+    [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
 
 export interface MembershipConfig {
@@ -346,8 +349,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
-            // TODO: Consider exposing this as a signal from the RTCSession so it can be used in the UI.
             logger.error("MembershipManager encountered an unrecoverable error: ", e);
+            this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
         });
         this.encryptionManager!.join(joinConfig);
 
