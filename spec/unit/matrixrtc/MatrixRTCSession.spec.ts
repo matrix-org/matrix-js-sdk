@@ -36,10 +36,10 @@ describe("MatrixRTCSession", () => {
         client.getDeviceId = jest.fn().mockReturnValue("AAAAAAA");
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         client.stopClient();
         client.matrixRTC.stop();
-        if (sess) sess.stop();
+        if (sess) await sess.stop();
         sess = undefined;
     });
 
@@ -496,9 +496,9 @@ describe("MatrixRTCSession", () => {
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
             });
 
-            afterEach(() => {
+            afterEach(async () => {
                 // stop the timers
-                sess!.leaveRoomSession();
+                await sess!.leaveRoomSession();
             });
 
             it("creates a key when joining", () => {
@@ -595,7 +595,7 @@ describe("MatrixRTCSession", () => {
                 }
             });
 
-            it("cancels key send event that fail", async () => {
+            it("cancels key send event that fail", () => {
                 const eventSentinel = {} as unknown as MatrixEvent;
 
                 client.cancelPendingEvent = jest.fn();
