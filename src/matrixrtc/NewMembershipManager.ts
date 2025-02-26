@@ -181,7 +181,15 @@ interface Action {
  */
 class ActionScheduler {
     public state: ActionSchedulerState;
-
+    public static defaultState: ActionSchedulerState = {
+        hasMemberStateEvent: false,
+        running: false,
+        startTime: 0,
+        delayId: undefined,
+        rateLimitRetries: 0,
+        retries: 0,
+        expireUpdateIterations: 0,
+    };
     public constructor(
         state: ActionSchedulerState,
         private manager: Pick<MembershipManager, "membershipLoopHandler">,
@@ -254,6 +262,9 @@ class ActionScheduler {
             this.wakeup?.();
         }
     }
+    public resetState(): void {
+        this.state = ActionScheduler.defaultState;
+    }
 }
 
 /**
@@ -287,6 +298,7 @@ export class MembershipManager implements IMembershipManager {
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
         if (!this.scheduler.state.running) {
+            this.scheduler.resetState();
             this.scheduler.state.running = true;
             this.scheduler
                 .startWithActions([{ ts: Date.now(), type: DirectMembershipManagerAction.Join }])
@@ -425,18 +437,7 @@ export class MembershipManager implements IMembershipManager {
         return 10;
     }
     // Scheduler:
-    private scheduler = new ActionScheduler(
-        {
-            hasMemberStateEvent: false,
-            running: false,
-            startTime: 0,
-            delayId: undefined,
-            rateLimitRetries: 0,
-            retries: 0,
-            expireUpdateIterations: 0,
-        },
-        this,
-    );
+    private scheduler = new ActionScheduler(ActionScheduler.defaultState, this);
 
     // Loop Handler:
     public async membershipLoopHandler(state: ActionSchedulerState, type: MembershipActionType): Promise<void> {
@@ -463,7 +464,7 @@ export class MembershipManager implements IMembershipManager {
                             this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
                         })
                         .catch((e) => {
-                            if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
+                            if (this.rateLimitErrorHandler(e, "sendDelayedStateEvent", type)) return;
                             if (this.maxDelayeExceededErrorHandler(e)) {
                                 this.scheduler.addAction({
                                     ts: Date.now(),
@@ -481,6 +482,7 @@ export class MembershipManager implements IMembershipManager {
                             }
                             return e;
                         });
+                    // On any other error we fall back to not using delayed events and send the join state event immediately
                     if (error) {
                         logger.info("Not using deleayed event because: " + error);
                         this.scheduler.addAction({
@@ -488,12 +490,11 @@ export class MembershipManager implements IMembershipManager {
                             type: MembershipActionType.SendJoinEvent,
                         });
                     }
-                    // On any other error we fall back to not using delayed events and send the state event immediately
                 } else {
                     // Restart case with delayed id.
                     // Remove all running updates and restarts
                     this.scheduler.resetActions([]);
-                    await this.client
+                    const error = await this.client
                         ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel)
                         .then(() => {
                             state.delayId = undefined;
@@ -523,7 +524,16 @@ export class MembershipManager implements IMembershipManager {
                                 });
                                 return;
                             }
+                            return e;
                         });
+                    if (error) {
+                        // This becomes an unhandle-able error case since sth is signifciantly off if we dont hit any of the above cases
+                        // when state.delayId !== undefined
+                        throw Error(
+                            "We failed to cancel a delayed event where we already had a delay id with an error we cannot automatically handle" +
+                                error,
+                        );
+                    }
                 }
                 break;
             }
@@ -564,7 +574,7 @@ export class MembershipManager implements IMembershipManager {
                         // In other error cases we have no idea what is happening
                         return Error("Could not restart delayed event, even though delayed events are supported. " + e);
                     });
-                if (error instanceof Error) throw error;
+                if (error) throw error;
                 break;
             }
             case MembershipActionType.SendMainDelayedEvent: {
@@ -600,12 +610,12 @@ export class MembershipManager implements IMembershipManager {
                         if (this.unsupportedDelayedEndpoint(e)) return;
                         return Error("Could not send delayed event, even though delayed events are supported. " + e);
                     });
-                if (error instanceof Error) throw error;
+                if (error) throw error;
                 break;
             }
             case MembershipActionType.SendScheduledDelayedLeaveEvent: {
                 if (state.delayId) {
-                    await this.client
+                    const error = await this.client
                         ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Send)
                         .then(() => {
                             state.hasMemberStateEvent = false;
@@ -622,10 +632,10 @@ export class MembershipManager implements IMembershipManager {
                             }
                             if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
                             if (this.unsupportedDelayedEndpoint(e)) return;
-
-                            // On any other error we fall back to SendLeaveEvent
-                            this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
+                            return e;
                         });
+                    // On any other error we fall back to SendLeaveEvent
+                    if (error) this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                 } else {
                     this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                 }
@@ -660,7 +670,7 @@ export class MembershipManager implements IMembershipManager {
 
                         return Error("Could not send state event because of unrecoverable error: " + e);
                     });
-                if (error instanceof Error) throw error;
+                if (error) throw error;
                 break;
             }
             case MembershipActionType.UpdateExpiry: {
@@ -692,7 +702,7 @@ export class MembershipManager implements IMembershipManager {
                             "Could not update state event with new expiry ts because of unrecoverable error: " + e,
                         );
                     });
-                if (error instanceof Error) throw error;
+                if (error) throw error;
                 break;
             }
             case MembershipActionType.SendLeaveEvent: {
@@ -720,7 +730,7 @@ export class MembershipManager implements IMembershipManager {
 
                         return Error("Failed to send Leave event because of: " + e);
                     });
-                if (error instanceof Error) throw error;
+                if (error) throw error;
                 break;
             }
         }
