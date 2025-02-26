@@ -32,7 +32,7 @@ import { makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
 describe("MatrixRTCSessionManager", () => {
     let client: MatrixClient;
 
-    beforeEach(async () => {
+    beforeEach(() => {
         client = new MatrixClient({ baseUrl: "base_url" });
         client.matrixRTC.start();
     });

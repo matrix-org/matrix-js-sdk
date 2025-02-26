@@ -319,7 +319,7 @@ describe.each([
         it("resolves delayed leave event when leave is called", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
-            await jest.advanceTimersToNextTimerAsync();
+            await jest.advanceTimersByTimeAsync(1);
             await manager.leave();
             expect(client._unstable_updateDelayedEvent).toHaveBeenLastCalledWith("id", "send");
             expect(client.sendStateEvent).toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe.each([
         it("send leave event when leave is called and resolving delayed leave fails", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive);
-            await jest.advanceTimersByTimeAsync(100);
+            await jest.advanceTimersByTimeAsync(1);
             (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue("unknown");
             await manager.leave();
             // We send a normal leave event since we failed using updateDelayedEvent with the "send" action.
@@ -341,9 +341,7 @@ describe.each([
         // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
         it("does nothing if not joined !FailsForLegacy", async () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
-            const errorFn = jest.fn();
-            await manager.leave().catch(errorFn);
-            expect(errorFn).not.toHaveBeenCalled();
+            await manager.leave();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });

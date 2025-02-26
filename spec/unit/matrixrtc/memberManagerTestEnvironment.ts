@@ -27,16 +27,12 @@ It is very specific to the MembershipManager.spec.ts file and introduces the fol
 */
 
 import { TestEnvironment } from "jest-environment-jsdom";
-import { type JestEnvironmentConfig, type EnvironmentContext } from "@jest/environment";
 
-import { logger } from "../../../src/logger";
+import { logger as rootLogger } from "../../../src/logger";
+const logger = rootLogger.getChild("MatrixRTCSessionManager");
 
-class CustomEnvironment extends TestEnvironment {
-    constructor(config: JestEnvironmentConfig, context: EnvironmentContext) {
-        super(config, context);
-    }
-
-    async handleTestEvent(event: any) {
+class MemberManagerTestEnvironment extends TestEnvironment {
+    handleTestEvent(event: any) {
         if (event.name === "test_start" && event.test.name.includes("!FailsForLegacy")) {
             let parent = event.test.parent;
             let isLegacy = false;
@@ -49,10 +45,10 @@ class CustomEnvironment extends TestEnvironment {
                 }
             }
             if (isLegacy) {
-                logger.log("skip test: ", event.test.name);
+                logger.info("skip test: ", event.test.name);
                 event.test.mode = "skip";
             }
         }
     }
 }
-module.exports = CustomEnvironment;
+module.exports = MemberManagerTestEnvironment;
