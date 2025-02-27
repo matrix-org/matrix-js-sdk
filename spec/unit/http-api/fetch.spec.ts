@@ -494,6 +494,7 @@ describe("FetchHttpApi", () => {
             fetchFn,
             doNotAttemptTokenRefresh: false,
             tokenRefreshFunction,
+            accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
         });
 
@@ -514,11 +515,13 @@ describe("FetchHttpApi", () => {
                 get: jest.fn().mockReturnValue("application/json"),
             },
         });
-        deferredTokenRefresh.resolve({ accessToken: "NEW_TOKEN", refreshToken: "NEW_REFRESH" });
+        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
 
         await prom1;
         await prom2;
         expect(fetchFn).toHaveBeenCalledTimes(4); // 2 original calls + 2 retries
         expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+        expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
+        expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });
 });
