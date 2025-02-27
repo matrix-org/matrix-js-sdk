@@ -108,6 +108,12 @@ export class FetchHttpApi<O extends IHttpOpts> {
     }
 
     /**
+     * Promise used to block authenticated requests during a token refresh to avoid repeated expected errors.
+     * @private
+     */
+    private tokenRefreshPromise?: Promise<unknown>;
+
+    /**
      * Perform an authorised request to the homeserver.
      * @param method - The HTTP method e.g. "GET".
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
@@ -163,13 +169,17 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         try {
+            // Await any ongoing token refresh
+            await this.tokenRefreshPromise;
             const response = await this.request<T>(method, path, queryParams, body, opts);
             return response;
         } catch (error) {
             const err = error as MatrixError;
 
             if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
-                const shouldRetry = await this.tryRefreshToken();
+                const tokenRefreshPromise = this.tryRefreshToken();
+                this.tokenRefreshPromise = Promise.allSettled([tokenRefreshPromise]);
+                const shouldRetry = await tokenRefreshPromise;
                 // if we got a new token retry the request
                 if (shouldRetry) {
                     return this.authedRequest(method, path, queryParams, body, {
@@ -177,7 +187,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
                         doNotAttemptTokenRefresh: true,
                     });
                 }
+
+                throw err;
             }
+
             // otherwise continue with error handling
             if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
