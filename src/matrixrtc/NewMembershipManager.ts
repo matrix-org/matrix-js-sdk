@@ -37,7 +37,7 @@ const logger = rootLogger.getChild("MatrixRTCSession");
  */
 export interface IMembershipManager {
     /**
-     * If we are trying to join the session.
+     * If we are trying to join, or have successfully joined the session.
      * It does not reflect if the room state is already configured to represent us being joined.
      * It only means that the Manager is running.
      * @returns true if we intend to be participating in the MatrixRTC session
@@ -196,14 +196,13 @@ class ActionScheduler {
     }
     public constructor(
         state: ActionSchedulerState,
+        /** This is the callback called for each scheduled action (`this.addAction()`) */
         private membershipLoopHandler: (state: ActionSchedulerState, type: MembershipActionType) => Promise<void>,
     ) {
         this.state = state;
     }
-    // state variables for a wakeup mechanism (in case we add some action externally and need to leave the current sleep)
-    private wakeupPromise?: Promise<void>;
+    // function for the wakeup mechanism (in case we add an action externally and need to leave the current sleep)
     private wakeup?: (value: void | PromiseLike<void>) => void;
-    private didWakeUp = false;
 
     private actions: Action[] = [];
     private insertions: Action[] = [];
@@ -221,16 +220,15 @@ class ActionScheduler {
         while (this.actions.length > 0) {
             this.actions.sort((a, b) => a.ts - b.ts);
             const nextAction = this.actions[0];
-
-            this.wakeupPromise = new Promise((resolve) => {
-                this.wakeup = resolve;
+            let didWakeUp = false;
+            const wakeupPromise = new Promise<void>((resolve) => {
+                this.wakeup = (): void => {
+                    didWakeUp = true;
+                    resolve();
+                };
             });
-            if (nextAction.ts > Date.now()) await Promise.race([this.wakeupPromise, sleep(nextAction.ts - Date.now())]);
-            if (this.didWakeUp) {
-                // In case of a wakeup we do not want to run the next action because the next action now might be sth different.
-                // Instead we recompute the actions array and do another iteration.
-                this.didWakeUp = false;
-            } else {
+            if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
+            if (!didWakeUp) {
                 logger.debug(
                     "Current MembershipManager processing: " + nextAction.type,
                     "\nQueue:",
@@ -260,16 +258,14 @@ class ActionScheduler {
         this.insertions.push(action);
         const nextTs = this.actions[0]?.ts;
         if (!nextTs || nextTs > action.ts) {
-            this.didWakeUp = true;
             this.wakeup?.();
         }
     }
     public resetActions(actions: Action[]): void {
         this.resetWith = actions;
         const nextTs = this.actions[0]?.ts;
-        const newestTs = actions.map((a) => a.ts).sort((a, b) => a - b)[0];
+        const newestTs = this.resetWith.map((a) => a.ts).sort((a, b) => a - b)[0];
         if (nextTs && newestTs && nextTs > newestTs) {
-            this.didWakeUp = true;
             this.wakeup?.();
         }
     }
@@ -283,10 +279,10 @@ class ActionScheduler {
 }
 
 /**
- * This class takes care of the membership management.
+ * This class is responsible for sending all events relating to the own membership of a matrixRTC call.
  * It has the following tasks:
  *  - Send the users leave delayed event before sending the membership
- *  - Sent the users membership if the state machine is started
+ *  - Send the users membership if the state machine is started
  *  - Check if the delayed event was canceled due to sending the membership
  *  - update the delayed event (`restart`)
  *  - Update the state event every ~5h = `DEFAULT_EXPIRE_DURATION` (so it does not get treated as expired)
@@ -447,7 +443,9 @@ export class MembershipManager implements IMembershipManager {
     }
 
     // Scheduler:
-    private scheduler = new ActionScheduler(ActionScheduler.defaultState, this.membershipLoopHandler.bind(this));
+    private scheduler = new ActionScheduler(ActionScheduler.defaultState, (state, type) =>
+        this.membershipLoopHandler(state, type),
+    );
 
     // Loop Handler:
     private async membershipLoopHandler(state: ActionSchedulerState, type: MembershipActionType): Promise<void> {
@@ -518,7 +516,7 @@ export class MembershipManager implements IMembershipManager {
                         })
                         .catch((e) => {
                             if (this.rateLimitErrorHandler(e, "updateDelayedEvent", type)) return;
-                            if (this.notFoundError(e)) {
+                            if (this.isNotFoundError(e)) {
                                 // If we get a M_NOT_FOUND we know that the delayed event got already removed.
                                 // This means we are good and can set it to undefined and run this again.
                                 state.delayId = undefined;
@@ -570,7 +568,7 @@ export class MembershipManager implements IMembershipManager {
                         });
                     })
                     .catch((e) => {
-                        if (this.notFoundError(e)) {
+                        if (this.isNotFoundError(e)) {
                             state.delayId = undefined;
                             this.scheduler.addAction({
                                 ts: Date.now(),
@@ -639,7 +637,7 @@ export class MembershipManager implements IMembershipManager {
                             this.leavePromiseDefer = undefined;
                         })
                         .catch((e) => {
-                            if (this.notFoundError(e)) {
+                            if (this.isNotFoundError(e)) {
                                 state.delayId = undefined;
                                 this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                                 return;
@@ -649,6 +647,10 @@ export class MembershipManager implements IMembershipManager {
                             if (this.retryOnNetworkError(e, type)) return;
 
                             // On any other error we fall back to SendLeaveEvent (this includes hard errors from rate limiting)
+                            logger.warn(
+                                "Encountered unexpected error during SendScheduledDelayedLeaveEvent. Falling back to SendLeaveEvent",
+                                e,
+                            );
                             this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendLeaveEvent });
                         });
                 } else {
@@ -775,7 +777,7 @@ export class MembershipManager implements IMembershipManager {
      * @param error the error causing this handler check/execution
      * @returns true if its a not found error
      */
-    private notFoundError(error: unknown): boolean {
+    private isNotFoundError(error: unknown): boolean {
         return error instanceof MatrixError && error.errcode === "M_NOT_FOUND";
     }
 
@@ -835,7 +837,6 @@ export class MembershipManager implements IMembershipManager {
             return true;
         }
 
-        // Failiour
         throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + "): " + (error as Error));
     }
 
@@ -876,7 +877,7 @@ export class MembershipManager implements IMembershipManager {
             error.httpStatus < 600
         ) {
             logger.warn(
-                "Network error while sending event, retrying in " + retryDurationString + " " + retryCounterString,
+                "Server error while sending event, retrying in " + retryDurationString + " " + retryCounterString,
                 error,
             );
         } else {
