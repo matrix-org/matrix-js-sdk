@@ -38,7 +38,7 @@ export interface IMembershipManager {
      * @returns It resolves with true in case the leave was sent successfully.
      * It resolves with false in case we hit the timeout before sending successfully.
      */
-    leave(timeout: number | undefined): Promise<boolean>;
+    leave(timeout?: number): Promise<boolean>;
     /**
      * Call this if the MatrixRTC session members have changed.
      */
@@ -117,7 +117,6 @@ export class LegacyMembershipManager implements IMembershipManager {
             | "getUserId"
             | "getDeviceId"
             | "sendStateEvent"
-            | "_unstable_sendDelayedEvent"
             | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
         >,
@@ -312,6 +311,7 @@ export class LegacyMembershipManager implements IMembershipManager {
                 if (this.disconnectDelayId !== undefined) {
                     this.scheduleDelayDisconnection();
                 }
+                // TODO throw or log an error if this.disconnectDelayId === undefined
             } else {
                 // Not joined
                 let sentDelayedDisconnect = false;
