@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "target": "es2022",
-        "experimentalDecorators": true,
+        "experimentalDecorators": false,
         "esModuleInterop": true,
         "module": "commonjs",
         "moduleResolution": "node",
