@@ -767,22 +767,22 @@ export class MapWithDefault<K, V> extends Map<K, V> {
  * and any concurrent calls will return the same promise as the original call.
  * After execution is complete a new call will be able to run the method again.
  */
-export function singleConcurrency<A extends Array<unknown>, V>(
-    target: unknown,
-    propertyKey: string,
-    descriptor: TypedPropertyDescriptor<(...a: A) => Promise<V>>,
-): void {
-    let promise: Promise<V> | undefined;
-    const method = descriptor.value!;
+export function singleConcurrency<This, Args extends unknown[], Return>(
+    target: (this: This, ...args: Args) => Promise<Return>,
+    context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Promise<Return>>,
+): (this: This, ...args: Args) => Promise<Return> {
+    let promise: Promise<Return> | undefined;
 
-    descriptor.value = async function (...args: A): Promise<V> {
+    async function replacementMethod(this: This, ...args: Args): Promise<Return> {
         if (promise) return promise;
         try {
-            promise = method.apply(this, args);
+            promise = target.call(this, ...args);
             await promise;
             return promise;
         } finally {
             promise = undefined;
         }
-    };
+    }
+
+    return replacementMethod;
 }
