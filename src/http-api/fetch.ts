@@ -187,8 +187,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
                         doNotAttemptTokenRefresh: true,
                     });
                 }
-
-                throw err;
             }
 
             // otherwise continue with error handling

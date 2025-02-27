@@ -125,7 +125,7 @@ describe("FetchHttpApi", () => {
         ).resolves.toBe(text);
     });
 
-    it("should send token via query params if useAuthorizationHeader=false", () => {
+    it("should send token via query params if useAuthorizationHeader=false", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -134,11 +134,11 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: false,
         });
-        api.authedRequest(Method.Get, "/path");
+        await api.authedRequest(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("token");
     });
 
-    it("should send token via headers by default", () => {
+    it("should send token via headers by default", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -146,7 +146,7 @@ describe("FetchHttpApi", () => {
             fetchFn,
             accessToken: "token",
         });
-        api.authedRequest(Method.Get, "/path");
+        await api.authedRequest(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
     });
 
@@ -163,7 +163,7 @@ describe("FetchHttpApi", () => {
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBeFalsy();
     });
 
-    it("should ensure no token is leaked out via query params if sending via headers", () => {
+    it("should ensure no token is leaked out via query params if sending via headers", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -172,12 +172,12 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: true,
         });
-        api.authedRequest(Method.Get, "/path", { access_token: "123" });
+        await api.authedRequest(Method.Get, "/path", { access_token: "123" });
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
     });
 
-    it("should not override manually specified access token via query params", () => {
+    it("should not override manually specified access token via query params", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -186,11 +186,11 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: false,
         });
-        api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
+        await api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("RealToken");
     });
 
-    it("should not override manually specified access token via header", () => {
+    it("should not override manually specified access token via header", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -199,16 +199,16 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: true,
         });
-        api.authedRequest(Method.Get, "/path", undefined, undefined, {
+        await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Authorization: "Bearer RealToken" },
         });
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer RealToken");
     });
 
-    it("should not override Accept header", () => {
+    it("should not override Accept header", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
-        api.authedRequest(Method.Get, "/path", undefined, undefined, {
+        await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Accept: "text/html" },
         });
         expect(fetchFn.mock.calls[0][1].headers["Accept"]).toBe("text/html");
@@ -501,6 +501,7 @@ describe("FetchHttpApi", () => {
         const prom1 = api.authedRequest(Method.Get, "/path1");
         const prom2 = api.authedRequest(Method.Get, "/path2");
 
+        await jest.advanceTimersByTimeAsync(10); // wait for requests to fire
         expect(fetchFn).toHaveBeenCalledTimes(2);
         fetchFn.mockResolvedValue({
             ok: true,
