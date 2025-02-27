@@ -18,10 +18,12 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
+import { ErrorResponse as OidcAuthError } from "oidc-client-ts";
+
 import { checkObjectHasKeys, encodeParams } from "../utils.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { Method } from "./method.ts";
-import { ConnectionError, type MatrixError } from "./errors.ts";
+import { ConnectionError, MatrixError, TokenRefreshError } from "./errors.ts";
 import {
     HttpApiEvent,
     type HttpApiEventHandlerMap,
@@ -42,6 +44,12 @@ export type ResponseType<T, O extends IHttpOpts> = O extends undefined
     : O extends { onlyData: true }
       ? T
       : TypedResponse<T>;
+
+const enum TokenRefreshOutcome {
+    Success = "success",
+    Failure = "failure",
+    Logout = "logout",
+}
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
@@ -174,29 +182,36 @@ export class FetchHttpApi<O extends IHttpOpts> {
             const response = await this.request<T>(method, path, queryParams, body, opts);
             return response;
         } catch (error) {
-            const err = error as MatrixError;
+            if (!(error instanceof MatrixError)) {
+                throw error;
+            }
 
-            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
+            if (error.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
                 const tokenRefreshPromise = this.tryRefreshToken();
                 this.tokenRefreshPromise = Promise.allSettled([tokenRefreshPromise]);
-                const shouldRetry = await tokenRefreshPromise;
-                // if we got a new token retry the request
-                if (shouldRetry) {
+                const outcome = await tokenRefreshPromise;
+
+                if (outcome === TokenRefreshOutcome.Success) {
+                    // if we got a new token retry the request
                     return this.authedRequest(method, path, queryParams, body, {
                         ...paramOpts,
                         doNotAttemptTokenRefresh: true,
                     });
                 }
+                if (outcome === TokenRefreshOutcome.Failure) {
+                    throw new TokenRefreshError(error);
+                }
+                // Fall through to SessionLoggedOut handler below
             }
 
             // otherwise continue with error handling
-            if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
-                this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
-            } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
-                this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
+            if (error.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
+                this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, error);
+            } else if (error.errcode == "M_CONSENT_NOT_GIVEN") {
+                this.eventEmitter.emit(HttpApiEvent.NoConsent, error.message, error.data.consent_uri);
             }
 
-            throw err;
+            throw error;
         }
     }
 
@@ -206,9 +221,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns Promise that resolves to a boolean - true when token was refreshed successfully
      */
     @singleAsyncExecution
-    private async tryRefreshToken(): Promise<boolean> {
+    private async tryRefreshToken(): Promise<TokenRefreshOutcome> {
         if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
-            return false;
+            return TokenRefreshOutcome.Logout;
         }
 
         try {
@@ -216,10 +231,13 @@ export class FetchHttpApi<O extends IHttpOpts> {
             this.opts.accessToken = accessToken;
             this.opts.refreshToken = refreshToken;
             // successfully got new tokens
-            return true;
+            return TokenRefreshOutcome.Success;
         } catch (error) {
             this.opts.logger?.warn("Failed to refresh token", error);
-            return false;
+            if (error instanceof OidcAuthError || error instanceof MatrixError) {
+                return TokenRefreshOutcome.Logout;
+            }
+            return TokenRefreshOutcome.Failure;
         }
     }
 

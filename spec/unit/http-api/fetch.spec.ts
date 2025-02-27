@@ -20,6 +20,7 @@ import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
     ClientPrefix,
+    ConnectionError,
     HttpApiEvent,
     type HttpApiEventHandlerMap,
     IdentityPrefix,
@@ -288,7 +289,7 @@ describe("FetchHttpApi", () => {
 
                 describe("with a tokenRefreshFunction", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
-                        const error = new Error("uh oh");
+                        const error = new MatrixError();
                         const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
                         const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
@@ -306,6 +307,27 @@ describe("FetchHttpApi", () => {
                         );
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
+                        const error = new ConnectionError("transitive fault");
+                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
+                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                        jest.spyOn(emitter, "emit");
+                        const api = new FetchHttpApi(emitter, {
+                            baseUrl,
+                            prefix,
+                            fetchFn,
+                            tokenRefreshFunction,
+                            accessToken,
+                            refreshToken,
+                        });
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            unknownTokenErr,
+                        );
+                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should refresh token and retry request", async () => {
