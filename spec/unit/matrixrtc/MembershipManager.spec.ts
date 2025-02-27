@@ -655,13 +655,32 @@ describe.each([
         });
         it("falls back to using pure state events when some error occurs while sending delayed events !FailsForLegacy", async () => {
             const unrecoverableError = jest.fn();
-            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 601));
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive, unrecoverableError);
-            await jest.advanceTimersByTimeAsync(1);
-
+            await waitForMockCall(client.sendStateEvent);
             expect(unrecoverableError).not.toHaveBeenCalledWith();
             expect(client.sendStateEvent).toHaveBeenCalled();
+        });
+        it("retries before failing in case its a network error !FailsForLegacy", async () => {
+            const unrecoverableError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
+            const manager = new TestMembershipManager(
+                { callMemberEventRetryDelayMinimum: 1000, maximumNetworkErrorRetryCount: 7 },
+                room,
+                client,
+                () => undefined,
+            );
+            manager.join([focus], focusActive, unrecoverableError);
+            for (let retries = 0; retries < 7; retries++) {
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(retries + 1);
+                await jest.advanceTimersByTimeAsync(1000);
+            }
+            expect(unrecoverableError).toHaveBeenCalled();
+            expect(unrecoverableError.mock.lastCall![0].message).toMatch(
+                "The MembershipManager has to shut down because of the end condition: Error: Reached maximum",
+            );
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
         it("falls back to using pure state events when UnsupportedEndpointError encountered for delayed events !FailsForLegacy", async () => {
             const unrecoverableError = jest.fn();

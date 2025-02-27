@@ -312,7 +312,9 @@ export class MembershipManager implements IMembershipManager {
             this.scheduler.state.running = true;
             this.scheduler
                 .startWithActions([{ ts: Date.now(), type: DirectMembershipManagerAction.Join }])
-                .catch((e) => onError?.(e));
+                .catch((e) => {
+                    onError?.(e);
+                });
         }
     }
 
@@ -442,10 +444,10 @@ export class MembershipManager implements IMembershipManager {
     private get maximumRateLimitRetryCount(): number {
         return this.joinConfig?.maximumRateLimitRetryCount ?? 10;
     }
-    private get maximumRetryCount(): number {
-        // TODO allow configuring this via `MembershipConfig`.
-        return 10;
+    private get maximumNetworkErrorRetryCount(): number {
+        return this.joinConfig?.maximumNetworkErrorRetryCount ?? 10;
     }
+
     // Scheduler:
     private scheduler = new ActionScheduler(ActionScheduler.defaultState, this.membershipLoopHandler.bind(this));
 
@@ -482,18 +484,14 @@ export class MembershipManager implements IMembershipManager {
                                 });
                                 return;
                             }
-                            if (this.unsupportedDelayedEndpoint(e)) {
-                                logger.info("Not using delayed event because the endpoint is not supported");
-                                this.scheduler.addAction({
-                                    ts: Date.now(),
-                                    type: MembershipActionType.SendJoinEvent,
-                                });
-                                return;
-                            }
-
                             if (this.retryOnNetworkError(e, type)) return;
 
-                            logger.info("Not using delayed event because: " + e.getMessage());
+                            // log and fall through
+                            if (this.unsupportedDelayedEndpoint(e)) {
+                                logger.info("Not using delayed event because the endpoint is not supported");
+                            } else {
+                                logger.info("Not using delayed event because: " + e);
+                            }
                             // On any other error we fall back to not using delayed events and send the join state event immediately
                             this.scheduler.addAction({
                                 ts: Date.now(),
@@ -501,7 +499,13 @@ export class MembershipManager implements IMembershipManager {
                             });
                         });
                 } else {
-                    // Restart case with delayed id.
+                    // This can happen if someone else (or another client) removes our own membership event.
+                    // It will trigger `onRTCSessionMemberUpdate` queue `MembershipActionType.SendFirstDelayedEvent`.
+                    // We might still have our delyed event from the previous participation and dependent on the serve this might not
+                    // get automatically removed if the state changes. Hence It would remove our membership unexpectedly shortly after the rejoin.
+                    //
+                    // In this block we will try to cancel this delayed event before setting up a new one.
+
                     // Remove all running updates and restarts
                     this.scheduler.resetActions([]);
                     await this.client
@@ -702,7 +706,6 @@ export class MembershipManager implements IMembershipManager {
                     })
                     .catch((e) => {
                         if (this.rateLimitErrorHandler(e, "sendStateEvent", type)) return;
-                        // TODO add timeout/netowrk error (or just the below)
 
                         // Event sending retry (different to rate limit retries)
                         if (this.retryOnNetworkError(e, type)) return;
@@ -832,7 +835,7 @@ export class MembershipManager implements IMembershipManager {
         }
 
         // Failiour
-        throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + "): " + error.message);
+        throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + "): " + (error as Error));
     }
 
     /**
@@ -846,30 +849,40 @@ export class MembershipManager implements IMembershipManager {
      */
     private retryOnNetworkError(error: unknown, type: MembershipActionType): boolean {
         // "Is a network error"-boundary
+        const retries = this.scheduler.state.networkErrorRetries.get(type) ?? 0;
         const retryDurationString = this.callMemberEventRetryDelayMinimum / 1000 + "s";
+        const retryCounterString = "(" + retries + "/" + this.maximumNetworkErrorRetryCount + ")";
         if (error instanceof Error && error.name === "AbortError") {
-            logger.warn("Network local timeout error while sending event, retrying in " + retryDurationString, error);
+            logger.warn(
+                "Network local timeout error while sending event, retrying in " +
+                    retryDurationString +
+                    " " +
+                    retryCounterString,
+                error,
+            );
         } else if (
             error instanceof HTTPError &&
             typeof error.httpStatus === "number" &&
             error.httpStatus >= 500 &&
             error.httpStatus < 600
         ) {
-            logger.warn("Network error while sending event, retrying in " + retryDurationString, error);
+            logger.warn(
+                "Network error while sending event, retrying in " + retryDurationString + " " + retryCounterString,
+                error,
+            );
         } else {
             return false;
         }
 
         // retry boundary
-        const retries = this.scheduler.state.networkErrorRetries.get(type) ?? 0;
-        if (retries < this.maximumRetryCount) {
+        if (retries < this.maximumNetworkErrorRetryCount) {
             this.scheduler.state.networkErrorRetries.set(type, retries + 1);
             this.scheduler.addAction({ ts: Date.now() + this.callMemberEventRetryDelayMinimum, type });
             return true;
         }
 
         // Failiour
-        throw Error("Reached maximum (" + this.maximumRetryCount + ") retries cause by: " + error);
+        throw Error("Reached maximum (" + this.maximumNetworkErrorRetryCount + ") retries cause by: " + error);
     }
 
     /**

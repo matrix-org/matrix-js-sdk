@@ -110,10 +110,16 @@ export interface MembershipConfig {
      * @deprecated It should be possible to make it stable without this.
      */
     callMemberEventRetryJitter?: number;
+
     /**
      * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a server rate limit has been hit.
      */
     maximumRateLimitRetryCount?: number;
+
+    /**
+     * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a network error occurs.
+     */
+    maximumNetworkErrorRetryCount?: number;
 }
 
 export interface EncryptionConfig {
