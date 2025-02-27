@@ -233,12 +233,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * WARN: this can in theory only be a subset of the room with the properties required by
      * this class.
-     * Outside of tests this most likely will be a full room however.
-     * @deprecated
+     * Outside of tests this most likely will be a full room, however.
+     * @deprecated Relying on a full Room object being available here is an anti-pattern. You should be tracking
+     * the room object in your own code and passing it in when needed.
      */
     public get room(): Room {
         return this.roomSubset as Room;
     }
+
     /**
      * This constructs a room session. When using MatrixRTC inside the js-sdk this is expected
      * to be used with the MatrixRTCSessionManager exclusively.
@@ -247,7 +249,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * to manage a joined MatrixRTC session.
      *
      * @param client A subset of the {@link MatrixClient} that lets the session interact with the Matrix room.
-     * @param room The room this session is attached to. A subset of a js-sdk Room that the session needs.
+     * @param roomSubset The room this session is attached to. A subset of a js-sdk Room that the session needs.
      * @param memberships The list of memberships this session currently has.
      */
     public constructor(
