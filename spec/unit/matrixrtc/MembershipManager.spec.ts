@@ -339,9 +339,8 @@ describe.each([
             );
         });
         // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
-        it("does nothing if not joined !FailsForLegacy", async () => {
+        it("does nothing if not joined !FailsForLegacy", () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
-            await manager.leave();
             expect(async () => await manager.leave()).not.toThrow();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
