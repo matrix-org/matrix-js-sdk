@@ -158,7 +158,7 @@ interface ActionSchedulerState {
     /** Retry counter for rate limits */
     rateLimitRetries: Map<MembershipActionType, number>;
     /** Retry counter for other errors */
-    retries: Map<MembershipActionType, number>;
+    networkErrorRetries: Map<MembershipActionType, number>;
 }
 
 interface Action {
@@ -191,7 +191,7 @@ class ActionScheduler {
             startTime: 0,
             delayId: undefined,
             rateLimitRetries: new Map(),
-            retries: new Map(),
+            networkErrorRetries: new Map(),
             expireUpdateIterations: 0,
         };
     }
@@ -273,7 +273,7 @@ class ActionScheduler {
     }
     public resetRateLimitCounter(type: MembershipActionType): void {
         this.state.rateLimitRetries.set(type, 0);
-        this.state.retries.set(type, 0);
+        this.state.networkErrorRetries.set(type, 0);
     }
 }
 
@@ -469,7 +469,7 @@ export class MembershipManager implements IMembershipManager {
                         .then((response) => {
                             // Success we reset retries and set delayId.
                             state.rateLimitRetries.set(MembershipActionType.SendFirstDelayedEvent, 0);
-                            state.retries.set(MembershipActionType.SendFirstDelayedEvent, 0);
+                            state.networkErrorRetries.set(MembershipActionType.SendFirstDelayedEvent, 0);
                             state.delayId = response.delay_id;
                             this.scheduler.addAction({ ts: Date.now(), type: MembershipActionType.SendJoinEvent });
                         })
@@ -768,51 +768,56 @@ export class MembershipManager implements IMembershipManager {
 
     /**
      * Check if its a NOT_FOUND error
-     * @param e the error causing this handler check/execution
+     * @param error the error causing this handler check/execution
      * @returns true if its a not found error
      */
-    private notFoundError(e: unknown): boolean {
-        return e instanceof MatrixError && e.errcode === "M_NOT_FOUND";
+    private notFoundError(error: unknown): boolean {
+        return error instanceof MatrixError && error.errcode === "M_NOT_FOUND";
     }
 
     /**
      * Check if this is a DelayExceeded timeout and update the TimeoutOverride for the next try
-     * @param e the error causing this handler check/execution
+     * @param error the error causing this handler check/execution
      * @returns true if its a delay exceeded error and we updated the local TimeoutOverride
      */
-    private maxDelayExceededErrorHandler(e: unknown): boolean {
+    private maxDelayExceededErrorHandler(error: unknown): boolean {
         if (
-            e instanceof MatrixError &&
-            e.errcode === "M_UNKNOWN" &&
-            e.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
+            error instanceof MatrixError &&
+            error.errcode === "M_UNKNOWN" &&
+            error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
         ) {
-            const maxDelayAllowed = e.data["org.matrix.msc4140.max_delay"];
+            const maxDelayAllowed = error.data["org.matrix.msc4140.max_delay"];
             if (typeof maxDelayAllowed === "number" && this.membershipServerSideExpiryTimeout > maxDelayAllowed) {
                 this.membershipServerSideExpiryTimeoutOverride = maxDelayAllowed;
             }
-            logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", e);
+            logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
             return true;
         }
         return false;
     }
+
     /**
      * Check if we have a rate limit error and schedule the same action again if we dont exceed the rate limit retry count yet.
-     * @param e the error causing this handler check/execution
+     * @param error the error causing this handler check/execution
      * @param method the method used for the throw message
      * @param type which MembershipActionType we reschedule because of a rate limit.
-     * @returns Returns true if handled the error and rescheduled the correct next action did anything.
+     * @throws If it is a rate limit error and the retry count got exceeded
+     * @returns Returns true if we handled the error by rescheduling the correct next action.
+     * Returns false if it is not a network error.
      */
-    private rateLimitErrorHandler(e: unknown, method: string, type: MembershipActionType): boolean | Error {
-        if (!(e instanceof HTTPError && e.isRateLimitError())) {
+    private rateLimitErrorHandler(error: unknown, method: string, type: MembershipActionType): boolean {
+        // "Is rate limit"-boundary
+        if (!(error instanceof HTTPError && error.isRateLimitError())) {
             return false;
         }
 
+        // retry boundary
         const rateLimitRetries = this.scheduler.state.rateLimitRetries.get(type) ?? 0;
         if (rateLimitRetries < this.maximumRateLimitRetryCount) {
             let resendDelay: number;
             const defaultMs = 5000;
             try {
-                resendDelay = e.getRetryAfterMs() ?? defaultMs;
+                resendDelay = error.getRetryAfterMs() ?? defaultMs;
                 logger.info(`Rate limited by server, retrying in ${resendDelay}ms`);
             } catch (e) {
                 logger.warn(
@@ -823,51 +828,56 @@ export class MembershipManager implements IMembershipManager {
             }
             this.scheduler.state.rateLimitRetries.set(type, rateLimitRetries + 1);
             this.scheduler.addAction({ ts: Date.now() + resendDelay, type });
-
             return true;
         }
-        throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + "): " + e.message);
+
+        // Failiour
+        throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + "): " + error.message);
     }
 
     /**
      * FIXME Don't Check the error and retry the same MembershipAction again in the configured time and for the configured retry count.
-     * @param e the error causing this handler check/execution
+     * @param error the error causing this handler check/execution
      * @param type the action type that we need to repeat because of the error
-     * @returns Returns true if we handled the error by rescheduling the correct next action.
+     * @throws If it is a network error and the retry count got exceeded
+     * @returns
+     * Returns true if we handled the error by rescheduling the correct next action.
+     * Returns false if it is not a network error.
      */
-    private retryOnNetworkError(e: unknown, type: MembershipActionType): boolean {
-        return false;
-        /*
-        handle HTTPError with status = 5xx || ConnectionError || AbortError;
-        const retries = this.scheduler.state.retries.get(type) ?? 0;
-
-
-        if (e instanceof HTTPError && typeof e.httpStatus === "number" && e.httpStatus >= 500 && e.httpStatus < 600) {
-            logger.warn("Network error while sending state event, retrying in 5s", e);
-            this.scheduler.state.retries.set(type, retries + 1);
-            this.scheduler.addAction({ ts: Date.now() + this.callMemberEventRetryDelayMinimum, type });
-
-            return true;
-        }
-
-        // timeout
-
-        if (retries < this.maximumRetryCount) {
-            this.scheduler.state.retries.set(type, retries + 1);
-
-            return true;
+    private retryOnNetworkError(error: unknown, type: MembershipActionType): boolean {
+        // "Is a network error"-boundary
+        const retryDurationString = this.callMemberEventRetryDelayMinimum / 1000 + "s";
+        if (error instanceof Error && error.name === "AbortError") {
+            logger.warn("Network local timeout error while sending event, retrying in " + retryDurationString, error);
+        } else if (
+            error instanceof HTTPError &&
+            typeof error.httpStatus === "number" &&
+            error.httpStatus >= 500 &&
+            error.httpStatus < 600
+        ) {
+            logger.warn("Network error while sending event, retrying in " + retryDurationString, error);
         } else {
-            throw Error("Reached maximum (" + this.maximumRetryCount + ") retries cause by: " + e);
+            return false;
         }
-            */
+
+        // retry boundary
+        const retries = this.scheduler.state.networkErrorRetries.get(type) ?? 0;
+        if (retries < this.maximumRetryCount) {
+            this.scheduler.state.networkErrorRetries.set(type, retries + 1);
+            this.scheduler.addAction({ ts: Date.now() + this.callMemberEventRetryDelayMinimum, type });
+            return true;
+        }
+
+        // Failiour
+        throw Error("Reached maximum (" + this.maximumRetryCount + ") retries cause by: " + error);
     }
 
     /**
      * Check if its an UnsupportedEndpointError and which implies that we cannot do any delayed event logic
-     * @param e The error to check
-     * @returns true it its a UnsupportedEndpointError
+     * @param error The error to check
+     * @returns true it its an UnsupportedEndpointError
      */
-    private unsupportedDelayedEndpoint(e: unknown): boolean {
-        return e instanceof UnsupportedEndpointError;
+    private unsupportedDelayedEndpoint(error: unknown): boolean {
+        return error instanceof UnsupportedEndpointError;
     }
 }
