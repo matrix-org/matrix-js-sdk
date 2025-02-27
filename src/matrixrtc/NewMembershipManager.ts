@@ -21,31 +21,30 @@ import { UnsupportedEndpointError } from "../errors.ts";
 import { HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import { sleep } from "../utils.ts";
+import { defer, type IDeferred, sleep } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
-
 /**
  * This interface defines what a MembershipManager uses and exposes.
- * This interface is what we use to write tests and allows to change the actual implementation
- * Without breaking tests because of some internal method renaming.
+ * This interface is what we use to write tests and allows changing the actual implementation
+ * without breaking tests because of some internal method renaming.
  *
  * @internal
  */
 export interface IMembershipManager {
     /**
      * If we are trying to join the session.
-     * It does not reflect if the room state is already configures to represent us being joined.
+     * It does not reflect if the room state is already configured to represent us being joined.
      * It only means that the Manager is running.
      * @returns true if we intend to be participating in the MatrixRTC session
      */
     isJoined(): boolean;
     /**
-     * Start sending all necessary events to make this user participant in the RTC session.
+     * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
      * @param fociActive the active focus to use in the joined RTC membership event.
      * @throws can throw if it exceeds a configured maximum retry.
@@ -221,7 +220,6 @@ class ActionScheduler {
 
         while (this.actions.length > 0) {
             this.actions.sort((a, b) => a.ts - b.ts);
-            logger.debug("Current MembershipManager action queue: ", this.actions, "\nDate.now: ", +Date.now());
             const nextAction = this.actions[0];
 
             this.wakeupPromise = new Promise((resolve) => {
@@ -233,6 +231,12 @@ class ActionScheduler {
                 // Instead we recompute the actions array and do another iteration.
                 this.didWakeUp = false;
             } else {
+                logger.debug(
+                    "Current MembershipManager processing: " + nextAction.type,
+                    "\nQueue:",
+                    this.actions,
+                    "\nDate.now: " + Date.now(),
+                );
                 try {
                     await this.membershipLoopHandler(this.state, nextAction.type as MembershipActionType);
                 } catch (e) {
@@ -249,6 +253,7 @@ class ActionScheduler {
             this.actions.push(...this.insertions);
             this.insertions = [];
         }
+        logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
     }
 
     public addAction(action: Action): void {
@@ -307,12 +312,14 @@ export class MembershipManager implements IMembershipManager {
     public join(fociPreferred: Focus[], focusActive?: Focus, onError?: (error: unknown) => void): void {
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
+        this.leavePromiseDefer = undefined;
         if (!this.scheduler.state.running) {
             this.scheduler.resetState();
             this.scheduler.state.running = true;
             this.scheduler
                 .startWithActions([{ ts: Date.now(), type: DirectMembershipManagerAction.Join }])
                 .catch((e) => {
+                    logger.error("MembershipManager stopped because: ", e);
                     onError?.(e);
                 });
         }
@@ -327,24 +334,15 @@ export class MembershipManager implements IMembershipManager {
         if (!this.scheduler.state.running) return Promise.resolve(true);
         this.scheduler.state.running = false;
 
-        if (!this.leavePromise) {
+        if (!this.leavePromiseDefer) {
             // reset scheduled actions so we will not do any new actions.
             this.scheduler.resetActions([{ type: DirectMembershipManagerAction.Leave, ts: Date.now() }]);
-            this.leavePromise = new Promise<boolean>((resolve, reject) => {
-                this.leavePromiseHandle.reject = reject;
-                this.leavePromiseHandle.resolve = resolve;
-                if (timeout) setTimeout(() => resolve(false), timeout);
-            });
+            this.leavePromiseDefer = defer<boolean>();
+            if (timeout) setTimeout(() => this.leavePromiseDefer?.resolve(false), timeout);
         }
-
-        return this.leavePromise;
+        return this.leavePromiseDefer.promise;
     }
-
-    private leavePromise?: Promise<boolean>;
-    private leavePromiseHandle: {
-        reject?: (reason: any) => void;
-        resolve?: (didSendLeaveEvent: boolean) => void;
-    } = {};
+    private leavePromiseDefer?: IDeferred<boolean>;
 
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const isMyMembership = (m: CallMembership): boolean =>
@@ -637,7 +635,8 @@ export class MembershipManager implements IMembershipManager {
                             state.hasMemberStateEvent = false;
                             this.scheduler.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
                             this.scheduler.resetActions([]);
-                            this.leavePromiseHandle.resolve?.(true);
+                            this.leavePromiseDefer?.resolve(true);
+                            this.leavePromiseDefer = undefined;
                         })
                         .catch((e) => {
                             if (this.notFoundError(e)) {
@@ -717,7 +716,8 @@ export class MembershipManager implements IMembershipManager {
             case MembershipActionType.SendLeaveEvent: {
                 // We are good already
                 if (!state.hasMemberStateEvent) {
-                    this.leavePromiseHandle.resolve?.(true);
+                    this.leavePromiseDefer?.resolve(true);
+                    this.leavePromiseDefer = undefined;
                     return;
                 }
                 // This is only a fallback in case we do not have working delayed events support.
@@ -727,7 +727,8 @@ export class MembershipManager implements IMembershipManager {
                     .then(() => {
                         this.scheduler.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                         this.scheduler.resetActions([]);
-                        this.leavePromiseHandle.resolve?.(true);
+                        this.leavePromiseDefer?.resolve(true);
+                        this.leavePromiseDefer = undefined;
                         state.hasMemberStateEvent = false;
                     })
                     .catch((e) => {
