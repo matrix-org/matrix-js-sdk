@@ -246,7 +246,12 @@ describe.each([
                 const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
                 manager.join([focus], focusActive);
-                delayedHandle.reject?.(Error("Server does not support the delayed events API"));
+                delayedHandle.reject?.(
+                    new UnsupportedEndpointError(
+                        "Server does not support the delayed events API",
+                        "sendDelayedStateEvent",
+                    ),
+                );
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
             });
             it("does try to schedule a delayed leave event again if rate limited", async () => {
