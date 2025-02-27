@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { checkObjectHasKeys, encodeParams, singleConcurrency } from "../utils.ts";
+import { checkObjectHasKeys, encodeParams } from "../utils.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { Method } from "./method.ts";
 import { ConnectionError, type MatrixError } from "./errors.ts";
@@ -31,6 +31,7 @@ import {
 } from "./interface.ts";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
 import { type QueryDict } from "../utils.ts";
+import { singleAsyncExecution } from "../utils/decorators.ts";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
@@ -193,7 +194,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * On success, sets new access and refresh tokens in opts.
      * @returns Promise that resolves to a boolean - true when token was refreshed successfully
      */
-    @singleConcurrency
+    @singleAsyncExecution
     private async tryRefreshToken(): Promise<boolean> {
         if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
             return false;

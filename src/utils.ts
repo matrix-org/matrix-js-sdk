@@ -761,28 +761,3 @@ export class MapWithDefault<K, V> extends Map<K, V> {
         return this.get(key)!;
     }
 }
-
-/**
- * Method decorator to ensure that only one instance of the method is running at a time,
- * and any concurrent calls will return the same promise as the original call.
- * After execution is complete a new call will be able to run the method again.
- */
-export function singleConcurrency<This, Args extends unknown[], Return>(
-    target: (this: This, ...args: Args) => Promise<Return>,
-    context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Promise<Return>>,
-): (this: This, ...args: Args) => Promise<Return> {
-    let promise: Promise<Return> | undefined;
-
-    async function replacementMethod(this: This, ...args: Args): Promise<Return> {
-        if (promise) return promise;
-        try {
-            promise = target.call(this, ...args);
-            await promise;
-            return promise;
-        } finally {
-            promise = undefined;
-        }
-    }
-
-    return replacementMethod;
-}

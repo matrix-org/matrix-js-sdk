@@ -468,4 +468,57 @@ describe("FetchHttpApi", () => {
             ]
         `);
     });
+
+    it("should not make multiple concurrent refresh token requests", async () => {
+        const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
+
+        const deferredTokenRefresh = defer<{ accessToken: string; refreshToken: string }>();
+        const fetchFn = jest.fn().mockResolvedValue({
+            ok: false,
+            status: tokenInactiveError.httpStatus,
+            async text() {
+                return JSON.stringify(tokenInactiveError.data);
+            },
+            async json() {
+                return tokenInactiveError.data;
+            },
+            headers: {
+                get: jest.fn().mockReturnValue("application/json"),
+            },
+        });
+        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
+
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+            baseUrl,
+            prefix,
+            fetchFn,
+            doNotAttemptTokenRefresh: false,
+            tokenRefreshFunction,
+            refreshToken: "REFRESH_TOKEN",
+        });
+
+        const prom1 = api.authedRequest(Method.Get, "/path1");
+        const prom2 = api.authedRequest(Method.Get, "/path2");
+
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+        fetchFn.mockResolvedValue({
+            ok: true,
+            status: 200,
+            async text() {
+                return "{}";
+            },
+            async json() {
+                return {};
+            },
+            headers: {
+                get: jest.fn().mockReturnValue("application/json"),
+            },
+        });
+        deferredTokenRefresh.resolve({ accessToken: "NEW_TOKEN", refreshToken: "NEW_REFRESH" });
+
+        await prom1;
+        await prom2;
+        expect(fetchFn).toHaveBeenCalledTimes(4); // 2 original calls + 2 retries
+        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+    });
 });
