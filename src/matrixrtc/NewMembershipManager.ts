@@ -18,7 +18,7 @@ import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import type { MatrixClient } from "../client.ts";
 import { UnsupportedEndpointError } from "../errors.ts";
-import { HTTPError, MatrixError } from "../http-api/errors.ts";
+import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { defer, type IDeferred, sleep } from "../utils.ts";
@@ -861,6 +861,14 @@ export class MembershipManager implements IMembershipManager {
                     retryCounterString,
                 error,
             );
+        } else if (error instanceof ConnectionError) {
+            logger.warn(
+                "Network connection error while sending event, retrying in " +
+                    retryDurationString +
+                    " " +
+                    retryCounterString,
+                error,
+            );
         } else if (
             error instanceof HTTPError &&
             typeof error.httpStatus === "number" &&
@@ -883,7 +891,9 @@ export class MembershipManager implements IMembershipManager {
         }
 
         // Failiour
-        throw Error("Reached maximum (" + this.maximumNetworkErrorRetryCount + ") retries cause by: " + error);
+        throw Error(
+            "Reached maximum (" + this.maximumNetworkErrorRetryCount + ") retries cause by: " + (error as Error),
+        );
     }
 
     /**
