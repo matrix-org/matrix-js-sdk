@@ -50,7 +50,7 @@ import {
 } from "./client.ts";
 import { SyncApi, SyncState } from "./sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
-import { MatrixError } from "./http-api/errors.ts";
+import { ConnectionError, MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
@@ -358,13 +358,15 @@ export class RoomWidgetClient extends MatrixClient {
         // Delayed event special case.
         if (delayOpts) {
             // TODO: updatePendingEvent for delayed events?
-            const response = await this.widgetApi.sendRoomEvent(
-                event.getType(),
-                content,
-                room.roomId,
-                "delay" in delayOpts ? delayOpts.delay : undefined,
-                "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-            );
+            const response = await this.widgetApi
+                .sendRoomEvent(
+                    event.getType(),
+                    content,
+                    room.roomId,
+                    "delay" in delayOpts ? delayOpts.delay : undefined,
+                    "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
+                )
+                .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
         }
 
@@ -374,7 +376,9 @@ export class RoomWidgetClient extends MatrixClient {
 
         let response: ISendEventFromWidgetResponseData;
         try {
-            response = await this.widgetApi.sendRoomEvent(event.getType(), content, room.roomId);
+            response = await this.widgetApi
+                .sendRoomEvent(event.getType(), content, room.roomId)
+                .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
             throw e;
@@ -397,7 +401,9 @@ export class RoomWidgetClient extends MatrixClient {
         content: any,
         stateKey = "",
     ): Promise<ISendEventResponse> {
-        const response = await this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId);
+        const response = await this.widgetApi
+            .sendStateEvent(eventType, stateKey, content, roomId)
+            .catch(timeoutToConnectionError);
         if (response.event_id === undefined) {
             throw new Error("'event_id' absent from response to an event request");
         }
@@ -422,14 +428,16 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        const response = await this.widgetApi.sendStateEvent(
-            eventType,
-            stateKey,
-            content,
-            roomId,
-            "delay" in delayOpts ? delayOpts.delay : undefined,
-            "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-        );
+        const response = await this.widgetApi
+            .sendStateEvent(
+                eventType,
+                stateKey,
+                content,
+                roomId,
+                "delay" in delayOpts ? delayOpts.delay : undefined,
+                "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
+            )
+            .catch(timeoutToConnectionError);
         return this.validateSendDelayedEventResponse(response);
     }
 
@@ -449,17 +457,19 @@ export class RoomWidgetClient extends MatrixClient {
             throw new UnsupportedEndpointError("Server does not support the delayed events API", "updateDelayedEvent");
         }
 
-        await this.widgetApi.updateDelayedEvent(delayId, action);
+        await this.widgetApi.updateDelayedEvent(delayId, action).catch(timeoutToConnectionError);
         return {};
     }
 
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<EmptyObject> {
-        await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
+        await this.widgetApi
+            .sendToDevice(eventType, false, recursiveMapToObject(contentMap))
+            .catch(timeoutToConnectionError);
         return {};
     }
 
     public async getOpenIdToken(): Promise<IOpenIDToken> {
-        const token = await this.widgetApi.requestOpenIDConnectToken();
+        const token = await this.widgetApi.requestOpenIDConnectToken().catch(timeoutToConnectionError);
         // the IOpenIDCredentials from the widget-api and IOpenIDToken form the matrix-js-sdk are compatible.
         // we still recreate the token to make this transparent and catch'able by the linter in case the types change in the future.
         return <IOpenIDToken>{
@@ -477,7 +487,9 @@ export class RoomWidgetClient extends MatrixClient {
             contentMap.getOrCreate(userId).set(deviceId, payload);
         }
 
-        await this.widgetApi.sendToDevice(eventType, false, recursiveMapToObject(contentMap));
+        await this.widgetApi
+            .sendToDevice(eventType, false, recursiveMapToObject(contentMap))
+            .catch(timeoutToConnectionError);
     }
 
     public async encryptAndSendToDevices(userDeviceInfoArr: OlmDevice[], payload: object): Promise<void> {
@@ -487,7 +499,9 @@ export class RoomWidgetClient extends MatrixClient {
             contentMap.getOrCreate(userId).set(deviceId, payload);
         }
 
-        await this.widgetApi.sendToDevice((payload as { type: string }).type, true, recursiveMapToObject(contentMap));
+        await this.widgetApi
+            .sendToDevice((payload as { type: string }).type, true, recursiveMapToObject(contentMap))
+            .catch(timeoutToConnectionError);
     }
 
     /**
@@ -508,7 +522,9 @@ export class RoomWidgetClient extends MatrixClient {
         encrypted: boolean,
         contentMap: SendToDeviceContentMap,
     ): Promise<void> {
-        await this.widgetApi.sendToDevice(eventType, encrypted, recursiveMapToObject(contentMap));
+        await this.widgetApi
+            .sendToDevice(eventType, encrypted, recursiveMapToObject(contentMap))
+            .catch(timeoutToConnectionError);
     }
 
     // Overridden since we get TURN servers automatically over the widget API,
@@ -672,4 +688,13 @@ function processAndThrow(error: unknown): never {
     } else {
         throw error;
     }
+}
+
+function timeoutToConnectionError(error: unknown): never {
+    // TODO: this should not check on error.message but instead it should be a specific type
+    // error instanceof WidgetTimeoutError
+    if (error instanceof Error && error.message === "Request timed out") {
+        throw new ConnectionError("widget api timeout");
+    }
+    throw error;
 }
