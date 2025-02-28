@@ -682,7 +682,7 @@ describe.each([
             }
             expect(unrecoverableError).toHaveBeenCalled();
             expect(unrecoverableError.mock.lastCall![0].message).toMatch(
-                "The MembershipManager has to shut down because of the end condition: Error: Reached maximum",
+                "The MembershipManager shut down because of the end condition",
             );
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
