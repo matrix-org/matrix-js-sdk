@@ -40,6 +40,8 @@ export interface ISetAvatarUrlCapability extends ICapability {}
 
 export interface IProfileFieldsCapability extends ICapability {}
 
+export interface ILeaveWithoutForgetCapability extends ICapability {}
+
 export enum RoomVersionStability {
     Stable = "stable",
     Unstable = "unstable",
@@ -64,6 +66,7 @@ export interface Capabilities {
     "m.set_displayname"?: ISetDisplayNameCapability;
     "m.set_avatar_url"?: ISetAvatarUrlCapability;
     "uk.tcpip.msc4133.profile_fields"?: IProfileFieldsCapability;
+    "org.matrix.msc4267.leave_without_forget"?: ILeaveWithoutForgetCapability;
 }
 
 type CapabilitiesResponse = {
