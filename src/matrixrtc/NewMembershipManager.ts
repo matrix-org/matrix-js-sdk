@@ -872,6 +872,22 @@ export class MembershipManager implements IMembershipManager {
                     retryCounterString,
                 error,
             );
+        } else if (error instanceof Error && error.message.includes("updating delayed event")) {
+            // TODO: We do not want a error message matching here but instead sth more sophiticated:
+            // The error originates because of https://github.com/matrix-org/matrix-widget-api/blob/5d81d4a26ff69e4bd3ddc79a884c9527999fb2f4/src/ClientWidgetApi.ts#L698-L701
+            // uses `e` instance of HttpError (and not MatrixError)
+            // The element web widget driver (only checks for MatrixError) is then failing to process (`processError`) it as a typed error: https://github.com/element-hq/element-web/blob/471712cbf06a067e5499bd5d2d7a75f693d9a12d/src/stores/widgets/StopGapWidgetDriver.ts#L711-L715
+            // So it will not call: `error.asWidgetApiErrorData()` which is also missing for `HttpError`
+            //
+            // A proper fix would be to either find a place to convert the `HttpError` into a `MatrixError` and the `processError`
+            // method to handle it as expected or to adjust `processError` to also process `HttpError`'s.
+            logger.warn(
+                "delayed event update timeout error, retrying in " +
+                    retryDurationString +
+                    " " +
+                    retryCounterString,
+                error,
+            );
         } else if (error instanceof ConnectionError) {
             logger.warn(
                 "Network connection error while sending event, retrying in " +
