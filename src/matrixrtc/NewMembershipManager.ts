@@ -16,7 +16,7 @@ limitations under the License.
 
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
-import type { MatrixClient } from "../client.ts";
+import { type MatrixClient } from "../client.ts";
 import { UnsupportedEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger as rootLogger } from "../logger.ts";
@@ -823,7 +823,7 @@ export class MembershipManager implements IMembershipManager {
      */
     private rateLimitErrorHandler(error: unknown, method: string, type: MembershipActionType): boolean {
         // "Is rate limit"-boundary
-        if (!(error instanceof HTTPError && error.isRateLimitError())) {
+        if (!((error instanceof HTTPError || error instanceof MatrixError) && error.isRateLimitError())) {
             return false;
         }
 
@@ -881,7 +881,7 @@ export class MembershipManager implements IMembershipManager {
                 error,
             );
         } else if (
-            error instanceof HTTPError &&
+            (error instanceof HTTPError || error instanceof MatrixError) &&
             typeof error.httpStatus === "number" &&
             error.httpStatus >= 500 &&
             error.httpStatus < 600
