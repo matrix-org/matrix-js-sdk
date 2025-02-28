@@ -207,6 +207,7 @@ class ActionScheduler {
     private actions: Action[] = [];
     private insertions: Action[] = [];
     private resetWith?: Action[];
+
     /**
      * This starts the main loop of the membership manager that handles event sending, delayed event sending and delayed event restarting.
      * @param initialActions The initial actions the manager will start with. It should be enough to pass: DelayedLeaveActionType.Initial
@@ -230,15 +231,14 @@ class ActionScheduler {
             if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
             if (!didWakeUp) {
                 logger.debug(
-                    "Current MembershipManager processing: " + nextAction.type,
-                    "\nQueue:",
+                    `Current MembershipManager processing: ${nextAction.type}\nQueue:`,
                     this.actions,
-                    "\nDate.now: " + Date.now(),
+                    `\nDate.now: "${Date.now()}`,
                 );
                 try {
                     await this.membershipLoopHandler(this.state, nextAction.type as MembershipActionType);
                 } catch (e) {
-                    throw Error("The MembershipManager has to shut down because of the end condition: " + e);
+                    throw Error(`The MembershipManager shut down because of the end condition: ${e}`);
                 }
             }
 
@@ -257,21 +257,31 @@ class ActionScheduler {
     public addAction(action: Action): void {
         this.insertions.push(action);
         const nextTs = this.actions[0]?.ts;
+        const actionString = `${action.type} (ts: ${action.ts})`;
         if (!nextTs || nextTs > action.ts) {
+            logger.info(`added action (with wake up): ${actionString}\nAddQueue:`, this.insertions);
             this.wakeup?.();
+        } else {
+            logger.info(`added action: ${actionString}\nAddQueue:`, this.insertions);
         }
     }
+
     public resetActions(actions: Action[]): void {
         this.resetWith = actions;
         const nextTs = this.actions[0]?.ts;
         const newestTs = this.resetWith.map((a) => a.ts).sort((a, b) => a - b)[0];
         if (nextTs && newestTs && nextTs > newestTs) {
+            logger.info("reset actions (with wake up)");
             this.wakeup?.();
+        } else {
+            logger.info("reset actions");
         }
     }
+
     public resetState(): void {
         this.state = ActionScheduler.defaultState;
     }
+
     public resetRateLimitCounter(type: MembershipActionType): void {
         this.state.rateLimitRetries.set(type, 0);
         this.state.networkErrorRetries.set(type, 0);
