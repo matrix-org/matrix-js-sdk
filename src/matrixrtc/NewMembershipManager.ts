@@ -208,7 +208,10 @@ class ActionScheduler {
     public get actions(): Action[] {
         return this._actions;
     }
-    private insertions: Action[] = [];
+    private _insertions: Action[] = [];
+    public get insertions(): Action[] {
+        return this._insertions;
+    }
     private resetWith?: Action[];
 
     /**
@@ -251,21 +254,21 @@ class ActionScheduler {
             }
             this._actions = this._actions.filter((a) => a !== nextAction);
 
-            this._actions.push(...this.insertions);
-            this.insertions = [];
+            this._actions.push(...this._insertions);
+            this._insertions = [];
         }
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
     }
 
     public addAction(action: Action): void {
-        this.insertions.push(action);
+        this._insertions.push(action);
         const nextTs = this._actions[0]?.ts;
         const actionString = `${action.type} (ts: ${action.ts})`;
         if (!nextTs || nextTs > action.ts) {
-            logger.info(`added action (with wake up): ${actionString}\nAddQueue:`, this.insertions);
+            logger.info(`added action (with wake up): ${actionString}\nAddQueue:`, this._insertions);
             this.wakeup?.();
         } else {
-            logger.info(`added action: ${actionString}\nAddQueue:`, this.insertions);
+            logger.info(`added action: ${actionString}\nAddQueue:`, this._insertions);
         }
     }
 
@@ -363,7 +366,13 @@ export class MembershipManager implements IMembershipManager {
         if (this.isJoined() && !memberships.some(isMyMembership)) {
             if (this.scheduler.actions.find((a) => a.type === DirectMembershipManagerAction.Join)) {
                 logger.error(
-                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one",
+                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already has on int the Queue\nActionQueueOnMemberUpdate:",
+                    this.scheduler.actions,
+                );
+            } else if (this.scheduler.insertions.find((a) => a.type === DirectMembershipManagerAction.Join)) {
+                logger.error(
+                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one in the Insertion queue\nInsertionQueueOnMemberUpdate: ",
+                    this.scheduler.insertions,
                 );
             } else {
                 logger.warn("Missing own membership: force re-join");
