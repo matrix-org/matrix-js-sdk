@@ -325,6 +325,9 @@ export class MembershipManager implements IMembershipManager {
             this.scheduler
                 .startWithActions([{ ts: Date.now(), type: DirectMembershipManagerAction.Join }])
                 .catch((e) => {
+                    // Set the rtc session to left state since we cannot recover from here and the consumer user of the
+                    // MatrixRTCSession class needs to manually rejoin.
+                    this.scheduler.state.running = false;
                     logger.error("MembershipManager stopped because: ", e);
                     onError?.(e);
                 });
