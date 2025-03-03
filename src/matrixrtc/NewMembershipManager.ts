@@ -204,7 +204,10 @@ class ActionScheduler {
     // function for the wakeup mechanism (in case we add an action externally and need to leave the current sleep)
     private wakeup?: (value: void | PromiseLike<void>) => void;
 
-    private actions: Action[] = [];
+    private _actions: Action[] = [];
+    public get actions(): Action[] {
+        return this._actions;
+    }
     private insertions: Action[] = [];
     private resetWith?: Action[];
 
@@ -216,11 +219,11 @@ class ActionScheduler {
      * In most other error cases the manager will try to handle any server errors by itself.
      */
     public async startWithActions(initialActions: Action[]): Promise<void> {
-        this.actions = initialActions;
+        this._actions = initialActions;
 
-        while (this.actions.length > 0) {
-            this.actions.sort((a, b) => a.ts - b.ts);
-            const nextAction = this.actions[0];
+        while (this._actions.length > 0) {
+            this._actions.sort((a, b) => a.ts - b.ts);
+            const nextAction = this._actions[0];
             let didWakeUp = false;
             const wakeupPromise = new Promise<void>((resolve) => {
                 this.wakeup = (): void => {
@@ -232,7 +235,7 @@ class ActionScheduler {
             if (!didWakeUp) {
                 logger.debug(
                     `Current MembershipManager processing: ${nextAction.type}\nQueue:`,
-                    this.actions,
+                    this._actions,
                     `\nDate.now: "${Date.now()}`,
                 );
                 try {
@@ -243,12 +246,12 @@ class ActionScheduler {
             }
 
             if (this.resetWith) {
-                this.actions = this.resetWith;
+                this._actions = this.resetWith;
                 this.resetWith = undefined;
             }
-            this.actions = this.actions.filter((a) => a !== nextAction);
+            this._actions = this._actions.filter((a) => a !== nextAction);
 
-            this.actions.push(...this.insertions);
+            this._actions.push(...this.insertions);
             this.insertions = [];
         }
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
@@ -256,7 +259,7 @@ class ActionScheduler {
 
     public addAction(action: Action): void {
         this.insertions.push(action);
-        const nextTs = this.actions[0]?.ts;
+        const nextTs = this._actions[0]?.ts;
         const actionString = `${action.type} (ts: ${action.ts})`;
         if (!nextTs || nextTs > action.ts) {
             logger.info(`added action (with wake up): ${actionString}\nAddQueue:`, this.insertions);
@@ -268,7 +271,7 @@ class ActionScheduler {
 
     public resetActions(actions: Action[]): void {
         this.resetWith = actions;
-        const nextTs = this.actions[0]?.ts;
+        const nextTs = this._actions[0]?.ts;
         const newestTs = this.resetWith.map((a) => a.ts).sort((a, b) => a - b)[0];
         if (nextTs && newestTs && nextTs > newestTs) {
             logger.info("reset actions (with wake up)");
@@ -358,9 +361,15 @@ export class MembershipManager implements IMembershipManager {
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
         if (this.isJoined() && !memberships.some(isMyMembership)) {
-            logger.warn("Missing own membership: force re-join");
-            this.scheduler.state.hasMemberStateEvent = false;
-            this.scheduler.addAction({ ts: Date.now(), type: DirectMembershipManagerAction.Join });
+            if (this.scheduler.actions.find((a) => a.type === DirectMembershipManagerAction.Join)) {
+                logger.error(
+                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one",
+                );
+            } else {
+                logger.warn("Missing own membership: force re-join");
+                this.scheduler.state.hasMemberStateEvent = false;
+                this.scheduler.addAction({ ts: Date.now(), type: DirectMembershipManagerAction.Join });
+            }
         }
         return Promise.resolve();
     }
