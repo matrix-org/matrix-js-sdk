@@ -364,6 +364,7 @@ export class MembershipManager implements IMembershipManager {
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
         if (this.isJoined() && !memberships.some(isMyMembership)) {
+            logger.warn("Missing own membership: force re-join");
             if (this.scheduler.actions.find((a) => a.type === DirectMembershipManagerAction.Join)) {
                 logger.error(
                     "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already has on int the Queue\nActionQueueOnMemberUpdate:",
@@ -375,7 +376,6 @@ export class MembershipManager implements IMembershipManager {
                     this.scheduler.insertions,
                 );
             } else {
-                logger.warn("Missing own membership: force re-join");
                 this.scheduler.state.hasMemberStateEvent = false;
                 this.scheduler.addAction({ ts: Date.now(), type: DirectMembershipManagerAction.Join });
             }
