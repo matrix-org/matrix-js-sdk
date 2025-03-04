@@ -213,6 +213,7 @@ class ActionScheduler {
         return this._insertions;
     }
     private resetWith?: Action[];
+    private resetWithoutInsertions = false;
 
     /**
      * This starts the main loop of the membership manager that handles event sending, delayed event sending and delayed event restarting.
@@ -253,8 +254,10 @@ class ActionScheduler {
                 this.resetWith = undefined;
             }
             this._actions = this._actions.filter((a) => a !== nextAction);
-
-            this._actions.push(...this._insertions);
+            if (!this.resetWithoutInsertions) {
+                this._actions.push(...this._insertions);
+                this.resetWithoutInsertions = false;
+            }
             this._insertions = [];
         }
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
@@ -272,8 +275,9 @@ class ActionScheduler {
         }
     }
 
-    public resetActions(actions: Action[]): void {
+    public resetActions(actions: Action[], withoutInsertions = true): void {
         this.resetWith = actions;
+        this.resetWithoutInsertions = withoutInsertions;
         const nextTs = this._actions[0]?.ts;
         const newestTs = this.resetWith.map((a) => a.ts).sort((a, b) => a - b)[0];
         if (nextTs && newestTs && nextTs > newestTs) {
@@ -353,7 +357,11 @@ export class MembershipManager implements IMembershipManager {
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseDefer) {
             // reset scheduled actions so we will not do any new actions.
-            this.scheduler.resetActions([{ type: DirectMembershipManagerAction.Leave, ts: Date.now() }]);
+            if (this.scheduler.state.hasMemberStateEvent) {
+                this.scheduler.resetActions([{ type: DirectMembershipManagerAction.Leave, ts: Date.now() }]);
+            } else {
+                this.scheduler.resetActions([]);
+            }
             this.leavePromiseDefer = defer<boolean>();
             if (timeout) setTimeout(() => this.leavePromiseDefer?.resolve(false), timeout);
         }
@@ -545,7 +553,7 @@ export class MembershipManager implements IMembershipManager {
                     // In this block we will try to cancel this delayed event before setting up a new one.
 
                     // Remove all running updates and restarts
-                    this.scheduler.resetActions([]);
+                    this.scheduler.resetActions([], false);
                     await this.client
                         ._unstable_updateDelayedEvent(state.delayId, UpdateDelayedEventAction.Cancel)
                         .then(() => {
