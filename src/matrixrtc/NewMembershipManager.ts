@@ -349,6 +349,8 @@ export class MembershipManager implements IMembershipManager {
         if (!this.scheduler.state.running) return Promise.resolve(true);
         this.scheduler.state.running = false;
 
+        // We use the promise to track if we already scheduled a leave event
+        // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseDefer) {
             // reset scheduled actions so we will not do any new actions.
             this.scheduler.resetActions([{ type: DirectMembershipManagerAction.Leave, ts: Date.now() }]);
@@ -364,18 +366,27 @@ export class MembershipManager implements IMembershipManager {
             m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
 
         if (this.isJoined() && !memberships.some(isMyMembership)) {
+            // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
+            // take care of our missing membership.
+            const sendingMembershipActions = [
+                MembershipActionType.SendFirstDelayedEvent,
+                MembershipActionType.SendJoinEvent,
+            ];
             logger.warn("Missing own membership: force re-join");
-            if (this.scheduler.actions.find((a) => a.type === DirectMembershipManagerAction.Join)) {
+            if (this.scheduler.actions.find((a) => sendingMembershipActions.includes(a.type as MembershipActionType))) {
                 logger.error(
-                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already has on int the Queue\nActionQueueOnMemberUpdate:",
+                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
                     this.scheduler.actions,
                 );
-            } else if (this.scheduler.insertions.find((a) => a.type === DirectMembershipManagerAction.Join)) {
+            } else if (
+                this.scheduler.insertions.find((a) => sendingMembershipActions.includes(a.type as MembershipActionType))
+            ) {
                 logger.error(
-                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one in the Insertion queue\nInsertionQueueOnMemberUpdate: ",
+                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one in the Insertion Queue\nInsertionQueueOnMemberUpdate: ",
                     this.scheduler.insertions,
                 );
             } else {
+                // Only react to our own membership missing if we have not already scheduled sending a new membership DirectMembershipManagerAction.Join
                 this.scheduler.state.hasMemberStateEvent = false;
                 this.scheduler.addAction({ ts: Date.now(), type: DirectMembershipManagerAction.Join });
             }
