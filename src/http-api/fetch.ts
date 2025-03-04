@@ -39,9 +39,9 @@ interface TypedResponse<T> extends Response {
     json(): Promise<T>;
 }
 
-export type ResponseType<T, O extends IHttpOpts> = O extends undefined
-    ? T
-    : O extends { onlyData: true }
+export type ResponseType<T, O extends IHttpOpts> = O extends { json: false }
+    ? string
+    : O extends { onlyData: true } | undefined
       ? T
       : TypedResponse<T>;
 
@@ -371,7 +371,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (this.opts.onlyData) {
-            return json ? res.json() : res.text();
+            return (json ? res.json() : res.text()) as ResponseType<T, O>;
         }
         return res as ResponseType<T, O>;
     }
