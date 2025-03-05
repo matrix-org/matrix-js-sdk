@@ -630,6 +630,18 @@ export interface CryptoApi {
     resetKeyBackup(): Promise<void>;
 
     /**
+     * Disables server-side key storage and deletes server-side backups.
+     *  * Deletes the current key backup version, if any (but not any previous versions).
+     *  * Disables 4S, deleting the info for the default key, the default key pointer itself and any
+     *    known 4S data (cross-signing keys and the megolm key backup key).
+     *  * Deletes any dehydrated devices.
+     *  * Sets the "m.org.matrix.custom.backup_disabled" account data flag to indicate that the user has disabled backups.
+     *
+     * @throws {Error} if encryption is not enabled.
+     */
+    disableKeyStorage(): Promise<void>;
+
+    /**
      * Deletes the given key backup.
      *
      * @param version - The backup version to delete.
