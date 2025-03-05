@@ -2321,8 +2321,7 @@ describe("RustCrypto", () => {
 
     describe("disableKeyStorage", () => {
         it("should disable key storage", async () => {
-            let secretStorage: ServerSideSecretStorage;
-            secretStorage = {
+            const secretStorage = {
                 getDefaultKeyId: jest.fn().mockResolvedValue("bloop"),
                 setDefaultKeyId: jest.fn(),
                 store: jest.fn(),
