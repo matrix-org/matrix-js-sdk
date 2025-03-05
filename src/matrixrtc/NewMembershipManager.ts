@@ -68,6 +68,17 @@ export interface IMembershipManager {
     getActiveFocus(): Focus | undefined;
 }
 
+enum Status {
+    Disconnected = "Disconnected",
+    Connecting = "Connecting",
+    ConnectingFailed = "ConnectingFailed",
+    Connected = "Connected",
+    Reconnecting = "Reconnecting",
+    Disconnecting = "Disconnecting",
+    Stuck = "Stuck",
+    Unknown = "Unknown",
+}
+
 /* SCHEDULER TYPES:
 
             DirectMembershipManagerAction.Join
@@ -236,6 +247,9 @@ class ActionScheduler {
                 };
             });
             if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
+
+            logger.info("MembershipManager ActionScheduler awakened. status=" + this.status);
+
             if (!didWakeUp) {
                 logger.debug(
                     `Current MembershipManager processing: ${nextAction.type}\nQueue:`,
@@ -297,6 +311,45 @@ class ActionScheduler {
         this.state.rateLimitRetries.set(type, 0);
         this.state.networkErrorRetries.set(type, 0);
     }
+
+    public get status(): Status {
+        const actions = [...this.actions, ...this.insertions];
+
+        logger.info(`foo ${actions.map((a) => a.type)}`);
+        if (actions.length === 1) {
+            const { type } = actions[0];
+            switch (type) {
+                case MembershipActionType.SendFirstDelayedEvent:
+                case MembershipActionType.SendJoinEvent:
+                case MembershipActionType.SendMainDelayedEvent:
+                    return Status.Connecting;
+                case MembershipActionType.UpdateExpiry: // where no delayed events
+                    return Status.Connected;
+                case MembershipActionType.SendScheduledDelayedLeaveEvent:
+                case MembershipActionType.SendLeaveEvent:
+                    return Status.Disconnecting;
+                default:
+                // pass through as not expected
+            }
+        } else if (actions.length === 2) {
+            const types = actions.map((a) => a.type);
+            // normal state for connected with delayed events
+            if (
+                (types.includes(MembershipActionType.RestartDelayedEvent) ||
+                    types.includes(MembershipActionType.SendMainDelayedEvent)) &&
+                types.includes(MembershipActionType.UpdateExpiry)
+            ) {
+                return Status.Connected;
+            }
+        }
+
+        if (!this.state.running) {
+            return Status.Disconnected;
+        }
+
+        logger.error("MembershipManager has an unknown state. Actions: ", actions);
+        return Status.Unknown;
+    }
 }
 
 /**
@@ -318,6 +371,45 @@ export class MembershipManager implements IMembershipManager {
     public isJoined(): boolean {
         return this.scheduler.state.running;
     }
+
+    public status(): Status {
+        if (!this.scheduler.state.running) {
+            return Status.Disconnected;
+        }
+        const actions = [...this.scheduler.actions, ...this.scheduler.insertions];
+
+        if (actions.length === 1) {
+            const { type } = actions[0];
+            switch (type) {
+                case DirectMembershipManagerAction.Join:
+                case MembershipActionType.SendFirstDelayedEvent:
+                case MembershipActionType.SendJoinEvent:
+                case MembershipActionType.SendMainDelayedEvent:
+                    return Status.Connecting;
+                case MembershipActionType.UpdateExpiry: // where no delayed events
+                    return Status.Connected;
+                case DirectMembershipManagerAction.Leave:
+                case MembershipActionType.SendScheduledDelayedLeaveEvent:
+                case MembershipActionType.SendLeaveEvent:
+                    return Status.Disconnecting;
+                default:
+                // pass through as not expected
+            }
+        } else if (actions.length === 2) {
+            const types = actions.map((a) => a.type);
+            // normal state for connected with delayed events
+            if (
+                types.includes(MembershipActionType.RestartDelayedEvent) &&
+                types.includes(MembershipActionType.UpdateExpiry)
+            ) {
+                return Status.Connected;
+            }
+        }
+
+        logger.error("MembershipManager has an unknown state. Actions: ", actions);
+        return Status.Unknown;
+    }
+
     /**
      * Puts the MembershipManager in a state where it tries to be joined.
      * It will send delayed events and membership events
