@@ -335,6 +335,7 @@ describe.each([
             await jest.advanceTimersByTimeAsync(1);
             (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue("unknown");
             await manager.leave();
+
             // We send a normal leave event since we failed using updateDelayedEvent with the "send" action.
             expect(client.sendStateEvent).toHaveBeenLastCalledWith(
                 room.roomId,
@@ -557,7 +558,7 @@ describe.each([
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             });
             // FailsForLegacy as implementation does not re-check membership before retrying.
-            it("abandons retry loop if leave() was called !FailsForLegacy", async () => {
+            it("abandons retry loop if leave() was called before sending state event !FailsForLegacy", async () => {
                 const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
@@ -578,7 +579,6 @@ describe.each([
                 await manager.leave();
 
                 // Wait for all timers to be setup
-                // await flushPromises();
                 await jest.advanceTimersByTimeAsync(1000);
 
                 // No new events should have been sent:

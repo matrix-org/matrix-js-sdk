@@ -254,9 +254,10 @@ class ActionScheduler {
                 this.resetWith = undefined;
             }
             this._actions = this._actions.filter((a) => a !== nextAction);
-            if (!this.resetWithoutInsertions) {
-                this._actions.push(...this._insertions);
+            if (this.resetWithoutInsertions) {
                 this.resetWithoutInsertions = false;
+            } else {
+                this._actions.push(...this._insertions);
             }
             this._insertions = [];
         }
@@ -280,7 +281,7 @@ class ActionScheduler {
         this.resetWithoutInsertions = withoutInsertions;
         const nextTs = this._actions[0]?.ts;
         const newestTs = this.resetWith.map((a) => a.ts).sort((a, b) => a - b)[0];
-        if (nextTs && newestTs && nextTs > newestTs) {
+        if (actions.length === 0 || (nextTs && newestTs && nextTs > newestTs)) {
             logger.info("reset actions (with wake up)");
             this.wakeup?.();
         } else {
@@ -357,12 +358,15 @@ export class MembershipManager implements IMembershipManager {
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseDefer) {
             // reset scheduled actions so we will not do any new actions.
+            this.leavePromiseDefer = defer<boolean>();
             if (this.scheduler.state.hasMemberStateEvent) {
                 this.scheduler.resetActions([{ type: DirectMembershipManagerAction.Leave, ts: Date.now() }]);
             } else {
                 this.scheduler.resetActions([]);
+                // We don't do anything else here since we are already in the left state.
+                // We do not care about canceling a pending delayed leave event it will set it to {} again = no-op.
+                this.leavePromiseDefer?.resolve(true);
             }
-            this.leavePromiseDefer = defer<boolean>();
             if (timeout) setTimeout(() => this.leavePromiseDefer?.resolve(false), timeout);
         }
         return this.leavePromiseDefer.promise;
