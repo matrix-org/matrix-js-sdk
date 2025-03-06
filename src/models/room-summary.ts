@@ -21,7 +21,7 @@ export interface IRoomSummary {
     "m.joined_member_count"?: number;
     "m.invited_member_count"?: number;
 }
-export interface IRoomSummaryMSC4186 {
+export interface RoomSummaryMSC4186 {
     "m.heroes": Hero[];
     "m.joined_member_count"?: number;
     "m.invited_member_count"?: number;

@@ -35,7 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { type IRoomSummary, type IRoomSummaryMSC4186, RoomSummary } from "./room-summary.ts";
+import { type IRoomSummary, type RoomSummaryMSC4186, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
@@ -1679,7 +1679,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.setUnreadNotificationCount(type, count);
     }
 
-    public setSummary(summary: IRoomSummary | IRoomSummaryMSC4186): void {
+    public setSummary(summary: IRoomSummary | RoomSummaryMSC4186): void {
         // map heroes onto the MSC4186 form as that has more data
         const heroes = summary["m.heroes"]?.map((h) => {
             if (typeof h === "string") {
