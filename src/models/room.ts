@@ -362,15 +362,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
     private selfMembership?: Membership;
-
     // A Hero is a stripped m.room.member event which contains the key renderable fields from the event.
     // It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old 'summary' field.
-    // The old form simply contained the hero's user ID, which forced clients to then look up the
-    // m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
-    // works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
-    // values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
-    // in SSS mode we will always use the heroes if they exist, but in sync v2 mode these fields will
-    // never be set and hence we will always do getMember lookups (at the right time as well).
     private heroes: Hero[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
@@ -956,6 +949,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // use first hero that has a display name or avatar url, or whose user ID
             // can be looked up as a member of the room
             for (const hero of nonFunctionalHeroes) {
+                // The old form of heroes simply contained the hero's user ID, which forced clients to then look up the
+                // m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
+                // works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
+                // values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
+                // in SSS mode we will always use the heroes if they exist, but in sync v2 mode these fields will
+                // never be set and hence we will always do getMember lookups (at the right time as well).
                 if (!hero.displayName && !hero.avatarUrl) {
                     // attempt to look up renderable fields from the m.room.member event if it exists
                     const member = this.getMember(hero.userId);
