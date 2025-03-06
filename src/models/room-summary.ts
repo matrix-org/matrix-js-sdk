@@ -16,14 +16,41 @@ limitations under the License.
 
 import type { Hero } from "./room.ts";
 
+/**
+ * High level summary information for a room
+ */
 export interface IRoomSummary {
+    /**
+     * The room heroes: a selected set of members that can be used when summarising or
+     * generating a name for a room. List of user IDs.
+     */
     "m.heroes": string[];
+    /**
+     * The number of joined members in the room.
+     */
     "m.joined_member_count"?: number;
+    /**
+     * The number of invited members in the room.
+     */
     "m.invited_member_count"?: number;
 }
+
+/**
+ * High level summary information for a room (MSC4186 sliding sync)
+ */
 export interface RoomSummaryMSC4186 {
+    /**
+     * The room heroes: a selected set of members that can be used when summarising or
+     * generating a name for a room.
+     */
     "m.heroes": Hero[];
+    /**
+     * The number of joined members in the room.
+     */
     "m.joined_member_count"?: number;
+    /**
+     * The number of invited members in the room.
+     */
     "m.invited_member_count"?: number;
 }
 
