@@ -248,7 +248,8 @@ class ActionScheduler {
             });
             if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
 
-            logger.info("MembershipManager ActionScheduler awakened. status=" + this.status);
+            const oldStatus = this.status;
+            logger.info(`MembershipManager ActionScheduler awakened. status=${oldStatus}`);
 
             if (!didWakeUp) {
                 logger.debug(
@@ -263,7 +264,7 @@ class ActionScheduler {
                 }
             }
 
-            const oldStatus = this.status;
+            logger.info(`MembershipManager ActionScheduler intermediate status=${this.status}`);
             if (this.resetWith) {
                 this._actions = this.resetWith;
                 this.resetWith = undefined;
