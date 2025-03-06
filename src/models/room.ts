@@ -944,7 +944,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const nonFunctionalHeroes = this.heroes?.filter((h) => !functionalMembers.includes(h.userId));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
-            // use first hero which exists
+            // use first hero that has a display name or avatar url, or whose user ID
+            // can be looked up as a member of the room
             for (const hero of nonFunctionalHeroes) {
                 if (!hero.displayName && !hero.avatarUrl) {
                     // attempt to look up renderable fields from the m.room.member event if it exists
