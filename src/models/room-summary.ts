@@ -14,14 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A Hero is a stripped m.room.member event which contains the key renderable fields from the event.
-// It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old 'summary' field.
-// The old form simply contained the hero's user ID, which forced clients to then look up the
-// m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
-// works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
-// values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
-// in SSS mode we will always use the heroes if they exist, but in sync v2 mode these fields will
-// never be set and hence we will always do getMember lookups (at the right time as well).
+/**
+ * A stripped m.room.member event which contains the key renderable fields from the event,
+ * sent only in simplified sliding sync (not sync v2).
+ */
 export type Hero = {
     userId: string;
     displayName?: string;
