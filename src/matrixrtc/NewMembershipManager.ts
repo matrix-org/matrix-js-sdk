@@ -263,6 +263,7 @@ class ActionScheduler {
                 }
             }
 
+            const oldStatus = this.status;
             if (this.resetWith) {
                 this._actions = this.resetWith;
                 this.resetWith = undefined;
@@ -274,6 +275,9 @@ class ActionScheduler {
                 this._actions.push(...this._insertions);
             }
             this._insertions = [];
+            logger.info(
+                `MembershipManager ActionScheduler applied action changes. Status: ${oldStatus} -> ${this.status}`,
+            );
         }
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
     }
