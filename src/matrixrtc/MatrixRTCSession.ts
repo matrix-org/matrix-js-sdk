@@ -64,6 +64,11 @@ export interface MembershipConfig {
      */
     useNewMembershipManager?: boolean;
 
+    /**
+     * This is just for testing
+     *
+     * TODO: remove as part of PR cleanup
+     */
     membershipManagerFactory?: (
         joinConfig: MembershipConfig | undefined,
         room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
