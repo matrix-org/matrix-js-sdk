@@ -319,7 +319,6 @@ class ActionScheduler {
     public get status(): Status {
         const actions = [...this.actions, ...this.insertions];
 
-        logger.info(`foo ${actions.map((a) => a.type)}`);
         if (actions.length === 1) {
             const { type } = actions[0];
             switch (type) {
