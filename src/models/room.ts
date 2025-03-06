@@ -35,7 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { type IRoomSummary, type RoomSummaryMSC4186, RoomSummary } from "./room-summary.ts";
+import { type IRoomSummary, type RoomSummaryMSC4186, Hero, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
@@ -177,20 +177,6 @@ export type RoomEmittedEvents =
     | BeaconEvent.Destroy
     | BeaconEvent.LivenessChange
     | PollEvent.New;
-
-// A Hero is a stripped m.room.member event which contains the key renderable fields from the event.
-// It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old 'summary' field.
-// The old form simply contained the hero's user ID, which forced clients to then look up the
-// m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
-// works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
-// values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
-// in SSS mode we will always use the heroes if they exist, but in sync v2 mode these fields will
-// never be set and hence we will always do getMember lookups (at the right time as well).
-export type Hero = {
-    userId: string;
-    displayName?: string;
-    avatarUrl?: string;
-};
 
 export type RoomEventHandlerMap = {
     /**
