@@ -292,6 +292,8 @@ class ActionScheduler {
         } else {
             logger.info(`added action: ${actionString}\nAddQueue:`, this._insertions);
         }
+        if (!this.state.running)
+            logger.warn(`MembershipManager is not running but we try to add Action: ${actionString}`);
     }
 
     public resetActions(actions: Action[], withoutInsertions = true): void {
