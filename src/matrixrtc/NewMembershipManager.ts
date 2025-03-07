@@ -264,7 +264,6 @@ class ActionScheduler {
                 }
             }
 
-            logger.info(`MembershipManager ActionScheduler intermediate status=${this.status}`);
             if (this.resetWith) {
                 this._actions = this.resetWith;
                 this.resetWith = undefined;
@@ -374,46 +373,6 @@ export class MembershipManager implements IMembershipManager {
 
     public isJoined(): boolean {
         return this.scheduler.state.running;
-    }
-
-    public status(): Status {
-        return this.scheduler.status;
-        // TODO figure out if this is still needed and different to the scheduler status
-        // if (!this.scheduler.state.running) {
-        //     return Status.Disconnected;
-        // }
-        // const actions = [...this.scheduler.actions];
-
-        // if (actions.length === 1) {
-        //     const { type } = actions[0];
-        //     switch (type) {
-        //         case DirectMembershipManagerAction.Join:
-        //         case MembershipActionType.SendFirstDelayedEvent:
-        //         case MembershipActionType.SendJoinEvent:
-        //         case MembershipActionType.SendMainDelayedEvent:
-        //             return Status.Connecting;
-        //         case MembershipActionType.UpdateExpiry: // where no delayed events
-        //             return Status.Connected;
-        //         case DirectMembershipManagerAction.Leave:
-        //         case MembershipActionType.SendScheduledDelayedLeaveEvent:
-        //         case MembershipActionType.SendLeaveEvent:
-        //             return Status.Disconnecting;
-        //         default:
-        //         // pass through as not expected
-        //     }
-        // } else if (actions.length === 2) {
-        //     const types = actions.map((a) => a.type);
-        //     // normal state for connected with delayed events
-        //     if (
-        //         types.includes(MembershipActionType.RestartDelayedEvent) &&
-        //         types.includes(MembershipActionType.UpdateExpiry)
-        //     ) {
-        //         return Status.Connected;
-        //     }
-        // }
-
-        // logger.error("MembershipManager has an unknown state. Actions: ", actions);
-        // return Status.Unknown;
     }
 
     /**
