@@ -1674,6 +1674,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.setUnreadNotificationCount(type, count);
     }
 
+    /**
+     * Takes either a legacy or MSC4186 room summary and updates the room with it.
+     * The summary will be converted to a legacy style summary in order to be emitted
+     * in the `RoomEvent.Summary` event.
+     *
+     * @param summary - The room summary to update the room with
+     */
     public setSummary(summary: IRoomSummary | RoomSummaryMSC4186): void {
         // map heroes onto the MSC4186 form as that has more data
         const heroes = summary["m.heroes"]?.map((h) => (typeof h === "string" ? { userId: h } : h));
