@@ -197,18 +197,3 @@ export class ConnectionError extends Error {
         return "ConnectionError";
     }
 }
-
-/**
- * Construct a TokenRefreshError. This indicates that a request failed due to the token being expired,
- * and attempting to refresh said token also failed but in a way which was not indicative of token invalidation.
- * Assumed to be a temporary failure.
- */
-export class TokenRefreshError extends Error {
-    public constructor(cause?: Error) {
-        super(cause?.message ?? "");
-    }
-
-    public get name(): string {
-        return "TokenRefreshError";
-    }
-}

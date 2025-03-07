@@ -27,7 +27,7 @@ jobs:
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
             # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
-            - uses: guibranco/github-status-action-v2@5ef6e175c333bc629f3718b083c8a2ff6e0bbfbc
+            - uses: guibranco/github-status-action-v2@7ca807c2ba3401be532d29a876b93262108099fb
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: pending
@@ -75,7 +75,7 @@ jobs:
 
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
-              uses: matrix-org/sonarcloud-workflow-action@v4.0
+              uses: matrix-org/sonarcloud-workflow-action@v3.3
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
@@ -87,7 +87,7 @@ jobs:
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
 
-            - uses: guibranco/github-status-action-v2@5ef6e175c333bc629f3718b083c8a2ff6e0bbfbc
+            - uses: guibranco/github-status-action-v2@7ca807c2ba3401be532d29a876b93262108099fb
               if: always()
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}

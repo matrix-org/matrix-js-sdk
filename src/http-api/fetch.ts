@@ -18,12 +18,10 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { ErrorResponse as OidcAuthError } from "oidc-client-ts";
-
 import { checkObjectHasKeys, encodeParams } from "../utils.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { Method } from "./method.ts";
-import { ConnectionError, MatrixError, TokenRefreshError } from "./errors.ts";
+import { ConnectionError, type MatrixError } from "./errors.ts";
 import {
     HttpApiEvent,
     type HttpApiEventHandlerMap,
@@ -33,23 +31,16 @@ import {
 } from "./interface.ts";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
 import { type QueryDict } from "../utils.ts";
-import { singleAsyncExecution } from "../utils/decorators.ts";
 
 interface TypedResponse<T> extends Response {
     json(): Promise<T>;
 }
 
-export type ResponseType<T, O extends IHttpOpts> = O extends { json: false }
-    ? string
-    : O extends { onlyData: true } | undefined
+export type ResponseType<T, O extends IHttpOpts> = O extends undefined
+    ? T
+    : O extends { onlyData: true }
       ? T
       : TypedResponse<T>;
-
-const enum TokenRefreshOutcome {
-    Success = "success",
-    Failure = "failure",
-    Logout = "logout",
-}
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
@@ -116,12 +107,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
     }
 
     /**
-     * Promise used to block authenticated requests during a token refresh to avoid repeated expected errors.
-     * @private
-     */
-    private tokenRefreshPromise?: Promise<unknown>;
-
-    /**
      * Perform an authorised request to the homeserver.
      * @param method - The HTTP method e.g. "GET".
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
@@ -177,41 +162,29 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         try {
-            // Await any ongoing token refresh
-            await this.tokenRefreshPromise;
             const response = await this.request<T>(method, path, queryParams, body, opts);
             return response;
         } catch (error) {
-            if (!(error instanceof MatrixError)) {
-                throw error;
-            }
+            const err = error as MatrixError;
 
-            if (error.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
-                const tokenRefreshPromise = this.tryRefreshToken();
-                this.tokenRefreshPromise = Promise.allSettled([tokenRefreshPromise]);
-                const outcome = await tokenRefreshPromise;
-
-                if (outcome === TokenRefreshOutcome.Success) {
-                    // if we got a new token retry the request
+            if (err.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
+                const shouldRetry = await this.tryRefreshToken();
+                // if we got a new token retry the request
+                if (shouldRetry) {
                     return this.authedRequest(method, path, queryParams, body, {
                         ...paramOpts,
                         doNotAttemptTokenRefresh: true,
                     });
                 }
-                if (outcome === TokenRefreshOutcome.Failure) {
-                    throw new TokenRefreshError(error);
-                }
-                // Fall through to SessionLoggedOut handler below
             }
-
             // otherwise continue with error handling
-            if (error.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
-                this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, error);
-            } else if (error.errcode == "M_CONSENT_NOT_GIVEN") {
-                this.eventEmitter.emit(HttpApiEvent.NoConsent, error.message, error.data.consent_uri);
+            if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
+                this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
+            } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
+                this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
 
-            throw error;
+            throw err;
         }
     }
 
@@ -220,10 +193,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * On success, sets new access and refresh tokens in opts.
      * @returns Promise that resolves to a boolean - true when token was refreshed successfully
      */
-    @singleAsyncExecution
-    private async tryRefreshToken(): Promise<TokenRefreshOutcome> {
+    private async tryRefreshToken(): Promise<boolean> {
         if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
-            return TokenRefreshOutcome.Logout;
+            return false;
         }
 
         try {
@@ -231,13 +203,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
             this.opts.accessToken = accessToken;
             this.opts.refreshToken = refreshToken;
             // successfully got new tokens
-            return TokenRefreshOutcome.Success;
+            return true;
         } catch (error) {
             this.opts.logger?.warn("Failed to refresh token", error);
-            if (error instanceof OidcAuthError || error instanceof MatrixError) {
-                return TokenRefreshOutcome.Logout;
-            }
-            return TokenRefreshOutcome.Failure;
+            return false;
         }
     }
 
@@ -371,7 +340,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (this.opts.onlyData) {
-            return (json ? res.json() : res.text()) as ResponseType<T, O>;
+            return json ? res.json() : res.text();
         }
         return res as ResponseType<T, O>;
     }

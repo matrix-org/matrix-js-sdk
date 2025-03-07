@@ -2318,43 +2318,6 @@ describe("RustCrypto", () => {
             expect(dehydratedDeviceIsDeleted).toBeTruthy();
         });
     });
-
-    describe("disableKeyStorage", () => {
-        it("should disable key storage", async () => {
-            const secretStorage = {
-                getDefaultKeyId: jest.fn().mockResolvedValue("bloop"),
-                setDefaultKeyId: jest.fn(),
-                store: jest.fn(),
-            } as unknown as ServerSideSecretStorage;
-
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
-
-            let backupIsDeleted = false;
-            fetchMock.delete("path:/_matrix/client/v3/room_keys/version/1", () => {
-                backupIsDeleted = true;
-                return {};
-            });
-
-            let dehydratedDeviceIsDeleted = false;
-            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", () => {
-                dehydratedDeviceIsDeleted = true;
-                return { device_id: "ADEVICEID" };
-            });
-
-            const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
-            await rustCrypto.disableKeyStorage();
-
-            expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.master", null);
-            expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.self_signing", null);
-            expect(secretStorage.store).toHaveBeenCalledWith("m.cross_signing.user_signing", null);
-            expect(secretStorage.store).toHaveBeenCalledWith("m.megolm_backup.v1", null);
-            expect(secretStorage.store).toHaveBeenCalledWith("m.secret_storage.key.bloop", null);
-            expect(secretStorage.setDefaultKeyId).toHaveBeenCalledWith(null);
-
-            expect(backupIsDeleted).toBeTruthy();
-            expect(dehydratedDeviceIsDeleted).toBeTruthy();
-        });
-    });
 });
 
 /** Build a MatrixHttpApi instance */

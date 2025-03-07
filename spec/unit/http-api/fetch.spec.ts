@@ -20,7 +20,6 @@ import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
     ClientPrefix,
-    ConnectionError,
     HttpApiEvent,
     type HttpApiEventHandlerMap,
     IdentityPrefix,
@@ -126,7 +125,7 @@ describe("FetchHttpApi", () => {
         ).resolves.toBe(text);
     });
 
-    it("should send token via query params if useAuthorizationHeader=false", async () => {
+    it("should send token via query params if useAuthorizationHeader=false", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -135,11 +134,11 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: false,
         });
-        await api.authedRequest(Method.Get, "/path");
+        api.authedRequest(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("token");
     });
 
-    it("should send token via headers by default", async () => {
+    it("should send token via headers by default", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -147,7 +146,7 @@ describe("FetchHttpApi", () => {
             fetchFn,
             accessToken: "token",
         });
-        await api.authedRequest(Method.Get, "/path");
+        api.authedRequest(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
     });
 
@@ -164,7 +163,7 @@ describe("FetchHttpApi", () => {
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBeFalsy();
     });
 
-    it("should ensure no token is leaked out via query params if sending via headers", async () => {
+    it("should ensure no token is leaked out via query params if sending via headers", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -173,12 +172,12 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: true,
         });
-        await api.authedRequest(Method.Get, "/path", { access_token: "123" });
+        api.authedRequest(Method.Get, "/path", { access_token: "123" });
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
     });
 
-    it("should not override manually specified access token via query params", async () => {
+    it("should not override manually specified access token via query params", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -187,11 +186,11 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: false,
         });
-        await api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
+        api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("RealToken");
     });
 
-    it("should not override manually specified access token via header", async () => {
+    it("should not override manually specified access token via header", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -200,16 +199,16 @@ describe("FetchHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: true,
         });
-        await api.authedRequest(Method.Get, "/path", undefined, undefined, {
+        api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Authorization: "Bearer RealToken" },
         });
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer RealToken");
     });
 
-    it("should not override Accept header", async () => {
+    it("should not override Accept header", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
-        await api.authedRequest(Method.Get, "/path", undefined, undefined, {
+        api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Accept: "text/html" },
         });
         expect(fetchFn.mock.calls[0][1].headers["Accept"]).toBe("text/html");
@@ -289,7 +288,7 @@ describe("FetchHttpApi", () => {
 
                 describe("with a tokenRefreshFunction", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
-                        const error = new MatrixError();
+                        const error = new Error("uh oh");
                         const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
                         const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
@@ -307,27 +306,6 @@ describe("FetchHttpApi", () => {
                         );
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
-                    });
-
-                    it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
-                        const error = new ConnectionError("transitive fault");
-                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            tokenRefreshFunction,
-                            accessToken,
-                            refreshToken,
-                        });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
-                            unknownTokenErr,
-                        );
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
-                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should refresh token and retry request", async () => {
@@ -489,62 +467,5 @@ describe("FetchHttpApi", () => {
               "FetchHttpApi: <-- GET https://server:8448/some/path?query=xxx [1234ms 200]",
             ]
         `);
-    });
-
-    it("should not make multiple concurrent refresh token requests", async () => {
-        const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
-
-        const deferredTokenRefresh = defer<{ accessToken: string; refreshToken: string }>();
-        const fetchFn = jest.fn().mockResolvedValue({
-            ok: false,
-            status: tokenInactiveError.httpStatus,
-            async text() {
-                return JSON.stringify(tokenInactiveError.data);
-            },
-            async json() {
-                return tokenInactiveError.data;
-            },
-            headers: {
-                get: jest.fn().mockReturnValue("application/json"),
-            },
-        });
-        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
-
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
-            baseUrl,
-            prefix,
-            fetchFn,
-            doNotAttemptTokenRefresh: false,
-            tokenRefreshFunction,
-            accessToken: "ACCESS_TOKEN",
-            refreshToken: "REFRESH_TOKEN",
-        });
-
-        const prom1 = api.authedRequest(Method.Get, "/path1");
-        const prom2 = api.authedRequest(Method.Get, "/path2");
-
-        await jest.advanceTimersByTimeAsync(10); // wait for requests to fire
-        expect(fetchFn).toHaveBeenCalledTimes(2);
-        fetchFn.mockResolvedValue({
-            ok: true,
-            status: 200,
-            async text() {
-                return "{}";
-            },
-            async json() {
-                return {};
-            },
-            headers: {
-                get: jest.fn().mockReturnValue("application/json"),
-            },
-        });
-        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
-
-        await prom1;
-        await prom2;
-        expect(fetchFn).toHaveBeenCalledTimes(4); // 2 original calls + 2 retries
-        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
-        expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
-        expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });
 });
