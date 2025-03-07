@@ -3536,6 +3536,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     inviteJoinCount--;
                     return;
                 }
+                // If the hero has a display name, use that.
+                // Otherwise, look their user ID up in the membership and use
+                // the name from there, or the user ID as a last resort.
                 if (hero.displayName) {
                     otherNames.push(hero.displayName);
                 } else {
