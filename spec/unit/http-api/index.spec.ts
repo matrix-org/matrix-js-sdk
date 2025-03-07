@@ -59,11 +59,12 @@ describe("MatrixHttpApi", () => {
         xhr.onreadystatechange?.(new Event("test"));
     });
 
-    it("should fall back to `fetch` where xhr is unavailable", () => {
+    it("should fall back to `fetch` where xhr is unavailable", async () => {
         globalThis.XMLHttpRequest = undefined!;
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
         upload = api.uploadContent({} as File);
+        await upload;
         expect(fetchFn).toHaveBeenCalled();
     });
 

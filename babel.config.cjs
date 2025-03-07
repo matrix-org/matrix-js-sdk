@@ -26,6 +26,7 @@ module.exports = {
         ],
     ],
     plugins: [
+        ["@babel/plugin-proposal-decorators", { version: "2023-11" }],
         "@babel/plugin-transform-numeric-separator",
         "@babel/plugin-transform-class-properties",
         "@babel/plugin-transform-object-rest-spread",
