@@ -382,7 +382,6 @@ export class SlidingSyncSdk {
     }
 
     private async onRoomData(roomId: string, roomData: MSC3575RoomData): Promise<void> {
-        const start = new Date().getTime();
         let room = this.client.store.getRoom(roomId);
         if (!room) {
             if (!roomData.initial) {
@@ -392,7 +391,6 @@ export class SlidingSyncSdk {
             room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
         await this.processRoomData(this.client, room!, roomData);
-        logger.log(`onRoomData ${roomId} took ${new Date().getTime() - start}ms`);
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {
@@ -401,7 +399,6 @@ export class SlidingSyncSdk {
         }
         switch (state) {
             case SlidingSyncState.Complete:
-                logger.log(`SlidingSyncState.Complete with ${Object.keys(resp?.rooms || []).length} rooms`);
                 this.purgeNotifications();
                 if (!resp) {
                     break;
