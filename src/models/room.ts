@@ -1677,14 +1677,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     public setSummary(summary: IRoomSummary | RoomSummaryMSC4186): void {
         // map heroes onto the MSC4186 form as that has more data
-        const heroes = summary["m.heroes"]?.map((h) => {
-            if (typeof h === "string") {
-                return {
-                    userId: h,
-                };
-            }
-            return h;
-        });
+        const heroes = summary["m.heroes"]?.map(
+            (h) => (typeof h === "string") ? { userId: h } : h
+        );
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
