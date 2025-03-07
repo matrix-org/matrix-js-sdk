@@ -35,7 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { type IRoomSummary, type RoomSummaryMSC4186, Hero, RoomSummary } from "./room-summary.ts";
+import { type IRoomSummary, type RoomSummaryMSC4186, type Hero, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
