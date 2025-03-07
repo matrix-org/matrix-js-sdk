@@ -690,6 +690,10 @@ function processAndThrow(error: unknown): never {
     }
 }
 
+/**
+ * This converts an "Request timed out" error from the PostmessageTransport into a ConnectionError.
+ * It either throws the original error or a new ConnectionError.
+ **/
 function timeoutToConnectionError(error: unknown): never {
     // TODO: this should not check on error.message but instead it should be a specific type
     // error instanceof WidgetTimeoutError

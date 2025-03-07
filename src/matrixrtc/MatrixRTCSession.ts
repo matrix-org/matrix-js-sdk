@@ -61,28 +61,11 @@ export type MatrixRTCSessionEventHandlerMap = {
 
 export interface MembershipConfig {
     /**
-     * Use the new Manager
+     * Use the new Manager.
+     *
+     * Default: `false`.
      */
     useNewMembershipManager?: boolean;
-
-    /**
-     * This is just for testing
-     *
-     * TODO: remove as part of PR cleanup
-     */
-    membershipManagerFactory?: (
-        joinConfig: MembershipConfig | undefined,
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
-        client: Pick<
-            MatrixClient,
-            | "getUserId"
-            | "getDeviceId"
-            | "sendStateEvent"
-            | "_unstable_sendDelayedStateEvent"
-            | "_unstable_updateDelayedEvent"
-        >,
-        getOldestMembership: () => CallMembership | undefined,
-    ) => IMembershipManager;
 
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
@@ -373,14 +356,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             return;
         } else {
             // Create MembershipManager
-            if (joinConfig?.membershipManagerFactory) {
-                this.membershipManager = joinConfig.membershipManagerFactory(
-                    joinConfig,
-                    this.roomSubset,
-                    this.client,
-                    () => this.getOldestMembership(),
-                );
-            } else if (joinConfig?.useNewMembershipManager ?? false) {
+            if (joinConfig?.useNewMembershipManager ?? false) {
                 this.membershipManager = new MembershipManager(joinConfig, this.roomSubset, this.client, () =>
                     this.getOldestMembership(),
                 );
