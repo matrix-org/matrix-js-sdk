@@ -82,10 +82,14 @@ export interface MSC3575SlidingSyncRequest {
     clientTimeout?: number;
 }
 
+/**
+ * New format of hero introduced in MSC4186 with display name and avatar URL
+ * in addition to just user_id
+ */
 export interface MSC4186Hero {
     user_id: string;
-    displayname: string;
-    avatar_url: string;
+    displayname?: string;
+    avatar_url?: string;
 }
 
 export interface MSC3575RoomData {
