@@ -318,7 +318,7 @@ class ActionScheduler {
     }
 
     public get status(): Status {
-        const actions = [...this.actions, ...this.insertions];
+        const actions = [...this.actions];
 
         if (actions.length === 1) {
             const { type } = actions[0];
@@ -377,41 +377,43 @@ export class MembershipManager implements IMembershipManager {
     }
 
     public status(): Status {
-        if (!this.scheduler.state.running) {
-            return Status.Disconnected;
-        }
-        const actions = [...this.scheduler.actions, ...this.scheduler.insertions];
+        return this.scheduler.status;
+        // TODO figure out if this is still needed and different to the scheduler status
+        // if (!this.scheduler.state.running) {
+        //     return Status.Disconnected;
+        // }
+        // const actions = [...this.scheduler.actions];
 
-        if (actions.length === 1) {
-            const { type } = actions[0];
-            switch (type) {
-                case DirectMembershipManagerAction.Join:
-                case MembershipActionType.SendFirstDelayedEvent:
-                case MembershipActionType.SendJoinEvent:
-                case MembershipActionType.SendMainDelayedEvent:
-                    return Status.Connecting;
-                case MembershipActionType.UpdateExpiry: // where no delayed events
-                    return Status.Connected;
-                case DirectMembershipManagerAction.Leave:
-                case MembershipActionType.SendScheduledDelayedLeaveEvent:
-                case MembershipActionType.SendLeaveEvent:
-                    return Status.Disconnecting;
-                default:
-                // pass through as not expected
-            }
-        } else if (actions.length === 2) {
-            const types = actions.map((a) => a.type);
-            // normal state for connected with delayed events
-            if (
-                types.includes(MembershipActionType.RestartDelayedEvent) &&
-                types.includes(MembershipActionType.UpdateExpiry)
-            ) {
-                return Status.Connected;
-            }
-        }
+        // if (actions.length === 1) {
+        //     const { type } = actions[0];
+        //     switch (type) {
+        //         case DirectMembershipManagerAction.Join:
+        //         case MembershipActionType.SendFirstDelayedEvent:
+        //         case MembershipActionType.SendJoinEvent:
+        //         case MembershipActionType.SendMainDelayedEvent:
+        //             return Status.Connecting;
+        //         case MembershipActionType.UpdateExpiry: // where no delayed events
+        //             return Status.Connected;
+        //         case DirectMembershipManagerAction.Leave:
+        //         case MembershipActionType.SendScheduledDelayedLeaveEvent:
+        //         case MembershipActionType.SendLeaveEvent:
+        //             return Status.Disconnecting;
+        //         default:
+        //         // pass through as not expected
+        //     }
+        // } else if (actions.length === 2) {
+        //     const types = actions.map((a) => a.type);
+        //     // normal state for connected with delayed events
+        //     if (
+        //         types.includes(MembershipActionType.RestartDelayedEvent) &&
+        //         types.includes(MembershipActionType.UpdateExpiry)
+        //     ) {
+        //         return Status.Connected;
+        //     }
+        // }
 
-        logger.error("MembershipManager has an unknown state. Actions: ", actions);
-        return Status.Unknown;
+        // logger.error("MembershipManager has an unknown state. Actions: ", actions);
+        // return Status.Unknown;
     }
 
     /**
