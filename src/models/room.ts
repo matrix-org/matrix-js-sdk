@@ -953,8 +953,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 // m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
                 // works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
                 // values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
-                // in SSS mode we will always use the heroes if they exist, but in sync v2 mode these fields will
-                // never be set and hence we will always do getMember lookups (at the right time as well).
+                // in SSS mode we will use the heroes if the display name or avatar URL fields are set, but in sync v2
+                // mode these fields will never be set and hence we will always do getMember lookups (at the right time as well).
                 if (!hero.displayName && !hero.avatarUrl) {
                     // attempt to look up renderable fields from the m.room.member event if it exists
                     const member = this.getMember(hero.userId);
@@ -1676,9 +1676,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     public setSummary(summary: IRoomSummary | RoomSummaryMSC4186): void {
         // map heroes onto the MSC4186 form as that has more data
-        const heroes = summary["m.heroes"]?.map(
-            (h) => (typeof h === "string") ? { userId: h } : h
-        );
+        const heroes = summary["m.heroes"]?.map((h) => (typeof h === "string" ? { userId: h } : h));
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
