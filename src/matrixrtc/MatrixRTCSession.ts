@@ -28,6 +28,7 @@ import { type MatrixEvent } from "../models/event.ts";
 import { MembershipManager, type IMembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
+import { logDurationSync } from "../utils.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -558,7 +559,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         if (changed) {
             logger.info(`Memberships for call in room ${this.roomSubset.roomId} have changed: emitting`);
-            this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+            logDurationSync(logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
+                this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+            });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
         }
