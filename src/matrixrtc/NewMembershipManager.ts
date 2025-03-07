@@ -344,6 +344,16 @@ class ActionScheduler {
             ) {
                 return Status.Connected;
             }
+        } else if (actions.length === 3) {
+            const types = actions.map((a) => a.type);
+            // It is a correct connected state if we already schedule the next Restart but have not yet cleaned up
+            // the current restart.
+            if (
+                types.filter((t) => t === MembershipActionType.RestartDelayedEvent).length === 2 &&
+                types.includes(MembershipActionType.UpdateExpiry)
+            ) {
+                return Status.Connected;
+            }
         }
 
         if (!this.state.running) {
