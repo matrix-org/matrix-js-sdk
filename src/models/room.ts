@@ -1692,6 +1692,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             });
         }
 
+        // Convert back to the legacy heroes format for the `RoomEvent.Summary` event.
         summary["m.heroes"] = heroes?.map((h) => h.userId);
 
         this.emit(RoomEvent.Summary, summary as IRoomSummary);
