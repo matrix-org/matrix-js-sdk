@@ -1,6 +1,6 @@
-import { logger as rootLogger } from "../logger";
-import { sleep } from "../utils";
-import { MembershipActionType } from "./NewMembershipManager";
+import { logger as rootLogger } from "../logger.ts";
+import { sleep } from "../utils.ts";
+import { MembershipActionType } from "./NewMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -149,7 +149,7 @@ export class ActionScheduler {
             // remove the processed action only after we are done processing
             this._actions.splice(0, 1);
             // The wakeupUpdate always wins since that is a direct external update.
-            let { addActions, setActions } = wakeupUpdate ?? handlerResult;
+            const { addActions, setActions } = wakeupUpdate ?? handlerResult;
 
             if (setActions) {
                 this._actions = setActions;

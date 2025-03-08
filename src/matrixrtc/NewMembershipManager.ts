@@ -20,13 +20,17 @@ import { type MatrixClient } from "../client.ts";
 import { UnsupportedEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger as rootLogger } from "../logger.ts";
-import { Room } from "../models/room.ts";
+import { type Room } from "../models/room.ts";
 import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
-import { ActionScheduler, ActionSchedulerState, ActionUpdate } from "./NewMembershipManagerActionScheduler.ts";
+import {
+    ActionScheduler,
+    type ActionSchedulerState,
+    type ActionUpdate,
+} from "./NewMembershipManagerActionScheduler.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
