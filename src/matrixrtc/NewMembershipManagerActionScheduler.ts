@@ -1,4 +1,5 @@
 import { logger as rootLogger } from "../logger.ts";
+import { type EmptyObject } from "../matrix.ts";
 import { sleep } from "../utils.ts";
 import { MembershipActionType } from "./NewMembershipManager.ts";
 
@@ -43,10 +44,16 @@ export interface Action {
     type: MembershipActionType;
 }
 /** @internal */
-export interface ActionUpdate {
-    setActions?: Action[];
-    addActions?: Action[];
-}
+export type ActionUpdate =
+    | {
+          /** Replace all existing scheduled actions with this new array */
+          replace: Action[];
+      }
+    | {
+          /** Add these actions to the existing scheduled actions */
+          insert: Action[];
+      }
+    | EmptyObject;
 
 enum Status {
     Disconnected = "Disconnected",
@@ -149,13 +156,12 @@ export class ActionScheduler {
             // remove the processed action only after we are done processing
             this._actions.splice(0, 1);
             // The wakeupUpdate always wins since that is a direct external update.
-            const { addActions, setActions } = wakeupUpdate ?? handlerResult;
+            const actionUpdate = wakeupUpdate ?? handlerResult;
 
-            if (setActions) {
-                this._actions = setActions;
-            }
-            if (addActions) {
-                this._actions.push(...addActions);
+            if ("replace" in actionUpdate) {
+                this._actions = actionUpdate.replace;
+            } else if ("insert" in actionUpdate) {
+                this._actions.push(...actionUpdate.insert);
             }
 
             logger.info(
@@ -166,10 +172,10 @@ export class ActionScheduler {
     }
 
     public initiateJoin(): void {
-        this.wakeup?.({ setActions: [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }] });
+        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }] });
     }
     public initiateLeave(): void {
-        this.wakeup?.({ setActions: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
+        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
     }
 
     public resetState(): void {
