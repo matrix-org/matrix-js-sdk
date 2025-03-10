@@ -168,6 +168,7 @@ export class MembershipManager implements IMembershipManager {
         this.focusActive = focusActive;
         this.leavePromiseDefer = undefined;
         if (!this.scheduler.state.running) {
+            this.scheduler.resetState();
             this.scheduler.state.running = true;
             this.scheduler.startWithJoin().catch((e) => {
                 // Set the rtc session to left state since we cannot recover from here and the consumer user of the

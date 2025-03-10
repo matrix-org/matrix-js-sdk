@@ -116,7 +116,6 @@ export class ActionScheduler {
      * In most other error cases the manager will try to handle any server errors by itself.
      */
     public async startWithJoin(): Promise<void> {
-        this.state = ActionScheduler.defaultState;
         this._actions = [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }];
 
         while (this._actions.length > 0) {
@@ -177,6 +176,10 @@ export class ActionScheduler {
     }
     public initiateLeave(): void {
         this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
+    }
+
+    public resetState(): void {
+        this.state = ActionScheduler.defaultState;
     }
 
     public resetRateLimitCounter(type: MembershipActionType): void {
