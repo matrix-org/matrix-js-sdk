@@ -27,6 +27,7 @@ import {
     SignatureUploadRequest,
     UploadSigningKeysRequest,
     ToDeviceRequest,
+    type OutgoingRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
 
@@ -271,7 +272,7 @@ describe("OutgoingRequestProcessor", () => {
     });
 
     it("does not explode with unknown requests", async () => {
-        const outgoingRequest = { id: "5678", type: 987 };
+        const outgoingRequest = { id: "5678", type: 987 } as unknown as OutgoingRequest;
         const markSentCallPromise = awaitCallToMarkAsSent();
         await Promise.all([processor.makeOutgoingRequest(outgoingRequest), markSentCallPromise]);
         expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("5678", 987, "");

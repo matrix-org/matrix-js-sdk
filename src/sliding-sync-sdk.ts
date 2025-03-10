@@ -28,6 +28,7 @@ import {
     defaultClientOpts,
     defaultSyncApiOpts,
     type SetPresence,
+    mapToDeviceEvent,
 } from "./sync.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import {
@@ -155,7 +156,7 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
             events = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
         }
         events
-            .map(this.client.getEventMapper())
+            .map(mapToDeviceEvent)
             .map((toDeviceEvent) => {
                 // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled

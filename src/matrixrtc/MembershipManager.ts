@@ -38,7 +38,7 @@ export interface IMembershipManager {
      * @returns It resolves with true in case the leave was sent successfully.
      * It resolves with false in case we hit the timeout before sending successfully.
      */
-    leave(timeout: number | undefined): Promise<boolean>;
+    leave(timeout?: number): Promise<boolean>;
     /**
      * Call this if the MatrixRTC session members have changed.
      */
@@ -117,7 +117,6 @@ export class LegacyMembershipManager implements IMembershipManager {
             | "getUserId"
             | "getDeviceId"
             | "sendStateEvent"
-            | "_unstable_sendDelayedEvent"
             | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
         >,
@@ -134,7 +133,7 @@ export class LegacyMembershipManager implements IMembershipManager {
         this.relativeExpiry = this.membershipExpiryTimeout;
         // We don't wait for this, mostly because it may fail and schedule a retry, so this
         // function returning doesn't really mean anything at all.
-        this.triggerCallMembershipEventUpdate();
+        void this.triggerCallMembershipEventUpdate();
     }
 
     public async leave(timeout: number | undefined = undefined): Promise<boolean> {
@@ -312,6 +311,7 @@ export class LegacyMembershipManager implements IMembershipManager {
                 if (this.disconnectDelayId !== undefined) {
                     this.scheduleDelayDisconnection();
                 }
+                // TODO throw or log an error if this.disconnectDelayId === undefined
             } else {
                 // Not joined
                 let sentDelayedDisconnect = false;
@@ -351,7 +351,7 @@ export class LegacyMembershipManager implements IMembershipManager {
     }
 
     private scheduleDelayDisconnection(): void {
-        this.memberEventTimeout = setTimeout(this.delayDisconnection, this.membershipKeepAlivePeriod);
+        this.memberEventTimeout = setTimeout(() => void this.delayDisconnection(), this.membershipKeepAlivePeriod);
     }
 
     private readonly delayDisconnection = async (): Promise<void> => {

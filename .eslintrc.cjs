@@ -154,5 +154,16 @@ module.exports = {
                 "@typescript-eslint/no-empty-object-type": "off",
             },
         },
+        {
+            // Enable stricter promise rules for the MatrixRTC codebase
+            files: ["src/matrixrtc/**/*.ts", "spec/unit/matrixrtc/*.ts"],
+            rules: {
+                // Encourage proper usage of Promises:
+                "@typescript-eslint/no-floating-promises": "error",
+                "@typescript-eslint/no-misused-promises": "error",
+                "@typescript-eslint/require-await": "error",
+                "@typescript-eslint/await-thenable": "error",
+            },
+        },
     ],
 };

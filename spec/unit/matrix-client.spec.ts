@@ -2753,12 +2753,13 @@ describe("MatrixClient", function () {
             // WHEN we call `setAccountData` ...
             const setProm = client.setAccountData(eventType, content);
 
+            await jest.advanceTimersByTimeAsync(10);
             // THEN, the REST call should have happened, and had the correct content
             const lastCall = fetchMock.lastCall("put-account-data");
             expect(lastCall).toBeDefined();
             expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
 
-            // Even after waiting a bit, the method should not yet have returned
+            // Even after waiting a bit more, the method should not yet have returned
             await jest.advanceTimersByTimeAsync(10);
             let finished = false;
             setProm.finally(() => (finished = true));

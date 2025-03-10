@@ -67,6 +67,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type StartDehydrationOpts,
+    ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { type IDownloadKeyResult, type IQueryKeysRequest } from "../client.ts";
@@ -1276,6 +1277,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Implementation of {@link CryptoApi#disableKeyStorage}.
+     */
+    public async disableKeyStorage(): Promise<void> {
+        // Get the key backup version we're using
+        const info = await this.getKeyBackupInfo();
+        if (info?.version) {
+            await this.deleteKeyBackupVersion(info.version);
+        } else {
+            logger.error("Can't delete key backup version: no version available");
+        }
+
+        // also turn off 4S, since this is also storing keys on the server.
+        await this.deleteSecretStorage();
+
+        await this.dehydratedDeviceManager.delete();
+    }
+
+    /**
      * Signs the given object with the current device and current identity (if available).
      * As defined in {@link https://spec.matrix.org/v1.8/appendices/#signing-json | Signing JSON}.
      *
@@ -1340,7 +1359,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         try {
             opts?.progressCallback?.({
-                stage: "fetch",
+                stage: ImportRoomKeyStage.Fetch,
             });
 
             return await this.backupManager.restoreKeyBackup(backupVersion, backupDecryptor, opts);
@@ -1439,20 +1458,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async resetEncryption(authUploadDeviceSigningKeys: UIAuthCallback<void>): Promise<void> {
         this.logger.debug("resetEncryption: resetting encryption");
 
+        // Delete the dehydrated device, since any existing one will be signed
+        // by the wrong cross-signing key
+        this.dehydratedDeviceManager.delete();
+
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
 
-        // Remove the stored secrets in the secret storage
-        await this.secretStorage.store("m.cross_signing.master", null);
-        await this.secretStorage.store("m.cross_signing.self_signing", null);
-        await this.secretStorage.store("m.cross_signing.user_signing", null);
-        await this.secretStorage.store("m.megolm_backup.v1", null);
-
-        // Remove the recovery key
-        const defaultKeyId = await this.secretStorage.getDefaultKeyId();
-        if (defaultKeyId) await this.secretStorage.store(`m.secret_storage.key.${defaultKeyId}`, null);
-        // Disable the recovery key and the secret storage
-        await this.secretStorage.setDefaultKeyId(null);
+        this.deleteSecretStorage();
 
         // Reset the cross-signing keys
         await this.crossSigningIdentity.bootstrapCrossSigning({
@@ -1464,6 +1477,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await this.resetKeyBackup();
 
         this.logger.debug("resetEncryption: ended");
+    }
+
+    /**
+     * Removes the secret storage key, default key pointer and all (known) secret storage data
+     * from the user's account data
+     */
+    private async deleteSecretStorage(): Promise<void> {
+        // Remove the stored secrets in the secret storage
+        await this.secretStorage.store("m.cross_signing.master", null);
+        await this.secretStorage.store("m.cross_signing.self_signing", null);
+        await this.secretStorage.store("m.cross_signing.user_signing", null);
+        await this.secretStorage.store("m.megolm_backup.v1", null);
+
+        // Remove the recovery key
+        const defaultKeyId = await this.secretStorage.getDefaultKeyId();
+        if (defaultKeyId) await this.secretStorage.store(`m.secret_storage.key.${defaultKeyId}`, null);
+        // Disable the recovery key and the secret storage
+        await this.secretStorage.setDefaultKeyId(null);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
