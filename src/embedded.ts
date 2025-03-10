@@ -55,7 +55,7 @@ import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
-import { type EmptyObject, TypedEventEmitter, UnsupportedEndpointError } from "./matrix.ts";
+import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -422,7 +422,7 @@ export class RoomWidgetClient extends MatrixClient {
         stateKey = "",
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedEndpointError(
+            throw new UnsupportedDelayedEventsEndpointError(
                 "Server does not support the delayed events API",
                 "sendDelayedStateEvent",
             );
@@ -454,7 +454,10 @@ export class RoomWidgetClient extends MatrixClient {
     // eslint-disable-next-line
     public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedEndpointError("Server does not support the delayed events API", "updateDelayedEvent");
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "updateDelayedEvent",
+            );
         }
 
         await this.widgetApi.updateDelayedEvent(delayId, action).catch(timeoutToConnectionError);

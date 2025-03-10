@@ -19,7 +19,7 @@ limitations under the License.
 
 import { type MockedFunction, type Mock } from "jest-mock";
 
-import { EventType, HTTPError, MatrixError, UnsupportedEndpointError, type Room } from "../../../src";
+import { EventType, HTTPError, MatrixError, UnsupportedDelayedEventsEndpointError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
 import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
@@ -247,7 +247,7 @@ describe.each([
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
                 manager.join([focus], focusActive);
                 delayedHandle.reject?.(
-                    new UnsupportedEndpointError(
+                    new UnsupportedDelayedEventsEndpointError(
                         "Server does not support the delayed events API",
                         "sendDelayedStateEvent",
                     ),
@@ -686,10 +686,10 @@ describe.each([
             );
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
-        it("falls back to using pure state events when UnsupportedEndpointError encountered for delayed events !FailsForLegacy", async () => {
+        it("falls back to using pure state events when UnsupportedDelayedEventsEndpointError encountered for delayed events !FailsForLegacy", async () => {
             const unrecoverableError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
-                new UnsupportedEndpointError("not supported", "sendDelayedStateEvent"),
+                new UnsupportedDelayedEventsEndpointError("not supported", "sendDelayedStateEvent"),
             );
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([focus], focusActive, unrecoverableError);

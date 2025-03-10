@@ -53,12 +53,15 @@ export class ClientStoppedError extends Error {
     }
 }
 
-export class UnsupportedEndpointError extends Error {
+/**
+ * This error is thrown when the Homeserver does not support the delayed events enpdpoints.
+ */
+export class UnsupportedDelayedEventsEndpointError extends Error {
     public constructor(
         message: string,
         public clientEndpoint: "sendDelayedEvent" | "updateDelayedEvent" | "sendDelayedStateEvent" | "getDelayedEvents",
     ) {
         super(message);
-        this.name = "UnsupportedEndpointError";
+        this.name = "UnsupportedDelayedEventsEndpointError";
     }
 }

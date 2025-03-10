@@ -17,7 +17,7 @@ limitations under the License.
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import { type MatrixClient } from "../client.ts";
-import { UnsupportedEndpointError } from "../errors.ts";
+import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
@@ -843,12 +843,12 @@ export class MembershipManager implements IMembershipManager {
     }
 
     /**
-     * Check if its an UnsupportedEndpointError and which implies that we cannot do any delayed event logic
+     * Check if its an UnsupportedDelayedEventsEndpointError and which implies that we cannot do any delayed event logic
      * @param error The error to check
-     * @returns true it its an UnsupportedEndpointError
+     * @returns true it its an UnsupportedDelayedEventsEndpointError
      */
     private isUnsupportedDelayedEndpoint(error: unknown): boolean {
-        return error instanceof UnsupportedEndpointError;
+        return error instanceof UnsupportedDelayedEventsEndpointError;
     }
 }
 function createAddActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
