@@ -618,7 +618,7 @@ describe.each([
     });
     describe("unrecoverable errors", () => {
         // !FailsForLegacy because legacy does not have a retry limit and no mechanism to communicate unrecoverable errors.
-        it("throws, when reaching maximum number of retires for initial delayed event creation !FailsForLegacy", async () => {
+        it("throws, when reaching maximum number of retries for initial delayed event creation !FailsForLegacy", async () => {
             const delayEventSendError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
                 new MatrixError(
@@ -638,7 +638,7 @@ describe.each([
             expect(delayEventSendError).toHaveBeenCalled();
         });
         // !FailsForLegacy because legacy does not have a retry limit and no mechanism to communicate unrecoverable errors.
-        it("throws, when reaching maximum number of retires !FailsForLegacy", async () => {
+        it("throws, when reaching maximum number of retries !FailsForLegacy", async () => {
             const delayEventRestartError = jest.fn();
             (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue(
                 new MatrixError(
@@ -695,7 +695,7 @@ describe.each([
             manager.join([focus], focusActive, unrecoverableError);
             await jest.advanceTimersByTimeAsync(1);
 
-            expect(unrecoverableError).not.toHaveBeenCalledWith();
+            expect(unrecoverableError).not.toHaveBeenCalled();
             expect(client.sendStateEvent).toHaveBeenCalled();
         });
     });
