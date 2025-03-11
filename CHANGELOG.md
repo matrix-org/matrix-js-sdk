@@ -1,3 +1,22 @@
+Changes in [37.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.1.0) (2025-03-11)
+==================================================================================================
+## 🦖 Deprecations
+
+* MatrixRTC: MembershipManager test cases and deprecation of MatrixRTCSession.room ([#4713](https://github.com/matrix-org/matrix-js-sdk/pull/4713)). Contributed by @toger5.
+
+## ✨ Features
+
+* Add `EventType.SecretRequest` and `EventType.SecretSend` ([#4728](https://github.com/matrix-org/matrix-js-sdk/pull/4728)). Contributed by @richvdh.
+* Attest npm package provenance ([#4724](https://github.com/matrix-org/matrix-js-sdk/pull/4724)). Contributed by @t3chguy.
+* Report backup key import progress on start and improve types ([#4711](https://github.com/matrix-org/matrix-js-sdk/pull/4711)). Contributed by @ajbura.
+
+## 🐛 Bug Fixes
+
+* Handle unexpected token refresh failures gracefully ([#4731](https://github.com/matrix-org/matrix-js-sdk/pull/4731)). Contributed by @t3chguy.
+* Fix idempotency issue around token refresh ([#4730](https://github.com/matrix-org/matrix-js-sdk/pull/4730)). Contributed by @t3chguy.
+* Delete the dehydrated device when resetEncryption is called ([#4727](https://github.com/matrix-org/matrix-js-sdk/pull/4727)). Contributed by @uhoreg.
+
+
 Changes in [37.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.0.0) (2025-02-25)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
