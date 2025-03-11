@@ -311,7 +311,7 @@ export class MembershipManager implements IMembershipManager {
 
     // MembershipManager mutable state.
     public state: ActionSchedulerState;
-    public static get defaultState(): ActionSchedulerState {
+    private static get defaultState(): ActionSchedulerState {
         return {
             hasMemberStateEvent: false,
             delayId: undefined,
@@ -384,16 +384,16 @@ export class MembershipManager implements IMembershipManager {
             case MembershipActionType.SendFirstDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
                 if (!this.state.delayId) {
-                    return this.sendFirstDelayedLeaveEvent(type); // Normal case without any previous delayed id.
+                    return this.sendFirstDelayedLeaveEvent(); // Normal case without any previous delayed id.
                 } else {
                     // This can happen if someone else (or another client) removes our own membership event.
                     // It will trigger `onRTCSessionMemberUpdate` queue `MembershipActionType.SendFirstDelayedEvent`.
-                    // We might still have our delyed event from the previous participation and dependent on the serve this might not
+                    // We might still have our delayed event from the previous participation and dependent on the server this might not
                     // get automatically removed if the state changes. Hence It would remove our membership unexpectedly shortly after the rejoin.
                     //
                     // In this block we will try to cancel this delayed event before setting up a new one.
 
-                    return this.cancelKnownDelayIdBeforeSendFirstDelayedEvent(type, this.state.delayId);
+                    return this.cancelKnownDelayIdBeforeSendFirstDelayedEvent(this.state.delayId);
                 }
             }
             case MembershipActionType.RestartDelayedEvent: {
@@ -405,10 +405,10 @@ export class MembershipManager implements IMembershipManager {
                             : MembershipActionType.SendFirstDelayedEvent,
                     );
                 }
-                return this.restartDelayedEvent(type, this.state.delayId);
+                return this.restartDelayedEvent(this.state.delayId);
             }
             case MembershipActionType.SendMainDelayedEvent: {
-                return this.sendMainDelayedEvent(type);
+                return this.sendMainDelayedEvent();
             }
             case MembershipActionType.SendScheduledDelayedLeaveEvent: {
                 // We are already good
@@ -416,16 +416,16 @@ export class MembershipManager implements IMembershipManager {
                     return { replace: [] };
                 }
                 if (this.state.delayId) {
-                    return this.sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(type, this.state.delayId);
+                    return this.sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(this.state.delayId);
                 } else {
                     return createInsertActionUpdate(MembershipActionType.SendLeaveEvent);
                 }
             }
             case MembershipActionType.SendJoinEvent: {
-                return this.sendJoinEvent(type);
+                return this.sendJoinEvent();
             }
             case MembershipActionType.UpdateExpiry: {
-                return this.updateExpiryOnJoinedEvent(type);
+                return this.updateExpiryOnJoinedEvent();
             }
             case MembershipActionType.SendLeaveEvent: {
                 // We are good already
@@ -434,14 +434,13 @@ export class MembershipManager implements IMembershipManager {
                 }
                 // This is only a fallback in case we do not have working delayed events support.
                 // first we should try to just send the scheduled leave event
-                return this.sendFallbackLeaveEvent(type);
+                return this.sendFallbackLeaveEvent();
             }
         }
     }
 
     // HANDLERS (used in the membershipLoopHandler)
-
-    private async sendFirstDelayedLeaveEvent(type: MembershipActionType): Promise<ActionUpdate> {
+    private async sendFirstDelayedLeaveEvent(): Promise<ActionUpdate> {
         return await this.client
             ._unstable_sendDelayedStateEvent(
                 this.room.roomId,
@@ -453,27 +452,19 @@ export class MembershipManager implements IMembershipManager {
                 this.stateKey,
             )
             .then((response) => {
-                // Success we reset retries and set delayId.
+                // On success we reset retries and set delayId.
                 this.state.rateLimitRetries.set(MembershipActionType.SendFirstDelayedEvent, 0);
                 this.state.networkErrorRetries.set(MembershipActionType.SendFirstDelayedEvent, 0);
                 this.state.delayId = response.delay_id;
                 return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
             })
             .catch((e) => {
+                const repeatActionType = MembershipActionType.SendFirstDelayedEvent;
                 if (this.manageMaxDelayExceededSituation(e)) {
-                    return {
-                        insert: [
-                            {
-                                ts: Date.now(),
-                                type: MembershipActionType.SendFirstDelayedEvent,
-                            },
-                        ],
-                    };
+                    return createInsertActionUpdate(repeatActionType);
                 }
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "sendDelayedStateEvent", type);
-                if (updateLimit) return updateLimit;
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "sendDelayedStateEvent");
+                if (update) return update;
 
                 // log and fall through
                 if (this.isUnsupportedDelayedEndpoint(e)) {
@@ -486,12 +477,8 @@ export class MembershipManager implements IMembershipManager {
             });
     }
 
-    private async cancelKnownDelayIdBeforeSendFirstDelayedEvent(
-        type: MembershipActionType,
-        delayId: string,
-    ): Promise<ActionUpdate> {
+    private async cancelKnownDelayIdBeforeSendFirstDelayedEvent(delayId: string): Promise<ActionUpdate> {
         // Remove all running updates and restarts
-        const resetActionUpdate = { replace: [] };
         return await this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel)
             .then(() => {
@@ -500,22 +487,22 @@ export class MembershipManager implements IMembershipManager {
                 return createReplaceActionUpdate(MembershipActionType.SendFirstDelayedEvent);
             })
             .catch((e) => {
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "updateDelayedEvent", type);
-                if (updateLimit) return { ...resetActionUpdate, ...updateLimit };
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return { ...resetActionUpdate, ...updateNetwork };
+                const repeatActionType = MembershipActionType.SendFirstDelayedEvent;
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                if (update) return update;
 
                 if (this.isNotFoundError(e)) {
                     // If we get a M_NOT_FOUND we know that the delayed event got already removed.
                     // This means we are good and can set it to undefined and run this again.
                     this.state.delayId = undefined;
-                    return createReplaceActionUpdate(MembershipActionType.SendFirstDelayedEvent);
+                    return createReplaceActionUpdate(repeatActionType);
                 }
                 if (this.isUnsupportedDelayedEndpoint(e)) {
                     return createReplaceActionUpdate(MembershipActionType.SendJoinEvent);
                 }
+                // We do not just ignore and log this error since we would also need to reset the delayId.
 
-                // This becomes an unhandle-able error case since sth is signifciantly off if we dont hit any of the above cases
+                // This becomes an unrecoverable error case since something is significantly off if we don't hit any of the above cases
                 // when state.delayId !== undefined
                 // We do not use ignore and log this error since we would also need to reset the delayId.
                 // It is cleaner if we the frontend rejoines instead of resetting the delayId here and behaving like in the success case.
@@ -525,7 +512,7 @@ export class MembershipManager implements IMembershipManager {
             });
     }
 
-    private async restartDelayedEvent(type: MembershipActionType, delayId: string): Promise<ActionUpdate> {
+    private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
         return await this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart)
             .then(() => {
@@ -536,6 +523,7 @@ export class MembershipManager implements IMembershipManager {
                 );
             })
             .catch((e) => {
+                const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
                     this.state.delayId = undefined;
                     return createInsertActionUpdate(MembershipActionType.SendMainDelayedEvent);
@@ -544,17 +532,15 @@ export class MembershipManager implements IMembershipManager {
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
 
                 // TODO this also needs a test: get rate limit while checking id delayed event is scheduled
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "updateDelayedEvent", type);
-                if (updateLimit) return updateLimit;
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                if (update) return update;
 
                 // In other error cases we have no idea what is happening
                 throw Error("Could not restart delayed event, even though delayed events are supported. " + e);
             });
     }
 
-    private async sendMainDelayedEvent(type: MembershipActionType): Promise<ActionUpdate> {
+    private async sendMainDelayedEvent(): Promise<ActionUpdate> {
         return await this.client
             ._unstable_sendDelayedStateEvent(
                 this.room.roomId,
@@ -574,25 +560,21 @@ export class MembershipManager implements IMembershipManager {
                 );
             })
             .catch((e) => {
+                const repeatActionType = MembershipActionType.SendMainDelayedEvent;
                 // Don't do any other delayed event work if its not supported.
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
 
                 if (this.manageMaxDelayExceededSituation(e)) {
-                    return createInsertActionUpdate(MembershipActionType.SendMainDelayedEvent);
+                    return createInsertActionUpdate(repeatActionType);
                 }
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "sendDelayedStateEvent", type);
-                if (updateLimit) return updateLimit;
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                if (update) return update;
 
                 throw Error("Could not send delayed event, even though delayed events are supported. " + e);
             });
     }
 
-    private async sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(
-        type: MembershipActionType,
-        delayId: string,
-    ): Promise<ActionUpdate> {
+    private async sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(delayId: string): Promise<ActionUpdate> {
         return await this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send)
             .then(() => {
@@ -602,26 +584,25 @@ export class MembershipManager implements IMembershipManager {
                 return { replace: [] };
             })
             .catch((e) => {
+                const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
                 if (this.isNotFoundError(e)) {
                     this.state.delayId = undefined;
-                    return createInsertActionUpdate(MembershipActionType.SendLeaveEvent);
+                    return createInsertActionUpdate(repeatActionType);
                 }
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "updateDelayedEvent", type);
-                if (updateLimit) return updateLimit;
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                if (update) return update;
 
                 // On any other error we fall back to SendLeaveEvent (this includes hard errors from rate limiting)
                 logger.warn(
                     "Encountered unexpected error during SendScheduledDelayedLeaveEvent. Falling back to SendLeaveEvent",
                     e,
                 );
-                return createInsertActionUpdate(MembershipActionType.SendLeaveEvent);
+                return createInsertActionUpdate(repeatActionType);
             });
     }
 
-    private async sendJoinEvent(type: MembershipActionType): Promise<ActionUpdate> {
+    private async sendJoinEvent(): Promise<ActionUpdate> {
         return await this.client
             .sendStateEvent(
                 this.room.roomId,
@@ -646,15 +627,13 @@ export class MembershipManager implements IMembershipManager {
                 };
             })
             .catch((e) => {
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "sendStateEvent", type);
-                if (updateLimit) return updateLimit;
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
+                const update = this.actionUpdateFromErrors(e, MembershipActionType.SendJoinEvent, "sendStateEvent");
+                if (update) return update;
                 throw e;
             });
     }
 
-    private async updateExpiryOnJoinedEvent(type: MembershipActionType): Promise<ActionUpdate> {
+    private async updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;
         return await this.client
             .sendStateEvent(
@@ -677,14 +656,13 @@ export class MembershipManager implements IMembershipManager {
                 };
             })
             .catch((e) => {
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "sendStateEvent", type);
-                if (updateLimit) return updateLimit;
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
+                const update = this.actionUpdateFromErrors(e, MembershipActionType.UpdateExpiry, "sendStateEvent");
+                if (update) return update;
+
                 throw e;
             });
     }
-    private async sendFallbackLeaveEvent(type: MembershipActionType): Promise<ActionUpdate> {
+    private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
         return await this.client
             .sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {}, this.stateKey)
             .then(() => {
@@ -693,10 +671,8 @@ export class MembershipManager implements IMembershipManager {
                 return { replace: [] };
             })
             .catch((e) => {
-                const updateLimit = this.actionUpdateFromRateLimitError(e, "sendStateEvent", type);
-                if (updateLimit) return updateLimit;
-                const updateNetwork = this.actionUpdateFromNetworkErrorRetry(e, type);
-                if (updateNetwork) return updateNetwork;
+                const update = this.actionUpdateFromErrors(e, MembershipActionType.SendLeaveEvent, "sendStateEvent");
+                if (update) return update;
                 throw e;
             });
     }
@@ -758,6 +734,16 @@ export class MembershipManager implements IMembershipManager {
         return false;
     }
 
+    private actionUpdateFromErrors(
+        error: unknown,
+        type: MembershipActionType,
+        method: string,
+    ): ActionUpdate | undefined {
+        const updateLimit = this.actionUpdateFromRateLimitError(error, method, type);
+        if (updateLimit) return updateLimit;
+        const updateNetwork = this.actionUpdateFromNetworkErrorRetry(error, type);
+        if (updateNetwork) return updateNetwork;
+    }
     /**
      * Check if we have a rate limit error and schedule the same action again if we dont exceed the rate limit retry count yet.
      * @param error the error causing this handler check/execution
