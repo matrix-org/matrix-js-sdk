@@ -206,13 +206,13 @@ export class MembershipManager implements IMembershipManager {
 
         this.scheduler
             .startWithJoin()
-            .catch((e) => {
-                logger.error("MembershipManager stopped because: ", e);
-                onError?.(e);
-            })
             .then(() => {
                 this.leavePromiseDefer?.resolve(true);
                 this.leavePromiseDefer = undefined;
+            })
+            .catch((e) => {
+                logger.error("MembershipManager stopped because: ", e);
+                onError?.(e);
             });
     }
 
