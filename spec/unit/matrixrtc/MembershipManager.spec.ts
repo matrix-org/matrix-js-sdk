@@ -19,10 +19,11 @@ limitations under the License.
 
 import { type MockedFunction, type Mock } from "jest-mock";
 
-import { EventType, HTTPError, MatrixError, type Room } from "../../../src";
+import { EventType, HTTPError, MatrixError, UnsupportedDelayedEventsEndpointError, type Room } from "../../../src";
 import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
-import { LegacyMembershipManager } from "../../../src/matrixrtc/MembershipManager";
+import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
+import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 import { defer } from "../../../src/utils";
 
 function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) {
@@ -44,9 +45,10 @@ function createAsyncHandle(method: MockedFunction<any>) {
  * Tests different MembershipManager implementations. Some tests don't apply to `LegacyMembershipManager`
  * use !FailsForLegacy to skip those. See: testEnvironment for more details.
  */
+
 describe.each([
     { TestMembershipManager: LegacyMembershipManager, description: "LegacyMembershipManager" },
-    // { TestMembershipManager: MembershipManager, description: "MembershipManager" },
+    { TestMembershipManager: MembershipManager, description: "MembershipManager" },
 ])("$description", ({ TestMembershipManager }) => {
     let client: MockClient;
     let room: Room;
@@ -244,7 +246,12 @@ describe.each([
                 const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
                 manager.join([focus], focusActive);
-                delayedHandle.reject?.(Error("Server does not support the delayed events API"));
+                delayedHandle.reject?.(
+                    new UnsupportedDelayedEventsEndpointError(
+                        "Server does not support the delayed events API",
+                        "sendDelayedStateEvent",
+                    ),
+                );
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
             });
             it("does try to schedule a delayed leave event again if rate limited", async () => {
@@ -328,6 +335,7 @@ describe.each([
             await jest.advanceTimersByTimeAsync(1);
             (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue("unknown");
             await manager.leave();
+
             // We send a normal leave event since we failed using updateDelayedEvent with the "send" action.
             expect(client.sendStateEvent).toHaveBeenLastCalledWith(
                 room.roomId,
@@ -337,9 +345,9 @@ describe.each([
             );
         });
         // FailsForLegacy because legacy implementation always sends the empty state event even though it isn't needed
-        it("does nothing if not joined !FailsForLegacy", async () => {
+        it("does nothing if not joined !FailsForLegacy", () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
-            await manager.leave();
+            expect(async () => await manager.leave()).not.toThrow();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
@@ -470,10 +478,10 @@ describe.each([
         // !FailsForLegacy because the expires logic was removed for the legacy call manager.
         // Delayed events should replace it entirely but before they have wide adoption
         // the expiration logic still makes sense.
-        // TODO: add git commit when we removed it.
-        it("extends `expires` when call still active !FailsForLegacy", async () => {
+        // TODO: Add git commit when we removed it.
+        async function testExpires(expire: number, headroom?: number) {
             const manager = new TestMembershipManager(
-                { membershipExpiryTimeout: 10_000 },
+                { membershipExpiryTimeout: expire, membershipExpiryTimeoutHeadroom: headroom },
                 room,
                 client,
                 () => undefined,
@@ -482,13 +490,19 @@ describe.each([
             await waitForMockCall(client.sendStateEvent);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
-            expect(sentMembership.expires).toBe(10_000);
+            expect(sentMembership.expires).toBe(expire);
             for (let i = 2; i <= 12; i++) {
-                await jest.advanceTimersByTimeAsync(10_000);
+                await jest.advanceTimersByTimeAsync(expire);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(i);
                 const sentMembership = (client.sendStateEvent as Mock).mock.lastCall![2] as SessionMembershipData;
-                expect(sentMembership.expires).toBe(10_000 * i);
+                expect(sentMembership.expires).toBe(expire * i);
             }
+        }
+        it("extends `expires` when call still active !FailsForLegacy", async () => {
+            await testExpires(10_000);
+        });
+        it("extends `expires` using headroom configuration !FailsForLegacy", async () => {
+            await testExpires(10_000, 1_000);
         });
     });
 
@@ -544,7 +558,7 @@ describe.each([
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             });
             // FailsForLegacy as implementation does not re-check membership before retrying.
-            it("abandons retry loop if leave() was called !FailsForLegacy", async () => {
+            it("abandons retry loop if leave() was called before sending state event !FailsForLegacy", async () => {
                 const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
                 const manager = new TestMembershipManager({}, room, client, () => undefined);
@@ -565,7 +579,6 @@ describe.each([
                 await manager.leave();
 
                 // Wait for all timers to be setup
-                // await flushPromises();
                 await jest.advanceTimersByTimeAsync(1000);
 
                 // No new events should have been sent:
@@ -601,6 +614,89 @@ describe.each([
                 expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             });
+        });
+    });
+    describe("unrecoverable errors", () => {
+        // !FailsForLegacy because legacy does not have a retry limit and no mechanism to communicate unrecoverable errors.
+        it("throws, when reaching maximum number of retries for initial delayed event creation !FailsForLegacy", async () => {
+            const delayEventSendError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "2" }),
+                ),
+            );
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive, delayEventSendError);
+
+            for (let i = 0; i < 10; i++) {
+                await jest.advanceTimersByTimeAsync(2000);
+            }
+            expect(delayEventSendError).toHaveBeenCalled();
+        });
+        // !FailsForLegacy because legacy does not have a retry limit and no mechanism to communicate unrecoverable errors.
+        it("throws, when reaching maximum number of retries !FailsForLegacy", async () => {
+            const delayEventRestartError = jest.fn();
+            (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "1" }),
+                ),
+            );
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive, delayEventRestartError);
+
+            for (let i = 0; i < 10; i++) {
+                await jest.advanceTimersByTimeAsync(1000);
+            }
+            expect(delayEventRestartError).toHaveBeenCalled();
+        });
+        it("falls back to using pure state events when some error occurs while sending delayed events !FailsForLegacy", async () => {
+            const unrecoverableError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 601));
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive, unrecoverableError);
+            await waitForMockCall(client.sendStateEvent);
+            expect(unrecoverableError).not.toHaveBeenCalledWith();
+            expect(client.sendStateEvent).toHaveBeenCalled();
+        });
+        it("retries before failing in case its a network error !FailsForLegacy", async () => {
+            const unrecoverableError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
+            const manager = new TestMembershipManager(
+                { callMemberEventRetryDelayMinimum: 1000, maximumNetworkErrorRetryCount: 7 },
+                room,
+                client,
+                () => undefined,
+            );
+            manager.join([focus], focusActive, unrecoverableError);
+            for (let retries = 0; retries < 7; retries++) {
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(retries + 1);
+                await jest.advanceTimersByTimeAsync(1000);
+            }
+            expect(unrecoverableError).toHaveBeenCalled();
+            expect(unrecoverableError.mock.lastCall![0].message).toMatch(
+                "The MembershipManager shut down because of the end condition",
+            );
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
+        });
+        it("falls back to using pure state events when UnsupportedDelayedEventsEndpointError encountered for delayed events !FailsForLegacy", async () => {
+            const unrecoverableError = jest.fn();
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
+                new UnsupportedDelayedEventsEndpointError("not supported", "sendDelayedStateEvent"),
+            );
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive, unrecoverableError);
+            await jest.advanceTimersByTimeAsync(1);
+
+            expect(unrecoverableError).not.toHaveBeenCalled();
+            expect(client.sendStateEvent).toHaveBeenCalled();
         });
     });
 });

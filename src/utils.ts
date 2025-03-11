@@ -406,6 +406,23 @@ export async function logDuration<T>(logger: BaseLogger, name: string, block: ()
 }
 
 /**
+ * Utility to log the duration of a synchronous block.
+ *
+ * @param logger - The logger to log to.
+ * @param name - The name of the operation.
+ * @param block - The block to execute.
+ */
+export function logDurationSync<T>(logger: BaseLogger, name: string, block: () => T): T {
+    const start = Date.now();
+    try {
+        return block();
+    } finally {
+        const end = Date.now();
+        logger.debug(`[Perf]: ${name} took ${end - start}ms`);
+    }
+}
+
+/**
  * Promise/async version of {@link setImmediate}.
  *
  * Implementation is based on `setTimeout` for wider compatibility.

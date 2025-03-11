@@ -49,26 +49,26 @@ const testOIDCToken = {
     token_type: "Bearer",
 };
 class MockWidgetApi extends EventEmitter {
-    public start = jest.fn();
-    public requestCapability = jest.fn();
-    public requestCapabilities = jest.fn();
-    public requestCapabilityForRoomTimeline = jest.fn();
-    public requestCapabilityToSendEvent = jest.fn();
-    public requestCapabilityToReceiveEvent = jest.fn();
-    public requestCapabilityToSendMessage = jest.fn();
-    public requestCapabilityToReceiveMessage = jest.fn();
-    public requestCapabilityToSendState = jest.fn();
-    public requestCapabilityToReceiveState = jest.fn();
-    public requestCapabilityToSendToDevice = jest.fn();
-    public requestCapabilityToReceiveToDevice = jest.fn();
+    public start = jest.fn().mockResolvedValue(undefined);
+    public requestCapability = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilities = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityForRoomTimeline = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendEvent = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveEvent = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendMessage = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveMessage = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendState = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveState = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendToDevice = jest.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveToDevice = jest.fn().mockResolvedValue(undefined);
     public sendRoomEvent = jest.fn(
-        (eventType: string, content: unknown, roomId?: string, delay?: number, parentDelayId?: string) =>
+        async (eventType: string, content: unknown, roomId?: string, delay?: number, parentDelayId?: string) =>
             delay === undefined && parentDelayId === undefined
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
     public sendStateEvent = jest.fn(
-        (
+        async (
             eventType: string,
             stateKey: string,
             content: unknown,
@@ -80,17 +80,17 @@ class MockWidgetApi extends EventEmitter {
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public updateDelayedEvent = jest.fn();
-    public sendToDevice = jest.fn();
-    public requestOpenIDConnectToken = jest.fn(() => {
+    public updateDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public sendToDevice = jest.fn().mockResolvedValue(undefined);
+    public requestOpenIDConnectToken = jest.fn(async () => {
         return testOIDCToken;
         return new Promise<IOpenIDCredentials>(() => {
             return testOIDCToken;
         });
     });
-    public readStateEvents = jest.fn(() => []);
-    public getTurnServers = jest.fn(() => []);
-    public sendContentLoaded = jest.fn();
+    public readStateEvents = jest.fn(async () => []);
+    public getTurnServers = jest.fn(async () => []);
+    public sendContentLoaded = jest.fn().mockResolvedValue(undefined);
 
     public transport = {
         reply: jest.fn(),
