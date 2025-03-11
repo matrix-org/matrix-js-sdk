@@ -310,7 +310,7 @@ export class MembershipManager implements IMembershipManager {
     }
 
     // MembershipManager mutable state.
-    public state: ActionSchedulerState;
+    private state: ActionSchedulerState;
     private static get defaultState(): ActionSchedulerState {
         return {
             hasMemberStateEvent: false,
@@ -368,7 +368,7 @@ export class MembershipManager implements IMembershipManager {
     private oldStatus?: Status;
     private scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
         if (this.oldStatus) {
-            // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
+            //  we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
             // is equivalent to running it at the end of the loop. (just after applying the status/action list changes)
             logger.debug(`MembershipManager applied action changes. Status: ${this.oldStatus} -> ${this.status}`);
         }
@@ -504,8 +504,8 @@ export class MembershipManager implements IMembershipManager {
 
                 // This becomes an unrecoverable error case since something is significantly off if we don't hit any of the above cases
                 // when state.delayId !== undefined
-                // We do not use ignore and log this error since we would also need to reset the delayId.
-                // It is cleaner if we the frontend rejoines instead of resetting the delayId here and behaving like in the success case.
+                // We do not just ignore and log this error since we would also need to reset the delayId.
+                // It is cleaner if we, the frontend, rejoins instead of resetting the delayId here and behaving like in the success case.
                 throw Error(
                     "We failed to cancel a delayed event where we already had a delay id with an error we cannot automatically handle",
                 );
