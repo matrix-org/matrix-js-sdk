@@ -368,7 +368,7 @@ export class MembershipManager implements IMembershipManager {
     private oldStatus?: Status;
     private scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
         if (this.oldStatus) {
-            // we put this at the beginngin of the actsion scheduler loop handle callback since it is a loop this
+            // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
             // is equivalent to running it at the end of the loop. (just after applying the status/action list changes)
             logger.debug(`MembershipManager applied action changes. Status: ${this.oldStatus} -> ${this.status}`);
         }
