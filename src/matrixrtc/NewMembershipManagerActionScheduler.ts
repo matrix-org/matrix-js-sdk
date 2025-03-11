@@ -5,29 +5,6 @@ import { MembershipActionType } from "./NewMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
-/**
- * @internal
- */
-export interface ActionSchedulerState {
-    /** The delayId we got when successfully sending the delayed leave event.
-     * Gets set to undefined if the server claims it cannot find the delayed event anymore. */
-    delayId?: string;
-    /** Stores how often we have update the `expires` field.
-     * `expireUpdateIterations` * `membershipEventExpiryTimeout` resolves to the value the expires field should contain next */
-    expireUpdateIterations: number;
-    /** The time at which we send the first state event. The time the call started from the DAG point of view.
-     * This is used to compute the local sleep timestamps when to next update the member event with a new expires value. */
-    startTime: number;
-    /** The manager is in the state where its actually connected to the session. */
-    hasMemberStateEvent: boolean;
-    // There can be multiple retries at once so we need to store counters per action
-    // e.g. the send update membership and the restart delayed could be rate limited at the same time.
-    /** Retry counter for rate limits */
-    rateLimitRetries: Map<MembershipActionType, number>;
-    /** Retry counter for other errors */
-    networkErrorRetries: Map<MembershipActionType, number>;
-}
-
 /** @internal */
 export interface Action {
     /**
@@ -53,17 +30,6 @@ export type ActionUpdate =
       }
     | EmptyObject;
 
-enum Status {
-    Disconnected = "Disconnected",
-    Connecting = "Connecting",
-    ConnectingFailed = "ConnectingFailed",
-    Connected = "Connected",
-    Reconnecting = "Reconnecting",
-    Disconnecting = "Disconnecting",
-    Stuck = "Stuck",
-    Unknown = "Unknown",
-}
-
 /**
  * This scheduler tracks the state of the current membership participation
  * and runs one central timer that wakes up a handler callback with the correct action + state
@@ -75,28 +41,12 @@ enum Status {
  */
 export class ActionScheduler {
     public running = false;
-    public state: ActionSchedulerState;
-    public static get defaultState(): ActionSchedulerState {
-        return {
-            hasMemberStateEvent: false,
-            delayId: undefined,
 
-            startTime: 0,
-            rateLimitRetries: new Map(),
-            networkErrorRetries: new Map(),
-            expireUpdateIterations: 1,
-        };
-    }
     public constructor(
-        state: ActionSchedulerState,
         /** This is the callback called for each scheduled action (`this.addAction()`) */
-        private membershipLoopHandler: (
-            state: ActionSchedulerState,
-            type: MembershipActionType,
-        ) => Promise<ActionUpdate>,
-    ) {
-        this.state = state;
-    }
+        private membershipLoopHandler: (type: MembershipActionType) => Promise<ActionUpdate>,
+    ) {}
+
     // function for the wakeup mechanism (in case we add an action externally and need to leave the current sleep)
     private wakeup: (update: ActionUpdate) => void = (update: ActionUpdate): void => {
         logger.error("Cannot call wakeup before calling `startWithJoin()`");
@@ -136,9 +86,6 @@ export class ActionScheduler {
                 });
                 if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
 
-                const oldStatus = this.status;
-                logger.info(`MembershipManager ActionScheduler awakened. status=${oldStatus}`);
-
                 let handlerResult: ActionUpdate = {};
                 if (!wakeupUpdate) {
                     logger.debug(
@@ -148,10 +95,7 @@ export class ActionScheduler {
                     );
                     try {
                         // `this.wakeup` can also be called and sets the `wakupUpdate` object while we are in the handler.
-                        handlerResult = await this.membershipLoopHandler(
-                            this.state,
-                            nextAction.type as MembershipActionType,
-                        );
+                        handlerResult = await this.membershipLoopHandler(nextAction.type as MembershipActionType);
                     } catch (e) {
                         throw Error(`The MembershipManager shut down because of the end condition: ${e}`);
                     }
@@ -166,10 +110,6 @@ export class ActionScheduler {
                 } else if ("insert" in actionUpdate) {
                     this._actions.push(...actionUpdate.insert);
                 }
-
-                logger.info(
-                    `MembershipManager ActionScheduler applied action changes. Status: ${oldStatus} -> ${this.status}`,
-                );
             }
         } catch (e) {
             // Set the rtc session "not running" state since we cannot recover from here and the consumer user of the
@@ -187,60 +127,5 @@ export class ActionScheduler {
     }
     public initiateLeave(): void {
         this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
-    }
-
-    public resetState(): void {
-        this.state = ActionScheduler.defaultState;
-    }
-
-    public resetRateLimitCounter(type: MembershipActionType): void {
-        this.state.rateLimitRetries.set(type, 0);
-        this.state.networkErrorRetries.set(type, 0);
-    }
-
-    public get status(): Status {
-        if (this.actions.length === 1) {
-            const { type } = this.actions[0];
-            switch (type) {
-                case MembershipActionType.SendFirstDelayedEvent:
-                case MembershipActionType.SendJoinEvent:
-                case MembershipActionType.SendMainDelayedEvent:
-                    return Status.Connecting;
-                case MembershipActionType.UpdateExpiry: // where no delayed events
-                    return Status.Connected;
-                case MembershipActionType.SendScheduledDelayedLeaveEvent:
-                case MembershipActionType.SendLeaveEvent:
-                    return Status.Disconnecting;
-                default:
-                // pass through as not expected
-            }
-        } else if (this.actions.length === 2) {
-            const types = this.actions.map((a) => a.type);
-            // normal state for connected with delayed events
-            if (
-                (types.includes(MembershipActionType.RestartDelayedEvent) ||
-                    types.includes(MembershipActionType.SendMainDelayedEvent)) &&
-                types.includes(MembershipActionType.UpdateExpiry)
-            ) {
-                return Status.Connected;
-            }
-        } else if (this.actions.length === 3) {
-            const types = this.actions.map((a) => a.type);
-            // It is a correct connected state if we already schedule the next Restart but have not yet cleaned up
-            // the current restart.
-            if (
-                types.filter((t) => t === MembershipActionType.RestartDelayedEvent).length === 2 &&
-                types.includes(MembershipActionType.UpdateExpiry)
-            ) {
-                return Status.Connected;
-            }
-        }
-
-        if (!this.running) {
-            return Status.Disconnected;
-        }
-
-        logger.error("MembershipManager has an unknown state. Actions: ", this.actions);
-        return Status.Unknown;
     }
 }
