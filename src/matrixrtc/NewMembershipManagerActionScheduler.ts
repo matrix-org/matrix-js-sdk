@@ -18,10 +18,6 @@ export interface ActionSchedulerState {
     /** The time at which we send the first state event. The time the call started from the DAG point of view.
      * This is used to compute the local sleep timestamps when to next update the member event with a new expires value. */
     startTime: number;
-    /** Flag that gets set once join is called.
-     * The manager tries its best to get the user into the call.
-     * Does not imply the user is actually joined via room state. */
-    running: boolean;
     /** The manager is in the state where its actually connected to the session. */
     hasMemberStateEvent: boolean;
     // There can be multiple retries at once so we need to store counters per action
@@ -31,6 +27,7 @@ export interface ActionSchedulerState {
     /** Retry counter for other errors */
     networkErrorRetries: Map<MembershipActionType, number>;
 }
+
 /** @internal */
 export interface Action {
     /**
@@ -43,6 +40,7 @@ export interface Action {
      */
     type: MembershipActionType;
 }
+
 /** @internal */
 export type ActionUpdate =
     | {
@@ -76,11 +74,11 @@ enum Status {
  * @internal
  */
 export class ActionScheduler {
+    public running = false;
     public state: ActionSchedulerState;
     public static get defaultState(): ActionSchedulerState {
         return {
             hasMemberStateEvent: false,
-            running: false,
             delayId: undefined,
 
             startTime: 0,
@@ -116,58 +114,71 @@ export class ActionScheduler {
      * In most other error cases the manager will try to handle any server errors by itself.
      */
     public async startWithJoin(): Promise<void> {
-        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }];
-
-        while (this._actions.length > 0) {
-            // Sort so next (smallest ts) action is at the beginning
-            this._actions.sort((a, b) => a.ts - b.ts);
-            const nextAction = this._actions[0];
-            let wakeupUpdate: ActionUpdate | undefined = undefined;
-
-            // while we await for the next action, wakeup has to resolve the wakeupPromise
-            const wakeupPromise = new Promise<void>((resolve) => {
-                this.wakeup = (update: ActionUpdate): void => {
-                    wakeupUpdate = update;
-                    resolve();
-                };
-            });
-            if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
-
-            const oldStatus = this.status;
-            logger.info(`MembershipManager ActionScheduler awakened. status=${oldStatus}`);
-
-            let handlerResult: ActionUpdate = {};
-            if (!wakeupUpdate) {
-                logger.debug(
-                    `Current MembershipManager processing: ${nextAction.type}\nQueue:`,
-                    this._actions,
-                    `\nDate.now: "${Date.now()}`,
-                );
-                try {
-                    // `this.wakeup` can also be called and sets the `wakupUpdate` object while we are in the handler.
-                    handlerResult = await this.membershipLoopHandler(
-                        this.state,
-                        nextAction.type as MembershipActionType,
-                    );
-                } catch (e) {
-                    throw Error(`The MembershipManager shut down because of the end condition: ${e}`);
-                }
-            }
-            // remove the processed action only after we are done processing
-            this._actions.splice(0, 1);
-            // The wakeupUpdate always wins since that is a direct external update.
-            const actionUpdate = wakeupUpdate ?? handlerResult;
-
-            if ("replace" in actionUpdate) {
-                this._actions = actionUpdate.replace;
-            } else if ("insert" in actionUpdate) {
-                this._actions.push(...actionUpdate.insert);
-            }
-
-            logger.info(
-                `MembershipManager ActionScheduler applied action changes. Status: ${oldStatus} -> ${this.status}`,
-            );
+        if (this.running) {
+            logger.error("Cannot call startWithJoin() on NewMembershipActionScheduler while already running");
+            return;
         }
+        this.running = true;
+        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }];
+        try {
+            while (this._actions.length > 0) {
+                // Sort so next (smallest ts) action is at the beginning
+                this._actions.sort((a, b) => a.ts - b.ts);
+                const nextAction = this._actions[0];
+                let wakeupUpdate: ActionUpdate | undefined = undefined;
+
+                // while we await for the next action, wakeup has to resolve the wakeupPromise
+                const wakeupPromise = new Promise<void>((resolve) => {
+                    this.wakeup = (update: ActionUpdate): void => {
+                        wakeupUpdate = update;
+                        resolve();
+                    };
+                });
+                if (nextAction.ts > Date.now()) await Promise.race([wakeupPromise, sleep(nextAction.ts - Date.now())]);
+
+                const oldStatus = this.status;
+                logger.info(`MembershipManager ActionScheduler awakened. status=${oldStatus}`);
+
+                let handlerResult: ActionUpdate = {};
+                if (!wakeupUpdate) {
+                    logger.debug(
+                        `Current MembershipManager processing: ${nextAction.type}\nQueue:`,
+                        this._actions,
+                        `\nDate.now: "${Date.now()}`,
+                    );
+                    try {
+                        // `this.wakeup` can also be called and sets the `wakupUpdate` object while we are in the handler.
+                        handlerResult = await this.membershipLoopHandler(
+                            this.state,
+                            nextAction.type as MembershipActionType,
+                        );
+                    } catch (e) {
+                        throw Error(`The MembershipManager shut down because of the end condition: ${e}`);
+                    }
+                }
+                // remove the processed action only after we are done processing
+                this._actions.splice(0, 1);
+                // The wakeupUpdate always wins since that is a direct external update.
+                const actionUpdate = wakeupUpdate ?? handlerResult;
+
+                if ("replace" in actionUpdate) {
+                    this._actions = actionUpdate.replace;
+                } else if ("insert" in actionUpdate) {
+                    this._actions.push(...actionUpdate.insert);
+                }
+
+                logger.info(
+                    `MembershipManager ActionScheduler applied action changes. Status: ${oldStatus} -> ${this.status}`,
+                );
+            }
+        } catch (e) {
+            // Set the rtc session "not running" state since we cannot recover from here and the consumer user of the
+            // MatrixRTCSession class needs to manually rejoin.
+            this.running = false;
+            throw e;
+        }
+        this.running = false;
+
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
     }
 
@@ -225,7 +236,7 @@ export class ActionScheduler {
             }
         }
 
-        if (!this.state.running) {
+        if (!this.running) {
             return Status.Disconnected;
         }
 

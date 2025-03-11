@@ -152,7 +152,7 @@ export enum MembershipActionType {
  */
 export class MembershipManager implements IMembershipManager {
     public isJoined(): boolean {
-        return this.scheduler.state.running;
+        return this.scheduler.running;
     }
 
     /**
@@ -164,20 +164,26 @@ export class MembershipManager implements IMembershipManager {
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      */
     public join(fociPreferred: Focus[], focusActive?: Focus, onError?: (error: unknown) => void): void {
+        if (this.isJoined()) {
+            logger.error("MembershipManager is already running. Ignoring join request.");
+            return;
+        }
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
         this.leavePromiseDefer = undefined;
-        if (!this.scheduler.state.running) {
-            this.scheduler.resetState();
-            this.scheduler.state.running = true;
-            this.scheduler.startWithJoin().catch((e) => {
-                // Set the rtc session to left state since we cannot recover from here and the consumer user of the
-                // MatrixRTCSession class needs to manually rejoin.
-                this.scheduler.state.running = false;
+
+        this.scheduler.resetState();
+
+        this.scheduler
+            .startWithJoin()
+            .catch((e) => {
                 logger.error("MembershipManager stopped because: ", e);
                 onError?.(e);
+            })
+            .then(() => {
+                this.leavePromiseDefer?.resolve(true);
+                this.leavePromiseDefer = undefined;
             });
-        }
     }
 
     /**
@@ -186,8 +192,7 @@ export class MembershipManager implements IMembershipManager {
      * @returns true if it managed to leave and false if the timeout condition happened.
      */
     public leave(timeout?: number): Promise<boolean> {
-        if (!this.scheduler.state.running) return Promise.resolve(true);
-        this.scheduler.state.running = false;
+        if (!this.scheduler.running) return Promise.resolve(true);
 
         // We use the promise to track if we already scheduled a leave event
         // So we do not check scheduler.actions/scheduler.insertions
@@ -359,8 +364,6 @@ export class MembershipManager implements IMembershipManager {
             case MembershipActionType.SendScheduledDelayedLeaveEvent: {
                 // We are already good
                 if (!state.hasMemberStateEvent) {
-                    this.leavePromiseDefer?.resolve(true);
-                    this.leavePromiseDefer = undefined;
                     return { replace: [] };
                 }
                 if (state.delayId) {
@@ -378,8 +381,6 @@ export class MembershipManager implements IMembershipManager {
             case MembershipActionType.SendLeaveEvent: {
                 // We are good already
                 if (!state.hasMemberStateEvent) {
-                    this.leavePromiseDefer?.resolve(true);
-                    this.leavePromiseDefer = undefined;
                     return { replace: [] };
                 }
                 // This is only a fallback in case we do not have working delayed events support.
@@ -451,10 +452,7 @@ export class MembershipManager implements IMembershipManager {
             .then(() => {
                 state.delayId = undefined;
                 this.scheduler.resetRateLimitCounter(MembershipActionType.SendFirstDelayedEvent);
-                return {
-                    ...resetActionUpdate,
-                    ...createInsertActionUpdate(MembershipActionType.SendFirstDelayedEvent),
-                };
+                return createReplaceActionUpdate(MembershipActionType.SendFirstDelayedEvent);
             })
             .catch((e) => {
                 const updateLimit = this.actionUpdateFromRateLimitError(e, "updateDelayedEvent", type);
@@ -466,16 +464,10 @@ export class MembershipManager implements IMembershipManager {
                     // If we get a M_NOT_FOUND we know that the delayed event got already removed.
                     // This means we are good and can set it to undefined and run this again.
                     state.delayId = undefined;
-                    return {
-                        ...resetActionUpdate,
-                        ...createInsertActionUpdate(MembershipActionType.SendFirstDelayedEvent),
-                    };
+                    return createReplaceActionUpdate(MembershipActionType.SendFirstDelayedEvent);
                 }
                 if (this.isUnsupportedDelayedEndpoint(e)) {
-                    return {
-                        ...resetActionUpdate,
-                        ...createInsertActionUpdate(MembershipActionType.SendJoinEvent),
-                    };
+                    return createReplaceActionUpdate(MembershipActionType.SendJoinEvent);
                 }
 
                 // This becomes an unhandle-able error case since sth is signifciantly off if we dont hit any of the above cases
@@ -567,8 +559,6 @@ export class MembershipManager implements IMembershipManager {
                 state.hasMemberStateEvent = false;
                 this.scheduler.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
 
-                this.leavePromiseDefer?.resolve(true);
-                this.leavePromiseDefer = undefined;
                 return { replace: [] };
             })
             .catch((e) => {
@@ -666,8 +656,6 @@ export class MembershipManager implements IMembershipManager {
             .sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {}, this.stateKey)
             .then(() => {
                 this.scheduler.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
-                this.leavePromiseDefer?.resolve(true);
-                this.leavePromiseDefer = undefined;
                 state.hasMemberStateEvent = false;
                 return { replace: [] };
             })
@@ -689,6 +677,7 @@ export class MembershipManager implements IMembershipManager {
             return `_${stateKey}`;
         }
     }
+
     /**
      * Constructs our own membership
      */
@@ -857,8 +846,15 @@ export class MembershipManager implements IMembershipManager {
         return error instanceof UnsupportedDelayedEventsEndpointError;
     }
 }
+
 function createInsertActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
     return {
         insert: [{ ts: Date.now() + (offset ?? 0), type }],
+    };
+}
+
+function createReplaceActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
+    return {
+        replace: [{ ts: Date.now() + (offset ?? 0), type }],
     };
 }
