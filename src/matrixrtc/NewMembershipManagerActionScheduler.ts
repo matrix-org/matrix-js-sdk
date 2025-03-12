@@ -69,7 +69,7 @@ export class ActionScheduler {
             return;
         }
         this.running = true;
-        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }];
+        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }];
         try {
             while (this._actions.length > 0) {
                 // Sort so next (smallest ts) action is at the beginning
@@ -123,7 +123,7 @@ export class ActionScheduler {
     }
 
     public initiateJoin(): void {
-        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }] });
+        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
     }
     public initiateLeave(): void {
         this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
