@@ -29,8 +29,8 @@ describe("registerOidcClient()", () => {
         redirectUris: [baseUrl],
         clientName,
         applicationType: "web",
-        tosUri: "http://tos-uri",
-        policyUri: "http://policy-uri",
+        tosUri: "https://just.testing/tos",
+        policyUri: "https://policy.just.testing",
         contacts: ["admin@example.com"],
     };
     const dynamicClientId = "xyz789";
@@ -67,6 +67,8 @@ describe("registerOidcClient()", () => {
                 id_token_signed_response_alg: "RS256",
                 token_endpoint_auth_method: "none",
                 application_type: "web",
+                tos_uri: "https://just.testing/tos",
+                policy_uri: "https://policy.just.testing",
             }),
         );
     });
@@ -113,5 +115,25 @@ describe("registerOidcClient()", () => {
                 metadata,
             ),
         ).rejects.toThrow(OidcError.DynamicRegistrationNotSupported);
+    });
+
+    it("should filter out invalid URIs", async () => {
+        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
+            status: 200,
+            body: JSON.stringify({ client_id: dynamicClientId }),
+        });
+        expect(
+            await registerOidcClient(delegatedAuthConfig, {
+                ...metadata,
+                tosUri: "http://just.testing/tos",
+                policyUri: "https://policy-uri/",
+            }),
+        ).toEqual(dynamicClientId);
+        expect(JSON.parse(fetchMockJest.mock.calls[0][1]!.body as string)).not.toEqual(
+            expect.objectContaining({
+                tos_uri: "http://just.testing/tos",
+                policy_uri: "https://policy-uri/",
+            }),
+        );
     });
 });

@@ -54,8 +54,18 @@ interface OidcRegistrationRequestBody {
 
 export const DEVICE_CODE_SCOPE = "urn:ietf:params:oauth:grant-type:device_code";
 
+// Check that URIs have a common base, as per the MSC2966 definition
+const urlHasCommonBase = (base: URL, urlStr?: string): boolean => {
+    if (!urlStr) return false;
+    const url = new URL(urlStr);
+    if (url.protocol !== base.protocol) return false;
+    if (url.host !== base.host && !url.host.endsWith(`.${base.host}`)) return false;
+    return true;
+};
+
 /**
- * Attempts dynamic registration against the configured registration endpoint
+ * Attempts dynamic registration against the configured registration endpoint.
+ * Will ignore any URIs that do not use client_uri as a common base as per the spec.
  * @param delegatedAuthConfig - Auth config from {@link discoverAndValidateOIDCIssuerWellKnown}
  * @param clientMetadata - The metadata for the client which to register
  * @returns Promise<string> resolved with registered clientId
@@ -74,6 +84,8 @@ export const registerOidcClient = async (
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
+    const commonBase = new URL(clientMetadata.clientUri);
+
     // https://openid.net/specs/openid-connect-registration-1_0.html
     const metadata: OidcRegistrationRequestBody = {
         client_name: clientMetadata.clientName,
@@ -84,11 +96,12 @@ export const registerOidcClient = async (
         id_token_signed_response_alg: "RS256",
         token_endpoint_auth_method: "none",
         application_type: clientMetadata.applicationType,
-        logo_uri: clientMetadata.logoUri,
         contacts: clientMetadata.contacts,
-        policy_uri: clientMetadata.policyUri,
-        tos_uri: clientMetadata.tosUri,
+        logo_uri: urlHasCommonBase(commonBase, clientMetadata.logoUri) ? clientMetadata.logoUri : undefined,
+        policy_uri: urlHasCommonBase(commonBase, clientMetadata.policyUri) ? clientMetadata.policyUri : undefined,
+        tos_uri: urlHasCommonBase(commonBase, clientMetadata.tosUri) ? clientMetadata.tosUri : undefined,
     };
+
     const headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
