@@ -115,12 +115,10 @@ export class ActionScheduler {
                     this._actions.push(...actionUpdate.insert);
                 }
             }
-            this.running = false;
-        } catch (e) {
-            // Set the rtc session "not running" state since we cannot recover from here and the consumer user of the
+        } finally {
+            // Set the rtc session running state since we cannot recover from here and the consumer user of the
             // MatrixRTCSession class needs to manually rejoin.
             this.running = false;
-            throw e;
         }
 
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
