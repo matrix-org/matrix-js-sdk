@@ -949,7 +949,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // use first hero that has a display name or avatar url, or whose user ID
             // can be looked up as a member of the room
             for (const hero of nonFunctionalHeroes) {
-                // The old form of heroes simply contained the hero's user ID, which forced clients to then look up the
+                // The old (`/v3/sync`) form of heroes simply contained the hero's user ID, which forced clients to then look up the
                 // m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
                 // works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
                 // values, B) always prefer the hero values if they are set, over calling `.getMember`. This means

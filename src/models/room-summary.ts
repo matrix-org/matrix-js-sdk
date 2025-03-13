@@ -16,7 +16,7 @@ limitations under the License.
 
 /**
  * A stripped m.room.member event which contains the key renderable fields from the event,
- * sent only in simplified sliding sync (not sync v2).
+ * sent only in simplified sliding sync (not `/v3/sync`).
  */
 export type Hero = {
     userId: string;
@@ -25,7 +25,7 @@ export type Hero = {
 };
 
 /**
- * High level summary information for a room
+ * High level summary information for a room, as returned by `/v3/sync`.
  */
 export interface IRoomSummary {
     /**
@@ -44,7 +44,7 @@ export interface IRoomSummary {
 }
 
 /**
- * High level summary information for a room (MSC4186 sliding sync)
+ * High level summary information for a room, as returned by MSC4186 sliding sync.
  */
 export interface RoomSummaryMSC4186 {
     /**
