@@ -362,8 +362,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
     private selfMembership?: Membership;
-    // A Hero is a stripped m.room.member event which contains the key renderable fields from the event.
-    // It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old 'summary' field.
+    /**
+     * A `Hero` is a stripped `m.room.member` event which contains the important renderable fields from the event.
+      * 
+      * It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old `summary` field.
+      *
+      * When we are doing old-style (`/v3/sync`) sync, we simulate the SSS behaviour by constructing
+      * a `Hero` object based on the user id we get from the summary. Obviously, in that case,
+      * the `Hero` will lack a `displayName` or `avatarUrl`.
+      */
     private heroes: Hero[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
