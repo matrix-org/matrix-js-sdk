@@ -1683,8 +1683,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Takes either a legacy or MSC4186 room summary and updates the room with it.
-     * The summary will be converted to a legacy style summary in order to be emitted
-     * in the `RoomEvent.Summary` event.
+     * Note that the provided `summary` will be modified. (Specifically, it will be converted to a legacy-style 
+     * `IRoomSummary`).
      *
      * @param summary - The room summary to update the room with
      */
