@@ -364,13 +364,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private selfMembership?: Membership;
     /**
      * A `Hero` is a stripped `m.room.member` event which contains the important renderable fields from the event.
-      * 
-      * It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old `summary` field.
-      *
-      * When we are doing old-style (`/v3/sync`) sync, we simulate the SSS behaviour by constructing
-      * a `Hero` object based on the user id we get from the summary. Obviously, in that case,
-      * the `Hero` will lack a `displayName` or `avatarUrl`.
-      */
+     *
+     * It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old `summary` field.
+     *
+     * When we are doing old-style (`/v3/sync`) sync, we simulate the SSS behaviour by constructing
+     * a `Hero` object based on the user id we get from the summary. Obviously, in that case,
+     * the `Hero` will lack a `displayName` or `avatarUrl`.
+     */
     private heroes: Hero[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
@@ -1683,7 +1683,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Takes either a legacy or MSC4186 room summary and updates the room with it.
-     * Note that the provided `summary` will be modified. (Specifically, it will be converted to a legacy-style 
+     * Note that the provided `summary` will be modified. (Specifically, it will be converted to a legacy-style
      * `IRoomSummary`).
      *
      * @param summary - The room summary to update the room with
