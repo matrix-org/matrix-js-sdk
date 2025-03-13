@@ -40,6 +40,10 @@ export type ActionUpdate =
  * @internal
  */
 export class ActionScheduler {
+    /**
+     * This is tracking the state of the scheduler loop.
+     * Only used to prevent starting the loop twice.
+     */
     public running = false;
 
     public constructor(
@@ -111,13 +115,11 @@ export class ActionScheduler {
                     this._actions.push(...actionUpdate.insert);
                 }
             }
-        } catch (e) {
-            // Set the rtc session "not running" state since we cannot recover from here and the consumer user of the
+        } finally {
+            // Set the rtc session running state since we cannot recover from here and the consumer user of the
             // MatrixRTCSession class needs to manually rejoin.
             this.running = false;
-            throw e;
         }
-        this.running = false;
 
         logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
     }
