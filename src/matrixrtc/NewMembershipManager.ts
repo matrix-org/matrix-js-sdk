@@ -399,7 +399,7 @@ export class MembershipManager implements IMembershipManager {
             case MembershipActionType.SendDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
                 if (!this.state.delayId) {
-                    this.sendOrResendDelayedLeaveEvent(); // Normal case without any previous delayed id.
+                    return this.sendOrResendDelayedLeaveEvent(); // Normal case without any previous delayed id.
                 } else {
                     // This can happen if someone else (or another client) removes our own membership event.
                     // It will trigger `onRTCSessionMemberUpdate` queue `MembershipActionType.SendFirstDelayedEvent`.
