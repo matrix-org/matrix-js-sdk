@@ -41,7 +41,9 @@ export interface IMembershipManager {
     /**
      * If we are trying to join, or have successfully joined the session.
      * It does not reflect if the room state is already configured to represent us being joined.
-     * It only means that the Manager is running.
+     * It only means that the Manager should be trying to connect or to disconnect running.
+     * The Manager is still running right after isJoined becomes false to send the disconnect events.
+     * (A more accurate name would be `isActivated`)
      * @returns true if we intend to be participating in the MatrixRTC session
      */
     isJoined(): boolean;
@@ -181,8 +183,9 @@ enum Status {
  *   - Stop the timer for updating the state event
  */
 export class MembershipManager implements IMembershipManager {
+    private activated = false;
     public isJoined(): boolean {
-        return this.scheduler.running;
+        return this.activated;
     }
 
     /**
@@ -194,26 +197,31 @@ export class MembershipManager implements IMembershipManager {
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      */
     public join(fociPreferred: Focus[], focusActive?: Focus, onError?: (error: unknown) => void): void {
-        if (this.isJoined()) {
+        if (this.scheduler.running) {
             logger.error("MembershipManager is already running. Ignoring join request.");
             return;
         }
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
         this.leavePromiseDefer = undefined;
+        this.activated = true;
 
         this.state = MembershipManager.defaultState;
 
         this.scheduler
             .startWithJoin()
             .then(() => {
-                this.leavePromiseDefer?.resolve(true);
-                this.leavePromiseDefer = undefined;
+                if (!this.scheduler.running) {
+                    this.leavePromiseDefer?.resolve(true);
+                    this.leavePromiseDefer = undefined;
+                }
             })
             .catch((e) => {
                 logger.error("MembershipManager stopped because: ", e);
                 onError?.(e);
-            });
+            })
+            // Should already be set to false when calling `leave` in non error cases.
+            .finally(() => (this.activated = false));
     }
 
     /**
@@ -222,13 +230,17 @@ export class MembershipManager implements IMembershipManager {
      * @returns true if it managed to leave and false if the timeout condition happened.
      */
     public leave(timeout?: number): Promise<boolean> {
-        if (!this.scheduler.running) return Promise.resolve(true);
+        if (!this.scheduler.running) {
+            logger.warn("Called MembershipManager.leave() even though the MembershipManager is not running");
+            return Promise.resolve(true);
+        }
 
         // We use the promise to track if we already scheduled a leave event
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseDefer) {
             // reset scheduled actions so we will not do any new actions.
             this.leavePromiseDefer = defer<boolean>();
+            this.activated = false;
             this.scheduler.initiateLeave();
             if (timeout) setTimeout(() => this.leavePromiseDefer?.resolve(false), timeout);
         }
