@@ -32,6 +32,7 @@ describe("registerOidcClient()", () => {
         tosUri: "https://just.testing/tos",
         policyUri: "https://policy.just.testing",
         contacts: ["admin@example.com"],
+        logoUri: `${baseUrl}:8443/logo.png`,
     };
     const dynamicClientId = "xyz789";
 
@@ -69,6 +70,7 @@ describe("registerOidcClient()", () => {
                 application_type: "web",
                 tos_uri: "https://just.testing/tos",
                 policy_uri: "https://policy.just.testing",
+                logo_uri: `${baseUrl}:8443/logo.png`,
             }),
         );
     });
