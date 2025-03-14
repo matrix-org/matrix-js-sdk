@@ -59,7 +59,7 @@ const urlHasCommonBase = (base: URL, urlStr?: string): boolean => {
     if (!urlStr) return false;
     const url = new URL(urlStr);
     if (url.protocol !== base.protocol) return false;
-    if (url.host !== base.host && !url.host.endsWith(`.${base.host}`)) return false;
+    if (url.hostname !== base.hostname && !url.hostname.endsWith(`.${base.hostname}`)) return false;
     return true;
 };
 
