@@ -1635,7 +1635,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
     /** called by the sync loop after processing each sync.
      *
-     * TODO: figure out something equivalent for sliding sync.
      *
      * @param syncState - information on the completed sync.
      */
@@ -1645,6 +1644,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
             this.logger.warn("onSyncCompleted: Error processing outgoing requests", e);
         });
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#markAllTrackedUsersAsDirty}.
+     */
+    public async markAllTrackedUsersAsDirty(): Promise<void> {
+        await this.olmMachine.markAllTrackedUsersAsDirty();
     }
 
     /**

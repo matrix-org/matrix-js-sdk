@@ -138,6 +138,15 @@ export interface SyncCryptoCallbacks {
      * @param syncState - information about the completed sync.
      */
     onSyncCompleted(syncState: OnSyncCompletedData): void;
+
+    /**
+     * Mark all tracked users' device lists as dirty.
+     *
+     * This method will cause additional `/keys/query` requests on the server, so should be used only
+     * when the client has desynced tracking device list deltas from the server.
+     * In MSC4186: Simplified Sliding Sync, this can happen when the server expires the connection.
+     */
+    markAllTrackedUsersAsDirty(): Promise<void>;
 }
 
 /**

@@ -649,11 +649,13 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("e2ee");
         });
 
-        it("gets enabled on the initial request only", () => {
-            expect(ext.onRequest(true)).toEqual({
+        it("gets enabled all the time", async () => {
+            expect(await ext.onRequest(true)).toEqual({
                 enabled: true,
             });
-            expect(ext.onRequest(false)).toEqual(undefined);
+            expect(await ext.onRequest(false)).toEqual({
+                enabled: true,
+            });
         });
 
         it("can update device lists", () => {
@@ -695,11 +697,13 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("account_data");
         });
 
-        it("gets enabled on the initial request only", () => {
-            expect(ext.onRequest(true)).toEqual({
+        it("gets enabled all the time", async () => {
+            expect(await ext.onRequest(true)).toEqual({
                 enabled: true,
             });
-            expect(ext.onRequest(false)).toEqual(undefined);
+            expect(await ext.onRequest(false)).toEqual({
+                enabled: true,
+            });
         });
 
         it("processes global account data", async () => {
@@ -823,8 +827,12 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("to_device");
         });
 
-        it("gets enabled with a limit on the initial request only", () => {
-            const reqJson: any = ext.onRequest(true);
+        it("gets enabled all the time", async () => {
+            let reqJson: any = await ext.onRequest(true);
+            expect(reqJson.enabled).toEqual(true);
+            expect(reqJson.limit).toBeGreaterThan(0);
+            expect(reqJson.since).toBeUndefined();
+            reqJson = await ext.onRequest(false);
             expect(reqJson.enabled).toEqual(true);
             expect(reqJson.limit).toBeGreaterThan(0);
             expect(reqJson.since).toBeUndefined();
@@ -835,7 +843,7 @@ describe("SlidingSyncSdk", () => {
                 next_batch: "12345",
                 events: [],
             });
-            expect(ext.onRequest(false)).toEqual({
+            expect(await ext.onRequest(false)).toMatchObject({
                 since: "12345",
             });
         });
@@ -919,11 +927,13 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("typing");
         });
 
-        it("gets enabled on the initial request only", () => {
-            expect(ext.onRequest(true)).toEqual({
+        it("gets enabled all the time", async () => {
+            expect(await ext.onRequest(true)).toEqual({
                 enabled: true,
             });
-            expect(ext.onRequest(false)).toEqual(undefined);
+            expect(await ext.onRequest(false)).toEqual({
+                enabled: true,
+            });
         });
 
         it("processes typing notifications", async () => {
@@ -1042,11 +1052,13 @@ describe("SlidingSyncSdk", () => {
             ext = findExtension("receipts");
         });
 
-        it("gets enabled on the initial request only", () => {
-            expect(ext.onRequest(true)).toEqual({
+        it("gets enabled all the time", async () => {
+            expect(await ext.onRequest(true)).toEqual({
                 enabled: true,
             });
-            expect(ext.onRequest(false)).toEqual(undefined);
+            expect(await ext.onRequest(false)).toEqual({
+                enabled: true,
+            });
         });
 
         it("processes receipts", async () => {

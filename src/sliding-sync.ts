@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022-2024 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
 import { type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
-import { sleep, type IDeferred, defer } from "./utils.ts";
+import { sleep } from "./utils.ts";
 import { type HTTPError } from "./http-api/index.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
@@ -82,10 +82,23 @@ export interface MSC3575SlidingSyncRequest {
     clientTimeout?: number;
 }
 
+/**
+ * New format of hero introduced in MSC4186 with display name and avatar URL
+ * in addition to just user_id (as it is on the wire, with underscores)
+ * as opposed to Hero in room-summary.ts which has fields in camelCase
+ * (and also a flag to note what format the hero came from).
+ */
+export interface MSC4186Hero {
+    user_id: string;
+    displayname?: string;
+    avatar_url?: string;
+}
+
 export interface MSC3575RoomData {
     name: string;
     required_state: IStateEvent[];
     timeline: (IRoomEvent | IStateEvent)[];
+    heroes?: MSC4186Hero[];
     notification_count?: number;
     highlight_count?: number;
     joined_count?: number;
@@ -96,40 +109,12 @@ export interface MSC3575RoomData {
     is_dm?: boolean;
     prev_batch?: string;
     num_live?: number;
+    bump_stamp?: number;
 }
 
 interface ListResponse {
     count: number;
-    ops: Operation[];
 }
-
-interface BaseOperation {
-    op: string;
-}
-
-interface DeleteOperation extends BaseOperation {
-    op: "DELETE";
-    index: number;
-}
-
-interface InsertOperation extends BaseOperation {
-    op: "INSERT";
-    index: number;
-    room_id: string;
-}
-
-interface InvalidateOperation extends BaseOperation {
-    op: "INVALIDATE";
-    range: [number, number];
-}
-
-interface SyncOperation extends BaseOperation {
-    op: "SYNC";
-    range: [number, number];
-    room_ids: string[];
-}
-
-type Operation = DeleteOperation | InsertOperation | InvalidateOperation | SyncOperation;
 
 /**
  * A complete Sliding Sync response
@@ -163,7 +148,6 @@ class SlidingList {
     private isModified?: boolean;
 
     // returned data
-    public roomIndexToRoomId: Record<number, string> = {};
     public joinedCount = 0;
 
     /**
@@ -204,9 +188,6 @@ class SlidingList {
         // reset values as the join count may be very different (if filters changed) including the rooms
         // (e.g. sort orders or sliding window ranges changed)
 
-        // the constantly changing sliding window ranges. Not an array for performance reasons
-        // E.g. tracking ranges 0-99, 500-599, we don't want to have a 600 element array
-        this.roomIndexToRoomId = {};
         // the total number of joined rooms according to the server, always >= len(roomIndexToRoomId)
         this.joinedCount = 0;
     }
@@ -225,26 +206,6 @@ class SlidingList {
             list = JSON.parse(JSON.stringify(this.list));
         }
         return list;
-    }
-
-    /**
-     * Check if a given index is within the list range. This is required even though the /sync API
-     * provides explicit updates with index positions because of the following situation:
-     *   0 1 2 3 4 5 6 7 8   indexes
-     *   a b c       d e f   COMMANDS: SYNC 0 2 a b c; SYNC 6 8 d e f;
-     *   a b c       d _ f   COMMAND: DELETE 7;
-     *   e a b c       d f   COMMAND: INSERT 0 e;
-     *   c=3 is wrong as we are not tracking it, ergo we need to see if `i` is in range else drop it
-     * @param i - The index to check
-     * @returns True if the index is within a sliding window
-     */
-    public isIndexInRange(i: number): boolean {
-        for (const r of this.list.ranges) {
-            if (r[0] <= i && i <= r[1]) {
-                return true;
-            }
-        }
-        return false;
     }
 }
 
@@ -274,10 +235,10 @@ export interface Extension<Req extends object, Res extends object> {
     /**
      * A function which is called when the request JSON is being formed.
      * Returns the data to insert under this key.
-     * @param isInitial - True when this is part of the initial request (send sticky params)
+     * @param isInitial - True when this is part of the initial request.
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): Req | undefined;
+    onRequest(isInitial: boolean): Promise<Req>;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data - The response JSON under the extension name.
@@ -295,12 +256,10 @@ export interface Extension<Req extends object, Res extends object> {
  * of information when processing sync responses.
  *  - RoomData: concerns rooms, useful for SlidingSyncSdk to update its knowledge of rooms.
  *  - Lifecycle: concerns callbacks at various well-defined points in the sync process.
- *  - List: concerns lists, useful for UI layers to re-render room lists.
  * Specifically, the order of event invocation is:
  *  - Lifecycle (state=RequestFinished)
  *  - RoomData (N times)
  *  - Lifecycle (state=Complete)
- *  - List (at most once per list)
  */
 export enum SlidingSyncEvent {
     /**
@@ -313,16 +272,9 @@ export enum SlidingSyncEvent {
      *  - SlidingSyncState.RequestFinished: Fires after we receive a valid response but before the
      * response has been processed. Perform any pre-process steps here. If there was a problem syncing,
      * `err` will be set (e.g network errors).
-     *  - SlidingSyncState.Complete: Fires after all SlidingSyncEvent.RoomData have been fired but before
-     * SlidingSyncEvent.List.
+     *  - SlidingSyncState.Complete: Fires after the response has been processed.
      */
     Lifecycle = "SlidingSync.Lifecycle",
-    /**
-     * This event fires whenever there has been a change to this list index. It fires exactly once
-     * per list, even if there were multiple operations for the list.
-     * It fires AFTER Lifecycle and RoomData events.
-     */
-    List = "SlidingSync.List",
 }
 
 export type SlidingSyncEventHandlerMap = {
@@ -332,7 +284,6 @@ export type SlidingSyncEventHandlerMap = {
         resp: MSC3575SlidingSyncResponse | null,
         err?: Error,
     ) => void;
-    [SlidingSyncEvent.List]: (listKey: string, joinedCount: number, roomIndexToRoomId: Record<number, string>) => void;
 };
 
 /**
@@ -347,11 +298,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private terminated = false;
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
     private needsResend = false;
-    // the txn_id to send with the next request.
-    private txnId: string | null = null;
-    // a list (in chronological order of when they were sent) of objects containing the txn ID and
-    // a defer to resolve/reject depending on whether they were successfully sent or not.
-    private txnIdDefers: (IDeferred<string> & { txnId: string })[] = [];
     // map of extension name to req/resp handler
     private extensions: Record<string, Extension<any, any>> = {};
 
@@ -426,14 +372,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param key - The list key
      * @returns The list data which contains the rooms in this list
      */
-    public getListData(key: string): { joinedCount: number; roomIndexToRoomId: Record<number, string> } | null {
+    public getListData(key: string): { joinedCount: number } | null {
         const data = this.lists.get(key);
         if (!data) {
             return null;
         }
         return {
             joinedCount: data.joinedCount,
-            roomIndexToRoomId: Object.assign({}, data.roomIndexToRoomId),
         };
     }
 
@@ -461,13 +406,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public setListRanges(key: string, ranges: number[][]): Promise<string> {
+    public setListRanges(key: string, ranges: number[][]): void {
         const list = this.lists.get(key);
         if (!list) {
-            return Promise.reject(new Error("no list with key " + key));
+            throw new Error("no list with key " + key);
         }
         list.updateListRange(ranges);
-        return this.resend();
+        this.resend();
     }
 
     /**
@@ -479,7 +424,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public setList(key: string, list: MSC3575List): Promise<string> {
+    public setList(key: string, list: MSC3575List): void {
         const existingList = this.lists.get(key);
         if (existingList) {
             existingList.replaceList(list);
@@ -488,7 +433,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             this.lists.set(key, new SlidingList(list));
         }
         this.listModifiedCount += 1;
-        return this.resend();
+        this.resend();
     }
 
     /**
@@ -504,27 +449,21 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * /sync request to resend new subscriptions. If the /sync stream has not started, this will
      * prepare the room subscriptions for when start() is called.
      * @param s - The new desired room subscriptions.
-     * @returns A promise which resolves to the transaction ID when it has been received down sync
-     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
-     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public modifyRoomSubscriptions(s: Set<string>): Promise<string> {
+    public modifyRoomSubscriptions(s: Set<string>): void {
         this.desiredRoomSubscriptions = s;
-        return this.resend();
+        this.resend();
     }
 
     /**
      * Modify which events to retrieve for room subscriptions. Invalidates all room subscriptions
      * such that they will be sent up afresh.
      * @param rs - The new room subscription fields to fetch.
-     * @returns A promise which resolves to the transaction ID when it has been received down sync
-     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
-     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
-    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): Promise<string> {
+    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): void {
         this.roomSubscriptionInfo = rs;
         this.confirmedRoomSubscriptions = new Set<string>();
-        return this.resend();
+        this.resend();
     }
 
     /**
@@ -538,11 +477,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.extensions[ext.name()] = ext;
     }
 
-    private getExtensionRequest(isInitial: boolean): Record<string, object | undefined> {
+    private async getExtensionRequest(isInitial: boolean): Promise<Record<string, object | undefined>> {
         const ext: Record<string, object | undefined> = {};
-        Object.keys(this.extensions).forEach((extName) => {
-            ext[extName] = this.extensions[extName].onRequest(isInitial);
-        });
+        for (const extName in this.extensions) {
+            ext[extName] = await this.extensions[extName].onRequest(isInitial);
+        }
         return ext;
     }
 
@@ -595,203 +534,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
-    private shiftRight(listKey: string, hi: number, low: number): void {
-        const list = this.lists.get(listKey);
-        if (!list) {
-            return;
-        }
-        //     l   h
-        // 0,1,2,3,4 <- before
-        // 0,1,2,2,3 <- after, hi is deleted and low is duplicated
-        for (let i = hi; i > low; i--) {
-            if (list.isIndexInRange(i)) {
-                list.roomIndexToRoomId[i] = list.roomIndexToRoomId[i - 1];
-            }
-        }
-    }
-
-    private shiftLeft(listKey: string, hi: number, low: number): void {
-        const list = this.lists.get(listKey);
-        if (!list) {
-            return;
-        }
-        //     l   h
-        // 0,1,2,3,4 <- before
-        // 0,1,3,4,4 <- after, low is deleted and hi is duplicated
-        for (let i = low; i < hi; i++) {
-            if (list.isIndexInRange(i)) {
-                list.roomIndexToRoomId[i] = list.roomIndexToRoomId[i + 1];
-            }
-        }
-    }
-
-    private removeEntry(listKey: string, index: number): void {
-        const list = this.lists.get(listKey);
-        if (!list) {
-            return;
-        }
-        // work out the max index
-        let max = -1;
-        for (const n in list.roomIndexToRoomId) {
-            if (Number(n) > max) {
-                max = Number(n);
-            }
-        }
-        if (max < 0 || index > max) {
-            return;
-        }
-        // Everything higher than the gap needs to be shifted left.
-        this.shiftLeft(listKey, max, index);
-        delete list.roomIndexToRoomId[max];
-    }
-
-    private addEntry(listKey: string, index: number): void {
-        const list = this.lists.get(listKey);
-        if (!list) {
-            return;
-        }
-        // work out the max index
-        let max = -1;
-        for (const n in list.roomIndexToRoomId) {
-            if (Number(n) > max) {
-                max = Number(n);
-            }
-        }
-        if (max < 0 || index > max) {
-            return;
-        }
-        // Everything higher than the gap needs to be shifted right, +1 so we don't delete the highest element
-        this.shiftRight(listKey, max + 1, index);
-    }
-
-    private processListOps(list: ListResponse, listKey: string): void {
-        let gapIndex = -1;
-        const listData = this.lists.get(listKey);
-        if (!listData) {
-            return;
-        }
-        list.ops.forEach((op: Operation) => {
-            if (!listData) {
-                return;
-            }
-            switch (op.op) {
-                case "DELETE": {
-                    logger.debug("DELETE", listKey, op.index, ";");
-                    delete listData.roomIndexToRoomId[op.index];
-                    if (gapIndex !== -1) {
-                        // we already have a DELETE operation to process, so process it.
-                        this.removeEntry(listKey, gapIndex);
-                    }
-                    gapIndex = op.index;
-                    break;
-                }
-                case "INSERT": {
-                    logger.debug("INSERT", listKey, op.index, op.room_id, ";");
-                    if (listData.roomIndexToRoomId[op.index]) {
-                        // something is in this space, shift items out of the way
-                        if (gapIndex < 0) {
-                            // we haven't been told where to shift from, so make way for a new room entry.
-                            this.addEntry(listKey, op.index);
-                        } else if (gapIndex > op.index) {
-                            // the gap is further down the list, shift every element to the right
-                            // starting at the gap so we can just shift each element in turn:
-                            // [A,B,C,_] gapIndex=3, op.index=0
-                            // [A,B,C,C] i=3
-                            // [A,B,B,C] i=2
-                            // [A,A,B,C] i=1
-                            // Terminate. We'll assign into op.index next.
-                            this.shiftRight(listKey, gapIndex, op.index);
-                        } else if (gapIndex < op.index) {
-                            // the gap is further up the list, shift every element to the left
-                            // starting at the gap so we can just shift each element in turn
-                            this.shiftLeft(listKey, op.index, gapIndex);
-                        }
-                    }
-                    // forget the gap, we don't need it anymore. This is outside the check for
-                    // a room being present in this index position because INSERTs always universally
-                    // forget the gap, not conditionally based on the presence of a room in the INSERT
-                    // position. Without this, DELETE 0; INSERT 0; would do the wrong thing.
-                    gapIndex = -1;
-                    listData.roomIndexToRoomId[op.index] = op.room_id;
-                    break;
-                }
-                case "INVALIDATE": {
-                    const startIndex = op.range[0];
-                    for (let i = startIndex; i <= op.range[1]; i++) {
-                        delete listData.roomIndexToRoomId[i];
-                    }
-                    logger.debug("INVALIDATE", listKey, op.range[0], op.range[1], ";");
-                    break;
-                }
-                case "SYNC": {
-                    const startIndex = op.range[0];
-                    for (let i = startIndex; i <= op.range[1]; i++) {
-                        const roomId = op.room_ids[i - startIndex];
-                        if (!roomId) {
-                            break; // we are at the end of list
-                        }
-                        listData.roomIndexToRoomId[i] = roomId;
-                    }
-                    logger.debug("SYNC", listKey, op.range[0], op.range[1], (op.room_ids || []).join(" "), ";");
-                    break;
-                }
-            }
-        });
-        if (gapIndex !== -1) {
-            // we already have a DELETE operation to process, so process it
-            // Everything higher than the gap needs to be shifted left.
-            this.removeEntry(listKey, gapIndex);
-        }
-    }
-
     /**
-     * Resend a Sliding Sync request. Used when something has changed in the request. Resolves with
-     * the transaction ID of this request on success. Rejects with the transaction ID of this request
-     * on failure.
+     * Resend a Sliding Sync request. Used when something has changed in the request.
      */
-    public resend(): Promise<string> {
-        if (this.needsResend && this.txnIdDefers.length > 0) {
-            // we already have a resend queued, so just return the same promise
-            return this.txnIdDefers[this.txnIdDefers.length - 1].promise;
-        }
+    public resend(): void {
         this.needsResend = true;
-        this.txnId = this.client.makeTxnId();
-        const d = defer<string>();
-        this.txnIdDefers.push({
-            ...d,
-            txnId: this.txnId,
-        });
         this.abortController?.abort();
         this.abortController = new AbortController();
-        return d.promise;
-    }
-
-    private resolveTransactionDefers(txnId?: string): void {
-        if (!txnId) {
-            return;
-        }
-        // find the matching index
-        let txnIndex = -1;
-        for (let i = 0; i < this.txnIdDefers.length; i++) {
-            if (this.txnIdDefers[i].txnId === txnId) {
-                txnIndex = i;
-                break;
-            }
-        }
-        if (txnIndex === -1) {
-            // this shouldn't happen; we shouldn't be seeing txn_ids for things we don't know about,
-            // whine about it.
-            logger.warn(`resolveTransactionDefers: seen ${txnId} but it isn't a pending txn, ignoring.`);
-            return;
-        }
-        // This list is sorted in time, so if the input txnId ACKs in the middle of this array,
-        // then everything before it that hasn't been ACKed yet never will and we should reject them.
-        for (let i = 0; i < txnIndex; i++) {
-            this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
-        }
-        this.txnIdDefers[txnIndex].resolve(txnId);
-        // clear out settled promises, including the one we resolved.
-        this.txnIdDefers = this.txnIdDefers.slice(txnIndex + 1);
     }
 
     /**
@@ -802,7 +551,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.abortController?.abort();
         // remove all listeners so things can be GC'd
         this.removeAllListeners(SlidingSyncEvent.Lifecycle);
-        this.removeAllListeners(SlidingSyncEvent.List);
         this.removeAllListeners(SlidingSyncEvent.RoomData);
     }
 
@@ -811,20 +559,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     private resetup(): void {
         logger.warn("SlidingSync: resetting connection info");
-        // any pending txn ID defers will be forgotten already by the server, so clear them out
-        this.txnIdDefers.forEach((d) => {
-            d.reject(d.txnId);
-        });
-        this.txnIdDefers = [];
         // resend sticky params and de-confirm all subscriptions
         this.lists.forEach((l) => {
             l.setModified(true);
         });
         this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
         // reset the connection as we might be wedged
-        this.needsResend = true;
-        this.abortController?.abort();
-        this.abortController = new AbortController();
+        this.resend();
     }
 
     /**
@@ -836,20 +577,18 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         let currentPos: string | undefined;
         while (!this.terminated) {
             this.needsResend = false;
-            let doNotUpdateList = false;
             let resp: MSC3575SlidingSyncResponse | undefined;
             try {
-                const listModifiedCount = this.listModifiedCount;
                 const reqLists: Record<string, MSC3575List> = {};
                 this.lists.forEach((l: SlidingList, key: string) => {
-                    reqLists[key] = l.getList(false);
+                    reqLists[key] = l.getList(true);
                 });
                 const reqBody: MSC3575SlidingSyncRequest = {
                     lists: reqLists,
                     pos: currentPos,
                     timeout: this.timeoutMS,
                     clientTimeout: this.timeoutMS + BUFFER_PERIOD_MS,
-                    extensions: this.getExtensionRequest(currentPos === undefined),
+                    extensions: await this.getExtensionRequest(currentPos === undefined),
                 };
                 // check if we are (un)subscribing to a room and modify request this one time for it
                 const newSubscriptions = difference(this.desiredRoomSubscriptions, this.confirmedRoomSubscriptions);
@@ -868,10 +607,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         reqBody.room_subscriptions[roomId] = sub;
                     }
                 }
-                if (this.txnId) {
-                    reqBody.txn_id = this.txnId;
-                    this.txnId = null;
-                }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl, this.abortController.signal);
                 resp = await this.pendingReq;
                 currentPos = resp.pos;
@@ -881,13 +616,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 for (const roomId of unsubscriptions) {
                     this.confirmedRoomSubscriptions.delete(roomId);
-                }
-                if (listModifiedCount !== this.listModifiedCount) {
-                    // the lists have been modified whilst we were waiting for 'await' to return, but the abort()
-                    // call did nothing. It is NOT SAFE to modify the list array now. We'll process the response but
-                    // not update list pointers.
-                    logger.debug("list modified during await call, not updating list");
-                    doNotUpdateList = true;
                 }
                 // mark all these lists as having been sent as sticky so we don't keep sending sticky params
                 this.lists.forEach((l) => {
@@ -931,27 +659,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 await this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
             }
 
-            const listKeysWithUpdates: Set<string> = new Set();
-            if (!doNotUpdateList) {
-                for (const [key, list] of Object.entries(resp.lists)) {
-                    list.ops = list.ops ?? [];
-                    if (list.ops.length > 0) {
-                        listKeysWithUpdates.add(key);
-                    }
-                    this.processListOps(list, key);
-                }
-            }
             this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);
             await this.onPostExtensionsResponse(resp.extensions);
-            listKeysWithUpdates.forEach((listKey: string) => {
-                const list = this.lists.get(listKey);
-                if (!list) {
-                    return;
-                }
-                this.emit(SlidingSyncEvent.List, listKey, list.joinedCount, Object.assign({}, list.roomIndexToRoomId));
-            });
-
-            this.resolveTransactionDefers(resp.txn_id);
         }
     }
 }
