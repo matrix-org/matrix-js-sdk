@@ -14,12 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MSC4186Hero } from "../sliding-sync";
-
 /**
  * A stripped m.room.member event which contains the key renderable fields from the event,
  * sent only in simplified sliding sync (not `/v3/sync`).
- * This is very similar to {@link MSC4186Hero} but an internal format with
+ * This is very similar to MSC4186Hero from sliding-sync.ts but an internal format with
  * camelCase rather than underscores.
  */
 export type Hero = {
