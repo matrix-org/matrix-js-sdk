@@ -956,13 +956,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // use first hero that has a display name or avatar url, or whose user ID
             // can be looked up as a member of the room
             for (const hero of nonFunctionalHeroes) {
-                // The old (`/v3/sync`) form of heroes simply contained the hero's user ID, which forced clients to then look up the
-                // m.room.member event in the current state. This is entirely decoupled in SSS. To ensure this
-                // works in a backwards compatible way, we will A) only set displayName/avatarUrl with server-provided
-                // values, B) always prefer the hero values if they are set, over calling `.getMember`. This means
-                // in SSS mode we will use the heroes if the display name or avatar URL fields are set, but in sync v2
-                // mode these fields will never be set and hence we will always do getMember lookups (at the right time as well).
-                if (!hero.displayName && !hero.avatarUrl) {
+                // If the hero was from a legacy sync (`/v3/sync`), we will need to look the user ID up in the room
+                // the display name and avatar URL will not be set.
+                if (!hero.fromMSC4186) {
                     // attempt to look up renderable fields from the m.room.member event if it exists
                     const member = this.getMember(hero.userId);
                     if (member) {
@@ -1690,7 +1686,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public setSummary(summary: IRoomSummary | RoomSummaryMSC4186): void {
         // map heroes onto the MSC4186 form as that has more data
-        const heroes = summary["m.heroes"]?.map((h) => (typeof h === "string" ? { userId: h } : h));
+        const heroes = summary["m.heroes"]?.map((h) =>
+            typeof h === "string" ? { userId: h, fromMSC4186: false } : { ...h, fromMSC4186: true },
+        );
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
