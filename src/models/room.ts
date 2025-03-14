@@ -77,7 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import * as utils from "../utils.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
-import { MSC4186Hero } from "../sliding-sync.ts";
+import { type MSC4186Hero } from "../sliding-sync.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
