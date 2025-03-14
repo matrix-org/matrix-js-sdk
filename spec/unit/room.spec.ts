@@ -1239,9 +1239,7 @@ describe("Room", function () {
                 const nameC = "Clarissa Harissa";
                 addMember(userB, KnownMembership.Join, { name: nameB });
                 addMember(userC, KnownMembership.Join, { name: nameC });
-                room.setSummary({
-                    "m.heroes": [{ userId: userB }, { userId: userC }],
-                });
+                room.setMSC4186SummaryData([{ user_id: userB }, { user_id: userC }], undefined, undefined);
                 room.recalculate();
                 expect(room.name).toEqual(`${nameB} and ${nameC}`);
             });

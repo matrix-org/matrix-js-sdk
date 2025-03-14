@@ -35,7 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { type IRoomSummary, type RoomSummaryMSC4186, type Hero, RoomSummary } from "./room-summary.ts";
+import { type IRoomSummary, type Hero, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
@@ -77,6 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import * as utils from "../utils.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
+import { MSC4186Hero } from "../sliding-sync.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1678,17 +1679,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Takes either a legacy or MSC4186 room summary and updates the room with it.
-     * Note that the provided `summary` will be modified. (Specifically, it will be converted to a legacy-style
-     * `IRoomSummary`).
+     * Takes a legacy room summary (/v3/sync as opposed to MSC4186) and updates the room with it.
      *
      * @param summary - The room summary to update the room with
      */
-    public setSummary(summary: IRoomSummary | RoomSummaryMSC4186): void {
-        // map heroes onto the MSC4186 form as that has more data
-        const heroes = summary["m.heroes"]?.map((h) =>
-            typeof h === "string" ? { userId: h, fromMSC4186: false } : { ...h, fromMSC4186: true },
-        );
+    public setSummary(summary: IRoomSummary): void {
+        const heroes = summary["m.heroes"]?.map((h) => ({ userId: h, fromMSC4186: false }));
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
@@ -1704,10 +1700,45 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             });
         }
 
-        // Convert back to the legacy heroes format for the `RoomEvent.Summary` event.
-        summary["m.heroes"] = heroes?.map((h) => h.userId);
-
         this.emit(RoomEvent.Summary, summary as IRoomSummary);
+    }
+
+    /**
+     * Takes information from the MSC4186 room summary and updates the room with it.
+     *
+     * @param heroes
+     * @param joinedCount
+     * @param invitedCount
+     */
+    public setMSC4186SummaryData(
+        heroes: MSC4186Hero[] | undefined,
+        joinedCount: number | undefined,
+        invitedCount: number | undefined,
+    ): void {
+        if (heroes) {
+            this.heroes = heroes
+                .filter((h) => h.user_id !== this.myUserId)
+                .map((h) => ({
+                    userId: h.user_id,
+                    displayName: h.displayname,
+                    avatarUrl: h.avatar_url,
+                    fromMSC4186: true,
+                }));
+        }
+        if (joinedCount !== undefined && Number.isInteger(joinedCount)) {
+            this.currentState.setJoinedMemberCount(joinedCount);
+        }
+        if (invitedCount !== undefined && Number.isInteger(invitedCount)) {
+            this.currentState.setInvitedMemberCount(invitedCount);
+        }
+
+        // Construct a summary object to emit as the event wants the info in a single object
+        // more like old-style (/v3/sync) summaries.
+        this.emit(RoomEvent.Summary, {
+            "m.heroes": this.heroes ? this.heroes.map((h) => h.userId) : [],
+            "m.joined_member_count": joinedCount,
+            "m.invited_member_count": invitedCount,
+        });
     }
 
     /**

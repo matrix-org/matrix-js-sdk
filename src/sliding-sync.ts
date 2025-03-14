@@ -84,7 +84,7 @@ export interface MSC3575SlidingSyncRequest {
 
 /**
  * New format of hero introduced in MSC4186 with display name and avatar URL
- * in addition to just user_id
+ * in addition to just user_id (as it is on the wire, with underscores)
  */
 export interface MSC4186Hero {
     user_id: string;
