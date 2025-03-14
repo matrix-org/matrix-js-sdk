@@ -85,6 +85,8 @@ export interface MSC3575SlidingSyncRequest {
 /**
  * New format of hero introduced in MSC4186 with display name and avatar URL
  * in addition to just user_id (as it is on the wire, with underscores)
+ * as opposed to Hero in room-summary.ts which has fields in camelCase
+ * (and also a flag to note what format the hero came from).
  */
 export interface MSC4186Hero {
     user_id: string;
