@@ -8043,7 +8043,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Reports a room as inappropriate to the server, which may then notify the appropriate people.
      * @param roomId - The room being reported.
-     * @param reason - The reason the content is being reported. May be blank.
+     * @param reason - The reason the room is being reported. May be blank.
      * @returns Promise which resolves to an empty object if successful
      */
     public reportRoom(roomId: string, reason: string): Promise<EmptyObject> {
