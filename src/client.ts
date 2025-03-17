@@ -8041,7 +8041,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches or paginates a room hierarchy as defined by MSC2946.
+     * Reports a room as inappropriate to the server, which may then notify the appropriate people.
+     *
+     * This API was introduced in Matrix v1.13.
+     *
+     * @param roomId - The room being reported.
+     * @param reason - The reason the room is being reported. May be blank.
+     * @returns Promise which resolves to an empty object if successful
+     */
+    public reportRoom(roomId: string, reason: string): Promise<EmptyObject> {
+        const path = utils.encodeUri("/rooms/$roomId/report", {
+            $roomId: roomId,
+        });
+
+        return this.http.authedRequest(Method.Post, path, undefined, { reason });
+    }
+
+    /**
+     * Fetches or paginates a room hierarchy asmatrix-js-sdk/spec/unit/matrix-client.spec.ts defined by MSC2946.
      * Falls back gracefully to sourcing its data from `getSpaceSummary` if this API is not yet supported by the server.
      * @param roomId - The ID of the space-room to use as the root of the summary.
      * @param limit - The maximum number of rooms to return per page.

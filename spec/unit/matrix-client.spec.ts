@@ -607,6 +607,26 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("reportRoom", function () {
+        const roomId = "!foo:bar";
+        const reason = "rubbish room";
+
+        it("should send an invite HTTP POST", async function () {
+            httpLookups = [
+                {
+                    method: "POST",
+                    path: "/rooms/!foo%3Abar/report",
+                    data: {},
+                    expectBody: {
+                        reason,
+                    },
+                },
+            ];
+            await client.reportRoom(roomId, reason);
+            expect(httpLookups.length).toEqual(0);
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
