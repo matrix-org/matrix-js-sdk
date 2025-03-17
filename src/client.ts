@@ -8042,9 +8042,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Reports a room as inappropriate to the server, which may then notify the appropriate people.
-     * 
+     *
      * This API was introduced in Matrix v1.13.
-     * 
+     *
      * @param roomId - The room being reported.
      * @param reason - The reason the room is being reported. May be blank.
      * @returns Promise which resolves to an empty object if successful
