@@ -25,8 +25,10 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { LegacyMembershipManager, type IMembershipManager } from "./MembershipManager.ts";
+import { MembershipManager, type IMembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
+import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
+import { logDurationSync } from "../utils.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -39,6 +41,8 @@ export enum MatrixRTCSessionEvent {
     JoinStateChanged = "join_state_changed",
     // The key used to encrypt media has changed
     EncryptionKeyChanged = "encryption_key_changed",
+    /** The membership manager had to shut down caused by an unrecoverable error */
+    MembershipManagerError = "membership_manager_error",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -52,9 +56,17 @@ export type MatrixRTCSessionEventHandlerMap = {
         encryptionKeyIndex: number,
         participantId: string,
     ) => void;
+    [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
 
 export interface MembershipConfig {
+    /**
+     * Use the new Manager.
+     *
+     * Default: `false`.
+     */
+    useNewMembershipManager?: boolean;
+
     /**
      * The timeout (in milliseconds) after we joined the call, that our membership should expire
      * unless we have explicitly updated it.
@@ -62,6 +74,17 @@ export interface MembershipConfig {
      * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
      */
     membershipExpiryTimeout?: number;
+
+    /**
+     * The time in (in milliseconds) which the manager will prematurely send the updated state event before the membership `expires` time to make sure it
+     * sends the updated state event early enough.
+     *
+     * A headroom of 1000ms and a `membershipExpiryTimeout` of 10000ms would result in the first membership event update after 9s and
+     * a membership event that would be considered expired after 10s.
+     *
+     * This value does not have an effect on the value of `SessionMembershipData.expires`.
+     */
+    membershipExpiryTimeoutHeadroom?: number;
 
     /**
      * The period (in milliseconds) with which we check that our membership event still exists on the
@@ -90,6 +113,16 @@ export interface MembershipConfig {
      * @deprecated It should be possible to make it stable without this.
      */
     callMemberEventRetryJitter?: number;
+
+    /**
+     * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a server rate limit has been hit.
+     */
+    maximumRateLimitRetryCount?: number;
+
+    /**
+     * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a network error occurs.
+     */
+    maximumNetworkErrorRetryCount?: number;
 }
 
 export interface EncryptionConfig {
@@ -318,18 +351,28 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * @param joinConfig - Additional configuration for the joined session.
      */
     public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
-        // create MembershipManager
         if (this.isJoined()) {
             logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
             return;
         } else {
-            this.membershipManager = new LegacyMembershipManager(joinConfig, this.roomSubset, this.client, () =>
-                this.getOldestMembership(),
-            );
+            // Create MembershipManager
+            if (joinConfig?.useNewMembershipManager ?? false) {
+                this.membershipManager = new MembershipManager(joinConfig, this.roomSubset, this.client, () =>
+                    this.getOldestMembership(),
+                );
+            } else {
+                this.membershipManager = new LegacyMembershipManager(joinConfig, this.roomSubset, this.client, () =>
+                    this.getOldestMembership(),
+                );
+            }
         }
 
         // Join!
-        this.membershipManager!.join(fociPreferred, fociActive);
+        this.membershipManager!.join(fociPreferred, fociActive, (e) => {
+            logger.error("MembershipManager encountered an unrecoverable error: ", e);
+            this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
+            this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
+        });
         this.encryptionManager!.join(joinConfig);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
@@ -492,7 +535,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         if (changed) {
             logger.info(`Memberships for call in room ${this.roomSubset.roomId} have changed: emitting`);
-            this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+            logDurationSync(logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
+                this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+            });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
         }

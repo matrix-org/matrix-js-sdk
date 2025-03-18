@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "37.0.0",
+    "version": "37.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=20.0.0"
@@ -26,7 +26,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/matrix-org/matrix-js-sdk"
+        "url": "git+https://github.com/matrix-org/matrix-js-sdk.git"
     },
     "keywords": [
         "matrix-org"
@@ -97,11 +97,11 @@
         "eslint": "8.57.1",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^10.0.0",
-        "eslint-import-resolver-typescript": "^3.5.1",
+        "eslint-import-resolver-typescript": "^4.0.0",
         "eslint-plugin-import": "^2.26.0",
         "eslint-plugin-jest": "^28.0.0",
         "eslint-plugin-jsdoc": "^50.0.0",
-        "eslint-plugin-matrix-org": "^2.1.0",
+        "eslint-plugin-matrix-org": "2.1.0",
         "eslint-plugin-n": "^14.0.0",
         "eslint-plugin-tsdoc": "^0.4.0",
         "eslint-plugin-unicorn": "^56.0.0",
@@ -117,7 +117,7 @@
         "lint-staged": "^15.0.2",
         "matrix-mock-request": "^2.5.0",
         "node-fetch": "^2.7.0",
-        "prettier": "3.5.1",
+        "prettier": "3.5.3",
         "rimraf": "^6.0.0",
         "ts-node": "^10.9.2",
         "typedoc": "^0.27.0",
