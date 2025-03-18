@@ -35,7 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { type IRoomSummary, RoomSummary } from "./room-summary.ts";
+import { type IRoomSummary, type Hero, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
@@ -77,6 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import * as utils from "../utils.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
+import { type MSC4186Hero } from "../sliding-sync.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -335,6 +336,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Map<string, MatrixEvent> = new Map(); // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
+    private bumpStamp: number | undefined = undefined;
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
     // Useful to know at what point the current user has started using threads in this room
@@ -361,7 +363,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
     private selfMembership?: Membership;
-    private summaryHeroes: string[] | null = null;
+    /**
+     * A `Hero` is a stripped `m.room.member` event which contains the important renderable fields from the event.
+     *
+     * It is used in MSC4186 (Simplified Sliding Sync) as a replacement for the old `summary` field.
+     *
+     * When we are doing old-style (`/v3/sync`) sync, we simulate the SSS behaviour by constructing
+     * a `Hero` object based on the user id we get from the summary. Obviously, in that case,
+     * the `Hero` will lack a `displayName` or `avatarUrl`.
+     */
+    private heroes: Hero[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
     private getVersionWarning = false;
@@ -879,7 +890,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
             if (memberCount === 2) {
-                return this.summaryHeroes?.[0];
+                return this.heroes?.[0]?.userId;
             }
         }
     }
@@ -897,8 +908,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         }
         // Remember, we're assuming this room is a DM, so returning the first member we find should be fine
-        if (Array.isArray(this.summaryHeroes) && this.summaryHeroes.length) {
-            return this.summaryHeroes[0];
+        if (Array.isArray(this.heroes) && this.heroes.length) {
+            return this.heroes[0].userId;
         }
         const members = this.currentState.getMembers();
         const anyMember = members.find((m) => m.userId !== this.myUserId);
@@ -940,12 +951,45 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (nonFunctionalMemberCount > 2) return;
 
         // Prefer the list of heroes, if present. It should only include the single other user in the DM.
-        const nonFunctionalHeroes = this.summaryHeroes?.filter((h) => !functionalMembers.includes(h));
+        const nonFunctionalHeroes = this.heroes?.filter((h) => !functionalMembers.includes(h.userId));
         const hasHeroes = Array.isArray(nonFunctionalHeroes) && nonFunctionalHeroes.length;
         if (hasHeroes) {
+            // use first hero that has a display name or avatar url, or whose user ID
+            // can be looked up as a member of the room
+            for (const hero of nonFunctionalHeroes) {
+                // If the hero was from a legacy sync (`/v3/sync`), we will need to look the user ID up in the room
+                // the display name and avatar URL will not be set.
+                if (!hero.fromMSC4186) {
+                    // attempt to look up renderable fields from the m.room.member event if it exists
+                    const member = this.getMember(hero.userId);
+                    if (member) {
+                        return member;
+                    }
+                } else {
+                    // use the Hero supplied values for the room member.
+                    // TODO: It's unfortunate that this function, which clearly only cares about the
+                    //       avatar url, returns the entire RoomMember event. We need to fake an event
+                    //       to meet this API shape.
+                    const heroMember = new RoomMember(this.roomId, hero.userId);
+                    // set the display name and avatar url
+                    heroMember.setMembershipEvent(
+                        new MatrixEvent({
+                            // ensure it's unique even if we hit the same millisecond
+                            event_id: "$" + this.roomId + hero.userId + new Date().getTime(),
+                            type: EventType.RoomMember,
+                            state_key: hero.userId,
+                            content: {
+                                displayname: hero.displayName,
+                                avatar_url: hero.avatarUrl,
+                            },
+                        }),
+                    );
+                    return heroMember;
+                }
+            }
             const availableMember = nonFunctionalHeroes
-                .map((userId) => {
-                    return this.getMember(userId);
+                .map((hero) => {
+                    return this.getMember(hero.userId);
                 })
                 .find((member) => !!member);
             if (availableMember) {
@@ -970,8 +1014,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // trust and try falling back to a hero, creating a one-off member for it
         if (hasHeroes) {
             const availableUser = nonFunctionalHeroes
-                .map((userId) => {
-                    return this.client.getUser(userId);
+                .map((hero) => {
+                    return this.client.getUser(hero.userId);
                 })
                 .find((user) => !!user);
             if (availableUser) {
@@ -1603,6 +1647,24 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Set the bump stamp for this room. This can be used for sorting rooms when the timeline
+     * entries are unknown. Used in MSC4186: Simplified Sliding Sync.
+     * @param bumpStamp The bump_stamp value from the server
+     */
+    public setBumpStamp(bumpStamp: number): void {
+        this.bumpStamp = bumpStamp;
+    }
+
+    /**
+     * Get the bump stamp for this room. This can be used for sorting rooms when the timeline
+     * entries are unknown. Used in MSC4186: Simplified Sliding Sync.
+     * @returns The bump stamp for the room, if it exists.
+     */
+    public getBumpStamp(): number | undefined {
+        return this.bumpStamp;
+    }
+
+    /**
      * Set one of the notification counts for this room
      * @param type - The type of notification count to set.
      * @param count - The new count
@@ -1616,8 +1678,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.setUnreadNotificationCount(type, count);
     }
 
+    /**
+     * Takes a legacy room summary (/v3/sync as opposed to MSC4186) and updates the room with it.
+     *
+     * @param summary - The room summary to update the room with
+     */
     public setSummary(summary: IRoomSummary): void {
-        const heroes = summary["m.heroes"];
+        const heroes = summary["m.heroes"]?.map((h) => ({ userId: h, fromMSC4186: false }));
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
@@ -1627,15 +1694,51 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.currentState.setInvitedMemberCount(invitedCount!);
         }
         if (Array.isArray(heroes)) {
-            // be cautious about trusting server values,
-            // and make sure heroes doesn't contain our own id
-            // just to be sure
-            this.summaryHeroes = heroes.filter((userId) => {
-                return userId !== this.myUserId;
+            // filter out ourselves just in case
+            this.heroes = heroes.filter((h) => {
+                return h.userId != this.myUserId;
             });
         }
 
         this.emit(RoomEvent.Summary, summary);
+    }
+
+    /**
+     * Takes information from the MSC4186 room summary and updates the room with it.
+     *
+     * @param heroes - The room's hero members
+     * @param joinedCount - The number of joined members
+     * @param invitedCount - The number of invited members
+     */
+    public setMSC4186SummaryData(
+        heroes: MSC4186Hero[] | undefined,
+        joinedCount: number | undefined,
+        invitedCount: number | undefined,
+    ): void {
+        if (heroes) {
+            this.heroes = heroes
+                .filter((h) => h.user_id !== this.myUserId)
+                .map((h) => ({
+                    userId: h.user_id,
+                    displayName: h.displayname,
+                    avatarUrl: h.avatar_url,
+                    fromMSC4186: true,
+                }));
+        }
+        if (joinedCount !== undefined && Number.isInteger(joinedCount)) {
+            this.currentState.setJoinedMemberCount(joinedCount);
+        }
+        if (invitedCount !== undefined && Number.isInteger(invitedCount)) {
+            this.currentState.setInvitedMemberCount(invitedCount);
+        }
+
+        // Construct a summary object to emit as the event wants the info in a single object
+        // more like old-style (/v3/sync) summaries.
+        this.emit(RoomEvent.Summary, {
+            "m.heroes": this.heroes ? this.heroes.map((h) => h.userId) : [],
+            "m.joined_member_count": joinedCount,
+            "m.invited_member_count": invitedCount,
+        });
     }
 
     /**
@@ -3459,18 +3562,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // get service members (e.g. helper bots) for exclusion
         const excludedUserIds = this.getFunctionalMembers();
 
-        // get members that are NOT ourselves and are actually in the room.
+        // get members from heroes that are NOT ourselves
         let otherNames: string[] = [];
-        if (this.summaryHeroes) {
-            // if we have a summary, the member state events should be in the room state
-            this.summaryHeroes.forEach((userId) => {
+        if (this.heroes) {
+            // if we have heroes, use those as the names
+            this.heroes.forEach((hero) => {
                 // filter service members
-                if (excludedUserIds.includes(userId)) {
+                if (excludedUserIds.includes(hero.userId)) {
                     inviteJoinCount--;
                     return;
                 }
-                const member = this.getMember(userId);
-                otherNames.push(member ? member.name : userId);
+                // If the hero has a display name, use that.
+                // Otherwise, look their user ID up in the membership and use
+                // the name from there, or the user ID as a last resort.
+                if (hero.displayName) {
+                    otherNames.push(hero.displayName);
+                } else {
+                    const member = this.getMember(hero.userId);
+                    otherNames.push(member ? member.name : hero.userId);
+                }
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {

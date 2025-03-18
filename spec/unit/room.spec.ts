@@ -1234,6 +1234,16 @@ describe("Room", function () {
                 expect(room.name).toEqual(nameB);
             });
 
+            it("supports MSC4186 style heroes", () => {
+                const nameB = "Bertha Bobbington";
+                const nameC = "Clarissa Harissa";
+                addMember(userB, KnownMembership.Join, { name: nameB });
+                addMember(userC, KnownMembership.Join, { name: nameC });
+                room.setMSC4186SummaryData([{ user_id: userB }, { user_id: userC }], undefined, undefined);
+                room.recalculate();
+                expect(room.name).toEqual(`${nameB} and ${nameC}`);
+            });
+
             it("reverts to empty room in case of self chat", function () {
                 room.setSummary({
                     "m.heroes": [],
@@ -4275,5 +4285,10 @@ describe("Room", function () {
             expect(filteredEvents).toHaveLength(1);
             expect(filteredEvents[0].getContent().body).toEqual("ev2");
         });
+    });
+
+    it("saves and retrieves the bump stamp", () => {
+        room.setBumpStamp(123456789);
+        expect(room.getBumpStamp()).toEqual(123456789);
     });
 });
