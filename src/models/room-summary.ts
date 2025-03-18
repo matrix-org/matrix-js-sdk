@@ -26,7 +26,8 @@ export type Hero = {
     avatarUrl?: string;
     /**
      * If true, the hero is from an MSC4186 summary, in which case `displayName` and `avatarUrl` will
-     * have been set by the server if available. If false, these fields will always be undefined.
+     * have been set by the server if available. If false, the `Hero` has been constructed from a `/v3/sync` response,
+     * so these fields will always be undefined.
      */
     fromMSC4186: boolean;
 };
