@@ -1700,7 +1700,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             });
         }
 
-        this.emit(RoomEvent.Summary, summary as IRoomSummary);
+        this.emit(RoomEvent.Summary, summary);
     }
 
     /**
