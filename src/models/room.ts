@@ -1725,7 +1725,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     fromMSC4186: true,
                 }));
         }
-        if (joinedCount !== undefined && Number.isInteger(joinedCount)) {
+        if (Number.isInteger(joinedCount)) {
             this.currentState.setJoinedMemberCount(joinedCount);
         }
         if (invitedCount !== undefined && Number.isInteger(invitedCount)) {
