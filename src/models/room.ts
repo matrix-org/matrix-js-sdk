@@ -1693,7 +1693,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (Number.isInteger(invitedCount)) {
             this.currentState.setInvitedMemberCount(invitedCount!);
         }
-        if (Array.isArray(heroes) && heroes.length > 0) {
+        if (Array.isArray(heroes)) {
             // filter out ourselves just in case
             this.heroes = heroes.filter((h) => {
                 return h.userId != this.myUserId;
