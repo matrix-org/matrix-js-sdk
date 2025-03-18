@@ -1706,9 +1706,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Takes information from the MSC4186 room summary and updates the room with it.
      *
-     * @param heroes
-     * @param joinedCount
-     * @param invitedCount
+     * @param heroes - The room's hero members
+     * @param joinedCount - The number of joined members
+     * @param invitedCount - The number of invited members
      */
     public setMSC4186SummaryData(
         heroes: MSC4186Hero[] | undefined,
