@@ -3562,7 +3562,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // get service members (e.g. helper bots) for exclusion
         const excludedUserIds = this.getFunctionalMembers();
 
-        // get members that are NOT ourselves and are actually in the room.
+        // get members from heroes that are NOT ourselves
         let otherNames: string[] = [];
         if (this.heroes) {
             // if we have a summary, the member state events should be in the room state
