@@ -219,6 +219,12 @@ export class OutgoingRequestProcessor {
 
             // we use the full prefix
             prefix: "",
+
+            // We set a timeout of 60 seconds to guard against requests getting stuck forever and wedging the
+            // request loop (cf https://github.com/element-hq/element-web/issues/29534).
+            //
+            // (XXX: should we do this in the whole of the js-sdk?)
+            localTimeoutMs: 60000,
         };
 
         return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
