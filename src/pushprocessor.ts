@@ -309,6 +309,23 @@ export class PushProcessor {
     }
 
     /**
+     * Create a RegExp object for the given glob pattern, caching the result.
+     * No cache invalidation is present currently,
+     * as this will be inherently bounded to the size of the user's own push rules.
+     * @param pattern - the glob pattern to convert to a RegExp
+     * @param alignToWordBoundary - whether to align the pattern to word boundaries, as specified for `content.body` matches
+     * @param flags - the flags to pass to the RegExp constructor, defaults to case-insensitive
+     */
+    public static getPushRuleGlobRegex(pattern: string, alignToWordBoundary = false, flags = "i"): RegExp {
+        const [prefix, suffix] = alignToWordBoundary ? ["(^|\\W)", "(\\W|$)"] : ["^", "$"];
+
+        if (!PushProcessor.cachedGlobToRegex[pattern]) {
+            PushProcessor.cachedGlobToRegex[pattern] = new RegExp(prefix + globToRegexp(pattern) + suffix, flags);
+        }
+        return PushProcessor.cachedGlobToRegex[pattern];
+    }
+
+    /**
      * Pre-caches the parsed keys for push rules and cleans out any obsolete cache
      * entries. Should be called after push rules are updated.
      * @param newRules - The new push rules.
@@ -567,11 +584,9 @@ export class PushProcessor {
             return false;
         }
 
-        const regex =
-            cond.key === "content.body"
-                ? this.createCachedRegex("(^|\\W)", cond.pattern, "(\\W|$)")
-                : this.createCachedRegex("^", cond.pattern, "$");
-
+        // Align to word boundary on `content.body` matches, whole string otherwise
+        // https://spec.matrix.org/v1.13/client-server-api/#conditions-1
+        const regex = PushProcessor.getPushRuleGlobRegex(cond.pattern, cond.key === "content.body");
         return !!val.match(regex);
     }
 
@@ -619,17 +634,6 @@ export class PushProcessor {
             (ev.getPrevContent()["m.terminated"] !== ev.getContent()["m.terminated"] ||
                 deepCompare(ev.getPrevContent(), {}))
         );
-    }
-
-    private createCachedRegex(prefix: string, glob: string, suffix: string): RegExp {
-        if (PushProcessor.cachedGlobToRegex[glob]) {
-            return PushProcessor.cachedGlobToRegex[glob];
-        }
-        PushProcessor.cachedGlobToRegex[glob] = new RegExp(
-            prefix + globToRegexp(glob) + suffix,
-            "i", // Case insensitive
-        );
-        return PushProcessor.cachedGlobToRegex[glob];
     }
 
     /**
