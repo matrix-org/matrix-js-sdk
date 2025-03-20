@@ -157,6 +157,30 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("mediaConfig", function () {
+        it("should get media config on unauthenticated media call", async () => {
+            httpBackend.when("GET", "/_matrix/media/v3/config").respond(200, '{"m.upload.size": 50000000}', true);
+
+            const prom = client.getMediaConfig();
+
+            httpBackend.flushAllExpected();
+
+            expect((await prom)["m.upload.size"]).toEqual(50000000);
+        });
+
+        it("should get media config on authenticated media call", async () => {
+            httpBackend
+                .when("GET", "/_matrix/client/v1/media/config")
+                .respond(200, '{"m.upload.size": 50000000}', true);
+
+            const prom = client.getMediaConfig(true);
+
+            httpBackend.flushAllExpected();
+
+            expect((await prom)["m.upload.size"]).toEqual(50000000);
+        });
+    });
+
     describe("joinRoom", function () {
         it("should no-op given the ID of a room you've already joined", async () => {
             const roomId = "!foo:bar";
