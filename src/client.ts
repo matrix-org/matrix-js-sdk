@@ -2069,11 +2069,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Get the config for the media repository.
+     *
+     * @param useAuthenticatedMedia - If true, the caller supports authenticated
+     * media and wants an authentication-required URL. Note that server support
+     * for authenticated media will *not* be checked - it is the caller's responsibility
+     * to do so before calling this function.
+     *
      * @returns Promise which resolves with an object containing the config.
      */
-    public getMediaConfig(): Promise<IMediaConfig> {
-        return this.http.authedRequest(Method.Get, "/config", undefined, undefined, {
-            prefix: MediaPrefix.V3,
+    public getMediaConfig(useAuthenticatedMedia: boolean = false): Promise<IMediaConfig> {
+        const path = useAuthenticatedMedia ? "/media/config" : "/config";
+        return this.http.authedRequest(Method.Get, path, undefined, undefined, {
+            prefix: useAuthenticatedMedia ? ClientPrefix.V1 : MediaPrefix.V3,
         });
     }
 
