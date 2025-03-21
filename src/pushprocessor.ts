@@ -320,7 +320,10 @@ export class PushProcessor {
         const [prefix, suffix] = alignToWordBoundary ? ["(^|\\W)", "(\\W|$)"] : ["^", "$"];
 
         if (!PushProcessor.cachedGlobToRegex[pattern]) {
-            PushProcessor.cachedGlobToRegex[pattern] = new RegExp(prefix + globToRegexp(pattern) + suffix, flags);
+            PushProcessor.cachedGlobToRegex[pattern] = new RegExp(
+                prefix + "(" + globToRegexp(pattern) + ")" + suffix,
+                flags,
+            );
         }
         return PushProcessor.cachedGlobToRegex[pattern];
     }
