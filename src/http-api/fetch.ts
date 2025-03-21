@@ -18,12 +18,10 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  */
 
-import { ErrorResponse as OidcAuthError } from "oidc-client-ts";
-
 import { checkObjectHasKeys, encodeParams } from "../utils.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { Method } from "./method.ts";
-import { ConnectionError, MatrixError, TokenRefreshError } from "./errors.ts";
+import { ConnectionError, MatrixError, TokenRefreshError, TokenRefreshLogoutError } from "./errors.ts";
 import {
     HttpApiEvent,
     type HttpApiEventHandlerMap,
@@ -234,7 +232,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
             return TokenRefreshOutcome.Success;
         } catch (error) {
             this.opts.logger?.warn("Failed to refresh token", error);
-            if (error instanceof OidcAuthError || error instanceof MatrixError) {
+            // If we get a TokenError or MatrixError, we should log out, otherwise assume transient
+            if (error instanceof TokenRefreshLogoutError || error instanceof MatrixError) {
                 return TokenRefreshOutcome.Logout;
             }
             return TokenRefreshOutcome.Failure;

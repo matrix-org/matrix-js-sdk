@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type IdTokenClaims, OidcClient, WebStorageStateStore } from "oidc-client-ts";
+import { type IdTokenClaims, OidcClient, WebStorageStateStore, ErrorResponse } from "oidc-client-ts";
 
-import { type AccessTokens } from "../http-api/index.ts";
+import { type AccessTokens, TokenRefreshLogoutError } from "../http-api/index.ts";
 import { generateScope } from "./authorize.ts";
 import { discoverAndValidateOIDCIssuerWellKnown } from "./discovery.ts";
 import { logger } from "../logger.ts";
@@ -104,6 +104,12 @@ export class OidcTokenRefresher {
         try {
             const tokens = await this.inflightRefreshRequest;
             return tokens;
+        } catch (e) {
+            // If we encounter an OIDC error then signal that it should cause a logout by upgrading it to a TokenRefreshLogoutError
+            if (e instanceof ErrorResponse) {
+                throw new TokenRefreshLogoutError(e);
+            }
+            throw e;
         } finally {
             this.inflightRefreshRequest = undefined;
         }
