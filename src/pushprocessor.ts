@@ -309,7 +309,7 @@ export class PushProcessor {
     }
 
     /**
-     * Create a RegExp object for the given glob pattern, caching the result.
+     * Create a RegExp object for the given glob pattern with a single capture group around the pattern itself, caching the result.
      * No cache invalidation is present currently,
      * as this will be inherently bounded to the size of the user's own push rules.
      * @param pattern - the glob pattern to convert to a RegExp
