@@ -120,10 +120,10 @@
         "prettier": "3.5.3",
         "rimraf": "^6.0.0",
         "ts-node": "^10.9.2",
-        "typedoc": "^0.27.0",
+        "typedoc": "^0.28.1",
         "typedoc-plugin-coverage": "^3.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",
-        "typedoc-plugin-missing-exports": "^3.0.0",
+        "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "^5.4.2"
     },
     "@casualbot/jest-sonar-reporter": {
