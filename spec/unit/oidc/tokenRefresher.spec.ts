@@ -20,7 +20,7 @@ limitations under the License.
 
 import fetchMock from "fetch-mock-jest";
 
-import { OidcTokenRefresher } from "../../../src";
+import { OidcTokenRefresher, TokenRefreshLogoutError } from "../../../src";
 import { logger } from "../../../src/logger";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
@@ -265,6 +265,28 @@ describe("OidcTokenRefresher", () => {
                 accessToken: "second-new-access-token",
                 refreshToken: "second-new-refresh-token",
             });
+        });
+
+        it("should throw TokenRefreshLogoutError when expired", async () => {
+            fetchMock.post(
+                config.token_endpoint,
+                {
+                    status: 400,
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: {
+                        error: "invalid_grant",
+                        error_description: "The provided access grant is invalid, expired, or revoked.",
+                    },
+                },
+                { overwriteRoutes: true },
+            );
+
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
+            await refresher.oidcClientReady;
+
+            await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
         });
     });
 });
