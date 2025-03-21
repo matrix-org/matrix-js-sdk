@@ -313,19 +313,21 @@ export class PushProcessor {
      * No cache invalidation is present currently,
      * as this will be inherently bounded to the size of the user's own push rules.
      * @param pattern - the glob pattern to convert to a RegExp
-     * @param alignToWordBoundary - whether to align the pattern to word boundaries, as specified for `content.body` matches
+     * @param alignToWordBoundary - whether to align the pattern to word boundaries,
+     *     as specified for `content.body` matches, will use lookaround assertions to ensure the match only includes the pattern
      * @param flags - the flags to pass to the RegExp constructor, defaults to case-insensitive
      */
     public static getPushRuleGlobRegex(pattern: string, alignToWordBoundary = false, flags = "i"): RegExp {
-        const [prefix, suffix] = alignToWordBoundary ? ["(^|\\W)", "(\\W|$)"] : ["^", "$"];
+        const [prefix, suffix] = alignToWordBoundary ? ["(?<=^|\\W)", "(?=\\W|$)"] : ["^", "$"];
+        const cacheKey = `${alignToWordBoundary}-${flags}-${pattern}`;
 
-        if (!PushProcessor.cachedGlobToRegex[pattern]) {
-            PushProcessor.cachedGlobToRegex[pattern] = new RegExp(
+        if (!PushProcessor.cachedGlobToRegex[cacheKey]) {
+            PushProcessor.cachedGlobToRegex[cacheKey] = new RegExp(
                 prefix + "(" + globToRegexp(pattern) + ")" + suffix,
                 flags,
             );
         }
-        return PushProcessor.cachedGlobToRegex[pattern];
+        return PushProcessor.cachedGlobToRegex[cacheKey];
     }
 
     /**
