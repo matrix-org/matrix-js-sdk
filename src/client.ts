@@ -20,85 +20,59 @@ limitations under the License.
 
 import { type Optional } from "matrix-events-sdk";
 
-import type { IDeviceKeys, IOneTimeKey } from "./@types/crypto.ts";
-import { type ISyncStateData, type SetPresence, SyncApi, type SyncApiOptions, SyncState } from "./sync.ts";
-import {
-    EventStatus,
-    type IContent,
-    type IDecryptOptions,
-    type IEvent,
-    MatrixEvent,
-    MatrixEventEvent,
-    type MatrixEventHandlerMap,
-    type PushDetails,
-} from "./models/event.ts";
-import { StubStore } from "./store/stub.ts";
-import {
-    type CallEvent,
-    type CallEventHandlerMap,
-    createNewMatrixCall,
-    type MatrixCall,
-    supportsMatrixCall,
-} from "./webrtc/call.ts";
-import { Filter, type IFilterDefinition, type IRoomEventFilter } from "./filter.ts";
-import {
-    CallEventHandler,
-    type CallEventHandlerEvent,
-    type CallEventHandlerEventHandlerMap,
-} from "./webrtc/callEventHandler.ts";
-import {
-    GroupCallEventHandler,
-    type GroupCallEventHandlerEvent,
-    type GroupCallEventHandlerEventHandlerMap,
-} from "./webrtc/groupCallEventHandler.ts";
-import * as utils from "./utils.ts";
-import { deepCompare, defer, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
-import { Direction, EventTimeline } from "./models/event-timeline.ts";
-import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
-import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
-import { encodeUnpaddedBase64Url } from "./base64.ts";
-import { TypedReEmitter } from "./ReEmitter.ts";
-import { logger, type Logger } from "./logger.ts";
-import { SERVICE_TYPES } from "./service-types.ts";
-import {
-    type Body,
-    ClientPrefix,
-    type FileType,
-    type HttpApiEvent,
-    type HttpApiEventHandlerMap,
-    type HTTPError,
-    IdentityPrefix,
-    type IHttpOpts,
-    type IRequestOpts,
-    MatrixError,
-    MatrixHttpApi,
-    MediaPrefix,
-    Method,
-    retryNetworkOperation,
-    type TokenRefreshFunction,
-    type Upload,
-    type UploadOpts,
-    type UploadResponse,
-} from "./http-api/index.ts";
-import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
-import { getHttpUriForMxc } from "./content-repo.ts";
-import { SearchResult } from "./models/search-result.ts";
 import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
-import { type MatrixScheduler } from "./scheduler.ts";
-import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
-import { type AuthDict } from "./interactive-auth.ts";
-import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
-import type { EventTimelineSet } from "./models/event-timeline-set.ts";
-import * as ContentHelpers from "./content-helpers.ts";
 import {
-    NotificationCountType,
-    type Room,
-    type RoomEvent,
-    type RoomEventHandlerMap,
-    type RoomNameState,
-} from "./models/room.ts";
-import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
-import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
+    type IPusher,
+    type IPusherRequest,
+    type IPushRule,
+    type IPushRules,
+    type PushRuleAction,
+    PushRuleActionName,
+    PushRuleKind,
+    type RuleId,
+} from "./@types/PushRules.ts";
+import {
+    type ILoginFlowsResponse,
+    type IRefreshTokenResponse,
+    type LoginRequest,
+    type LoginResponse,
+    type LoginTokenPostResponse,
+    type SSOAction,
+} from "./@types/auth.ts";
+import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
+import { type EmptyObject } from "./@types/common.ts";
+import type { IDeviceKeys, IOneTimeKey } from "./@types/crypto.ts";
+import {
+    type AccountDataEvents,
+    EventType,
+    LOCAL_NOTIFICATION_SETTINGS_PREFIX,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
+    MsgType,
+    PUSHER_ENABLED,
+    RelationType,
+    RoomCreateTypeField,
+    RoomType,
+    type StateEvents,
+    type TimelineEvents,
+    UNSTABLE_MSC3088_ENABLED,
+    UNSTABLE_MSC3088_PURPOSE,
+    UNSTABLE_MSC3089_TREE_SUBTYPE,
+} from "./@types/event.ts";
+import { type RoomMessageEventContent, type StickerEventContent } from "./@types/events.ts";
+import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
+import { type ImageInfo } from "./@types/media.ts";
+import { KnownMembership, type Membership } from "./@types/membership.ts";
+import {
+    GuestAccess,
+    HistoryVisibility,
+    type IdServerUnbindResult,
+    type JoinRule,
+    Preset,
+    type Terms,
+    type Visibility,
+} from "./@types/partials.ts";
+import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts.ts";
+import { type RegisterRequest, type RegisterResponse } from "./@types/registration.ts";
 import {
     type DelayedEventInfo,
     type IAddThreePidOnlyBody,
@@ -126,36 +100,6 @@ import {
     type UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
-    type AccountDataEvents,
-    EventType,
-    LOCAL_NOTIFICATION_SETTINGS_PREFIX,
-    MSC3912_RELATION_BASED_REDACTIONS_PROP,
-    MsgType,
-    PUSHER_ENABLED,
-    RelationType,
-    RoomCreateTypeField,
-    RoomType,
-    type StateEvents,
-    type TimelineEvents,
-    UNSTABLE_MSC3088_ENABLED,
-    UNSTABLE_MSC3088_PURPOSE,
-    UNSTABLE_MSC3089_TREE_SUBTYPE,
-} from "./@types/event.ts";
-import {
-    GuestAccess,
-    HistoryVisibility,
-    type IdServerUnbindResult,
-    type JoinRule,
-    Preset,
-    type Terms,
-    type Visibility,
-} from "./@types/partials.ts";
-import { type EventMapper, eventMapperFor, type MapperOpts } from "./event-mapper.ts";
-import { secureRandomString } from "./randomstring.ts";
-import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
-import { type ISignatures } from "./@types/signed.ts";
-import { type IStore } from "./store/index.ts";
-import {
     type IEventWithRoomId,
     type ISearchRequestBody,
     type ISearchResponse,
@@ -163,39 +107,81 @@ import {
     type IStateEventWithRoomId,
     SearchOrderBy,
 } from "./@types/search.ts";
-import { type ISynapseAdminDeactivateResponse, type ISynapseAdminWhoisResponse } from "./@types/synapse.ts";
+import { type ISignatures } from "./@types/signed.ts";
 import { type IHierarchyRoom } from "./@types/spaces.ts";
-import {
-    type IPusher,
-    type IPusherRequest,
-    type IPushRule,
-    type IPushRules,
-    type PushRuleAction,
-    PushRuleActionName,
-    PushRuleKind,
-    type RuleId,
-} from "./@types/PushRules.ts";
+import { type ISynapseAdminDeactivateResponse, type ISynapseAdminWhoisResponse } from "./@types/synapse.ts";
 import { type IThreepid } from "./@types/threepids.ts";
+import { type UIARequest } from "./@types/uia.ts";
+import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
+import { TypedReEmitter } from "./ReEmitter.ts";
+import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
+import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
+import { encodeUnpaddedBase64Url } from "./base64.ts";
+import { type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
+import * as ContentHelpers from "./content-helpers.ts";
+import { getHttpUriForMxc } from "./content-repo.ts";
+import {
+    type CrossSigningKeyInfo,
+    type CryptoApi,
+    type CryptoCallbacks,
+    CryptoEvent,
+    type CryptoEventHandlerMap,
+} from "./crypto-api/index.ts";
 import { type CryptoStore } from "./crypto/store/base.ts";
+import { sha256 } from "./digest.ts";
+import { UnsupportedDelayedEventsEndpointError } from "./errors.ts";
+import { type EventMapper, eventMapperFor, type MapperOpts } from "./event-mapper.ts";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature.ts";
+import { Filter, type IFilterDefinition, type IRoomEventFilter } from "./filter.ts";
 import {
-    GroupCall,
-    type GroupCallIntent,
-    type GroupCallType,
-    type IGroupCallDataChannelOptions,
-} from "./webrtc/groupCall.ts";
-import { MediaHandler } from "./webrtc/mediaHandler.ts";
+    type Body,
+    ClientPrefix,
+    type FileType,
+    type HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    type HTTPError,
+    IdentityPrefix,
+    type IHttpOpts,
+    type IRequestOpts,
+    MatrixError,
+    MatrixHttpApi,
+    MediaPrefix,
+    Method,
+    retryNetworkOperation,
+    type TokenRefreshFunction,
+    type Upload,
+    type UploadOpts,
+    type UploadResponse,
+} from "./http-api/index.ts";
+import { type AuthDict } from "./interactive-auth.ts";
+import { logger, type Logger } from "./logger.ts";
+import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager.ts";
+import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE, MSC3089TreeSpace } from "./models/MSC3089TreeSpace.ts";
+import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
+import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
+import type { EventTimelineSet } from "./models/event-timeline-set.ts";
+import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import {
-    type ILoginFlowsResponse,
-    type IRefreshTokenResponse,
-    type LoginRequest,
-    type LoginResponse,
-    type LoginTokenPostResponse,
-    type SSOAction,
-} from "./@types/auth.ts";
-import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
-import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts.ts";
-import { type MSC3575SlidingSyncRequest, type MSC3575SlidingSyncResponse, type SlidingSync } from "./sliding-sync.ts";
-import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
+    EventStatus,
+    type IContent,
+    type IDecryptOptions,
+    type IEvent,
+    MatrixEvent,
+    MatrixEventEvent,
+    type MatrixEventHandlerMap,
+    type PushDetails,
+} from "./models/event.ts";
+import { IgnoredInvites } from "./models/invites-ignorer.ts";
+import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
+import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
+import {
+    NotificationCountType,
+    type Room,
+    type RoomEvent,
+    type RoomEventHandlerMap,
+    type RoomNameState,
+} from "./models/room.ts";
+import { SearchResult } from "./models/search-result.ts";
 import {
     determineFeatureSupport,
     FeatureSupport,
@@ -204,43 +190,57 @@ import {
     ThreadFilterType,
     threadFilterTypeToFilter,
 } from "./models/thread.ts";
-import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
-import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
-import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
-import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
-import { IgnoredInvites } from "./models/invites-ignorer.ts";
-import { type UIARequest } from "./@types/uia.ts";
-import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
-import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature.ts";
-import { type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
-import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
-import {
-    type CrossSigningKeyInfo,
-    type CryptoApi,
-    CryptoEvent,
-    type CryptoEventHandlerMap,
-    type CryptoCallbacks,
-} from "./crypto-api/index.ts";
-import {
-    type SecretStorageKeyDescription,
-    type ServerSideSecretStorage,
-    ServerSideSecretStorageImpl,
-} from "./secret-storage.ts";
-import { type RegisterRequest, type RegisterResponse } from "./@types/registration.ts";
-import { MatrixRTCSessionManager } from "./matrixrtc/MatrixRTCSessionManager.ts";
-import { getRelationsThreadFilter } from "./thread-utils.ts";
-import { KnownMembership, type Membership } from "./@types/membership.ts";
-import { type RoomMessageEventContent, type StickerEventContent } from "./@types/events.ts";
-import { type ImageInfo } from "./@types/media.ts";
-import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
-import { sha256 } from "./digest.ts";
+import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
 import {
     discoverAndValidateOIDCIssuerWellKnown,
     type OidcClientConfig,
     validateAuthMetadataAndKeys,
 } from "./oidc/index.ts";
-import { type EmptyObject } from "./@types/common.ts";
-import { UnsupportedDelayedEventsEndpointError } from "./errors.ts";
+import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
+import { secureRandomString } from "./randomstring.ts";
+import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
+import { type MatrixScheduler } from "./scheduler.ts";
+import {
+    type SecretStorageKeyDescription,
+    type ServerSideSecretStorage,
+    ServerSideSecretStorageImpl,
+} from "./secret-storage.ts";
+import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
+import { SERVICE_TYPES } from "./service-types.ts";
+import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
+import { type MSC3575SlidingSyncRequest, type MSC3575SlidingSyncResponse, type SlidingSync } from "./sliding-sync.ts";
+import { type IStore } from "./store/index.ts";
+import { StubStore } from "./store/stub.ts";
+import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
+import { type ISyncStateData, type SetPresence, SyncApi, type SyncApiOptions, SyncState } from "./sync.ts";
+import { getRelationsThreadFilter } from "./thread-utils.ts";
+import * as utils from "./utils.ts";
+import { deepCompare, defer, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
+import {
+    type CallEvent,
+    type CallEventHandlerMap,
+    createNewMatrixCall,
+    type MatrixCall,
+    supportsMatrixCall,
+} from "./webrtc/call.ts";
+import {
+    CallEventHandler,
+    type CallEventHandlerEvent,
+    type CallEventHandlerEventHandlerMap,
+} from "./webrtc/callEventHandler.ts";
+import {
+    GroupCall,
+    type GroupCallIntent,
+    type GroupCallType,
+    type IGroupCallDataChannelOptions,
+} from "./webrtc/groupCall.ts";
+import {
+    GroupCallEventHandler,
+    type GroupCallEventHandlerEvent,
+    type GroupCallEventHandlerEventHandlerMap,
+} from "./webrtc/groupCallEventHandler.ts";
+import { MediaHandler } from "./webrtc/mediaHandler.ts";
 
 export type Store = IStore;
 
@@ -522,7 +522,7 @@ export interface IStartClientOpts {
     slidingSync?: SlidingSync;
 }
 
-export interface IStoredClientOpts extends IStartClientOpts {}
+export interface IStoredClientOpts extends IStartClientOpts { }
 
 export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
     "m.get_login_token",
@@ -1927,14 +1927,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (userId === null) {
             throw new Error(
                 `Cannot enable encryption on MatrixClient with unknown userId: ` +
-                    `ensure userId is passed in createClient().`,
+                `ensure userId is passed in createClient().`,
             );
         }
         const deviceId = this.getDeviceId();
         if (deviceId === null) {
             throw new Error(
                 `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
-                    `ensure deviceId is passed in createClient().`,
+                `ensure deviceId is passed in createClient().`,
             );
         }
 
@@ -2356,6 +2356,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
             queryParams.server_name = opts.viaServers;
             queryParams.via = opts.viaServers;
+        }
+
+        if (opts.token) {
+            queryParams["re.jki.join_policy_token"] = opts.token;
         }
 
         const data: IJoinRequestBody = {};
@@ -3057,7 +3061,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported) {
                 throw new Error(
                     "Server does not support relation based redactions " +
-                        `roomId ${roomId} eventId ${eventId} txnId: ${txnId as string} threadId ${threadId}`,
+                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId as string} threadId ${threadId}`,
                 );
             }
 
@@ -4196,7 +4200,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.timelineSupport) {
             throw new Error(
                 "timeline support is disabled. Set the 'timelineSupport'" +
-                    " parameter to true when creating MatrixClient to enable it.",
+                " parameter to true when creating MatrixClient to enable it.",
             );
         }
 
@@ -4439,7 +4443,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.timelineSupport) {
             throw new Error(
                 "timeline support is disabled. Set the 'timelineSupport'" +
-                    " parameter to true when creating MatrixClient to enable it.",
+                " parameter to true when creating MatrixClient to enable it.",
             );
         }
 
@@ -7821,10 +7825,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         identityAccessToken: string,
     ): Promise<
         | {
-              address: string;
-              medium: string;
-              mxid: string;
-          }
+            address: string;
+            medium: string;
+            mxid: string;
+        }
         | EmptyObject
     > {
         // Note: we're using the V2 API by calling this function, but our
@@ -8426,12 +8430,12 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         hasReadEvent = thread
             ? thread.hasUserReadEvent(ourUserId, eventId)
             : // If the thread object does not exist in the room yet, we don't
-              // want to calculate notification for this event yet. We have not
-              // restored the read receipts yet and can't accurately calculate
-              // notifications at this stage.
-              //
-              // This issue can likely go away when MSC3874 is implemented
-              true;
+            // want to calculate notification for this event yet. We have not
+            // restored the read receipts yet and can't accurately calculate
+            // notifications at this stage.
+            //
+            // This issue can likely go away when MSC3874 is implemented
+            true;
     } else {
         hasReadEvent = room.hasUserReadEvent(ourUserId, eventId);
     }

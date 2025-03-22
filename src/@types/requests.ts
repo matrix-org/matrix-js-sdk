@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type IContent, type IEvent } from "../models/event.ts";
-import { type Preset, type Visibility } from "./partials.ts";
-import { type IEventWithRoomId, type SearchKey } from "./search.ts";
 import { type IRoomEventFilter } from "../filter.ts";
 import { type Direction } from "../models/event-timeline.ts";
-import { type PushRuleAction } from "./PushRules.ts";
+import { type IContent, type IEvent } from "../models/event.ts";
 import { type IRoomEvent } from "../sync-accumulator.ts";
 import { type EventType, type RelationType, type RoomType } from "./event.ts";
+import { type Preset, type Visibility } from "./partials.ts";
+import { type PushRuleAction } from "./PushRules.ts";
+import { type IEventWithRoomId, type SearchKey } from "./search.ts";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -43,6 +43,8 @@ export interface IJoinRoomOpts {
      * The server names to try and join through in addition to those that are automatically chosen.
      */
     viaServers?: string[];
+
+    token?: string;
 }
 
 export interface KnockRoomOpts {
