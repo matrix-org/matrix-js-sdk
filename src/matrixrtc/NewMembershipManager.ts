@@ -315,13 +315,21 @@ export class MembershipManager
     private membershipServerSideExpiryTimeoutOverride?: number;
 
     private get callMemberEventRetryDelayMinimum(): number {
-        return this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
+        return this.joinConfig?.networkErrorLocalRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
     }
     private get membershipEventExpiryTimeout(): number {
-        return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
+        return (
+            this.joinConfig?.membershipEventExpiryMs ??
+            this.joinConfig?.membershipExpiryTimeout ??
+            DEFAULT_EXPIRE_DURATION
+        );
     }
     private get membershipEventExpiryTimeoutHeadroom(): number {
-        return this.joinConfig?.membershipExpiryTimeoutHeadroom ?? 5_000;
+        return (
+            this.joinConfig?.membershipEventExpiryHeadroomMs ??
+            this.joinConfig?.membershipExpiryTimeoutHeadroom ??
+            5_000
+        );
     }
     private computeNextExpiryActionTs(iteration: number): number {
         return (
@@ -333,12 +341,13 @@ export class MembershipManager
     private get membershipServerSideExpiryTimeout(): number {
         return (
             this.membershipServerSideExpiryTimeoutOverride ??
+            this.joinConfig?.delayedLeaveEventDelayMs ??
             this.joinConfig?.membershipServerSideExpiryTimeout ??
             8_000
         );
     }
     private get membershipKeepAlivePeriod(): number {
-        return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
+        return this.joinConfig?.delayedLeaveEventRestartMs ?? this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
     private get maximumRateLimitRetryCount(): number {
         return this.joinConfig?.maximumRateLimitRetryCount ?? 10;

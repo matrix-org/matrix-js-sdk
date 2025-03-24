@@ -73,7 +73,11 @@ export interface MembershipConfig {
      * unless we have explicitly updated it.
      *
      * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
+     *
+     * This is what goes into the m.rtc.member event expiry field.
      */
+    membershipEventExpiryMs?: number;
+    /** @deprecated renamed to `membershipEventExpiryMs`*/
     membershipExpiryTimeout?: number;
 
     /**
@@ -85,29 +89,31 @@ export interface MembershipConfig {
      *
      * This value does not have an effect on the value of `SessionMembershipData.expires`.
      */
+    membershipEventExpiryHeadroomMs?: number;
+    /** @deprecated  renamed to `membershipEventExpiryHeadroomMs`*/
     membershipExpiryTimeoutHeadroom?: number;
-
-    /**
-     * The period (in milliseconds) with which we check that our membership event still exists on the
-     * server. If it is not found we create it again.
-     */
-    memberEventCheckPeriod?: number;
 
     /**
      * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
      * failed to send.
      */
+    networkErrorLocalRetryMs?: number;
+    /** @deprecated renamed to `networkErrorLocalRetryMs`*/
     callMemberEventRetryDelayMinimum?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
+    delayedLeaveEventDelayMs?: number;
+    /** @deprecated renamed to `delayedLeaveEventDelayMs`*/
     membershipServerSideExpiryTimeout?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
+    delayedLeaveEventRestartMs?: number;
+    /** @deprecated renamed to `delayedLeaveEventRestartMs`*/
     membershipKeepAlivePeriod?: number;
 
     /**
