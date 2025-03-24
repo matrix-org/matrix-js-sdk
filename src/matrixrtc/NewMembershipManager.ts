@@ -375,7 +375,7 @@ export class MembershipManager
                     // This can happen if someone else (or another client) removes our own membership event.
                     // It will trigger `onRTCSessionMemberUpdate` queue `MembershipActionType.SendFirstDelayedEvent`.
                     // We might still have our delayed event from the previous participation and dependent on the server this might not
-                    // get automatically removed if the state changes. Hence It would remove our membership unexpectedly shortly after the rejoin.
+                    // get removed automatically if the state changes. Hence, it would remove our membership unexpectedly shortly after the rejoin.
                     //
                     // In this block we will try to cancel this delayed event before setting up a new one.
 

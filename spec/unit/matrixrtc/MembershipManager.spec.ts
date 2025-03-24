@@ -40,6 +40,14 @@ function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) 
         });
     });
 }
+function waitForMockCallOnce(method: MockedFunction<any>, returnVal?: Promise<any>) {
+    return new Promise<void>((resolve) => {
+        method.mockImplementationOnce(() => {
+            resolve();
+            return returnVal ?? Promise.resolve();
+        });
+    });
+}
 
 function createAsyncHandle(method: MockedFunction<any>) {
     const { reject, resolve, promise } = defer();
@@ -131,6 +139,23 @@ describe.each([
                     {},
                     "_@alice:example.org_AAAAAAA",
                 );
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            });
+
+            it("reschedules delayed leave event if sending state cancels it", async () => {
+                const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
+                const waitForSendState = waitForMockCall(client.sendStateEvent);
+                const waitForUpdateDelaye = waitForMockCallOnce(
+                    client._unstable_updateDelayedEvent,
+                    Promise.reject(new MatrixError({ errcode: "M_NOT_FOUND" }, 429, undefined)),
+                );
+                memberManager.join([focus], focusActive);
+                await waitForSendState;
+                await waitForUpdateDelaye;
+                await jest.advanceTimersByTimeAsync(1);
+                // Once for the initial event and once because of the errcode: "M_NOT_FOUND"
+                // Different to "sends a membership event and schedules delayed leave when joining a call" where its only called once (1)
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
 
             describe("does not prefix the state key with _ for rooms that support user-owned state events", () => {
