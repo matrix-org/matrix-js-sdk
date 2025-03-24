@@ -312,19 +312,19 @@ export class MembershipManager
     private focusActive?: Focus;
 
     // Config:
-    private membershipServerSideExpiryTimeoutOverride?: number;
+    private delayedLeaveEventDelayMsOverride?: number;
 
-    private get callMemberEventRetryDelayMinimum(): number {
+    private get networkErrorLocalRetryMs(): number {
         return this.joinConfig?.networkErrorLocalRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
     }
-    private get membershipEventExpiryTimeout(): number {
+    private get membershipEventExpiryMs(): number {
         return (
             this.joinConfig?.membershipEventExpiryMs ??
             this.joinConfig?.membershipExpiryTimeout ??
             DEFAULT_EXPIRE_DURATION
         );
     }
-    private get membershipEventExpiryTimeoutHeadroom(): number {
+    private get membershipEventExpiryHeadroomMs(): number {
         return (
             this.joinConfig?.membershipEventExpiryHeadroomMs ??
             this.joinConfig?.membershipExpiryTimeoutHeadroom ??
@@ -332,21 +332,17 @@ export class MembershipManager
         );
     }
     private computeNextExpiryActionTs(iteration: number): number {
-        return (
-            this.state.startTime +
-            this.membershipEventExpiryTimeout * iteration -
-            this.membershipEventExpiryTimeoutHeadroom
-        );
+        return this.state.startTime + this.membershipEventExpiryMs * iteration - this.membershipEventExpiryHeadroomMs;
     }
-    private get membershipServerSideExpiryTimeout(): number {
+    private get delayedLeaveEventDelayMs(): number {
         return (
-            this.membershipServerSideExpiryTimeoutOverride ??
+            this.delayedLeaveEventDelayMsOverride ??
             this.joinConfig?.delayedLeaveEventDelayMs ??
             this.joinConfig?.membershipServerSideExpiryTimeout ??
             8_000
         );
     }
-    private get membershipKeepAlivePeriod(): number {
+    private get delayedLeaveEventRestartMs(): number {
         return this.joinConfig?.delayedLeaveEventRestartMs ?? this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
     private get maximumRateLimitRetryCount(): number {
@@ -437,7 +433,7 @@ export class MembershipManager
             ._unstable_sendDelayedStateEvent(
                 this.room.roomId,
                 {
-                    delay: this.membershipServerSideExpiryTimeout,
+                    delay: this.delayedLeaveEventDelayMs,
                 },
                 EventType.GroupCallMemberPrefix,
                 {}, // leave event
@@ -452,7 +448,7 @@ export class MembershipManager
                     // due to lack of https://github.com/element-hq/synapse/pull/17810
                     return createInsertActionUpdate(
                         MembershipActionType.RestartDelayedEvent,
-                        this.membershipKeepAlivePeriod,
+                        this.delayedLeaveEventRestartMs,
                     );
                 } else {
                     // This action was scheduled because we are in the process of joining
@@ -530,7 +526,7 @@ export class MembershipManager
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
                 return createInsertActionUpdate(
                     MembershipActionType.RestartDelayedEvent,
-                    this.membershipKeepAlivePeriod,
+                    this.delayedLeaveEventRestartMs,
                 );
             })
             .catch((e) => {
@@ -584,7 +580,7 @@ export class MembershipManager
             .sendStateEvent(
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
-                this.makeMyMembership(this.membershipEventExpiryTimeout),
+                this.makeMyMembership(this.membershipEventExpiryMs),
                 this.stateKey,
             )
             .then(() => {
@@ -616,7 +612,7 @@ export class MembershipManager
             .sendStateEvent(
                 this.room.roomId,
                 EventType.GroupCallMemberPrefix,
-                this.makeMyMembership(this.membershipEventExpiryTimeout * nextExpireUpdateIteration),
+                this.makeMyMembership(this.membershipEventExpiryMs * nextExpireUpdateIteration),
                 this.stateKey,
             )
             .then(() => {
@@ -702,8 +698,8 @@ export class MembershipManager
             error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
         ) {
             const maxDelayAllowed = error.data["org.matrix.msc4140.max_delay"];
-            if (typeof maxDelayAllowed === "number" && this.membershipServerSideExpiryTimeout > maxDelayAllowed) {
-                this.membershipServerSideExpiryTimeoutOverride = maxDelayAllowed;
+            if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
+                this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
             }
             logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
             return true;
@@ -774,7 +770,7 @@ export class MembershipManager
     private actionUpdateFromNetworkErrorRetry(error: unknown, type: MembershipActionType): ActionUpdate | undefined {
         // "Is a network error"-boundary
         const retries = this.state.networkErrorRetries.get(type) ?? 0;
-        const retryDurationString = this.callMemberEventRetryDelayMinimum / 1000 + "s";
+        const retryDurationString = this.networkErrorLocalRetryMs / 1000 + "s";
         const retryCounterString = "(" + retries + "/" + this.maximumNetworkErrorRetryCount + ")";
         if (error instanceof Error && error.name === "AbortError") {
             logger.warn(
@@ -824,7 +820,7 @@ export class MembershipManager
         // retry boundary
         if (retries < this.maximumNetworkErrorRetryCount) {
             this.state.networkErrorRetries.set(type, retries + 1);
-            return createInsertActionUpdate(type, this.callMemberEventRetryDelayMinimum);
+            return createInsertActionUpdate(type, this.networkErrorLocalRetryMs);
         }
 
         // Failure
