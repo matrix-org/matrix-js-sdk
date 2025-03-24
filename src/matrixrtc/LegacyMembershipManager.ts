@@ -27,7 +27,7 @@ import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 import { type EmptyObject } from "../@types/common.ts";
-import { IMembershipManager, MembershipManagerEvent, Status } from "./types.ts";
+import { type IMembershipManager, type MembershipManagerEvent, Status } from "./types.ts";
 
 /**
  * This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
@@ -103,12 +103,18 @@ export class LegacyMembershipManager implements IMembershipManager {
         private getOldestMembership: () => CallMembership | undefined,
     ) {}
 
-    off(event: MembershipManagerEvent.StatusChanged, listener: (prefStatus: string, newStatus: string) => void): this {
+    public off(
+        event: MembershipManagerEvent.StatusChanged,
+        listener: (oldStatus: string, newStatus: string) => void,
+    ): this {
         logger.error("off is not implemented on LegacyMembershipManager");
         return this;
     }
 
-    on(event: MembershipManagerEvent.StatusChanged, listener: (prefStatus: string, newStatus: string) => void): this {
+    public on(
+        event: MembershipManagerEvent.StatusChanged,
+        listener: (oldStatus: string, newStatus: string) => void,
+    ): this {
         logger.error("on is not implemented on LegacyMembershipManager");
         return this;
     }

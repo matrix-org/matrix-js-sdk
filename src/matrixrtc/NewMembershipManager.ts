@@ -24,7 +24,12 @@ import { type Room } from "../models/room.ts";
 import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
-import { IMembershipManager, MembershipManagerEvent, MembershipManagerEventHandlerMap, Status } from "./types.ts";
+import {
+    type IMembershipManager,
+    type MembershipManagerEventHandlerMap,
+    MembershipManagerEvent,
+    Status,
+} from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./NewMembershipManagerActionScheduler.ts";
@@ -179,8 +184,9 @@ export class MembershipManager
                 // Should already be set to false when calling `leave` in non error cases.
                 this.activated = false;
                 // Here the scheduler is not running anymore so we the `membershipLoopHandler` is not called to emit.
-                if (this.oldStatus && this.oldStatus !== this.status)
+                if (this.oldStatus && this.oldStatus !== this.status) {
                     this.emit(MembershipManagerEvent.StatusChanged, this.oldStatus, this.status);
+                }
                 if (!this.scheduler.running) {
                     this.leavePromiseDefer?.resolve(true);
                     this.leavePromiseDefer = undefined;
