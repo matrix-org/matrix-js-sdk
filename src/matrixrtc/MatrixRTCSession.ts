@@ -59,7 +59,13 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
-
+// The names follow these principles:
+// - we use the tehcnical term delay if the option is related to delayed events.
+// - we use delayedLeaveEvent if the option is related to the delayed leave event.
+// - we use membershipEvent if the option is related to the rtc member state event.
+// - we use the technical term expiry if the option is related to the expiry field of the membership state event.
+// - we use a `MS` postfix if the option is a duration to avoid using words like:
+//   `time`, `duration`, `delay`, `timeout`... that might be mistaken/confused with technical terms.
 export interface MembershipConfig {
     /**
      * Use the new Manager.
@@ -94,14 +100,6 @@ export interface MembershipConfig {
     membershipExpiryTimeoutHeadroom?: number;
 
     /**
-     * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
-     * failed to send.
-     */
-    networkErrorLocalRetryMs?: number;
-    /** @deprecated renamed to `networkErrorLocalRetryMs`*/
-    callMemberEventRetryDelayMinimum?: number;
-
-    /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
@@ -125,6 +123,14 @@ export interface MembershipConfig {
      * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a network error occurs.
      */
     maximumNetworkErrorRetryCount?: number;
+
+    /**
+     * The time (in milliseconds) after which we will retry a http request if it
+     * failed to send due to a network error. (send membership event, send delayed event, restart delayed event...)
+     */
+    networkErrorRetryMs?: number;
+    /** @deprecated renamed to `networkErrorRetryMs`*/
+    callMemberEventRetryDelayMinimum?: number;
 }
 
 export interface EncryptionConfig {

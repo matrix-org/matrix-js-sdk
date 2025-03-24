@@ -314,8 +314,8 @@ export class MembershipManager
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
 
-    private get networkErrorLocalRetryMs(): number {
-        return this.joinConfig?.networkErrorLocalRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
+    private get networkErrorRetryMs(): number {
+        return this.joinConfig?.networkErrorRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
     }
     private get membershipEventExpiryMs(): number {
         return (
@@ -770,7 +770,7 @@ export class MembershipManager
     private actionUpdateFromNetworkErrorRetry(error: unknown, type: MembershipActionType): ActionUpdate | undefined {
         // "Is a network error"-boundary
         const retries = this.state.networkErrorRetries.get(type) ?? 0;
-        const retryDurationString = this.networkErrorLocalRetryMs / 1000 + "s";
+        const retryDurationString = this.networkErrorRetryMs / 1000 + "s";
         const retryCounterString = "(" + retries + "/" + this.maximumNetworkErrorRetryCount + ")";
         if (error instanceof Error && error.name === "AbortError") {
             logger.warn(
@@ -820,7 +820,7 @@ export class MembershipManager
         // retry boundary
         if (retries < this.maximumNetworkErrorRetryCount) {
             this.state.networkErrorRetries.set(type, retries + 1);
-            return createInsertActionUpdate(type, this.networkErrorLocalRetryMs);
+            return createInsertActionUpdate(type, this.networkErrorRetryMs);
         }
 
         // Failure

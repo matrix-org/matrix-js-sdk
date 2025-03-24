@@ -733,7 +733,7 @@ describe.each([
             const unrecoverableError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
             const manager = new TestMembershipManager(
-                { networkErrorLocalRetryMs: 1000, maximumNetworkErrorRetryCount: 7 },
+                { networkErrorRetryMs: 1000, maximumNetworkErrorRetryCount: 7 },
                 room,
                 client,
                 () => undefined,

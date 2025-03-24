@@ -69,8 +69,8 @@ export class LegacyMembershipManager implements IMembershipManager {
     private delayedLeaveEventDelayMsOverride?: number;
     private disconnectDelayId: string | undefined;
 
-    private get networkErrorLocalRetryMs(): number {
-        return this.joinConfig?.networkErrorLocalRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
+    private get networkErrorRetryMs(): number {
+        return this.joinConfig?.networkErrorRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
     }
     private get membershipEventExpiryMs(): number {
         return (
@@ -351,7 +351,7 @@ export class LegacyMembershipManager implements IMembershipManager {
             }
             logger.info("Sent updated call member event.");
         } catch (e) {
-            const resendDelay = this.networkErrorLocalRetryMs;
+            const resendDelay = this.networkErrorRetryMs;
             logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
             await sleep(resendDelay);
             await this.triggerCallMembershipEventUpdate();
