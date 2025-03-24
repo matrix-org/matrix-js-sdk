@@ -70,20 +70,25 @@ export class LegacyMembershipManager implements IMembershipManager {
     private disconnectDelayId: string | undefined;
 
     private get callMemberEventRetryDelayMinimum(): number {
-        return this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
+        return this.joinConfig?.networkErrorLocalRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
     }
     private get membershipExpiryTimeout(): number {
-        return this.joinConfig?.membershipExpiryTimeout ?? DEFAULT_EXPIRE_DURATION;
+        return (
+            this.joinConfig?.membershipEventExpiryMs ??
+            this.joinConfig?.membershipExpiryTimeout ??
+            DEFAULT_EXPIRE_DURATION
+        );
     }
     private get membershipServerSideExpiryTimeout(): number {
         return (
             this.membershipServerSideExpiryTimeoutOverride ??
+            this.joinConfig?.delayedLeaveEventDelayMs ??
             this.joinConfig?.membershipServerSideExpiryTimeout ??
             8_000
         );
     }
     private get membershipKeepAlivePeriod(): number {
-        return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
+        return this.joinConfig?.delayedLeaveEventRestartMs ?? this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
 
     public constructor(
