@@ -24,53 +24,13 @@ import { type Room } from "../models/room.ts";
 import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
+import { IMembershipManager, MembershipManagerEvent, MembershipManagerEventHandlerMap, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./NewMembershipManagerActionScheduler.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
-
-/**
- * This interface defines what a MembershipManager uses and exposes.
- * This interface is what we use to write tests and allows changing the actual implementation
- * without breaking tests because of some internal method renaming.
- *
- * @internal
- */
-export interface IMembershipManager {
-    /**
-     * If we are trying to join, or have successfully joined the session.
-     * It does not reflect if the room state is already configured to represent us being joined.
-     * It only means that the Manager should be trying to connect or to disconnect running.
-     * The Manager is still running right after isJoined becomes false to send the disconnect events.
-     * (A more accurate name would be `isActivated`)
-     * @returns true if we intend to be participating in the MatrixRTC session
-     */
-    isJoined(): boolean;
-    /**
-     * Start sending all necessary events to make this user participate in the RTC session.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * @param fociActive the active focus to use in the joined RTC membership event.
-     * @throws can throw if it exceeds a configured maximum retry.
-     */
-    join(fociPreferred: Focus[], fociActive?: Focus, onError?: (error: unknown) => void): void;
-    /**
-     * Send all necessary events to make this user leave the RTC session.
-     * @param timeout the maximum duration in ms until the promise is forced to resolve.
-     * @returns It resolves with true in case the leave was sent successfully.
-     * It resolves with false in case we hit the timeout before sending successfully.
-     */
-    leave(timeout?: number): Promise<boolean>;
-    /**
-     * Call this if the MatrixRTC session members have changed.
-     */
-    onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
-    /**
-     * The used active focus in the currently joined session.
-     * @returns the used active focus in the currently joined session or undefined if not joined.
-     */
-    getActiveFocus(): Focus | undefined;
-}
 
 /* MembershipActionTypes:
                            
@@ -87,17 +47,17 @@ On Join:  ───────────────┐   ┌─────�
        │  ┌─────┐                  ┌──────┐    │  │        │
        ▼  ▼     │                  │      ▼    ▼  ▼        │
 ┌────────────┐  │                  │ ┌───────────────────┐ │
-│UpdateExpiry│  │                  │ │RestartDelayedEvent│ │
+│UpdateExpiry│ (s)                (s)|RestartDelayedEvent│ │
 └────────────┘  │                  │ └───────────────────┘ │
           │     │                  │      │        │       │       
           └─────┘                  └──────┘        └───────┘ 
      
 On Leave: ─────────  STOP ALL ABOVE
                            ▼
-            ┌───────────────────────────────┐
-            │ SendScheduledDelayedLeaveEvent│
-            └───────────────────────────────┘
-                           │
+            ┌────────────────────────────────┐
+            │ SendScheduledDelayedLeaveEvent │
+            └────────────────────────────────┘
+                           │(5)
                            ▼
                     ┌──────────────┐
                     │SendLeaveEvent│
@@ -110,6 +70,8 @@ On Leave: ─────────  STOP ALL ABOVE
     sending it is the next step
 (4) Both (UpdateExpiry and RestartDelayedEvent) actions are
     scheduled when successfully sending the state event
+(5) Only if delayed event sending failed (fallback)
+(s) Successful restart/resend
 */
 
 /**
@@ -141,7 +103,7 @@ export enum MembershipActionType {
 /**
  * @internal
  */
-export interface ActionSchedulerState {
+export interface MembershipManagerState {
     /** The delayId we got when successfully sending the delayed leave event.
      * Gets set to undefined if the server claims it cannot find the delayed event anymore. */
     delayId?: string;
@@ -161,17 +123,6 @@ export interface ActionSchedulerState {
     networkErrorRetries: Map<MembershipActionType, number>;
 }
 
-enum Status {
-    Disconnected = "Disconnected",
-    Connecting = "Connecting",
-    ConnectingFailed = "ConnectingFailed",
-    Connected = "Connected",
-    Reconnecting = "Reconnecting",
-    Disconnecting = "Disconnecting",
-    Stuck = "Stuck",
-    Unknown = "Unknown",
-}
-
 /**
  * This class is responsible for sending all events relating to the own membership of a matrixRTC call.
  * It has the following tasks:
@@ -185,10 +136,17 @@ enum Status {
  *   - Stop the timer for the delay refresh
  *   - Stop the timer for updating the state event
  */
-export class MembershipManager implements IMembershipManager {
+export class MembershipManager
+    extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap>
+    implements IMembershipManager
+{
     private activated = false;
-    public isJoined(): boolean {
+    public isActivated(): boolean {
         return this.activated;
+    }
+    // DEPRECATED use isActivated
+    public isJoined(): boolean {
+        return this.isActivated();
     }
 
     /**
@@ -208,23 +166,26 @@ export class MembershipManager implements IMembershipManager {
         this.focusActive = focusActive;
         this.leavePromiseDefer = undefined;
         this.activated = true;
-
+        this.oldStatus = this.status;
         this.state = MembershipManager.defaultState;
 
         this.scheduler
             .startWithJoin()
-            .then(() => {
-                if (!this.scheduler.running) {
-                    this.leavePromiseDefer?.resolve(true);
-                    this.leavePromiseDefer = undefined;
-                }
-            })
             .catch((e) => {
                 logger.error("MembershipManager stopped because: ", e);
                 onError?.(e);
             })
-            // Should already be set to false when calling `leave` in non error cases.
-            .finally(() => (this.activated = false));
+            .finally(() => {
+                // Should already be set to false when calling `leave` in non error cases.
+                this.activated = false;
+                // Here the scheduler is not running anymore so we the `membershipLoopHandler` is not called to emit.
+                if (this.oldStatus && this.oldStatus !== this.status)
+                    this.emit(MembershipManagerEvent.StatusChanged, this.oldStatus, this.status);
+                if (!this.scheduler.running) {
+                    this.leavePromiseDefer?.resolve(true);
+                    this.leavePromiseDefer = undefined;
+                }
+            });
     }
 
     /**
@@ -316,6 +277,7 @@ export class MembershipManager implements IMembershipManager {
         >,
         private getOldestMembership: () => CallMembership | undefined,
     ) {
+        super();
         const [userId, deviceId] = [this.client.getUserId(), this.client.getDeviceId()];
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
@@ -325,8 +287,8 @@ export class MembershipManager implements IMembershipManager {
     }
 
     // MembershipManager mutable state.
-    private state: ActionSchedulerState;
-    private static get defaultState(): ActionSchedulerState {
+    private state: MembershipManagerState;
+    private static get defaultState(): MembershipManagerState {
         return {
             hasMemberStateEvent: false,
             delayId: undefined,
@@ -383,9 +345,13 @@ export class MembershipManager implements IMembershipManager {
     private oldStatus?: Status;
     private scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
         if (this.oldStatus) {
-            //  we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
+            // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
             // is equivalent to running it at the end of the loop. (just after applying the status/action list changes)
+            // This order is required because this method needs to return the action updates.
             logger.debug(`MembershipManager applied action changes. Status: ${this.oldStatus} -> ${this.status}`);
+            if (this.oldStatus !== this.status) {
+                this.emit(MembershipManagerEvent.StatusChanged, this.oldStatus, this.status);
+            }
         }
         this.oldStatus = this.status;
         logger.debug(`MembershipManager before processing action. status=${this.oldStatus}`);
@@ -394,7 +360,6 @@ export class MembershipManager implements IMembershipManager {
 
     // LOOP HANDLER:
     private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
-        this.oldStatus = this.status;
         switch (type) {
             case MembershipActionType.SendDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
