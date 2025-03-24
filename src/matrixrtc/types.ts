@@ -13,9 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { type IMentions } from "../matrix.ts";
-import { CallMembership } from "./CallMembership";
-import { Focus } from "./focus";
+import type { IMentions } from "../matrix.ts";
+import type { CallMembership } from "./CallMembership.ts";
+import type { Focus } from "./focus.ts";
 
 export interface EncryptionKeyEntry {
     index: number;
@@ -114,6 +114,6 @@ export interface IMembershipManager {
     getActiveFocus(): Focus | undefined;
 
     // TypedEventEmitter methods:
-    on(event: MembershipManagerEvent.StatusChanged, listener: (prefStatus: string, newStatus: string) => void): this;
-    off(event: MembershipManagerEvent.StatusChanged, listener: (prefStatus: string, newStatus: string) => void): this;
+    on(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: string, newStatus: string) => void): this;
+    off(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: string, newStatus: string) => void): this;
 }

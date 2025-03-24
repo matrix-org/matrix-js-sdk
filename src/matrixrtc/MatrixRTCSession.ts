@@ -29,7 +29,7 @@ import { MembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { IMembershipManager } from "./types.ts";
+import type { IMembershipManager } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
