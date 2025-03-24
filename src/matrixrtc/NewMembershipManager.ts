@@ -439,13 +439,14 @@ export class MembershipManager
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
                 this.state.delayId = response.delay_id;
                 if (this.state.hasMemberStateEvent) {
-                    // Delayed event got send because it got lost due to state event auto cancel
+                    // This action was scheduled because the previous delayed event was cancelled
+                    // due to lack of https://github.com/element-hq/synapse/pull/17810
                     return createInsertActionUpdate(
                         MembershipActionType.RestartDelayedEvent,
                         this.membershipKeepAlivePeriod,
                     );
                 } else {
-                    // Delayed event got send because we just joined
+                    // This action was scheduled because we are in the process of joining  
                     return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
                 }
             })
@@ -458,13 +459,14 @@ export class MembershipManager
                 if (update) return update;
 
                 if (this.state.hasMemberStateEvent) {
-                    // Delayed event got send because it got lost due to state event auto cancel
+                    // This action was scheduled because the previous delayed event was cancelled  
+                    // due to lack of https://github.com/element-hq/synapse/pull/17810  
 
                     // Don't do any other delayed event work if its not supported.
                     if (this.isUnsupportedDelayedEndpoint(e)) return {};
                     throw Error("Could not send delayed event, even though delayed events are supported. " + e);
                 } else {
-                    // Delayed event got send because we just joined
+                    // This action was scheduled because we are in the process of joining  
                     // log and fall through
                     if (this.isUnsupportedDelayedEndpoint(e)) {
                         logger.info("Not using delayed event because the endpoint is not supported");

@@ -147,7 +147,7 @@ describe.each([
                 const waitForSendState = waitForMockCall(client.sendStateEvent);
                 const waitForUpdateDelaye = waitForMockCallOnce(
                     client._unstable_updateDelayedEvent,
-                    Promise.reject(new MatrixError({ errcode: "M_NOT_FOUND" }, 429, undefined)),
+                    Promise.reject(new MatrixError({ errcode: "M_NOT_FOUND" })),
                 );
                 memberManager.join([focus], focusActive);
                 await waitForSendState;
