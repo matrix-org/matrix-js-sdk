@@ -85,9 +85,6 @@ export class LegacyMembershipManager implements IMembershipManager {
     private get membershipKeepAlivePeriod(): number {
         return this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
     }
-    private get callMemberEventRetryJitter(): number {
-        return this.joinConfig?.callMemberEventRetryJitter ?? 2_000;
-    }
 
     public constructor(
         private joinConfig: MembershipConfig | undefined,
@@ -349,7 +346,7 @@ export class LegacyMembershipManager implements IMembershipManager {
             }
             logger.info("Sent updated call member event.");
         } catch (e) {
-            const resendDelay = this.callMemberEventRetryDelayMinimum + Math.random() * this.callMemberEventRetryJitter;
+            const resendDelay = this.callMemberEventRetryDelayMinimum;
             logger.warn(`Failed to send call member event (retrying in ${resendDelay}): ${e}`);
             await sleep(resendDelay);
             await this.triggerCallMembershipEventUpdate();
