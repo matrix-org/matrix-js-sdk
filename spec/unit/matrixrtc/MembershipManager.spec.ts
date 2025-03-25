@@ -20,7 +20,13 @@ limitations under the License.
 import { type MockedFunction, type Mock } from "jest-mock";
 
 import { EventType, HTTPError, MatrixError, UnsupportedDelayedEventsEndpointError, type Room } from "../../../src";
-import { type Focus, type LivekitFocusActive, type SessionMembershipData } from "../../../src/matrixrtc";
+import {
+    MembershipManagerEvent,
+    Status,
+    type Focus,
+    type LivekitFocusActive,
+    type SessionMembershipData,
+} from "../../../src/matrixrtc";
 import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
@@ -29,6 +35,14 @@ import { defer } from "../../../src/utils";
 function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) {
     return new Promise<void>((resolve) => {
         method.mockImplementation(() => {
+            resolve();
+            return returnVal ?? Promise.resolve();
+        });
+    });
+}
+function waitForMockCallOnce(method: MockedFunction<any>, returnVal?: Promise<any>) {
+    return new Promise<void>((resolve) => {
+        method.mockImplementationOnce(() => {
             resolve();
             return returnVal ?? Promise.resolve();
         });
@@ -78,16 +92,16 @@ describe.each([
         // There is no need to clean up mocks since we will recreate the client.
     });
 
-    describe("isJoined()", () => {
+    describe("isActivated()", () => {
         it("defaults to false", () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
-            expect(manager.isJoined()).toEqual(false);
+            expect(manager.isActivated()).toEqual(false);
         });
 
         it("returns true after join()", () => {
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             manager.join([]);
-            expect(manager.isJoined()).toEqual(true);
+            expect(manager.isActivated()).toEqual(true);
         });
     });
 
@@ -125,6 +139,23 @@ describe.each([
                     {},
                     "_@alice:example.org_AAAAAAA",
                 );
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            });
+
+            it("reschedules delayed leave event if sending state cancels it", async () => {
+                const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
+                const waitForSendState = waitForMockCall(client.sendStateEvent);
+                const waitForUpdateDelaye = waitForMockCallOnce(
+                    client._unstable_updateDelayedEvent,
+                    Promise.reject(new MatrixError({ errcode: "M_NOT_FOUND" })),
+                );
+                memberManager.join([focus], focusActive);
+                await waitForSendState;
+                await waitForUpdateDelaye;
+                await jest.advanceTimersByTimeAsync(1);
+                // Once for the initial event and once because of the errcode: "M_NOT_FOUND"
+                // Different to "sends a membership event and schedules delayed leave when joining a call" where its only called once (1)
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
 
             describe("does not prefix the state key with _ for rooms that support user-owned state events", () => {
@@ -505,7 +536,39 @@ describe.each([
             await testExpires(10_000, 1_000);
         });
     });
+    describe("status updates", () => {
+        it("starts 'Disconnected' !FailsForLegacy", () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            expect(manager.status).toBe(Status.Disconnected);
+        });
+        it("emits 'Connection' and 'Connected' after join !FailsForLegacy", async () => {
+            const handleDelayedEvent = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+            const handleStateEvent = createAsyncHandle(client.sendStateEvent);
 
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            expect(manager.status).toBe(Status.Disconnected);
+            const connectEmit = jest.fn();
+            manager.on(MembershipManagerEvent.StatusChanged, connectEmit);
+            manager.join([focus], focusActive);
+            expect(manager.status).toBe(Status.Connecting);
+            handleDelayedEvent.resolve();
+            await jest.advanceTimersByTimeAsync(1);
+            expect(connectEmit).toHaveBeenCalledWith(Status.Disconnected, Status.Connecting);
+            handleStateEvent.resolve();
+            await jest.advanceTimersByTimeAsync(1);
+            expect(connectEmit).toHaveBeenCalledWith(Status.Connecting, Status.Connected);
+        });
+        it("emits 'Disconnecting' and 'Disconnected' after leave !FailsForLegacy", async () => {
+            const manager = new TestMembershipManager({}, room, client, () => undefined);
+            const connectEmit = jest.fn();
+            manager.on(MembershipManagerEvent.StatusChanged, connectEmit);
+            manager.join([focus], focusActive);
+            await jest.advanceTimersByTimeAsync(1);
+            await manager.leave();
+            expect(connectEmit).toHaveBeenCalledWith(Status.Connected, Status.Disconnecting);
+            expect(connectEmit).toHaveBeenCalledWith(Status.Disconnecting, Status.Disconnected);
+        });
+    });
     describe("server error handling", () => {
         // Types of server error: 429 rate limit with no retry-after header, 429 with retry-after, 50x server error (maybe retry every second), connection/socket timeout
         describe("retries sending delayed leave event", () => {

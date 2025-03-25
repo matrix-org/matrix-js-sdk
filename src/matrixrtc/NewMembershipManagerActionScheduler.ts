@@ -73,7 +73,7 @@ export class ActionScheduler {
             return;
         }
         this.running = true;
-        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }];
+        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }];
         try {
             while (this._actions.length > 0) {
                 // Sort so next (smallest ts) action is at the beginning
@@ -98,7 +98,7 @@ export class ActionScheduler {
                         `\nDate.now: "${Date.now()}`,
                     );
                     try {
-                        // `this.wakeup` can also be called and sets the `wakupUpdate` object while we are in the handler.
+                        // `this.wakeup` can also be called and sets the `wakeupUpdate` object while we are in the handler.
                         handlerResult = await this.membershipLoopHandler(nextAction.type as MembershipActionType);
                     } catch (e) {
                         throw Error(`The MembershipManager shut down because of the end condition: ${e}`);
@@ -125,7 +125,7 @@ export class ActionScheduler {
     }
 
     public initiateJoin(): void {
-        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendFirstDelayedEvent }] });
+        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
     }
     public initiateLeave(): void {
         this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
