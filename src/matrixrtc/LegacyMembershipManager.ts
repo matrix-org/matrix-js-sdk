@@ -105,7 +105,7 @@ export class LegacyMembershipManager implements IMembershipManager {
 
     public off(
         event: MembershipManagerEvent.StatusChanged,
-        listener: (oldStatus: string, newStatus: string) => void,
+        listener: (oldStatus: Status, newStatus: Status) => void,
     ): this {
         logger.error("off is not implemented on LegacyMembershipManager");
         return this;
@@ -113,7 +113,7 @@ export class LegacyMembershipManager implements IMembershipManager {
 
     public on(
         event: MembershipManagerEvent.StatusChanged,
-        listener: (oldStatus: string, newStatus: string) => void,
+        listener: (oldStatus: Status, newStatus: Status) => void,
     ): this {
         logger.error("on is not implemented on LegacyMembershipManager");
         return this;
