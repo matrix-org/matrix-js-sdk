@@ -212,3 +212,17 @@ export class TokenRefreshError extends Error {
         return "TokenRefreshError";
     }
 }
+
+/**
+ * Construct a TokenRefreshError. This indicates that a request failed due to the token being expired,
+ * and attempting to refresh said token failed in a way indicative of token invalidation.
+ */
+export class TokenRefreshLogoutError extends Error {
+    public constructor(cause?: Error) {
+        super(cause?.message ?? "");
+    }
+
+    public get name(): string {
+        return "TokenRefreshLogoutError";
+    }
+}
