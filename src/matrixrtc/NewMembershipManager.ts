@@ -446,7 +446,7 @@ export class MembershipManager
                         this.membershipKeepAlivePeriod,
                     );
                 } else {
-                    // This action was scheduled because we are in the process of joining  
+                    // This action was scheduled because we are in the process of joining
                     return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
                 }
             })
@@ -459,14 +459,14 @@ export class MembershipManager
                 if (update) return update;
 
                 if (this.state.hasMemberStateEvent) {
-                    // This action was scheduled because the previous delayed event was cancelled  
-                    // due to lack of https://github.com/element-hq/synapse/pull/17810  
+                    // This action was scheduled because the previous delayed event was cancelled
+                    // due to lack of https://github.com/element-hq/synapse/pull/17810
 
                     // Don't do any other delayed event work if its not supported.
                     if (this.isUnsupportedDelayedEndpoint(e)) return {};
                     throw Error("Could not send delayed event, even though delayed events are supported. " + e);
                 } else {
-                    // This action was scheduled because we are in the process of joining  
+                    // This action was scheduled because we are in the process of joining
                     // log and fall through
                     if (this.isUnsupportedDelayedEndpoint(e)) {
                         logger.info("Not using delayed event because the endpoint is not supported");
