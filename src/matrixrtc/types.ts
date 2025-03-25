@@ -114,6 +114,6 @@ export interface IMembershipManager {
     getActiveFocus(): Focus | undefined;
 
     // TypedEventEmitter methods:
-    on(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: string, newStatus: string) => void): this;
-    off(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: string, newStatus: string) => void): this;
+    on(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: Status, newStatus: Status) => void): this;
+    off(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: Status, newStatus: Status) => void): this;
 }
