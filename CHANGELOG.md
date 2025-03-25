@@ -1,3 +1,17 @@
+Changes in [37.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.2.0) (2025-03-25)
+==================================================================================================
+## ✨ Features
+
+* Add reportRoom API ([#4753](https://github.com/matrix-org/matrix-js-sdk/pull/4753)). Contributed by @Half-Shot.
+* MatrixRTC: New membership manager ([#4726](https://github.com/matrix-org/matrix-js-sdk/pull/4726)). Contributed by @toger5.
+* Add disableKeyStorage() to crypto API ([#4742](https://github.com/matrix-org/matrix-js-sdk/pull/4742)). Contributed by @dbkr.
+
+## 🐛 Bug Fixes
+
+* Allow port differing in OIDC dynamic registration URIs ([#4749](https://github.com/matrix-org/matrix-js-sdk/pull/4749)). Contributed by @t3chguy.
+* OIDC: only pass logo\_uri, policy\_uri, tos\_uri if they conform to "common base" ([#4748](https://github.com/matrix-org/matrix-js-sdk/pull/4748)). Contributed by @t3chguy.
+
+
 Changes in [37.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.1.0) (2025-03-11)
 ==================================================================================================
 ## 🦖 Deprecations
