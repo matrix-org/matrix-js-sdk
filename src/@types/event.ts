@@ -58,6 +58,7 @@ import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import { type InviteConfigAccountData } from "./inviteconfig.ts";
 
 export enum EventType {
     // Room state events
@@ -386,6 +387,8 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     // Invites-ignorer events
     [POLICIES_ACCOUNT_EVENT_TYPE.name]: { [key: string]: any };
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
+    // MSC4155: Invite filtering
+    "org.matrix.msc4155.invite_permission_config": InviteConfigAccountData;
 }
 
 /**
