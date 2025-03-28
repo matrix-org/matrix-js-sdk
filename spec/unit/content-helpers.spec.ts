@@ -197,12 +197,12 @@ describe("Topic content helpers", () => {
                 topic: "pizza",
                 [M_TOPIC.name]: [
                     {
-                        body: "pizza",
-                        mimetype: "text/plain",
-                    },
-                    {
                         body: "<b>pizza</b>",
                         mimetype: "text/html",
+                    },
+                    {
+                        body: "pizza",
+                        mimetype: "text/plain",
                     },
                 ],
             });
