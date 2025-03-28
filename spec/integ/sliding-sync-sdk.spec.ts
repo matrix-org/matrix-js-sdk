@@ -200,7 +200,7 @@ describe("SlidingSyncSdk", () => {
             const roomE = "!e_with_invite:localhost";
             const roomF = "!f_calc_room_name:localhost";
             const roomG = "!g_join_invite_counts:localhost";
-            const roomH = "!g_num_live:localhost";
+            const roomH = "!h_num_live:localhost";
             const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
@@ -252,6 +252,12 @@ describe("SlidingSyncSdk", () => {
                         mkOwnEvent(EventType.RoomMessage, { body: "world D" }),
                     ],
                     notification_count: 5,
+                    unread_thread_notifications: {
+                        "!some_thread:localhost": {
+                            notification_count: 3,
+                            highlight_count: 1,
+                        },
+                    },
                     initial: true,
                 },
                 [roomE]: {
@@ -357,6 +363,23 @@ describe("SlidingSyncSdk", () => {
                 expect(gotRoom!.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(
                     data[roomD].notification_count,
                 );
+            });
+
+            it("can be created with a thread notification counts", async () => {
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomD, data[roomD]);
+                await emitPromise(client!, ClientEvent.Room);
+                const gotRoom = client!.getRoom(roomD);
+                expect(gotRoom).toBeTruthy();
+
+                expect(
+                    gotRoom!.getThreadUnreadNotificationCount("!some_thread:localhost", NotificationCountType.Total),
+                ).toEqual(3);
+                expect(
+                    gotRoom!.getThreadUnreadNotificationCount(
+                        "!some_thread:localhost",
+                        NotificationCountType.Highlight,
+                    ),
+                ).toEqual(1);
             });
 
             it("can be created with an invited/joined_count", async () => {
