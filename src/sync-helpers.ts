@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { NotificationCountType, Room, UnreadNotificationCounts } from "./matrix";
+import { NotificationCountType, type Room, type UnreadNotificationCounts } from "./matrix.ts";
 
 /**
  * Updates the thread notification counts for a room based on the value of

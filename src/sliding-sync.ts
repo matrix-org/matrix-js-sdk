@@ -16,7 +16,7 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
-import { UnreadNotificationCounts, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
+import { type UnreadNotificationCounts, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { sleep } from "./utils.ts";
 import { type HTTPError } from "./http-api/index.ts";
