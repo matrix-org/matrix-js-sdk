@@ -101,7 +101,7 @@ export interface MSC3575RoomData {
     heroes?: MSC4186Hero[];
     notification_count?: number;
     highlight_count?: number;
-    unread_thread_notifications: Record<string, UnreadNotificationCounts>;
+    unread_thread_notifications?: Record<string, UnreadNotificationCounts>;
     joined_count?: number;
     invited_count?: number;
     invite_state?: IStateEvent[];
