@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { NotificationCountType, type Room, type UnreadNotificationCounts } from "./matrix.ts";
+import { type Room, NotificationCountType } from "./models/room.ts";
+import { type UnreadNotificationCounts } from "./sync-accumulator.ts";
 
 /**
  * Updates the thread notification counts for a room based on the value of
