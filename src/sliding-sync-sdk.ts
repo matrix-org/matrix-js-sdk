@@ -53,6 +53,7 @@ import { type IPushRules } from "./@types/PushRules.ts";
 import { RoomStateEvent } from "./models/room-state.ts";
 import { RoomMemberEvent } from "./models/room-member.ts";
 import { KnownMembership } from "./@types/membership.ts";
+import { updateRoomThreadNotifications } from "./sync-helpers.ts";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -633,6 +634,9 @@ export class SlidingSyncSdk {
                 room.setUnreadNotificationCount(NotificationCountType.Highlight, roomData.highlight_count);
             }
         }
+
+        updateRoomThreadNotifications(room, encrypted, roomData.unread_thread_notifications);
+
         if (roomData.bump_stamp) {
             room.setBumpStamp(roomData.bump_stamp);
         }

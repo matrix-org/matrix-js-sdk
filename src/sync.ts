@@ -66,6 +66,7 @@ import { type IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
 import { KnownMembership } from "./@types/membership.ts";
+import { updateRoomThreadNotifications } from "./sync-helpers.ts";
 
 const DEBUG = true;
 
@@ -1298,34 +1299,7 @@ export class SyncApi {
 
             const unreadThreadNotifications =
                 joinObj[UNREAD_THREAD_NOTIFICATIONS.name] ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName!];
-            if (unreadThreadNotifications) {
-                // This mirrors the logic above for rooms: take the *total* notification count from
-                // the server for unencrypted rooms or is it's zero. Any threads not present in this
-                // object implicitly have zero notifications, so start by clearing the total counts
-                // for all such threads.
-                room.resetThreadUnreadNotificationCountFromSync(Object.keys(unreadThreadNotifications));
-                for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
-                    if (!encrypted || unreadNotification.notification_count === 0) {
-                        room.setThreadUnreadNotificationCount(
-                            threadId,
-                            NotificationCountType.Total,
-                            unreadNotification.notification_count ?? 0,
-                        );
-                    }
-
-                    const hasNoNotifications =
-                        room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;
-                    if (!encrypted || (encrypted && hasNoNotifications)) {
-                        room.setThreadUnreadNotificationCount(
-                            threadId,
-                            NotificationCountType.Highlight,
-                            unreadNotification.highlight_count ?? 0,
-                        );
-                    }
-                }
-            } else {
-                room.resetThreadUnreadNotificationCountFromSync();
-            }
+            updateRoomThreadNotifications(room, encrypted, unreadThreadNotifications);
 
             joinObj.timeline = joinObj.timeline || ({} as ITimeline);
 

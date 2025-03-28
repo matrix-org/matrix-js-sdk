@@ -16,7 +16,7 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
-import { type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
+import { UnreadNotificationCounts, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { sleep } from "./utils.ts";
 import { type HTTPError } from "./http-api/index.ts";
@@ -101,6 +101,7 @@ export interface MSC3575RoomData {
     heroes?: MSC4186Hero[];
     notification_count?: number;
     highlight_count?: number;
+    unread_thread_notifications: Record<string, UnreadNotificationCounts>;
     joined_count?: number;
     invited_count?: number;
     invite_state?: IStateEvent[];
