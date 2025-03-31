@@ -360,7 +360,7 @@ describe("SlidingSyncSdk", () => {
                 await emitPromise(client!, ClientEvent.Room);
                 const gotRoom = client!.getRoom(roomD);
                 expect(gotRoom).toBeTruthy();
-                expect(gotRoom!.getUnreadNotificationCount(NotificationCountType.Total)).toEqual(
+                expect(gotRoom!.getRoomUnreadNotificationCount(NotificationCountType.Total)).toEqual(
                     data[roomD].notification_count,
                 );
             });
