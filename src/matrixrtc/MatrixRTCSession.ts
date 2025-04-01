@@ -60,7 +60,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
 // The names follow these principles:
-// - we use the tehcnical term delay if the option is related to delayed events.
+// - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
 // - we use membershipEvent if the option is related to the rtc member state event.
 // - we use the technical term expiry if the option is related to the expiry field of the membership state event.
@@ -79,8 +79,6 @@ export interface MembershipConfig {
      * unless we have explicitly updated it.
      *
      * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
-     *
-     * This is what goes into the m.rtc.member event expiry field.
      */
     membershipEventExpiryMs?: number;
     /** @deprecated renamed to `membershipEventExpiryMs`*/
