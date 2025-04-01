@@ -287,7 +287,7 @@ export class EncryptionManager implements IEncryptionManager {
 
         try {
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
-            await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend);
+            await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, this.getMemberships());
             logger.debug(
                 `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.currentEncryptionKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,

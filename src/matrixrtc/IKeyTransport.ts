@@ -16,6 +16,7 @@ limitations under the License.
 
 import { type MatrixEvent } from "../models/event.ts";
 import { type Statistics } from "./EncryptionManager.ts";
+import { type CallMembership } from "./CallMembership.ts";
 
 /**
  * Generic interface for the transport used to share room keys.
@@ -23,11 +24,12 @@ import { type Statistics } from "./EncryptionManager.ts";
  */
 export interface IKeyTransport {
     /**
-     * Sends the current user media key.
+     * Sends the current user media key to the given members.
      * @param keyBase64Encoded
      * @param index
+     * @param members - The participants that should get they key
      */
-    sendKey(keyBase64Encoded: string, index: number): Promise<void>;
+    sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void>;
 
     /**
      * Takes an incoming event from the transport and extracts the key information.

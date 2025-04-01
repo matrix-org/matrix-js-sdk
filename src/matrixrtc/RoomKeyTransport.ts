@@ -22,6 +22,7 @@ import { logger, type Logger } from "../logger.ts";
 import { type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Statistics } from "./EncryptionManager.ts";
+import { type CallMembership } from "./CallMembership.ts";
 
 export class RoomKeyTransport implements IKeyTransport {
     private readonly prefixedLogger: Logger;
@@ -33,7 +34,9 @@ export class RoomKeyTransport implements IKeyTransport {
         this.prefixedLogger = logger.getChild(`[RTC: ${roomId} RoomKeyTransport]`);
     }
 
-    public async sendKey(keyBase64Encoded: string, index: number): Promise<void> {
+    /** implements {@link IKeyTransport#sendKey} */
+    public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
+        // members not used in room transports as the keys are sent to all room members
         const content: EncryptionKeysEventContent = {
             keys: [
                 {
