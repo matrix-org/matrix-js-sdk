@@ -1466,6 +1466,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await this.backupManager.deleteAllKeyBackupVersions();
 
         this.deleteSecretStorage();
+        await this.deleteSecretStorage();
 
         // Reset the cross-signing keys
         await this.crossSigningIdentity.bootstrapCrossSigning({
