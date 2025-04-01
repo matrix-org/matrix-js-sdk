@@ -2255,10 +2255,10 @@ describe("RustCrypto", () => {
         let secretStorage: ServerSideSecretStorage;
         beforeEach(() => {
             secretStorage = {
-                setDefaultKeyId: jest.fn(),
+                setDefaultKeyId: jest.fn().mockResolvedValue(undefined),
                 hasKey: jest.fn().mockResolvedValue(false),
                 getKey: jest.fn().mockResolvedValue(null),
-                store: jest.fn(),
+                store: jest.fn().mockResolvedValue(undefined),
                 getDefaultKeyId: jest.fn().mockResolvedValue("defaultKeyId"),
             } as unknown as ServerSideSecretStorage;
 
