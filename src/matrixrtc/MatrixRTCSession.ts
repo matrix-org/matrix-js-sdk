@@ -30,6 +30,7 @@ import { EncryptionManager, type IEncryptionManager, type Statistics } from "./E
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
 import type { IMembershipManager } from "./types.ts";
+import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -306,10 +307,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.setExpiryTimer();
+
+        const transport = new RoomKeyTransport(this.roomSubset.roomId, this.client);
         this.encryptionManager = new EncryptionManager(
-            this.client,
-            this.roomSubset,
+            this.client.getUserId()!,
+            this.client.getDeviceId()!,
             () => this.memberships,
+            transport,
             (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
             },

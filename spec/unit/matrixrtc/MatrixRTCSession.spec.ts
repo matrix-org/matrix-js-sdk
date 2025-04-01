@@ -584,7 +584,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                    jest.advanceTimersByTime(10000);
+                    await jest.runAllTimersAsync();
 
                     await eventSentPromise;
 
