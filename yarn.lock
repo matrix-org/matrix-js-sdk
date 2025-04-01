@@ -1937,9 +1937,9 @@
     undici-types "~5.26.4"
 
 "@types/node@18":
-  version "18.19.80"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.80.tgz#6d6008e8920dddcd23f9dd33da24684ef57d487c"
-  integrity sha512-kEWeMwMeIvxYkeg1gTc01awpwLbfMRZXdIhwRcakd/KlK53jmRC26LqcbIt7fnAQTu5GzlnWmzA3H6+l1u6xxQ==
+  version "18.19.85"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.85.tgz#c5778d9c8c00ec81d4fa10845f328b94e0e6c220"
+  integrity sha512-61sLB7tXUMpkHJagZQAzPV4xGyqzulLvphe0lquRX80rZG24VupRv9p6Qo06V9VBNeGBM8Sv8rRVVLji6pi7QQ==
   dependencies:
     undici-types "~5.26.4"
 
