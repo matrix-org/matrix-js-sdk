@@ -14,19 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    encodeBase64,
-    EventType,
-    IRoomTimelineData,
-    MatrixClient,
-    RoomEvent,
-    type MatrixError,
-    type MatrixEvent,
-    type Room,
-} from "../../../src";
+import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { IKeyTransport } from "../../../src/matrixrtc/IKeyTransport";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
@@ -45,6 +35,9 @@ describe("MatrixRTCSession", () => {
         client.getUserId = jest.fn().mockReturnValue("@alice:example.org");
         client.getDeviceId = jest.fn().mockReturnValue("AAAAAAA");
         client.sendEvent = jest.fn().mockResolvedValue({ event_id: "success" });
+        client.decryptEventIfNeeded = jest.fn().mockImplementation(() => {
+            console.log("Fake decryptEventIfNeeded");
+        });
     });
 
     afterEach(async () => {
@@ -997,7 +990,7 @@ describe("MatrixRTCSession", () => {
         });
 
         describe("receiving", () => {
-            it("collects keys from encryption events", () => {
+            it("collects keys from encryption events", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -1013,6 +1006,7 @@ describe("MatrixRTCSession", () => {
                         ],
                     }),
                 );
+                await jest.advanceTimersToNextTimerAsync();
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess!.reemitEncryptionKeys();
@@ -1026,7 +1020,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
             });
 
-            it("collects keys at non-zero indices", () => {
+            it("collects keys at non-zero indices", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -1042,6 +1036,7 @@ describe("MatrixRTCSession", () => {
                         ],
                     }),
                 );
+                await jest.advanceTimersToNextTimerAsync();
 
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
@@ -1056,7 +1051,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
             });
 
-            it("collects keys by merging", () => {
+            it("collects keys by merging", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -1072,6 +1067,7 @@ describe("MatrixRTCSession", () => {
                         ],
                     }),
                 );
+                await jest.advanceTimersToNextTimerAsync();
 
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
@@ -1097,6 +1093,7 @@ describe("MatrixRTCSession", () => {
                         ],
                     }),
                 );
+                await jest.advanceTimersToNextTimerAsync();
 
                 encryptionKeyChangedListener.mockClear();
                 sess!.reemitEncryptionKeys();
@@ -1115,7 +1112,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
             });
 
-            it("ignores older keys at same index", () => {
+            it("ignores older keys at same index", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -1174,6 +1171,7 @@ describe("MatrixRTCSession", () => {
                         1000,
                     ),
                 );
+                await jest.advanceTimersToNextTimerAsync();
 
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
@@ -1188,7 +1186,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(3);
             });
 
-            it("key timestamps are treated as monotonic", () => {
+            it("key timestamps are treated as monotonic", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
@@ -1229,6 +1227,7 @@ describe("MatrixRTCSession", () => {
                         1000,
                     ),
                 );
+                await jest.advanceTimersToNextTimerAsync();
 
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
@@ -1267,7 +1266,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(0);
             });
 
-            it("tracks total age statistics for collected keys", () => {
+            it("tracks total age statistics for collected keys", async () => {
                 jest.useFakeTimers();
                 try {
                     const mockRoom = makeMockRoom([membershipTemplate]);
@@ -1294,6 +1293,7 @@ describe("MatrixRTCSession", () => {
                             0,
                         ),
                     );
+                    await jest.advanceTimersToNextTimerAsync();
 
                     expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(1000);
 
@@ -1312,6 +1312,7 @@ describe("MatrixRTCSession", () => {
                             sent_ts: 0,
                         }),
                     );
+                    await jest.advanceTimersToNextTimerAsync();
 
                     expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(3000);
 
@@ -1329,6 +1330,7 @@ describe("MatrixRTCSession", () => {
                             sent_ts: 1000,
                         }),
                     );
+                    await jest.advanceTimersToNextTimerAsync();
 
                     expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(5000);
                 } finally {

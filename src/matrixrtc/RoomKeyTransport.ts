@@ -51,7 +51,7 @@ export class RoomKeyTransport
     }
 
     private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
-        // await this.client.decryptEventIfNeeded(event);
+        await this.client.decryptEventIfNeeded(event);
 
         if (event.isDecryptionFailure()) {
             if (!isRetry) {
