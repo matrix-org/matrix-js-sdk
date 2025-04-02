@@ -14,9 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixEvent } from "../models/event.ts";
-import { type Statistics } from "./EncryptionManager.ts";
 import { type CallMembership } from "./CallMembership.ts";
+
+export enum KeyTransportEvents {
+    ReceivedKeys = "received_keys",
+}
+
+export type KeyTransportEventListener = (
+    userId: string,
+    deviceId: string,
+    keyBase64Encoded: string,
+    index: number,
+    timestamp: number,
+) => void;
+
+export type KeyTransportEventsHandlerMap = {
+    [KeyTransportEvents.ReceivedKeys]: KeyTransportEventListener;
+};
 
 /**
  * Generic interface for the transport used to share room keys.
@@ -31,21 +45,9 @@ export interface IKeyTransport {
      */
     sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void>;
 
-    /**
-     * Takes an incoming event from the transport and extracts the key information.
-     * @param event
-     * @param statistics
-     * @param callback
-     */
-    receiveRoomEvent(
-        event: MatrixEvent,
-        statistics: Statistics,
-        callback: (
-            userId: string,
-            deviceId: string,
-            encryptionKeyIndex: number,
-            encryptionKeyString: string,
-            timestamp: number,
-        ) => void,
-    ): void;
+    on(event: KeyTransportEvents.ReceivedKeys, listener: KeyTransportEventListener): this;
+    off(event: KeyTransportEvents.ReceivedKeys, listener: KeyTransportEventListener): this;
+
+    start(): void;
+    stop(): void;
 }

@@ -24,7 +24,6 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { type MatrixEvent } from "../models/event.ts";
 import { MembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
@@ -298,7 +297,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             | "sendEvent"
             | "cancelPendingEvent"
         >,
-        private roomSubset: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState">,
+        private roomSubset: Pick<
+            Room,
+            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+        >,
         public memberships: CallMembership[],
     ) {
         super();
@@ -308,7 +310,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.setExpiryTimer();
 
-        const transport = new RoomKeyTransport(this.roomSubset.roomId, this.client);
+        const transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
         this.encryptionManager = new EncryptionManager(
             this.client.getUserId()!,
             this.client.getDeviceId()!,
@@ -487,17 +489,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
         }
     }
-
-    /**
-     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
-     * This should be called each time the relevant event is received from a room timeline.
-     * If the event is malformed then it will be logged and ignored.
-     *
-     * @param event the event to process
-     */
-    public onCallEncryption = (event: MatrixEvent): void => {
-        this.encryptionManager.onCallEncryptionEventReceived(event);
-    };
 
     /**
      * @deprecated use onRoomMemberUpdate or onRTCSessionMemberUpdate instead. this should be called when any membership in the call is updated

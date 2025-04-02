@@ -19,20 +19,63 @@ import type { EncryptionKeysEventContent } from "./types.ts";
 import { EventType } from "../@types/event.ts";
 import { type MatrixError } from "../http-api/errors.ts";
 import { logger, type Logger } from "../logger.ts";
-import { type IKeyTransport } from "./IKeyTransport.ts";
+import { KeyTransportEvents, KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Statistics } from "./EncryptionManager.ts";
 import { type CallMembership } from "./CallMembership.ts";
+import { Room, RoomEvent, TypedEventEmitter } from "../matrix.ts";
 
-export class RoomKeyTransport implements IKeyTransport {
+export class RoomKeyTransport
+    extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
+    implements IKeyTransport
+{
     private readonly prefixedLogger: Logger;
 
     public constructor(
-        private roomId: string,
+        private room: Pick<Room, "on" | "off" | "roomId">,
         private client: Pick<MatrixClient, "sendEvent" | "getDeviceId" | "getUserId" | "cancelPendingEvent">,
+        private statistics: Statistics,
     ) {
-        this.prefixedLogger = logger.getChild(`[RTC: ${roomId} RoomKeyTransport]`);
+        super();
+        this.prefixedLogger = logger.getChild(`[RTC: ${room.roomId} RoomKeyTransport]`);
     }
+    public start(): void {
+        this.room.on(RoomEvent.Timeline, this.onTimeline);
+    }
+    public stop(): void {
+        this.room.off(RoomEvent.Timeline, this.onTimeline);
+    }
+
+    private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
+        // we should not need this
+        // await this.client.decryptEventIfNeeded(event);
+        if (event.isDecryptionFailure()) {
+            if (!isRetry) {
+                logger.warn(
+                    `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
+                );
+                // retry after 1 second. After this we give up.
+                setTimeout(() => void this.consumeCallEncryptionEvent(event, true), 1000);
+            } else {
+                logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
+            }
+            return;
+        } else if (isRetry) {
+            logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
+        }
+
+        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return Promise.resolve();
+
+        if (!this.room) {
+            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
+            return Promise.resolve();
+        }
+
+        this.onEncryptionEvent(event);
+    }
+    private onTimeline = (event: MatrixEvent): void => {
+        void this.consumeCallEncryptionEvent(event);
+    };
 
     /** implements {@link IKeyTransport#sendKey} */
     public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
@@ -50,7 +93,7 @@ export class RoomKeyTransport implements IKeyTransport {
         };
 
         try {
-            await this.client.sendEvent(this.roomId, EventType.CallEncryptionKeysPrefix, content);
+            await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, content);
         } catch (error) {
             this.prefixedLogger.error("Failed to send call encryption keys", error);
             const matrixError = error as MatrixError;
@@ -63,17 +106,7 @@ export class RoomKeyTransport implements IKeyTransport {
         }
     }
 
-    public receiveRoomEvent(
-        event: MatrixEvent,
-        statistics: Statistics,
-        callback: (
-            userId: string,
-            deviceId: string,
-            encryptionKeyIndex: number,
-            encryptionKeyString: string,
-            timestamp: number,
-        ) => void,
-    ): void {
+    public onEncryptionEvent(event: MatrixEvent): void {
         const userId = event.getSender();
         const content = event.getContent<EncryptionKeysEventContent>();
 
@@ -106,9 +139,9 @@ export class RoomKeyTransport implements IKeyTransport {
             return;
         }
 
-        statistics.counters.roomEventEncryptionKeysReceived += 1;
+        this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         const age = Date.now() - (typeof content.sent_ts === "number" ? content.sent_ts : event.getTs());
-        statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
+        this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
 
         for (const key of content.keys) {
             if (!key) {
@@ -137,7 +170,14 @@ export class RoomKeyTransport implements IKeyTransport {
                 logger.debug(
                     `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} age=${age}ms`,
                 );
-                callback(userId, deviceId, encryptionKeyIndex, encryptionKey, event.getTs());
+                this.emit(
+                    KeyTransportEvents.ReceivedKeys,
+                    userId,
+                    deviceId,
+                    encryptionKey,
+                    encryptionKeyIndex,
+                    event.getTs(),
+                );
             }
         }
     }

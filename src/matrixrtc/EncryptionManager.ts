@@ -5,7 +5,7 @@ import { secureRandomBase64Url } from "../randomstring.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { type IKeyTransport } from "./IKeyTransport.ts";
+import { KeyTransportEventListener, type IKeyTransport } from "./IKeyTransport.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -42,15 +42,6 @@ export interface IEncryptionManager {
     leave(): void;
 
     onMembershipsUpdate(oldMemberships: CallMembership[]): void;
-
-    /**
-     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
-     * This should be called each time the relevant event is received from a room timeline.
-     * If the event is malformed then it will be logged and ignored.
-     *
-     * @param event the event to process
-     */
-    onCallEncryptionEventReceived(event: MatrixEvent): void;
 
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
 
@@ -303,14 +294,8 @@ export class EncryptionManager implements IEncryptionManager {
         }
     };
 
-    public onCallEncryptionEventReceived = (event: MatrixEvent): void => {
-        this.transport.receiveRoomEvent(
-            event,
-            this.statistics,
-            (userId, deviceId, encryptionKeyIndex, encryptionKeyString, timestamp) => {
-                this.setEncryptionKey(userId, deviceId, encryptionKeyIndex, encryptionKeyString, timestamp);
-            },
-        );
+    public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
+        this.setEncryptionKey(userId, deviceId, index, keyBase64Encoded, timestamp);
     };
 
     private storeLastMembershipFingerprints(): void {
