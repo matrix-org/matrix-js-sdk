@@ -58,11 +58,15 @@ jobs:
             - name: Load GPG key
               id: gpg
               if: inputs.gpg-fingerprint
-              uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6
-              with:
-                  gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-                  passphrase: ${{ secrets.GPG_PASSPHRASE }}
-                  fingerprint: ${{ inputs.gpg-fingerprint }}
+              env:
+                  PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+                  PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+                  FINGERPRINT: ${{ inputs.gpg-fingerprint }}
+              run: |
+                  # Import the private key from the GH secrets
+                  echo "$PRIVATE_KEY" | gpg --import --batch --passphrase "$PASSPHRASE" -
+                  # For debugging, show the contents of the keyring
+                  gpg --list-keys --list-options show-unusable-subkeys=yes --with-subkey-fingerprint $FINGERPRINT
 
             - name: Get draft release
               id: draft-release
@@ -192,6 +196,7 @@ jobs:
               run: |
                   GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
               env:
+                  # TODO
                   SIGNING_ID: ${{ steps.gpg.outputs.email }}
 
             - name: Generate & upload tarball signature
