@@ -332,6 +332,7 @@ export class EncryptionManager implements IEncryptionManager {
         timestamp: number,
         delayBeforeUse = false,
     ): void {
+        logger.debug(`Setting encryption key for ${userId}:${deviceId} at index ${encryptionKeyIndex}`);
         const keyBin = decodeBase64(encryptionKeyString);
 
         const participantId = getParticipantId(userId, deviceId);

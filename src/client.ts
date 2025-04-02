@@ -207,7 +207,7 @@ import {
 import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
-import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
+import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
 import { type UIARequest } from "./@types/uia.ts";
 import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
@@ -7940,6 +7940,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.logger.debug(`PUT ${path}`, targets);
 
         return this.http.authedRequest(Method.Put, path, undefined, body);
+    }
+
+    public async encryptAndSendToDevice(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<void> {
+        if (!this.cryptoBackend) {
+            throw new Error("Cannot encrypt to device event, your client does not support encryption.");
+        }
+        const batch = await this.cryptoBackend.encryptToDeviceMessages(eventType, devices, payload);
+
+        // TODO The batch mechanism removes all possibility to get error feedbacks..
+        // We might want instead to do the API call directly and pass the errors back.
+        await this.queueToDevice(batch);
     }
 
     /**

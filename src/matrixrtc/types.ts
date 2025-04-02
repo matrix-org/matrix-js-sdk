@@ -28,6 +28,24 @@ export interface EncryptionKeysEventContent {
     sent_ts?: number;
 }
 
+export interface EncryptionKeysToDeviceEventContent {
+    keys: { index: number; key: string };
+    member: {
+        // id: ParticipantId,
+        // TODO Remove that it is claimed, need to get the sealed sender from decryption info
+        claimed_device_id: string;
+        // user_id: string
+    };
+    roomId: string;
+    session: {
+        application: string;
+        call_id: string;
+        scope: string;
+    };
+    // Why is this needed?
+    sent_ts?: number;
+}
+
 export type CallNotifyType = "ring" | "notify";
 
 export interface ICallNotifyContent {

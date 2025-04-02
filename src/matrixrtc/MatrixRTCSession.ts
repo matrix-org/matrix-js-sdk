@@ -28,9 +28,10 @@ import { MembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import { type IMembershipManager } from "./IMembershipManager.ts";
+import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type Statistics } from "./types.ts";
+import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import type { IMembershipManager } from "./IMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -125,6 +126,11 @@ export interface MembershipConfig {
      * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a network error occurs.
      */
     maximumNetworkErrorRetryCount?: number;
+
+    /**
+     * If true, use the new to-device transport for sending encryption keys.
+     */
+    useExperimentalToDeviceTransport?: boolean;
 }
 
 export interface EncryptionConfig {
@@ -303,6 +309,9 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             | "_unstable_updateDelayedEvent"
             | "sendEvent"
             | "cancelPendingEvent"
+            | "encryptAndSendToDevice"
+            | "off"
+            | "on"
             | "decryptEventIfNeeded"
         >,
         private roomSubset: Pick<
@@ -370,7 +379,19 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 );
             }
             // Create Encryption manager
-            const transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+            let transport;
+            if (joinConfig?.useExperimentalToDeviceTransport == true) {
+                logger.info("Using experimental to-device transport for encryption keys");
+                transport = new ToDeviceKeyTransport(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    this.roomSubset.roomId,
+                    this.client,
+                    this.statistics,
+                );
+            } else {
+                transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+            }
             this.encryptionManager = new EncryptionManager(
                 this.client.getUserId()!,
                 this.client.getDeviceId()!,
