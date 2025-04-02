@@ -464,6 +464,22 @@ export class RoomWidgetClient extends MatrixClient {
         return {};
     }
 
+    public async encryptAndSendToDevice(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<void> {
+        // map: user Id → device Id → payload
+        const contentMap: MapWithDefault<string, Map<string, ToDevicePayload>> = new MapWithDefault(() => new Map());
+        for (const { userId, deviceId } of devices) {
+            contentMap.getOrCreate(userId).set(deviceId, payload);
+        }
+
+        await this.widgetApi
+            .sendToDevice(eventType, true, recursiveMapToObject(contentMap))
+            .catch(timeoutToConnectionError);
+    }
+
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<EmptyObject> {
         await this.widgetApi
             .sendToDevice(eventType, false, recursiveMapToObject(contentMap))
