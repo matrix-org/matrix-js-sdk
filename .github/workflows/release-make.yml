@@ -67,6 +67,9 @@ jobs:
                   echo "$PRIVATE_KEY" | gpg --import --batch --passphrase "$PASSPHRASE" -
                   # For debugging, show the contents of the keyring
                   gpg --list-keys --list-options show-unusable-subkeys=yes --with-subkey-fingerprint $FINGERPRINT
+                  # Extract the email address
+                  EMAIL=$(gpg --list-keys --with-colons $FINGERPRINT | head -n1 | awk -F: '$1=="uid" {match($10, /<([^>]+)>/, a); print a[1]}')
+                  echo "email=$EMAIL" >> $GITHUB_OUTPUT
 
             - name: Get draft release
               id: draft-release
@@ -196,7 +199,6 @@ jobs:
               run: |
                   GIT_COMMITTER_EMAIL="$SIGNING_ID" GPG_TTY=$(tty) git tag -u "$SIGNING_ID" -m "Release $VERSION" "$VERSION"
               env:
-                  # TODO
                   SIGNING_ID: ${{ steps.gpg.outputs.email }}
 
             - name: Generate & upload tarball signature
