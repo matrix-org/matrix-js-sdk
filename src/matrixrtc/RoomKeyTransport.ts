@@ -21,10 +21,10 @@ import { type MatrixError } from "../http-api/errors.ts";
 import { logger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { type Statistics } from "./EncryptionManager.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { Room, RoomEvent } from "../matrix.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { Statistics } from "./MatrixRTCSession.ts";
 
 export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
@@ -51,7 +51,7 @@ export class RoomKeyTransport
     }
 
     private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
-        await this.client.decryptEventIfNeeded(event);
+        // await this.client.decryptEventIfNeeded(event);
 
         if (event.isDecryptionFailure()) {
             if (!isRetry) {

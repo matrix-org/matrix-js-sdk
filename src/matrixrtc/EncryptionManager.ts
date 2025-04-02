@@ -1,6 +1,5 @@
 import { logger as rootLogger } from "../logger.ts";
-import { type MatrixEvent } from "../models/event.ts";
-import { type EncryptionConfig } from "./MatrixRTCSession.ts";
+import { Statistics, type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
@@ -8,29 +7,6 @@ import { type CallMembership } from "./CallMembership.ts";
 import { KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
-
-/**
- * A type collecting call encryption statistics for a session.
- */
-export type Statistics = {
-    counters: {
-        /**
-         * The number of times we have sent a room event containing encryption keys.
-         */
-        roomEventEncryptionKeysSent: number;
-        /**
-         * The number of times we have received a room event containing encryption keys.
-         */
-        roomEventEncryptionKeysReceived: number;
-    };
-    totals: {
-        /**
-         * The total age (in milliseconds) of all room events containing encryption keys that we have received.
-         * We track the total age so that we can later calculate the average age of all keys received.
-         */
-        roomEventEncryptionKeysReceivedTotalAge: number;
-    };
-};
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -44,8 +20,6 @@ export interface IEncryptionManager {
     onMembershipsUpdate(oldMemberships: CallMembership[]): void;
 
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
-
-    statistics: Statistics;
 }
 
 /**
@@ -83,15 +57,6 @@ export class EncryptionManager implements IEncryptionManager {
 
     private currentEncryptionKeyIndex = -1;
 
-    public statistics: Statistics = {
-        counters: {
-            roomEventEncryptionKeysSent: 0,
-            roomEventEncryptionKeysReceived: 0,
-        },
-        totals: {
-            roomEventEncryptionKeysReceivedTotalAge: 0,
-        },
-    };
     private joinConfig: EncryptionConfig | undefined;
 
     public constructor(
@@ -99,6 +64,7 @@ export class EncryptionManager implements IEncryptionManager {
         private deviceId: string,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
+        private statistics: Statistics,
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array<ArrayBufferLike>,
             encryptionKeyIndex: number,
@@ -116,7 +82,9 @@ export class EncryptionManager implements IEncryptionManager {
         this.joinConfig = joinConfig;
         this.joined = true;
         this.manageMediaKeys = this.joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
+
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
+        this.transport.start();
         if (this.joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
             this.requestSendCurrentKey();
@@ -129,6 +97,7 @@ export class EncryptionManager implements IEncryptionManager {
         // as they may still be using the same ones.
         this.encryptionKeys.set(getParticipantId(this.userId, this.deviceId), []);
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
+        this.transport.stop();
 
         if (this.makeNewKeyTimeout !== undefined) {
             clearTimeout(this.makeNewKeyTimeout);

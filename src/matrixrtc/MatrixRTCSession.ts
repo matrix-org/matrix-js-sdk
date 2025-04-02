@@ -25,13 +25,36 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./NewMembershipManager.ts";
-import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
+import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
 import type { IMembershipManager } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
+
+/**
+ * A type collecting call encryption statistics for a session.
+ */
+export type Statistics = {
+    counters: {
+        /**
+         * The number of times we have sent a room event containing encryption keys.
+         */
+        roomEventEncryptionKeysSent: number;
+        /**
+         * The number of times we have received a room event containing encryption keys.
+         */
+        roomEventEncryptionKeysReceived: number;
+    };
+    totals: {
+        /**
+         * The total age (in milliseconds) of all room events containing encryption keys that we have received.
+         * We track the total age so that we can later calculate the average age of all keys received.
+         */
+        roomEventEncryptionKeysReceivedTotalAge: number;
+    };
+};
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
@@ -173,9 +196,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * The statistics for this session.
      */
-    public get statistics(): Statistics {
-        return this.encryptionManager.statistics;
-    }
+    public statistics: Statistics = {
+        counters: {
+            roomEventEncryptionKeysSent: 0,
+            roomEventEncryptionKeysReceived: 0,
+        },
+        totals: {
+            roomEventEncryptionKeysReceivedTotalAge: 0,
+        },
+    };
 
     /**
      * The callId (sessionId) of the call.
@@ -317,6 +346,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.client.getDeviceId()!,
             () => this.memberships,
             transport,
+            this.statistics,
             (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
             },

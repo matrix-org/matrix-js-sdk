@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EventEmitter } from "stream";
 import { EventType, type MatrixClient, type MatrixEvent, type Room } from "../../../src";
 import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
@@ -69,14 +70,14 @@ export function makeMockRoom(membershipData: MembershipData): Room {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
     const roomState = makeMockRoomState(membershipData, roomId);
-    const room = {
+    const room = Object.assign(new EventEmitter(), {
         roomId: roomId,
         hasMembershipState: jest.fn().mockReturnValue(true),
         getLiveTimeline: jest.fn().mockReturnValue({
             getState: jest.fn().mockReturnValue(roomState),
         }),
         getVersion: jest.fn().mockReturnValue("default"),
-    } as unknown as Room;
+    }) as unknown as Room;
     return room;
 }
 

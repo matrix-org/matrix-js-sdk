@@ -14,9 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
+import {
+    encodeBase64,
+    EventType,
+    IRoomTimelineData,
+    MatrixClient,
+    RoomEvent,
+    type MatrixError,
+    type MatrixEvent,
+    type Room,
+} from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { IKeyTransport } from "../../../src/matrixrtc/IKeyTransport";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
@@ -988,7 +998,8 @@ describe("MatrixRTCSession", () => {
             it("collects keys from encryption events", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
-                sess.onCallEncryption({
+                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                (sess as unknown as any).encryptionManager.transport.onEncryptionEvent({
                     getType: jest.fn().mockReturnValue("io.element.call.encryption_keys"),
                     getContent: jest.fn().mockReturnValue({
                         device_id: "bobsphone",
@@ -1003,17 +1014,16 @@ describe("MatrixRTCSession", () => {
                     getSender: jest.fn().mockReturnValue("@bob:example.org"),
                     getTs: jest.fn().mockReturnValue(Date.now()),
                 } as unknown as MatrixEvent);
-
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+
+                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
+                expect(encryptionKeyChangedListener).toHaveBeenLastCalledWith(
                     textEncoder.encode("this is the key"),
                     0,
                     "@bob:example.org:bobsphone",
                 );
-
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
             });
 
