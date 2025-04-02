@@ -296,6 +296,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             | "_unstable_updateDelayedEvent"
             | "sendEvent"
             | "cancelPendingEvent"
+            | "decryptEventIfNeeded"
         >,
         private roomSubset: Pick<
             Room,

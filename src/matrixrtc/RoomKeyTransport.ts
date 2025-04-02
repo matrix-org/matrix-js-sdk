@@ -23,7 +23,8 @@ import { KeyTransportEvents, KeyTransportEventsHandlerMap, type IKeyTransport } 
 import { type MatrixEvent } from "../models/event.ts";
 import { type Statistics } from "./EncryptionManager.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { Room, RoomEvent, TypedEventEmitter } from "../matrix.ts";
+import { Room, RoomEvent } from "../matrix.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
@@ -33,22 +34,25 @@ export class RoomKeyTransport
 
     public constructor(
         private room: Pick<Room, "on" | "off" | "roomId">,
-        private client: Pick<MatrixClient, "sendEvent" | "getDeviceId" | "getUserId" | "cancelPendingEvent">,
+        private client: Pick<
+            MatrixClient,
+            "sendEvent" | "getDeviceId" | "getUserId" | "cancelPendingEvent" | "decryptEventIfNeeded"
+        >,
         private statistics: Statistics,
     ) {
         super();
         this.prefixedLogger = logger.getChild(`[RTC: ${room.roomId} RoomKeyTransport]`);
     }
     public start(): void {
-        this.room.on(RoomEvent.Timeline, this.onTimeline);
+        this.room.on(RoomEvent.Timeline, (ev) => this.consumeCallEncryptionEvent(ev));
     }
     public stop(): void {
-        this.room.off(RoomEvent.Timeline, this.onTimeline);
+        this.room.off(RoomEvent.Timeline, (ev) => this.consumeCallEncryptionEvent(ev));
     }
 
     private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
-        // we should not need this
-        // await this.client.decryptEventIfNeeded(event);
+        await this.client.decryptEventIfNeeded(event);
+
         if (event.isDecryptionFailure()) {
             if (!isRetry) {
                 logger.warn(
@@ -73,9 +77,6 @@ export class RoomKeyTransport
 
         this.onEncryptionEvent(event);
     }
-    private onTimeline = (event: MatrixEvent): void => {
-        void this.consumeCallEncryptionEvent(event);
-    };
 
     /** implements {@link IKeyTransport#sendKey} */
     public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {

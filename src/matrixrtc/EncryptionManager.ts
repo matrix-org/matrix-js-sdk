@@ -5,7 +5,7 @@ import { secureRandomBase64Url } from "../randomstring.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { KeyTransportEventListener, type IKeyTransport } from "./IKeyTransport.ts";
+import { KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -116,6 +116,7 @@ export class EncryptionManager implements IEncryptionManager {
         this.joinConfig = joinConfig;
         this.joined = true;
         this.manageMediaKeys = this.joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
+        this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         if (this.joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
             this.requestSendCurrentKey();
@@ -127,6 +128,7 @@ export class EncryptionManager implements IEncryptionManager {
         // make new keys if we rejoin). We leave keys for other participants
         // as they may still be using the same ones.
         this.encryptionKeys.set(getParticipantId(this.userId, this.deviceId), []);
+        this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
 
         if (this.makeNewKeyTimeout !== undefined) {
             clearTimeout(this.makeNewKeyTimeout);

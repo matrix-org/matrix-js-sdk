@@ -17,7 +17,7 @@ limitations under the License.
 import { logger as rootLogger } from "../logger.ts";
 import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { type Room, RoomEvent } from "../models/room.ts";
+import { type Room } from "../models/room.ts";
 import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
@@ -116,14 +116,15 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
     private refreshRoom(room: Room): void {
         const isNewSession = !this.roomSessions.has(room.roomId);
-        const sess = this.getRoomSession(room);
+        const session = this.getRoomSession(room);
 
-        const wasActiveAndKnown = sess.memberships.length > 0 && !isNewSession;
-        // TODO remove this and make the session subscribe to this manually.
-        // move away from magically called methods. Prefer explicit subscriptions.
-        sess.onRTCSessionMemberUpdate();
+        const wasActiveAndKnown = session.memberships.length > 0 && !isNewSession;
+        // TODO: we can move this directly into the rtcSession without any performacn impact.
+        // Because it is possible to subscribe to state events per room. So each session will just
+        // subscribe to only a subset of events.
+        session.onRTCSessionMemberUpdate();
 
-        const nowActive = sess.memberships.length > 0;
+        const nowActive = session.memberships.length > 0;
 
         if (wasActiveAndKnown && !nowActive) {
             this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
