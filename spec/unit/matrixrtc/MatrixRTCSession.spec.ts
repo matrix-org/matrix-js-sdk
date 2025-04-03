@@ -20,7 +20,7 @@ import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../sr
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
-import { makeMockEvent, makeMockRoom, makeMockRoomState, membershipTemplate } from "./mocks";
+import { makeMockEvent, makeMockRoom, makeMockRoomState, membershipTemplate, makeKey } from "./mocks";
 
 const mockFocus = { type: "mock" };
 
@@ -534,12 +534,7 @@ describe("MatrixRTCSession", () => {
                         {
                             call_id: "",
                             device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
+                            keys: [makeKey(0, expect.stringMatching(".*"))],
                             sent_ts: Date.now(),
                         },
                     );
@@ -742,12 +737,7 @@ describe("MatrixRTCSession", () => {
                         {
                             call_id: "",
                             device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
+                            keys: [makeKey(0, expect.stringMatching(".*"))],
                             sent_ts: Date.now(),
                         },
                     );
@@ -796,12 +786,7 @@ describe("MatrixRTCSession", () => {
                         {
                             call_id: "",
                             device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
+                            keys: [makeKey(0, expect.stringMatching(".*"))],
                             sent_ts: Date.now(),
                         },
                     );
@@ -834,12 +819,7 @@ describe("MatrixRTCSession", () => {
                         {
                             call_id: "",
                             device_id: "AAAAAAA",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: expect.stringMatching(".*"),
-                                },
-                            ],
+                            keys: [makeKey(0, expect.stringMatching(".*"))],
                             sent_ts: Date.now(),
                         },
                     );
@@ -996,12 +976,7 @@ describe("MatrixRTCSession", () => {
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
-                        keys: [
-                            {
-                                index: 0,
-                                key: "dGhpcyBpcyB0aGUga2V5",
-                            },
-                        ],
+                        keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
                     }),
                 );
                 await jest.advanceTimersToNextTimerAsync();
@@ -1026,12 +1001,7 @@ describe("MatrixRTCSession", () => {
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
-                        keys: [
-                            {
-                                index: 4,
-                                key: "dGhpcyBpcyB0aGUga2V5",
-                            },
-                        ],
+                        keys: [makeKey(4, "dGhpcyBpcyB0aGUga2V5")],
                     }),
                 );
                 await jest.advanceTimersToNextTimerAsync();
@@ -1057,12 +1027,7 @@ describe("MatrixRTCSession", () => {
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
-                        keys: [
-                            {
-                                index: 0,
-                                key: "dGhpcyBpcyB0aGUga2V5",
-                            },
-                        ],
+                        keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
                     }),
                 );
                 await jest.advanceTimersToNextTimerAsync();
@@ -1083,12 +1048,7 @@ describe("MatrixRTCSession", () => {
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
-                        keys: [
-                            {
-                                index: 4,
-                                key: "dGhpcyBpcyB0aGUga2V5",
-                            },
-                        ],
+                        keys: [makeKey(4, "dGhpcyBpcyB0aGUga2V5")],
                     }),
                 );
                 await jest.advanceTimersToNextTimerAsync();
@@ -1122,12 +1082,7 @@ describe("MatrixRTCSession", () => {
                         {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: encodeBase64(Buffer.from("newer key", "utf-8")),
-                                },
-                            ],
+                            keys: [makeKey(0, encodeBase64(Buffer.from("newer key", "utf-8")))],
                         },
                         2000,
                     ),
@@ -1141,12 +1096,7 @@ describe("MatrixRTCSession", () => {
                         {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: encodeBase64(Buffer.from("newer key", "utf-8")),
-                                },
-                            ],
+                            keys: [makeKey(0, encodeBase64(Buffer.from("newer key", "utf-8")))],
                         },
                         2000,
                     ),
@@ -1159,12 +1109,7 @@ describe("MatrixRTCSession", () => {
                         {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: encodeBase64(Buffer.from("older key", "utf-8")),
-                                },
-                            ],
+                            keys: [makeKey(0, encodeBase64(Buffer.from("older key", "utf-8")))],
                         },
                         1000,
                     ),
@@ -1196,12 +1141,7 @@ describe("MatrixRTCSession", () => {
                         {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: encodeBase64(Buffer.from("first key", "utf-8")),
-                                },
-                            ],
+                            keys: [makeKey(0, encodeBase64(Buffer.from("older key", "utf-8")))],
                         },
                         1000,
                     ),
@@ -1215,12 +1155,7 @@ describe("MatrixRTCSession", () => {
                         {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: encodeBase64(Buffer.from("second key", "utf-8")),
-                                },
-                            ],
+                            keys: [makeKey(0, encodeBase64(Buffer.from("second key", "utf-8")))],
                         },
                         1000,
                     ),
@@ -1247,12 +1182,7 @@ describe("MatrixRTCSession", () => {
                     makeMockEvent("io.element.call.encryption_keys", client.getUserId()!, "1234roomId", {
                         device_id: client.getDeviceId(),
                         call_id: "",
-                        keys: [
-                            {
-                                index: 4,
-                                key: "dGhpcyBpcyB0aGUga2V5",
-                            },
-                        ],
+                        keys: [makeKey(4, "dGhpcyBpcyB0aGUga2V5")],
                     }),
                 );
 
@@ -1281,12 +1211,7 @@ describe("MatrixRTCSession", () => {
                             {
                                 device_id: "bobsphone",
                                 call_id: "",
-                                keys: [
-                                    {
-                                        index: 0,
-                                        key: "dGhpcyBpcyB0aGUga2V5",
-                                    },
-                                ],
+                                keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
                             },
                             0,
                         ),
@@ -1301,12 +1226,7 @@ describe("MatrixRTCSession", () => {
                         makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: "dGhpcyBpcyB0aGUga2V5",
-                                },
-                            ],
+                            keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
                             sent_ts: 0,
                         }),
                     );
@@ -1319,12 +1239,7 @@ describe("MatrixRTCSession", () => {
                         makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                             device_id: "bobsphone",
                             call_id: "",
-                            keys: [
-                                {
-                                    index: 0,
-                                    key: "dGhpcyBpcyB0aGUga2V5",
-                                },
-                            ],
+                            keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
                             sent_ts: 1000,
                         }),
                     );

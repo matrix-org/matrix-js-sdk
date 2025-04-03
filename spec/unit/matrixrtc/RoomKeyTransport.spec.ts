@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { makeMockEvent, makeMockRoom, membershipTemplate, mockKey } from "./mocks";
+import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey } from "./mocks";
 import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
@@ -58,7 +58,7 @@ describe("RoomKyTransport", () => {
         client.decryptEventIfNeeded = () => Promise.resolve();
         const timelineEvent = makeMockEvent(EventType.CallEncryptionKeysPrefix, "@mock:user.example", "!room:id", {
             call_id: "",
-            keys: [mockKey(0, "testKey")],
+            keys: [makeKey(0, "testKey")],
             sent_ts: Date.now(),
             device_id: "AAAAAAA",
         });
@@ -82,7 +82,7 @@ describe("RoomKyTransport", () => {
             const timelineEvent = Object.assign(
                 makeMockEvent(EventType.CallEncryptionKeysPrefix, "@mock:user.example", "!room:id", {
                     call_id: "",
-                    keys: [mockKey(0, "testKey")],
+                    keys: [makeKey(0, "testKey")],
                     sent_ts: Date.now(),
                     device_id: "AAAAAAA",
                 }),
@@ -110,7 +110,7 @@ describe("RoomKyTransport", () => {
                 const timelineEvent = Object.assign(
                     makeMockEvent(EventType.CallEncryptionKeysPrefix, "@mock:user.example", "!room:id", {
                         call_id: "",
-                        keys: [mockKey(0, "testKey")],
+                        keys: [makeKey(0, "testKey")],
                         sent_ts: Date.now(),
                         device_id: "AAAAAAA",
                     }),
