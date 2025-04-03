@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 import { EventEmitter } from "stream";
-import { EventType, Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
+
+import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 
@@ -68,7 +69,7 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
 
 export function makeMockRoom(
     membershipData: MembershipData,
-): Room & { emitTimelineEvent_tests: (event: MatrixEvent) => void } {
+): Room & { emitTimelineEvent: (event: MatrixEvent) => void } {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
     const roomState = makeMockRoomState(membershipData, roomId);
@@ -81,7 +82,7 @@ export function makeMockRoom(
         getVersion: jest.fn().mockReturnValue("default"),
     }) as unknown as Room;
     return Object.assign(room, {
-        emitTimelineEvent_tests: (event: MatrixEvent) =>
+        emitTimelineEvent: (event: MatrixEvent) =>
             room.emit(RoomEvent.Timeline, event, room, undefined, false, {} as any),
     });
 }
@@ -132,7 +133,7 @@ export function makeMockEvent(
         getSender: jest.fn().mockReturnValue(sender),
         getTs: jest.fn().mockReturnValue(timestamp ?? Date.now()),
         getRoomId: jest.fn().mockReturnValue(roomId),
-
+        getId: jest.fn().mockReturnValue(secureRandomString(8)),
         isDecryptionFailure: jest.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
 }
@@ -144,4 +145,11 @@ export function mockRTCEvent(membershipData: MembershipData, roomId: string, cus
 
 export function mockCallMembership(membershipData: MembershipData, roomId: string, sender?: string): CallMembership {
     return new CallMembership(mockRTCEvent(membershipData, roomId, sender), membershipData);
+}
+
+export function mockKey(id: number, key: string): { key: string; index: number } {
+    return {
+        key: key,
+        index: id,
+    };
 }

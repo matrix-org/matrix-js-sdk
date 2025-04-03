@@ -35,9 +35,7 @@ describe("MatrixRTCSession", () => {
         client.getUserId = jest.fn().mockReturnValue("@alice:example.org");
         client.getDeviceId = jest.fn().mockReturnValue("AAAAAAA");
         client.sendEvent = jest.fn().mockResolvedValue({ event_id: "success" });
-        client.decryptEventIfNeeded = jest.fn().mockImplementation(() => {
-            console.log("Fake decryptEventIfNeeded");
-        });
+        client.decryptEventIfNeeded = jest.fn();
     });
 
     afterEach(async () => {
@@ -994,7 +992,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
@@ -1024,7 +1022,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
@@ -1055,7 +1053,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
@@ -1081,7 +1079,7 @@ describe("MatrixRTCSession", () => {
 
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
 
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
                         call_id: "",
@@ -1116,7 +1114,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
                         "@bob:example.org",
@@ -1135,7 +1133,7 @@ describe("MatrixRTCSession", () => {
                     ),
                 );
 
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
                         "@bob:example.org",
@@ -1153,7 +1151,7 @@ describe("MatrixRTCSession", () => {
                         2000,
                     ),
                 );
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
                         "@bob:example.org",
@@ -1190,7 +1188,7 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
                         "@bob:example.org",
@@ -1209,7 +1207,7 @@ describe("MatrixRTCSession", () => {
                     ),
                 );
 
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
                         "@bob:example.org",
@@ -1245,7 +1243,7 @@ describe("MatrixRTCSession", () => {
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
 
                 sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent_tests(
+                mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", client.getUserId()!, "1234roomId", {
                         device_id: client.getDeviceId(),
                         call_id: "",
@@ -1275,7 +1273,7 @@ describe("MatrixRTCSession", () => {
                     // defaults to getTs()
                     jest.setSystemTime(1000);
                     sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                    mockRoom.emitTimelineEvent_tests(
+                    mockRoom.emitTimelineEvent(
                         makeMockEvent(
                             "io.element.call.encryption_keys",
                             "@bob:example.org",
@@ -1299,7 +1297,7 @@ describe("MatrixRTCSession", () => {
 
                     jest.setSystemTime(2000);
 
-                    mockRoom.emitTimelineEvent_tests(
+                    mockRoom.emitTimelineEvent(
                         makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                             device_id: "bobsphone",
                             call_id: "",
@@ -1317,7 +1315,7 @@ describe("MatrixRTCSession", () => {
                     expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(3000);
 
                     jest.setSystemTime(3000);
-                    mockRoom.emitTimelineEvent_tests(
+                    mockRoom.emitTimelineEvent(
                         makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                             device_id: "bobsphone",
                             call_id: "",
