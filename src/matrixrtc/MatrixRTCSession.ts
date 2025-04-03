@@ -28,33 +28,11 @@ import { MembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
-import type { IMembershipManager } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import { type IMembershipManager } from "./IMembershipManager.ts";
+import { type Statistics } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
-
-/**
- * A type collecting call encryption statistics for a session.
- */
-export type Statistics = {
-    counters: {
-        /**
-         * The number of times we have sent a room event containing encryption keys.
-         */
-        roomEventEncryptionKeysSent: number;
-        /**
-         * The number of times we have received a room event containing encryption keys.
-         */
-        roomEventEncryptionKeysReceived: number;
-    };
-    totals: {
-        /**
-         * The total age (in milliseconds) of all room events containing encryption keys that we have received.
-         * We track the total age so that we can later calculate the average age of all keys received.
-         */
-        roomEventEncryptionKeysReceivedTotalAge: number;
-    };
-};
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.

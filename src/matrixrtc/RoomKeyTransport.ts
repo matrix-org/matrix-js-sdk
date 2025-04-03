@@ -15,16 +15,15 @@ limitations under the License.
 */
 
 import type { MatrixClient } from "../client.ts";
-import type { EncryptionKeysEventContent } from "./types.ts";
+import type { EncryptionKeysEventContent, Statistics } from "./types.ts";
 import { EventType } from "../@types/event.ts";
 import { type MatrixError } from "../http-api/errors.ts";
 import { logger, type Logger } from "../logger.ts";
-import { KeyTransportEvents, KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
+import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { Room, RoomEvent } from "../matrix.ts";
+import { type Room, RoomEvent } from "../matrix.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { Statistics } from "./MatrixRTCSession.ts";
 
 export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
@@ -44,10 +43,10 @@ export class RoomKeyTransport
         this.prefixedLogger = logger.getChild(`[RTC: ${room.roomId} RoomKeyTransport]`);
     }
     public start(): void {
-        this.room.on(RoomEvent.Timeline, (ev) => this.consumeCallEncryptionEvent(ev));
+        this.room.on(RoomEvent.Timeline, (ev) => void this.consumeCallEncryptionEvent(ev));
     }
     public stop(): void {
-        this.room.off(RoomEvent.Timeline, (ev) => this.consumeCallEncryptionEvent(ev));
+        this.room.off(RoomEvent.Timeline, (ev) => void this.consumeCallEncryptionEvent(ev));
     }
 
     private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
