@@ -160,7 +160,7 @@ export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
     private membershipManager?: IMembershipManager;
-    private encryptionManager: IEncryptionManager;
+    private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
 
@@ -317,18 +317,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.setExpiryTimer();
-
-        const transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
-        this.encryptionManager = new EncryptionManager(
-            this.client.getUserId()!,
-            this.client.getDeviceId()!,
-            () => this.memberships,
-            transport,
-            this.statistics,
-            (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
-                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
-            },
-        );
     }
 
     /*
@@ -381,6 +369,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.getOldestMembership(),
                 );
             }
+            // Create Encryption manager
+            const transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+            this.encryptionManager = new EncryptionManager(
+                this.client.getUserId()!,
+                this.client.getDeviceId()!,
+                () => this.memberships,
+                transport,
+                this.statistics,
+                (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                    this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
+                },
+            );
         }
 
         // Join!
@@ -412,7 +412,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
 
-        this.encryptionManager.leave();
+        this.encryptionManager!.leave();
 
         const leavePromise = this.membershipManager!.leave(timeout);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
@@ -452,7 +452,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * the keys.
      */
     public reemitEncryptionKeys(): void {
-        this.encryptionManager.getEncryptionKeys().forEach((keys, participantId) => {
+        this.encryptionManager?.getEncryptionKeys().forEach((keys, participantId) => {
             keys.forEach((key, index) => {
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
             });
@@ -467,7 +467,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         const keys =
-            this.encryptionManager.getEncryptionKeys() ??
+            this.encryptionManager?.getEncryptionKeys() ??
             new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
         // the returned array doesn't contain the timestamps
         return Array.from(keys.entries())
@@ -540,7 +540,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        void this.encryptionManager.onMembershipsUpdate(oldMemberships);
+        void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
     };

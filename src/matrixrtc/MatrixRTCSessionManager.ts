@@ -127,8 +127,10 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         const nowActive = session.memberships.length > 0;
 
         if (wasActiveAndKnown && !nowActive) {
+            logger.trace(`Session ended for ${room.roomId} (${session.memberships.length} members)`);
             this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
         } else if (!wasActiveAndKnown && nowActive) {
+            logger.trace(`Session started for ${room.roomId} (${session.memberships.length} members)`);
             this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
         }
     }
