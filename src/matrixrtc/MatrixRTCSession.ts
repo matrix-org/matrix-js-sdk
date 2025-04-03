@@ -500,14 +500,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     }
 
     /**
-     * @deprecated use onRoomMemberUpdate or onRTCSessionMemberUpdate instead. this should be called when any membership in the call is updated
-     * the old name might have implied to only need to call this when your own membership changes.
-     */
-    public onMembershipUpdate = (): void => {
-        this.recalculateSessionMembers();
-    };
-
-    /**
      * Call this when the Matrix room members have changed.
      */
     public onRoomMemberUpdate = (): void => {
