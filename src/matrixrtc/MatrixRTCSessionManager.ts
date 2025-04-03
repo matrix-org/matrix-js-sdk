@@ -119,9 +119,11 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         const session = this.getRoomSession(room);
 
         const wasActiveAndKnown = session.memberships.length > 0 && !isNewSession;
-        // TODO: we can move this directly into the rtcSession without any performacn impact.
-        // Because it is possible to subscribe to state events per room. So each session will just
-        // subscribe to only a subset of events.
+        // This needs to be here and the event listener cannot be setup in the MatrixRTCSession,
+        // because we need the update to happen between:
+        // wasActiveAndKnown = session.memberships.length > 0 and
+        // nowActive = session.memberships.length
+        // Alternatively we would need to setup some event emission when the RTC session ended.
         session.onRTCSessionMemberUpdate();
 
         const nowActive = session.memberships.length > 0;
