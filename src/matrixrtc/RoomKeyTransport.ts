@@ -22,8 +22,8 @@ import { logger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { type Room, RoomEvent } from "../matrix.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { type Room, RoomEvent } from "../models/room.ts";
 
 export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
