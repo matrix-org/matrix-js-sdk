@@ -1,10 +1,11 @@
 import { logger as rootLogger } from "../logger.ts";
-import { Statistics, type EncryptionConfig } from "./MatrixRTCSession.ts";
+import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
+import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
+import { isMyMembership, type Statistics } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -12,13 +13,37 @@ const logger = rootLogger.getChild("MatrixRTCSession");
  * This interface is for testing and for making it possible to interchange the encryption manager.
  * @internal
  */
+/**
+ * Interface representing an encryption manager for handling encryption-related
+ * operations in a real-time communication context.
+ */
 export interface IEncryptionManager {
+    /**
+     * Joins the encryption manager with the provided configuration.
+     *
+     * @param joinConfig - The configuration for joining encryption, or undefined
+     * if no specific configuration is provided.
+     */
     join(joinConfig: EncryptionConfig | undefined): void;
 
+    /**
+     * Leaves the encryption manager, cleaning up any associated resources.
+     */
     leave(): void;
 
+    /**
+     * Called from the MatrixRTCSession when the memberships in this session updated.
+     *
+     * @param oldMemberships - The previous state of call memberships before the update.
+     */
     onMembershipsUpdate(oldMemberships: CallMembership[]): void;
 
+    /**
+     * Retrieves the encryption keys currently managed by the encryption manager.
+     *
+     * @returns A map where the keys are identifiers and the values are arrays of
+     * objects containing encryption keys and their associated timestamps.
+     */
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
 }
 
@@ -112,17 +137,16 @@ export class EncryptionManager implements IEncryptionManager {
         this.joined = false;
     }
 
-    // TODO deduplicate this method. It also is in MatrixRTCSession.
-    private isMyMembership = (m: CallMembership): boolean => m.sender === this.userId && m.deviceId === this.deviceId;
-
     public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
         if (this.manageMediaKeys && this.joined) {
             const oldMembershipIds = new Set(
-                oldMemberships.filter((m) => !this.isMyMembership(m)).map(getParticipantIdFromMembership),
+                oldMemberships
+                    .filter((m) => !isMyMembership(m, this.userId, this.deviceId))
+                    .map(getParticipantIdFromMembership),
             );
             const newMembershipIds = new Set(
                 this.getMemberships()
-                    .filter((m) => !this.isMyMembership(m))
+                    .filter((m) => !isMyMembership(m, this.userId, this.deviceId))
                     .map(getParticipantIdFromMembership),
             );
 
@@ -272,7 +296,7 @@ export class EncryptionManager implements IEncryptionManager {
     private storeLastMembershipFingerprints(): void {
         this.lastMembershipFingerprints = new Set(
             this.getMemberships()
-                .filter((m) => !this.isMyMembership(m))
+                .filter((m) => !isMyMembership(m, this.userId, this.deviceId))
                 .map((m) => `${getParticipantIdFromMembership(m)}:${m.createdTs()}`),
         );
     }
