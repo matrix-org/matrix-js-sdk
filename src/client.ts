@@ -207,7 +207,7 @@ import {
 import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
-import {type ToDeviceBatch, ToDevicePayload} from "./models/ToDeviceMessage.ts";
+import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
 import { type UIARequest } from "./@types/uia.ts";
 import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
@@ -7957,8 +7957,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         await this.queueToDevice(batch);
     }
 
-
-        /**
+    /**
      * Sends events directly to specific devices using Matrix's to-device
      * messaging system. The batch will be split up into appropriately sized
      * batches for sending and stored in the store so they can be retried

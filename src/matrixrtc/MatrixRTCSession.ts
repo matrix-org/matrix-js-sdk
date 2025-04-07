@@ -31,7 +31,7 @@ import { logDurationSync } from "../utils.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import { IMembershipManager } from "./IMembershipManager.ts";
+import type { IMembershipManager } from "./IMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 

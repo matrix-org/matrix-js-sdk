@@ -218,7 +218,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * On success, sets new access and refresh tokens in opts.
      * @returns Promise that resolves to a boolean - true when token was refreshed successfully
      */
-    // @singleAsyncExecution
+    @singleAsyncExecution
     private async tryRefreshToken(): Promise<TokenRefreshOutcome> {
         if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
             return TokenRefreshOutcome.Logout;

@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientEvent, EventType, type MatrixClient, MatrixEvent } from "../matrix.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { IKeyTransport, KeyTransportEvents, KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
+import { type IKeyTransport, KeyTransportEvents, type KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
 import { type Logger, logger } from "../logger.ts";
-import { CallMembership } from "./CallMembership.ts";
-import { EncryptionKeysToDeviceEventContent, Statistics } from "./types.ts";
+import type { CallMembership } from "./CallMembership.ts";
+import type { EncryptionKeysToDeviceEventContent, Statistics } from "./types.ts";
+import { ClientEvent, MatrixClient } from "../client.ts";
+import { MatrixEvent } from "../models/event.ts";
+import { EventType } from "../@types/event.ts";
 
 export class ToDeviceKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
@@ -145,7 +147,7 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        if (!content.keys || !content.keys.key || !content.keys.index) {
+        if (!content.keys || !content.keys.key || typeof content.keys.index !== "number") {
             this.prefixedLogger.warn("Malformed Event: Missing keys field");
             return;
         }
