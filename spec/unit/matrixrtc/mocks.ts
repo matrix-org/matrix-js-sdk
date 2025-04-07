@@ -123,7 +123,7 @@ export function makeMockRoomState(membershipData: MembershipData, roomId: string
 export function makeMockEvent(
     type: string,
     sender: string,
-    roomId: string,
+    roomId: string | undefined,
     content: any,
     timestamp?: number,
 ): MatrixEvent {

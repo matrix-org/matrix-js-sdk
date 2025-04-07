@@ -16,7 +16,7 @@ limitations under the License.
 
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type IKeyTransport, KeyTransportEvents, type KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
-import { type Logger, logger } from "../logger.ts";
+import { type Logger } from "../logger.ts";
 import type { CallMembership } from "./CallMembership.ts";
 import type { EncryptionKeysToDeviceEventContent, Statistics } from "./types.ts";
 import { ClientEvent, type MatrixClient } from "../client.ts";
@@ -35,9 +35,10 @@ export class ToDeviceKeyTransport
         private roomId: string,
         private client: Pick<MatrixClient, "encryptAndSendToDevice" | "on" | "off">,
         private statistics: Statistics,
+        logger: Logger,
     ) {
         super();
-        this.prefixedLogger = logger.getChild(`[RTC: ${roomId} ToDeviceKeyTransport]`);
+        this.prefixedLogger = logger.getChild(`[${roomId} ToDeviceKeyTransport]`);
     }
 
     public start(): void {
@@ -54,7 +55,7 @@ export class ToDeviceKeyTransport
                 index: index,
                 key: keyBase64Encoded,
             },
-            roomId: this.roomId,
+            room_id: this.roomId,
             member: {
                 claimed_device_id: this.deviceId,
             },
@@ -69,7 +70,7 @@ export class ToDeviceKeyTransport
             .filter((member) => {
                 // filter malformed call members
                 if (member.sender == undefined || member.deviceId == undefined) {
-                    logger.warn(`Malformed call member: ${member.sender}|${member.deviceId}`);
+                    this.prefixedLogger.warn(`Malformed call member: ${member.sender}|${member.deviceId}`);
                     return false;
                 }
                 // Filter out me
@@ -84,6 +85,7 @@ export class ToDeviceKeyTransport
 
         if (targets.length > 0) {
             await this.client.encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content);
+            this.statistics.counters.roomEventEncryptionKeysSent += 1;
         } else {
             this.prefixedLogger.warn("No targets found for sending key");
         }
@@ -135,8 +137,8 @@ export class ToDeviceKeyTransport
     };
 
     private getValidEventContent(event: MatrixEvent): EncryptionKeysToDeviceEventContent | undefined {
-        const content = event.getContent<EncryptionKeysToDeviceEventContent>();
-        const roomId = content.roomId;
+        const content = event.getContent();
+        const roomId = content.room_id;
         if (!roomId) {
             // Invalid event
             this.prefixedLogger.warn("Malformed Event: invalid call encryption keys event, no roomId");
@@ -162,6 +164,6 @@ export class ToDeviceKeyTransport
         //     this.prefixedLogger.warn("Malformed Event: Missing/Malformed content.session", content.session);
         //     return;
         // }
-        return content;
+        return content as EncryptionKeysToDeviceEventContent;
     }
 }

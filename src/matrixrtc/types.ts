@@ -36,7 +36,7 @@ export interface EncryptionKeysToDeviceEventContent {
         claimed_device_id: string;
         // user_id: string
     };
-    roomId: string;
+    room_id: string;
     session: {
         application: string;
         call_id: string;

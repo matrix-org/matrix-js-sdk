@@ -388,6 +388,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.roomSubset.roomId,
                     this.client,
                     this.statistics,
+                    logger,
                 );
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
