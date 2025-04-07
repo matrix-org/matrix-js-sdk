@@ -14,15 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type Mocked } from "jest-mock";
+
 import { makeMockEvent, membershipTemplate, mockCallMembership } from "./mocks";
-import { ClientEvent, EventType, MatrixClient } from "../../../src";
+import { ClientEvent, EventType, type MatrixClient } from "../../../src";
 import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
-import { Mocked } from "jest-mock";
 import { getMockClientWithEventEmitter } from "../../test-utils/client.ts";
-import { Statistics } from "../../../src/matrixrtc";
+import { type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { defer } from "../../../src/utils.ts";
-import { Logger } from "../../../src/logger.ts";
+import { type Logger } from "../../../src/logger.ts";
 
 describe("ToDeviceKeyTransport", () => {
     const roomId = "!room:id";
@@ -166,7 +167,7 @@ describe("ToDeviceKeyTransport", () => {
         expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledTimes(0);
     });
 
-    it("should warn when there is a room mismatch", async () => {
+    it("should warn when there is a room mismatch", () => {
         setup();
 
         transport.start();
@@ -241,7 +242,7 @@ describe("ToDeviceKeyTransport", () => {
             },
         ];
 
-        test.each(MALFORMED_EVENT)("should warn on malformed event %j", async (event) => {
+        test.each(MALFORMED_EVENT)("should warn on malformed event %j", (event) => {
             setup();
 
             transport.start();
