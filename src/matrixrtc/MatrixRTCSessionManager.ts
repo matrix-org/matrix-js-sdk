@@ -17,7 +17,7 @@ limitations under the License.
 import { logger as rootLogger } from "../logger.ts";
 import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { type Room, RoomEvent } from "../models/room.ts";
+import { type Room } from "../models/room.ts";
 import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
@@ -65,7 +65,6 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
 
         this.client.on(ClientEvent.Room, this.onRoom);
-        this.client.on(RoomEvent.Timeline, this.onTimeline);
         this.client.on(RoomStateEvent.Events, this.onRoomState);
     }
 
@@ -76,7 +75,6 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.roomSessions.clear();
 
         this.client.off(ClientEvent.Room, this.onRoom);
-        this.client.off(RoomEvent.Timeline, this.onTimeline);
         this.client.off(RoomStateEvent.Events, this.onRoomState);
     }
 
@@ -100,37 +98,6 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         return this.roomSessions.get(room.roomId)!;
     }
 
-    private async consumeCallEncryptionEvent(event: MatrixEvent, isRetry = false): Promise<void> {
-        await this.client.decryptEventIfNeeded(event);
-        if (event.isDecryptionFailure()) {
-            if (!isRetry) {
-                logger.warn(
-                    `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
-                );
-                // retry after 1 second. After this we give up.
-                setTimeout(() => void this.consumeCallEncryptionEvent(event, true), 1000);
-            } else {
-                logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
-            }
-            return;
-        } else if (isRetry) {
-            logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
-        }
-
-        if (event.getType() !== EventType.CallEncryptionKeysPrefix) return Promise.resolve();
-
-        const room = this.client.getRoom(event.getRoomId());
-        if (!room) {
-            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
-            return Promise.resolve();
-        }
-
-        this.getRoomSession(room).onCallEncryption(event);
-    }
-    private onTimeline = (event: MatrixEvent): void => {
-        void this.consumeCallEncryptionEvent(event);
-    };
-
     private onRoom = (room: Room): void => {
         this.refreshRoom(room);
     };
@@ -149,17 +116,23 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
 
     private refreshRoom(room: Room): void {
         const isNewSession = !this.roomSessions.has(room.roomId);
-        const sess = this.getRoomSession(room);
+        const session = this.getRoomSession(room);
 
-        const wasActiveAndKnown = sess.memberships.length > 0 && !isNewSession;
+        const wasActiveAndKnown = session.memberships.length > 0 && !isNewSession;
+        // This needs to be here and the event listener cannot be setup in the MatrixRTCSession,
+        // because we need the update to happen between:
+        // wasActiveAndKnown = session.memberships.length > 0 and
+        // nowActive = session.memberships.length
+        // Alternatively we would need to setup some event emission when the RTC session ended.
+        session.onRTCSessionMemberUpdate();
 
-        sess.onRTCSessionMemberUpdate();
-
-        const nowActive = sess.memberships.length > 0;
+        const nowActive = session.memberships.length > 0;
 
         if (wasActiveAndKnown && !nowActive) {
+            logger.trace(`Session ended for ${room.roomId} (${session.memberships.length} members)`);
             this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
         } else if (!wasActiveAndKnown && nowActive) {
+            logger.trace(`Session started for ${room.roomId} (${session.memberships.length} members)`);
             this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
         }
     }

@@ -24,12 +24,13 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { type MatrixEvent } from "../models/event.ts";
 import { MembershipManager } from "./NewMembershipManager.ts";
-import { EncryptionManager, type IEncryptionManager, type Statistics } from "./EncryptionManager.ts";
+import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
-import type { IMembershipManager } from "./types.ts";
+import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import { type IMembershipManager } from "./IMembershipManager.ts";
+import { type Statistics } from "./types.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -159,7 +160,7 @@ export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
  */
 export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
     private membershipManager?: IMembershipManager;
-    private encryptionManager: IEncryptionManager;
+    private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
 
@@ -173,9 +174,15 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     /**
      * The statistics for this session.
      */
-    public get statistics(): Statistics {
-        return this.encryptionManager.statistics;
-    }
+    public statistics: Statistics = {
+        counters: {
+            roomEventEncryptionKeysSent: 0,
+            roomEventEncryptionKeysReceived: 0,
+        },
+        totals: {
+            roomEventEncryptionKeysReceivedTotalAge: 0,
+        },
+    };
 
     /**
      * The callId (sessionId) of the call.
@@ -296,8 +303,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             | "_unstable_updateDelayedEvent"
             | "sendEvent"
             | "cancelPendingEvent"
+            | "decryptEventIfNeeded"
         >,
-        private roomSubset: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState">,
+        private roomSubset: Pick<
+            Room,
+            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+        >,
         public memberships: CallMembership[],
     ) {
         super();
@@ -306,14 +317,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.setExpiryTimer();
-        this.encryptionManager = new EncryptionManager(
-            this.client,
-            this.roomSubset,
-            () => this.memberships,
-            (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
-                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
-            },
-        );
     }
 
     /*
@@ -366,6 +369,18 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.getOldestMembership(),
                 );
             }
+            // Create Encryption manager
+            const transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+            this.encryptionManager = new EncryptionManager(
+                this.client.getUserId()!,
+                this.client.getDeviceId()!,
+                () => this.memberships,
+                transport,
+                this.statistics,
+                (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                    this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
+                },
+            );
         }
 
         // Join!
@@ -397,7 +412,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
 
         logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
 
-        this.encryptionManager.leave();
+        this.encryptionManager!.leave();
 
         const leavePromise = this.membershipManager!.leave(timeout);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
@@ -437,7 +452,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      * the keys.
      */
     public reemitEncryptionKeys(): void {
-        this.encryptionManager.getEncryptionKeys().forEach((keys, participantId) => {
+        this.encryptionManager?.getEncryptionKeys().forEach((keys, participantId) => {
             keys.forEach((key, index) => {
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
             });
@@ -452,7 +467,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
         const keys =
-            this.encryptionManager.getEncryptionKeys() ??
+            this.encryptionManager?.getEncryptionKeys() ??
             new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
         // the returned array doesn't contain the timestamps
         return Array.from(keys.entries())
@@ -483,25 +498,6 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
         }
     }
-
-    /**
-     * Process `m.call.encryption_keys` events to track the encryption keys for call participants.
-     * This should be called each time the relevant event is received from a room timeline.
-     * If the event is malformed then it will be logged and ignored.
-     *
-     * @param event the event to process
-     */
-    public onCallEncryption = (event: MatrixEvent): void => {
-        this.encryptionManager.onCallEncryptionEventReceived(event);
-    };
-
-    /**
-     * @deprecated use onRoomMemberUpdate or onRTCSessionMemberUpdate instead. this should be called when any membership in the call is updated
-     * the old name might have implied to only need to call this when your own membership changes.
-     */
-    public onMembershipUpdate = (): void => {
-        this.recalculateSessionMembers();
-    };
 
     /**
      * Call this when the Matrix room members have changed.
@@ -544,7 +540,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        void this.encryptionManager.onMembershipsUpdate(oldMemberships);
+        void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
     };

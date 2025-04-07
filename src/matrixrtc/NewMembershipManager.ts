@@ -24,16 +24,16 @@ import { type Room } from "../models/room.ts";
 import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
-import {
-    type IMembershipManager,
-    type MembershipManagerEventHandlerMap,
-    MembershipManagerEvent,
-    Status,
-} from "./types.ts";
+import { isMyMembership, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./NewMembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import {
+    MembershipManagerEvent,
+    type IMembershipManager,
+    type MembershipManagerEventHandlerMap,
+} from "./IMembershipManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -219,10 +219,9 @@ export class MembershipManager
     private leavePromiseDefer?: IDeferred<boolean>;
 
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
-        const isMyMembership = (m: CallMembership): boolean =>
-            m.sender === this.client.getUserId() && m.deviceId === this.client.getDeviceId();
-
-        if (this.isJoined() && !memberships.some(isMyMembership)) {
+        const userId = this.client.getUserId();
+        const deviceId = this.client.getDeviceId();
+        if (userId && deviceId && this.isJoined() && !memberships.some((m) => isMyMembership(m, userId, deviceId))) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
             // take care of our missing membership.
             const sendingMembershipActions = [

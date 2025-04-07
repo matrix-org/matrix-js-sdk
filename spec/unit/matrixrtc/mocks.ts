@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, type MatrixClient, type MatrixEvent, type Room } from "../../../src";
+import { EventEmitter } from "stream";
+
+import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 
@@ -65,19 +67,24 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
     };
 }
 
-export function makeMockRoom(membershipData: MembershipData): Room {
+export function makeMockRoom(
+    membershipData: MembershipData,
+): Room & { emitTimelineEvent: (event: MatrixEvent) => void } {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
     const roomState = makeMockRoomState(membershipData, roomId);
-    const room = {
+    const room = Object.assign(new EventEmitter(), {
         roomId: roomId,
         hasMembershipState: jest.fn().mockReturnValue(true),
         getLiveTimeline: jest.fn().mockReturnValue({
             getState: jest.fn().mockReturnValue(roomState),
         }),
         getVersion: jest.fn().mockReturnValue("default"),
-    } as unknown as Room;
-    return room;
+    }) as unknown as Room;
+    return Object.assign(room, {
+        emitTimelineEvent: (event: MatrixEvent) =>
+            room.emit(RoomEvent.Timeline, event, room, undefined, false, {} as any),
+    });
 }
 
 export function makeMockRoomState(membershipData: MembershipData, roomId: string) {
@@ -113,17 +120,36 @@ export function makeMockRoomState(membershipData: MembershipData, roomId: string
     };
 }
 
-export function mockRTCEvent(membershipData: MembershipData, roomId: string, customSender?: string): MatrixEvent {
-    const sender = customSender ?? "@mock:user.example";
+export function makeMockEvent(
+    type: string,
+    sender: string,
+    roomId: string,
+    content: any,
+    timestamp?: number,
+): MatrixEvent {
     return {
-        getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-        getContent: jest.fn().mockReturnValue(membershipData),
+        getType: jest.fn().mockReturnValue(type),
+        getContent: jest.fn().mockReturnValue(content),
         getSender: jest.fn().mockReturnValue(sender),
-        getTs: jest.fn().mockReturnValue(Date.now()),
+        getTs: jest.fn().mockReturnValue(timestamp ?? Date.now()),
         getRoomId: jest.fn().mockReturnValue(roomId),
+        getId: jest.fn().mockReturnValue(secureRandomString(8)),
         isDecryptionFailure: jest.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
 }
+
+export function mockRTCEvent(membershipData: MembershipData, roomId: string, customSender?: string): MatrixEvent {
+    const sender = customSender ?? "@mock:user.example";
+    return makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData);
+}
+
 export function mockCallMembership(membershipData: MembershipData, roomId: string, sender?: string): CallMembership {
     return new CallMembership(mockRTCEvent(membershipData, roomId, sender), membershipData);
+}
+
+export function makeKey(id: number, key: string): { key: string; index: number } {
+    return {
+        key: key,
+        index: id,
+    };
 }

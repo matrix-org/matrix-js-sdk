@@ -27,7 +27,8 @@ import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
 import { type EmptyObject } from "../@types/common.ts";
-import { type IMembershipManager, type MembershipManagerEvent, Status } from "./types.ts";
+import { Status } from "./types.ts";
+import type { IMembershipManager, MembershipManagerEvent } from "./IMembershipManager.ts";
 
 /**
  * This internal class is used by the MatrixRTCSession to manage the local user's own membership of the session.
