@@ -1465,7 +1465,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
 
-        this.deleteSecretStorage();
         await this.deleteSecretStorage();
 
         // Reset the cross-signing keys
