@@ -80,8 +80,8 @@ export class EncryptionManager implements IEncryptionManager {
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
-    private currentEncryptionKeyIndex = -1;
-
+    private mediaTrailerKeyIndexInUse = -1;
+    private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
 
     public constructor(
@@ -254,8 +254,6 @@ export class EncryptionManager implements IEncryptionManager {
 
         if (!this.joined) return;
 
-        logger.info(`Sending encryption keys event. indexToSend=${indexToSend}`);
-
         const myKeys = this.getKeysForParticipant(this.userId, this.deviceId);
 
         if (!myKeys) {
@@ -263,19 +261,22 @@ export class EncryptionManager implements IEncryptionManager {
             return;
         }
 
-        if (typeof indexToSend !== "number" && this.currentEncryptionKeyIndex === -1) {
+        if (typeof indexToSend !== "number" && this.latestGeneratedKeyIndex === -1) {
             logger.warn("Tried to send encryption keys event but no current key index found!");
             return;
         }
 
-        const keyIndexToSend = indexToSend ?? this.currentEncryptionKeyIndex;
+        const keyIndexToSend = indexToSend ?? this.latestGeneratedKeyIndex;
+        logger.info(
+            `Try sending encryption keys event. keyIndexToSend=${keyIndexToSend} (method parameter: ${indexToSend})`,
+        );
         const keyToSend = myKeys[keyIndexToSend];
 
         try {
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
             await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, this.getMemberships());
             logger.debug(
-                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.currentEncryptionKeyIndex} keyIndexToSend=${keyIndexToSend}`,
+                `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
             );
         } catch (error) {
@@ -290,6 +291,7 @@ export class EncryptionManager implements IEncryptionManager {
     };
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
+        logger.debug(`Received key over key transport ${userId}:${deviceId} at index ${index}`);
         this.setEncryptionKey(userId, deviceId, index, keyBase64Encoded, timestamp);
     };
 
@@ -302,12 +304,12 @@ export class EncryptionManager implements IEncryptionManager {
     }
 
     private getNewEncryptionKeyIndex(): number {
-        if (this.currentEncryptionKeyIndex === -1) {
+        if (this.latestGeneratedKeyIndex === -1) {
             return 0;
         }
 
         // maximum key index is 255
-        return (this.currentEncryptionKeyIndex + 1) % 256;
+        return (this.latestGeneratedKeyIndex + 1) % 256;
     }
 
     /**
@@ -357,6 +359,7 @@ export class EncryptionManager implements IEncryptionManager {
             }
         }
 
+        this.latestGeneratedKeyIndex = encryptionKeyIndex;
         participantKeys[encryptionKeyIndex] = {
             key: keyBin,
             timestamp,
@@ -365,18 +368,18 @@ export class EncryptionManager implements IEncryptionManager {
         if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
-                logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
+                logger.info(`Delayed-emitting key changed event for ${participantId} index ${encryptionKeyIndex}`);
                 if (userId === this.userId && deviceId === this.deviceId) {
-                    this.currentEncryptionKeyIndex = encryptionKeyIndex;
+                    this.mediaTrailerKeyIndexInUse = encryptionKeyIndex;
                 }
-                this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
+                this.onEncryptionKeysChanged(keyBin, this.mediaTrailerKeyIndexInUse, participantId);
             }, this.useKeyDelay);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
             if (userId === this.userId && deviceId === this.deviceId) {
-                this.currentEncryptionKeyIndex = encryptionKeyIndex;
+                this.mediaTrailerKeyIndexInUse = encryptionKeyIndex;
             }
-            this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
+            this.onEncryptionKeysChanged(keyBin, this.mediaTrailerKeyIndexInUse, participantId);
         }
     }
 

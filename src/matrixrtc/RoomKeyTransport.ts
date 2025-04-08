@@ -168,7 +168,7 @@ export class RoomKeyTransport
                 );
             } else {
                 logger.debug(
-                    `Embedded-E2EE-LOG onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} age=${age}ms`,
+                    `onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} age=${age}ms`,
                 );
                 this.emit(
                     KeyTransportEvents.ReceivedKeys,
