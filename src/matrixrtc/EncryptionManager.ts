@@ -80,6 +80,9 @@ export class EncryptionManager implements IEncryptionManager {
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
+    // TODO: remove this value since I think this is not helpful to use
+    // it represents what index we actually sent over to ElementCall (which we do in a delayed manner)
+    // but it has no releavnt information for the encryption manager.
     private mediaTrailerKeyIndexInUse = -1;
     private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
@@ -267,6 +270,12 @@ export class EncryptionManager implements IEncryptionManager {
         }
 
         const keyIndexToSend = indexToSend ?? this.latestGeneratedKeyIndex;
+        // TODO remove this debug log. it just shows then when sending mediaTrailerKeyIndexInUse contained the wrong index.
+        logger.debug(
+            `Compare key in use to last generated key\n`,
+            `latestGeneratedKeyIndex: ${this.latestGeneratedKeyIndex}\n`,
+            `mediaTrailerKeyIndexInUse: ${this.mediaTrailerKeyIndexInUse}`,
+        );
         logger.info(
             `Try sending encryption keys event. keyIndexToSend=${keyIndexToSend} (method parameter: ${indexToSend})`,
         );
@@ -359,7 +368,15 @@ export class EncryptionManager implements IEncryptionManager {
             }
         }
 
-        this.latestGeneratedKeyIndex = encryptionKeyIndex;
+        if (userId === this.userId && deviceId === this.deviceId) {
+            // It is important to already update the latestGeneratedKeyIndex here
+            // NOT IN THE `delayBeforeUse` `setTimeout`.
+            // Even though this is where we call onEncryptionKeysChanged and set the key in EC (and livekit).
+            // It needs to happen here because we will send the key before the timeout has passed and sending
+            // the key will use latestGeneratedKeyIndex as the index. if we update it in the `setTimeout` callback
+            // it will use the wrong index (index - 1)!
+            this.latestGeneratedKeyIndex = encryptionKeyIndex;
+        }
         participantKeys[encryptionKeyIndex] = {
             key: keyBin,
             timestamp,
@@ -372,14 +389,14 @@ export class EncryptionManager implements IEncryptionManager {
                 if (userId === this.userId && deviceId === this.deviceId) {
                     this.mediaTrailerKeyIndexInUse = encryptionKeyIndex;
                 }
-                this.onEncryptionKeysChanged(keyBin, this.mediaTrailerKeyIndexInUse, participantId);
+                this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
             }, this.useKeyDelay);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
             if (userId === this.userId && deviceId === this.deviceId) {
                 this.mediaTrailerKeyIndexInUse = encryptionKeyIndex;
             }
-            this.onEncryptionKeysChanged(keyBin, this.mediaTrailerKeyIndexInUse, participantId);
+            this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
         }
     }
 
