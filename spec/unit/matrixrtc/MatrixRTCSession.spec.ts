@@ -486,14 +486,17 @@ describe("MatrixRTCSession", () => {
             let sendStateEventMock: jest.Mock;
             let sendDelayedStateMock: jest.Mock;
             let sendEventMock: jest.Mock;
+            let sendToDeviceMock: jest.Mock;
 
             beforeEach(() => {
                 sendStateEventMock = jest.fn();
                 sendDelayedStateMock = jest.fn();
                 sendEventMock = jest.fn();
+                sendToDeviceMock = jest.fn();
                 client.sendStateEvent = sendStateEventMock;
                 client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
                 client.sendEvent = sendEventMock;
+                client.encryptAndSendToDevice = sendToDeviceMock;
 
                 mockRoom = makeMockRoom([]);
                 sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
@@ -961,6 +964,29 @@ describe("MatrixRTCSession", () => {
 
                     expect(sendEventMock).not.toHaveBeenCalled();
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
+                } finally {
+                    jest.useRealTimers();
+                }
+            });
+
+            it("send key as to device", async () => {
+                jest.useFakeTimers();
+                try {
+                    const keySentPromise = new Promise((resolve) => {
+                        sendToDeviceMock.mockImplementation(resolve);
+                    });
+
+                    const mockRoom = makeMockRoom([membershipTemplate]);
+                    sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+
+                    sess!.joinRoomSession([mockFocus], mockFocus, {
+                        manageMediaKeys: true,
+                        useExperimentalToDeviceTransport: true,
+                    });
+
+                    await keySentPromise;
+
+                    expect(sendToDeviceMock).toHaveBeenCalled();
                 } finally {
                     jest.useRealTimers();
                 }
