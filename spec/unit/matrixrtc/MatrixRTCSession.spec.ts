@@ -835,6 +835,7 @@ describe("MatrixRTCSession", () => {
             it("rotates key if a member leaves", async () => {
                 jest.useFakeTimers();
                 try {
+                    const KEY_DALAY = 3000;
                     const member2 = Object.assign({}, membershipTemplate, {
                         device_id: "BBBBBBB",
                     });
@@ -855,7 +856,8 @@ describe("MatrixRTCSession", () => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
 
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true, makeKeyDelay: KEY_DALAY });
+                    const sendKeySpy = jest.spyOn((sess as unknown as any).encryptionManager.transport, "sendKey");
                     const firstKeysPayload = await keysSentPromise1;
                     expect(firstKeysPayload.keys).toHaveLength(1);
                     expect(firstKeysPayload.keys[0].index).toEqual(0);
@@ -872,14 +874,24 @@ describe("MatrixRTCSession", () => {
                         .mockReturnValue(makeMockRoomState([membershipTemplate], mockRoom.roomId));
                     sess.onRTCSessionMemberUpdate();
 
-                    jest.advanceTimersByTime(10000);
+                    jest.advanceTimersByTime(3000);
+                    expect(sendKeySpy).toHaveBeenCalledTimes(1);
+                    // check that we send the key with index 1 even though the send gets delayed when leaving.
+                    // this makes sure we do not use an index that is one too old.
+                    expect(sendKeySpy).toHaveBeenLastCalledWith(expect.any(String), 1, sess.memberships);
+                    // fake a condition in which we send another encryption key event.
+                    // this could happen do to someone joining the call.
+                    (sess as unknown as any).encryptionManager.sendEncryptionKeysEvent();
+                    expect(sendKeySpy).toHaveBeenLastCalledWith(expect.any(String), 1, sess.memberships);
+                    jest.advanceTimersByTime(7000);
 
                     const secondKeysPayload = await keysSentPromise2;
 
                     expect(secondKeysPayload.keys).toHaveLength(1);
                     expect(secondKeysPayload.keys[0].index).toEqual(1);
                     expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(2);
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
+                    // initial, on leave and the fake one we do with: `(sess as unknown as any).encryptionManager.sendEncryptionKeysEvent();`
+                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(3);
                 } finally {
                     jest.useRealTimers();
                 }
