@@ -380,7 +380,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             }
             // Create Encryption manager
             let transport;
-            if (joinConfig?.useExperimentalToDeviceTransport == true) {
+            if (joinConfig?.useExperimentalToDeviceTransport) {
                 logger.info("Using experimental to-device transport for encryption keys");
                 transport = new ToDeviceKeyTransport(
                     this.client.getUserId()!,

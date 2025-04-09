@@ -13,10 +13,6 @@ const logger = rootLogger.getChild("MatrixRTCSession");
  * This interface is for testing and for making it possible to interchange the encryption manager.
  * @internal
  */
-/**
- * Interface representing an encryption manager for handling encryption-related
- * operations in a real-time communication context.
- */
 export interface IEncryptionManager {
     /**
      * Joins the encryption manager with the provided configuration.

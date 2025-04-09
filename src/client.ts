@@ -7942,6 +7942,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Put, path, undefined, body);
     }
 
+    /**
+     * This will encrypt the payload for all devices in the list and will queue it.
+     * The type of the sent to-device message will be `m.room.encrypted`.
+     * @param eventType - The type of event to send
+     * @param devices - The list of devices to send the event to. Each device is
+     * @param payload - The payload to send. This will be encrypted.
+     * @returns Promise which resolves once queued.
+     */
     public async encryptAndSendToDevice(
         eventType: string,
         devices: { userId: string; deviceId: string }[],
