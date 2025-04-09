@@ -835,7 +835,7 @@ describe("MatrixRTCSession", () => {
             it("rotates key if a member leaves", async () => {
                 jest.useFakeTimers();
                 try {
-                    const KEY_DALAY = 3000;
+                    const KEY_DELAY = 3000;
                     const member2 = Object.assign({}, membershipTemplate, {
                         device_id: "BBBBBBB",
                     });
@@ -856,7 +856,7 @@ describe("MatrixRTCSession", () => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
 
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true, makeKeyDelay: KEY_DALAY });
+                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true, makeKeyDelay: KEY_DELAY });
                     const sendKeySpy = jest.spyOn((sess as unknown as any).encryptionManager.transport, "sendKey");
                     const firstKeysPayload = await keysSentPromise1;
                     expect(firstKeysPayload.keys).toHaveLength(1);
@@ -874,7 +874,7 @@ describe("MatrixRTCSession", () => {
                         .mockReturnValue(makeMockRoomState([membershipTemplate], mockRoom.roomId));
                     sess.onRTCSessionMemberUpdate();
 
-                    jest.advanceTimersByTime(3000);
+                    jest.advanceTimersByTime(KEY_DELAY);
                     expect(sendKeySpy).toHaveBeenCalledTimes(1);
                     // check that we send the key with index 1 even though the send gets delayed when leaving.
                     // this makes sure we do not use an index that is one too old.

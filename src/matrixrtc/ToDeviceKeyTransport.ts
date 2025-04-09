@@ -23,6 +23,10 @@ import { ClientEvent, type MatrixClient } from "../client.ts";
 import type { MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
 
+/**
+ * ToDeviceKeyTransport is used to send MatrixRTC keys to other devices using the
+ * to-device CS-API.
+ */
 export class ToDeviceKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
@@ -42,7 +46,7 @@ export class ToDeviceKeyTransport
     }
 
     public start(): void {
-        this.client.on(ClientEvent.ToDeviceEvent, (ev) => this.onToDeviceEvent(ev));
+        this.client.on(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
     public stop(): void {
@@ -110,7 +114,7 @@ export class ToDeviceKeyTransport
             content.member.claimed_device_id!,
             content.keys.key,
             content.keys.index,
-            age,
+            now,
         );
     }
 
@@ -159,11 +163,7 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        // TODO session is not used so far
-        // if (!content.session || !content.session.call_id || !content.session.scope || !content.session.application) {
-        //     this.prefixedLogger.warn("Malformed Event: Missing/Malformed content.session", content.session);
-        //     return;
-        // }
+        // TODO check for session related fields once the to-device encryption uses the new format.
         return content as EncryptionKeysToDeviceEventContent;
     }
 }

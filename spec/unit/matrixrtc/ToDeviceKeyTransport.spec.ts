@@ -33,7 +33,7 @@ describe("ToDeviceKeyTransport", () => {
     let mockLogger: Mocked<Logger>;
     let transport: ToDeviceKeyTransport;
 
-    function setup() {
+    beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
             encryptAndSendToDevice: jest.fn(),
         });
@@ -54,11 +54,9 @@ describe("ToDeviceKeyTransport", () => {
         transport = new ToDeviceKeyTransport("@alice:example.org", "MYDEVICE", roomId, mockClient, statistics, {
             getChild: jest.fn().mockReturnValue(mockLogger),
         } as unknown as Mocked<Logger>);
-    }
+    });
 
     it("should send my keys on via to device", async () => {
-        setup();
-
         transport.start();
 
         const keyBase64Encoded = "ABCDEDF";
@@ -110,8 +108,6 @@ describe("ToDeviceKeyTransport", () => {
     });
 
     it("should emit when a key is received", async () => {
-        setup();
-
         const deferred = defer<{ userId: string; deviceId: string; keyBase64Encoded: string; index: number }>();
         transport.on(KeyTransportEvents.ReceivedKeys, (userId, deviceId, keyBase64Encoded, index, timestamp) => {
             deferred.resolve({ userId, deviceId, keyBase64Encoded, index });
@@ -150,8 +146,6 @@ describe("ToDeviceKeyTransport", () => {
     });
 
     it("should not sent to ourself", async () => {
-        setup();
-
         const keyBase64Encoded = "ABCDEDF";
         const keyIndex = 2;
         await transport.sendKey(keyBase64Encoded, keyIndex, [
@@ -168,8 +162,6 @@ describe("ToDeviceKeyTransport", () => {
     });
 
     it("should warn when there is a room mismatch", () => {
-        setup();
-
         transport.start();
 
         const testEncoded = "ABCDEDF";
@@ -243,8 +235,6 @@ describe("ToDeviceKeyTransport", () => {
         ];
 
         test.each(MALFORMED_EVENT)("should warn on malformed event %j", (event) => {
-            setup();
-
             transport.start();
 
             mockClient.emit(

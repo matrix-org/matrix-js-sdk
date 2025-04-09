@@ -47,7 +47,7 @@ export interface IKeyTransport {
 
     /** Subscribe to keys from this transport. */
     on(event: KeyTransportEvents.ReceivedKeys, listener: KeyTransportEventListener): this;
-    /** Unsubscribe to keys from this transport. */
+    /** Unsubscribe from keys from this transport. */
     off(event: KeyTransportEvents.ReceivedKeys, listener: KeyTransportEventListener): this;
 
     /** Once start is called the underlying transport will subscribe to its transport system.
