@@ -13,10 +13,6 @@ const logger = rootLogger.getChild("MatrixRTCSession");
  * This interface is for testing and for making it possible to interchange the encryption manager.
  * @internal
  */
-/**
- * Interface representing an encryption manager for handling encryption-related
- * operations in a real-time communication context.
- */
 export interface IEncryptionManager {
     /**
      * Joins the encryption manager with the provided configuration.
@@ -80,8 +76,7 @@ export class EncryptionManager implements IEncryptionManager {
     // if it looks like a membership has been updated.
     private lastMembershipFingerprints: Set<string> | undefined;
 
-    private currentEncryptionKeyIndex = -1;
-
+    private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
 
     public constructor(
@@ -254,8 +249,6 @@ export class EncryptionManager implements IEncryptionManager {
 
         if (!this.joined) return;
 
-        logger.info(`Sending encryption keys event. indexToSend=${indexToSend}`);
-
         const myKeys = this.getKeysForParticipant(this.userId, this.deviceId);
 
         if (!myKeys) {
@@ -263,19 +256,23 @@ export class EncryptionManager implements IEncryptionManager {
             return;
         }
 
-        if (typeof indexToSend !== "number" && this.currentEncryptionKeyIndex === -1) {
+        if (typeof indexToSend !== "number" && this.latestGeneratedKeyIndex === -1) {
             logger.warn("Tried to send encryption keys event but no current key index found!");
             return;
         }
 
-        const keyIndexToSend = indexToSend ?? this.currentEncryptionKeyIndex;
+        const keyIndexToSend = indexToSend ?? this.latestGeneratedKeyIndex;
+
+        logger.info(
+            `Try sending encryption keys event. keyIndexToSend=${keyIndexToSend} (method parameter: ${indexToSend})`,
+        );
         const keyToSend = myKeys[keyIndexToSend];
 
         try {
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
             await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, this.getMemberships());
             logger.debug(
-                `Embedded-E2EE-LOG updateEncryptionKeyEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.currentEncryptionKeyIndex} keyIndexToSend=${keyIndexToSend}`,
+                `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
             );
         } catch (error) {
@@ -290,6 +287,7 @@ export class EncryptionManager implements IEncryptionManager {
     };
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
+        logger.debug(`Received key over key transport ${userId}:${deviceId} at index ${index}`);
         this.setEncryptionKey(userId, deviceId, index, keyBase64Encoded, timestamp);
     };
 
@@ -302,12 +300,12 @@ export class EncryptionManager implements IEncryptionManager {
     }
 
     private getNewEncryptionKeyIndex(): number {
-        if (this.currentEncryptionKeyIndex === -1) {
+        if (this.latestGeneratedKeyIndex === -1) {
             return 0;
         }
 
         // maximum key index is 255
-        return (this.currentEncryptionKeyIndex + 1) % 256;
+        return (this.latestGeneratedKeyIndex + 1) % 256;
     }
 
     /**
@@ -332,6 +330,7 @@ export class EncryptionManager implements IEncryptionManager {
         timestamp: number,
         delayBeforeUse = false,
     ): void {
+        logger.debug(`Setting encryption key for ${userId}:${deviceId} at index ${encryptionKeyIndex}`);
         const keyBin = decodeBase64(encryptionKeyString);
 
         const participantId = getParticipantId(userId, deviceId);
@@ -356,6 +355,15 @@ export class EncryptionManager implements IEncryptionManager {
             }
         }
 
+        if (userId === this.userId && deviceId === this.deviceId) {
+            // It is important to already update the latestGeneratedKeyIndex here
+            // NOT IN THE `delayBeforeUse` `setTimeout`.
+            // Even though this is where we call onEncryptionKeysChanged and set the key in EC (and livekit).
+            // It needs to happen here because we will send the key before the timeout has passed and sending
+            // the key will use latestGeneratedKeyIndex as the index. if we update it in the `setTimeout` callback
+            // it will use the wrong index (index - 1)!
+            this.latestGeneratedKeyIndex = encryptionKeyIndex;
+        }
         participantKeys[encryptionKeyIndex] = {
             key: keyBin,
             timestamp,
@@ -364,17 +372,12 @@ export class EncryptionManager implements IEncryptionManager {
         if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
-                logger.info(`Delayed-emitting key changed event for ${participantId} idx ${encryptionKeyIndex}`);
-                if (userId === this.userId && deviceId === this.deviceId) {
-                    this.currentEncryptionKeyIndex = encryptionKeyIndex;
-                }
+                logger.info(`Delayed-emitting key changed event for ${participantId} index ${encryptionKeyIndex}`);
+
                 this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
             }, this.useKeyDelay);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
-            if (userId === this.userId && deviceId === this.deviceId) {
-                this.currentEncryptionKeyIndex = encryptionKeyIndex;
-            }
             this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
         }
     }

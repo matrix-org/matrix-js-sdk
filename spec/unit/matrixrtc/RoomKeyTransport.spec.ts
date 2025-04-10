@@ -20,7 +20,7 @@ import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
 import type { IRoomTimelineData, MatrixEvent, Room } from "../../../src";
 
-describe("RoomKyTransport", () => {
+describe("RoomKeyTransport", () => {
     let client: MatrixClient;
     let room: Room & {
         emitTimelineEvent: (event: MatrixEvent) => void;

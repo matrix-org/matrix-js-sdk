@@ -45,9 +45,17 @@ export interface IKeyTransport {
      */
     sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void>;
 
+    /** Subscribe to keys from this transport. */
     on(event: KeyTransportEvents.ReceivedKeys, listener: KeyTransportEventListener): this;
+    /** Unsubscribe from keys from this transport. */
     off(event: KeyTransportEvents.ReceivedKeys, listener: KeyTransportEventListener): this;
 
+    /** Once start is called the underlying transport will subscribe to its transport system.
+     * Before start is called this transport will not emit any events.
+     */
     start(): void;
+    /** Once stop is called the underlying transport will unsubscribe from its transport system.
+     * After stop is called this transport will not emit any events.
+     */
     stop(): void;
 }
