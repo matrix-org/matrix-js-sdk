@@ -1,0 +1,134 @@
+/*
+Copyright 2025 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import type { MatrixClient } from "../client.ts";
+import { logger as rootLogger, type Logger } from "../logger.ts";
+import { KeyTransportEvents, KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
+import { type CallMembership } from "./CallMembership.ts";
+import { Room, TypedEventEmitter } from "../matrix.ts";
+import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import { Statistics } from "./types.ts";
+import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
+
+export interface EnabledTransports {
+    toDevice: boolean;
+    room: boolean;
+}
+
+export enum RoomAndToDeviceEvents {
+    EnabledTransportsChanged = "enabled_transports_changed",
+}
+export type RoomAndToDeviceEventsHandlerMap = {
+    [RoomAndToDeviceEvents.EnabledTransportsChanged]: (enabledTransports: EnabledTransports) => void;
+};
+/**
+ * A custom transport that subscribes to room key events (via `RoomKeyTransport`) and to device key events (via: `ToDeviceKeyTransport`)
+ * The public setEnabled method allows to turn one or the other on or off on the fly.
+ * It will emit `RoomAndToDeviceEvents.EnabledTransportsChanged` if the enabled transport changes to allow comminitcating this to
+ * the user in the ui.
+ *
+ * Since it will always subscribe to both (room and to device) but only emit for the enabled ones, it can detect
+ * if a room key event was received and autoenable it.
+ */
+export class RoomAndToDeviceTransport
+    extends TypedEventEmitter<
+        KeyTransportEvents | RoomAndToDeviceEvents,
+        KeyTransportEventsHandlerMap & RoomAndToDeviceEventsHandlerMap
+    >
+    implements IKeyTransport
+{
+    private readonly logger: Logger;
+    private roomKeyTransport: RoomKeyTransport;
+    private toDeviceTransport: IKeyTransport;
+    private _enabled: EnabledTransports = { toDevice: true, room: false };
+    public constructor(
+        userId: string,
+        deviceId: string,
+        room: Pick<Room, "on" | "off" | "roomId">,
+        client: Pick<
+            MatrixClient,
+            | "sendEvent"
+            | "getDeviceId"
+            | "getUserId"
+            | "cancelPendingEvent"
+            | "decryptEventIfNeeded"
+            | "encryptAndSendToDevice"
+            | "on"
+            | "off"
+        >,
+        statistics: Statistics,
+        private parentLogger?: Logger,
+    ) {
+        super();
+        this.logger = (parentLogger ?? rootLogger).getChild(`[RoomAndToDeviceTransport]`);
+
+        this.roomKeyTransport = new RoomKeyTransport(room, client, statistics);
+        this.toDeviceTransport = new ToDeviceKeyTransport(
+            userId,
+            deviceId,
+            room.roomId,
+            client,
+            statistics,
+            this.parentLogger,
+        );
+        this.roomKeyTransport.on(KeyTransportEvents.ReceivedKeys, (...props) => {
+            // Turn on the room transport if we receive a roomKey from another participant
+            // and disable the toDevice transport.
+            this.setEnabled({ toDevice: false, room: true });
+            this.emit(KeyTransportEvents.ReceivedKeys, ...props);
+        });
+        this.toDeviceTransport.on(KeyTransportEvents.ReceivedKeys, (...props) => {
+            if (this._enabled.toDevice) {
+                this.emit(KeyTransportEvents.ReceivedKeys, ...props);
+            } else {
+                this.logger.debug("To Device transport is disabled, ignoring received keys");
+            }
+        });
+    }
+
+    public setEnabled(enabled: { toDevice: boolean; room: boolean }): void {
+        this._enabled = enabled;
+        this.emit(RoomAndToDeviceEvents.EnabledTransportsChanged, enabled);
+    }
+    public get enabled(): EnabledTransports {
+        return this._enabled;
+    }
+
+    public start(): void {
+        // always start the underlying transport since we need to enable room transport
+        // when someone else sends us a room key. (we need to listen to roomKeyTransport)
+        this.roomKeyTransport.start();
+        this.toDeviceTransport.start();
+    }
+
+    public stop(): void {
+        // always stop since it is always running
+        this.roomKeyTransport.stop();
+        this.toDeviceTransport.stop();
+    }
+
+    /** implements {@link IKeyTransport#sendKey} */
+    public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
+        this.logger.debug(
+            `Sending key with index ${index} to ${members.length} members via:`,
+            `${this._enabled.room ? "room transport" : ""}`,
+            `${this._enabled.room && this._enabled.toDevice ? "and" : ""}`,
+            `${this._enabled.room ? "to device transport" : ""}`,
+        );
+        if (this._enabled.room) this.roomKeyTransport.sendKey(keyBase64Encoded, index, members);
+        if (this._enabled.toDevice) this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
+    }
+}
