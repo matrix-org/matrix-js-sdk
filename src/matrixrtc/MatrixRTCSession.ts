@@ -397,15 +397,20 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.client.getDeviceId()!,
                     () => this.memberships,
                     transport,
-                    // this.statistics,
+                    this.statistics,
                     (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
                         // TODO do no commmit
                         logger.info(
                             `Encryption key changed for ${participantId}: ${encodeBase64(keyBin)} index:${encryptionKeyIndex}`,
                         );
-                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            participantId,
+                        );
                     },
-                )
+                );
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
                 this.encryptionManager = new EncryptionManager(
@@ -419,7 +424,12 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                         logger.info(
                             `Encryption key changed for ${participantId}: ${encodeBase64(keyBin)} index:${encryptionKeyIndex}`,
                         );
-                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            participantId,
+                        );
                     },
                 );
             }

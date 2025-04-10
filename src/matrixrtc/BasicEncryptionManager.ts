@@ -14,39 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {IEncryptionManager, Statistics} from "./EncryptionManager.ts";
-import {EncryptionConfig} from "./MatrixRTCSession.ts";
+import { IEncryptionManager } from "./EncryptionManager.ts";
+import { EncryptionConfig } from "./MatrixRTCSession.ts";
 
-import {CallMembership} from "./CallMembership.ts";
-import {decodeBase64, encodeBase64} from "../base64.ts";
-import { type KeyTransportEventListener, KeyTransportEvents} from "./IKeyTransport.ts";
-import {Logger, logger} from "../logger.ts";
+import { CallMembership } from "./CallMembership.ts";
+import { decodeBase64, encodeBase64 } from "../base64.ts";
+import { type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
+import { Logger, logger } from "../logger.ts";
 import { defer } from "../utils.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
-
+import { type Statistics } from "./types.ts";
 
 type DeviceInfo = {
-    userId: string,
-    deviceId: string,
-}
+    userId: string;
+    deviceId: string;
+};
 
 type OutboundEncryptionSession = {
-    key: Uint8Array,
-    creationTS: number,
-    sharedWith: Array<DeviceInfo>,
+    key: Uint8Array;
+    creationTS: number;
+    sharedWith: Array<DeviceInfo>;
     // This is an index acting as the id of the key
-    keyId: number,
-    dirty: boolean
-}
+    keyId: number;
+    dirty: boolean;
+};
 
 type InboundEncryptionSession = {
-    key: Uint8Array,
-    participantId: string,
-    keyId: number,
-    creationTS: number,
-}
+    key: Uint8Array;
+    participantId: string;
+    keyId: number;
+    creationTS: number;
+};
 
-export type ParticipantId = string
+export type ParticipantId = string;
 
 /**
  * A simple encryption manager.
@@ -55,7 +55,6 @@ export type ParticipantId = string
  * It works with to-device transport.
  */
 export class BasicEncryptionManager implements IEncryptionManager {
-
     // The current per-sender media key for this device
     private outboundSession: OutboundEncryptionSession | null = null;
 
@@ -77,6 +76,7 @@ export class BasicEncryptionManager implements IEncryptionManager {
         private deviceId: string,
         private getMemberships: () => CallMembership[],
         private transport: ToDeviceKeyTransport,
+        private statistics: Statistics,
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array<ArrayBufferLike>,
             encryptionKeyIndex: number,
@@ -86,8 +86,6 @@ export class BasicEncryptionManager implements IEncryptionManager {
         this.logger = logger.getChild("BasicEncryptionManager");
     }
 
-    statistics: Statistics;
-
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
         // TODO what is this timestamp and why?
         // Do that more efficiently
@@ -95,49 +93,46 @@ export class BasicEncryptionManager implements IEncryptionManager {
         this.keyStore.forEach((values, participantId) => {
             map.set(
                 participantId,
-                values.map( inbound => {
-                    return { key: inbound.key, timestamp: inbound.creationTS }
-                    })
-            )
-        })
-        return map
+                values.map((inbound) => {
+                    return { key: inbound.key, timestamp: inbound.creationTS };
+                }),
+            );
+        });
+        return map;
     }
 
     // TODO would be nice to make this async
     join(joinConfig: EncryptionConfig | undefined): void {
-        this.logger.info(`Joining room ${joinConfig}`)
+        this.logger.info(`Joining room ${joinConfig}`);
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.start();
 
         this.ensureMediaKey();
     }
 
-
     /**
      * Will ensure that a new key is distributed and used to encrypt our media.
      * If this function is called repeatidly, the calls will be buffered to a single key rotation.
      */
     private ensureMediaKey(): void {
-
-        this.logger.info(`ensureMediaKey... `)
+        this.logger.info(`ensureMediaKey... `);
         if (this.currentKeyDistributionPromise == null) {
-            this.logger.info(`No rollout, start a new one`)
+            this.logger.info(`No rollout, start a new one`);
             // start a rollout
             this.currentKeyDistributionPromise = this.rolloutOutboundKey().then(() => {
-                this.logger.info(`Rollout completed`)
-                this.currentKeyDistributionPromise = null
+                this.logger.info(`Rollout completed`);
+                this.currentKeyDistributionPromise = null;
                 if (this.outboundSession?.dirty) {
-                    this.logger.info(`New Rollout needed`)
-                    // rollout a new one 
+                    this.logger.info(`New Rollout needed`);
+                    // rollout a new one
                     this.ensureMediaKey();
                 }
             });
-
         } else {
             // There is a rollout in progress, but membership has changed and a new rollout is needed.
             // Mark this key as dirty so that a new one is rolled out immediatly after the current one
-            this.logger.info(`Rollout in progress, mark outbound as dirty`)
-            this.outboundSession!.dirty = true
+            this.logger.info(`Rollout in progress, mark outbound as dirty`);
+            this.outboundSession!.dirty = true;
         }
     }
 
@@ -147,7 +142,6 @@ export class BasicEncryptionManager implements IEncryptionManager {
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.stop();
     }
-
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
         this.logger.info(`Received key over transport ${userId}:${deviceId} at index ${index}`);
@@ -161,7 +155,7 @@ export class BasicEncryptionManager implements IEncryptionManager {
             participantId,
             keyId: index,
             creationTS: timestamp,
-        }
+        };
 
         const existingKey = this.keyStore.get(participantId)?.[index];
         if (existingKey) {
@@ -172,10 +166,10 @@ export class BasicEncryptionManager implements IEncryptionManager {
             // just keep the last one.
             if (timestamp > existingKey.creationTS) {
                 // We have a new key, update it
-                this.keyStore.get(participantId)![index] = newKey
+                this.keyStore.get(participantId)![index] = newKey;
             } else {
                 // this key is outdated, ignore it
-                return
+                return;
             }
         }
 
@@ -190,18 +184,16 @@ export class BasicEncryptionManager implements IEncryptionManager {
         this.ensureMediaKey();
     }
 
-
     private async rolloutOutboundKey(): Promise<void> {
-
         const hasExistingKey = this.outboundSession != null;
 
         // Create a new key
-        const newOutboundKey : OutboundEncryptionSession=  {
+        const newOutboundKey: OutboundEncryptionSession = {
             key: this.generateRandomKey(),
             creationTS: Date.now(),
             sharedWith: [],
             keyId: this.nextKeyId(),
-            dirty: false
+            dirty: false,
         };
 
         this.logger.info(`creating new key index:${newOutboundKey.keyId} key:${encodeBase64(newOutboundKey.key)}`);
@@ -212,39 +204,46 @@ export class BasicEncryptionManager implements IEncryptionManager {
         try {
             this.logger.info(`Sending key...`);
             await this.transport.sendKey(encodeBase64(newOutboundKey.key), newOutboundKey.keyId, toShareWith);
-            newOutboundKey.sharedWith = toShareWith.map(ms => {
+            this.statistics.counters.roomEventEncryptionKeysSent += 1;
+            newOutboundKey.sharedWith = toShareWith.map((ms) => {
                 return {
                     userId: ms.sender ?? "",
-                    deviceId: ms.deviceId ?? ""
-                }
-            })
+                    deviceId: ms.deviceId ?? "",
+                };
+            });
             this.logger.info(`key index:${newOutboundKey.keyId} sent to ${newOutboundKey.sharedWith}`);
             if (!hasExistingKey) {
                 this.logger.info(`Rollout immediatly`);
                 // rollout imediatly
-                this.onEncryptionKeysChanged(newOutboundKey.key, newOutboundKey.keyId, getParticipantId(this.userId, this.deviceId))
+                this.onEncryptionKeysChanged(
+                    newOutboundKey.key,
+                    newOutboundKey.keyId,
+                    getParticipantId(this.userId, this.deviceId),
+                );
             } else {
                 // Delay a bit using this key
-                const rolledOut = defer<void>()
+                const rolledOut = defer<void>();
                 this.logger.info(`Delay Rollout...`);
                 setTimeout(() => {
                     this.logger.info(`...Delayed rollout of index:${newOutboundKey.keyId} `);
                     // Start encrypting with that key now that there was time to distibute it
-                    this.onEncryptionKeysChanged(newOutboundKey.key, newOutboundKey.keyId, getParticipantId(this.userId, this.deviceId))
-                    rolledOut.resolve()
-                }, 1000)
-                return rolledOut.promise
+                    this.onEncryptionKeysChanged(
+                        newOutboundKey.key,
+                        newOutboundKey.keyId,
+                        getParticipantId(this.userId, this.deviceId),
+                    );
+                    rolledOut.resolve();
+                }, 1000);
+                return rolledOut.promise;
             }
- 
         } catch (err) {
             this.logger.error(`Failed to rollout key`, err);
         }
-
     }
 
     private nextKeyId(): number {
         if (this.outboundSession) {
-            return (this.outboundSession!.keyId + 1) % 256
+            return (this.outboundSession!.keyId + 1) % 256;
         }
         return 0;
     }
@@ -254,7 +253,6 @@ export class BasicEncryptionManager implements IEncryptionManager {
         globalThis.crypto.getRandomValues(key);
         return key;
     }
-
 }
 
 const getParticipantId = (userId: string, deviceId: string): ParticipantId => `${userId}:${deviceId}`;
