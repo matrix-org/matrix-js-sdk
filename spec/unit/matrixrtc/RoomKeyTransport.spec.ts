@@ -19,6 +19,8 @@ import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
 import { type IRoomTimelineData, MatrixEvent, type Room } from "../../../src";
+import type { Mocked } from "jest-mock";
+import type { Logger } from "../../../src/logger.ts";
 
 describe("RoomKeyTransport", () => {
     let client: MatrixClient;
@@ -26,9 +28,16 @@ describe("RoomKeyTransport", () => {
         emitTimelineEvent: (event: MatrixEvent) => void;
     };
     let transport: RoomKeyTransport;
+    let mockLogger: Mocked<Logger>;
+
     const onCallEncryptionMock = jest.fn();
     beforeEach(() => {
         onCallEncryptionMock.mockReset();
+        mockLogger = {
+            debug: jest.fn(),
+            warn: jest.fn(),
+        } as unknown as Mocked<Logger>;
+
         const statistics = {
             counters: {
                 roomEventEncryptionKeysSent: 0,
@@ -41,7 +50,9 @@ describe("RoomKeyTransport", () => {
         room = makeMockRoom([membershipTemplate]);
         client = new MatrixClient({ baseUrl: "base_url" });
         client.matrixRTC.start();
-        transport = new RoomKeyTransport(room, client, statistics);
+        transport = new RoomKeyTransport(room, client, statistics, {
+            getChild: jest.fn().mockReturnValue(mockLogger),
+        } as unknown as Mocked<Logger>);
         transport.on(KeyTransportEvents.ReceivedKeys, (...p) => {
             onCallEncryptionMock(...p);
         });
@@ -208,6 +219,7 @@ describe("RoomKeyTransport", () => {
 
         test.each(MALFORMED_EVENT)("should warn on malformed event %j", (event) => {
             transport.onEncryptionEvent(event);
+            expect(mockLogger.warn).toHaveBeenCalled();
             expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
         });
     });
