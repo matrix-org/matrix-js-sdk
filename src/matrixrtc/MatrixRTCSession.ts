@@ -33,9 +33,9 @@ import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
 import {
     RoomAndToDeviceEvents,
-    RoomAndToDeviceEventsHandlerMap,
+    type RoomAndToDeviceEventsHandlerMap,
     RoomAndToDeviceTransport,
-} from "./ToDeviceAndRoomKeyTransport.ts";
+} from "./RoomAndToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 
 export enum MatrixRTCSessionEvent {

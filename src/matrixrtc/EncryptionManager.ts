@@ -6,7 +6,7 @@ import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 import { isMyMembership, type Statistics } from "./types.ts";
-import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "./ToDeviceAndRoomKeyTransport.ts";
+import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "./RoomAndToDeviceKeyTransport.ts";
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -106,9 +106,9 @@ export class EncryptionManager implements IEncryptionManager {
         this.manageMediaKeys = this.joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
 
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
-        if (this.transport instanceof RoomAndToDeviceTransport)
+        if (this.transport instanceof RoomAndToDeviceTransport) {
             this.transport.on(RoomAndToDeviceEvents.EnabledTransportsChanged, this.onTransportChanged);
-
+        }
         this.transport.start();
         if (this.joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
@@ -126,8 +126,9 @@ export class EncryptionManager implements IEncryptionManager {
         // as they may still be using the same ones.
         this.encryptionKeys.set(getParticipantId(this.userId, this.deviceId), []);
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
-        if (this.transport instanceof RoomAndToDeviceTransport)
+        if (this.transport instanceof RoomAndToDeviceTransport) {
             this.transport.off(RoomAndToDeviceEvents.EnabledTransportsChanged, this.onTransportChanged);
+        }
         this.transport.stop();
 
         if (this.makeNewKeyTimeout !== undefined) {

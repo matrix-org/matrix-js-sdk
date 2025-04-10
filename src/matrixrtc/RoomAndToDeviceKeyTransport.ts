@@ -18,10 +18,11 @@ import type { MatrixClient } from "../client.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { type Room, TypedEventEmitter } from "../matrix.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { Statistics } from "./types.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
+import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { type Room } from "../models/room.ts";
 
 export interface EnabledTransports {
     toDevice: boolean;

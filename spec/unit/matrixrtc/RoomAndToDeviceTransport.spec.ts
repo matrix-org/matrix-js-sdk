@@ -27,7 +27,7 @@ import {
 import { type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { type Logger } from "../../../src/logger.ts";
-import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "../../../src/matrixrtc/ToDeviceAndRoomKeyTransport.ts";
+import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "../../../src/matrixrtc/RoomAndToDeviceKeyTransport.ts";
 import type { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
 
 describe("RoomAndToDeviceTransport", () => {
