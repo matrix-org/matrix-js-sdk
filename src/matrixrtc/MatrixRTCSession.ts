@@ -32,6 +32,8 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
+import { encodeBase64 } from "../base64.ts";
+import { BasicEncryptionManager } from "./BasicEncryptionManager.ts";
 
 const logger = rootLogger.getChild("MatrixRTCSession");
 
@@ -390,19 +392,37 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.statistics,
                     logger,
                 );
+                this.encryptionManager = new BasicEncryptionManager(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    () => this.memberships,
+                    transport,
+                    // this.statistics,
+                    (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                        // TODO do no commmit
+                        logger.info(
+                            `Encryption key changed for ${participantId}: ${encodeBase64(keyBin)} index:${encryptionKeyIndex}`,
+                        );
+                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
+                    },
+                )
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+                this.encryptionManager = new EncryptionManager(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    () => this.memberships,
+                    transport,
+                    this.statistics,
+                    (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                        // TODO do no commmit
+                        logger.info(
+                            `Encryption key changed for ${participantId}: ${encodeBase64(keyBin)} index:${encryptionKeyIndex}`,
+                        );
+                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
+                    },
+                );
             }
-            this.encryptionManager = new EncryptionManager(
-                this.client.getUserId()!,
-                this.client.getDeviceId()!,
-                () => this.memberships,
-                transport,
-                this.statistics,
-                (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
-                    this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
-                },
-            );
         }
 
         // Join!
