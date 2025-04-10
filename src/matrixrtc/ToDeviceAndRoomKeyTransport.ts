@@ -99,10 +99,13 @@ export class RoomAndToDeviceTransport
         });
     }
 
+    /** Set which transport type should be used to send and receive keys.*/
     public setEnabled(enabled: { toDevice: boolean; room: boolean }): void {
         this._enabled = enabled;
         this.emit(RoomAndToDeviceEvents.EnabledTransportsChanged, enabled);
     }
+
+    /** The currently enabled transports that are used to send and receive keys.*/
     public get enabled(): EnabledTransports {
         return this._enabled;
     }
@@ -120,7 +123,6 @@ export class RoomAndToDeviceTransport
         this.toDeviceTransport.stop();
     }
 
-    /** implements {@link IKeyTransport#sendKey} */
     public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
         this.logger.debug(
             `Sending key with index ${index} to ${members.length} members via:`,
