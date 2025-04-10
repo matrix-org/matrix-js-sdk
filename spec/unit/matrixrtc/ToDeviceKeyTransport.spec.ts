@@ -205,31 +205,31 @@ describe("ToDeviceKeyTransport", () => {
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
-                keys: { keys: "ABCDEF" },
+                keys: { key: "ABCDEF" },
                 member: { claimed_device_id: "MYDEVICE" },
                 room_id: "!room:id",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
-                keys: { keys: "ABCDEF", index: 2 },
+                keys: { key: "ABCDEF", index: 2 },
                 room_id: "!room:id",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
-                keys: { keys: "ABCDEF", index: 2 },
+                keys: { key: "ABCDEF", index: 2 },
                 member: {},
                 room_id: "!room:id",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
-                keys: { keys: "ABCDEF", index: 2 },
+                keys: { key: "ABCDEF", index: 2 },
                 member: { claimed_device_id: "MYDEVICE" },
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
-                keys: { keys: "ABCDEF", index: 2 },
+                keys: { key: "ABCDEF", index: 2 },
                 member: { claimed_device_id: "MYDEVICE" },
-                room_id: "!room:id",
+                room_id: "!wrong_room",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
         ];
