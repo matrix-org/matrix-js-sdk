@@ -28,10 +28,15 @@ import { MembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
+import {
+    RoomAndToDeviceEvents,
+    RoomAndToDeviceEventsHandlerMap,
+    RoomAndToDeviceTransport,
+} from "./ToDeviceAndRoomKeyTransport.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
@@ -162,7 +167,10 @@ export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
-export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, MatrixRTCSessionEventHandlerMap> {
+export class MatrixRTCSession extends TypedEventEmitter<
+    MatrixRTCSessionEvent | RoomAndToDeviceEvents,
+    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap
+> {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
@@ -348,6 +356,10 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
     }
+    private reEmitter = new TypedReEmitter<
+        MatrixRTCSessionEvent | RoomAndToDeviceEvents,
+        MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap
+    >(this);
 
     /**
      * Announces this user and device as joined to the MatrixRTC session,
@@ -385,15 +397,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
-                this.logger.info("Using experimental to-device transport for encryption keys");
-                transport = new ToDeviceKeyTransport(
+                this.logger.info("Using to-device with room fallback transport for encryption keys");
+                transport = new RoomAndToDeviceTransport(
                     this.client.getUserId()!,
                     this.client.getDeviceId()!,
-                    this.roomSubset.roomId,
+                    this.roomSubset,
                     this.client,
                     this.statistics,
                     this.logger,
                 );
+                // Expose the changes so the ui can display the currently used transport.
+                this.reEmitter.reEmit(transport, [RoomAndToDeviceEvents.EnabledTransportsChanged]);
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
             }
