@@ -36,6 +36,7 @@ describe("RoomKeyTransport", () => {
         mockLogger = {
             debug: jest.fn(),
             warn: jest.fn(),
+            info: jest.fn(),
         } as unknown as Mocked<Logger>;
 
         const statistics = {
