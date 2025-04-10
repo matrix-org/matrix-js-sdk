@@ -16,10 +16,22 @@ limitations under the License.
 import type { IMentions } from "../matrix.ts";
 import type { CallMembership } from "./CallMembership.ts";
 
+export type ParticipantId = string;
+
 export interface EncryptionKeyEntry {
     index: number;
     key: string;
 }
+
+/**
+ * A type representing the information needed to decrypt video streams.
+ */
+export type InboundEncryptionSession = {
+    key: Uint8Array;
+    participantId: ParticipantId;
+    keyId: number;
+    creationTS: number;
+};
 
 export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];

@@ -32,6 +32,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
+import { BasicEncryptionManager } from "./BasicEncryptionManager.ts";
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
@@ -394,8 +395,38 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                     this.statistics,
                     this.logger,
                 );
+                this.encryptionManager = new BasicEncryptionManager(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    () => this.memberships,
+                    transport,
+                    this.statistics,
+                    (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            participantId,
+                        );
+                    },
+                );
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+                this.encryptionManager = new EncryptionManager(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    () => this.memberships,
+                    transport,
+                    this.statistics,
+                    (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            participantId,
+                        );
+                    },
+                );
             }
             this.encryptionManager = new EncryptionManager(
                 this.client.getUserId()!,
