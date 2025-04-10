@@ -30,6 +30,8 @@ type DeviceInfo = {
     deviceId: string;
 };
 
+export type ParticipantId = string;
+
 type OutboundEncryptionSession = {
     key: Uint8Array;
     creationTS: number;
@@ -41,12 +43,10 @@ type OutboundEncryptionSession = {
 
 type InboundEncryptionSession = {
     key: Uint8Array;
-    participantId: string;
+    participantId: ParticipantId;
     keyId: number;
     creationTS: number;
 };
-
-export type ParticipantId = string;
 
 /**
  * A simple encryption manager.
