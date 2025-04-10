@@ -16,11 +16,11 @@ limitations under the License.
 
 import type { MatrixClient } from "../client.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
-import { KeyTransportEvents, KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
+import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { Room, TypedEventEmitter } from "../matrix.ts";
+import { type Room, TypedEventEmitter } from "../matrix.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import { Statistics } from "./types.ts";
+import type { Statistics } from "./types.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 
 export interface EnabledTransports {
@@ -128,7 +128,7 @@ export class RoomAndToDeviceTransport
             `${this._enabled.room && this._enabled.toDevice ? "and" : ""}`,
             `${this._enabled.room ? "to device transport" : ""}`,
         );
-        if (this._enabled.room) this.roomKeyTransport.sendKey(keyBase64Encoded, index, members);
-        if (this._enabled.toDevice) this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
+        if (this._enabled.room) await this.roomKeyTransport.sendKey(keyBase64Encoded, index, members);
+        if (this._enabled.toDevice) await this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
     }
 }

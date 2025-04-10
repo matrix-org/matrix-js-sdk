@@ -17,8 +17,8 @@ limitations under the License.
 import { type Mocked } from "jest-mock";
 
 import { makeKey, makeMockEvent, makeMockRoom, membershipTemplate, mockCallMembership } from "./mocks";
-import { EventType, IRoomTimelineData, Room, RoomEvent, type MatrixClient } from "../../../src";
-import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
+import { EventType, type IRoomTimelineData, type Room, RoomEvent, type MatrixClient } from "../../../src";
+import type { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import {
     getMockClientWithEventEmitter,
     mockClientMethodsEvents,
@@ -28,7 +28,7 @@ import { type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { type Logger } from "../../../src/logger.ts";
 import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "../../../src/matrixrtc/ToDeviceAndRoomKeyTransport.ts";
-import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
+import type { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
 
 describe("RoomAndToDeviceTransport", () => {
     const roomId = "!room:id";
@@ -73,16 +73,16 @@ describe("RoomAndToDeviceTransport", () => {
         } as unknown as Mocked<Logger>);
     });
 
-    it("to device should be enable when starting", async () => {
+    it("should enable to device transport when starting", () => {
         transport.start();
         expect(transport.enabled.room).toBeFalsy();
         expect(transport.enabled.toDevice).toBeTruthy();
     });
-    it("it only send to device keys when sending a key", async () => {
+    it("only sends to device keys when sending a key", async () => {
         transport.start();
         const toDeviceSpy = jest.spyOn(getToDeviceTransport(transport), "sendKey");
         const roomSpy = jest.spyOn(getRoomTransport(transport), "sendKey");
-        transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
+        await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
         expect(toDeviceSpy).toHaveBeenCalledTimes(1);
         expect(roomSpy).toHaveBeenCalledTimes(0);
         expect(transport.enabled.room).toBeFalsy();
@@ -114,7 +114,7 @@ describe("RoomAndToDeviceTransport", () => {
         expect(transport.enabled.room).toBeTruthy();
         expect(transport.enabled.toDevice).toBeFalsy();
 
-        transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
+        await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
         expect(sendEventMock).toHaveBeenCalledTimes(1);
         expect(roomSpy).toHaveBeenCalledTimes(1);
         expect(toDeviceSpy).toHaveBeenCalledTimes(0);
