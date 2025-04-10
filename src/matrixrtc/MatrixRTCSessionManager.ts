@@ -23,7 +23,7 @@ import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
 
-const logger = rootLogger.getChild("MatrixRTCSessionManager");
+const logger = rootLogger.getChild("[MatrixRTCSessionManager]");
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously

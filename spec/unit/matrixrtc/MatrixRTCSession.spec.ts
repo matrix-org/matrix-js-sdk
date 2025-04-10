@@ -993,6 +993,7 @@ describe("MatrixRTCSession", () => {
 
                     sess!.joinRoomSession([mockFocus], mockFocus, {
                         manageMediaKeys: true,
+                        useNewMembershipManager: true,
                         useExperimentalToDeviceTransport: true,
                     });
 

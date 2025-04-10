@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger as rootLogger } from "../logger.ts";
+import { type Logger, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
@@ -32,8 +32,6 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
-
-const logger = rootLogger.getChild("MatrixRTCSession");
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
@@ -169,7 +167,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
-
+    private logger: Logger;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -206,6 +204,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
     public static callMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
     ): CallMembership[] {
+        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
@@ -321,6 +320,7 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
         public memberships: CallMembership[],
     ) {
         super();
+        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
         this._callId = memberships[0]?.callId;
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
@@ -365,13 +365,17 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     public joinRoomSession(fociPreferred: Focus[], fociActive?: Focus, joinConfig?: JoinSessionConfig): void {
         if (this.isJoined()) {
-            logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
+            this.logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
             return;
         } else {
-            // Create MembershipManager
+            // Create MembershipManager and pass the RTCSession logger (with room id info)
             if (joinConfig?.useNewMembershipManager ?? false) {
-                this.membershipManager = new MembershipManager(joinConfig, this.roomSubset, this.client, () =>
-                    this.getOldestMembership(),
+                this.membershipManager = new MembershipManager(
+                    joinConfig,
+                    this.roomSubset,
+                    this.client,
+                    () => this.getOldestMembership(),
+                    this.logger,
                 );
             } else {
                 this.membershipManager = new LegacyMembershipManager(joinConfig, this.roomSubset, this.client, () =>
@@ -381,14 +385,14 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
-                logger.info("Using experimental to-device transport for encryption keys");
+                this.logger.info("Using experimental to-device transport for encryption keys");
                 transport = new ToDeviceKeyTransport(
                     this.client.getUserId()!,
                     this.client.getDeviceId()!,
                     this.roomSubset.roomId,
                     this.client,
                     this.statistics,
-                    logger,
+                    this.logger,
                 );
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
@@ -402,12 +406,13 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
                 (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
                     this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
                 },
+                this.logger,
             );
         }
 
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
-            logger.error("MembershipManager encountered an unrecoverable error: ", e);
+            this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
@@ -428,11 +433,11 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
      */
     public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
         if (!this.isJoined()) {
-            logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
+            this.logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
             return false;
         }
 
-        logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
+        this.logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
 
         this.encryptionManager!.leave();
 
@@ -553,8 +558,8 @@ export class MatrixRTCSession extends TypedEventEmitter<MatrixRTCSessionEvent, M
             oldMemberships.some((m, i) => !CallMembership.equal(m, this.memberships[i]));
 
         if (changed) {
-            logger.info(`Memberships for call in room ${this.roomSubset.roomId} have changed: emitting`);
-            logDurationSync(logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
+            this.logger.info(`Memberships for call in room ${this.roomSubset.roomId} have changed: emitting`);
+            logDurationSync(this.logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
                 this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
             });
 

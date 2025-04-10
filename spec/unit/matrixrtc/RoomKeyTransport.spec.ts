@@ -18,7 +18,9 @@ import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey } from "./mock
 import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
-import type { IRoomTimelineData, MatrixEvent, Room } from "../../../src";
+import { type IRoomTimelineData, MatrixEvent, type Room } from "../../../src";
+import type { Mocked } from "jest-mock";
+import type { Logger } from "../../../src/logger.ts";
 
 describe("RoomKeyTransport", () => {
     let client: MatrixClient;
@@ -26,9 +28,17 @@ describe("RoomKeyTransport", () => {
         emitTimelineEvent: (event: MatrixEvent) => void;
     };
     let transport: RoomKeyTransport;
+    let mockLogger: Mocked<Logger>;
+
     const onCallEncryptionMock = jest.fn();
     beforeEach(() => {
         onCallEncryptionMock.mockReset();
+        mockLogger = {
+            debug: jest.fn(),
+            warn: jest.fn(),
+            info: jest.fn(),
+        } as unknown as Mocked<Logger>;
+
         const statistics = {
             counters: {
                 roomEventEncryptionKeysSent: 0,
@@ -41,7 +51,9 @@ describe("RoomKeyTransport", () => {
         room = makeMockRoom([membershipTemplate]);
         client = new MatrixClient({ baseUrl: "base_url" });
         client.matrixRTC.start();
-        transport = new RoomKeyTransport(room, client, statistics);
+        transport = new RoomKeyTransport(room, client, statistics, {
+            getChild: jest.fn().mockReturnValue(mockLogger),
+        } as unknown as Mocked<Logger>);
         transport.on(KeyTransportEvents.ReceivedKeys, (...p) => {
             onCallEncryptionMock(...p);
         });
@@ -136,6 +148,80 @@ describe("RoomKeyTransport", () => {
             } finally {
                 jest.useRealTimers();
             }
+        });
+    });
+
+    describe("malformed events", () => {
+        const MALFORMED_EVENT = [
+            // empty content
+            new MatrixEvent({
+                type: EventType.CallEncryptionKeysPrefix,
+                sender: "@alice:example.com",
+                content: {},
+            }),
+            // no sender
+            new MatrixEvent({
+                type: EventType.CallEncryptionKeysPrefix,
+                content: {
+                    call_id: "",
+                    keys: [makeKey(0, "testKey")],
+                    sent_ts: Date.now(),
+                    device_id: "AAAAAAA",
+                },
+            }),
+            // Call_id not empty string
+            new MatrixEvent({
+                type: EventType.CallEncryptionKeysPrefix,
+                sender: "@alice:example.com",
+                content: {
+                    call_id: "FOO",
+                    keys: [makeKey(0, "testKey")],
+                    sent_ts: Date.now(),
+                    device_id: "AAAAAAA",
+                },
+            }),
+            // Various Malformed keys
+            new MatrixEvent({
+                type: EventType.CallEncryptionKeysPrefix,
+                sender: "@alice:example.com",
+                content: {
+                    call_id: "",
+                    keys: "FOO",
+                    sent_ts: Date.now(),
+                    device_id: "AAAAAAA",
+                },
+            }),
+            new MatrixEvent({
+                type: EventType.CallEncryptionKeysPrefix,
+                sender: "@alice:example.com",
+                content: {
+                    call_id: "",
+                    keys: [{ index: 0 }],
+                    sent_ts: Date.now(),
+                    device_id: "AAAAAAA",
+                },
+            }),
+            new MatrixEvent({
+                type: EventType.CallEncryptionKeysPrefix,
+                sender: "@alice:example.com",
+                content: {
+                    call_id: "",
+                    keys: [
+                        {
+                            key: "BASE64KEY",
+                            index: "mcall",
+                        },
+                    ],
+                    sent_ts: Date.now(),
+                    device_id: "AAAAAAA",
+                },
+            }),
+        ];
+
+        test.each(MALFORMED_EVENT)("should warn on malformed event %j", (event) => {
+            transport.onEncryptionEvent(event);
+            expect(mockLogger.warn).toHaveBeenCalled();
+            expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
         });
     });
 });

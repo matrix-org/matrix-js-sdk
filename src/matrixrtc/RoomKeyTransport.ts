@@ -18,7 +18,7 @@ import type { MatrixClient } from "../client.ts";
 import type { EncryptionKeysEventContent, Statistics } from "./types.ts";
 import { EventType } from "../@types/event.ts";
 import { type MatrixError } from "../http-api/errors.ts";
-import { logger, type Logger } from "../logger.ts";
+import { logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type CallMembership } from "./CallMembership.ts";
@@ -29,7 +29,7 @@ export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
 {
-    private readonly prefixedLogger: Logger;
+    private readonly logger: Logger;
 
     public constructor(
         private room: Pick<Room, "on" | "off" | "roomId">,
@@ -38,9 +38,10 @@ export class RoomKeyTransport
             "sendEvent" | "getDeviceId" | "getUserId" | "cancelPendingEvent" | "decryptEventIfNeeded"
         >,
         private statistics: Statistics,
+        parentLogger?: Logger,
     ) {
         super();
-        this.prefixedLogger = logger.getChild(`[RTC: ${room.roomId} RoomKeyTransport]`);
+        this.logger = (parentLogger ?? rootLogger).getChild(`[RoomKeyTransport]`);
     }
     public start(): void {
         this.room.on(RoomEvent.Timeline, (ev) => void this.consumeCallEncryptionEvent(ev));
@@ -54,23 +55,23 @@ export class RoomKeyTransport
 
         if (event.isDecryptionFailure()) {
             if (!isRetry) {
-                logger.warn(
+                this.logger.warn(
                     `Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason} will retry once only`,
                 );
                 // retry after 1 second. After this we give up.
                 setTimeout(() => void this.consumeCallEncryptionEvent(event, true), 1000);
             } else {
-                logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
+                this.logger.warn(`Decryption failed for event ${event.getId()}: ${event.decryptionFailureReason}`);
             }
             return;
         } else if (isRetry) {
-            logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
+            this.logger.info(`Decryption succeeded for event ${event.getId()} after retry`);
         }
 
         if (event.getType() !== EventType.CallEncryptionKeysPrefix) return Promise.resolve();
 
         if (!this.room) {
-            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
+            this.logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
             return Promise.resolve();
         }
 
@@ -95,7 +96,7 @@ export class RoomKeyTransport
         try {
             await this.client.sendEvent(this.room.roomId, EventType.CallEncryptionKeysPrefix, content);
         } catch (error) {
-            this.prefixedLogger.error("Failed to send call encryption keys", error);
+            this.logger.error("Failed to send call encryption keys", error);
             const matrixError = error as MatrixError;
             if (matrixError.event) {
                 // cancel the pending event: we'll just generate a new one with our latest
@@ -114,20 +115,20 @@ export class RoomKeyTransport
         const callId = content["call_id"];
 
         if (!userId) {
-            logger.warn(`Received m.call.encryption_keys with no userId: callId=${callId}`);
+            this.logger.warn(`Received m.call.encryption_keys with no userId: callId=${callId}`);
             return;
         }
 
         // We currently only handle callId = "" (which is the default for room scoped calls)
         if (callId !== "") {
-            logger.warn(
+            this.logger.warn(
                 `Received m.call.encryption_keys with unsupported callId: userId=${userId}, deviceId=${deviceId}, callId=${callId}`,
             );
             return;
         }
 
         if (!Array.isArray(content.keys)) {
-            logger.warn(`Received m.call.encryption_keys where keys wasn't an array: callId=${callId}`);
+            this.logger.warn(`Received m.call.encryption_keys where keys wasn't an array: callId=${callId}`);
             return;
         }
 
@@ -135,7 +136,7 @@ export class RoomKeyTransport
             // We store our own sender key in the same set along with keys from others, so it's
             // important we don't allow our own keys to be set by one of these events (apart from
             // the fact that we don't need it anyway because we already know our own keys).
-            logger.info("Ignoring our own keys event");
+            this.logger.info("Ignoring our own keys event");
             return;
         }
 
@@ -145,7 +146,7 @@ export class RoomKeyTransport
 
         for (const key of content.keys) {
             if (!key) {
-                logger.info("Ignoring false-y key in keys event");
+                this.logger.info("Ignoring false-y key in keys event");
                 continue;
             }
 
@@ -163,11 +164,11 @@ export class RoomKeyTransport
                 typeof encryptionKey !== "string" ||
                 typeof encryptionKeyIndex !== "number"
             ) {
-                logger.warn(
+                this.logger.warn(
                     `Malformed call encryption_key: userId=${userId}, deviceId=${deviceId}, encryptionKeyIndex=${encryptionKeyIndex} callId=${callId}`,
                 );
             } else {
-                logger.debug(
+                this.logger.debug(
                     `onCallEncryption userId=${userId}:${deviceId} encryptionKeyIndex=${encryptionKeyIndex} age=${age}ms`,
                 );
                 this.emit(
