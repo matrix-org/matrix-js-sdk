@@ -1,4 +1,4 @@
-import { logger as rootLogger } from "../logger.ts";
+import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
@@ -6,8 +6,6 @@ import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 import { isMyMembership, type Statistics } from "./types.ts";
-
-const logger = rootLogger.getChild("MatrixRTCSession");
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -78,7 +76,7 @@ export class EncryptionManager implements IEncryptionManager {
 
     private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
-
+    private logger: Logger;
     public constructor(
         private userId: string,
         private deviceId: string,
@@ -90,7 +88,10 @@ export class EncryptionManager implements IEncryptionManager {
             encryptionKeyIndex: number,
             participantId: string,
         ) => void,
-    ) {}
+        parentLogger?: Logger,
+    ) {
+        this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
+    }
 
     public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
         return this.encryptionKeys;
@@ -158,11 +159,11 @@ export class EncryptionManager implements IEncryptionManager {
                 if (this.makeNewKeyTimeout) {
                     // existing rotation in progress, so let it complete
                 } else {
-                    logger.debug(`Member(s) have left: queueing sender key rotation`);
+                    this.logger.debug(`Member(s) have left: queueing sender key rotation`);
                     this.makeNewKeyTimeout = setTimeout(this.onRotateKeyTimeout, this.makeKeyDelay);
                 }
             } else if (anyJoined) {
-                logger.debug(`New member(s) have joined: re-sending keys`);
+                this.logger.debug(`New member(s) have joined: re-sending keys`);
                 this.requestSendCurrentKey();
             } else if (oldFingerprints) {
                 // does it look like any of the members have updated their memberships?
@@ -174,7 +175,7 @@ export class EncryptionManager implements IEncryptionManager {
                     Array.from(oldFingerprints).some((x) => !newFingerprints.has(x)) ||
                     Array.from(newFingerprints).some((x) => !oldFingerprints.has(x));
                 if (candidateUpdates) {
-                    logger.debug(`Member(s) have updated/reconnected: re-sending keys to everyone`);
+                    this.logger.debug(`Member(s) have updated/reconnected: re-sending keys to everyone`);
                     this.requestSendCurrentKey();
                 }
             }
@@ -190,7 +191,7 @@ export class EncryptionManager implements IEncryptionManager {
     private makeNewSenderKey(delayBeforeUse = false): number {
         const encryptionKey = secureRandomBase64Url(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
-        logger.info("Generated new key at index " + encryptionKeyIndex);
+        this.logger.info("Generated new key at index " + encryptionKeyIndex);
         this.setEncryptionKey(
             this.userId,
             this.deviceId,
@@ -213,7 +214,7 @@ export class EncryptionManager implements IEncryptionManager {
             this.lastEncryptionKeyUpdateRequest &&
             this.lastEncryptionKeyUpdateRequest + this.updateEncryptionKeyThrottle > Date.now()
         ) {
-            logger.info("Last encryption key event sent too recently: postponing");
+            this.logger.info("Last encryption key event sent too recently: postponing");
             if (this.keysEventUpdateTimeout === undefined) {
                 this.keysEventUpdateTimeout = setTimeout(
                     () => void this.sendEncryptionKeysEvent(),
@@ -252,18 +253,18 @@ export class EncryptionManager implements IEncryptionManager {
         const myKeys = this.getKeysForParticipant(this.userId, this.deviceId);
 
         if (!myKeys) {
-            logger.warn("Tried to send encryption keys event but no keys found!");
+            this.logger.warn("Tried to send encryption keys event but no keys found!");
             return;
         }
 
         if (typeof indexToSend !== "number" && this.latestGeneratedKeyIndex === -1) {
-            logger.warn("Tried to send encryption keys event but no current key index found!");
+            this.logger.warn("Tried to send encryption keys event but no current key index found!");
             return;
         }
 
         const keyIndexToSend = indexToSend ?? this.latestGeneratedKeyIndex;
 
-        logger.info(
+        this.logger.info(
             `Try sending encryption keys event. keyIndexToSend=${keyIndexToSend} (method parameter: ${indexToSend})`,
         );
         const keyToSend = myKeys[keyIndexToSend];
@@ -271,23 +272,23 @@ export class EncryptionManager implements IEncryptionManager {
         try {
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
             await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, this.getMemberships());
-            logger.debug(
+            this.logger.debug(
                 `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
             );
         } catch (error) {
             if (this.keysEventUpdateTimeout === undefined) {
                 const resendDelay = safeGetRetryAfterMs(error, 5000);
-                logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
+                this.logger.warn(`Failed to send m.call.encryption_key, retrying in ${resendDelay}`, error);
                 this.keysEventUpdateTimeout = setTimeout(() => void this.sendEncryptionKeysEvent(), resendDelay);
             } else {
-                logger.info("Not scheduling key resend as another re-send is already pending");
+                this.logger.info("Not scheduling key resend as another re-send is already pending");
             }
         }
     };
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
-        logger.debug(`Received key over key transport ${userId}:${deviceId} at index ${index}`);
+        this.logger.debug(`Received key over key transport ${userId}:${deviceId} at index ${index}`);
         this.setEncryptionKey(userId, deviceId, index, keyBase64Encoded, timestamp);
     };
 
@@ -330,7 +331,7 @@ export class EncryptionManager implements IEncryptionManager {
         timestamp: number,
         delayBeforeUse = false,
     ): void {
-        logger.debug(`Setting encryption key for ${userId}:${deviceId} at index ${encryptionKeyIndex}`);
+        this.logger.debug(`Setting encryption key for ${userId}:${deviceId} at index ${encryptionKeyIndex}`);
         const keyBin = decodeBase64(encryptionKeyString);
 
         const participantId = getParticipantId(userId, deviceId);
@@ -343,7 +344,7 @@ export class EncryptionManager implements IEncryptionManager {
 
         if (existingKeyAtIndex) {
             if (existingKeyAtIndex.timestamp > timestamp) {
-                logger.info(
+                this.logger.info(
                     `Ignoring new key at index ${encryptionKeyIndex} for ${participantId} as it is older than existing known key`,
                 );
                 return;
@@ -372,7 +373,7 @@ export class EncryptionManager implements IEncryptionManager {
         if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
-                logger.info(`Delayed-emitting key changed event for ${participantId} index ${encryptionKeyIndex}`);
+                this.logger.info(`Delayed-emitting key changed event for ${participantId} index ${encryptionKeyIndex}`);
 
                 this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
             }, this.useKeyDelay);
@@ -386,7 +387,7 @@ export class EncryptionManager implements IEncryptionManager {
         if (!this.manageMediaKeys) return;
 
         this.makeNewKeyTimeout = undefined;
-        logger.info("Making new sender key for key rotation");
+        this.logger.info("Making new sender key for key rotation");
         const newKeyIndex = this.makeNewSenderKey(true);
         // send immediately: if we're about to start sending with a new key, it's
         // important we get it out to others as soon as we can.
