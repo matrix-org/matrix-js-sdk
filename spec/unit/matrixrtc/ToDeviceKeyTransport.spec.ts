@@ -101,6 +101,7 @@ describe("ToDeviceKeyTransport", () => {
                     call_id: "",
                     scope: "m.room",
                 },
+                sent_ts: expect.any(Number),
             },
         );
 

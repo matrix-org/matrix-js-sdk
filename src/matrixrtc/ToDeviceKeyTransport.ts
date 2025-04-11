@@ -68,6 +68,7 @@ export class ToDeviceKeyTransport
                 application: "m.call",
                 scope: "m.room",
             },
+            sent_ts: Date.now(),
         };
 
         const targets = members
