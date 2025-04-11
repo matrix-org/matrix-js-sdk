@@ -126,9 +126,6 @@ export class EncryptionManager implements IEncryptionManager {
         // as they may still be using the same ones.
         this.encryptionKeys.set(getParticipantId(this.userId, this.deviceId), []);
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
-        if (this.transport instanceof RoomAndToDeviceTransport) {
-            this.transport.off(RoomAndToDeviceEvents.EnabledTransportsChanged, this.onTransportChanged);
-        }
         this.transport.stop();
 
         if (this.makeNewKeyTimeout !== undefined) {
@@ -298,10 +295,7 @@ export class EncryptionManager implements IEncryptionManager {
         }
     };
 
-    private onTransportChanged: (enabled: EnabledTransports) => void = (enabled: {
-        toDevice: boolean;
-        room: boolean;
-    }) => {
+    private onTransportChanged: (enabled: EnabledTransports) => void = () => {
         this.requestSendCurrentKey();
     };
 
