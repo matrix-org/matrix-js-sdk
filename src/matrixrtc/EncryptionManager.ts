@@ -6,7 +6,11 @@ import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 import { isMyMembership, type Statistics } from "./types.ts";
-import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "./RoomAndToDeviceKeyTransport.ts";
+import {
+    type EnabledTransports,
+    RoomAndToDeviceEvents,
+    RoomAndToDeviceTransport,
+} from "./RoomAndToDeviceKeyTransport.ts";
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -294,7 +298,10 @@ export class EncryptionManager implements IEncryptionManager {
         }
     };
 
-    onTransportChanged = (enabled: { toDevice: boolean; room: boolean }) => {
+    private onTransportChanged: (enabled: EnabledTransports) => void = (enabled: {
+        toDevice: boolean;
+        room: boolean;
+    }) => {
         this.requestSendCurrentKey();
     };
 
