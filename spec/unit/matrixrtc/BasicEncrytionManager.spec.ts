@@ -152,6 +152,8 @@ describe("BasicEncryptionManager", () => {
                 1,
                 "@alice:example.org:DEVICE01",
             );
+
+            expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
         it("Should rotate key when a user leaves and delay the rollout", async () => {
@@ -206,6 +208,8 @@ describe("BasicEncryptionManager", () => {
                 1,
                 "@alice:example.org:DEVICE01",
             );
+
+            expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
     });
 
@@ -286,6 +290,8 @@ describe("BasicEncryptionManager", () => {
                 8,
                 "@carl:example.org:CARLDEVICE",
             );
+
+            expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(3);
         });
 
         it("Should support quick re-joiner if keys received out of order", async () => {

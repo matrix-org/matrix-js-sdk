@@ -142,6 +142,7 @@ export class BasicEncryptionManager implements IEncryptionManager {
         const validKey = this.keyBuffer.disambiguate(participantId, newKey);
         if (validKey) {
             this.onEncryptionKeysChanged(validKey.key, index, validKey.participantId);
+            this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
             this.logger.info(`Received an out of order key for ${userId}:${deviceId}, dropping it`);
         }
