@@ -58,8 +58,9 @@ describe("RoomAndToDeviceTransport", () => {
         mockLogger = {
             debug: jest.fn(),
             warn: jest.fn(),
-            getChild: jest.fn().mockReturnValue(mockLogger),
+            getChild: jest.fn(),
         } as unknown as Mocked<Logger>;
+        mockLogger.getChild.mockReturnValue(mockLogger);
         statistics = {
             counters: {
                 roomEventEncryptionKeysSent: 0,
@@ -128,8 +129,6 @@ describe("RoomAndToDeviceTransport", () => {
     });
     it("does log that it did nothing when disabled", () => {
         transport.start();
-        const debug = jest.fn();
-        (transport as unknown as any).logger = { debug };
         const onNewKeyFromTransport = jest.fn();
         const onTransportEnabled = jest.fn();
         transport.on(KeyTransportEvents.ReceivedKeys, onNewKeyFromTransport);
@@ -147,7 +146,7 @@ describe("RoomAndToDeviceTransport", () => {
             Date.now(),
         );
 
-        expect(debug).toHaveBeenCalledWith("To Device transport is disabled, ignoring received keys");
+        expect(mockLogger.debug).toHaveBeenCalledWith("To Device transport is disabled, ignoring received keys");
         // for room key transport we will never get a disabled message because its will always just turn on
         expect(onTransportEnabled).toHaveBeenNthCalledWith(1, { toDevice: false, room: false });
         expect(onTransportEnabled).toHaveBeenNthCalledWith(2, { toDevice: false, room: true });
