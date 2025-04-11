@@ -158,25 +158,28 @@ export class FetchHttpApi<O extends IHttpOpts> {
         // avoid mutating paramOpts so they can be used on retry
         const opts = { ...paramOpts };
 
-        if (this.opts.accessToken) {
+        // Await any ongoing token refresh before we build the headers/params
+        await this.tokenRefreshPromise;
+
+        // Take a copy of the access token so we have a record of the token we used for this request if it fails
+        const accessToken = this.opts.accessToken;
+        if (accessToken) {
             if (this.opts.useAuthorizationHeader) {
                 if (!opts.headers) {
                     opts.headers = {};
                 }
                 if (!opts.headers.Authorization) {
-                    opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+                    opts.headers.Authorization = `Bearer ${accessToken}`;
                 }
                 if (queryParams.access_token) {
                     delete queryParams.access_token;
                 }
             } else if (!queryParams.access_token) {
-                queryParams.access_token = this.opts.accessToken;
+                queryParams.access_token = accessToken;
             }
         }
 
         try {
-            // Await any ongoing token refresh
-            await this.tokenRefreshPromise;
             const response = await this.request<T>(method, path, queryParams, body, opts);
             return response;
         } catch (error) {
@@ -185,9 +188,16 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
 
             if (error.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
-                const tokenRefreshPromise = this.tryRefreshToken();
-                this.tokenRefreshPromise = Promise.allSettled([tokenRefreshPromise]);
-                const outcome = await tokenRefreshPromise;
+                let outcome: TokenRefreshOutcome;
+                if (accessToken !== this.opts.accessToken) {
+                    // The access token has changed since we started the request,
+                    // so assume it was refreshed during our request
+                    outcome = TokenRefreshOutcome.Success;
+                } else {
+                    const tokenRefreshPromise = this.tryRefreshToken();
+                    this.tokenRefreshPromise = tokenRefreshPromise;
+                    outcome = await tokenRefreshPromise;
+                }
 
                 if (outcome === TokenRefreshOutcome.Success) {
                     // if we got a new token retry the request
