@@ -71,19 +71,19 @@ export class RoomAndToDeviceTransport
             | "off"
         >,
         statistics: Statistics,
-        private parentLogger?: Logger,
+        parentLogger?: Logger,
     ) {
         super();
         this.logger = (parentLogger ?? rootLogger).getChild(`[RoomAndToDeviceTransport]`);
 
-        this.roomKeyTransport = new RoomKeyTransport(room, client, statistics);
+        this.roomKeyTransport = new RoomKeyTransport(room, client, statistics, this.logger);
         this.toDeviceTransport = new ToDeviceKeyTransport(
             userId,
             deviceId,
             room.roomId,
             client,
             statistics,
-            this.parentLogger,
+            this.logger,
         );
         this.roomKeyTransport.on(KeyTransportEvents.ReceivedKeys, (...props) => {
             // Turn on the room transport if we receive a roomKey from another participant
@@ -126,10 +126,10 @@ export class RoomAndToDeviceTransport
 
     public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
         this.logger.debug(
-            `Sending key with index ${index} to ${members.length} members via:`,
-            `${this._enabled.room ? "room transport" : ""}`,
-            `${this._enabled.room && this._enabled.toDevice ? "and" : ""}`,
-            `${this._enabled.room ? "to device transport" : ""}`,
+            `Sending key with index ${index} to call members (count=${members.length}) via:` +
+                (this._enabled.room ? "room transport" : "") +
+                (this._enabled.room && this._enabled.toDevice ? "and" : "") +
+                (this._enabled.toDevice ? "to device transport" : ""),
         );
         if (this._enabled.room) await this.roomKeyTransport.sendKey(keyBase64Encoded, index, members);
         if (this._enabled.toDevice) await this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
