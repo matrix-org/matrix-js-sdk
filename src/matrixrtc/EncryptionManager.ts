@@ -116,10 +116,6 @@ export class EncryptionManager implements IEncryptionManager {
         }
     }
 
-    private onTransportChanged(enabled: { toDevice: boolean; room: boolean }): void {
-        this.requestSendCurrentKey();
-    }
-
     public leave(): void {
         // clear our encryption keys as we're done with them now (we'll
         // make new keys if we rejoin). We leave keys for other participants
@@ -296,6 +292,10 @@ export class EncryptionManager implements IEncryptionManager {
                 this.logger.info("Not scheduling key resend as another re-send is already pending");
             }
         }
+    };
+
+    onTransportChanged = (enabled: { toDevice: boolean; room: boolean }) => {
+        this.requestSendCurrentKey();
     };
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
