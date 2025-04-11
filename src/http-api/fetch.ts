@@ -188,22 +188,21 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
 
             if (error.errcode === "M_UNKNOWN_TOKEN" && !opts.doNotAttemptTokenRefresh) {
-                let outcome: TokenRefreshOutcome;
-                if (accessToken !== this.opts.accessToken) {
-                    // The access token has changed since we started the request,
-                    // so assume it was refreshed during our request
-                    outcome = TokenRefreshOutcome.Success;
-                } else {
+                // If the access token has changed since we started the request, but before we refreshed it,
+                // then it was refreshed due to another request failing, so retry before refreshing again.
+                let outcome: TokenRefreshOutcome | null = null;
+                if (accessToken === this.opts.accessToken) {
                     const tokenRefreshPromise = this.tryRefreshToken();
                     this.tokenRefreshPromise = tokenRefreshPromise;
                     outcome = await tokenRefreshPromise;
                 }
 
-                if (outcome === TokenRefreshOutcome.Success) {
+                if (outcome === TokenRefreshOutcome.Success || outcome === null) {
                     // if we got a new token retry the request
                     return this.authedRequest(method, path, queryParams, body, {
                         ...paramOpts,
-                        doNotAttemptTokenRefresh: true,
+                        // Only attempt token refresh once for each failed request
+                        doNotAttemptTokenRefresh: outcome !== null,
                     });
                 }
                 if (outcome === TokenRefreshOutcome.Failure) {
