@@ -58,6 +58,7 @@ describe("RoomAndToDeviceTransport", () => {
         mockLogger = {
             debug: jest.fn(),
             warn: jest.fn(),
+            getChild: jest.fn().mockReturnValue(mockLogger),
         } as unknown as Mocked<Logger>;
         statistics = {
             counters: {
@@ -68,9 +69,14 @@ describe("RoomAndToDeviceTransport", () => {
                 roomEventEncryptionKeysReceivedTotalAge: 0,
             },
         };
-        transport = new RoomAndToDeviceTransport("@alice:example.org", "MYDEVICE", mockRoom, mockClient, statistics, {
-            getChild: jest.fn().mockReturnValue(mockLogger),
-        } as unknown as Mocked<Logger>);
+        transport = new RoomAndToDeviceTransport(
+            "@alice:example.org",
+            "MYDEVICE",
+            mockRoom,
+            mockClient,
+            statistics,
+            mockLogger,
+        );
     });
 
     it("should enable to device transport when starting", () => {
