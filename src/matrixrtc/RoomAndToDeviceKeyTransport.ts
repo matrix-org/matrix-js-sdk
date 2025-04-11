@@ -88,7 +88,10 @@ export class RoomAndToDeviceTransport
         this.roomKeyTransport.on(KeyTransportEvents.ReceivedKeys, (...props) => {
             // Turn on the room transport if we receive a roomKey from another participant
             // and disable the toDevice transport.
-            this.setEnabled({ toDevice: false, room: true });
+            if (!this._enabled.room) {
+                this.logger.debug("Received room key, enabling room key transport, disabling toDevice transport");
+                this.setEnabled({ toDevice: false, room: true });
+            }
             this.emit(KeyTransportEvents.ReceivedKeys, ...props);
         });
         this.toDeviceTransport.on(KeyTransportEvents.ReceivedKeys, (...props) => {
@@ -102,8 +105,10 @@ export class RoomAndToDeviceTransport
 
     /** Set which transport type should be used to send and receive keys.*/
     public setEnabled(enabled: { toDevice: boolean; room: boolean }): void {
-        this._enabled = enabled;
-        this.emit(RoomAndToDeviceEvents.EnabledTransportsChanged, enabled);
+        if (this.enabled.toDevice !== enabled.toDevice || this.enabled.room !== enabled.room) {
+            this._enabled = enabled;
+            this.emit(RoomAndToDeviceEvents.EnabledTransportsChanged, enabled);
+        }
     }
 
     /** The currently enabled transports that are used to send and receive keys.*/
