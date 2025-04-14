@@ -14,15 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { MatrixClient } from "../client.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import type { Statistics } from "./types.ts";
-import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
+import type { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import type { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { type Room } from "../models/room.ts";
 
 export interface EnabledTransports {
     toDevice: boolean;
@@ -52,39 +49,18 @@ export class RoomAndToDeviceTransport
     implements IKeyTransport
 {
     private readonly logger: Logger;
-    private roomKeyTransport: RoomKeyTransport;
-    private toDeviceTransport: IKeyTransport;
     private _enabled: EnabledTransports = { toDevice: true, room: false };
     public constructor(
-        userId: string,
-        deviceId: string,
-        room: Pick<Room, "on" | "off" | "roomId">,
-        client: Pick<
-            MatrixClient,
-            | "sendEvent"
-            | "getDeviceId"
-            | "getUserId"
-            | "cancelPendingEvent"
-            | "decryptEventIfNeeded"
-            | "encryptAndSendToDevice"
-            | "on"
-            | "off"
-        >,
-        statistics: Statistics,
+        private toDeviceTransport: ToDeviceKeyTransport,
+        private roomKeyTransport: RoomKeyTransport,
         parentLogger?: Logger,
     ) {
         super();
         this.logger = (parentLogger ?? rootLogger).getChild(`[RoomAndToDeviceTransport]`);
+        // update parent loggers for the sub transports so filtering for `RoomAndToDeviceTransport` contains their logs too
+        this.toDeviceTransport.setParentLogger(this.logger);
+        this.roomKeyTransport.setParentLogger(this.logger);
 
-        this.roomKeyTransport = new RoomKeyTransport(room, client, statistics, this.logger);
-        this.toDeviceTransport = new ToDeviceKeyTransport(
-            userId,
-            deviceId,
-            room.roomId,
-            client,
-            statistics,
-            this.logger,
-        );
         this.roomKeyTransport.on(KeyTransportEvents.ReceivedKeys, (...props) => {
             // Turn on the room transport if we receive a roomKey from another participant
             // and disable the toDevice transport.

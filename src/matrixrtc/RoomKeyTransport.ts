@@ -29,8 +29,10 @@ export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
 {
-    private readonly logger: Logger;
-
+    private logger: Logger = rootLogger;
+    public setParentLogger(parentLogger: Logger): void {
+        this.logger = parentLogger.getChild(`[RoomKeyTransport]`);
+    }
     public constructor(
         private room: Pick<Room, "on" | "off" | "roomId">,
         private client: Pick<
@@ -41,7 +43,7 @@ export class RoomKeyTransport
         parentLogger?: Logger,
     ) {
         super();
-        this.logger = (parentLogger ?? rootLogger).getChild(`[RoomKeyTransport]`);
+        this.setParentLogger(parentLogger ?? rootLogger);
     }
     public start(): void {
         this.room.on(RoomEvent.Timeline, (ev) => void this.consumeCallEncryptionEvent(ev));

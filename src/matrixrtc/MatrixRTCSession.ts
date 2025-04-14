@@ -37,6 +37,7 @@ import {
     RoomAndToDeviceTransport,
 } from "./RoomAndToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
+import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
@@ -398,14 +399,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
                 this.logger.info("Using to-device with room fallback transport for encryption keys");
-                transport = new RoomAndToDeviceTransport(
-                    this.client.getUserId()!,
-                    this.client.getDeviceId()!,
-                    this.roomSubset,
-                    this.client,
-                    this.statistics,
-                    this.logger,
-                );
+                const [uId, dId] = [this.client.getUserId()!, this.client.getDeviceId()!];
+                const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
+                const roomKeyTransport = new RoomKeyTransport(room, client, statistics);
+                const toDeviceTransport = new ToDeviceKeyTransport(uId, dId, room.roomId, client, statistics);
+                transport = new RoomAndToDeviceTransport(toDeviceTransport, roomKeyTransport, this.logger);
+
                 // Expose the changes so the ui can display the currently used transport.
                 this.reEmitter.reEmit(transport, [RoomAndToDeviceEvents.EnabledTransportsChanged]);
             } else {
