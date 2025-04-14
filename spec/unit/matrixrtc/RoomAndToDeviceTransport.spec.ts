@@ -18,7 +18,7 @@ import { type Mocked } from "jest-mock";
 
 import { makeKey, makeMockEvent, makeMockRoom, membershipTemplate, mockCallMembership } from "./mocks";
 import { EventType, type IRoomTimelineData, type Room, RoomEvent, type MatrixClient } from "../../../src";
-import type { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
+import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import {
     getMockClientWithEventEmitter,
     mockClientMethodsEvents,
@@ -28,7 +28,7 @@ import { type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { type Logger } from "../../../src/logger.ts";
 import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "../../../src/matrixrtc/RoomAndToDeviceKeyTransport.ts";
-import type { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
+import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
 
 describe("RoomAndToDeviceTransport", () => {
     const roomId = "!room:id";
@@ -39,12 +39,10 @@ describe("RoomAndToDeviceTransport", () => {
     let transport: RoomAndToDeviceTransport;
     let mockRoom: Room;
     let sendEventMock: jest.Mock;
-    function getToDeviceTransport(transport: RoomAndToDeviceTransport): ToDeviceKeyTransport {
-        return (transport as unknown as any).toDeviceTransport as ToDeviceKeyTransport;
-    }
-    function getRoomTransport(transport: RoomAndToDeviceTransport) {
-        return (transport as unknown as any).roomKeyTransport as RoomKeyTransport;
-    }
+    let roomKeyTransport: RoomKeyTransport;
+    let toDeviceKeyTransport: ToDeviceKeyTransport;
+    let toDeviceSendKeySpy: jest.SpyInstance;
+    let roomSendKeySpy: jest.SpyInstance;
     beforeEach(() => {
         sendEventMock = jest.fn();
         mockClient = getMockClientWithEventEmitter({
@@ -70,14 +68,17 @@ describe("RoomAndToDeviceTransport", () => {
                 roomEventEncryptionKeysReceivedTotalAge: 0,
             },
         };
-        transport = new RoomAndToDeviceTransport(
+        roomKeyTransport = new RoomKeyTransport(mockRoom, mockClient, statistics);
+        toDeviceKeyTransport = new ToDeviceKeyTransport(
             "@alice:example.org",
             "MYDEVICE",
-            mockRoom,
+            mockRoom.roomId,
             mockClient,
             statistics,
-            mockLogger,
         );
+        transport = new RoomAndToDeviceTransport(toDeviceKeyTransport, roomKeyTransport, mockLogger);
+        toDeviceSendKeySpy = jest.spyOn(toDeviceKeyTransport, "sendKey");
+        roomSendKeySpy = jest.spyOn(roomKeyTransport, "sendKey");
     });
 
     it("should enable to device transport when starting", () => {
@@ -87,19 +88,15 @@ describe("RoomAndToDeviceTransport", () => {
     });
     it("only sends to device keys when sending a key", async () => {
         transport.start();
-        const toDeviceSpy = jest.spyOn(getToDeviceTransport(transport), "sendKey");
-        const roomSpy = jest.spyOn(getRoomTransport(transport), "sendKey");
         await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
-        expect(toDeviceSpy).toHaveBeenCalledTimes(1);
-        expect(roomSpy).toHaveBeenCalledTimes(0);
+        expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(1);
+        expect(roomSendKeySpy).toHaveBeenCalledTimes(0);
         expect(transport.enabled.room).toBeFalsy();
         expect(transport.enabled.toDevice).toBeTruthy();
     });
 
     it("enables room transport and disables to device transport when receiving a room key", async () => {
         transport.start();
-        const roomSpy = jest.spyOn(getRoomTransport(transport), "sendKey");
-        const toDeviceSpy = jest.spyOn(getToDeviceTransport(transport), "sendKey");
         const onNewKeyFromTransport = jest.fn();
         const onTransportEnabled = jest.fn();
         transport.on(KeyTransportEvents.ReceivedKeys, onNewKeyFromTransport);
@@ -123,8 +120,8 @@ describe("RoomAndToDeviceTransport", () => {
 
         await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
         expect(sendEventMock).toHaveBeenCalledTimes(1);
-        expect(roomSpy).toHaveBeenCalledTimes(1);
-        expect(toDeviceSpy).toHaveBeenCalledTimes(0);
+        expect(roomSendKeySpy).toHaveBeenCalledTimes(1);
+        expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(0);
         expect(onTransportEnabled).toHaveBeenCalledWith({ toDevice: false, room: true });
     });
     it("does log that it did nothing when disabled", () => {
@@ -136,15 +133,8 @@ describe("RoomAndToDeviceTransport", () => {
 
         transport.setEnabled({ toDevice: false, room: false });
         const dateNow = Date.now();
-        getRoomTransport(transport).emit(KeyTransportEvents.ReceivedKeys, "user", "device", "roomKey", 0, dateNow);
-        getToDeviceTransport(transport).emit(
-            KeyTransportEvents.ReceivedKeys,
-            "user",
-            "device",
-            "toDeviceKey",
-            0,
-            Date.now(),
-        );
+        roomKeyTransport.emit(KeyTransportEvents.ReceivedKeys, "user", "device", "roomKey", 0, dateNow);
+        toDeviceKeyTransport.emit(KeyTransportEvents.ReceivedKeys, "user", "device", "toDeviceKey", 0, Date.now());
 
         expect(mockLogger.debug).toHaveBeenCalledWith("To Device transport is disabled, ignoring received keys");
         // for room key transport we will never get a disabled message because its will always just turn on
