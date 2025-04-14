@@ -401,6 +401,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.logger.info("Using to-device with room fallback transport for encryption keys");
                 const [uId, dId] = [this.client.getUserId()!, this.client.getDeviceId()!];
                 const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
+                // Deprecate RoomKeyTransport: only ToDeviceKeyTransport is needed once deprecated
                 const roomKeyTransport = new RoomKeyTransport(room, client, statistics);
                 const toDeviceTransport = new ToDeviceKeyTransport(uId, dId, room.roomId, client, statistics);
                 transport = new RoomAndToDeviceTransport(toDeviceTransport, roomKeyTransport, this.logger);

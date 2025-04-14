@@ -21,6 +21,7 @@ import type { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
+// Deprecate RoomAndToDeviceTransport: This whole class is only a stop gap until we remove RoomKeyTransport.
 export interface EnabledTransports {
     toDevice: boolean;
     room: boolean;

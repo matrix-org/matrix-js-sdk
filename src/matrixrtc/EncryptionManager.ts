@@ -110,6 +110,7 @@ export class EncryptionManager implements IEncryptionManager {
         this.manageMediaKeys = this.joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
 
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
+        // Deprecate RoomKeyTransport: this can get removed.
         if (this.transport instanceof RoomAndToDeviceTransport) {
             this.transport.on(RoomAndToDeviceEvents.EnabledTransportsChanged, this.onTransportChanged);
         }
