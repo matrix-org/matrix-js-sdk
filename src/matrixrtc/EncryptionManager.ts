@@ -6,6 +6,7 @@ import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 import { isMyMembership, type Statistics } from "./types.ts";
+import { getParticipantId } from "./utils.ts";
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -394,8 +395,6 @@ export class EncryptionManager implements IEncryptionManager {
         void this.sendEncryptionKeysEvent(newKeyIndex);
     };
 }
-
-const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
 
 function keysEqual(a: Uint8Array | undefined, b: Uint8Array | undefined): boolean {
     if (a === b) return true;

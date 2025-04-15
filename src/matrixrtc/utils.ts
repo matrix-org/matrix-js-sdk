@@ -47,7 +47,7 @@ export class KeyBuffer {
             }, this.ttl);
 
             const map = new Map<number, InboundEncryptionSession>();
-            map.set(item.keyId, item);
+            map.set(item.keyIndex, item);
             const entry: BufferEntry = {
                 keys: map,
                 timeout,
@@ -62,12 +62,12 @@ export class KeyBuffer {
             this.buffer.delete(participantId);
         }, this.ttl);
 
-        const existing = entry.keys.get(item.keyId);
+        const existing = entry.keys.get(item.keyIndex);
         if (existing && existing.creationTS > item.creationTS) {
             // The existing is more recent just ignore this one, it is a key received out of order
             return null;
         } else {
-            entry.keys.set(item.keyId, item);
+            entry.keys.set(item.keyIndex, item);
             return item;
         }
     }
@@ -78,4 +78,8 @@ export class KeyBuffer {
         });
         this.buffer.clear();
     }
+}
+
+export function getParticipantId(userId: string, deviceId: string): ParticipantId {
+    return `${userId}:${deviceId}`;
 }

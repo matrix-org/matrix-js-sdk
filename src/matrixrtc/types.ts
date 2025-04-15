@@ -29,7 +29,7 @@ export interface EncryptionKeyEntry {
 export type InboundEncryptionSession = {
     key: Uint8Array;
     participantId: ParticipantId;
-    keyId: number;
+    keyIndex: number;
     creationTS: number;
 };
 

@@ -61,7 +61,7 @@ describe("KeyBuffer Test", () => {
 
     function fakeInboundSessionWithTimestamp(ts: number): InboundEncryptionSession {
         return {
-            keyId: 0,
+            keyIndex: 0,
             creationTS: ts,
             participantId: "@alice:localhost|ABCDE",
             key: new Uint8Array(16),
