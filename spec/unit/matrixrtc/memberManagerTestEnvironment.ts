@@ -29,7 +29,7 @@ It is very specific to the MembershipManager.spec.ts file and introduces the fol
 import { TestEnvironment } from "jest-environment-jsdom";
 
 import { logger as rootLogger } from "../../../src/logger";
-const logger = rootLogger.getChild("MatrixRTCSession");
+const logger = rootLogger.getChild("[MatrixRTCSession]");
 
 class MemberManagerTestEnvironment extends TestEnvironment {
     handleTestEvent(event: any) {

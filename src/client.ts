@@ -207,7 +207,7 @@ import {
 import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
-import { type ToDeviceBatch } from "./models/ToDeviceMessage.ts";
+import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
 import { type UIARequest } from "./@types/uia.ts";
 import { type LocalNotificationSettings } from "./@types/local_notifications.ts";
@@ -7940,6 +7940,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.logger.debug(`PUT ${path}`, targets);
 
         return this.http.authedRequest(Method.Put, path, undefined, body);
+    }
+
+    /**
+     * This will encrypt the payload for all devices in the list and will queue it.
+     * The type of the sent to-device message will be `m.room.encrypted`.
+     * @param eventType - The type of event to send
+     * @param devices - The list of devices to send the event to.
+     * @param payload - The payload to send. This will be encrypted.
+     * @returns Promise which resolves once queued there is no error feedback when sending fails.
+     */
+    public async encryptAndSendToDevice(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<void> {
+        if (!this.cryptoBackend) {
+            throw new Error("Cannot encrypt to device event, your client does not support encryption.");
+        }
+        const batch = await this.cryptoBackend.encryptToDeviceMessages(eventType, devices, payload);
+
+        // TODO The batch mechanism removes all possibility to get error feedbacks..
+        // We might want instead to do the API call directly and pass the errors back.
+        await this.queueToDevice(batch);
     }
 
     /**
