@@ -3715,15 +3715,14 @@ fetch-mock-jest@^1.5.1:
   dependencies:
     fetch-mock "^9.11.0"
 
-fetch-mock@11.1.5:
-  version "11.1.5"
-  resolved "https://registry.yarnpkg.com/fetch-mock/-/fetch-mock-11.1.5.tgz#77f78942f3733cfba47fc232b8528d1138a6761f"
-  integrity sha512-KHmZDnZ1ry0pCTrX4YG5DtThHi0MH+GNI9caESnzX/nMJBrvppUHMvLx47M0WY9oAtKOMiPfZDRpxhlHg89BOA==
+fetch-mock@12.5.2:
+  version "12.5.2"
+  resolved "https://registry.yarnpkg.com/fetch-mock/-/fetch-mock-12.5.2.tgz#dbd7e2bb6a61fdbc7af45d399fe9aa1da97e3582"
+  integrity sha512-b5KGDFmdmado2MPQjZl6ix3dAG3iwCitb0XQwN72y2s9VnWZ3ObaGNy+bkpm1390foiLDybdJ7yjRGKD36kATw==
   dependencies:
     "@types/glob-to-regexp" "^0.4.4"
     dequal "^2.0.3"
     glob-to-regexp "^0.4.1"
-    is-subset "^0.1.1"
     regexparam "^3.0.0"
 
 fetch-mock@^9.11.0:
