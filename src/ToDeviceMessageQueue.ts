@@ -55,7 +55,14 @@ export class ToDeviceMessageQueue {
         this.client.removeListener(ClientEvent.Sync, this.onResumedSync);
     }
 
-    public async queueBatch(batch: ToDeviceBatch): Promise<void> {
+    /**
+     * queues a batch of to-device messages for sending. The batch is split into
+     * smaller batches of size MAX_BATCH_SIZE, and each batch is given a unique
+     * transaction ID.
+     * @param batch the total (not split) batch of to-device messages.
+     * @param sendCallback a callback that is called once all batches are sent.
+     */
+    public async queueBatch(batch: ToDeviceBatch, sendCallback?: (result: Error | undefined) => void): Promise<void> {
         const batches: ToDeviceBatchWithTxnId[] = [];
         for (let i = 0; i < batch.batch.length; i += MAX_BATCH_SIZE) {
             const batchWithTxnId = {
@@ -74,10 +81,15 @@ export class ToDeviceMessageQueue {
         }
 
         await this.client.store.saveToDeviceBatches(batches);
-        this.sendQueue();
+        this.sendQueue().then(sendCallback);
     }
 
-    public sendQueue = async (): Promise<void> => {
+    /**
+     * sends the queues to device messages currently saved in client.store.
+     * @returns resolves to undefined if the queue was sent successfully, or an error if
+     * the queue could not be sent.
+     */
+    public sendQueue = async (): Promise<Error | undefined> => {
         if (this.retryTimeout !== null) clearTimeout(this.retryTimeout);
         this.retryTimeout = null;
 
@@ -114,13 +126,14 @@ export class ToDeviceMessageQueue {
                 } else {
                     logger.info("Automatic retry limit reached for to-device messages.");
                 }
-                return;
+                return Error("max to devices retries reached");
             }
 
             logger.info(`Failed to send batch of to-device messages. Will retry in ${retryDelay}ms`, e);
             this.retryTimeout = setTimeout(this.sendQueue, retryDelay);
         } finally {
             this.sending = false;
+            return undefined;
         }
     };
 
