@@ -296,9 +296,7 @@ export class MembershipManager
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
                 // is equivalent to running it at the end of the loop. (just after applying the status/action list changes)
                 // This order is required because this method needs to return the action updates.
-                this.logger.debug(
-                    `applied action changes. Status: ${this.oldStatus} -> ${this.status}`,
-                );
+                this.logger.debug(`applied action changes. Status: ${this.oldStatus} -> ${this.status}`);
                 if (this.oldStatus !== this.status) {
                     this.emit(MembershipManagerEvent.StatusChanged, this.oldStatus, this.status);
                 }

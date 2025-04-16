@@ -136,7 +136,10 @@ describe("RoomAndToDeviceTransport", () => {
         roomKeyTransport.emit(KeyTransportEvents.ReceivedKeys, "user", "device", "roomKey", 0, dateNow);
         toDeviceKeyTransport.emit(KeyTransportEvents.ReceivedKeys, "user", "device", "toDeviceKey", 0, Date.now());
 
-        expect(mockLogger.debug).toHaveBeenCalledWith("To Device transport is disabled, ignoring received keys");
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+            "[RoomAndToDeviceTransport]:",
+            "To Device transport is disabled, ignoring received keys",
+        );
         // for room key transport we will never get a disabled message because its will always just turn on
         expect(onTransportEnabled).toHaveBeenNthCalledWith(1, { toDevice: false, room: false });
         expect(onTransportEnabled).toHaveBeenNthCalledWith(2, { toDevice: false, room: true });

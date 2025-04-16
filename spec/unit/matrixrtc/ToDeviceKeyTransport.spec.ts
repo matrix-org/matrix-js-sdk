@@ -51,9 +51,14 @@ describe("ToDeviceKeyTransport", () => {
             },
         };
 
-        transport = new ToDeviceKeyTransport("@alice:example.org", "MYDEVICE", roomId, mockClient, statistics, {
-            getChild: jest.fn().mockReturnValue(mockLogger),
-        } as unknown as Mocked<Logger>);
+        transport = new ToDeviceKeyTransport(
+            "@alice:example.org",
+            "MYDEVICE",
+            roomId,
+            mockClient,
+            statistics,
+            mockLogger,
+        );
     });
 
     it("should send my keys on via to device", async () => {
@@ -186,7 +191,7 @@ describe("ToDeviceKeyTransport", () => {
             }),
         );
 
-        expect(mockLogger.warn).toHaveBeenCalledWith("Malformed Event: Mismatch roomId");
+        expect(mockLogger.warn).toHaveBeenCalledWith("[ToDeviceKeyTransport]:", "Malformed Event: Mismatch roomId");
         expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(0);
     });
 

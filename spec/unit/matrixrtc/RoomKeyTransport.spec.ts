@@ -51,9 +51,7 @@ describe("RoomKeyTransport", () => {
         room = makeMockRoom([membershipTemplate]);
         client = new MatrixClient({ baseUrl: "base_url" });
         client.matrixRTC.start();
-        transport = new RoomKeyTransport(room, client, statistics, {
-            getChild: jest.fn().mockReturnValue(mockLogger),
-        } as unknown as Mocked<Logger>);
+        transport = new RoomKeyTransport(room, client, statistics, mockLogger);
         transport.on(KeyTransportEvents.ReceivedKeys, (...p) => {
             onCallEncryptionMock(...p);
         });
