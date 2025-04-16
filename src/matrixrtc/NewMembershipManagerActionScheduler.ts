@@ -1,4 +1,4 @@
-import { type Logger, logger as rootLogger } from "../logger.ts";
+import { type BaseLogger, LogSpan, logger as rootLogger } from "../logger.ts";
 import { type EmptyObject } from "../matrix.ts";
 import { sleep } from "../utils.ts";
 import { MembershipActionType } from "./NewMembershipManager.ts";
@@ -38,7 +38,7 @@ export type ActionUpdate =
  * @internal
  */
 export class ActionScheduler {
-    private logger: Logger;
+    private logger: LogSpan;
     /**
      * This is tracking the state of the scheduler loop.
      * Only used to prevent starting the loop twice.
@@ -48,9 +48,9 @@ export class ActionScheduler {
     public constructor(
         /** This is the callback called for each scheduled action (`this.addAction()`) */
         private membershipLoopHandler: (type: MembershipActionType) => Promise<ActionUpdate>,
-        parentLogger?: Logger,
+        parentLogger?: BaseLogger,
     ) {
-        this.logger = (parentLogger ?? rootLogger).getChild(`[NewMembershipActionScheduler]`);
+        this.logger = new LogSpan(parentLogger ?? rootLogger, `[NewMembershipActionScheduler]`);
     }
 
     // function for the wakeup mechanism (in case we add an action externally and need to leave the current sleep)

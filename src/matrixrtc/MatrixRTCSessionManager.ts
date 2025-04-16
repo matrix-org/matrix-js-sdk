@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger as rootLogger } from "../logger.ts";
+import { LogSpan, logger as rootLogger } from "../logger.ts";
 import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
@@ -23,7 +23,7 @@ import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
 
-const logger = rootLogger.getChild("[MatrixRTCSessionManager]");
+const logger = new LogSpan(rootLogger, `[MatrixRTCSessionManager]`);
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously

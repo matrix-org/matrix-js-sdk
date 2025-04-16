@@ -16,7 +16,7 @@ limitations under the License.
 
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type IKeyTransport, KeyTransportEvents, type KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
-import { type Logger, logger as rootLogger } from "../logger.ts";
+import { type BaseLogger, LogSpan, logger as rootLogger } from "../logger.ts";
 import type { CallMembership } from "./CallMembership.ts";
 import type { EncryptionKeysToDeviceEventContent, Statistics } from "./types.ts";
 import { ClientEvent, type MatrixClient } from "../client.ts";
@@ -31,9 +31,9 @@ export class ToDeviceKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
 {
-    private logger: Logger = rootLogger;
-    public setParentLogger(parentLogger: Logger): void {
-        this.logger = parentLogger.getChild(`[ToDeviceKeyTransport]`);
+    private logger: BaseLogger = rootLogger;
+    public setParentLogger(parentLogger: BaseLogger): void {
+        this.logger = new LogSpan(parentLogger, `[ToDeviceKeyTransport]`);
     }
 
     public constructor(
@@ -42,7 +42,7 @@ export class ToDeviceKeyTransport
         private roomId: string,
         private client: Pick<MatrixClient, "encryptAndSendToDevice" | "on" | "off">,
         private statistics: Statistics,
-        parentLogger?: Logger,
+        parentLogger?: BaseLogger,
     ) {
         super();
         this.setParentLogger(parentLogger ?? rootLogger);

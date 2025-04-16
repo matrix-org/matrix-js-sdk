@@ -19,7 +19,7 @@ import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import { type MatrixClient } from "../client.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
-import { type Logger, logger as rootLogger } from "../logger.ts";
+import { type BaseLogger, LogSpan, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
@@ -144,7 +144,7 @@ export class MembershipManager
     implements IMembershipManager
 {
     private activated = false;
-    private logger: Logger;
+    private logger: LogSpan;
 
     public isActivated(): boolean {
         return this.activated;
@@ -281,10 +281,10 @@ export class MembershipManager
             | "_unstable_updateDelayedEvent"
         >,
         private getOldestMembership: () => CallMembership | undefined,
-        parentLogger?: Logger,
+        parentLogger?: BaseLogger,
     ) {
         super();
-        this.logger = (parentLogger ?? rootLogger).getChild(`[NewMembershipManager]`);
+        this.logger = new LogSpan(parentLogger ?? rootLogger, `[NewMembershipManager]`);
         const [userId, deviceId] = [this.client.getUserId(), this.client.getDeviceId()];
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
@@ -297,14 +297,14 @@ export class MembershipManager
                 // is equivalent to running it at the end of the loop. (just after applying the status/action list changes)
                 // This order is required because this method needs to return the action updates.
                 this.logger.debug(
-                    `MembershipManager applied action changes. Status: ${this.oldStatus} -> ${this.status}`,
+                    `applied action changes. Status: ${this.oldStatus} -> ${this.status}`,
                 );
                 if (this.oldStatus !== this.status) {
                     this.emit(MembershipManagerEvent.StatusChanged, this.oldStatus, this.status);
                 }
             }
             this.oldStatus = this.status;
-            this.logger.debug(`MembershipManager before processing action. status=${this.oldStatus}`);
+            this.logger.debug(`before processing action. status=${this.oldStatus}`);
             return this.membershipLoopHandler(type);
         }, this.logger);
     }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Logger, logger as rootLogger } from "../logger.ts";
+import { LogSpan, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
@@ -176,7 +176,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
-    private logger: Logger;
+    private logger: LogSpan;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -213,7 +213,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public static callMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
     ): CallMembership[] {
-        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
+        const logger = new LogSpan(rootLogger, `[MatrixRTCSession ${room.roomId}]`);
+
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
             logger.warn("Couldn't get state for room " + room.roomId);
@@ -329,7 +330,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         public memberships: CallMembership[],
     ) {
         super();
-        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
+        this.logger = new LogSpan(rootLogger, `[MatrixRTCSession ${roomSubset.roomId}]`);
+
         this._callId = memberships[0]?.callId;
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager

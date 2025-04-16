@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger as rootLogger, type Logger } from "../logger.ts";
+import { type BaseLogger, LogSpan, logger as rootLogger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import type { RoomKeyTransport } from "./RoomKeyTransport.ts";
@@ -49,15 +49,15 @@ export class RoomAndToDeviceTransport
     >
     implements IKeyTransport
 {
-    private readonly logger: Logger;
+    private readonly logger: LogSpan;
     private _enabled: EnabledTransports = { toDevice: true, room: false };
     public constructor(
         private toDeviceTransport: ToDeviceKeyTransport,
         private roomKeyTransport: RoomKeyTransport,
-        parentLogger?: Logger,
+        parentLogger?: BaseLogger,
     ) {
         super();
-        this.logger = (parentLogger ?? rootLogger).getChild(`[RoomAndToDeviceTransport]`);
+        this.logger = new LogSpan(parentLogger ?? rootLogger, `[RoomAndToDeviceTransport]`);
         // update parent loggers for the sub transports so filtering for `RoomAndToDeviceTransport` contains their logs too
         this.toDeviceTransport.setParentLogger(this.logger);
         this.roomKeyTransport.setParentLogger(this.logger);

@@ -18,7 +18,7 @@ import type { MatrixClient } from "../client.ts";
 import type { EncryptionKeysEventContent, Statistics } from "./types.ts";
 import { EventType } from "../@types/event.ts";
 import { type MatrixError } from "../http-api/errors.ts";
-import { logger as rootLogger, type Logger } from "../logger.ts";
+import { type BaseLogger, LogSpan, logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type CallMembership } from "./CallMembership.ts";
@@ -29,9 +29,9 @@ export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
 {
-    private logger: Logger = rootLogger;
-    public setParentLogger(parentLogger: Logger): void {
-        this.logger = parentLogger.getChild(`[RoomKeyTransport]`);
+    private logger: BaseLogger = rootLogger;
+    public setParentLogger(parentLogger: BaseLogger): void {
+        this.logger = new LogSpan(parentLogger, `[RoomKeyTransport]`);
     }
     public constructor(
         private room: Pick<Room, "on" | "off" | "roomId">,

@@ -1,4 +1,4 @@
-import { type Logger, logger as rootLogger } from "../logger.ts";
+import { type BaseLogger, LogSpan, logger as rootLogger } from "../logger.ts";
 import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { secureRandomBase64Url } from "../randomstring.ts";
 import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
@@ -81,7 +81,7 @@ export class EncryptionManager implements IEncryptionManager {
 
     private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
-    private logger: Logger;
+    private logger: LogSpan;
     public constructor(
         private userId: string,
         private deviceId: string,
@@ -93,9 +93,9 @@ export class EncryptionManager implements IEncryptionManager {
             encryptionKeyIndex: number,
             participantId: string,
         ) => void,
-        parentLogger?: Logger,
+        parentLogger?: BaseLogger,
     ) {
-        this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
+        this.logger = new LogSpan(parentLogger ?? rootLogger, "[EncryptionManager]");
     }
 
     public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {

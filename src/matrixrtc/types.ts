@@ -42,7 +42,6 @@ export interface EncryptionKeysToDeviceEventContent {
         call_id: string;
         scope: string;
     };
-    // Why is this needed?
     sent_ts?: number;
 }
 
