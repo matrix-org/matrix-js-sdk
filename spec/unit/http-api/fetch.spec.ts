@@ -29,13 +29,18 @@ import {
     Method,
 } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { defer, type QueryDict } from "../../../src/utils";
+import { defer, type QueryDict, sleep } from "../../../src/utils";
 import { type Logger } from "../../../src/logger";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
     const idBaseUrl = "http://idBaseUrl";
     const prefix = ClientPrefix.V3;
+    const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
+
+    beforeEach(() => {
+        jest.useRealTimers();
+    });
 
     it("should support aborting multiple times", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
@@ -492,8 +497,6 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not make multiple concurrent refresh token requests", async () => {
-        const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
-
         const deferredTokenRefresh = defer<{ accessToken: string; refreshToken: string }>();
         const fetchFn = jest.fn().mockResolvedValue({
             ok: false,
@@ -523,7 +526,7 @@ describe("FetchHttpApi", () => {
         const prom1 = api.authedRequest(Method.Get, "/path1");
         const prom2 = api.authedRequest(Method.Get, "/path2");
 
-        await jest.advanceTimersByTimeAsync(10); // wait for requests to fire
+        await sleep(0); // wait for requests to fire
         expect(fetchFn).toHaveBeenCalledTimes(2);
         fetchFn.mockResolvedValue({
             ok: true,
@@ -543,6 +546,68 @@ describe("FetchHttpApi", () => {
         await prom1;
         await prom2;
         expect(fetchFn).toHaveBeenCalledTimes(4); // 2 original calls + 2 retries
+        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+        expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
+        expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
+    });
+
+    it("should use newly refreshed token if request starts mid-refresh", async () => {
+        const deferredTokenRefresh = defer<{ accessToken: string; refreshToken: string }>();
+        const fetchFn = jest.fn().mockResolvedValue({
+            ok: false,
+            status: tokenInactiveError.httpStatus,
+            async text() {
+                return JSON.stringify(tokenInactiveError.data);
+            },
+            async json() {
+                return tokenInactiveError.data;
+            },
+            headers: {
+                get: jest.fn().mockReturnValue("application/json"),
+            },
+        });
+        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
+
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+            baseUrl,
+            prefix,
+            fetchFn,
+            doNotAttemptTokenRefresh: false,
+            tokenRefreshFunction,
+            accessToken: "ACCESS_TOKEN",
+            refreshToken: "REFRESH_TOKEN",
+        });
+
+        const prom1 = api.authedRequest(Method.Get, "/path1");
+        await sleep(0); // wait for request to fire
+
+        const prom2 = api.authedRequest(Method.Get, "/path2");
+        await sleep(0); // wait for request to fire
+
+        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
+        fetchFn.mockResolvedValue({
+            ok: true,
+            status: 200,
+            async text() {
+                return "{}";
+            },
+            async json() {
+                return {};
+            },
+            headers: {
+                get: jest.fn().mockReturnValue("application/json"),
+            },
+        });
+
+        await prom1;
+        await prom2;
+        expect(fetchFn).toHaveBeenCalledTimes(3); // 2 original calls + 1 retry
+        expect(fetchFn.mock.calls[0][1]).toEqual(
+            expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer ACCESS_TOKEN" }) }),
+        );
+        expect(fetchFn.mock.calls[2][1]).toEqual(
+            expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer NEW_ACCESS_TOKEN" }) }),
+        );
         expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
         expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
         expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");

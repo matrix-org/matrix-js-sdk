@@ -20,6 +20,10 @@ export enum KeyTransportEvents {
     ReceivedKeys = "received_keys",
 }
 
+export type KeyTransportEventsHandlerMap = {
+    [KeyTransportEvents.ReceivedKeys]: KeyTransportEventListener;
+};
+
 export type KeyTransportEventListener = (
     userId: string,
     deviceId: string,
@@ -27,10 +31,6 @@ export type KeyTransportEventListener = (
     index: number,
     timestamp: number,
 ) => void;
-
-export type KeyTransportEventsHandlerMap = {
-    [KeyTransportEvents.ReceivedKeys]: KeyTransportEventListener;
-};
 
 /**
  * Generic interface for the transport used to share room keys.

@@ -31,7 +31,10 @@ export class ToDeviceKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
 {
-    private readonly logger: Logger;
+    private logger: Logger = rootLogger;
+    public setParentLogger(parentLogger: Logger): void {
+        this.logger = parentLogger.getChild(`[ToDeviceKeyTransport]`);
+    }
 
     public constructor(
         private userId: string,
@@ -42,7 +45,7 @@ export class ToDeviceKeyTransport
         parentLogger?: Logger,
     ) {
         super();
-        this.logger = (parentLogger ?? rootLogger).getChild(`[ToDeviceKeyTransport]`);
+        this.setParentLogger(parentLogger ?? rootLogger);
     }
 
     public start(): void {
