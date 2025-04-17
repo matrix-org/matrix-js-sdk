@@ -73,6 +73,15 @@ describe("RTCEncryptionManager", () => {
     });
 
     describe("Sharing Keys", () => {
+        it("Set up my key asap even if no key distribution is needed", () => {
+            getMembershipMock.mockReturnValue([]);
+
+            encryptionManager.join(undefined);
+
+            // The key should have been rolled out immediately
+            expect(onEncryptionKeysChanged).toHaveBeenCalled();
+        });
+
         it("Should distribute keys to members on join", async () => {
             const members = [
                 aCallMembership("@bob:example.org", "BOBDEVICE"),
