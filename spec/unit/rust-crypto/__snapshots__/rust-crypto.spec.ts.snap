@@ -4,6 +4,7 @@ exports[`RustCrypto importing and exporting room keys should import and export k
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
+  "org.matrix.msc3061.shared_history": false,
   "room_id": "!room:id",
   "sender_claimed_keys": {
     "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0",
@@ -18,6 +19,7 @@ exports[`RustCrypto importing and exporting room keys should import and export k
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
+  "org.matrix.msc3061.shared_history": false,
   "room_id": "!room:id",
   "sender_claimed_keys": {
     "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0",
