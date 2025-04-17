@@ -31,7 +31,7 @@ import { logDurationSync } from "../utils.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
-import { BasicEncryptionManager } from "./BasicEncryptionManager.ts";
+import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import {
     RoomAndToDeviceEvents,
     type RoomAndToDeviceEventsHandlerMap,
@@ -410,7 +410,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
                 // Expose the changes so the ui can display the currently used transport.
                 this.reEmitter.reEmit(transport, [RoomAndToDeviceEvents.EnabledTransportsChanged]);
-                this.encryptionManager = new BasicEncryptionManager(
+                this.encryptionManager = new RTCEncryptionManager(
                     this.client.getUserId()!,
                     this.client.getDeviceId()!,
                     () => this.memberships,

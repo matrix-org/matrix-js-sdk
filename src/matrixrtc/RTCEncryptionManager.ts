@@ -33,9 +33,16 @@ type OutboundEncryptionSession = {
 };
 
 /**
- * A simple encryption manager.
+ * RTCEncryptionManager is used to manage the encryption keys for a call.
+ *
+ * It is responsible for distributing the keys to the other participants and rotating the keys if needed.
+ *
+ * This manager when used with to-device transport will share the existing key only to new joiners, and rotate
+ * if there is a leaver.
+ *
+ * XXX In the future we want to distribute a ratcheted key not the current one for new joiners.
  */
-export class BasicEncryptionManager implements IEncryptionManager {
+export class RTCEncryptionManager implements IEncryptionManager {
     // The current per-sender media key for this device
     private outboundSession: OutboundEncryptionSession | null = null;
 

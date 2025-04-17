@@ -16,16 +16,16 @@ limitations under the License.
 
 import { type Mocked } from "jest-mock";
 
-import { BasicEncryptionManager } from "../../../src/matrixrtc/BasicEncryptionManager.ts";
+import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 import { type CallMembership, type Statistics } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { membershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 
-describe("BasicEncryptionManager", () => {
+describe("RTCEncryptionManager", () => {
     // The manager being tested
-    let encryptionManager: BasicEncryptionManager;
+    let encryptionManager: RTCEncryptionManager;
     let getMembershipMock: jest.Mock;
     let mockTransport: Mocked<ToDeviceKeyTransport>;
     let statistics: Statistics;
@@ -51,7 +51,7 @@ describe("BasicEncryptionManager", () => {
             off: jest.fn(),
         } as unknown as Mocked<ToDeviceKeyTransport>;
 
-        encryptionManager = new BasicEncryptionManager(
+        encryptionManager = new RTCEncryptionManager(
             "@alice:example.org",
             "DEVICE01",
             getMembershipMock,
@@ -294,7 +294,7 @@ describe("BasicEncryptionManager", () => {
                 off: emitter.off.bind(emitter),
                 emit: emitter.emit.bind(emitter),
             } as unknown as Mocked<ToDeviceKeyTransport>;
-            encryptionManager = new BasicEncryptionManager(
+            encryptionManager = new RTCEncryptionManager(
                 "@alice:example.org",
                 "DEVICE01",
                 getMembershipMock,
