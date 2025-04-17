@@ -443,17 +443,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     },
                 );
             }
-            this.encryptionManager = new EncryptionManager(
-                this.client.getUserId()!,
-                this.client.getDeviceId()!,
-                () => this.memberships,
-                transport,
-                this.statistics,
-                (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
-                    this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
-                },
-                this.logger,
-            );
         }
 
         // Join!

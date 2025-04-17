@@ -21,6 +21,7 @@ import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
 import { makeMockEvent, makeMockRoom, makeMockRoomState, membershipTemplate, makeKey } from "./mocks";
+import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 
 const mockFocus = { type: "mock" };
 
@@ -1016,6 +1017,9 @@ describe("MatrixRTCSession", () => {
                     await keySentPromise;
 
                     expect(sendToDeviceMock).toHaveBeenCalled();
+
+                    // Access private to test
+                    expect(sess["encryptionManager"]).toBeInstanceOf(RTCEncryptionManager);
                 } finally {
                     jest.useRealTimers();
                 }
