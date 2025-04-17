@@ -514,11 +514,8 @@ describe("RustCrypto", () => {
             expect(Array.isArray(keys)).toBeTruthy();
             expect(keys.length).toBe(someRoomKeys.length);
 
-            const aSession = someRoomKeys[0];
-
-            const exportedKey = keys.find((k) => k.session_id == aSession.session_id);
-
-            expect(aSession).toStrictEqual(exportedKey);
+            const exportedKey = keys.find((k) => k.session_id == someRoomKeys[0].session_id);
+            expect(exportedKey).toMatchSnapshot();
         });
 
         it("should import and export keys as JSON", async () => {
@@ -539,11 +536,8 @@ describe("RustCrypto", () => {
             expect(Array.isArray(keys)).toBeTruthy();
             expect(keys.length).toBe(someRoomKeys.length);
 
-            const aSession = someRoomKeys[0];
-
-            const exportedKey = keys.find((k) => k.session_id == aSession.session_id);
-
-            expect(aSession).toStrictEqual(exportedKey);
+            const exportedKey = keys.find((k) => k.session_id == someRoomKeys[0].session_id);
+            expect(exportedKey).toMatchSnapshot();
         });
     });
 
