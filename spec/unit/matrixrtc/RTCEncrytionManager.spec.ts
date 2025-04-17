@@ -77,7 +77,9 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue([]);
 
             encryptionManager.join(undefined);
-
+            // After join it is too early, key might be lost as no one is listening yet
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+            encryptionManager.onMembershipsUpdate([]);
             // The key should have been rolled out immediately
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
         });
@@ -91,6 +93,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -114,6 +117,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -169,6 +173,7 @@ describe("RTCEncryptionManager", () => {
 
             // initial rollout
             encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
             await jest.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
@@ -217,6 +222,7 @@ describe("RTCEncryptionManager", () => {
 
             // initial rollout
             encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
             await jest.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
@@ -246,6 +252,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
             await jest.advanceTimersByTimeAsync(10);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
@@ -324,6 +331,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
             await jest.advanceTimersByTimeAsync(10);
 
             mockTransport.emit(
@@ -431,6 +439,7 @@ describe("RTCEncryptionManager", () => {
 
         // Let's join
         encryptionManager.join(undefined);
+        encryptionManager.onMembershipsUpdate([]);
         await jest.advanceTimersByTimeAsync(10);
 
         // The initial rollout

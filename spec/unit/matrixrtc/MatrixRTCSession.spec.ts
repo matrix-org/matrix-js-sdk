@@ -1013,6 +1013,7 @@ describe("MatrixRTCSession", () => {
                         useNewMembershipManager: true,
                         useExperimentalToDeviceTransport: true,
                     });
+                    sess.onRTCSessionMemberUpdate();
 
                     await keySentPromise;
 

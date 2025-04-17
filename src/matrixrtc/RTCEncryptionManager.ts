@@ -96,8 +96,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.delayRolloutTimeMillis = joinConfig?.useKeyDelay ?? 1000;
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.start();
-
-        this.ensureMediaKey();
     }
 
     public leave(): void {
