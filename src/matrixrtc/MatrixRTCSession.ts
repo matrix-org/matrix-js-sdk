@@ -424,6 +424,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                             participantId,
                         );
                     },
+                    this.logger,
                 );
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
