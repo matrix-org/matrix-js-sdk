@@ -17,8 +17,7 @@ limitations under the License.
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type IKeyTransport, KeyTransportEvents, type KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
-import type { CallMembership } from "./CallMembership.ts";
-import type { EncryptionKeysToDeviceEventContent, Statistics } from "./types.ts";
+import { type EncryptionKeysToDeviceEventContent, type ParticipantDeviceInfo, type Statistics } from "./types.ts";
 import { ClientEvent, type MatrixClient } from "../client.ts";
 import type { MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
@@ -32,6 +31,7 @@ export class ToDeviceKeyTransport
     implements IKeyTransport
 {
     private logger: Logger = rootLogger;
+
     public setParentLogger(parentLogger: Logger): void {
         this.logger = parentLogger.getChild(`[ToDeviceKeyTransport]`);
     }
@@ -56,7 +56,7 @@ export class ToDeviceKeyTransport
         this.client.off(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
-    public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
+    public async sendKey(keyBase64Encoded: string, index: number, members: ParticipantDeviceInfo[]): Promise<void> {
         const content: EncryptionKeysToDeviceEventContent = {
             keys: {
                 index: index,
@@ -75,21 +75,14 @@ export class ToDeviceKeyTransport
         };
 
         const targets = members
-            .filter((member) => {
-                // filter malformed call members
-                if (member.sender == undefined || member.deviceId == undefined) {
-                    this.logger.warn(`Malformed call member: ${member.sender}|${member.deviceId}`);
-                    return false;
-                }
-                // Filter out me
-                return !(member.sender == this.userId && member.deviceId == this.deviceId);
-            })
             .map((member) => {
                 return {
-                    userId: member.sender!,
+                    userId: member.userId!,
                     deviceId: member.deviceId!,
                 };
-            });
+            })
+            // filter out me
+            .filter((member) => !(member.userId == this.userId && member.deviceId == this.deviceId));
 
         if (targets.length > 0) {
             await this.client.encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content);

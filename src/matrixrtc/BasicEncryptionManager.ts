@@ -21,26 +21,19 @@ import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
-import { type InboundEncryptionSession, type ParticipantId, type Statistics } from "./types.ts";
+import type { InboundEncryptionSession, ParticipantDeviceInfo, ParticipantId, Statistics } from "./types.ts";
 import { getParticipantId, KeyBuffer } from "./utils.ts";
-
-type DeviceInfo = {
-    userId: string;
-    deviceId: string;
-};
 
 type OutboundEncryptionSession = {
     key: Uint8Array;
     creationTS: number;
-    sharedWith: Array<DeviceInfo>;
+    sharedWith: Array<ParticipantDeviceInfo>;
     // This is an index acting as the id of the key
     keyId: number;
 };
 
 /**
  * A simple encryption manager.
- * This manager is basic because it will rotate the keys for any membership change.
- * There is no ratcheting, or time based rotation.
  */
 export class BasicEncryptionManager implements IEncryptionManager {
     // The current per-sender media key for this device
@@ -53,11 +46,11 @@ export class BasicEncryptionManager implements IEncryptionManager {
     /** The time to wait before using outbound session after it has been distributed */
     private delayRolloutTimeMillis = 1000;
     /**
-     * If a new key is needed while the current one is being distributed, we will set this flag to true.
-     * This will ensure that a new key is distributed as soon as the current one is done.
+     * If a new key distribution is being requested while one is going on, we will set this flag to true.
+     * This will ensure that a new round is started after the current one.
      * @private
      */
-    private needToRotateAgain = false;
+    private needToEnsureKeyAgain = false;
 
     /**
      * There is a possibility that keys arrive in wrong order.
@@ -117,8 +110,9 @@ export class BasicEncryptionManager implements IEncryptionManager {
             this.currentKeyDistributionPromise = this.rolloutOutboundKey().then(() => {
                 this.logger.debug(`Rollout completed`);
                 this.currentKeyDistributionPromise = null;
-                if (this.needToRotateAgain) {
+                if (this.needToEnsureKeyAgain) {
                     this.logger.debug(`New Rollout needed`);
+                    this.needToEnsureKeyAgain = false;
                     // rollout a new one
                     this.ensureMediaKey();
                 }
@@ -127,7 +121,7 @@ export class BasicEncryptionManager implements IEncryptionManager {
             // There is a rollout in progress, but a key rotation is requested (could be caused by a membership change)
             // Remember that a new rotation is needed after the current one.
             this.logger.debug(`Rollout in progress, a new rollout will be started after the current one`);
-            this.needToRotateAgain = true;
+            this.needToEnsureKeyAgain = true;
         }
     }
 
@@ -161,58 +155,115 @@ export class BasicEncryptionManager implements IEncryptionManager {
     public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
         this.logger.trace(`onMembershipsUpdate`);
 
-        // This encryption manager is very basic, it will rotate the key for any membership change
-        // Request rotation of the key
+        // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
+        // If there is an ongoing distribution, it will be completed before a new one is started.
         this.ensureMediaKey();
     }
 
     private async rolloutOutboundKey(): Promise<void> {
-        const isFirstKey = this.outboundSession != null;
+        const isFirstKey = this.outboundSession == null;
+        if (isFirstKey) {
+            // create the first key
+            this.outboundSession = {
+                key: this.generateRandomKey(),
+                creationTS: Date.now(),
+                sharedWith: [],
+                keyId: 0,
+            };
+        }
+        // get current memberships
+        const toShareWith: ParticipantDeviceInfo[] = this.getMemberships()
+            .filter((membership) => {
+                return membership.sender != undefined;
+            })
+            .map((membership) => {
+                return {
+                    userId: membership.sender!,
+                    deviceId: membership.deviceId,
+                    membershipTs: membership.createdTs(),
+                };
+            });
 
-        // Create a new key
-        const newOutboundKey: OutboundEncryptionSession = {
-            key: this.generateRandomKey(),
-            creationTS: Date.now(),
-            sharedWith: [],
-            keyId: this.nextKeyIndex(),
-        };
+        let alreadySharedWith = this.outboundSession?.sharedWith ?? [];
 
-        this.logger.info(`creating new outbound key index:${newOutboundKey.keyId}`);
-        // Set this new key as the current one
-        this.outboundSession = newOutboundKey;
-        this.needToRotateAgain = false;
-        const toShareWith = this.getMemberships();
+        // Some users might have rotate their membership event (formally called fingerprint) meaning they might have
+        // clear their key. Reset the `alreadySharedWith` flag for them.
+        alreadySharedWith = alreadySharedWith.filter(
+            (x) =>
+                // If there was a member with same userId and deviceId but different membershipTs, we need to clear it
+                !toShareWith.some(
+                    (o) => x.userId == o.userId && x.deviceId == o.deviceId && x.membershipTs != o.membershipTs,
+                ),
+        );
+
+        const anyLeft = alreadySharedWith.filter(
+            (x) =>
+                !toShareWith.some(
+                    (o) => x.userId == o.userId && x.deviceId == o.deviceId && x.membershipTs == o.membershipTs,
+                ),
+        );
+        const anyJoined = toShareWith.filter(
+            (x) =>
+                !alreadySharedWith.some(
+                    (o) => x.userId == o.userId && x.deviceId == o.deviceId && x.membershipTs == o.membershipTs,
+                ),
+        );
+
+        let toDistributeTo: ParticipantDeviceInfo[] = [];
+        let outboundKey: OutboundEncryptionSession;
+        let hasKeyChanged = false;
+        if (anyLeft.length > 0) {
+            // We need to rotate the key
+            const newOutboundKey: OutboundEncryptionSession = {
+                key: this.generateRandomKey(),
+                creationTS: Date.now(),
+                sharedWith: [],
+                keyId: this.nextKeyIndex(),
+            };
+            hasKeyChanged = true;
+
+            this.logger.info(`creating new outbound key index:${newOutboundKey.keyId}`);
+            // Set this new key as the current one
+            this.outboundSession = newOutboundKey;
+
+            // Send
+            toDistributeTo = toShareWith;
+            outboundKey = newOutboundKey;
+        } else if (anyJoined.length > 0) {
+            // keep the same key
+            // XXX In the future we want to distribute a ratcheted key not the current one
+            toDistributeTo = anyJoined;
+            outboundKey = this.outboundSession!;
+        } else {
+            // no changes
+            return;
+        }
 
         try {
             this.logger.trace(`Sending key...`);
-            await this.transport.sendKey(encodeBase64(newOutboundKey.key), newOutboundKey.keyId, toShareWith);
+            await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
-            newOutboundKey.sharedWith = toShareWith.map((ms) => {
-                return {
-                    userId: ms.sender ?? "",
-                    deviceId: ms.deviceId ?? "",
-                };
-            });
+            outboundKey.sharedWith.push(...toDistributeTo);
             this.logger.trace(
-                `key index:${newOutboundKey.keyId} sent to ${newOutboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
+                `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
             );
-            if (!isFirstKey) {
+            if (isFirstKey) {
                 this.logger.trace(`Rollout immediately`);
                 // rollout immediately
                 this.onEncryptionKeysChanged(
-                    newOutboundKey.key,
-                    newOutboundKey.keyId,
+                    outboundKey.key,
+                    outboundKey.keyId,
                     getParticipantId(this.userId, this.deviceId),
                 );
-            } else {
+            } else if (hasKeyChanged) {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
-                this.logger.trace(`Delay Rollout for key:${newOutboundKey.keyId}...`);
+                this.logger.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
                 await sleep(this.delayRolloutTimeMillis);
-                this.logger.trace(`...Delayed rollout of index:${newOutboundKey.keyId} `);
+                this.logger.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
                 this.onEncryptionKeysChanged(
-                    newOutboundKey.key,
-                    newOutboundKey.keyId,
+                    outboundKey.key,
+                    outboundKey.keyId,
                     getParticipantId(this.userId, this.deviceId),
                 );
             }

@@ -23,6 +23,12 @@ export interface EncryptionKeyEntry {
     key: string;
 }
 
+export type ParticipantDeviceInfo = {
+    userId: string;
+    deviceId: string;
+    membershipTs: number;
+};
+
 /**
  * A type representing the information needed to decrypt video streams.
  */

@@ -399,7 +399,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
-
                 this.logger.info("Using experimental to-device transport for encryption keys");
                 this.logger.info("Using to-device with room fallback transport for encryption keys");
                 const [uId, dId] = [this.client.getUserId()!, this.client.getDeviceId()!];

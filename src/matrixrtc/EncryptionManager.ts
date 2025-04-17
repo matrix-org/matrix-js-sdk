@@ -83,6 +83,7 @@ export class EncryptionManager implements IEncryptionManager {
     private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
     private logger: Logger;
+
     public constructor(
         private userId: string,
         private deviceId: string,
@@ -281,7 +282,18 @@ export class EncryptionManager implements IEncryptionManager {
 
         try {
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
-            await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, this.getMemberships());
+            const targets = this.getMemberships()
+                .filter((membership) => {
+                    return membership.sender != undefined;
+                })
+                .map((membership) => {
+                    return {
+                        userId: membership.sender!,
+                        deviceId: membership.deviceId,
+                        membershipTs: membership.createdTs(),
+                    };
+                });
+            await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, targets);
             this.logger.debug(
                 `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
