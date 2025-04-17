@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import loglevel, { LoggingMethod } from "loglevel";
+import loglevel from "loglevel";
 
 /** Backwards-compatibility hack to expose `log` to applications that might still be relying on it. */
 interface LoggerWithLogMethod extends Logger {
@@ -137,18 +137,8 @@ function getPrefixedLogger(prefix?: string): LoggerWithLogMethod {
         prefixLogger.prefix = prefix;
         prefixLogger.getChild = (childPrefix): Logger => {
             const childLogger = getPrefixedLogger((prefix ?? "") + childPrefix) as unknown as loglevel.Logger;
-            childLogger.methodFactory = (methodName, configLevel, loggerName): LoggingMethod => {
-                const method = (logger as unknown as loglevel.Logger).methodFactory(
-                    methodName,
-                    configLevel,
-                    loggerName,
-                );
-                return (...args): void => {
-                    method.apply(childLogger, args);
-                };
-            };
+            childLogger.methodFactory = (logger as unknown as loglevel.Logger).methodFactory;
             childLogger.setLevel(childLogger.getLevel());
-
             return childLogger as unknown as Logger;
         };
         prefixLogger.setLevel(loglevel.levels.DEBUG, false);
