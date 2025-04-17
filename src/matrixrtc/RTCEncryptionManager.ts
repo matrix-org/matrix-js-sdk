@@ -147,7 +147,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         const validSession = this.keyBuffer.disambiguate(participantId, candidateInboundSession);
         if (validSession) {
-            this.onEncryptionKeysChanged(validSession.key, index, validSession.participantId);
+            this.onEncryptionKeysChanged(validSession.key, validSession.keyIndex, validSession.participantId);
             this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
             this.logger.info(`Received an out of order key for ${userId}:${deviceId}, dropping it`);
@@ -177,6 +177,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 sharedWith: [],
                 keyId: 0,
             };
+            this.onEncryptionKeysChanged(
+                this.outboundSession.key,
+                this.outboundSession.keyId,
+                getParticipantId(this.userId, this.deviceId),
+            );
         }
         // get current memberships
         const toShareWith: ParticipantDeviceInfo[] = this.getMemberships()
@@ -254,15 +259,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             this.logger.trace(
                 `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
             );
-            if (isFirstKey) {
-                this.logger.trace(`Rollout immediately`);
-                // rollout immediately
-                this.onEncryptionKeysChanged(
-                    outboundKey.key,
-                    outboundKey.keyId,
-                    getParticipantId(this.userId, this.deviceId),
-                );
-            } else if (hasKeyChanged) {
+            if (hasKeyChanged) {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
                 this.logger.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
