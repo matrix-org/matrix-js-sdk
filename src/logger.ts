@@ -131,22 +131,20 @@ interface PrefixedLogger extends loglevel.Logger, LoggerWithLogMethod {
 function getPrefixedLogger(prefix?: string): PrefixedLogger {
     const loggerName = DEFAULT_NAMESPACE + (prefix === undefined ? "" : `-${prefix}`);
     const prefixLogger = loglevel.getLogger(loggerName) as PrefixedLogger;
-    // This is a save cast since export const logger is constructed with getPrefixedLogger
-    // It is downcastet to `Logger` to minimize the public/exported api.
+
     if (prefixLogger.getChild === undefined) {
         // This is a new loglevel Logger which has not been turned into a PrefixedLogger yet.
         prefixLogger.prefix = prefix;
         prefixLogger.getChild = (childPrefix): Logger => {
-            const rootLogger = logger as PrefixedLogger;
             // create the new child logger
             const childLogger = getPrefixedLogger((prefix ?? "") + childPrefix);
             // assign the same methodFactory as the root logger.
             // this is useful if we add extensions to the root logger that modify
             // its methodFactory. (an example extension is: storing each log to a rageshake db)
-            childLogger.methodFactory = rootLogger.methodFactory;
+            childLogger.methodFactory = prefixLogger.methodFactory;
             // rebuild the child logger with the new methodFactory.
             childLogger.rebuild();
-            return childLogger as Logger;
+            return childLogger;
         };
         prefixLogger.setLevel(loglevel.levels.DEBUG, false);
     }
