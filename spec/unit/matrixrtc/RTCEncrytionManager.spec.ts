@@ -22,6 +22,9 @@ import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTra
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { membershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
+import { RoomAndToDeviceTransport } from "../../../src/matrixrtc/RoomAndToDeviceKeyTransport.ts";
+import { type RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
+import type { Logger } from "../../../src/logger.ts";
 
 describe("RTCEncryptionManager", () => {
     // The manager being tested
@@ -502,6 +505,86 @@ describe("RTCEncryptionManager", () => {
                     membershipTs: 1000,
                 },
             ],
+        );
+    });
+
+    it("Should re-distribute key on transport switch", async () => {
+        const toDeviceEmitter = new TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>();
+        const mockToDeviceTransport = {
+            start: jest.fn(),
+            stop: jest.fn(),
+            sendKey: jest.fn().mockResolvedValue(undefined),
+            on: toDeviceEmitter.on.bind(toDeviceEmitter),
+            off: toDeviceEmitter.off.bind(toDeviceEmitter),
+            emit: toDeviceEmitter.emit.bind(toDeviceEmitter),
+            setParentLogger: jest.fn(),
+        } as unknown as Mocked<ToDeviceKeyTransport>;
+
+        const roomEmitter = new TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>();
+        const mockRoomTransport = {
+            start: jest.fn(),
+            stop: jest.fn(),
+            sendKey: jest.fn().mockResolvedValue(undefined),
+            on: roomEmitter.on.bind(roomEmitter),
+            off: roomEmitter.off.bind(roomEmitter),
+            emit: roomEmitter.emit.bind(roomEmitter),
+            setParentLogger: jest.fn(),
+        } as unknown as Mocked<RoomKeyTransport>;
+
+        const mockLogger = {
+            debug: jest.fn(),
+            warn: jest.fn(),
+        } as unknown as Mocked<Logger>;
+
+        const transport = new RoomAndToDeviceTransport(mockToDeviceTransport, mockRoomTransport, {
+            getChild: jest.fn().mockReturnValue(mockLogger),
+        } as unknown as Mocked<Logger>);
+
+        encryptionManager = new RTCEncryptionManager(
+            "@alice:example.org",
+            "DEVICE01",
+            getMembershipMock,
+            transport,
+            statistics,
+            onEncryptionKeysChanged,
+        );
+
+        const members = [
+            aCallMembership("@bob:example.org", "BOBDEVICE"),
+            aCallMembership("@bob:example.org", "BOBDEVICE2"),
+            aCallMembership("@carl:example.org", "CARLDEVICE"),
+        ];
+        getMembershipMock.mockReturnValue(members);
+
+        // Let's join
+        encryptionManager.join(undefined);
+        encryptionManager.onMembershipsUpdate([]);
+        await jest.advanceTimersByTimeAsync(10);
+
+        // Should have sent the key to the toDevice transport
+        expect(mockToDeviceTransport.sendKey).toHaveBeenCalledTimes(1);
+        expect(mockRoomTransport.sendKey).not.toHaveBeenCalled();
+
+        // Simulate receiving a key by room transport
+        roomEmitter.emit(
+            KeyTransportEvents.ReceivedKeys,
+            "@bob:example.org",
+            "BOBDEVICE",
+            "AAAAAAAAAAA",
+            0 /* KeyId */,
+            0 /* Timestamp */,
+        );
+
+        await jest.runOnlyPendingTimersAsync();
+
+        // The key should have beed re-distributed to the room transport
+        expect(mockRoomTransport.sendKey).toHaveBeenCalled();
+        expect(mockToDeviceTransport.sendKey).toHaveBeenCalledWith(
+            expect.any(String),
+            // It is the first key re-distributed
+            0,
+            // to all the members
+            members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
         );
     });
 
