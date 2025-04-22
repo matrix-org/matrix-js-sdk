@@ -33,6 +33,10 @@ interface LoggerWithLogMethod extends Logger {
 export interface Logger extends BaseLogger {
     /**
      * Create a child logger.
+     * This child will apply the methodFactory of the parent. So any log extensions applied to the parent
+     * at the time of calling `getChild` will be applied to the child as well.
+     * It will NOT apply changes to the parents methodFactory after the child was created.
+     * Those changes will not be applied manually to the child.
      *
      * @param namespace - name to add to the current logger to generate the child. Some implementations of `Logger`
      *    use this as a prefix; others use a different mechanism.
