@@ -34,6 +34,11 @@ export interface Logger extends BaseLogger {
     /**
      * Create a child logger.
      *
+     * This child will use the `methodFactory` of the parent, so any log extensions applied to the parent
+     * at the time of calling `getChild` will be applied to the child as well.
+     * It will NOT apply changes to the parent's `methodFactory` after the child was created.
+     * Those changes need to be applied to the child manually.
+     *
      * @param namespace - name to add to the current logger to generate the child. Some implementations of `Logger`
      *    use this as a prefix; others use a different mechanism.
      */
@@ -128,14 +133,24 @@ interface PrefixedLogger extends loglevel.Logger, LoggerWithLogMethod {
  *
  * @param prefix Prefix to add to each logged line. If undefined, no prefix will be added.
  */
-function getPrefixedLogger(prefix?: string): LoggerWithLogMethod {
+function getPrefixedLogger(prefix?: string): PrefixedLogger {
     const loggerName = DEFAULT_NAMESPACE + (prefix === undefined ? "" : `-${prefix}`);
     const prefixLogger = loglevel.getLogger(loggerName) as PrefixedLogger;
 
     if (prefixLogger.getChild === undefined) {
         // This is a new loglevel Logger which has not been turned into a PrefixedLogger yet.
         prefixLogger.prefix = prefix;
-        prefixLogger.getChild = (childPrefix): Logger => getPrefixedLogger((prefix ?? "") + childPrefix);
+        prefixLogger.getChild = (childPrefix): Logger => {
+            // create the new child logger
+            const childLogger = getPrefixedLogger((prefix ?? "") + childPrefix);
+            // Assign the methodFactory from the parent logger.
+            // This is useful if we add extensions to the parent logger that modifies
+            // its methodFactory. (An example extension is: storing each log to a rageshake db)
+            childLogger.methodFactory = prefixLogger.methodFactory;
+            // Rebuild the child logger with the new methodFactory.
+            childLogger.rebuild();
+            return childLogger;
+        };
         prefixLogger.setLevel(loglevel.levels.DEBUG, false);
     }
 
@@ -146,7 +161,7 @@ function getPrefixedLogger(prefix?: string): LoggerWithLogMethod {
  * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
-export const logger = getPrefixedLogger();
+export const logger = getPrefixedLogger() as LoggerWithLogMethod;
 
 /**
  * A "span" for grouping related log lines together.
