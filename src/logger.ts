@@ -33,10 +33,11 @@ interface LoggerWithLogMethod extends Logger {
 export interface Logger extends BaseLogger {
     /**
      * Create a child logger.
-     * This child will apply the methodFactory of the parent. So any log extensions applied to the parent
+     *
+     * This child will use the `methodFactory` of the parent, so any log extensions applied to the parent
      * at the time of calling `getChild` will be applied to the child as well.
-     * It will NOT apply changes to the parents methodFactory after the child was created.
-     * Those changes will not be applied manually to the child.
+     * It will NOT apply changes to the parent's `methodFactory` after the child was created.
+     * Those changes need to be applied to the child manually.
      *
      * @param namespace - name to add to the current logger to generate the child. Some implementations of `Logger`
      *    use this as a prefix; others use a different mechanism.
@@ -142,11 +143,11 @@ function getPrefixedLogger(prefix?: string): PrefixedLogger {
         prefixLogger.getChild = (childPrefix): Logger => {
             // create the new child logger
             const childLogger = getPrefixedLogger((prefix ?? "") + childPrefix);
-            // assign the same methodFactory as the root logger.
-            // this is useful if we add extensions to the root logger that modify
-            // its methodFactory. (an example extension is: storing each log to a rageshake db)
+            // Assign the methodFactory from the parent logger.
+            // This is useful if we add extensions to the parent logger that modifies
+            // its methodFactory. (An example extension is: storing each log to a rageshake db)
             childLogger.methodFactory = prefixLogger.methodFactory;
-            // rebuild the child logger with the new methodFactory.
+            // Rebuild the child logger with the new methodFactory.
             childLogger.rebuild();
             return childLogger;
         };
