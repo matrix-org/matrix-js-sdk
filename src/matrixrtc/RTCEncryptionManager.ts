@@ -20,7 +20,7 @@ import { type CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
-import { sleep } from "../utils.ts";
+import { defer, type IDeferred, sleep } from "../utils.ts";
 import type { InboundEncryptionSession, ParticipantDeviceInfo, ParticipantId, Statistics } from "./types.ts";
 import { getParticipantId, KeyBuffer } from "./utils.ts";
 import {
@@ -75,6 +75,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger;
 
+    private currentRatchetRequest: IDeferred<{ key: ArrayBuffer; keyIndex: number }> | null = null;
+
     public constructor(
         private userId: string,
         private deviceId: string,
@@ -86,9 +88,10 @@ export class RTCEncryptionManager implements IEncryptionManager {
             encryptionKeyIndex: number,
             participantId: ParticipantId,
         ) => void,
+        private ratchetKey: (participantId: ParticipantId, encryptionKeyIndex: number) => void,
         parentLogger?: Logger,
     ) {
-        this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
+        this.logger = (parentLogger ?? rootLogger).getChild(`[RTCEncryptionManager]`);
     }
 
     public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
@@ -163,7 +166,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
-        this.logger.debug(`Received key over transport ${userId}:${deviceId} at index ${index}`);
+        this.logger.debug(
+            `Received key over transport ${userId}:${deviceId} at index ${index} key: ${keyBase64Encoded}`,
+        );
 
         // We received a new key, notify the video layer of this new key so that it can decrypt the frames properly.
         const participantId = getParticipantId(userId, deviceId);
@@ -216,7 +221,13 @@ export class RTCEncryptionManager implements IEncryptionManager {
         // get current memberships
         const toShareWith: ParticipantDeviceInfo[] = this.getMemberships()
             .filter((membership) => {
-                return membership.sender != undefined;
+                return (
+                    membership.sender != undefined &&
+                    !(
+                        // filter me out
+                        (membership.sender == this.userId && membership.deviceId == this.deviceId)
+                    )
+                );
             })
             .map((membership) => {
                 return {
@@ -272,23 +283,49 @@ export class RTCEncryptionManager implements IEncryptionManager {
             toDistributeTo = toShareWith;
             outboundKey = newOutboundKey;
         } else if (anyJoined.length > 0) {
-            // keep the same key
-            // XXX In the future we want to distribute a ratcheted key not the current one
+            if (this.outboundSession!.sharedWith.length > 0) {
+                // This key was already shared with someone, we need to ratchet it
+                // We want to ratchet the current key and only distribute the ratcheted key to the new joiners
+                // This needs to send some async messages, so we need to wait for the ratchet to finish
+                const deferredKey = defer<{ key: ArrayBuffer; keyIndex: number }>();
+                this.currentRatchetRequest = deferredKey;
+                this.logger.info(`Query ratcheting key index:${this.outboundSession!.keyId} ...`);
+                this.ratchetKey(getParticipantId(this.userId, this.deviceId), this.outboundSession!.keyId);
+                const res = await Promise.race([deferredKey.promise, sleep(1000)]);
+                if (res === undefined) {
+                    // TODO: we might want to rotate the key instead?
+                    this.logger.error("Ratchet key timed out sharing the same key for now :/");
+                } else {
+                    const { key, keyIndex } = await deferredKey.promise;
+                    this.logger.info(
+                        `... Ratcheting done key index:${keyIndex} key:${encodeBase64(new Uint8Array(key))}`,
+                    );
+                    this.outboundSession!.key = new Uint8Array(key);
+                    this.onEncryptionKeysChanged(
+                        this.outboundSession!.key,
+                        this.outboundSession!.keyId,
+                        getParticipantId(this.userId, this.deviceId),
+                    );
+                }
+            }
             toDistributeTo = anyJoined;
             outboundKey = this.outboundSession!;
         } else {
-            // no changes
-            return;
+            // No one joined or left, it could just be the first key, keep going
+            toDistributeTo = [];
+            outboundKey = this.outboundSession!;
         }
 
         try {
-            this.logger.trace(`Sending key...`);
-            await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
-            this.statistics.counters.roomEventEncryptionKeysSent += 1;
-            outboundKey.sharedWith.push(...toDistributeTo);
-            this.logger.trace(
-                `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
-            );
+            if (toDistributeTo.length > 0) {
+                this.logger.trace(`Sending key...`);
+                await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
+                this.statistics.counters.roomEventEncryptionKeysSent += 1;
+                outboundKey.sharedWith.push(...toDistributeTo);
+                this.logger.trace(
+                    `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
+                );
+            }
             if (hasKeyChanged) {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
@@ -317,5 +354,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
         const key = new Uint8Array(16);
         globalThis.crypto.getRandomValues(key);
         return key;
+    }
+
+    public onOwnKeyRatcheted(key: ArrayBuffer, keyIndex: number | undefined): void {
+        this.logger.debug(`Own key ratcheted for key index:${keyIndex} key:${encodeBase64(new Uint8Array(key))}`);
+
+        this.currentRatchetRequest?.resolve({ key, keyIndex: keyIndex! });
     }
 }
