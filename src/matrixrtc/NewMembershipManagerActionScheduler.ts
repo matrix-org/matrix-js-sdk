@@ -1,9 +1,7 @@
-import { logger as rootLogger } from "../logger.ts";
+import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type EmptyObject } from "../matrix.ts";
 import { sleep } from "../utils.ts";
 import { MembershipActionType } from "./NewMembershipManager.ts";
-
-const logger = rootLogger.getChild("MatrixRTCSession");
 
 /** @internal */
 export interface Action {
@@ -40,6 +38,7 @@ export type ActionUpdate =
  * @internal
  */
 export class ActionScheduler {
+    private logger: Logger;
     /**
      * This is tracking the state of the scheduler loop.
      * Only used to prevent starting the loop twice.
@@ -49,11 +48,14 @@ export class ActionScheduler {
     public constructor(
         /** This is the callback called for each scheduled action (`this.addAction()`) */
         private membershipLoopHandler: (type: MembershipActionType) => Promise<ActionUpdate>,
-    ) {}
+        parentLogger?: Logger,
+    ) {
+        this.logger = (parentLogger ?? rootLogger).getChild(`[NewMembershipActionScheduler]`);
+    }
 
     // function for the wakeup mechanism (in case we add an action externally and need to leave the current sleep)
     private wakeup: (update: ActionUpdate) => void = (update: ActionUpdate): void => {
-        logger.error("Cannot call wakeup before calling `startWithJoin()`");
+        this.logger.error("Cannot call wakeup before calling `startWithJoin()`");
     };
     private _actions: Action[] = [];
     public get actions(): Action[] {
@@ -69,7 +71,7 @@ export class ActionScheduler {
      */
     public async startWithJoin(): Promise<void> {
         if (this.running) {
-            logger.error("Cannot call startWithJoin() on NewMembershipActionScheduler while already running");
+            this.logger.error("Cannot call startWithJoin() on NewMembershipActionScheduler while already running");
             return;
         }
         this.running = true;
@@ -92,7 +94,7 @@ export class ActionScheduler {
 
                 let handlerResult: ActionUpdate = {};
                 if (!wakeupUpdate) {
-                    logger.debug(
+                    this.logger.debug(
                         `Current MembershipManager processing: ${nextAction.type}\nQueue:`,
                         this._actions,
                         `\nDate.now: "${Date.now()}`,
@@ -121,7 +123,7 @@ export class ActionScheduler {
             this.running = false;
         }
 
-        logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
+        this.logger.debug("Leave MembershipManager ActionScheduler loop (no more actions)");
     }
 
     public initiateJoin(): void {

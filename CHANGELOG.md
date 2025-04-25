@@ -1,3 +1,32 @@
+Changes in [37.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.4.0) (2025-04-22)
+==================================================================================================
+## ✨ Features
+
+* MatrixRTC: Add combined `toDeviceAndRoomKeyTransport` ([#4792](https://github.com/matrix-org/matrix-js-sdk/pull/4792)). Contributed by @toger5.
+* Make logging consistent for matrixRTC ([#4788](https://github.com/matrix-org/matrix-js-sdk/pull/4788)). Contributed by @toger5.
+* MatrixRTC: ToDevice distribution for media stream keys ([#4785](https://github.com/matrix-org/matrix-js-sdk/pull/4785)). Contributed by @BillCarsonFr.
+
+## 🐛 Bug Fixes
+
+* Fix token refresh racing with other requests and not using new token ([#4798](https://github.com/matrix-org/matrix-js-sdk/pull/4798)). Contributed by @t3chguy.
+* Fix fallback to MemoryCryptoStore when LocalStorage unavailable ([#4797](https://github.com/matrix-org/matrix-js-sdk/pull/4797)). Contributed by @t3chguy.
+* Remove duplicate `deleteSecretStorage` in `RustCrypto.resetEncryption` ([#4789](https://github.com/matrix-org/matrix-js-sdk/pull/4789)). Contributed by @florianduros.
+* Fix `RustCrypto.resetEncryption` failure ([#4772](https://github.com/matrix-org/matrix-js-sdk/pull/4772)). Contributed by @florianduros.
+
+
+Changes in [37.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.3.0) (2025-04-08)
+==================================================================================================
+## ✨ Features
+
+* MatrixRTC MembershipManger: remove redundant sendDelayedEventAction and expose status ([#4747](https://github.com/matrix-org/matrix-js-sdk/pull/4747)). Contributed by @toger5.
+* Abstract logout-causing error type from tokenRefreshFunction calls ([#4765](https://github.com/matrix-org/matrix-js-sdk/pull/4765)). Contributed by @t3chguy.
+* Improve PushProcessor::getPushRuleGlobRegex ([#4764](https://github.com/matrix-org/matrix-js-sdk/pull/4764)). Contributed by @t3chguy.
+* Export push processor \& method for converting matrix glob to regexp ([#4763](https://github.com/matrix-org/matrix-js-sdk/pull/4763)). Contributed by @t3chguy.
+* Add authenticated media parameter to getMediaConfig ([#4762](https://github.com/matrix-org/matrix-js-sdk/pull/4762)). Contributed by @m004.
+* Rust crypto: set a timeout on outgoing HTTP requests ([#4761](https://github.com/matrix-org/matrix-js-sdk/pull/4761)). Contributed by @richvdh.
+* Switch sliding sync support to simplified sliding sync ([#4400](https://github.com/matrix-org/matrix-js-sdk/pull/4400)). Contributed by @dbkr.
+
+
 Changes in [37.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.2.0) (2025-03-25)
 ==================================================================================================
 ## ✨ Features

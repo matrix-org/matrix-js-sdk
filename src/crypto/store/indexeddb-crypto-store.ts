@@ -204,9 +204,12 @@ export class IndexedDBCryptoStore implements CryptoStore {
                 );
 
                 try {
+                    if (!(globalThis.localStorage instanceof Storage)) {
+                        throw new Error("localStorage is not available");
+                    }
                     return new LocalStorageCryptoStore(globalThis.localStorage);
                 } catch (e) {
-                    logger.warn(`unable to open localStorage: falling back to in-memory store: ${e}`);
+                    logger.warn(`Unable to open localStorage: falling back to in-memory store: ${e}`);
                     return new MemoryCryptoStore();
                 }
             })

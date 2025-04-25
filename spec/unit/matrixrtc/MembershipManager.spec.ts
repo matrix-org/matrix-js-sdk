@@ -31,6 +31,7 @@ import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembership
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 import { defer } from "../../../src/utils";
+import { logger } from "../../../src/logger.ts";
 
 function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) {
     return new Promise<void>((resolve) => {
@@ -762,4 +763,20 @@ describe.each([
             expect(client.sendStateEvent).toHaveBeenCalled();
         });
     });
+});
+
+it("Should prefix log with MembershipManager used", () => {
+    const client = makeMockClient("@alice:example.org", "AAAAAAA");
+    const room = makeMockRoom(membershipTemplate);
+
+    const membershipManager = new MembershipManager(undefined, room, client, () => undefined, logger);
+
+    const spy = jest.spyOn(console, "error");
+    // Double join
+    membershipManager.join([]);
+    membershipManager.join([]);
+
+    expect(spy).toHaveBeenCalled();
+    const logline: string = spy.mock.calls[0][0];
+    expect(logline.startsWith("[NewMembershipManager]")).toBe(true);
 });

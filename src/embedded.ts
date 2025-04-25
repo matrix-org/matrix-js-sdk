@@ -62,17 +62,6 @@ interface IStateEventRequest {
     stateKey?: string;
 }
 
-export interface OlmDevice {
-    /**
-     * The user ID of the device owner.
-     */
-    userId: string;
-    /**
-     * The device ID of the device.
-     */
-    deviceId: string;
-}
-
 export interface ICapabilities {
     /**
      * Event types that this client expects to send.
@@ -464,6 +453,25 @@ export class RoomWidgetClient extends MatrixClient {
         return {};
     }
 
+    /**
+     * by {@link MatrixClient.encryptAndSendToDevice}.
+     */
+    public async encryptAndSendToDevice(
+        eventType: string,
+        devices: { userId: string; deviceId: string }[],
+        payload: ToDevicePayload,
+    ): Promise<void> {
+        // map: user Id → device Id → payload
+        const contentMap: MapWithDefault<string, Map<string, ToDevicePayload>> = new MapWithDefault(() => new Map());
+        for (const { userId, deviceId } of devices) {
+            contentMap.getOrCreate(userId).set(deviceId, payload);
+        }
+
+        await this.widgetApi
+            .sendToDevice(eventType, true, recursiveMapToObject(contentMap))
+            .catch(timeoutToConnectionError);
+    }
+
     public async sendToDevice(eventType: string, contentMap: SendToDeviceContentMap): Promise<EmptyObject> {
         await this.widgetApi
             .sendToDevice(eventType, false, recursiveMapToObject(contentMap))
@@ -492,18 +500,6 @@ export class RoomWidgetClient extends MatrixClient {
 
         await this.widgetApi
             .sendToDevice(eventType, false, recursiveMapToObject(contentMap))
-            .catch(timeoutToConnectionError);
-    }
-
-    public async encryptAndSendToDevices(userDeviceInfoArr: OlmDevice[], payload: object): Promise<void> {
-        // map: user Id → device Id → payload
-        const contentMap: MapWithDefault<string, Map<string, object>> = new MapWithDefault(() => new Map());
-        for (const { userId, deviceId } of userDeviceInfoArr) {
-            contentMap.getOrCreate(userId).set(deviceId, payload);
-        }
-
-        await this.widgetApi
-            .sendToDevice((payload as { type: string }).type, true, recursiveMapToObject(contentMap))
             .catch(timeoutToConnectionError);
     }
 
