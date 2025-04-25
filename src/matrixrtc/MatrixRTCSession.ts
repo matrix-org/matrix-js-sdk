@@ -28,7 +28,7 @@ import { MembershipManager } from "./NewMembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { type Statistics } from "./types.ts";
+import { type ParticipantId, type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
@@ -49,6 +49,9 @@ export enum MatrixRTCSessionEvent {
     JoinStateChanged = "join_state_changed",
     // The key used to encrypt media has changed
     EncryptionKeyChanged = "encryption_key_changed",
+    // Request ratcheting the current encryption key. When done `onOwnKeyRatcheted` will be called with the
+    // ratcheted material.
+    EncryptionKeyQueryRatchetStep = "encryption_key_ratchet_step",
     /** The membership manager had to shut down caused by an unrecoverable error */
     MembershipManagerError = "membership_manager_error",
 }
@@ -65,6 +68,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         participantId: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
+    [MatrixRTCSessionEvent.EncryptionKeyQueryRatchetStep]: (participantId: string, keyIndex: number) => void;
 };
 
 export interface MembershipConfig {
@@ -424,6 +428,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
                             participantId,
                         );
                     },
+                    (participantId: ParticipantId, encryptionKeyIndex: number) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyQueryRatchetStep,
+                            participantId,
+                            encryptionKeyIndex,
+                        );
+                    },
                     this.logger,
                 );
             } else {
@@ -520,6 +531,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
             });
         });
+    }
+
+    public onOwnKeyRatcheted(material: ArrayBuffer, keyIndex?: number): void {
+        this.encryptionManager?.onOwnKeyRatcheted(material, keyIndex);
     }
 
     /**
