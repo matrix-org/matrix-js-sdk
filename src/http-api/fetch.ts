@@ -137,7 +137,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
      */
-    public async authedRequest<T>(
+    public authedRequest<T>(
         method: Method,
         path: string,
         queryParams: QueryDict = {},
