@@ -110,14 +110,9 @@ export class TokenRefresher {
         }
 
         if (!snapshot || snapshot?.accessToken === this.opts.accessToken) {
-            if (attempt && attempt > 1) {
-                // Exponential backoff to ensure we don't trash the server
-                await sleep(1000 * 2 ** attempt);
-            }
-
             // If we have a snapshot, but the access token is the same as the current one then a refresh
             // did not happen behind us but one may be ongoing anyway
-            this.tokenRefreshPromise ??= this.doTokenRefresh();
+            this.tokenRefreshPromise ??= this.doTokenRefresh(attempt);
 
             try {
                 return await this.tokenRefreshPromise;
@@ -135,10 +130,15 @@ export class TokenRefresher {
      * On success, sets new access and refresh tokens in opts.
      * @returns Promise that resolves to a boolean - true when token was refreshed successfully
      */
-    private async doTokenRefresh(): Promise<TokenRefreshOutcome> {
+    private async doTokenRefresh(attempt?: number): Promise<TokenRefreshOutcome> {
         if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
             this.opts.logger?.error("Unable to refresh token - no refresh token or refresh function");
             return TokenRefreshOutcome.Logout;
+        }
+
+        if (attempt && attempt > 1) {
+            // Exponential backoff to ensure we don't trash the server, up to 2^5 seconds
+            await sleep(1000 * Math.min(32, 2 ** attempt));
         }
 
         try {
