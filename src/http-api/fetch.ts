@@ -146,6 +146,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         // avoid mutating paramOpts so they can be used on retry
         const opts = deepCopy(paramOpts);
+        // we have to manually copy the abortSignal over as it is not a plain object
+        opts.abortSignal = paramOpts.abortSignal;
 
         // Take a snapshot of the current token state before we start the request so we can reference it if we error
         const requestSnapshot = await this.tokenRefresher.prepareForRequest();

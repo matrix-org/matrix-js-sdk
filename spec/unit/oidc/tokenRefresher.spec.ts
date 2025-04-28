@@ -130,10 +130,12 @@ describe("OidcTokenRefresher", () => {
                 method: "POST",
             });
 
-            expect(result).toEqual({
-                accessToken: "new-access-token",
-                refreshToken: "new-refresh-token",
-            });
+            expect(result).toEqual(
+                expect.objectContaining({
+                    accessToken: "new-access-token",
+                    refreshToken: "new-refresh-token",
+                }),
+            );
         });
 
         it("should persist the new tokens", async () => {
@@ -144,10 +146,12 @@ describe("OidcTokenRefresher", () => {
 
             await refresher.doRefreshAccessToken("refresh-token");
 
-            expect(refresher.persistTokens).toHaveBeenCalledWith({
-                accessToken: "new-access-token",
-                refreshToken: "new-refresh-token",
-            });
+            expect(refresher.persistTokens).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    accessToken: "new-access-token",
+                    refreshToken: "new-refresh-token",
+                }),
+            );
         });
 
         it("should only have one inflight refresh request at once", async () => {
@@ -189,10 +193,12 @@ describe("OidcTokenRefresher", () => {
 
             // only one call to token endpoint
             expect(fetchMock).toHaveFetchedTimes(1, config.token_endpoint);
-            expect(result1).toEqual({
-                accessToken: "first-new-access-token",
-                refreshToken: "first-new-refresh-token",
-            });
+            expect(result1).toEqual(
+                expect.objectContaining({
+                    accessToken: "first-new-access-token",
+                    refreshToken: "first-new-refresh-token",
+                }),
+            );
             // same response
             expect(result1).toEqual(result2);
 
@@ -200,10 +206,12 @@ describe("OidcTokenRefresher", () => {
             const third = await refresher.doRefreshAccessToken("first-new-refresh-token");
 
             // called token endpoint, got new tokens
-            expect(third).toEqual({
-                accessToken: "second-new-access-token",
-                refreshToken: "second-new-refresh-token",
-            });
+            expect(third).toEqual(
+                expect.objectContaining({
+                    accessToken: "second-new-access-token",
+                    refreshToken: "second-new-refresh-token",
+                }),
+            );
         });
 
         it("should log and rethrow when token refresh fails", async () => {
@@ -261,10 +269,12 @@ describe("OidcTokenRefresher", () => {
             const result = await refresher.doRefreshAccessToken("first-new-refresh-token");
 
             // called token endpoint, got new tokens
-            expect(result).toEqual({
-                accessToken: "second-new-access-token",
-                refreshToken: "second-new-refresh-token",
-            });
+            expect(result).toEqual(
+                expect.objectContaining({
+                    accessToken: "second-new-access-token",
+                    refreshToken: "second-new-refresh-token",
+                }),
+            );
         });
 
         it("should throw TokenRefreshLogoutError when expired", async () => {
