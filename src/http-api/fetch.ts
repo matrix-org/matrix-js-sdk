@@ -144,6 +144,18 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         paramOpts: IRequestOpts = {},
     ): Promise<ResponseType<T, O>> {
+        return this.doAuthedRequest<T>(1, method, path, queryParams, body, paramOpts);
+    }
+
+    // Wrapper around public method authedRequest to allow for tracking retry attempt counts
+    private async doAuthedRequest<T>(
+        attempt: number,
+        method: Method,
+        path: string,
+        queryParams: QueryDict,
+        body?: Body,
+        paramOpts: IRequestOpts = {},
+    ): Promise<ResponseType<T, O>> {
         // avoid mutating paramOpts so they can be used on retry
         const opts = deepCopy(paramOpts);
         // we have to manually copy the abortSignal over as it is not a plain object
@@ -176,10 +188,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
 
             if (error.errcode === "M_UNKNOWN_TOKEN") {
-                const outcome = await this.tokenRefresher.handleUnknownToken(requestSnapshot);
+                const outcome = await this.tokenRefresher.handleUnknownToken(requestSnapshot, attempt);
                 if (outcome === TokenRefreshOutcome.Success) {
                     // if we got a new token retry the request
-                    return this.authedRequest(method, path, queryParams, body, paramOpts);
+                    return this.doAuthedRequest(attempt + 1, method, path, queryParams, body, paramOpts);
                 }
                 if (outcome === TokenRefreshOutcome.Failure) {
                     throw new TokenRefreshError(error);

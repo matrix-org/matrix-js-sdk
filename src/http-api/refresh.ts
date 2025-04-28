@@ -16,6 +16,7 @@ limitations under the License.
 
 import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
 import { type IHttpOpts } from "./interface.ts";
+import { sleep } from "../utils.ts";
 
 /**
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
@@ -76,21 +77,30 @@ export class TokenRefresher {
         if (this.tokenRefreshPromise) {
             return this.tokenRefreshPromise;
         }
-        // If we don't know the token expiry, we can't do anything
+        // If we don't know the token expiry, we can't eagerly refresh
         if (!this.latestTokenRefreshExpiry) return;
 
         const expiresIn = this.latestTokenRefreshExpiry.getTime() - Date.now();
         if (expiresIn <= REFRESH_IF_TOKEN_EXPIRES_WITHIN_MS) {
-            await this._handleUnknownToken(null);
+            await this._handleUnknownToken();
         }
     }
 
-    public async handleUnknownToken(snapshot: Snapshot): Promise<TokenRefreshOutcome> {
-        return this._handleUnknownToken(snapshot);
+    /**
+     * This function is called when an M_UNKNOWN_TOKEN error is encountered.
+     * It will attempt to refresh the access token if it is unknown, and will return a TokenRefreshOutcome.
+     * @param snapshot - the snapshot returned by prepareForRequest
+     * @param attempt - the number of attempts made for this request so far
+     * @returns a TokenRefreshOutcome indicating the result of the refresh attempt
+     */
+    public async handleUnknownToken(snapshot: Snapshot, attempt: number): Promise<TokenRefreshOutcome> {
+        return this._handleUnknownToken(snapshot, attempt);
     }
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    private async _handleUnknownToken(snapshot: Snapshot | null): Promise<TokenRefreshOutcome> {
+    /* eslint-disable @typescript-eslint/naming-convention */
+    private async _handleUnknownToken(): Promise<TokenRefreshOutcome>;
+    private async _handleUnknownToken(snapshot: Snapshot, attempt: number): Promise<TokenRefreshOutcome>;
+    private async _handleUnknownToken(snapshot?: Snapshot, attempt?: number): Promise<TokenRefreshOutcome> {
         if (snapshot?.expiry) {
             // If our token is unknown, but it should not have expired yet, then we should not refresh
             const expiresIn = snapshot.expiry.getTime() - Date.now();
@@ -99,7 +109,12 @@ export class TokenRefresher {
             }
         }
 
-        if (snapshot === null || snapshot?.accessToken === this.opts.accessToken) {
+        if (!snapshot || snapshot?.accessToken === this.opts.accessToken) {
+            if (attempt && attempt > 1) {
+                // Exponential backoff to ensure we don't trash the server
+                await sleep(1000 * 2 ** attempt);
+            }
+
             // If we have a snapshot, but the access token is the same as the current one then a refresh
             // did not happen behind us but one may be ongoing anyway
             this.tokenRefreshPromise ??= this.doTokenRefresh();
