@@ -45,7 +45,7 @@ export type ResponseType<T, O extends IHttpOpts> = O extends { json: false }
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
-    private tokenRefresher: TokenRefresher;
+    private readonly tokenRefresher: TokenRefresher;
 
     public constructor(
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,

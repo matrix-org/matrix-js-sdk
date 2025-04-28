@@ -36,17 +36,17 @@ interface Snapshot {
 // If the token expires in less than this time amount of time, we will eagerly refresh it before making the intended request.
 const REFRESH_IF_TOKEN_EXPIRES_WITHIN_MS = 500;
 // If we get an unknown token error and the token expires in less than this time amount of time, we will refresh it before making the intended request.
-// Otherwise we will error as the token should not have expired yet and we need to avoid retrying indefinitely.
+// Otherwise, we will error as the token should not have expired yet and we need to avoid retrying indefinitely.
 const REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS = 60 * 1000;
+
+type Opts = Pick<IHttpOpts, "tokenRefreshFunction" | "logger" | "refreshToken" | "accessToken">;
 
 /**
  * This class is responsible for managing the access token and refresh token for authenticated requests.
  * It will automatically refresh the access token when it is about to expire, and will handle unknown token errors.
  */
 export class TokenRefresher {
-    public constructor(
-        private opts: Pick<IHttpOpts, "tokenRefreshFunction" | "logger" | "refreshToken" | "accessToken">,
-    ) {}
+    public constructor(private readonly opts: Opts) {}
 
     /**
      * Promise used to block authenticated requests during a token refresh to avoid repeated expected errors.
@@ -102,9 +102,8 @@ export class TokenRefresher {
         if (snapshot === null || snapshot?.accessToken === this.opts.accessToken) {
             // If we have a snapshot, but the access token is the same as the current one then a refresh
             // did not happen behind us but one may be ongoing anyway
-            if (!this.tokenRefreshPromise) {
-                this.tokenRefreshPromise = this.doTokenRefresh();
-            }
+            this.tokenRefreshPromise ??= this.doTokenRefresh();
+
             try {
                 return await this.tokenRefreshPromise;
             } finally {
