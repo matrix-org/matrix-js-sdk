@@ -356,7 +356,9 @@ describe("FetchHttpApi", () => {
                             accessToken,
                             refreshToken,
                         });
-                        const result = await api.authedRequest(Method.Post, "/account/password");
+                        const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
+                            headers: {},
+                        });
                         expect(result).toEqual(okayResponse);
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
 
