@@ -356,7 +356,9 @@ describe("FetchHttpApi", () => {
                             accessToken,
                             refreshToken,
                         });
-                        const result = await api.authedRequest(Method.Post, "/account/password");
+                        const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
+                            headers: {},
+                        });
                         expect(result).toEqual(okayResponse);
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
 
@@ -372,6 +374,7 @@ describe("FetchHttpApi", () => {
                         const tokenRefreshFunction = jest.fn().mockResolvedValue({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
+                            expiry: new Date(Date.now() + 1000),
                         });
 
                         // fetch doesn't like our new or old tokens
