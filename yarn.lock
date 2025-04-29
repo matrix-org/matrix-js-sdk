@@ -6471,10 +6471,10 @@ typed-array-length@^1.0.6:
     is-typed-array "^1.1.13"
     possible-typed-array-names "^1.0.0"
 
-typedoc-plugin-coverage@^3.0.0:
-  version "3.4.1"
-  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-3.4.1.tgz#13b445cecb674845945e218c4560bbd91299af83"
-  integrity sha512-V23DAwinAMpGMGcL1R1s8Snr26hrjfIdwGf+4jR/65ZdmeAN+yRX0onfx5JlembTQhR6AePQ/parfQNS0AZ64A==
+typedoc-plugin-coverage@^4.0.0:
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/typedoc-plugin-coverage/-/typedoc-plugin-coverage-4.0.1.tgz#27042ed2bbfccc17ac00304718145424659e0b35"
+  integrity sha512-P1QBR5GJSfW3fDrpz4Vkd8z8lzWaBYjaHebRLk0u2Uga0oSFlPaqrCyiHzItBXxZX28aMlNlZwrUnsLgUgqA7g==
 
 typedoc-plugin-mdn-links@^5.0.0:
   version "5.0.1"
