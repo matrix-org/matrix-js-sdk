@@ -340,7 +340,7 @@ describe("MatrixRTCSession", () => {
                     };
                 });
             });
-            sendEventMock = jest.fn();
+            sendEventMock = jest.fn().mockResolvedValue(undefined);
             client.sendStateEvent = sendStateEventMock;
             client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
             client.sendEvent = sendEventMock;
@@ -367,6 +367,51 @@ describe("MatrixRTCSession", () => {
         it("shows joined once join is called", () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
+        });
+
+        it("sends a notification when starting a call", async () => {
+            // Simulate a join, including the update to the room state
+            sess!.joinRoomSession([mockFocus], mockFocus, { notifyType: "ring" });
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
+            sess!.onRTCSessionMemberUpdate();
+
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
+                "application": "m.call",
+                "m.mentions": { user_ids: [], room: true },
+                "notify_type": "ring",
+                "call_id": "",
+            });
+        });
+
+        it("doesn't send a notification when joining an existing call", async () => {
+            // Add another member to the call so that it is considered an existing call
+            mockRoomState(mockRoom, [membershipTemplate]);
+            sess!.onRTCSessionMemberUpdate();
+
+            // Simulate a join, including the update to the room state
+            sess!.joinRoomSession([mockFocus], mockFocus, { notifyType: "ring" });
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
+            sess!.onRTCSessionMemberUpdate();
+
+            expect(client.sendEvent).not.toHaveBeenCalled();
+        });
+
+        it("doesn't send a notification when someone else starts the call faster than us", async () => {
+            // Simulate a join, including the update to the room state
+            sess!.joinRoomSession([mockFocus], mockFocus, { notifyType: "ring" });
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            // But this time we want to simulate a race condition in which we receive a state event
+            // from someone else, starting the call before our own state event has been sent
+            mockRoomState(mockRoom, [membershipTemplate]);
+            sess!.onRTCSessionMemberUpdate();
+            mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
+            sess!.onRTCSessionMemberUpdate();
+
+            // We assume that the responsibility to send a notification, if any, lies with the other
+            // participant that won the race
+            expect(client.sendEvent).not.toHaveBeenCalled();
         });
 
         it("sends a membership event when joining a call", async () => {
