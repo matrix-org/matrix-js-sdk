@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { type Statistics } from "./types.ts";
+import { type Statistics, type CallNotifyType, isMyMembership } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
@@ -65,6 +65,15 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
+
+export interface SessionConfig {
+    /**
+     * What kind of notification to send when starting the session.
+     * @default `undefined` (no notification)
+     */
+    notifyType?: CallNotifyType;
+}
+
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
@@ -168,7 +177,7 @@ export interface EncryptionConfig {
      */
     useKeyDelay?: number;
 }
-export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
+export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionConfig;
 
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
@@ -182,7 +191,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
+    private joinConfig?: SessionConfig;
     private logger: Logger;
+
+    /**
+     * Whether we're trying to join the session but still waiting for room state
+     * to reflect our own membership.
+     */
+    private joining = false;
+
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -447,6 +464,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
             }
         }
 
+        this.joinConfig = joinConfig;
+        const userId = this.client.getUserId()!;
+        const deviceId = this.client.getDeviceId()!;
+        this.joining = !this.memberships.some((m) => isMyMembership(m, userId, deviceId));
+
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
@@ -476,11 +498,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         this.logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
 
+        this.joining = false;
         this.encryptionManager!.leave();
-
         const leavePromise = this.membershipManager!.leave(timeout);
-        this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
+        this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
         return await leavePromise;
     }
 
@@ -548,6 +570,22 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Sends a notification corresponding to the configured notify type.
+     */
+    private sendCallNotify(): void {
+        if (this.joinConfig?.notifyType !== undefined) {
+            this.client
+                .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
+                    "application": "m.call",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notify_type": this.joinConfig.notifyType,
+                    "call_id": this.callId!,
+                })
+                .catch((e) => this.logger.error("Failed to send call notification", e));
+        }
+    }
+
+    /**
      * Call this when the Matrix room members have changed.
      */
     public onRoomMemberUpdate = (): void => {
@@ -587,6 +625,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
             });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+
+            const userId = this.client.getUserId()!;
+            const deviceId = this.client.getDeviceId()!;
+            if (this.joining && this.memberships.some((m) => isMyMembership(m, userId, deviceId))) {
+                this.joining = false;
+                // If we're the first member in the call, we're responsible for
+                // sending the notification event
+                if (oldMemberships.length === 0) this.sendCallNotify();
+            }
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
