@@ -15,13 +15,12 @@ limitations under the License.
 */
 
 import type { MatrixClient } from "../client.ts";
-import type { EncryptionKeysEventContent, Statistics } from "./types.ts";
+import { type EncryptionKeysEventContent, type ParticipantDeviceInfo, type Statistics } from "./types.ts";
 import { EventType } from "../@types/event.ts";
 import { type MatrixError } from "../http-api/errors.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { type CallMembership } from "./CallMembership.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room, RoomEvent } from "../models/room.ts";
 
@@ -81,7 +80,7 @@ export class RoomKeyTransport
     }
 
     /** implements {@link IKeyTransport#sendKey} */
-    public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
+    public async sendKey(keyBase64Encoded: string, index: number, members: ParticipantDeviceInfo[]): Promise<void> {
         // members not used in room transports as the keys are sent to all room members
         const content: EncryptionKeysEventContent = {
             keys: [
