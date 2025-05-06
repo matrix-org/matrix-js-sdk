@@ -104,7 +104,9 @@ export class TokenRefresher {
         if (snapshot?.expiry) {
             // If our token is unknown, but it should not have expired yet, then we should not refresh
             const expiresIn = snapshot.expiry.getTime() - Date.now();
-            if (expiresIn <= REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS) {
+            // If it still has plenty of time left on the clock, we assume something else must be wrong and
+            // do not refresh. Otherwise if it's expired, or will soon, we try refreshing.
+            if (expiresIn >= REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS) {
                 return TokenRefreshOutcome.Logout;
             }
         }
