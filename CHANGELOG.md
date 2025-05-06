@@ -1,3 +1,16 @@
+Changes in [37.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.5.0) (2025-05-06)
+==================================================================================================
+## ✨ Features
+
+* Stabilise MSC3765 ([#4767](https://github.com/matrix-org/matrix-js-sdk/pull/4767)). Contributed by @Johennes.
+* Inherit `methodFactory` extensions from the parent to the child loggers. ([#4809](https://github.com/matrix-org/matrix-js-sdk/pull/4809)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] Fix token refresh behaviour for non-expired tokens ([#4827](https://github.com/matrix-org/matrix-js-sdk/pull/4827)). Contributed by @RiotRobot.
+* Refactor how token refreshing works to be more resilient ([#4819](https://github.com/matrix-org/matrix-js-sdk/pull/4819)). Contributed by @t3chguy.
+
+
 Changes in [37.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.4.0) (2025-04-22)
 ==================================================================================================
 ## ✨ Features
