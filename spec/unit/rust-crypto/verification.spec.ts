@@ -32,6 +32,7 @@ import {
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { type IDeviceKeys } from "../../../src/@types/crypto";
 import { EventType, MatrixEvent, MsgType } from "../../../src";
+import { logger } from "../../../src/logger.ts";
 
 describe("VerificationRequest", () => {
     describe("pending", () => {
@@ -147,6 +148,7 @@ describe("VerificationRequest", () => {
                 methods,
             );
             const aliceVerificationRequest = new RustVerificationRequest(
+                logger,
                 aliceOlmMachine,
                 innerVerificationRequest,
                 aliceRequestLoop as unknown as OutgoingRequestProcessor,
@@ -174,6 +176,7 @@ describe("VerificationRequest", () => {
                 "$m.key.verification.request",
             )!;
             const bobVerificationRequest = new RustVerificationRequest(
+                logger,
                 bobOlmMachine,
                 bobInnerVerificationRequest,
                 bobRequestLoop as unknown as OutgoingRequestProcessor,
@@ -278,6 +281,7 @@ describe("VerificationRequest", () => {
                 methods,
             );
             const aliceVerificationRequest = new RustVerificationRequest(
+                logger,
                 aliceOlmMachine,
                 innerVerificationRequest,
                 aliceRequestLoop as unknown as OutgoingRequestProcessor,
@@ -305,6 +309,7 @@ describe("VerificationRequest", () => {
                 "$m.key.verification.request",
             )!;
             const bobVerificationRequest = new RustVerificationRequest(
+                logger,
                 bobOlmMachine,
                 bobInnerVerificationRequest,
                 bobRequestLoop as unknown as OutgoingRequestProcessor,
@@ -392,6 +397,7 @@ describe("VerificationRequest", () => {
                 methods,
             );
             const aliceVerificationRequest = new RustVerificationRequest(
+                logger,
                 aliceOlmMachine,
                 innerVerificationRequest,
                 aliceRequestLoop as unknown as OutgoingRequestProcessor,
@@ -419,6 +425,7 @@ describe("VerificationRequest", () => {
                 "$m.key.verification.request",
             )!;
             const bobVerificationRequest = new RustVerificationRequest(
+                logger,
                 bobOlmMachine,
                 bobInnerVerificationRequest,
                 bobRequestLoop as unknown as OutgoingRequestProcessor,
@@ -496,7 +503,7 @@ function makeTestRequest(
     inner ??= makeMockedInner();
     olmMachine ??= {} as RustSdkCryptoJs.OlmMachine;
     outgoingRequestProcessor ??= {} as OutgoingRequestProcessor;
-    return new RustVerificationRequest(olmMachine, inner, outgoingRequestProcessor, []);
+    return new RustVerificationRequest(logger, olmMachine, inner, outgoingRequestProcessor, []);
 }
 
 /** Mock up a rust-side VerificationRequest */
