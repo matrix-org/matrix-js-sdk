@@ -368,13 +368,22 @@ describe("FetchHttpApi", () => {
                         expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
-                    it("should only try to refresh the token once", async () => {
+                    it("should not try to refresh the token if it has plenty of time left before expiry", async () => {
+                        // We can't specify an expiry for the initial token, so this should:
+                        // * Try once, fail
+                        // * Attempt a refresh, get a token that's not expired
+                        // * Try again, still fail
+                        // * Not refresh the token because it's not expired
+                        // ...which is TWO attempts and ONE refresh (which doesn't really
+                        // count because it's only to get a token with an expiry)
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
+                        const tokenRefreshFunction = jest.fn().mockReturnValue({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 1000),
+                            // This needs to be sufficiently high that it's over the threshold for
+                            // 'plenty of time' (which is a minute in practice).
+                            expiry: new Date(Date.now() + 5 * 60 * 1000),
                         });
 
                         // fetch doesn't like our new or old tokens
@@ -394,7 +403,7 @@ describe("FetchHttpApi", () => {
                             unknownTokenErr,
                         );
 
-                        // tried to refresh the token once
+                        // tried to refresh the token once (to get the one with an expiry)
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
                         expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
 
@@ -404,6 +413,54 @@ describe("FetchHttpApi", () => {
 
                         // logged out after refreshed access token is rejected
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should try to refresh the token if it will expire soon", async () => {
+                        const newAccessToken = "new-access-token";
+                        const newRefreshToken = "new-refresh-token";
+
+                        // first refresh is to get a token with an expiry at all, because we
+                        // can't specify an expiry on the token we inject
+                        const tokenRefreshFunction = jest.fn().mockResolvedValueOnce({
+                            accessToken: newAccessToken,
+                            refreshToken: newRefreshToken,
+                            expiry: new Date(Date.now() + 1000),
+                        });
+
+                        // next refresh is to return a token that will expire 'soon'
+                        tokenRefreshFunction.mockResolvedValueOnce({
+                            accessToken: newAccessToken,
+                            refreshToken: newRefreshToken,
+                            expiry: new Date(Date.now() + 1000),
+                        });
+
+                        // ...and finally we return a token that has adequate time left
+                        // so that it will cease retrying and fail the request.
+                        tokenRefreshFunction.mockResolvedValueOnce({
+                            accessToken: newAccessToken,
+                            refreshToken: newRefreshToken,
+                            expiry: new Date(Date.now() + 5 * 60 * 1000),
+                        });
+
+                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+
+                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                        jest.spyOn(emitter, "emit");
+                        const api = new FetchHttpApi(emitter, {
+                            baseUrl,
+                            prefix,
+                            fetchFn,
+                            tokenRefreshFunction,
+                            accessToken,
+                            refreshToken,
+                        });
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            unknownTokenErr,
+                        );
+
+                        // We should have seen the 3 token refreshes, as above.
+                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(tokenRefreshFunction).toHaveBeenCalledTimes(3);
                     });
                 });
             });
