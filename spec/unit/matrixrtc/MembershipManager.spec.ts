@@ -215,7 +215,7 @@ describe.each([
                     });
                     const manager = new TestMembershipManager(
                         {
-                            membershipServerSideExpiryTimeout: 9000,
+                            delayedLeaveEventDelayMs: 9000,
                         },
                         room,
                         client,
@@ -294,9 +294,9 @@ describe.each([
                 await jest.advanceTimersByTimeAsync(5000);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
-            it("uses membershipServerSideExpiryTimeout from config", () => {
+            it("uses delayedLeaveEventDelayMs from config", () => {
                 const manager = new TestMembershipManager(
-                    { membershipServerSideExpiryTimeout: 123456 },
+                    { delayedLeaveEventDelayMs: 123456 },
                     room,
                     client,
                     () => undefined,
@@ -312,9 +312,9 @@ describe.each([
             });
         });
 
-        it("uses membershipExpiryTimeout from config", async () => {
+        it("uses membershipEventExpiryMs from config", async () => {
             const manager = new TestMembershipManager(
-                { membershipExpiryTimeout: 1234567 },
+                { membershipEventExpiryMs: 1234567 },
                 room,
                 client,
                 () => undefined,
@@ -480,9 +480,9 @@ describe.each([
 
     // TODO: Not sure about this name
     describe("background timers", () => {
-        it("sends only one keep-alive for delayed leave event per `membershipKeepAlivePeriod`", async () => {
+        it("sends only one keep-alive for delayed leave event per `delayedLeaveEventRestartMs`", async () => {
             const manager = new TestMembershipManager(
-                { membershipKeepAlivePeriod: 10_000, membershipServerSideExpiryTimeout: 30_000 },
+                { delayedLeaveEventRestartMs: 10_000, delayedLeaveEventDelayMs: 30_000 },
                 room,
                 client,
                 () => undefined,
@@ -513,7 +513,7 @@ describe.each([
         // TODO: Add git commit when we removed it.
         async function testExpires(expire: number, headroom?: number) {
             const manager = new TestMembershipManager(
-                { membershipExpiryTimeout: expire, membershipExpiryTimeoutHeadroom: headroom },
+                { membershipEventExpiryMs: expire, membershipEventExpiryHeadroomMs: headroom },
                 room,
                 client,
                 () => undefined,
@@ -734,7 +734,7 @@ describe.each([
             const unrecoverableError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
             const manager = new TestMembershipManager(
-                { callMemberEventRetryDelayMinimum: 1000, maximumNetworkErrorRetryCount: 7 },
+                { networkErrorRetryMs: 1000, maximumNetworkErrorRetryCount: 7 },
                 room,
                 client,
                 () => undefined,
