@@ -1638,7 +1638,10 @@ function buildReadyMessage(
 }
 
 /** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
-function buildReciprocateStartMessage(transactionId: string, sharedSecret: Uint8Array | Uint8ClampedArray<ArrayBuffer>) {
+function buildReciprocateStartMessage(
+    transactionId: string,
+    sharedSecret: Uint8Array | Uint8ClampedArray<ArrayBuffer>,
+) {
     return {
         type: "m.key.verification.start",
         content: {

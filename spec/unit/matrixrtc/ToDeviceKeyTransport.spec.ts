@@ -107,7 +107,12 @@ describe("ToDeviceKeyTransport", () => {
     });
 
     it("should emit when a key is received", async () => {
-        const deferred = Promise.withResolvers<{ userId: string; deviceId: string; keyBase64Encoded: string; index: number }>();
+        const deferred = Promise.withResolvers<{
+            userId: string;
+            deviceId: string;
+            keyBase64Encoded: string;
+            index: number;
+        }>();
         transport.on(KeyTransportEvents.ReceivedKeys, (userId, deviceId, keyBase64Encoded, index, timestamp) => {
             deferred.resolve({ userId, deviceId, keyBase64Encoded, index });
         });
