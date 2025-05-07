@@ -13,6 +13,7 @@
         "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
+        "build:browser": "esbuild src/browser-index.ts --bundle --format=iife --global-name=matrix --platform=browser --target=es2020 --outfile=dist/matrix-js-sdk.js",
         "gendoc": "typedoc",
         "lint": "yarn lint:types && yarn lint:js && yarn lint:workflows",
         "lint:js": "eslint --max-warnings 0 src spec && prettier --check .",
@@ -94,6 +95,7 @@
         "babel-jest": "^29.0.0",
         "babel-plugin-search-and-replace": "^1.1.1",
         "debug": "^4.3.4",
+        "esbuild": "^0.25.4",
         "eslint": "8.57.1",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^10.0.0",
@@ -130,5 +132,6 @@
         "outputDirectory": "coverage",
         "outputName": "jest-sonar-report.xml",
         "relativePaths": true
-    }
+    },
+    "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610"
 }
