@@ -21,7 +21,6 @@ import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
 import { isMyMembership, Status } from "./types.ts";
@@ -36,12 +35,12 @@ import {
 } from "./IMembershipManager.ts";
 
 /* MembershipActionTypes:
-                           
+
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
                          ▼   ▼                             │
                    ┌────────────────┐                      │
                    │SendDelayedEvent│ ──────(2)───┐        │
-                   └────────────────┘             │        │ 
+                   └────────────────┘             │        │
                            │(3)                   │        │
                            ▼                      │        │
                     ┌─────────────┐               │        │
@@ -52,9 +51,9 @@ On Join:  ───────────────┐   ┌─────�
 ┌────────────┐  │                  │ ┌───────────────────┐ │
 │UpdateExpiry│ (s)                (s)|RestartDelayedEvent│ │
 └────────────┘  │                  │ └───────────────────┘ │
-          │     │                  │      │        │       │       
-          └─────┘                  └──────┘        └───────┘ 
-     
+          │     │                  │      │        │       │
+          └─────┘                  └──────┘        └───────┘
+
 On Leave: ─────────  STOP ALL ABOVE
                            ▼
             ┌────────────────────────────────┐
@@ -209,14 +208,14 @@ export class MembershipManager
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseDefer) {
             // reset scheduled actions so we will not do any new actions.
-            this.leavePromiseDefer = defer<boolean>();
+            this.leavePromiseDefer = Promise.withResolvers<boolean>();
             this.activated = false;
             this.scheduler.initiateLeave();
             if (timeout) setTimeout(() => this.leavePromiseDefer?.resolve(false), timeout);
         }
         return this.leavePromiseDefer.promise;
     }
-    private leavePromiseDefer?: IDeferred<boolean>;
+    private leavePromiseDefer?: PromiseWithResolvers<boolean>;
 
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const userId = this.client.getUserId();

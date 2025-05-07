@@ -40,7 +40,6 @@ import {
     type UIAuthCallback,
 } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import { defer } from "../../../src/utils";
 
 describe("OutgoingRequestProcessor", () => {
     /** the OutgoingRequestProcessor implementation under test */
@@ -285,7 +284,7 @@ describe("OutgoingRequestProcessor", () => {
             new RustSdkCryptoJs.DeviceId("TEST_DEVICE"),
         );
 
-        const authRequestResultDefer = defer<string>();
+        const authRequestResultDefer = Promise.withResolvers<string>();
 
         const authRequestCalledPromise = new Promise<void>((resolve) => {
             const mockHttpApi = {

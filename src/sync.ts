@@ -28,7 +28,7 @@ import { type Optional } from "matrix-events-sdk";
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
 import { User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
-import { deepCopy, defer, type IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
+import { deepCopy, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
 import { logger } from "./logger.ts";
@@ -220,7 +220,7 @@ export class SyncApi {
     private catchingUp = false;
     private running = false;
     private keepAliveTimer?: ReturnType<typeof setTimeout>;
-    private connectionReturnedDefer?: IDeferred<boolean>;
+    private connectionReturnedDefer?: PromiseWithResolvers<boolean>;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
@@ -1552,7 +1552,7 @@ export class SyncApi {
             this.pokeKeepAlive();
         }
         if (!this.connectionReturnedDefer) {
-            this.connectionReturnedDefer = defer();
+            this.connectionReturnedDefer = Promise.withResolvers();
         }
         return this.connectionReturnedDefer.promise;
     }

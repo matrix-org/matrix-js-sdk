@@ -18,7 +18,6 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
-import { defer, type IDeferred } from "./utils.ts";
 import { MatrixError } from "./http-api/index.ts";
 import { type UserIdentifier } from "./@types/auth.ts";
 
@@ -262,7 +261,7 @@ export class InteractiveAuth<T> {
     private data: IAuthData & MatrixError["data"];
     private emailSid?: string;
     private requestingEmailToken = false;
-    private attemptAuthDeferred: IDeferred<T> | null = null;
+    private attemptAuthDeferred: PromiseWithResolvers<T> | null = null;
     private chosenFlow: UIAFlow | null = null;
     private currentStage: string | null = null;
 
@@ -298,7 +297,7 @@ export class InteractiveAuth<T> {
     public async attemptAuth(): Promise<T> {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
-        this.attemptAuthDeferred = defer();
+        this.attemptAuthDeferred = Promise.withResolvers();
         // pluck the promise out now, as doRequest may clear before we return
         const promise = this.attemptAuthDeferred.promise;
 

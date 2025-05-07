@@ -25,7 +25,6 @@ import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@typ
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
 import { type MatrixClient } from "../../src/client";
-import { defer } from "../../src/utils";
 import { Room } from "../../src/models/room";
 import { KnownMembership } from "../../src/@types/membership";
 import { DecryptionFailureCode } from "../../src/crypto-api";
@@ -1084,7 +1083,7 @@ describe("RoomState", function () {
                     timestamp: Date.now() + 1,
                 });
 
-                const deferred = defer<void>();
+                const deferred = Promise.withResolvers<void>();
                 mockClient.decryptEventIfNeeded.mockReturnValue(deferred.promise);
 
                 state.setStateEvents([beacon1, beacon2]);

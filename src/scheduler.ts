@@ -21,7 +21,7 @@ limitations under the License.
 import { logger } from "./logger.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import { EventType } from "./@types/event.ts";
-import { defer, type IDeferred, removeElement } from "./utils.ts";
+import { removeElement } from "./utils.ts";
 import { calculateRetryBackoff, type MatrixError } from "./http-api/index.ts";
 import { type ISendEventResponse } from "./@types/requests.ts";
 
@@ -29,7 +29,7 @@ const DEBUG = false; // set true to enable console logging.
 
 interface IQueueEntry<T> {
     event: MatrixEvent;
-    defer: IDeferred<T>;
+    defer: PromiseWithResolvers<T>;
     attempts: number;
 }
 
@@ -70,7 +70,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
 
     // queueName: [{
     //  event: MatrixEvent,  // event to send
-    //  defer: Deferred,  // defer to resolve/reject at the END of the retries
+    //  defer: PromiseWithResolvers,  // defer to resolve/reject at the END of the retries
     //  attempts: Number  // number of times we've called processFn
     // }, ...]
     private readonly queues: Record<string, IQueueEntry<T>[]> = {};
@@ -188,7 +188,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (!this.queues[queueName]) {
             this.queues[queueName] = [];
         }
-        const deferred = defer<T>();
+        const deferred = Promise.withResolvers<T>();
         this.queues[queueName].push({
             event: event,
             defer: deferred,

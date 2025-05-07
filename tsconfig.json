@@ -9,7 +9,8 @@
         "noEmit": true,
         "declaration": true,
         "strict": true,
-        "allowImportingTsExtensions": true
+        "allowImportingTsExtensions": true,
+        "lib": ["es2024"]
     },
     "include": ["./src/**/*.ts", "./spec/**/*.ts"]
 }

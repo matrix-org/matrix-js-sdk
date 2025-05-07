@@ -24,7 +24,7 @@ import {
     type UploadResponse,
 } from "./interface.ts";
 import { MediaPrefix } from "./prefix.ts";
-import { defer, type QueryDict, removeElement } from "../utils.ts";
+import { type QueryDict, removeElement } from "../utils.ts";
 import * as callbacks from "../realtime-callbacks.ts";
 import { Method } from "./method.ts";
 import { ConnectionError } from "./errors.ts";
@@ -65,7 +65,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             total: 0,
             abortController,
         } as Upload;
-        const deferred = defer<UploadResponse>();
+        const deferred = Promise.withResolvers<UploadResponse>();
 
         if (globalThis.XMLHttpRequest) {
             const xhr = new globalThis.XMLHttpRequest();

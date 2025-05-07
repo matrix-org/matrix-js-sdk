@@ -1,7 +1,6 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-import { defer, type IDeferred } from "../../src/utils";
 import { MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
 import * as utils from "../test-utils/test-utils";
@@ -14,7 +13,7 @@ describe("MatrixScheduler", function () {
     let scheduler: MatrixScheduler<Record<string, boolean>>;
     let retryFn: ((event: MatrixEvent | null, attempt: number, err: MatrixError) => number) | null;
     let queueFn: ((event: MatrixEvent) => string | null) | null;
-    let deferred: IDeferred<Record<string, boolean>>;
+    let deferred: PromiseWithResolvers<Record<string, boolean>>;
     const roomId = "!foo:bar";
     const eventA = utils.mkMessage({
         user: "@alice:bar",
@@ -44,7 +43,7 @@ describe("MatrixScheduler", function () {
         );
         retryFn = null;
         queueFn = null;
-        deferred = defer();
+        deferred = Promise.withResolvers();
     });
 
     it("should process events in a queue in a FIFO manner", async function () {
@@ -54,8 +53,8 @@ describe("MatrixScheduler", function () {
         queueFn = function () {
             return "one_big_queue";
         };
-        const deferA = defer<Record<string, boolean>>();
-        const deferB = defer<Record<string, boolean>>();
+        const deferA = Promise.withResolvers<Record<string, boolean>>();
+        const deferB = Promise.withResolvers<Record<string, boolean>>();
         let yieldedA = false;
         scheduler.setProcessFunction(function (event) {
             if (yieldedA) {
@@ -79,7 +78,7 @@ describe("MatrixScheduler", function () {
 
     it("should invoke the retryFn on failure and wait the amount of time specified", async function () {
         const waitTimeMs = 1500;
-        const retryDefer = defer();
+        const retryDefer = Promise.withResolvers<void>();
         retryFn = function () {
             retryDefer.resolve();
             return waitTimeMs;
@@ -127,8 +126,8 @@ describe("MatrixScheduler", function () {
             return "yep";
         };
 
-        const deferA = defer<Record<string, boolean>>();
-        const deferB = defer<Record<string, boolean>>();
+        const deferA = Promise.withResolvers<Record<string, boolean>>();
+        const deferB = Promise.withResolvers<Record<string, boolean>>();
         let procCount = 0;
         scheduler.setProcessFunction(function (ev) {
             procCount += 1;
@@ -180,7 +179,7 @@ describe("MatrixScheduler", function () {
         };
 
         const expectOrder = [eventA.getId(), eventB.getId(), eventD.getId()];
-        const deferA = defer<Record<string, boolean>>();
+        const deferA = Promise.withResolvers<Record<string, boolean>>();
         const allExpectedEventsSeenInOrderPromise = new Promise((resolve) => {
             scheduler.setProcessFunction(function (event) {
                 const id = expectOrder.shift();

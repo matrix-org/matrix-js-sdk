@@ -68,7 +68,6 @@ import {
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
-import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { ClientEvent, type ClientEventHandlerMap } from "../../../src/client";
@@ -928,7 +927,7 @@ describe("RustCrypto", () => {
 
         it("should go round the loop again if another sync completes while the first `outgoingRequests` is running", async () => {
             // the first call to `outgoingMessages` will return a promise which blocks for a while
-            const firstOutgoingRequestsDefer = defer<Array<any>>();
+            const firstOutgoingRequestsDefer = Promise.withResolvers<Array<any>>();
             mocked(olmMachine.outgoingRequests).mockReturnValueOnce(firstOutgoingRequestsDefer.promise);
 
             // the second will return a KeysQueryRequest.

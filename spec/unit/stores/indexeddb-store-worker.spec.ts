@@ -18,7 +18,6 @@ import "fake-indexeddb/auto";
 
 import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 import { IndexedDBStoreWorker } from "../../../src/store/indexeddb-store-worker";
-import { defer } from "../../../src/utils";
 
 function setupWorker(worker: IndexedDBStoreWorker): void {
     worker.onMessage({ data: { command: "setupWorker", args: [] } } as any);
@@ -27,7 +26,7 @@ function setupWorker(worker: IndexedDBStoreWorker): void {
 
 describe("IndexedDBStore Worker", () => {
     it("should pass 'closed' event via postMessage", async () => {
-        const deferred = defer<void>();
+        const deferred = Promise.withResolvers<void>();
         const postMessage = jest.fn().mockImplementation(({ seq, command }) => {
             if (seq === 1 && command === "cmd_success") {
                 deferred.resolve();

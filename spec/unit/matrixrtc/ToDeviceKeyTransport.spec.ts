@@ -22,7 +22,6 @@ import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTranspor
 import { getMockClientWithEventEmitter } from "../../test-utils/client.ts";
 import { type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
-import { defer } from "../../../src/utils.ts";
 import { type Logger } from "../../../src/logger.ts";
 
 describe("ToDeviceKeyTransport", () => {
@@ -108,7 +107,7 @@ describe("ToDeviceKeyTransport", () => {
     });
 
     it("should emit when a key is received", async () => {
-        const deferred = defer<{ userId: string; deviceId: string; keyBase64Encoded: string; index: number }>();
+        const deferred = Promise.withResolvers<{ userId: string; deviceId: string; keyBase64Encoded: string; index: number }>();
         transport.on(KeyTransportEvents.ReceivedKeys, (userId, deviceId, keyBase64Encoded, index, timestamp) => {
             deferred.resolve({ userId, deviceId, keyBase64Encoded, index });
         });

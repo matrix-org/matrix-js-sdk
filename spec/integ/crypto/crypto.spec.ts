@@ -59,7 +59,7 @@ import {
 } from "../../../src/matrix";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
-import { defer, escapeRegExp } from "../../../src/utils";
+import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
 import {
@@ -1283,7 +1283,7 @@ describe("crypto", () => {
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
 
             // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
-            const sendRoomMessageDefer = defer<FetchMock.MockResponse>();
+            const sendRoomMessageDefer = Promise.withResolvers<FetchMock.MockResponse>();
             const reqProm = new Promise<IContent>((resolve) => {
                 fetchMock.putOnce(
                     new RegExp("/send/m.room.encrypted/"),

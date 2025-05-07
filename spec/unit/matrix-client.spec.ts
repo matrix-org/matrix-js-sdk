@@ -73,7 +73,7 @@ import {
     PolicyRecommendation,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
-import { defer, type QueryDict } from "../../src/utils";
+import { type QueryDict } from "../../src/utils";
 import { type SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
@@ -1997,7 +1997,7 @@ describe("MatrixClient", function () {
         });
 
         it("should cancel an event which is encrypting", async () => {
-            const encryptEventDefer = defer();
+            const encryptEventDefer = Promise.withResolvers<void>();
             mockCrypto.encryptEvent.mockReturnValue(encryptEventDefer.promise);
 
             const statusPromise = testUtils.emitPromise(event, "Event.status");

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { logger } from "../logger.ts";
-import { defer, type IDeferred } from "../utils.ts";
 import { type ISavedSync } from "./index.ts";
 import { type IStoredClientOpts } from "../client.ts";
 import { type IStateEventWithRoomId, type ISyncResponse } from "../matrix.ts";
@@ -26,7 +25,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker?: Worker;
     private nextSeq = 0;
     // The currently in-flight requests to the actual backend
-    private inFlight: Record<number, IDeferred<any>> = {}; // seq: promise
+    private inFlight: Record<number, PromiseWithResolvers<any>> = {}; // seq: promise
     // Once we start connecting, we keep the promise and re-use it
     // if we try to connect again
     private startPromise?: Promise<void>;
@@ -164,7 +163,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         // the promise automatically gets rejected
         return Promise.resolve().then(() => {
             const seq = this.nextSeq++;
-            const def = defer<T>();
+            const def = Promise.withResolvers<T>();
 
             this.inFlight[seq] = def;
 
