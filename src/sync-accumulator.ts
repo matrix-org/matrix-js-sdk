@@ -48,8 +48,13 @@ export interface IEphemeral {
     events: IMinimalEvent[];
 }
 
-/* eslint-disable camelcase */
-interface UnreadNotificationCounts {
+/**
+ * The structure of the unread_notification_counts object in sync responses
+ * XXX: This is not sync-accumulator related and is used in general sync code.
+ *
+ * eslint-disable camelcase
+ */
+export interface UnreadNotificationCounts {
     highlight_count?: number;
     notification_count?: number;
 }
