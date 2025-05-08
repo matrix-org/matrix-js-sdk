@@ -89,7 +89,7 @@ export class EncryptionManager implements IEncryptionManager {
         private transport: IKeyTransport,
         private statistics: Statistics,
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array<ArrayBufferLike>,
+            keyBin: Uint8Array,
             encryptionKeyIndex: number,
             participantId: string,
         ) => void,
