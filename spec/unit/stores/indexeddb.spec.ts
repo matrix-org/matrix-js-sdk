@@ -79,7 +79,7 @@ describe("IndexedDBStore", () => {
     it("Should load presence events on startup", async () => {
         // 1. Create idb database
         const indexedDB = new IDBFactory();
-        const setupDefer = Promise.withResolvers<Event>();
+        const setupResolvers = Promise.withResolvers<Event>();
         const req = indexedDB.open("matrix-js-sdk:db3", 1);
         let db: IDBDatabase;
         req.onupgradeneeded = () => {
@@ -88,11 +88,11 @@ describe("IndexedDBStore", () => {
             db.createObjectStore("accountData", { keyPath: ["type"] });
             db.createObjectStore("sync", { keyPath: ["clobber"] });
         };
-        req.onsuccess = setupDefer.resolve;
-        await setupDefer.promise;
+        req.onsuccess = setupResolvers.resolve;
+        await setupResolvers.promise;
 
         // 2. Fill in user presence data
-        const writeDefer = Promise.withResolvers<Event>();
+        const writeResolvers = Promise.withResolvers<Event>();
         const transaction = db!.transaction(["users"], "readwrite");
         const objectStore = transaction.objectStore("users");
         const request = objectStore.put({
@@ -105,8 +105,8 @@ describe("IndexedDBStore", () => {
                 type: "m.presence",
             },
         });
-        request.onsuccess = writeDefer.resolve;
-        await writeDefer.promise;
+        request.onsuccess = writeResolvers.resolve;
+        await writeResolvers.promise;
 
         // 3. Close database
         req.result.close();

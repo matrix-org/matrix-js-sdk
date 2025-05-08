@@ -78,9 +78,9 @@ describe("MatrixScheduler", function () {
 
     it("should invoke the retryFn on failure and wait the amount of time specified", async function () {
         const waitTimeMs = 1500;
-        const retryDefer = Promise.withResolvers<void>();
+        const retryResolvers = Promise.withResolvers<void>();
         retryFn = function () {
-            retryDefer.resolve();
+            retryResolvers.resolve();
             return waitTimeMs;
         };
         queueFn = function () {
@@ -108,7 +108,7 @@ describe("MatrixScheduler", function () {
         await Promise.resolve();
         expect(procCount).toEqual(1);
         deferred.reject({});
-        await retryDefer.promise;
+        await retryResolvers.promise;
         expect(procCount).toEqual(1);
         jest.advanceTimersByTime(waitTimeMs);
         await Promise.resolve();

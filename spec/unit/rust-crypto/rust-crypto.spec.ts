@@ -927,8 +927,8 @@ describe("RustCrypto", () => {
 
         it("should go round the loop again if another sync completes while the first `outgoingRequests` is running", async () => {
             // the first call to `outgoingMessages` will return a promise which blocks for a while
-            const firstOutgoingRequestsDefer = Promise.withResolvers<Array<any>>();
-            mocked(olmMachine.outgoingRequests).mockReturnValueOnce(firstOutgoingRequestsDefer.promise);
+            const firstOutgoingRequestsResolvers = Promise.withResolvers<Array<any>>();
+            mocked(olmMachine.outgoingRequests).mockReturnValueOnce(firstOutgoingRequestsResolvers.promise);
 
             // the second will return a KeysQueryRequest.
             const testReq = new KeysQueryRequest("1234", "{}");
@@ -945,7 +945,7 @@ describe("RustCrypto", () => {
 
             // the first call now completes, *with an empty result*, which would normally cause us to exit the loop, but
             // we should have a second call queued. It should trigger a call to `makeOutgoingRequest`.
-            firstOutgoingRequestsDefer.resolve([]);
+            firstOutgoingRequestsResolvers.resolve([]);
             await awaitCallToMakeOutgoingRequest();
             expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
         });

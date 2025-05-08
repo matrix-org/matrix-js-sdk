@@ -1997,8 +1997,8 @@ describe("MatrixClient", function () {
         });
 
         it("should cancel an event which is encrypting", async () => {
-            const encryptEventDefer = Promise.withResolvers<void>();
-            mockCrypto.encryptEvent.mockReturnValue(encryptEventDefer.promise);
+            const encryptEventResolvers = Promise.withResolvers<void>();
+            mockCrypto.encryptEvent.mockReturnValue(encryptEventResolvers.promise);
 
             const statusPromise = testUtils.emitPromise(event, "Event.status");
             // @ts-ignore protected method access
@@ -2009,7 +2009,7 @@ describe("MatrixClient", function () {
             assertCancelled();
 
             // now let the encryption complete, and check that the message is not sent.
-            encryptEventDefer.resolve();
+            encryptEventResolvers.resolve();
             await encryptAndSendPromise;
             assertCancelled();
         });

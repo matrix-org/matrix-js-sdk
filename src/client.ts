@@ -2191,7 +2191,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (existingData && deepCompare(existingData.event.content, content)) return {};
 
         // Create a promise which will resolve when the update is received
-        const updatedDefer = Promise.withResolvers<void>();
+        const updatedResolvers = Promise.withResolvers<void>();
         function accountDataListener(event: MatrixEvent): void {
             // Note that we cannot safely check that the content matches what we expected, because there is a race:
             //   * We set the new content
@@ -2203,13 +2203,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             //
             // Anyway, what we *shouldn't* do is get stuck in a loop. I think the best we can do is check that the event
             // type matches.
-            if (event.getType() === eventType) updatedDefer.resolve();
+            if (event.getType() === eventType) updatedResolvers.resolve();
         }
         this.addListener(ClientEvent.AccountData, accountDataListener);
 
         try {
             const result = await retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
-            await updatedDefer.promise;
+            await updatedResolvers.promise;
             return result;
         } finally {
             this.removeListener(ClientEvent.AccountData, accountDataListener);
