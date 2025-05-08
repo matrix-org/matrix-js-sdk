@@ -525,8 +525,8 @@ describe("FetchHttpApi", () => {
 
     it("should not log query parameters", async () => {
         jest.useFakeTimers();
-        const deferred = Promise.withResolvers<Response>();
-        const fetchFn = jest.fn().mockReturnValue(deferred.promise);
+        const responseResolvers = Promise.withResolvers<Response>();
+        const fetchFn = jest.fn().mockReturnValue(responseResolvers.promise);
         const mockLogger = {
             debug: jest.fn(),
         } as unknown as Mocked<Logger>;
@@ -538,7 +538,7 @@ describe("FetchHttpApi", () => {
         });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
         jest.advanceTimersByTime(1234);
-        deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
+        responseResolvers.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");
         expect(mockLogger.debug).not.toHaveBeenCalledWith("query");

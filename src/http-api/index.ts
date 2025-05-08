@@ -65,14 +65,14 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             total: 0,
             abortController,
         } as Upload;
-        const deferred = Promise.withResolvers<UploadResponse>();
+        const uploadResolvers = Promise.withResolvers<UploadResponse>();
 
         if (globalThis.XMLHttpRequest) {
             const xhr = new globalThis.XMLHttpRequest();
 
             const timeoutFn = function (): void {
                 xhr.abort();
-                deferred.reject(new Error("Timeout"));
+                uploadResolvers.reject(new Error("Timeout"));
             };
 
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
@@ -91,16 +91,16 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                             }
 
                             if (xhr.status >= 400) {
-                                deferred.reject(parseErrorResponse(xhr, xhr.responseText));
+                                uploadResolvers.reject(parseErrorResponse(xhr, xhr.responseText));
                             } else {
-                                deferred.resolve(JSON.parse(xhr.responseText));
+                                uploadResolvers.resolve(JSON.parse(xhr.responseText));
                             }
                         } catch (err) {
                             if ((<Error>err).name === "AbortError") {
-                                deferred.reject(err);
+                                uploadResolvers.reject(err);
                                 return;
                             }
-                            deferred.reject(new ConnectionError("request failed", <Error>err));
+                            uploadResolvers.reject(new ConnectionError("request failed", <Error>err));
                         }
                         break;
                 }
@@ -153,16 +153,16 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 .then((response) => {
                     return this.opts.onlyData ? <UploadResponse>response : response.json();
                 })
-                .then(deferred.resolve, deferred.reject);
+                .then(uploadResolvers.resolve, uploadResolvers.reject);
         }
 
         // remove the upload from the list on completion
-        upload.promise = deferred.promise.finally(() => {
+        upload.promise = uploadResolvers.promise.finally(() => {
             removeElement(this.uploads, (elem) => elem === upload);
         });
         abortController.signal.addEventListener("abort", () => {
             removeElement(this.uploads, (elem) => elem === upload);
-            deferred.reject(new DOMException("Aborted", "AbortError"));
+            uploadResolvers.reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
         return upload.promise;

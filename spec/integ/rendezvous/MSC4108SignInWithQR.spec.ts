@@ -333,11 +333,11 @@ describe("MSC4108SignInWithQR", () => {
             // @ts-ignore
             await opponentLogin.receive();
 
-            const deferred = Promise.withResolvers<IMyDevice>();
-            mocked(client.getDevice).mockReturnValue(deferred.promise);
+            const deviceResolvers = Promise.withResolvers<IMyDevice>();
+            mocked(client.getDevice).mockReturnValue(deviceResolvers.promise);
 
             ourLogin.cancel(MSC4108FailureReason.UserCancelled).catch(() => {});
-            deferred.resolve({} as IMyDevice);
+            deviceResolvers.resolve({} as IMyDevice);
 
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },

@@ -29,7 +29,7 @@ const DEBUG = false; // set true to enable console logging.
 
 interface IQueueEntry<T> {
     event: MatrixEvent;
-    defer: PromiseWithResolvers<T>;
+    resolvers: PromiseWithResolvers<T>;
     attempts: number;
 }
 
@@ -188,15 +188,15 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (!this.queues[queueName]) {
             this.queues[queueName] = [];
         }
-        const deferred = Promise.withResolvers<T>();
+        const eventResolvers = Promise.withResolvers<T>();
         this.queues[queueName].push({
             event: event,
-            defer: deferred,
+            resolvers: eventResolvers,
             attempts: 0,
         });
         debuglog("Queue algorithm dumped event %s into queue '%s'", event.getId(), queueName);
         this.startProcessingQueues();
-        return deferred.promise;
+        return eventResolvers.promise;
     }
 
     private startProcessingQueues(): void {
@@ -239,7 +239,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
                     // remove this from the queue
                     this.removeNextEvent(queueName);
                     debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
-                    obj.defer.resolve(res);
+                    obj.resolvers.resolve(res);
                     // keep processing
                     this.processQueue(queueName);
                 },
@@ -279,7 +279,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         logger.info("clearing queue '%s'", queueName);
         let obj: IQueueEntry<T> | undefined;
         while ((obj = this.removeNextEvent(queueName))) {
-            obj.defer.reject(err);
+            obj.resolvers.reject(err);
         }
         this.disableQueue(queueName);
     }

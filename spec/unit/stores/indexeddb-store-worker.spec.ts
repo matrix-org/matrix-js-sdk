@@ -26,16 +26,16 @@ function setupWorker(worker: IndexedDBStoreWorker): void {
 
 describe("IndexedDBStore Worker", () => {
     it("should pass 'closed' event via postMessage", async () => {
-        const deferred = Promise.withResolvers<void>();
+        const postMessageSuccessResolvers = Promise.withResolvers<void>();
         const postMessage = jest.fn().mockImplementation(({ seq, command }) => {
             if (seq === 1 && command === "cmd_success") {
-                deferred.resolve();
+                postMessageSuccessResolvers.resolve();
             }
         });
         const worker = new IndexedDBStoreWorker(postMessage);
         setupWorker(worker);
 
-        await deferred.promise;
+        await postMessageSuccessResolvers.promise;
 
         // @ts-ignore - private field access
         (worker.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);

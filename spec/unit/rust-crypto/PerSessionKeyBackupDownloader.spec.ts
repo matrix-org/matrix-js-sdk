@@ -59,12 +59,12 @@ describe("PerSessionKeyBackupDownloader", () => {
     let expectedSession: { [roomId: string]: { [sessionId: string]: PromiseWithResolvers<void> } };
 
     function expectSessionImported(roomId: string, sessionId: string) {
-        const deferred = Promise.withResolvers<void>();
+        const sessionImportedResolvers = Promise.withResolvers<void>();
         if (!expectedSession[roomId]) {
             expectedSession[roomId] = {};
         }
-        expectedSession[roomId][sessionId] = deferred;
-        return deferred.promise;
+        expectedSession[roomId][sessionId] = sessionImportedResolvers;
+        return sessionImportedResolvers.promise;
     }
 
     function mockClearSession(sessionId: string): Mocked<IMegolmSessionData> {
@@ -114,9 +114,9 @@ describe("PerSessionKeyBackupDownloader", () => {
         mockRustBackupManager.importBackedUpRoomKeys.mockImplementation(async (keys) => {
             const roomId = keys[0].room_id;
             const sessionId = keys[0].session_id;
-            const deferred = expectedSession[roomId] && expectedSession[roomId][sessionId];
-            if (deferred) {
-                deferred.resolve();
+            const sessionImportedResolvers = expectedSession[roomId] && expectedSession[roomId][sessionId];
+            if (sessionImportedResolvers) {
+                sessionImportedResolvers.resolve();
             }
         });
 

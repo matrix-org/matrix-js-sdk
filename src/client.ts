@@ -5173,24 +5173,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
-                const deferred = Promise.withResolvers<void>();
+                const doneResolvers = Promise.withResolvers<void>();
                 this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
                         this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                             actions: [PushRuleActionName.DontNotify],
                         })
                             .then(() => {
-                                deferred.resolve();
+                                doneResolvers.resolve();
                             })
                             .catch((err) => {
-                                deferred.reject(err);
+                                doneResolvers.reject(err);
                             });
                     })
                     .catch((err) => {
-                        deferred.reject(err);
+                        doneResolvers.reject(err);
                     });
 
-                promise = deferred.promise;
+                promise = doneResolvers.promise;
             }
         }
 

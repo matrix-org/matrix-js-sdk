@@ -1083,8 +1083,8 @@ describe("RoomState", function () {
                     timestamp: Date.now() + 1,
                 });
 
-                const deferred = Promise.withResolvers<void>();
-                mockClient.decryptEventIfNeeded.mockReturnValue(deferred.promise);
+                const decryptEventResolvers = Promise.withResolvers<void>();
+                mockClient.decryptEventIfNeeded.mockReturnValue(decryptEventResolvers.promise);
 
                 state.setStateEvents([beacon1, beacon2]);
                 const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
@@ -1094,7 +1094,7 @@ describe("RoomState", function () {
                 // update type after '''decryption'''
                 decryptingRelatedEvent.event.type = M_BEACON.name;
                 decryptingRelatedEvent.event.content = locationEvent.event.content;
-                deferred.resolve();
+                decryptEventResolvers.resolve();
                 await prom;
 
                 expect(addLocationsSpy).toHaveBeenCalledWith([decryptingRelatedEvent]);

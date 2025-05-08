@@ -99,14 +99,14 @@ export class OutgoingRequestsManager {
         this.outgoingRequestLoopRunning = true;
         try {
             while (!this.stopped && this.nextLoopDeferred) {
-                const deferred = this.nextLoopDeferred;
+                const loopTickResolvers = this.nextLoopDeferred;
 
                 // reset `nextLoopDeferred` so that any future calls to `doProcessOutgoingRequests` are queued
                 // for another additional iteration.
                 this.nextLoopDeferred = undefined;
 
                 // make the requests and feed the results back to the `nextLoopDeferred`
-                await this.processOutgoingRequests().then(deferred.resolve, deferred.reject);
+                await this.processOutgoingRequests().then(loopTickResolvers.resolve, loopTickResolvers.reject);
             }
         } finally {
             this.outgoingRequestLoopRunning = false;
