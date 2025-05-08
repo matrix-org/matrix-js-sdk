@@ -1604,7 +1604,7 @@ function sha256(commitmentStr: string): string {
     return encodeUnpaddedBase64(createHash("sha256").update(commitmentStr, "utf8").digest());
 }
 
-function encodeUnpaddedBase64(uint8Array: Uint8Array | Uint8ClampedArray<ArrayBuffer>): string {
+function encodeUnpaddedBase64(uint8Array: ArrayLike<number>): string {
     return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
 }
 
@@ -1638,10 +1638,7 @@ function buildReadyMessage(
 }
 
 /** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
-function buildReciprocateStartMessage(
-    transactionId: string,
-    sharedSecret: Uint8Array | Uint8ClampedArray<ArrayBuffer>,
-) {
+function buildReciprocateStartMessage(transactionId: string, sharedSecret: ArrayLike<number>) {
     return {
         type: "m.key.verification.start",
         content: {

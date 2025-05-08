@@ -969,15 +969,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
         return requests
             .filter((request) => request.roomId === undefined)
-            .map(
-                (request) =>
-                    new RustVerificationRequest(
-                        this.olmMachine,
-                        request,
-                        this.outgoingRequestProcessor,
-                        this._supportedVerificationMethods,
-                    ),
-            );
+            .map((request) => this.makeVerificationRequest(request));
     }
 
     /**
@@ -1002,12 +994,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const request = requests.find((request) => request.roomId?.toString() === roomId);
 
         if (request) {
-            return new RustVerificationRequest(
-                this.olmMachine,
-                request,
-                this.outgoingRequestProcessor,
-                this._supportedVerificationMethods,
-            );
+            return this.makeVerificationRequest(request);
         }
     }
 
@@ -1038,12 +1025,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 new RustSdkCryptoJs.EventId(eventId),
                 methods,
             );
-            return new RustVerificationRequest(
-                this.olmMachine,
-                request,
-                this.outgoingRequestProcessor,
-                this._supportedVerificationMethods,
-            );
+            return this.makeVerificationRequest(request);
         } finally {
             userIdentity.free();
         }
@@ -1114,12 +1096,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                     this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
                 );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-            return new RustVerificationRequest(
-                this.olmMachine,
-                request,
-                this.outgoingRequestProcessor,
-                this._supportedVerificationMethods,
-            );
+            return this.makeVerificationRequest(request);
         } finally {
             userIdentity.free();
         }
@@ -1152,12 +1129,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 this._supportedVerificationMethods.map(verificationMethodIdentifierToMethod),
             );
             await this.outgoingRequestProcessor.makeOutgoingRequest(outgoingRequest);
-            return new RustVerificationRequest(
-                this.olmMachine,
-                request,
-                this.outgoingRequestProcessor,
-                this._supportedVerificationMethods,
-            );
+            return this.makeVerificationRequest(request);
         } finally {
             device.free();
         }
@@ -1667,15 +1639,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         if (request) {
-            this.emit(
-                CryptoEvent.VerificationRequestReceived,
-                new RustVerificationRequest(
-                    this.olmMachine,
-                    request,
-                    this.outgoingRequestProcessor,
-                    this._supportedVerificationMethods,
-                ),
-            );
+            this.emit(CryptoEvent.VerificationRequestReceived, this.makeVerificationRequest(request));
         } else {
             // There are multiple reasons this can happen; probably the most likely is that the event is an
             // in-room event which is too old.
@@ -1683,6 +1647,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 `Ignoring just-received verification request ${transactionId} which did not start a rust-side verification`,
             );
         }
+    }
+
+    /** Utility function to wrap a rust `VerificationRequest` with our own {@link VerificationRequest}. */
+    private makeVerificationRequest(request: RustSdkCryptoJs.VerificationRequest): VerificationRequest {
+        return new RustVerificationRequest(
+            this.logger,
+            this.olmMachine,
+            request,
+            this.outgoingRequestProcessor,
+            this._supportedVerificationMethods,
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
