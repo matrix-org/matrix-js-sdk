@@ -436,6 +436,16 @@ export function isNullOrUndefined(val: any): boolean {
     return val === null || val === undefined;
 }
 
+export type IDeferred<T> = PromiseWithResolvers<T>;
+
+/**
+ * Creates a deferred promise. This is a promise that can be resolved or rejected.
+ * @deprecated use {@link Promise.withResolvers} instead.
+ */
+export function defer<T = void>(): IDeferred<T> {
+    return Promise.withResolvers<T>();
+}
+
 export async function promiseMapSeries<T>(
     promises: Array<T | Promise<T>>,
     fn: (t: T) => Promise<unknown> | undefined, // if async we don't care about the type as we only await resolution
