@@ -52,7 +52,16 @@ import {
     type GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler.ts";
 import * as utils from "./utils.ts";
-import { deepCompare, defer, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
+import {
+    deepCompare,
+    defer,
+    MapWithDefault,
+    noUnsafeEventProps,
+    type QueryDict,
+    replaceParam,
+    safeSet,
+    sleep,
+} from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
@@ -7948,7 +7957,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The type of event to send
      * @param devices - The list of devices to send the event to.
      * @param payload - The payload to send. This will be encrypted.
-     * @returns Promise which resolves once queued there is no error feedback when sending fails.
+     * @returns Promise which resolves once send there. Can be rejected with an error if sending fails
+     * Sending will retry automatically but there is a Max retries limit.
      */
     public async encryptAndSendToDevice(
         eventType: string,
@@ -7960,9 +7970,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         const batch = await this.cryptoBackend.encryptToDeviceMessages(eventType, devices, payload);
 
-        // TODO The batch mechanism removes all possibility to get error feedbacks..
-        // We might want instead to do the API call directly and pass the errors back.
-        await this.queueToDevice(batch);
+        const contentMap: MapWithDefault<string, Map<string, ToDevicePayload>> = new MapWithDefault(() => new Map());
+        for (const item of batch.batch) {
+            contentMap.getOrCreate(item.userId).set(item.deviceId, item.payload);
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            this.queueToDevice(batch, (result) => {
+                if (result === undefined) {
+                    resolve;
+                } else if (result) {
+                    reject(result);
+                }
+            });
+        });
     }
 
     /**
@@ -7971,9 +7992,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * batches for sending and stored in the store so they can be retried
      * later if they fail to send. Retries will happen automatically.
      * @param batch - The to-device messages to send
+     * @param sendCallback - Optional callback to call when the batch is sent
+     * @returns Promise which resolves once the batch is queued.
      */
-    public queueToDevice(batch: ToDeviceBatch): Promise<void> {
-        return this.toDeviceMessageQueue.queueBatch(batch);
+    public queueToDevice(batch: ToDeviceBatch, sendCallback?: (result: Error | undefined) => void): Promise<void> {
+        return this.toDeviceMessageQueue.queueBatch(batch, sendCallback);
     }
 
     /**
