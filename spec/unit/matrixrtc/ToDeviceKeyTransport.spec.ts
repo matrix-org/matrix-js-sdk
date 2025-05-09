@@ -22,7 +22,6 @@ import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTranspor
 import { getMockClientWithEventEmitter } from "../../test-utils/client.ts";
 import { type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
-import { defer } from "../../../src/utils.ts";
 import { type Logger } from "../../../src/logger.ts";
 
 describe("ToDeviceKeyTransport", () => {
@@ -108,9 +107,14 @@ describe("ToDeviceKeyTransport", () => {
     });
 
     it("should emit when a key is received", async () => {
-        const deferred = defer<{ userId: string; deviceId: string; keyBase64Encoded: string; index: number }>();
+        const receivedKeyResolvers = Promise.withResolvers<{
+            userId: string;
+            deviceId: string;
+            keyBase64Encoded: string;
+            index: number;
+        }>();
         transport.on(KeyTransportEvents.ReceivedKeys, (userId, deviceId, keyBase64Encoded, index, timestamp) => {
-            deferred.resolve({ userId, deviceId, keyBase64Encoded, index });
+            receivedKeyResolvers.resolve({ userId, deviceId, keyBase64Encoded, index });
         });
         transport.start();
 
@@ -136,7 +140,7 @@ describe("ToDeviceKeyTransport", () => {
             }),
         );
 
-        const { userId, deviceId, keyBase64Encoded, index } = await deferred.promise;
+        const { userId, deviceId, keyBase64Encoded, index } = await receivedKeyResolvers.promise;
         expect(userId).toBe("@bob:example.org");
         expect(deviceId).toBe("BOBDEVICE");
         expect(keyBase64Encoded).toBe(testEncoded);

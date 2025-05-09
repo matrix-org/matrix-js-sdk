@@ -29,7 +29,7 @@ import {
     Method,
 } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { defer, type QueryDict, sleep } from "../../../src/utils";
+import { type QueryDict, sleep } from "../../../src/utils";
 import { type Logger } from "../../../src/logger";
 
 describe("FetchHttpApi", () => {
@@ -525,8 +525,8 @@ describe("FetchHttpApi", () => {
 
     it("should not log query parameters", async () => {
         jest.useFakeTimers();
-        const deferred = defer<Response>();
-        const fetchFn = jest.fn().mockReturnValue(deferred.promise);
+        const responseResolvers = Promise.withResolvers<Response>();
+        const fetchFn = jest.fn().mockReturnValue(responseResolvers.promise);
         const mockLogger = {
             debug: jest.fn(),
         } as unknown as Mocked<Logger>;
@@ -538,7 +538,7 @@ describe("FetchHttpApi", () => {
         });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
         jest.advanceTimersByTime(1234);
-        deferred.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
+        responseResolvers.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");
         expect(mockLogger.debug).not.toHaveBeenCalledWith("query");
@@ -557,7 +557,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not make multiple concurrent refresh token requests", async () => {
-        const deferredTokenRefresh = defer<{ accessToken: string; refreshToken: string }>();
+        const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
         const fetchFn = jest.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,
@@ -612,7 +612,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should use newly refreshed token if request starts mid-refresh", async () => {
-        const deferredTokenRefresh = defer<{ accessToken: string; refreshToken: string }>();
+        const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
         const fetchFn = jest.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,

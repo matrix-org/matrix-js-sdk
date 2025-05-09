@@ -21,7 +21,6 @@ import fetchMock from "fetch-mock-jest";
 
 import { PerSessionKeyBackupDownloader } from "../../../src/rust-crypto/PerSessionKeyBackupDownloader";
 import { logger } from "../../../src/logger";
-import { defer, type IDeferred } from "../../../src/utils";
 import {
     type RustBackupCryptoEventMap,
     type RustBackupCryptoEvents,
@@ -57,15 +56,15 @@ describe("PerSessionKeyBackupDownloader", () => {
     let mockOlmMachine: Mocked<OlmMachine>;
     let mockBackupDecryptor: Mocked<BackupDecryptor>;
 
-    let expectedSession: { [roomId: string]: { [sessionId: string]: IDeferred<void> } };
+    let expectedSession: { [roomId: string]: { [sessionId: string]: PromiseWithResolvers<void> } };
 
     function expectSessionImported(roomId: string, sessionId: string) {
-        const deferred = defer<void>();
+        const sessionImportedResolvers = Promise.withResolvers<void>();
         if (!expectedSession[roomId]) {
             expectedSession[roomId] = {};
         }
-        expectedSession[roomId][sessionId] = deferred;
-        return deferred.promise;
+        expectedSession[roomId][sessionId] = sessionImportedResolvers;
+        return sessionImportedResolvers.promise;
     }
 
     function mockClearSession(sessionId: string): Mocked<IMegolmSessionData> {
@@ -115,9 +114,9 @@ describe("PerSessionKeyBackupDownloader", () => {
         mockRustBackupManager.importBackedUpRoomKeys.mockImplementation(async (keys) => {
             const roomId = keys[0].room_id;
             const sessionId = keys[0].session_id;
-            const deferred = expectedSession[roomId] && expectedSession[roomId][sessionId];
-            if (deferred) {
-                deferred.resolve();
+            const sessionImportedResolvers = expectedSession[roomId] && expectedSession[roomId][sessionId];
+            if (sessionImportedResolvers) {
+                sessionImportedResolvers.resolve();
             }
         });
 
@@ -143,7 +142,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         it("Should download and import a missing key from backup", async () => {
-            const awaitKeyImported = defer<void>();
+            const awaitKeyImported = Promise.withResolvers<void>();
             const roomId = "!roomId";
             const sessionId = "sessionId";
             const expectAPICall = new Promise<void>((resolve) => {
@@ -168,14 +167,14 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         it("Should not hammer the backup if the key is requested repeatedly", async () => {
-            const blockOnServerRequest = defer<void>();
+            const blockOnServerRequest = Promise.withResolvers<void>();
 
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/!roomId/:session_id`, async (url, request) => {
                 await blockOnServerRequest.promise;
                 return [mockCipherKey];
             });
 
-            const awaitKey2Imported = defer<void>();
+            const awaitKey2Imported = Promise.withResolvers<void>();
 
             mockRustBackupManager.importBackedUpRoomKeys.mockImplementation(async (keys) => {
                 if (keys[0].session_id === "sessionId2") {
@@ -267,8 +266,8 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("Should stop properly", async () => {
             // Simulate a call to stop while request is in flight
-            const blockOnServerRequest = defer<void>();
-            const requestRoomKeyCalled = defer<void>();
+            const blockOnServerRequest = Promise.withResolvers<void>();
+            const requestRoomKeyCalled = Promise.withResolvers<void>();
 
             // Mock the request to block
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, async (url, request) => {
@@ -490,7 +489,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // @ts-ignore access to private function
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
-            const rateDeferred = defer<void>();
+            const rateDeferred = Promise.withResolvers<void>();
 
             keyQuerySpy.mockImplementation(
                 // @ts-ignore
@@ -544,7 +543,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // @ts-ignore
             const keyQuerySpy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
-            const errorDeferred = defer<void>();
+            const errorDeferred = Promise.withResolvers<void>();
 
             keyQuerySpy.mockImplementation(
                 // @ts-ignore
@@ -588,7 +587,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         it("On Unknown error on import skip the key and continue", async () => {
-            const keyImported = defer<void>();
+            const keyImported = Promise.withResolvers<void>();
             mockRustBackupManager.importBackedUpRoomKeys
                 .mockImplementationOnce(async () => {
                     throw new Error("Didn't work");

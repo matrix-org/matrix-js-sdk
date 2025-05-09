@@ -29,7 +29,6 @@ import { type Mocked } from "jest-mock";
 import { HistoryVisibility, type MatrixEvent, type Room, type RoomMember } from "../../../src";
 import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
 import { type KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
-import { defer } from "../../../src/utils";
 import { type OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { KnownMembership } from "../../../src/@types/membership";
 import {
@@ -120,8 +119,8 @@ describe("RoomEncryptor", () => {
         const defaultDevicesIsolationMode = new AllDevicesIsolationMode(false);
 
         it("should ensure that there is only one shareRoomKey at a time", async () => {
-            const deferredShare = defer<void>();
-            const insideOlmShareRoom = defer<void>();
+            const deferredShare = Promise.withResolvers<void>();
+            const insideOlmShareRoom = Promise.withResolvers<void>();
 
             mockOlmMachine.shareRoomKey.mockImplementationOnce(async () => {
                 insideOlmShareRoom.resolve();
@@ -149,8 +148,8 @@ describe("RoomEncryptor", () => {
 
         // Regression test for https://github.com/element-hq/element-web/issues/26684
         it("Should maintain order of encryption requests", async () => {
-            const firstTargetMembers = defer<void>();
-            const secondTargetMembers = defer<void>();
+            const firstTargetMembers = Promise.withResolvers<void>();
+            const secondTargetMembers = Promise.withResolvers<void>();
 
             mockOlmMachine.shareRoomKey.mockResolvedValue([]);
 

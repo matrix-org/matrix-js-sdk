@@ -18,7 +18,7 @@ import { type OlmMachine, type OutgoingRequest } from "@matrix-org/matrix-sdk-cr
 
 import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { type Logger } from "../logger.ts";
-import { defer, type IDeferred, logDuration } from "../utils.ts";
+import { logDuration } from "../utils.ts";
 
 /**
  * OutgoingRequestsManager: responsible for processing outgoing requests from the OlmMachine.
@@ -39,7 +39,7 @@ export class OutgoingRequestsManager {
      * will resolve once that next iteration completes. If it is undefined, there have been no new calls
      * to `doProcessOutgoingRequests` since the current iteration started.
      */
-    private nextLoopDeferred?: IDeferred<void>;
+    private nextLoopDeferred?: PromiseWithResolvers<void>;
 
     public constructor(
         private readonly logger: Logger,
@@ -74,7 +74,7 @@ export class OutgoingRequestsManager {
         // In order to circumvent the race, we set a flag which tells the loop to go round once again even if the
         // queue appears to be empty.
         if (!this.nextLoopDeferred) {
-            this.nextLoopDeferred = defer();
+            this.nextLoopDeferred = Promise.withResolvers();
         }
 
         // ... and wait for it to complete.
@@ -99,14 +99,14 @@ export class OutgoingRequestsManager {
         this.outgoingRequestLoopRunning = true;
         try {
             while (!this.stopped && this.nextLoopDeferred) {
-                const deferred = this.nextLoopDeferred;
+                const loopTickResolvers = this.nextLoopDeferred;
 
                 // reset `nextLoopDeferred` so that any future calls to `doProcessOutgoingRequests` are queued
                 // for another additional iteration.
                 this.nextLoopDeferred = undefined;
 
                 // make the requests and feed the results back to the `nextLoopDeferred`
-                await this.processOutgoingRequests().then(deferred.resolve, deferred.reject);
+                await this.processOutgoingRequests().then(loopTickResolvers.resolve, loopTickResolvers.reject);
             }
         } finally {
             this.outgoingRequestLoopRunning = false;

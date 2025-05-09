@@ -59,7 +59,7 @@ import {
 } from "../../../src/matrix";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
-import { defer, escapeRegExp } from "../../../src/utils";
+import { escapeRegExp } from "../../../src/utils";
 import { downloadDeviceToJsDevice } from "../../../src/rust-crypto/device-converter";
 import { flushPromises } from "../../test-utils/flushPromises";
 import {
@@ -1283,13 +1283,13 @@ describe("crypto", () => {
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
 
             // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
-            const sendRoomMessageDefer = defer<FetchMock.MockResponse>();
+            const sendRoomMessageResolvers = Promise.withResolvers<FetchMock.MockResponse>();
             const reqProm = new Promise<IContent>((resolve) => {
                 fetchMock.putOnce(
                     new RegExp("/send/m.room.encrypted/"),
                     async (url: string, opts: RequestInit): Promise<FetchMock.MockResponse> => {
                         resolve(JSON.parse(opts.body as string));
-                        return await sendRoomMessageDefer.promise;
+                        return await sendRoomMessageResolvers.promise;
                     },
                     {
                         // append to the list of intercepts on this path (since we have some tests that call
@@ -1318,7 +1318,7 @@ describe("crypto", () => {
 
             // release the send request
             const resp = { event_id: "$event_id" };
-            sendRoomMessageDefer.resolve(resp);
+            sendRoomMessageResolvers.resolve(resp);
             expect(await sendProm).toEqual(resp);
 
             // still pending at this point

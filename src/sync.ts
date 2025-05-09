@@ -28,7 +28,7 @@ import { type Optional } from "matrix-events-sdk";
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
 import { User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
-import { deepCopy, defer, type IDeferred, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
+import { deepCopy, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
 import { logger } from "./logger.ts";
@@ -220,7 +220,7 @@ export class SyncApi {
     private catchingUp = false;
     private running = false;
     private keepAliveTimer?: ReturnType<typeof setTimeout>;
-    private connectionReturnedDefer?: IDeferred<boolean>;
+    private connectionReturnedResolvers?: PromiseWithResolvers<boolean>;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
@@ -792,7 +792,7 @@ export class SyncApi {
      * @returns True if this resulted in a request being retried.
      */
     public retryImmediately(): boolean {
-        if (!this.connectionReturnedDefer) {
+        if (!this.connectionReturnedResolvers) {
             return false;
         }
         this.startKeepAlives(0);
@@ -916,9 +916,9 @@ export class SyncApi {
 
         if (!this.running) {
             debuglog("Sync no longer running: exiting.");
-            if (this.connectionReturnedDefer) {
-                this.connectionReturnedDefer.reject();
-                this.connectionReturnedDefer = undefined;
+            if (this.connectionReturnedResolvers) {
+                this.connectionReturnedResolvers.reject();
+                this.connectionReturnedResolvers = undefined;
             }
             this.updateSyncState(SyncState.Stopped);
         }
@@ -999,9 +999,9 @@ export class SyncApi {
     private async onSyncError(err: MatrixError): Promise<boolean> {
         if (!this.running) {
             debuglog("Sync no longer running: exiting");
-            if (this.connectionReturnedDefer) {
-                this.connectionReturnedDefer.reject();
-                this.connectionReturnedDefer = undefined;
+            if (this.connectionReturnedResolvers) {
+                this.connectionReturnedResolvers.reject();
+                this.connectionReturnedResolvers = undefined;
             }
             this.updateSyncState(SyncState.Stopped);
             return true; // abort
@@ -1551,10 +1551,10 @@ export class SyncApi {
         } else {
             this.pokeKeepAlive();
         }
-        if (!this.connectionReturnedDefer) {
-            this.connectionReturnedDefer = defer();
+        if (!this.connectionReturnedResolvers) {
+            this.connectionReturnedResolvers = Promise.withResolvers();
         }
-        return this.connectionReturnedDefer.promise;
+        return this.connectionReturnedResolvers.promise;
     }
 
     /**
@@ -1562,7 +1562,7 @@ export class SyncApi {
      * reachable.
      *
      * On failure, schedules a call back to itself. On success, resolves
-     * this.connectionReturnedDefer.
+     * this.connectionReturnedResolvers.
      *
      * @param connDidFail - True if a connectivity failure has been detected. Optional.
      */
@@ -1571,18 +1571,18 @@ export class SyncApi {
             // we are in a keepAlive, retrying to connect, but the syncronization
             // was stopped, so we are stopping the retry.
             clearTimeout(this.keepAliveTimer);
-            if (this.connectionReturnedDefer) {
-                this.connectionReturnedDefer.reject("SyncApi.stop() was called");
-                this.connectionReturnedDefer = undefined;
+            if (this.connectionReturnedResolvers) {
+                this.connectionReturnedResolvers.reject("SyncApi.stop() was called");
+                this.connectionReturnedResolvers = undefined;
             }
             return;
         }
 
         const success = (): void => {
             clearTimeout(this.keepAliveTimer);
-            if (this.connectionReturnedDefer) {
-                this.connectionReturnedDefer.resolve(connDidFail);
-                this.connectionReturnedDefer = undefined;
+            if (this.connectionReturnedResolvers) {
+                this.connectionReturnedResolvers.resolve(connDidFail);
+                this.connectionReturnedResolvers = undefined;
             }
         };
 

@@ -52,7 +52,7 @@ import {
     type GroupCallEventHandlerEventHandlerMap,
 } from "./webrtc/groupCallEventHandler.ts";
 import * as utils from "./utils.ts";
-import { deepCompare, defer, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
+import { deepCompare, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
@@ -2191,7 +2191,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (existingData && deepCompare(existingData.event.content, content)) return {};
 
         // Create a promise which will resolve when the update is received
-        const updatedDefer = defer<void>();
+        const updatedResolvers = Promise.withResolvers<void>();
         function accountDataListener(event: MatrixEvent): void {
             // Note that we cannot safely check that the content matches what we expected, because there is a race:
             //   * We set the new content
@@ -2203,13 +2203,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             //
             // Anyway, what we *shouldn't* do is get stuck in a loop. I think the best we can do is check that the event
             // type matches.
-            if (event.getType() === eventType) updatedDefer.resolve();
+            if (event.getType() === eventType) updatedResolvers.resolve();
         }
         this.addListener(ClientEvent.AccountData, accountDataListener);
 
         try {
             const result = await retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
-            await updatedDefer.promise;
+            await updatedResolvers.promise;
             return result;
         } finally {
             this.removeListener(ClientEvent.AccountData, accountDataListener);
@@ -5173,24 +5173,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
-                const deferred = utils.defer();
+                const doneResolvers = Promise.withResolvers<void>();
                 this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
                         this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {
                             actions: [PushRuleActionName.DontNotify],
                         })
                             .then(() => {
-                                deferred.resolve();
+                                doneResolvers.resolve();
                             })
                             .catch((err) => {
-                                deferred.reject(err);
+                                doneResolvers.reject(err);
                             });
                     })
                     .catch((err) => {
-                        deferred.reject(err);
+                        doneResolvers.reject(err);
                     });
 
-                promise = deferred.promise;
+                promise = doneResolvers.promise;
             }
         }
 

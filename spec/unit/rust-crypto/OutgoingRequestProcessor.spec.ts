@@ -40,7 +40,6 @@ import {
     type UIAuthCallback,
 } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import { defer } from "../../../src/utils";
 
 describe("OutgoingRequestProcessor", () => {
     /** the OutgoingRequestProcessor implementation under test */
@@ -285,13 +284,13 @@ describe("OutgoingRequestProcessor", () => {
             new RustSdkCryptoJs.DeviceId("TEST_DEVICE"),
         );
 
-        const authRequestResultDefer = defer<string>();
+        const authRequestResultResolvers = Promise.withResolvers<string>();
 
         const authRequestCalledPromise = new Promise<void>((resolve) => {
             const mockHttpApi = {
                 authedRequest: async () => {
                     resolve();
-                    return await authRequestResultDefer.promise;
+                    return await authRequestResultResolvers.promise;
                 },
             } as unknown as Mocked<MatrixHttpApi<IHttpOpts & { onlyData: true }>>;
             processor = new OutgoingRequestProcessor(olmMachine, mockHttpApi);
@@ -308,7 +307,7 @@ describe("OutgoingRequestProcessor", () => {
         olmMachine.close();
 
         // the HTTP request completes...
-        authRequestResultDefer.resolve("{}");
+        authRequestResultResolvers.resolve("{}");
 
         // ... and `makeOutgoingRequest` resolves satisfactorily
         await result;

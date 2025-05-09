@@ -169,7 +169,7 @@ export class MembershipManager
         }
         this.fociPreferred = fociPreferred;
         this.focusActive = focusActive;
-        this.leavePromiseDefer = undefined;
+        this.leavePromiseResolvers = undefined;
         this.activated = true;
         this.oldStatus = this.status;
         this.state = MembershipManager.defaultState;
@@ -188,8 +188,8 @@ export class MembershipManager
                     this.emit(MembershipManagerEvent.StatusChanged, this.oldStatus, this.status);
                 }
                 if (!this.scheduler.running) {
-                    this.leavePromiseDefer?.resolve(true);
-                    this.leavePromiseDefer = undefined;
+                    this.leavePromiseResolvers?.resolve(true);
+                    this.leavePromiseResolvers = undefined;
                 }
             });
     }
@@ -207,16 +207,16 @@ export class MembershipManager
 
         // We use the promise to track if we already scheduled a leave event
         // So we do not check scheduler.actions/scheduler.insertions
-        if (!this.leavePromiseDefer) {
+        if (!this.leavePromiseResolvers) {
             // reset scheduled actions so we will not do any new actions.
-            this.leavePromiseDefer = defer<boolean>();
+            this.leavePromiseResolvers = defer<boolean>();
             this.activated = false;
             this.scheduler.initiateLeave();
-            if (timeout) setTimeout(() => this.leavePromiseDefer?.resolve(false), timeout);
+            if (timeout) setTimeout(() => this.leavePromiseResolvers?.resolve(false), timeout);
         }
-        return this.leavePromiseDefer.promise;
+        return this.leavePromiseResolvers.promise;
     }
-    private leavePromiseDefer?: IDeferred<boolean>;
+    private leavePromiseResolvers?: IDeferred<boolean>;
 
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const userId = this.client.getUserId();

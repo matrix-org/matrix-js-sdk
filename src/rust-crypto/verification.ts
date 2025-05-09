@@ -34,7 +34,6 @@ import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { EventType, MsgType } from "../@types/event.ts";
-import { defer, type IDeferred } from "../utils.ts";
 import { VerificationMethod } from "../types.ts";
 import type { Logger } from "../logger.ts";
 
@@ -478,7 +477,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     VerifierEventHandlerMap & VerificationRequestEventHandlerMap
 > {
     /** A deferred which completes when the verification completes (or rejects when it is cancelled/fails) */
-    protected readonly completionDeferred: IDeferred<void>;
+    protected readonly completionDeferred: PromiseWithResolvers<void>;
 
     public constructor(
         protected inner: InnerType,
@@ -486,7 +485,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     ) {
         super();
 
-        this.completionDeferred = defer();
+        this.completionDeferred = Promise.withResolvers();
 
         // As with RustVerificationRequest, we need to avoid a reference cycle.
         // See the comments in RustVerificationRequest.
