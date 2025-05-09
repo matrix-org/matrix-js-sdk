@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// this is needed to tell TS about globalThis.Olm
-import "@matrix-org/olm";
-
 export {};
 
 declare global {
@@ -34,39 +31,18 @@ declare global {
         }
     }
 
-    interface MediaDevices {
-        // This is experimental and types don't know about it yet
-        // https://github.com/microsoft/TypeScript/issues/33232
-        getDisplayMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
-        getUserMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
+    // Chrome-specific getUserMedia constraints
+    interface MediaTrackConstraints {
+        mandatory?: {
+            chromeMediaSource: string;
+            chromeMediaSourceId: string;
+        };
     }
-
-    interface DesktopCapturerConstraints {
-        audio:
-            | boolean
-            | {
-                  mandatory: {
-                      chromeMediaSource: string;
-                      chromeMediaSourceId: string;
-                  };
-              };
-        video:
-            | boolean
-            | {
-                  mandatory: {
-                      chromeMediaSource: string;
-                      chromeMediaSourceId: string;
-                  };
-              };
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    interface DummyInterfaceWeShouldntBeUsingThis {}
 
     interface Navigator {
         // We check for the webkit-prefixed getUserMedia to detect if we're
         // on webkit: we should check if we still need to do this
-        webkitGetUserMedia?: DummyInterfaceWeShouldntBeUsingThis;
+        webkitGetUserMedia?: unknown;
     }
 
     export interface Uint8ArrayToBase64Options {

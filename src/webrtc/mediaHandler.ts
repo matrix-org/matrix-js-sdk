@@ -462,7 +462,7 @@ export class MediaHandler extends TypedEventEmitter<
         };
     }
 
-    private getScreenshareContraints(opts: IScreensharingOpts): DesktopCapturerConstraints {
+    private getScreenshareContraints(opts: IScreensharingOpts): MediaStreamConstraints {
         const { desktopCapturerSourceId, audio } = opts;
         if (desktopCapturerSourceId) {
             return {
