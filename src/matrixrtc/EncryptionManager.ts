@@ -5,7 +5,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
-import { isMyMembership, type Statistics } from "./types.ts";
+import {isMyMembership, ParticipantId, type Statistics} from "./types.ts";
 import { getParticipantId } from "./utils.ts";
 import {
     type EnabledTransports,
@@ -51,7 +51,7 @@ export interface IEncryptionManager {
      * the lower layer will emit the ratcheted key to the encryption manager.
      * This is called after the key a ratchet request has been performed.
      */
-    onOwnKeyRatcheted(key: ArrayBuffer, keyIndex: number | undefined): void;
+    onKeyRatcheted(key: ArrayBuffer, participantId: ParticipantId| undefined, keyIndex: number | undefined): void;
 }
 
 /**
@@ -107,7 +107,7 @@ export class EncryptionManager implements IEncryptionManager {
         this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
     }
 
-    public onOwnKeyRatcheted(key: ArrayBuffer, keyIndex: number | undefined): void {
+    public onKeyRatcheted(key: ArrayBuffer, participantId: ParticipantId| undefined, keyIndex: number | undefined): void {
         this.logger.warn("Ratcheting key is not implemented in EncryptionManager");
     }
 
