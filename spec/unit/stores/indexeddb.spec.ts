@@ -21,7 +21,6 @@ import { IDBFactory } from "fake-indexeddb";
 import { IndexedDBStore, type IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
-import { defer } from "../../../src/utils";
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
@@ -80,7 +79,7 @@ describe("IndexedDBStore", () => {
     it("Should load presence events on startup", async () => {
         // 1. Create idb database
         const indexedDB = new IDBFactory();
-        const setupDefer = defer<Event>();
+        const setupResolvers = Promise.withResolvers<Event>();
         const req = indexedDB.open("matrix-js-sdk:db3", 1);
         let db: IDBDatabase;
         req.onupgradeneeded = () => {
@@ -89,11 +88,11 @@ describe("IndexedDBStore", () => {
             db.createObjectStore("accountData", { keyPath: ["type"] });
             db.createObjectStore("sync", { keyPath: ["clobber"] });
         };
-        req.onsuccess = setupDefer.resolve;
-        await setupDefer.promise;
+        req.onsuccess = setupResolvers.resolve;
+        await setupResolvers.promise;
 
         // 2. Fill in user presence data
-        const writeDefer = defer<Event>();
+        const writeResolvers = Promise.withResolvers<Event>();
         const transaction = db!.transaction(["users"], "readwrite");
         const objectStore = transaction.objectStore("users");
         const request = objectStore.put({
@@ -106,8 +105,8 @@ describe("IndexedDBStore", () => {
                 type: "m.presence",
             },
         });
-        request.onsuccess = writeDefer.resolve;
-        await writeDefer.promise;
+        request.onsuccess = writeResolvers.resolve;
+        await writeResolvers.promise;
 
         // 3. Close database
         req.result.close();
@@ -201,7 +200,7 @@ describe("IndexedDBStore", () => {
     });
 
     it("should resolve isNewlyCreated to false if database existed already but needs upgrade", async () => {
-        const deferred = defer<Event>();
+        const requestSuccessResolvers = Promise.withResolvers<Event>();
         // seed db3 to Version 1 so it forces a migration
         const req = indexedDB.open("matrix-js-sdk:db3", 1);
         req.onupgradeneeded = () => {
@@ -210,8 +209,8 @@ describe("IndexedDBStore", () => {
             db.createObjectStore("accountData", { keyPath: ["type"] });
             db.createObjectStore("sync", { keyPath: ["clobber"] });
         };
-        req.onsuccess = deferred.resolve;
-        await deferred.promise;
+        req.onsuccess = requestSuccessResolvers.resolve;
+        await requestSuccessResolvers.promise;
         req.result.close();
 
         const store = new IndexedDBStore({
@@ -232,20 +231,20 @@ describe("IndexedDBStore", () => {
         });
         await store.startup();
 
-        const deferred = defer<void>();
-        store.on("closed", deferred.resolve);
+        const storeClosedResolvers = Promise.withResolvers<void>();
+        store.on("closed", storeClosedResolvers.resolve);
 
         // @ts-ignore - private field access
         (store.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
-        await deferred.promise;
+        await storeClosedResolvers.promise;
     });
 
     it("should use remote backend if workerFactory passed", async () => {
-        const deferred = defer<void>();
+        const workerPostMessageResolvers = Promise.withResolvers<void>();
         class MockWorker {
             postMessage(data: any) {
                 if (data.command === "setupWorker") {
-                    deferred.resolve();
+                    workerPostMessageResolvers.resolve();
                 }
             }
         }
@@ -257,7 +256,7 @@ describe("IndexedDBStore", () => {
             workerFactory: () => new MockWorker() as Worker,
         });
         store.startup();
-        await deferred.promise;
+        await workerPostMessageResolvers.promise;
     });
 
     it("remote worker should pass closed event", async () => {
@@ -273,10 +272,10 @@ describe("IndexedDBStore", () => {
         });
         store.startup();
 
-        const deferred = defer<void>();
-        store.on("closed", deferred.resolve);
+        const storeClosedResolvers = Promise.withResolvers<void>();
+        store.on("closed", storeClosedResolvers.resolve);
         (worker as any).onmessage({ data: { command: "closed" } });
-        await deferred.promise;
+        await storeClosedResolvers.promise;
     });
 
     it("remote worker should pass command failures", async () => {

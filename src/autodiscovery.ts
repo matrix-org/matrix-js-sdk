@@ -462,7 +462,7 @@ export class AutoDiscovery {
                 };
             }
 
-            if (!response.ok) {
+            if (response.status !== 200) {
                 return {
                     raw: {},
                     action: AutoDiscoveryAction.FAIL_PROMPT,

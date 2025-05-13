@@ -9,6 +9,7 @@ export default {
         "src/crypto-api/index.ts",
         "src/testing.ts",
         "src/matrix.ts",
+        "src/utils.ts", // not really an entrypoint but we have deprecated `defer` there
         "scripts/**",
         "spec/**",
         // XXX: these look entirely unused

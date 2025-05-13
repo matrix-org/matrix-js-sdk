@@ -1796,6 +1796,27 @@ describe("MatrixClient", function () {
             expect(client.getUserIdLocalpart()).toBe("alice");
         });
     });
+
+    describe("setRoomMutePushRule", () => {
+        it("should set room push rule to muted", async () => {
+            const roomId = "!roomId:server";
+            const client = new MatrixClient({
+                baseUrl: "http://localhost",
+                fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
+            });
+            client.pushRules = {
+                global: {
+                    room: [{ rule_id: roomId, actions: [], default: false, enabled: false }],
+                },
+            };
+
+            const path = `/pushrules/global/room/${encodeURIComponent(roomId)}`;
+            httpBackend.when("DELETE", path).respond(200, {});
+            httpBackend.when("PUT", path).respond(200, {});
+            client.setRoomMutePushRule("global", roomId, true);
+            await httpBackend.flush("");
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {

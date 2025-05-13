@@ -48,7 +48,6 @@ import { type SyncApiOptions, SyncState } from "../../src/sync";
 import { type IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
-import { defer } from "../../src/utils";
 import { KnownMembership } from "../../src/@types/membership";
 import { type SyncCryptoCallbacks } from "../../src/common-crypto/CryptoBackend";
 
@@ -369,7 +368,7 @@ describe("SlidingSyncSdk", () => {
             });
 
             it("can be created with live events", async () => {
-                const seenLiveEventDeferred = defer<boolean>();
+                const seenLiveEventDeferred = Promise.withResolvers<boolean>();
                 const listener = (
                     ev: MatrixEvent,
                     room?: Room,

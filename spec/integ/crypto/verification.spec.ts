@@ -44,7 +44,7 @@ import {
     type Verifier,
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
-import { defer, escapeRegExp } from "../../../src/utils";
+import { escapeRegExp } from "../../../src/utils";
 import { awaitDecryption, emitPromise, getSyncResponse, syncPromise } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
@@ -1540,10 +1540,10 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
  *  @returns a map of secret name to promise that will resolve (with the id of the secret request) when the secret is requested.
  */
 function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
-    const mskRequestDefer = defer<string>();
-    const sskRequestDefer = defer<string>();
-    const uskRequestDefer = defer<string>();
-    const backupKeyRequestDefer = defer<string>();
+    const mskRequestResolvers = Promise.withResolvers<string>();
+    const sskRequestResolvers = Promise.withResolvers<string>();
+    const uskRequestResolvers = Promise.withResolvers<string>();
+    const backupKeyRequestResolvers = Promise.withResolvers<string>();
 
     fetchMock.put(
         new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
@@ -1555,13 +1555,13 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
                 const name = content.name;
                 const requestId = content.request_id;
                 if (name == "m.cross_signing.user_signing") {
-                    uskRequestDefer.resolve(requestId);
+                    uskRequestResolvers.resolve(requestId);
                 } else if (name == "m.cross_signing.master") {
-                    mskRequestDefer.resolve(requestId);
+                    mskRequestResolvers.resolve(requestId);
                 } else if (name == "m.cross_signing.self_signing") {
-                    sskRequestDefer.resolve(requestId);
+                    sskRequestResolvers.resolve(requestId);
                 } else if (name == "m.megolm_backup.v1") {
-                    backupKeyRequestDefer.resolve(requestId);
+                    backupKeyRequestResolvers.resolve(requestId);
                 }
             }
             return {};
@@ -1570,10 +1570,10 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
     );
 
     const promiseMap = new Map<string, Promise<string>>();
-    promiseMap.set("m.cross_signing.master", mskRequestDefer.promise);
-    promiseMap.set("m.cross_signing.self_signing", sskRequestDefer.promise);
-    promiseMap.set("m.cross_signing.user_signing", uskRequestDefer.promise);
-    promiseMap.set("m.megolm_backup.v1", backupKeyRequestDefer.promise);
+    promiseMap.set("m.cross_signing.master", mskRequestResolvers.promise);
+    promiseMap.set("m.cross_signing.self_signing", sskRequestResolvers.promise);
+    promiseMap.set("m.cross_signing.user_signing", uskRequestResolvers.promise);
+    promiseMap.set("m.megolm_backup.v1", backupKeyRequestResolvers.promise);
     return promiseMap;
 }
 
@@ -1604,7 +1604,7 @@ function sha256(commitmentStr: string): string {
     return encodeUnpaddedBase64(createHash("sha256").update(commitmentStr, "utf8").digest());
 }
 
-function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
+function encodeUnpaddedBase64(uint8Array: ArrayLike<number>): string {
     return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
 }
 
@@ -1638,7 +1638,7 @@ function buildReadyMessage(
 }
 
 /** build an m.key.verification.start to-device message suitable for the m.reciprocate.v1 flow, originating from the dummy device */
-function buildReciprocateStartMessage(transactionId: string, sharedSecret: ArrayBuffer) {
+function buildReciprocateStartMessage(transactionId: string, sharedSecret: ArrayLike<number>) {
     return {
         type: "m.key.verification.start",
         content: {

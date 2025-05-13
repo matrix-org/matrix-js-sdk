@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import { UnstableValue } from "../NamespacedValue.ts";
+import { NamespacedValue } from "../NamespacedValue.ts";
 import { type IMessageRendering } from "./extensible_events.ts";
 
 /**
@@ -42,20 +42,17 @@ import { type IMessageRendering } from "./extensible_events.ts";
 /**
  * The event type for an m.topic event (in content)
  */
-export const M_TOPIC = new UnstableValue("m.topic", "org.matrix.msc3765.topic");
+export const M_TOPIC = new NamespacedValue("m.topic");
 
 /**
  * The event content for an m.topic event (in content)
  */
 export type MTopicContent = IMessageRendering[];
 
-type MTopicStable = { [M_TOPIC.altName]: MTopicContent };
-type MTopicUnstable = { [M_TOPIC.name]: MTopicContent };
-
 /**
  * The event definition for an m.topic event (in content)
  */
-export type MTopicEvent = (MTopicStable & MTopicUnstable) | MTopicStable | MTopicUnstable;
+export type MTopicEvent = { "m.topic": MTopicContent };
 
 /**
  * The event content for an m.room.topic event

@@ -189,11 +189,13 @@ export type MakeTopicContent = (topic: string | null | undefined, htmlTopic?: st
 
 export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
     const renderings = [];
-    if (isProvided(topic)) {
-        renderings.push({ body: topic, mimetype: "text/plain" });
-    }
+    // Put HTML first because clients will render the first type in
+    // the array that they understand
     if (isProvided(htmlTopic)) {
         renderings.push({ body: htmlTopic, mimetype: "text/html" });
+    }
+    if (isProvided(topic)) {
+        renderings.push({ body: topic, mimetype: "text/plain" });
     }
     return { topic, [M_TOPIC.name]: renderings };
 };

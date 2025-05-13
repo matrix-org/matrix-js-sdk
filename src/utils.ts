@@ -436,23 +436,14 @@ export function isNullOrUndefined(val: any): boolean {
     return val === null || val === undefined;
 }
 
-export interface IDeferred<T> {
-    resolve: (value: T | Promise<T>) => void;
-    reject: (reason?: any) => void;
-    promise: Promise<T>;
-}
+export type IDeferred<T> = PromiseWithResolvers<T>;
 
-// Returns a Deferred
+/**
+ * Creates a deferred promise. This is a promise that can be resolved or rejected.
+ * @deprecated use {@link Promise.withResolvers} instead.
+ */
 export function defer<T = void>(): IDeferred<T> {
-    let resolve!: IDeferred<T>["resolve"];
-    let reject!: IDeferred<T>["reject"];
-
-    const promise = new Promise<T>((_resolve, _reject) => {
-        resolve = _resolve;
-        reject = _reject;
-    });
-
-    return { resolve, reject, promise };
+    return Promise.withResolvers<T>();
 }
 
 export async function promiseMapSeries<T>(

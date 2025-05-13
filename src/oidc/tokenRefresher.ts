@@ -139,6 +139,7 @@ export class OidcTokenRefresher {
             profile: this.idTokenClaims,
         };
 
+        const requestStart = Date.now();
         const response = await this.oidcClient.useRefreshToken({
             state: refreshTokenState,
             timeoutInSeconds: 300,
@@ -147,7 +148,9 @@ export class OidcTokenRefresher {
         const tokens = {
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
-        };
+            // We use the request start time to calculate the expiry time as we don't know when the server received our request
+            expiry: response.expires_in ? new Date(requestStart + response.expires_in * 1000) : undefined,
+        } satisfies AccessTokens;
 
         await this.persistTokens(tokens);
 

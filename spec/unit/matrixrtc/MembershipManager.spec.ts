@@ -30,7 +30,6 @@ import {
 import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembershipManager";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
-import { defer } from "../../../src/utils";
 import { logger } from "../../../src/logger.ts";
 
 function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) {
@@ -51,7 +50,7 @@ function waitForMockCallOnce(method: MockedFunction<any>, returnVal?: Promise<an
 }
 
 function createAsyncHandle(method: MockedFunction<any>) {
-    const { reject, resolve, promise } = defer();
+    const { reject, resolve, promise } = Promise.withResolvers<void>();
     method.mockImplementation(() => promise);
     return { reject, resolve };
 }

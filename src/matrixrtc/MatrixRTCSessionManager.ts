@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger as rootLogger } from "../logger.ts";
+import { logger as rootLogger, type Logger } from "../logger.ts";
 import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
@@ -22,8 +22,6 @@ import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
-
-const logger = rootLogger.getChild("[MatrixRTCSessionManager]");
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -50,8 +48,10 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     // longer the correct session object for the room.
     private roomSessions = new Map<string, MatrixRTCSession>();
 
+    private logger: Logger;
     public constructor(private client: MatrixClient) {
         super();
+        this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
     }
 
     public start(): void {
@@ -105,7 +105,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     private onRoomState = (event: MatrixEvent, _state: RoomState): void => {
         const room = this.client.getRoom(event.getRoomId());
         if (!room) {
-            logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
+            this.logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
             return;
         }
 
@@ -129,10 +129,10 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         const nowActive = session.memberships.length > 0;
 
         if (wasActiveAndKnown && !nowActive) {
-            logger.trace(`Session ended for ${room.roomId} (${session.memberships.length} members)`);
+            this.logger.trace(`Session ended for ${room.roomId} (${session.memberships.length} members)`);
             this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
         } else if (!wasActiveAndKnown && nowActive) {
-            logger.trace(`Session started for ${room.roomId} (${session.memberships.length} members)`);
+            this.logger.trace(`Session started for ${room.roomId} (${session.memberships.length} members)`);
             this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
         }
     }

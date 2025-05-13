@@ -36,7 +36,6 @@ import { advanceTimersUntil, awaitDecryption, syncPromise } from "../../test-uti
 import * as testData from "../../test-utils/test-data";
 import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { defer, type IDeferred } from "../../../src/utils";
 import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent, type CryptoApi } from "../../../src/crypto-api";
 import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
@@ -861,7 +860,7 @@ describe("megolm-keys backup", () => {
         expect(await aliceCrypto.getKeyBackupInfo()).toStrictEqual(testData.SIGNED_BACKUP_DATA);
 
         // Delete the backup and we are expecting the key backup to be disabled
-        const keyBackupStatus = defer<boolean>();
+        const keyBackupStatus = Promise.withResolvers<boolean>();
         aliceClient.once(CryptoEvent.KeyBackupStatus, (enabled) => keyBackupStatus.resolve(enabled));
         await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version!);
         expect(await keyBackupStatus.promise).toBe(false);
@@ -1158,7 +1157,7 @@ describe("megolm-keys backup", () => {
             // A check backup should happen at some point
             await aliceCrypto.checkKeyBackupAndEnable();
 
-            const awaitHasQueriedNewBackup: IDeferred<void> = defer<void>();
+            const awaitHasQueriedNewBackup: PromiseWithResolvers<void> = Promise.withResolvers<void>();
 
             fetchMock.get(
                 "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",

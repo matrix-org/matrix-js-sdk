@@ -24,9 +24,20 @@ export type Body = Record<string, any> | BodyInit;
  * Unencrypted access and (optional) refresh token
  */
 export type AccessTokens = {
+    /**
+     * The new access token to use for authenticated requests
+     */
     accessToken: string;
+    /**
+     * The new refresh token to use for refreshing tokens, optional
+     */
     refreshToken?: string;
+    /**
+     * Approximate date when the access token will expire, optional
+     */
+    expiry?: Date;
 };
+
 /**
  * @experimental
  * Function that performs token refresh using the given refreshToken.

@@ -26,7 +26,6 @@ import {
     PayloadType,
     RendezvousError,
 } from "../../../src/rendezvous";
-import { defer } from "../../../src/utils";
 import {
     ClientPrefix,
     DEVICE_CODE_SCOPE,
@@ -112,8 +111,8 @@ describe("MSC4108SignInWithQR", () => {
         let opponentLogin: MSC4108SignInWithQR;
 
         beforeEach(async () => {
-            let ourData = defer<string>();
-            let opponentData = defer<string>();
+            let ourData = Promise.withResolvers<string>();
+            let opponentData = Promise.withResolvers<string>();
 
             const ourMockSession = {
                 send: jest.fn(async (newData) => {
@@ -122,7 +121,7 @@ describe("MSC4108SignInWithQR", () => {
                 receive: jest.fn(() => {
                     const prom = opponentData.promise;
                     prom.then(() => {
-                        opponentData = defer();
+                        opponentData = Promise.withResolvers();
                     });
                     return prom;
                 }),
@@ -141,7 +140,7 @@ describe("MSC4108SignInWithQR", () => {
                 receive: jest.fn(() => {
                     const prom = ourData.promise;
                     prom.then(() => {
-                        ourData = defer();
+                        ourData = Promise.withResolvers();
                     });
                     return prom;
                 }),
@@ -334,11 +333,11 @@ describe("MSC4108SignInWithQR", () => {
             // @ts-ignore
             await opponentLogin.receive();
 
-            const deferred = defer<IMyDevice>();
-            mocked(client.getDevice).mockReturnValue(deferred.promise);
+            const deviceResolvers = Promise.withResolvers<IMyDevice>();
+            mocked(client.getDevice).mockReturnValue(deviceResolvers.promise);
 
             ourLogin.cancel(MSC4108FailureReason.UserCancelled).catch(() => {});
-            deferred.resolve({} as IMyDevice);
+            deviceResolvers.resolve({} as IMyDevice);
 
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },

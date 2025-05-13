@@ -20,7 +20,6 @@ import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
-import { defer, type IDeferred } from "../../../src/utils";
 import { logger } from "../../../src/logger";
 
 describe("OutgoingRequestsManager", () => {
@@ -70,11 +69,11 @@ describe("OutgoingRequestsManager", () => {
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("foo2", "{}");
             const request3 = new RustSdkCryptoJs.KeysBackupRequest("foo3", "{}", "1");
 
-            const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
+            const firstOutgoingRequestResolvers = Promise.withResolvers<OutgoingRequest[]>();
 
             olmMachine.outgoingRequests
                 .mockImplementationOnce(async () => {
-                    return firstOutgoingRequestDefer.promise;
+                    return firstOutgoingRequestResolvers.promise;
                 })
                 .mockImplementationOnce(async () => {
                     return [request3];
@@ -87,7 +86,7 @@ describe("OutgoingRequestsManager", () => {
             const thirdRequest = manager.doProcessOutgoingRequests();
 
             // let the first request complete
-            firstOutgoingRequestDefer.resolve([request1, request2]);
+            firstOutgoingRequestResolvers.resolve([request1, request2]);
 
             await firstRequest;
             await secondRequest;
@@ -112,10 +111,10 @@ describe("OutgoingRequestsManager", () => {
             const outgoingRequestCalledPromises: Promise<void>[] = [];
 
             // deferreds which will provide the results of OlmMachine.outgoingRequests
-            const outgoingRequestResultDeferreds: IDeferred<OutgoingRequest[]>[] = [];
+            const outgoingRequestResultDeferreds: PromiseWithResolvers<OutgoingRequest[]>[] = [];
 
             for (let i = 0; i < 3; i++) {
-                const resultDeferred = defer<OutgoingRequest[]>();
+                const resultDeferred = Promise.withResolvers<OutgoingRequest[]>();
                 const calledPromise = new Promise<void>((resolve) => {
                     olmMachine.outgoingRequests.mockImplementationOnce(() => {
                         resolve();
@@ -187,10 +186,10 @@ describe("OutgoingRequestsManager", () => {
         it("When the manager is stopped after outgoingRequests() call, do not make sever requests", async () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("foo", "{}");
 
-            const firstOutgoingRequestDefer = defer<OutgoingRequest[]>();
+            const firstOutgoingRequestResolvers = Promise.withResolvers<OutgoingRequest[]>();
 
             olmMachine.outgoingRequests.mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
-                return firstOutgoingRequestDefer.promise;
+                return firstOutgoingRequestResolvers.promise;
             });
 
             const firstRequest = manager.doProcessOutgoingRequests();
@@ -199,7 +198,7 @@ describe("OutgoingRequestsManager", () => {
             manager.stop();
 
             // let the first request complete
-            firstOutgoingRequestDefer.resolve([request1]);
+            firstOutgoingRequestResolvers.resolve([request1]);
 
             await firstRequest;
 
@@ -210,7 +209,7 @@ describe("OutgoingRequestsManager", () => {
             const request1 = new RustSdkCryptoJs.KeysQueryRequest("11", "{}");
             const request2 = new RustSdkCryptoJs.KeysUploadRequest("12", "{}");
 
-            const firstRequestDefer = defer<void>();
+            const firstRequestResolvers = Promise.withResolvers<void>();
 
             olmMachine.outgoingRequests.mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
                 return [request1, request2];
@@ -219,7 +218,7 @@ describe("OutgoingRequestsManager", () => {
             processor.makeOutgoingRequest
                 .mockImplementationOnce(async () => {
                     manager.stop();
-                    return firstRequestDefer.promise;
+                    return firstRequestResolvers.promise;
                 })
                 .mockImplementationOnce(async () => {
                     return;
@@ -227,7 +226,7 @@ describe("OutgoingRequestsManager", () => {
 
             const firstRequest = manager.doProcessOutgoingRequests();
 
-            firstRequestDefer.resolve();
+            firstRequestResolvers.resolve();
 
             await firstRequest;
 

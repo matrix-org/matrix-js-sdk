@@ -30,7 +30,6 @@ import {
 import { secureRandomString } from "../../src/randomstring";
 import { type SecretInfo } from "../../src/secret-storage.ts";
 import { type AccountDataEvents, ClientEvent, MatrixEvent, TypedEventEmitter } from "../../src";
-import { defer, type IDeferred } from "../../src/utils";
 
 declare module "../../src/@types/event" {
     interface SecretStorageAccountDataEvents {
@@ -289,10 +288,10 @@ describe("ServerSideSecretStorageImpl", function () {
     describe("setDefaultKeyId", function () {
         let secretStorage: ServerSideSecretStorage;
         let accountDataAdapter: Mocked<AccountDataClient>;
-        let accountDataPromise: IDeferred<void>;
+        let accountDataPromise: PromiseWithResolvers<void>;
         beforeEach(() => {
             accountDataAdapter = mockAccountDataClient();
-            accountDataPromise = defer();
+            accountDataPromise = Promise.withResolvers();
             accountDataAdapter.setAccountData.mockImplementation(() => {
                 accountDataPromise.resolve();
                 return Promise.resolve({});
