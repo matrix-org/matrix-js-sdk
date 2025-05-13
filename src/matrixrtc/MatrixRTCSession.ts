@@ -416,7 +416,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     () => this.memberships,
                     transport,
                     this.statistics,
-                    (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                    (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
                         this.emit(
                             MatrixRTCSessionEvent.EncryptionKeyChanged,
                             keyBin,
@@ -434,7 +434,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     () => this.memberships,
                     transport,
                     this.statistics,
-                    (keyBin: Uint8Array<ArrayBufferLike>, encryptionKeyIndex: number, participantId: string) => {
+                    (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
                         this.emit(
                             MatrixRTCSessionEvent.EncryptionKeyChanged,
                             keyBin,
