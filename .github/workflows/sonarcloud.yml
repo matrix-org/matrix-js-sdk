@@ -43,7 +43,7 @@ jobs:
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
 
             - name: 📥 Download artifact
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
               if: ${{ !inputs.sharded }}
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -51,7 +51,7 @@ jobs:
                   name: coverage
                   path: coverage
             - name: 📥 Download sharded artifacts
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
               if: inputs.sharded
               with:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -75,7 +75,7 @@ jobs:
 
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
-              uses: matrix-org/sonarcloud-workflow-action@v4.0
+              uses: matrix-org/sonarcloud-workflow-action@820f7c2e9e94ba9e35add0f739691e5c7e23fa25 # v4.0
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:

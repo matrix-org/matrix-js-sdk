@@ -16,12 +16,12 @@ jobs:
             contents: write
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
               with:
                   ref: staging
                   fetch-depth: 0
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
               with:
                   node-version-file: package.json
                   cache: "yarn"
@@ -37,7 +37,7 @@ jobs:
                   disable-autolabeler: true
 
             - name: Get actions scripts
-              uses: actions/checkout@v4
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
@@ -48,7 +48,7 @@ jobs:
 
             - name: Ingest upstream changes
               if: inputs.include-changes
-              uses: actions/github-script@v7
+              uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   RELEASE_ID: ${{ steps.draft-release.outputs.id }}
