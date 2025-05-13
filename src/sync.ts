@@ -54,7 +54,7 @@ import {
     type ITimeline,
     type IToDeviceEvent,
 } from "./sync-accumulator.ts";
-import { MatrixEvent, type IEvent } from "./models/event.ts";
+import { MatrixEvent, type IEvent, type MatrixToDeviceEvent } from "./models/event.ts";
 import { type MatrixError, Method } from "./http-api/index.ts";
 import { type ISavedSync } from "./store/index.ts";
 import { EventType } from "./@types/event.ts";
@@ -1144,15 +1144,16 @@ export class SyncApi {
 
         // handle to-device events
         if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
-            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
-
+            const rawEvents: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
+            let toDeviceMessages: MatrixToDeviceEvent[] = [];
             if (this.syncOpts.cryptoCallbacks) {
-                toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
+                toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(rawEvents);
+            } else {
+                toDeviceMessages = rawEvents.map(mapToDeviceEvent);
             }
 
             const cancelledKeyVerificationTxns: string[] = [];
             toDeviceMessages
-                .map(mapToDeviceEvent)
                 .map((toDeviceEvent) => {
                     // map is a cheap inline forEach
                     // We want to flag m.key.verification.start events as cancelled

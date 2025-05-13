@@ -248,6 +248,8 @@ export type MatrixEventHandlerMap = {
     [MatrixEventEvent.SentinelUpdated]: () => void;
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
+export type MatrixToDeviceEvent = MatrixEvent;
+
 export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
     // applied push rule and action for this event
     private pushDetails: PushDetails = {};
@@ -790,6 +792,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.event.content = cryptoContent;
         this.senderCurve25519Key = senderCurve25519Key;
         this.claimedEd25519Key = claimedEd25519Key;
+    }
+
+    /**
+     * Mark that event has failed to decrypt.
+     *
+     * Used for to device events, to signal that decryption was attempted but failed.
+     *
+     * @internal
+     */
+    public makeUTD(reason: DecryptionFailureCode): void {
+        this._decryptionFailureReason = reason;
     }
 
     /**
