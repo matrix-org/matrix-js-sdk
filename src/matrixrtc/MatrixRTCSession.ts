@@ -533,7 +533,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         });
     }
 
-    public onKeyRatcheted(material: ArrayBuffer,participantId?: ParticipantId, keyIndex?: number): void {
+    public onKeyRatcheted(material: ArrayBuffer, participantId?: ParticipantId, keyIndex?: number): void {
         this.encryptionManager?.onKeyRatcheted(material, participantId, keyIndex);
     }
 

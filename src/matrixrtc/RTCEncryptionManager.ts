@@ -356,12 +356,16 @@ export class RTCEncryptionManager implements IEncryptionManager {
         return key;
     }
 
-    public onKeyRatcheted(key: ArrayBuffer, participantId: ParticipantId | undefined, keyIndex: number | undefined): void {
+    public onKeyRatcheted(
+        key: ArrayBuffer,
+        participantId: ParticipantId | undefined,
+        keyIndex: number | undefined,
+    ): void {
         if (participantId == getParticipantId(this.userId, this.deviceId)) {
             // DO NOT COMMIT
             this.logger.debug(`Own key ratcheted for key index:${keyIndex} key:${encodeBase64(new Uint8Array(key))}`);
 
-            this.currentRatchetRequest?.resolve({key, keyIndex: keyIndex!});
+            this.currentRatchetRequest?.resolve({ key, keyIndex: keyIndex! });
         }
     }
 }
