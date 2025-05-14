@@ -195,7 +195,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * @param oldMemberships
      */
     public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
-        this.logger.trace(`onMembershipsUpdate`);
+        this.logger.debug(`onMembershipsUpdate`);
 
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
@@ -210,8 +210,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 key: this.generateRandomKey(),
                 creationTS: Date.now(),
                 sharedWith: [],
-                keyId: 0,
+                keyId: this.nextKeyIndex(),
             };
+            this.logger.debug(`Creating first outbound key index:${this.outboundSession.keyId}`);
             this.onEncryptionKeysChanged(
                 this.outboundSession.key,
                 this.outboundSession.keyId,
@@ -238,6 +239,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
             });
 
         let alreadySharedWith = this.outboundSession?.sharedWith ?? [];
+        this.logger.debug(
+            `Key ${this.outboundSession?.keyId}, already shared with ${alreadySharedWith.length} devices`,
+        );
+        this.logger.debug(
+            `Key ${this.outboundSession?.keyId}, already shared with [${alreadySharedWith.map((u) => u.deviceId).join(",")}]`,
+        );
 
         // Some users might have rotate their membership event (formally called fingerprint) meaning they might have
         // clear their key. Reset the `alreadySharedWith` flag for them.
@@ -255,11 +262,17 @@ export class RTCEncryptionManager implements IEncryptionManager {
                     (o) => x.userId == o.userId && x.deviceId == o.deviceId && x.membershipTs == o.membershipTs,
                 ),
         );
+        this.logger.debug(`Key ${this.outboundSession?.keyId}, left: [${anyLeft.map((u) => u.deviceId).join(",")}]`);
+
         const anyJoined = toShareWith.filter(
             (x) =>
                 !alreadySharedWith.some(
                     (o) => x.userId == o.userId && x.deviceId == o.deviceId && x.membershipTs == o.membershipTs,
                 ),
+        );
+
+        this.logger.debug(
+            `Key ${this.outboundSession?.keyId}, joined: [${anyJoined.map((u) => u.deviceId).join(",")}]`,
         );
 
         let toDistributeTo: ParticipantDeviceInfo[] = [];
@@ -275,7 +288,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             };
             hasKeyChanged = true;
 
-            this.logger.info(`creating new outbound key index:${newOutboundKey.keyId}`);
+            this.logger.info(`Rotating key due to leavers: new outbound key index:${newOutboundKey.keyId}`);
             // Set this new key as the current one
             this.outboundSession = newOutboundKey;
 
@@ -312,26 +325,29 @@ export class RTCEncryptionManager implements IEncryptionManager {
             outboundKey = this.outboundSession!;
         } else {
             // No one joined or left, it could just be the first key, keep going
+            this.logger.debug(`No one joined or left, keeping the same key`);
             toDistributeTo = [];
             outboundKey = this.outboundSession!;
         }
 
         try {
             if (toDistributeTo.length > 0) {
-                this.logger.trace(`Sending key...`);
+                this.logger.debug(`Sending key...`);
                 await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
                 this.statistics.counters.roomEventEncryptionKeysSent += 1;
                 outboundKey.sharedWith.push(...toDistributeTo);
-                this.logger.trace(
+                this.logger.debug(
                     `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
                 );
+            } else {
+                this.logger.debug(`No one to send key to`);
             }
             if (hasKeyChanged) {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
-                this.logger.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
+                this.logger.debug(`Delay Rollout for key:${outboundKey.keyId}...`);
                 await sleep(this.delayRolloutTimeMillis);
-                this.logger.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
+                this.logger.debug(`...Delayed rollout of index:${outboundKey.keyId} `);
                 this.onEncryptionKeysChanged(
                     outboundKey.key,
                     outboundKey.keyId,
