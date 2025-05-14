@@ -20,8 +20,8 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
-import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
-import { type MatrixEvent, MatrixEventEvent } from "../models/event.ts";
+import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
+import { MatrixEvent, MatrixEventEvent, type MatrixToDeviceEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
 import { type RoomMember } from "../models/room-member.ts";
 import {
@@ -37,6 +37,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { KeyClaimManager } from "./KeyClaimManager.ts";
 import { logDuration, MapWithDefault } from "../utils.ts";
 import {
+    AllDevicesIsolationMode,
     type BackupTrustInfo,
     type BootstrapCrossSigningOpts,
     type CreateSecretStorageOpts,
@@ -45,29 +46,28 @@ import {
     type CrossSigningStatus,
     type CryptoApi,
     type CryptoCallbacks,
+    CryptoEvent,
+    type CryptoEventHandlerMap,
     DecryptionFailureCode,
+    deriveRecoveryKeyFromPassphrase,
+    type DeviceIsolationMode,
+    DeviceIsolationModeKind,
     DeviceVerificationStatus,
+    encodeRecoveryKey,
     type EventEncryptionInfo,
     EventShieldColour,
     EventShieldReason,
     type GeneratedSecretStorageKey,
     type ImportRoomKeysOpts,
+    ImportRoomKeyStage,
     type KeyBackupCheck,
     type KeyBackupInfo,
-    type OwnDeviceKeys,
-    UserVerificationStatus,
-    type VerificationRequest,
-    encodeRecoveryKey,
-    deriveRecoveryKeyFromPassphrase,
-    type DeviceIsolationMode,
-    AllDevicesIsolationMode,
-    DeviceIsolationModeKind,
-    CryptoEvent,
-    type CryptoEventHandlerMap,
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
+    type OwnDeviceKeys,
     type StartDehydrationOpts,
-    ImportRoomKeyStage,
+    UserVerificationStatus,
+    type VerificationRequest,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { type IDownloadKeyResult, type IQueryKeysRequest } from "../client.ts";
@@ -139,26 +139,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
     public constructor(
         private readonly logger: Logger,
-
         /** The `OlmMachine` from the underlying rust crypto sdk. */
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-
         /**
          * Low-level HTTP interface: used to make outgoing requests required by the rust SDK.
          *
          * We expect it to set the access token, etc.
          */
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-
         /** The local user's User ID. */
         private readonly userId: string,
-
         /** The local user's Device ID. */
         _deviceId: string,
-
         /** Interface to server-side secret storage */
         private readonly secretStorage: ServerSideSecretStorage,
-
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
     ) {
@@ -1493,7 +1487,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         oneTimeKeysCounts?: Map<string, number>;
         unusedFallbackKeys?: Set<string>;
         devices?: RustSdkCryptoJs.DeviceLists;
-    }): Promise<IToDeviceEvent[]> {
+    }): Promise<MatrixToDeviceEvent[]> {
         const result = await logDuration(logger, "receiveSyncChanges", async () => {
             return await this.olmMachine.receiveSyncChanges(
                 events ? JSON.stringify(events) : "[]",
@@ -1503,8 +1497,57 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             );
         });
 
-        // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
-        return JSON.parse(result);
+        return result.map((processed) => {
+            switch (processed.type) {
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.Decrypted: {
+                    const decryptedEvent = JSON.parse(processed.wireEvent);
+                    /** Make it as an encrypted event.
+                     * Re-using the existing internal `makeEncrypted`
+                     * We want here that the following `MatrixEvent` API to work as expected:
+                     * - {@link MatrixEvent#getClearContent()}
+                     * - {@link MatrixEvent#isEncrypted()}
+                     * - {@link MatrixEvent#getWireType()}
+                     * The {@link MatrixEvent#senderCurve25519Key}, {@link MatrixEvent#claimedEd25519Key} end point are not supported yet,
+                     * for that rust sdk should return some EncryptionInfo.
+                     * XXX: Work around: maybe we can use MSC4147 for now if really needed?
+                     */
+                    const ev = new MatrixEvent(decryptedEvent);
+                    ev.makeEncrypted(
+                        EventType.RoomMessageEncrypted,
+                        {
+                            algorithm: "m.olm.v1.curve25519-aes-sha2",
+                            // The original event is not accessible and this information is
+                            // lost with the rust SDK (`ciphertext`, `sender_key`)
+                            ciphertext: {},
+                            sender_key: "",
+                        },
+                        "",
+                        "",
+                    );
+                    return ev;
+                }
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.UnableToDecrypt: {
+                    const ev = new MatrixEvent(JSON.parse(processed.wireEvent));
+                    // We don't have details about the failure
+                    ev.makeUTD(DecryptionFailureCode.UNKNOWN_ERROR);
+                    return ev;
+                }
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.PlainText:
+                    return new MatrixEvent(JSON.parse(processed.wireEvent));
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.Invalid: {
+                    const parsedEvent: IToDeviceEvent = JSON.parse(processed.wireEvent);
+                    const ev = new MatrixEvent(parsedEvent);
+                    if (parsedEvent.type == EventType.RoomMessageEncrypted) {
+                        // Consider as a failed to decrypt?
+                        // What reason to use here? the olm (BAD_ENCRYPTED?) codes are marked as deprecated
+                        ev.makeUTD(DecryptionFailureCode.UNKNOWN_ERROR);
+                        return ev;
+                    } else {
+                        return ev;
+                    }
+                }
+            }
+        });
     }
 
     /** called by the sync loop to preprocess incoming to-device messages
@@ -1512,16 +1555,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param events - the received to-device messages
      * @returns A list of preprocessed to-device messages.
      */
-    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<MatrixToDeviceEvent[]> {
         // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
         // one-time-keys, or fallback keys, so just pass empty data.
         const processed = await this.receiveSyncChanges({ events });
 
         // look for interesting to-device messages
         for (const message of processed) {
-            if (message.type === EventType.KeyVerificationRequest) {
-                const sender = message.sender;
-                const transactionId = message.content.transaction_id;
+            if (message.getType() === EventType.KeyVerificationRequest) {
+                const sender = message.getSender();
+                const transactionId = message.getContent().transaction_id;
                 if (transactionId && sender) {
                     this.onIncomingKeyVerificationRequest(sender, transactionId);
                 }
