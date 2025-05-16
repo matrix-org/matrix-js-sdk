@@ -23,6 +23,14 @@ import { ClientEvent, type MatrixClient } from "../client.ts";
 import type { MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
 
+export class NotSupportedError extends Error {
+    public constructor(message?: string) {
+        super(message);
+    }
+    public get name(): string {
+        return "NotSupportedError";
+    }
+}
 /**
  * ToDeviceKeyTransport is used to send MatrixRTC keys to other devices using the
  * to-device CS-API.
@@ -91,7 +99,18 @@ export class ToDeviceKeyTransport
             });
 
         if (targets.length > 0) {
-            await this.client.encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content);
+            await this.client
+                .encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content)
+                .catch((widgetErrorResponse) => {
+                    const msg: string = widgetErrorResponse.error.message;
+                    // This is not ideal. We would want to have a custom error type for not supported actions.
+                    // This is not part of the widget api spec. Since as of now there are only two implementations:
+                    // rust sdk + js-sdk and the js-sdk does support to-device sending, we can assume that
+                    // this is a widget driver issue error message.
+                    if (msg.includes("unknown variant") && msg.includes("send_to_device")) {
+                        throw new NotSupportedError("The widget driver does not support to-device encryption");
+                    }
+                });
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
         } else {
             this.logger.warn("No targets found for sending key");
