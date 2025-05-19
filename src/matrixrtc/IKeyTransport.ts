@@ -24,7 +24,6 @@ export enum KeyTransportEvents {
 export type KeyTransportEventsHandlerMap = {
     [KeyTransportEvents.ReceivedKeys]: KeyTransportEventListener;
     [KeyTransportEvents.NotSupportedError]: () => void;
-
 };
 
 export type KeyTransportEventListener = (

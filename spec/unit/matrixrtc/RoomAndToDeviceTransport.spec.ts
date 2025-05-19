@@ -127,10 +127,8 @@ describe("RoomAndToDeviceTransport", () => {
 
     it("enables room transport and disables to device transport on widget driver error", async () => {
         mockClient.encryptAndSendToDevice.mockRejectedValue({
-            error: {
-                message:
-                    "unknown variant `send_to_device`, expected one of `supported_api_versions`, `content_loaded`, `get_openid`, `org.matrix.msc2876.read_events`, `send_event`, `org.matrix.msc4157.update_delayed_event` at line 1 column 22",
-            },
+            message:
+                "unknown variant `send_to_device`, expected one of `supported_api_versions`, `content_loaded`, `get_openid`, `org.matrix.msc2876.read_events`, `send_event`, `org.matrix.msc4157.update_delayed_event` at line 1 column 22",
         });
 
         transport.start();

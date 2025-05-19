@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type WidgetApiResponseError } from "matrix-widget-api";
+
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type IKeyTransport, KeyTransportEvents, type KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
@@ -101,8 +103,8 @@ export class ToDeviceKeyTransport
         if (targets.length > 0) {
             await this.client
                 .encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content)
-                .catch((widgetErrorResponse) => {
-                    const msg: string = widgetErrorResponse.error.message;
+                .catch((error: WidgetApiResponseError) => {
+                    const msg: string = error.message;
                     // This is not ideal. We would want to have a custom error type for not supported actions.
                     // This is not part of the widget api spec. Since as of now there are only two implementations:
                     // rust sdk + js-sdk and the js-sdk does support to-device sending, we can assume that
