@@ -66,7 +66,13 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
-
+// The names follow these principles:
+// - we use the technical term delay if the option is related to delayed events.
+// - we use delayedLeaveEvent if the option is related to the delayed leave event.
+// - we use membershipEvent if the option is related to the rtc member state event.
+// - we use the technical term expiry if the option is related to the expiry field of the membership state event.
+// - we use a `MS` postfix if the option is a duration to avoid using words like:
+//   `time`, `duration`, `delay`, `timeout`... that might be mistaken/confused with technical terms.
 export interface MembershipConfig {
     /**
      * Use the new Manager.
@@ -81,6 +87,8 @@ export interface MembershipConfig {
      *
      * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
      */
+    membershipEventExpiryMs?: number;
+    /** @deprecated renamed to `membershipEventExpiryMs`*/
     membershipExpiryTimeout?: number;
 
     /**
@@ -92,35 +100,24 @@ export interface MembershipConfig {
      *
      * This value does not have an effect on the value of `SessionMembershipData.expires`.
      */
+    membershipEventExpiryHeadroomMs?: number;
+    /** @deprecated  renamed to `membershipEventExpiryHeadroomMs`*/
     membershipExpiryTimeoutHeadroom?: number;
-
-    /**
-     * The period (in milliseconds) with which we check that our membership event still exists on the
-     * server. If it is not found we create it again.
-     */
-    memberEventCheckPeriod?: number;
-
-    /**
-     * The minimum delay (in milliseconds) after which we will retry sending the membership event if it
-     * failed to send.
-     */
-    callMemberEventRetryDelayMinimum?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
+    delayedLeaveEventDelayMs?: number;
+    /** @deprecated renamed to `delayedLeaveEventDelayMs`*/
     membershipServerSideExpiryTimeout?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
+    delayedLeaveEventRestartMs?: number;
+    /** @deprecated renamed to `delayedLeaveEventRestartMs`*/
     membershipKeepAlivePeriod?: number;
-
-    /**
-     * @deprecated It should be possible to make it stable without this.
-     */
-    callMemberEventRetryJitter?: number;
 
     /**
      * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a server rate limit has been hit.
@@ -131,6 +128,14 @@ export interface MembershipConfig {
      * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a network error occurs.
      */
     maximumNetworkErrorRetryCount?: number;
+
+    /**
+     * The time (in milliseconds) after which we will retry a http request if it
+     * failed to send due to a network error. (send membership event, send delayed event, restart delayed event...)
+     */
+    networkErrorRetryMs?: number;
+    /** @deprecated renamed to `networkErrorRetryMs`*/
+    callMemberEventRetryDelayMinimum?: number;
 
     /**
      * If true, use the new to-device transport for sending encryption keys.
