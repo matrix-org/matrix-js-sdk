@@ -81,7 +81,7 @@ describe("MembershipManager", () => {
         // Default to fake timers.
         jest.useFakeTimers();
         client = makeMockClient("@alice:example.org", "AAAAAAA");
-        room = makeMockRoom(membershipTemplate);
+        room = makeMockRoom([membershipTemplate]);
         // Provide a default mock that is like the default "non error" server behaviour.
         (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
         (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
@@ -436,11 +436,11 @@ describe("MembershipManager", () => {
                                 type: "livekit",
                             },
                         ],
-                        device_id: client.getDeviceId(),
+                        user_id: client.getUserId()!,
+                        device_id: client.getDeviceId()!,
                         created_ts: 1000,
                     },
                     room.roomId,
-                    client.getUserId()!,
                 ),
             );
             expect(manager.getActiveFocus()).toStrictEqual(focus);
@@ -482,7 +482,7 @@ describe("MembershipManager", () => {
 
             await manager.onRTCSessionMemberUpdate([
                 mockCallMembership(membershipTemplate, room.roomId),
-                mockCallMembership(myMembership as SessionMembershipData, room.roomId, client.getUserId() ?? undefined),
+                mockCallMembership({ ...myMembership as SessionMembershipData, user_id: client.getUserId()! }, room.roomId),
             ]);
 
             await jest.advanceTimersByTimeAsync(1);
@@ -797,7 +797,7 @@ describe("MembershipManager", () => {
 
 it("Should prefix log with MembershipManager used", () => {
     const client = makeMockClient("@alice:example.org", "AAAAAAA");
-    const room = makeMockRoom(membershipTemplate);
+    const room = makeMockRoom([membershipTemplate]);
 
     const membershipManager = new MembershipManager(undefined, room, client, () => undefined, logger);
 
