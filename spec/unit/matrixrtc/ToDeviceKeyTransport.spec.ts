@@ -62,19 +62,16 @@ describe("ToDeviceKeyTransport", () => {
         const keyIndex = 2;
         await transport.sendKey(keyBase64Encoded, keyIndex, [
             mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "BOBDEVICE" }),
+                { ...membershipTemplate, user_id: "@bob:example.org", device_id: "BOBDEVICE" },
                 roomId,
-                "@bob:example.org",
             ),
             mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "CARLDEVICE" }),
+                { ...membershipTemplate, user_id: "@carl:example.org", device_id: "CARLDEVICE" },
                 roomId,
-                "@carl:example.org",
             ),
             mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "MATDEVICE" }),
+                { ...membershipTemplate, user_id: "@mat:example.org", device_id: "MATDEVICE" },
                 roomId,
-                "@mat:example.org",
             ),
         ]);
 
@@ -154,9 +151,8 @@ describe("ToDeviceKeyTransport", () => {
         const keyIndex = 2;
         await transport.sendKey(keyBase64Encoded, keyIndex, [
             mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "MYDEVICE" }),
+                { ...membershipTemplate, user_id: '@alice:example.org', device_id: 'MYDEVICE' },
                 roomId,
-                "@alice:example.org",
             ),
         ]);
 
