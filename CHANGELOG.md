@@ -1,3 +1,18 @@
+Changes in [37.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.6.0) (2025-05-20)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate utils function `defer` in favour of `Promise.withResolvers` ([#4829](https://github.com/matrix-org/matrix-js-sdk/pull/4829)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Update to Node 22 LTS ([#4832](https://github.com/matrix-org/matrix-js-sdk/pull/4832)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* Fix autodiscovery handling of 2xx (non-200) codes ([#4833](https://github.com/matrix-org/matrix-js-sdk/pull/4833)). Contributed by @t3chguy.
+
+
 Changes in [37.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.5.0) (2025-05-06)
 ==================================================================================================
 ## ✨ Features
