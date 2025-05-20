@@ -119,7 +119,7 @@ export class RoomAndToDeviceTransport
                 await this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
             } catch (error) {
                 if (error instanceof NotSupportedError && !this._enabled.room) {
-                    this.logger.debug(
+                    this.logger.warn(
                         "To device is not supported enabling room key transport, disabling toDevice transport",
                     );
                     this.setEnabled({ toDevice: false, room: true });

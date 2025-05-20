@@ -105,9 +105,9 @@ export class ToDeviceKeyTransport
                 .encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content)
                 .catch((error: WidgetApiResponseError) => {
                     const msg: string = error.message;
-                    // This is not ideal. We would want to have a custom error type for not supported actions.
-                    // This is not part of the widget api spec. Since as of now there are only two implementations:
-                    // rust sdk + js-sdk and the js-sdk does support to-device sending, we can assume that
+                    // This is not ideal. We would want to have a custom error type for unsupported actions.
+                    // This is not part of the widget API spec. Since as of now there are only two implementations:
+                    // Rust SDK + JS-SDK, and the JS-SDK does support to-device sending, we can assume that
                     // this is a widget driver issue error message.
                     if (msg.includes("unknown variant") && msg.includes("send_to_device")) {
                         throw new NotSupportedError("The widget driver does not support to-device encryption");
