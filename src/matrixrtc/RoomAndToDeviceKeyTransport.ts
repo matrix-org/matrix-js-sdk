@@ -18,7 +18,7 @@ import { logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import type { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import type { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
+import { NotSupportedError, type ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 // Deprecate RoomAndToDeviceTransport: This whole class is only a stop gap until we remove RoomKeyTransport.
@@ -114,6 +114,18 @@ export class RoomAndToDeviceTransport
                 (this._enabled.toDevice ? "to device transport" : ""),
         );
         if (this._enabled.room) await this.roomKeyTransport.sendKey(keyBase64Encoded, index, members);
-        if (this._enabled.toDevice) await this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
+        if (this._enabled.toDevice) {
+            try {
+                await this.toDeviceTransport.sendKey(keyBase64Encoded, index, members);
+            } catch (error) {
+                if (error instanceof NotSupportedError && !this._enabled.room) {
+                    this.logger.warn(
+                        "To device is not supported enabling room key transport, disabling toDevice transport",
+                    );
+                    this.setEnabled({ toDevice: false, room: true });
+                    await this.sendKey(keyBase64Encoded, index, members);
+                }
+            }
+        }
     }
 }
