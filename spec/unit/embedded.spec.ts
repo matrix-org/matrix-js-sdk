@@ -31,6 +31,9 @@ import {
     type IOpenIDCredentials,
     type ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
+    UnstableApiVersion,
+    type ApiVersion,
+    type IRoomEvent,
 } from "matrix-widget-api";
 
 import { createRoomWidgetClient, MatrixError, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
@@ -49,6 +52,7 @@ const testOIDCToken = {
 };
 class MockWidgetApi extends EventEmitter {
     public start = jest.fn().mockResolvedValue(undefined);
+    public getClientVersions = jest.fn();
     public requestCapability = jest.fn().mockResolvedValue(undefined);
     public requestCapabilities = jest.fn().mockResolvedValue(undefined);
     public requestCapabilityForRoomTimeline = jest.fn().mockResolvedValue(undefined);
@@ -96,6 +100,11 @@ class MockWidgetApi extends EventEmitter {
         send: jest.fn(),
         sendComplete: jest.fn(),
     };
+
+    public constructor(clientVersions: ApiVersion[]) {
+        super();
+        this.getClientVersions.mockResolvedValue(clientVersions);
+    }
 }
 
 declare module "../../src/types" {
@@ -117,7 +126,7 @@ describe("RoomWidgetClient", () => {
     let client: MatrixClient;
 
     beforeEach(() => {
-        widgetApi = new MockWidgetApi() as unknown as MockedObject<WidgetApi>;
+        widgetApi = new MockWidgetApi([UnstableApiVersion.MSC2762_UPDATE_STATE]) as unknown as MockedObject<WidgetApi>;
     });
 
     afterEach(() => {
@@ -668,8 +677,53 @@ describe("RoomWidgetClient", () => {
                     detail: { data: { state: [event] } },
                 }),
             );
+            // Allow the getClientVersions promise to resolve
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
             // It should now have changed the room state
             expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+        });
+
+        describe("without support for update_state", () => {
+            beforeEach(() => {
+                widgetApi = new MockWidgetApi([]) as unknown as MockedObject<WidgetApi>;
+            });
+
+            it("receives", async () => {
+                await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
+                const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
+                widgetApi.emit(
+                    `action:${WidgetApiToWidgetAction.SendEvent}`,
+                    new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+                );
+
+                // The client should've emitted about the received event
+                expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+                expect(await emittedSync).toEqual(SyncState.Syncing);
+                // It should've also inserted the event into the room object
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
+
+            it("backfills", async () => {
+                widgetApi.readStateEvents.mockImplementation(async (eventType, limit, stateKey) =>
+                    eventType === "org.example.foo" && (limit ?? Infinity) > 0 && stateKey === "bar"
+                        ? [event as IRoomEvent]
+                        : [],
+                );
+
+                await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
         });
 
         it("ignores state updates for other rooms", async () => {
