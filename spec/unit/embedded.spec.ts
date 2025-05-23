@@ -31,6 +31,9 @@ import {
     type IOpenIDCredentials,
     type ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
+    UnstableApiVersion,
+    type ApiVersion,
+    type IRoomEvent,
 } from "matrix-widget-api";
 
 import { createRoomWidgetClient, MatrixError, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
@@ -40,6 +43,9 @@ import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
 import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
+import { SlidingSync } from "../../src/sliding-sync";
+import { logger } from "../../src/logger";
+import { flushPromises } from "../test-utils/flushPromises";
 
 const testOIDCToken = {
     access_token: "12345678",
@@ -49,6 +55,7 @@ const testOIDCToken = {
 };
 class MockWidgetApi extends EventEmitter {
     public start = jest.fn().mockResolvedValue(undefined);
+    public getClientVersions = jest.fn();
     public requestCapability = jest.fn().mockResolvedValue(undefined);
     public requestCapabilities = jest.fn().mockResolvedValue(undefined);
     public requestCapabilityForRoomTimeline = jest.fn().mockResolvedValue(undefined);
@@ -96,6 +103,15 @@ class MockWidgetApi extends EventEmitter {
         send: jest.fn(),
         sendComplete: jest.fn(),
     };
+
+    /**
+     * This mocks the widget's view of what is supported by its environment.
+     * @param clientVersions The versions that the widget believes are supported by the host client's widget driver.
+     */
+    public constructor(clientVersions: ApiVersion[]) {
+        super();
+        this.getClientVersions.mockResolvedValue(clientVersions);
+    }
 }
 
 declare module "../../src/types" {
@@ -117,7 +133,7 @@ describe("RoomWidgetClient", () => {
     let client: MatrixClient;
 
     beforeEach(() => {
-        widgetApi = new MockWidgetApi() as unknown as MockedObject<WidgetApi>;
+        widgetApi = new MockWidgetApi([UnstableApiVersion.MSC2762_UPDATE_STATE]) as unknown as MockedObject<WidgetApi>;
     });
 
     afterEach(() => {
@@ -128,6 +144,7 @@ describe("RoomWidgetClient", () => {
         capabilities: ICapabilities,
         sendContentLoaded: boolean | undefined = undefined,
         userId?: string,
+        useSlidingSync?: boolean,
     ): Promise<void> => {
         const baseUrl = "https://example.org";
         client = createRoomWidgetClient(
@@ -139,7 +156,7 @@ describe("RoomWidgetClient", () => {
         );
         expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
         widgetApi.emit("ready");
-        await client.startClient();
+        await client.startClient(useSlidingSync ? { slidingSync: new SlidingSync("", new Map(), {}, client, 0) } : {});
     };
 
     describe("events", () => {
@@ -668,8 +685,104 @@ describe("RoomWidgetClient", () => {
                     detail: { data: { state: [event] } },
                 }),
             );
+            // Allow the getClientVersions promise to resolve
+            await flushPromises();
             // It should now have changed the room state
             expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+        });
+
+        describe("without support for update_state", () => {
+            beforeEach(() => {
+                widgetApi = new MockWidgetApi([]) as unknown as MockedObject<WidgetApi>;
+            });
+
+            it("receives", async () => {
+                await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
+                const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
+                widgetApi.emit(
+                    `action:${WidgetApiToWidgetAction.SendEvent}`,
+                    new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+                );
+
+                // The client should've emitted about the received event
+                expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+                expect(await emittedSync).toEqual(SyncState.Syncing);
+                // It should've also inserted the event into the room object
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
+
+            it("does not receive with sliding sync (update_state is needed for sliding sync)", async () => {
+                await makeClient(
+                    { receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] },
+                    undefined,
+                    undefined,
+                    true,
+                );
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
+                const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
+                const logSpy = jest.spyOn(logger, "error");
+                widgetApi.emit(
+                    `action:${WidgetApiToWidgetAction.SendEvent}`,
+                    new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+                );
+
+                // The client should've emitted about the received event
+                expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+                expect(await emittedSync).toEqual(SyncState.Syncing);
+
+                // The incompatibility of sliding sync without update_state to get logged.
+                expect(logSpy).toHaveBeenCalledWith(
+                    "slididng sync cannot be used in widget mode if the client widget driver does not support the version: 'org.matrix.msc2762_update_state'",
+                );
+                // It should not have inserted the event into the room object
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")).toEqual(null);
+            });
+
+            it("backfills", async () => {
+                widgetApi.readStateEvents.mockImplementation(async (eventType, limit, stateKey) =>
+                    eventType === "org.example.foo" && (limit ?? Infinity) > 0 && stateKey === "bar"
+                        ? [event as IRoomEvent]
+                        : [],
+                );
+
+                await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
+            it("backfills with sliding sync", async () => {
+                widgetApi.readStateEvents.mockImplementation(async (eventType, limit, stateKey) =>
+                    eventType === "org.example.foo" && (limit ?? Infinity) > 0 && stateKey === "bar"
+                        ? [event as IRoomEvent]
+                        : [],
+                );
+                await makeClient(
+                    { receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] },
+                    undefined,
+                    undefined,
+                    true,
+                );
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
         });
 
         it("ignores state updates for other rooms", async () => {
