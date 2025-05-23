@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mocked } from "jest-mock";
 
-import { makeMockEvent, membershipTemplate, mockCallMembership } from "./mocks";
+import { makeMockEvent } from "./mocks";
 import { ClientEvent, EventType, type MatrixClient } from "../../../src";
 import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { getMockClientWithEventEmitter } from "../../test-utils/client.ts";
@@ -61,21 +61,9 @@ describe("ToDeviceKeyTransport", () => {
         const keyBase64Encoded = "ABCDEDF";
         const keyIndex = 2;
         await transport.sendKey(keyBase64Encoded, keyIndex, [
-            mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "BOBDEVICE" }),
-                roomId,
-                "@bob:example.org",
-            ),
-            mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "CARLDEVICE" }),
-                roomId,
-                "@carl:example.org",
-            ),
-            mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "MATDEVICE" }),
-                roomId,
-                "@mat:example.org",
-            ),
+            { userId: "@bob:example.org", deviceId: "BOBDEVICE", membershipTs: 1234 },
+            { userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1234 },
+            { userId: "@mat:example.org", deviceId: "MATDEVICE", membershipTs: 1234 },
         ]);
 
         expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledTimes(1);
@@ -100,6 +88,7 @@ describe("ToDeviceKeyTransport", () => {
                     call_id: "",
                     scope: "m.room",
                 },
+                sent_ts: expect.any(Number),
             },
         );
 
@@ -153,11 +142,7 @@ describe("ToDeviceKeyTransport", () => {
         const keyBase64Encoded = "ABCDEDF";
         const keyIndex = 2;
         await transport.sendKey(keyBase64Encoded, keyIndex, [
-            mockCallMembership(
-                Object.assign({}, membershipTemplate, { device_id: "MYDEVICE" }),
-                roomId,
-                "@alice:example.org",
-            ),
+            { userId: "@alice:example.org", deviceId: "MYDEVICE", membershipTs: 1234 },
         ]);
 
         transport.start();
