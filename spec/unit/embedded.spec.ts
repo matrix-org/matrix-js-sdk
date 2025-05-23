@@ -43,6 +43,7 @@ import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
 import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
+import { SlidingSync } from "../../src/sliding-sync";
 
 const testOIDCToken = {
     access_token: "12345678",
@@ -137,6 +138,7 @@ describe("RoomWidgetClient", () => {
         capabilities: ICapabilities,
         sendContentLoaded: boolean | undefined = undefined,
         userId?: string,
+        useSlidingSync?: boolean,
     ): Promise<void> => {
         const baseUrl = "https://example.org";
         client = createRoomWidgetClient(
@@ -148,7 +150,7 @@ describe("RoomWidgetClient", () => {
         );
         expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
         widgetApi.emit("ready");
-        await client.startClient();
+        await client.startClient(useSlidingSync ? { slidingSync: new SlidingSync("", new Map(), {}, client, 0) } : {});
     };
 
     describe("events", () => {
@@ -717,6 +719,25 @@ describe("RoomWidgetClient", () => {
                 );
 
                 await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
+            it("backfills with sliding sync", async () => {
+                widgetApi.readStateEvents.mockImplementation(async (eventType, limit, stateKey) =>
+                    eventType === "org.example.foo" && (limit ?? Infinity) > 0 && stateKey === "bar"
+                        ? [event as IRoomEvent]
+                        : [],
+                );
+                await makeClient(
+                    { receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] },
+                    undefined,
+                    undefined,
+                    true,
+                );
                 expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
                 expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
 
