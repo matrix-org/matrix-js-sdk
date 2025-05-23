@@ -44,6 +44,7 @@ import { MatrixEvent } from "../../src/models/event";
 import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
 import { SlidingSync } from "../../src/sliding-sync";
+import { logger } from "../../src/logger";
 
 const testOIDCToken = {
     access_token: "12345678",
@@ -709,6 +710,38 @@ describe("RoomWidgetClient", () => {
                 const room = client.getRoom("!1:example.org");
                 expect(room).not.toBeNull();
                 expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
+            });
+
+            it("does not receive with sliding sync (update_state is needed for sliding sync)", async () => {
+                await makeClient(
+                    { receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] },
+                    undefined,
+                    undefined,
+                    true,
+                );
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
+
+                const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
+                const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
+                const logSpy = jest.spyOn(logger, "error");
+                widgetApi.emit(
+                    `action:${WidgetApiToWidgetAction.SendEvent}`,
+                    new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+                );
+
+                // The client should've emitted about the received event
+                expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+                expect(await emittedSync).toEqual(SyncState.Syncing);
+
+                // The incompatibility of sliding sync without update_state to get logged.
+                expect(logSpy).toHaveBeenCalledWith(
+                    "slididng sync cannot be used in widget mode if the client widget driver does not support the version: 'org.matrix.msc2762_update_state'",
+                );
+                // It should not have inserted the event into the room object
+                const room = client.getRoom("!1:example.org");
+                expect(room).not.toBeNull();
+                expect(room!.currentState.getStateEvents("org.example.foo", "bar")).toEqual(null);
             });
 
             it("backfills", async () => {
