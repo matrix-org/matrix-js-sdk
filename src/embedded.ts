@@ -261,7 +261,7 @@ export class RoomWidgetClient extends MatrixClient {
     }
 
     public async supportUpdateState(): Promise<boolean> {
-        return (await this.widgetApi.getClientVersions())?.includes(UnstableApiVersion.MSC2762_UPDATE_STATE);
+        return (await this.widgetApi.getClientVersions()).includes(UnstableApiVersion.MSC2762_UPDATE_STATE);
     }
 
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {

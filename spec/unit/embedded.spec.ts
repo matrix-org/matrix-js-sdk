@@ -45,6 +45,7 @@ import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
 import { SlidingSync } from "../../src/sliding-sync";
 import { logger } from "../../src/logger";
+import { flushPromises } from "../test-utils/flushPromises";
 
 const testOIDCToken = {
     access_token: "12345678",
@@ -681,7 +682,7 @@ describe("RoomWidgetClient", () => {
                 }),
             );
             // Allow the getClientVersions promise to resolve
-            await new Promise<void>((resolve) => setTimeout(resolve, 0));
+            await flushPromises();
             // It should now have changed the room state
             expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
         });
