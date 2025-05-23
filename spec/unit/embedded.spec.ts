@@ -104,6 +104,10 @@ class MockWidgetApi extends EventEmitter {
         sendComplete: jest.fn(),
     };
 
+    /**
+     * This mocks the widget's view of what is supported by its environment.
+     * @param clientVersions The versions that the widget believes are supported by the host client's widget driver.
+     */
     public constructor(clientVersions: ApiVersion[]) {
         super();
         this.getClientVersions.mockResolvedValue(clientVersions);
