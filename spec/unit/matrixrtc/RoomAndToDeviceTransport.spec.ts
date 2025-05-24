@@ -88,7 +88,7 @@ describe("RoomAndToDeviceTransport", () => {
     });
     it("only sends to device keys when sending a key", async () => {
         transport.start();
-        await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
+        await transport.sendKey("1235", 0, [mockCallMembership({ ...membershipTemplate, user_id: '@alice:example.org' }, roomId)]);
         expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(1);
         expect(roomSendKeySpy).toHaveBeenCalledTimes(0);
         expect(transport.enabled.room).toBeFalsy();
@@ -118,7 +118,7 @@ describe("RoomAndToDeviceTransport", () => {
         expect(transport.enabled.room).toBeTruthy();
         expect(transport.enabled.toDevice).toBeFalsy();
 
-        await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
+        await transport.sendKey("1235", 0, [mockCallMembership({ ...membershipTemplate, user_id: '@alice:example.org' }, roomId)]);
         expect(sendEventMock).toHaveBeenCalledTimes(1);
         expect(roomSendKeySpy).toHaveBeenCalledTimes(1);
         expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(0);
