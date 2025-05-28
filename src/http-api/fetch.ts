@@ -379,6 +379,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
             ? baseUrlWithFallback.slice(0, -1)
             : baseUrlWithFallback;
         const url = new URL(baseUrlWithoutTrailingSlash + (prefix ?? this.opts.prefix) + path);
+        if (this.opts.extraParams) {
+            encodeParams(this.opts.extraParams, url.searchParams);
+        }
+
         if (queryParams) {
             encodeParams(queryParams, url.searchParams);
         }
