@@ -360,7 +360,7 @@ export interface ICreateClientOpts {
      * to all requests with this client. Useful for application services which require
      * `?user_id=`.
      */
-    queryParams?: Record<string, string>;
+    queryParams?: QueryDict;
 
     /**
      * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link ICreateClientOpts#cryptoStore}.
