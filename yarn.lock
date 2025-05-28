@@ -2014,9 +2014,9 @@
     undici-types "~5.26.4"
 
 "@types/node@18":
-  version "18.19.100"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.100.tgz#7f3aefbb6911099ab7e0902a1f373b1a4d2c1947"
-  integrity sha512-ojmMP8SZBKprc3qGrGk8Ujpo80AXkrP7G2tOT4VWr5jlr5DHjsJF+emXJz+Wm0glmy4Js62oKMdZZ6B9Y+tEcA==
+  version "18.19.104"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.104.tgz#a515c0c6ea7672473873e73a4cad3d216a081735"
+  integrity sha512-mqjoYx1RjmN61vjnHWfiWzAlwvBKutoUdm+kYLPnjI5DCh8ZqofUhaTbT3WLl7bt3itR8DuCf8ShnxI0JvIC3g==
   dependencies:
     undici-types "~5.26.4"
 
