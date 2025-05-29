@@ -521,6 +521,83 @@ describe("FetchHttpApi", () => {
         describe("when fetch.opts.baseUrl does have a trailing slash", () => {
             runTests(baseUrlWithTrailingSlash);
         });
+
+        describe("extraParams handling", () => {
+            const makeApiWithExtraParams = (extraParams: QueryDict): FetchHttpApi<any> => {
+                const fetchFn = jest.fn();
+                const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                return new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn, extraParams });
+            };
+
+            const userId = "@rsb-tbg:localhost";
+            const encodedUserId = encodeURIComponent(userId);
+
+            it("should include extraParams in URL when no queryParams provided", () => {
+                const extraParams = { user_id: userId, version: "1.0" };
+                const api = makeApiWithExtraParams(extraParams);
+
+                const result = api.getUrl("/test");
+                expect(result.toString()).toBe(`${localBaseUrl}${prefix}/test?user_id=${encodedUserId}&version=1.0`);
+            });
+
+            it("should merge extraParams with queryParams", () => {
+                const extraParams = { user_id: userId, version: "1.0" };
+                const api = makeApiWithExtraParams(extraParams);
+
+                const queryParams = { userId: "123", filter: "active" };
+                const result = api.getUrl("/test", queryParams);
+
+                expect(result.searchParams.get("user_id")!).toBe(userId);
+                expect(result.searchParams.get("version")!).toBe("1.0");
+                expect(result.searchParams.get("userId")!).toBe("123");
+                expect(result.searchParams.get("filter")!).toBe("active");
+            });
+
+            it("should allow queryParams to override extraParams", () => {
+                const extraParams = { user_id: "@default:localhost", version: "1.0" };
+                const api = makeApiWithExtraParams(extraParams);
+
+                const queryParams = { user_id: "@override:localhost", userId: "123" };
+                const result = api.getUrl("/test", queryParams);
+
+                expect(result.searchParams.get("user_id")).toBe("@override:localhost");
+                expect(result.searchParams.get("version")!).toBe("1.0");
+                expect(result.searchParams.get("userId")!).toBe("123");
+            });
+
+            it("should handle empty extraParams", () => {
+                const extraParams = {};
+                const api = makeApiWithExtraParams(extraParams);
+
+                const queryParams = { userId: "123" };
+                const result = api.getUrl("/test", queryParams);
+
+                expect(result.searchParams.get("userId")!).toBe("123");
+                expect(result.searchParams.has("user_id")).toBe(false);
+            });
+
+            it("should work when extraParams is undefined", () => {
+                const fetchFn = jest.fn();
+                const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+                const api = new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn });
+
+                const queryParams = { userId: "123" };
+                const result = api.getUrl("/test", queryParams);
+
+                expect(result.searchParams.get("userId")!).toBe("123");
+                expect(result.toString()).toBe(`${localBaseUrl}${prefix}/test?userId=123`);
+            });
+
+            it("should work when queryParams is undefined", () => {
+                const extraParams = { user_id: userId, version: "1.0" };
+                const api = makeApiWithExtraParams(extraParams);
+
+                const result = api.getUrl("/test");
+
+                expect(result.searchParams.get("user_id")!).toBe(userId);
+                expect(result.toString()).toBe(`${localBaseUrl}${prefix}/test?user_id=${encodedUserId}&version=1.0`);
+            });
+        });
     });
 
     it("should not log query parameters", async () => {
