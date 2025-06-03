@@ -24,9 +24,8 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { MembershipManager } from "./NewMembershipManager.ts";
+import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
-import { LegacyMembershipManager } from "./LegacyMembershipManager.ts";
 import { logDurationSync } from "../utils.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
@@ -77,6 +76,7 @@ export interface MembershipConfig {
      * Use the new Manager.
      *
      * Default: `false`.
+     * @deprecated does nothing anymore we always default to the new memberhip manager.
      */
     useNewMembershipManager?: boolean;
 
@@ -387,19 +387,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
             return;
         } else {
             // Create MembershipManager and pass the RTCSession logger (with room id info)
-            if (joinConfig?.useNewMembershipManager ?? false) {
-                this.membershipManager = new MembershipManager(
-                    joinConfig,
-                    this.roomSubset,
-                    this.client,
-                    () => this.getOldestMembership(),
-                    this.logger,
-                );
-            } else {
-                this.membershipManager = new LegacyMembershipManager(joinConfig, this.roomSubset, this.client, () =>
-                    this.getOldestMembership(),
-                );
-            }
+
+            this.membershipManager = new MembershipManager(
+                joinConfig,
+                this.roomSubset,
+                this.client,
+                () => this.getOldestMembership(),
+                this.logger,
+            );
+
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
