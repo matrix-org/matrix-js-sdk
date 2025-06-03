@@ -21,7 +21,6 @@ import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import { defer, type IDeferred } from "../utils.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
 import { isMyMembership, Status } from "./types.ts";
@@ -209,14 +208,15 @@ export class MembershipManager
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseResolvers) {
             // reset scheduled actions so we will not do any new actions.
-            this.leavePromiseResolvers = defer<boolean>();
+            this.leavePromiseResolvers = Promise.withResolvers<boolean>();
             this.activated = false;
             this.scheduler.initiateLeave();
             if (timeout) setTimeout(() => this.leavePromiseResolvers?.resolve(false), timeout);
         }
         return this.leavePromiseResolvers.promise;
     }
-    private leavePromiseResolvers?: IDeferred<boolean>;
+
+    private leavePromiseResolvers?: PromiseWithResolvers<boolean>;
 
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const userId = this.client.getUserId();
@@ -383,13 +383,13 @@ export class MembershipManager
                     return this.sendOrResendDelayedLeaveEvent(); // Normal case without any previous delayed id.
                 } else {
                     // This can happen if someone else (or another client) removes our own membership event.
-                    // It will trigger `onRTCSessionMemberUpdate` queue `MembershipActionType.SendFirstDelayedEvent`.
+                    // It will trigger `onRTCSessionMemberUpdate` queue `MembershipActionType.SendDelayedEvent`.
                     // We might still have our delayed event from the previous participation and dependent on the server this might not
                     // get removed automatically if the state changes. Hence, it would remove our membership unexpectedly shortly after the rejoin.
                     //
                     // In this block we will try to cancel this delayed event before setting up a new one.
 
-                    return this.cancelKnownDelayIdBeforeSendFirstDelayedEvent(this.state.delayId);
+                    return this.cancelKnownDelayIdBeforeSendDelayedEvent(this.state.delayId);
                 }
             }
             case MembershipActionType.RestartDelayedEvent: {
@@ -489,7 +489,7 @@ export class MembershipManager
             });
     }
 
-    private async cancelKnownDelayIdBeforeSendFirstDelayedEvent(delayId: string): Promise<ActionUpdate> {
+    private async cancelKnownDelayIdBeforeSendDelayedEvent(delayId: string): Promise<ActionUpdate> {
         // Remove all running updates and restarts
         return await this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel)

@@ -577,7 +577,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
             oldMemberships.some((m, i) => !CallMembership.equal(m, this.memberships[i]));
 
         if (changed) {
-            this.logger.info(`Memberships for call in room ${this.roomSubset.roomId} have changed: emitting`);
+            this.logger.info(
+                `Memberships for call in room ${this.roomSubset.roomId} have changed: emitting (${this.memberships.length} members)`,
+            );
             logDurationSync(this.logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
                 this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
             });
