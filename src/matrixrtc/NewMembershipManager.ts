@@ -229,14 +229,15 @@ export class MembershipManager
                 MembershipActionType.SendJoinEvent,
             ];
             this.logger.warn("Missing own membership: force re-join");
+            this.state.hasMemberStateEvent = false;
+
             if (this.scheduler.actions.find((a) => sendingMembershipActions.includes(a.type as MembershipActionType))) {
                 this.logger.error(
-                    "NewMembershipManger tried adding another `SendFirstDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
+                    "NewMembershipManger tried adding another `SendDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
                     this.scheduler.actions,
                 );
             } else {
                 // Only react to our own membership missing if we have not already scheduled sending a new membership DirectMembershipManagerAction.Join
-                this.state.hasMemberStateEvent = false;
                 this.scheduler.initiateJoin();
             }
         }
