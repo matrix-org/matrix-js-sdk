@@ -1,3 +1,16 @@
+Changes in [37.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.7.0) (2025-06-03)
+==================================================================================================
+## 🦖 Deprecations
+
+* MatrixRTC: Rename `MembershipConfig` parameters ([#4714](https://github.com/matrix-org/matrix-js-sdk/pull/4714)). Contributed by @toger5.
+
+## ✨ Features
+
+* Allow the embedded client to work without update\_state support ([#4849](https://github.com/matrix-org/matrix-js-sdk/pull/4849)). Contributed by @robintown.
+* Check for `unknown variant` on to-device sending and fall back to room event encryption. ([#4847](https://github.com/matrix-org/matrix-js-sdk/pull/4847)). Contributed by @toger5.
+* Reapply "Distinguish room state and timeline events in embedded clients" ([#4790](https://github.com/matrix-org/matrix-js-sdk/pull/4790)). Contributed by @robintown.
+
+
 Changes in [37.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.6.0) (2025-05-20)
 ==================================================================================================
 ## 🦖 Deprecations
