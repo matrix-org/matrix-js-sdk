@@ -31,26 +31,43 @@ import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembership
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 import { logger } from "../../../src/logger.ts";
+import { setVSCodeJestDebugTimeoutOverride } from "../../test-utils/test-run-helper.ts";
 
-function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>) {
-    return new Promise<void>((resolve) => {
-        method.mockImplementation(() => {
-            resolve();
-            return returnVal ?? Promise.resolve();
-        });
+// Test configurations
+setVSCodeJestDebugTimeoutOverride();
+
+/**
+ * Create a promise that will resolve once a mocked method is called.
+ * @param method The method to wait for.
+ * @param returnVal Provide an optional value that the mocked method should return. (use Promise.resolve(val) or Promise.reject(err))
+ * @returns The promise that resolves once the method is called.
+ */
+function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>): Promise<void> {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    method.mockImplementation(() => {
+        resolve();
+        return returnVal ?? Promise.resolve();
     });
+    return promise;
 }
+
+/** See waitForMockCall */
 function waitForMockCallOnce(method: MockedFunction<any>, returnVal?: Promise<any>) {
-    return new Promise<void>((resolve) => {
-        method.mockImplementationOnce(() => {
-            resolve();
-            return returnVal ?? Promise.resolve();
-        });
+    const { promise, resolve } = Promise.withResolvers<void>();
+    method.mockImplementationOnce(() => {
+        resolve();
+        return returnVal ?? Promise.resolve();
     });
+    return promise;
 }
 
-function createAsyncHandle(method: MockedFunction<any>) {
-    const { reject, resolve, promise } = Promise.withResolvers<void>();
+/**
+ * A handle to control when in the test flow the provided method resolves (or gets rejected).
+ * @param method The method to control the resolve timing.
+ * @returns
+ */
+function createAsyncHandle<T>(method: MockedFunction<any>) {
+    const { reject, resolve, promise } = Promise.withResolvers<T>();
     method.mockImplementation(() => promise);
     return { reject, resolve };
 }
@@ -110,13 +127,13 @@ describe.each([
             it("sends a membership event and schedules delayed leave when joining a call", async () => {
                 // Spys/Mocks
 
-                const updateDelayedEventHandle = createAsyncHandle(client._unstable_updateDelayedEvent as Mock);
+                const updateDelayedEventHandle = createAsyncHandle<void>(client._unstable_updateDelayedEvent as Mock);
 
                 // Test
                 const memberManager = new TestMembershipManager(undefined, room, client, () => undefined);
                 memberManager.join([focus], focusActive);
                 // expects
-                await waitForMockCall(client.sendStateEvent);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     room.roomId,
                     "org.matrix.msc3401.call.member",
@@ -542,8 +559,8 @@ describe.each([
             expect(manager.status).toBe(Status.Disconnected);
         });
         it("emits 'Connection' and 'Connected' after join !FailsForLegacy", async () => {
-            const handleDelayedEvent = createAsyncHandle(client._unstable_sendDelayedStateEvent);
-            const handleStateEvent = createAsyncHandle(client.sendStateEvent);
+            const handleDelayedEvent = createAsyncHandle<void>(client._unstable_sendDelayedStateEvent);
+            const handleStateEvent = createAsyncHandle<void>(client.sendStateEvent);
 
             const manager = new TestMembershipManager({}, room, client, () => undefined);
             expect(manager.status).toBe(Status.Disconnected);
@@ -594,7 +611,7 @@ describe.each([
             });
             // FailsForLegacy as implementation does not re-check membership before retrying.
             it("abandons retry loop and sends new own membership if not present anymore !FailsForLegacy", async () => {
-                (client._unstable_sendDelayedStateEvent as any).mockRejectedValue(
+                (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
                     new MatrixError(
                         { errcode: "M_LIMIT_EXCEEDED" },
                         429,
