@@ -328,6 +328,44 @@ describe.each([
             });
         });
 
+        it("rejoins if delayed event is not found (404) !FailsForLegacy", async () => {
+            const RESTART_DELAY = 15000;
+            const manager = new TestMembershipManager(
+                { delayedLeaveEventRestartMs: RESTART_DELAY },
+                room,
+                client,
+                () => undefined,
+            );
+            // Join with the membership manager
+            manager.join([focus], focusActive);
+            expect(manager.status).toBe(Status.Connecting);
+            // Let the scheduler run one iteration so that we can send the join state event
+            await jest.advanceTimersByTimeAsync(0);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(manager.status).toBe(Status.Connected);
+            // Now that we are connected, we set up the mocks.
+            // We enforce the following scenario where we simulate that the delayed event activated and caused the user to leave:
+            // - We wait until the delayed event gets sent and then mock its response to be "not found."
+            // - We enforce a race condition between the sync that informs us that our call membership state event was set to "left"
+            //   and the "not found" response from the delayed event: we receive the sync while we are waiting for the delayed event to be sent.
+            // - While the delayed leave event is being sent, we inform the manager that our membership state event was set to "left."
+            //   (onRTCSessionMemberUpdate)
+            // - Only then do we resolve the sending of the delayed event.
+            // - We test that the manager acknowledges the leave and sends a new membership state event.
+            (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValueOnce(
+                new MatrixError({ errcode: "M_NOT_FOUND" }),
+            );
+
+            const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+            await jest.advanceTimersByTimeAsync(RESTART_DELAY);
+            // first simulate the sync, then resolve sending the delayed event.
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            resolve({ delay_id: "id" });
+            // Let the scheduler run one iteration so that the new join gets sent
+            await jest.advanceTimersByTimeAsync(0);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+        });
+
         it("uses membershipEventExpiryMs from config", async () => {
             const manager = new TestMembershipManager(
                 { membershipEventExpiryMs: 1234567 },
