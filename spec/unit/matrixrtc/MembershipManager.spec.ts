@@ -31,10 +31,6 @@ import { LegacyMembershipManager } from "../../../src/matrixrtc/LegacyMembership
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager } from "../../../src/matrixrtc/NewMembershipManager";
 import { logger } from "../../../src/logger.ts";
-import { setVSCodeJestDebugTimeoutOverride } from "../../test-utils/test-run-helper.ts";
-
-// Test configurations
-setVSCodeJestDebugTimeoutOverride();
 
 /**
  * Create a promise that will resolve once a mocked method is called.
