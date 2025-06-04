@@ -19,3 +19,8 @@ jest.mock("../src/http-api/utils", () => ({
     // We mock timeoutSignal otherwise it causes tests to leave timers running
     timeoutSignal: () => new AbortController().signal,
 }));
+
+// Dont make test fail too soon due to timeouts while debugging.
+if (process.env.VSCODE_INSPECTOR_OPTIONS) {
+    jest.setTimeout(60 * 1000 * 5); // 5 minutes
+}
