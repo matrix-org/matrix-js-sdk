@@ -30,7 +30,7 @@ import {
     type SetPresence,
     mapToDeviceEvent,
 } from "./sync.ts";
-import { type MatrixEvent } from "./models/event.ts";
+import { type MatrixEvent, type MatrixToDeviceEvent } from "./models/event.ts";
 import {
     type IMinimalEvent,
     type IRoomEvent,
@@ -151,12 +151,14 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
         const cancelledKeyVerificationTxns: string[] = [];
-        let events = data["events"] || [];
-        if (events.length > 0 && this.cryptoCallbacks) {
-            events = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        const rawEvents = data["events"] || [];
+        let events: MatrixToDeviceEvent[] = [];
+        if (rawEvents.length > 0 && this.cryptoCallbacks) {
+            events = await this.cryptoCallbacks.preprocessToDeviceMessages(rawEvents);
+        } else {
+            events = rawEvents.map(mapToDeviceEvent);
         }
         events
-            .map(mapToDeviceEvent)
             .map((toDeviceEvent) => {
                 // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled
