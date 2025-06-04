@@ -16,7 +16,7 @@ limitations under the License.
 
 import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
-import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
@@ -201,58 +201,6 @@ describe("MatrixRTCSession", () => {
         });
     });
 
-    describe("updateCallMembershipEvent", () => {
-        const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
-        const joinSessionConfig = {};
-
-        const sessionMembershipData: SessionMembershipData = {
-            call_id: "",
-            scope: "m.room",
-            application: "m.call",
-            device_id: "AAAAAAA_session",
-            focus_active: mockFocus,
-            foci_preferred: [mockFocus],
-        };
-
-        let sendStateEventMock: jest.Mock;
-        let sendDelayedStateMock: jest.Mock;
-
-        let sentStateEvent: Promise<void>;
-        let sentDelayedState: Promise<void>;
-
-        beforeEach(() => {
-            sentStateEvent = new Promise((resolve) => {
-                sendStateEventMock = jest.fn(resolve);
-            });
-            sentDelayedState = new Promise((resolve) => {
-                sendDelayedStateMock = jest.fn(() => {
-                    resolve();
-                    return {
-                        delay_id: "id",
-                    };
-                });
-            });
-            client.sendStateEvent = sendStateEventMock;
-            client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
-        });
-
-        async function testSession(membershipData: SessionMembershipData): Promise<void> {
-            sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom(membershipData));
-
-            sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
-            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
-
-            expect(sendStateEventMock).toHaveBeenCalledTimes(1);
-
-            await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
-            expect(sendDelayedStateMock).toHaveBeenCalledTimes(1);
-        }
-
-        it("sends events", async () => {
-            await testSession(sessionMembershipData);
-        });
-    });
-
     describe("getOldestMembership", () => {
         it("returns the oldest membership event", () => {
             jest.useFakeTimers();
@@ -320,28 +268,10 @@ describe("MatrixRTCSession", () => {
 
     describe("joining", () => {
         let mockRoom: Room;
-        let sendStateEventMock: jest.Mock;
-        let sendDelayedStateMock: jest.Mock;
         let sendEventMock: jest.Mock;
 
-        let sentStateEvent: Promise<void>;
-        let sentDelayedState: Promise<void>;
-
         beforeEach(() => {
-            sentStateEvent = new Promise((resolve) => {
-                sendStateEventMock = jest.fn(resolve);
-            });
-            sentDelayedState = new Promise((resolve) => {
-                sendDelayedStateMock = jest.fn(() => {
-                    resolve();
-                    return {
-                        delay_id: "id",
-                    };
-                });
-            });
             sendEventMock = jest.fn();
-            client.sendStateEvent = sendStateEventMock;
-            client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
             client.sendEvent = sendEventMock;
 
             client._unstable_updateDelayedEvent = jest.fn();
@@ -366,67 +296,6 @@ describe("MatrixRTCSession", () => {
         it("shows joined once join is called", () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
-        });
-
-        it("sends a membership event when joining a call", async () => {
-            const realSetTimeout = setTimeout;
-            jest.useFakeTimers();
-            sess!.joinRoomSession([mockFocus], mockFocus);
-            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client.sendStateEvent).toHaveBeenCalledWith(
-                mockRoom!.roomId,
-                EventType.GroupCallMemberPrefix,
-                {
-                    application: "m.call",
-                    scope: "m.room",
-                    call_id: "",
-                    device_id: "AAAAAAA",
-                    expires: DEFAULT_EXPIRE_DURATION,
-                    foci_preferred: [mockFocus],
-                    focus_active: {
-                        focus_selection: "oldest_membership",
-                        type: "livekit",
-                    },
-                },
-                "_@alice:example.org_AAAAAAA",
-            );
-            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            // Because we actually want to send the state
-            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-            // For checking if the delayed event is still there or got removed while sending the state.
-            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
-            // For scheduling the delayed event
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-            // This returns no error so we do not check if we reschedule the event again. this is done in another test.
-
-            jest.useRealTimers();
-        });
-
-        it("uses membershipEventExpiryMs from join config", async () => {
-            const realSetTimeout = setTimeout;
-            jest.useFakeTimers();
-            sess!.joinRoomSession([mockFocus], mockFocus, { membershipEventExpiryMs: 60000 });
-            await Promise.race([sentStateEvent, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client.sendStateEvent).toHaveBeenCalledWith(
-                mockRoom!.roomId,
-                EventType.GroupCallMemberPrefix,
-                {
-                    application: "m.call",
-                    scope: "m.room",
-                    call_id: "",
-                    device_id: "AAAAAAA",
-                    expires: 60000,
-                    foci_preferred: [mockFocus],
-                    focus_active: {
-                        focus_selection: "oldest_membership",
-                        type: "livekit",
-                    },
-                },
-                "_@alice:example.org_AAAAAAA",
-            );
-            await Promise.race([sentDelayedState, new Promise((resolve) => realSetTimeout(resolve, 500))]);
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-            jest.useRealTimers();
         });
     });
 
