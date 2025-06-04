@@ -336,7 +336,7 @@ describe.each([
             manager.join([focus], focusActive);
             expect(manager.status).toBe(Status.Connecting);
             // Let the scheduler run one iteration so that we can send the join state event
-            await jest.advanceTimersByTimeAsync(0);
+            await jest.runOnlyPendingTimersAsync();
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             expect(manager.status).toBe(Status.Connected);
             // Now that we are connected, we set up the mocks.
@@ -358,7 +358,7 @@ describe.each([
             await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
             resolve({ delay_id: "id" });
             // Let the scheduler run one iteration so that the new join gets sent
-            await jest.advanceTimersByTimeAsync(0);
+            await jest.runOnlyPendingTimersAsync();
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
         });
 
