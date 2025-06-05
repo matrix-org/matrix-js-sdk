@@ -1150,47 +1150,7 @@ export class SyncApi {
                 toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
             }
 
-            const cancelledKeyVerificationTxns: string[] = [];
-            toDeviceMessages
-                .map(mapToDeviceEvent)
-                .map((toDeviceEvent) => {
-                    // map is a cheap inline forEach
-                    // We want to flag m.key.verification.start events as cancelled
-                    // if there's an accompanying m.key.verification.cancel event, so
-                    // we pull out the transaction IDs from the cancellation events
-                    // so we can flag the verification events as cancelled in the loop
-                    // below.
-                    if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                        const txnId: string = toDeviceEvent.getContent()["transaction_id"];
-                        if (txnId) {
-                            cancelledKeyVerificationTxns.push(txnId);
-                        }
-                    }
-
-                    // as mentioned above, .map is a cheap inline forEach, so return
-                    // the unmodified event.
-                    return toDeviceEvent;
-                })
-                .forEach(function (toDeviceEvent) {
-                    const content = toDeviceEvent.getContent();
-                    if (toDeviceEvent.getType() == "m.room.message" && content.msgtype == "m.bad.encrypted") {
-                        // the mapper already logged a warning.
-                        logger.log("Ignoring undecryptable to-device event from " + toDeviceEvent.getSender());
-                        return;
-                    }
-
-                    if (
-                        toDeviceEvent.getType() === "m.key.verification.start" ||
-                        toDeviceEvent.getType() === "m.key.verification.request"
-                    ) {
-                        const txnId = content["transaction_id"];
-                        if (cancelledKeyVerificationTxns.includes(txnId)) {
-                            toDeviceEvent.flagCancelled();
-                        }
-                    }
-
-                    client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
-                });
+            processToDeviceMessages(toDeviceMessages, client);
         } else {
             // no more to-device events: we can stop polling with a short timeout.
             this.catchingUp = false;
@@ -1946,7 +1906,56 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
     return room;
 }
 
-export function mapToDeviceEvent(plainOldJsObject: Partial<IEvent>): MatrixEvent {
+/**
+ * Process a list of (decrypted, where possible) received to-device events.
+ *
+ * Converts the events into `MatrixEvent`s, and emits appropriate {@link ClientEvent.ToDeviceEvent} events.
+ * */
+export function processToDeviceMessages(toDeviceMessages: IToDeviceEvent[], client: MatrixClient): void {
+    const cancelledKeyVerificationTxns: string[] = [];
+    toDeviceMessages
+        .map(mapToDeviceEvent)
+        .map((toDeviceEvent) => {
+            // map is a cheap inline forEach
+            // We want to flag m.key.verification.start events as cancelled
+            // if there's an accompanying m.key.verification.cancel event, so
+            // we pull out the transaction IDs from the cancellation events
+            // so we can flag the verification events as cancelled in the loop
+            // below.
+            if (toDeviceEvent.getType() === "m.key.verification.cancel") {
+                const txnId: string = toDeviceEvent.getContent()["transaction_id"];
+                if (txnId) {
+                    cancelledKeyVerificationTxns.push(txnId);
+                }
+            }
+
+            // as mentioned above, .map is a cheap inline forEach, so return
+            // the unmodified event.
+            return toDeviceEvent;
+        })
+        .forEach(function (toDeviceEvent) {
+            const content = toDeviceEvent.getContent();
+            if (toDeviceEvent.getType() == "m.room.message" && content.msgtype == "m.bad.encrypted") {
+                // the mapper already logged a warning.
+                logger.log("Ignoring undecryptable to-device event from " + toDeviceEvent.getSender());
+                return;
+            }
+
+            if (
+                toDeviceEvent.getType() === "m.key.verification.start" ||
+                toDeviceEvent.getType() === "m.key.verification.request"
+            ) {
+                const txnId = content["transaction_id"];
+                if (cancelledKeyVerificationTxns.includes(txnId)) {
+                    toDeviceEvent.flagCancelled();
+                }
+            }
+
+            client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
+        });
+}
+
+function mapToDeviceEvent(plainOldJsObject: Partial<IEvent>): MatrixEvent {
     // to-device events should not have a `room_id` property, but let's be sure
     delete plainOldJsObject.room_id;
     return new MatrixEvent(plainOldJsObject);
