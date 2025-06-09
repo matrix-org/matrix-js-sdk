@@ -14,16 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {MatrixClient, MatrixEvent, MatrixEventEvent, Room} from "../../../src";
+import {Direction, MatrixClient, MatrixEvent, Room} from "../../../src";
 import type {MockedObject} from "jest-mock";
-import exp from "node:constants";
+
+const CREATOR_USER_ID = "@creator:example.org";
 
 describe("Room", () => {
     function createMockClient(): MatrixClient {
         return {
             supportsThreads: jest.fn().mockReturnValue(true),
             decryptEventIfNeeded: jest.fn().mockReturnThis(),
-            getUserId: jest.fn().mockReturnValue("@user:server"),
+            getUserId: jest.fn().mockReturnValue(CREATOR_USER_ID),
         } as unknown as MockedObject<MatrixClient>;
     }
 
@@ -34,6 +35,7 @@ describe("Room", () => {
                 body: eventId, // we do this for ease of use, not practicality
             },
             event_id: eventId,
+            sender: CREATOR_USER_ID,
         });
     }
 
@@ -42,6 +44,7 @@ describe("Room", () => {
             type: "m.room.redaction",
             redacts: redactsEventId,
             event_id: "$redacts_" + redactsEventId.substring(1),
+            sender: CREATOR_USER_ID,
         });
     }
 
@@ -51,7 +54,7 @@ describe("Room", () => {
 
     it("should apply redactions locally", async () => {
         const mockClient = createMockClient();
-        const room = new Room("!room:example.org", mockClient, "name");
+        const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
         const messageEvent = createEvent("$message_event");
 
         // Set up the room
@@ -70,5 +73,62 @@ describe("Room", () => {
         expect(timeline[0].isRedacted()).toEqual(true); // test case
         expect(timeline[1].getId()).toEqual(redactionEvent.getId());
         expect(timeline[1].isRedacted()).toEqual(false); // "should never happen"
+    });
+
+    describe("MSC4293: Redact on ban", () => {
+        async function setupRoom(andGrantPermissions: boolean): Promise<{room: Room, messageEvents: MatrixEvent[]}> {
+            const mockClient = createMockClient();
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+
+            // Pre-populate room
+            const messageEvents: MatrixEvent[] = [];
+            for (let i = 0; i < 3; i++) {
+                messageEvents.push(createEvent(`$message_${i}`));
+            }
+            await room.addLiveEvents(messageEvents, {addToState: false});
+
+            if (andGrantPermissions) {
+                room.getLiveTimeline().getState(Direction.Forward)!.maySendRedactionForEvent = (ev, userId) => {
+                    return true;
+                };
+            }
+
+            return {room, messageEvents};
+        }
+
+        function createRedactOnMembershipChange(targetUserId: string, membership: string): MatrixEvent {
+            return new MatrixEvent({
+                type: "m.room.member",
+                state_key: targetUserId,
+                content: {
+                    membership: membership,
+                    "org.matrix.msc4293.redact_events": true,
+                },
+                sender: CREATOR_USER_ID,
+            });
+        }
+
+        function expectRedacted(messageEvents: MatrixEvent[], room: Room) {
+            const actualEvents = getNonStateMainTimelineLiveEvents(room).filter(e => messageEvents.find(e2 => e2.getId() === e.getId()));
+            expect(actualEvents.length).toEqual(messageEvents.length);
+            const redactedEvents = actualEvents.filter(e => e.isRedacted());
+            expect(redactedEvents.length).toEqual(messageEvents.length);
+        }
+
+        it("should apply on ban", async () => {
+            const {room, messageEvents} = await setupRoom(true);
+            const banEvent = createRedactOnMembershipChange(CREATOR_USER_ID, "ban");
+            await room.addLiveEvents([banEvent], {addToState: true});
+
+            expectRedacted(messageEvents, room);
+        });
+
+        it("should apply on kick", async () => {
+            const {room, messageEvents} = await setupRoom(true);
+            const kickEvent = createRedactOnMembershipChange(CREATOR_USER_ID, "leave");
+            await room.addLiveEvents([kickEvent], {addToState: true});
+
+            expectRedacted(messageEvents, room);
+        });
     });
 });
