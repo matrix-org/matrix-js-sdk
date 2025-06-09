@@ -2639,7 +2639,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         } else if (event.getType() === EventType.RoomMember) {
             const membership = event.getContent()["membership"];
-            if (membership !== KnownMembership.Ban && !(membership === KnownMembership.Leave && event.getStateKey() !== event.getSender())) {
+            if (
+                membership !== KnownMembership.Ban &&
+                !(membership === KnownMembership.Leave && event.getStateKey() !== event.getSender())
+            ) {
                 // Not a ban or kick, therefore not a membership event we care about here.
                 return;
             }
@@ -2657,10 +2660,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             // The redaction is possible, so let's find all the events and apply it.
             const events = this.getTimelineSets()
-                .map(s => s.getTimelines())
-                .reduce((p, c) => {p.push(...c); return p;}, [])
-                .map(t => t.getEvents().filter(e => e.getSender() === event.getStateKey()))
-                .reduce((p,c)=>{p.push(...c);return c;}, []);
+                .map((s) => s.getTimelines())
+                .reduce((p, c) => {
+                    p.push(...c);
+                    return p;
+                }, [])
+                .map((t) => t.getEvents().filter((e) => e.getSender() === event.getStateKey()))
+                .reduce((p, c) => {
+                    p.push(...c);
+                    return c;
+                }, []);
             for (const toRedact of events) {
                 this.applyEventAsRedaction(event, toRedact);
             }
