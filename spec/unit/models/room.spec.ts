@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {Direction, MatrixClient, MatrixEvent, Room} from "../../../src";
-import type {MockedObject} from "jest-mock";
+import { Direction, type MatrixClient, MatrixEvent, Room } from "../../../src";
+import type { MockedObject } from "jest-mock";
 
 const CREATOR_USER_ID = "@creator:example.org";
 const MODERATOR_USER_ID = "@moderator:example.org";
@@ -50,7 +50,10 @@ describe("Room", () => {
     }
 
     function getNonStateMainTimelineLiveEvents(room: Room): Array<MatrixEvent> {
-        return room.getLiveTimeline().getEvents().filter(e => !e.isState());
+        return room
+            .getLiveTimeline()
+            .getEvents()
+            .filter((e) => !e.isState());
     }
 
     it("should apply redactions locally", async () => {
@@ -59,7 +62,7 @@ describe("Room", () => {
         const messageEvent = createEvent("$message_event");
 
         // Set up the room
-        await room.addLiveEvents([messageEvent], {addToState: false});
+        await room.addLiveEvents([messageEvent], { addToState: false });
         let timeline = getNonStateMainTimelineLiveEvents(room);
         expect(timeline.length).toEqual(1);
         expect(timeline[0].getId()).toEqual(messageEvent.getId());
@@ -67,7 +70,7 @@ describe("Room", () => {
 
         // Now redact
         const redactionEvent = createRedaction(messageEvent.getId()!);
-        await room.addLiveEvents([redactionEvent], {addToState: false});
+        await room.addLiveEvents([redactionEvent], { addToState: false });
         timeline = getNonStateMainTimelineLiveEvents(room);
         expect(timeline.length).toEqual(2);
         expect(timeline[0].getId()).toEqual(messageEvent.getId());
@@ -77,7 +80,7 @@ describe("Room", () => {
     });
 
     describe("MSC4293: Redact on ban", () => {
-        async function setupRoom(andGrantPermissions: boolean): Promise<{room: Room, messageEvents: MatrixEvent[]}> {
+        async function setupRoom(andGrantPermissions: boolean): Promise<{ room: Room; messageEvents: MatrixEvent[] }> {
             const mockClient = createMockClient();
             const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
 
@@ -86,7 +89,7 @@ describe("Room", () => {
             for (let i = 0; i < 3; i++) {
                 messageEvents.push(createEvent(`$message_${i}`));
             }
-            await room.addLiveEvents(messageEvents, {addToState: false});
+            await room.addLiveEvents(messageEvents, { addToState: false });
 
             if (andGrantPermissions) {
                 room.getLiveTimeline().getState(Direction.Forward)!.maySendRedactionForEvent = (ev, userId) => {
@@ -94,15 +97,19 @@ describe("Room", () => {
                 };
             }
 
-            return {room, messageEvents};
+            return { room, messageEvents };
         }
 
-        function createRedactOnMembershipChange(targetUserId: string, senderUserId: string, membership: string): MatrixEvent {
+        function createRedactOnMembershipChange(
+            targetUserId: string,
+            senderUserId: string,
+            membership: string,
+        ): MatrixEvent {
             return new MatrixEvent({
                 type: "m.room.member",
                 state_key: targetUserId,
                 content: {
-                    membership: membership,
+                    "membership": membership,
                     "org.matrix.msc4293.redact_events": true,
                 },
                 sender: senderUserId,
@@ -110,9 +117,11 @@ describe("Room", () => {
         }
 
         function expectRedacted(messageEvents: MatrixEvent[], room: Room, shouldAllBeRedacted: boolean) {
-            const actualEvents = getNonStateMainTimelineLiveEvents(room).filter(e => messageEvents.find(e2 => e2.getId() === e.getId()));
+            const actualEvents = getNonStateMainTimelineLiveEvents(room).filter((e) =>
+                messageEvents.find((e2) => e2.getId() === e.getId()),
+            );
             expect(actualEvents.length).toEqual(messageEvents.length);
-            const redactedEvents = actualEvents.filter(e => e.isRedacted());
+            const redactedEvents = actualEvents.filter((e) => e.isRedacted());
             if (shouldAllBeRedacted) {
                 expect(redactedEvents.length).toEqual(messageEvents.length);
             } else {
@@ -121,57 +130,57 @@ describe("Room", () => {
         }
 
         it("should apply on ban", async () => {
-            const {room, messageEvents} = await setupRoom(true);
+            const { room, messageEvents } = await setupRoom(true);
             const banEvent = createRedactOnMembershipChange(CREATOR_USER_ID, MODERATOR_USER_ID, "ban");
-            await room.addLiveEvents([banEvent], {addToState: true});
+            await room.addLiveEvents([banEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, true);
         });
 
         it("should apply on kick", async () => {
-            const {room, messageEvents} = await setupRoom(true);
-            const kickEvent = createRedactOnMembershipChange(CREATOR_USER_ID, MODERATOR_USER_ID,"leave");
-            await room.addLiveEvents([kickEvent], {addToState: true});
+            const { room, messageEvents } = await setupRoom(true);
+            const kickEvent = createRedactOnMembershipChange(CREATOR_USER_ID, MODERATOR_USER_ID, "leave");
+            await room.addLiveEvents([kickEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, true);
         });
 
         it("should not apply if the user doesn't have permission to redact", async () => {
-            const {room, messageEvents} = await setupRoom(false); // difference from other tests here
-            const banEvent = createRedactOnMembershipChange(CREATOR_USER_ID, MODERATOR_USER_ID,"ban");
-            await room.addLiveEvents([banEvent], {addToState: true});
+            const { room, messageEvents } = await setupRoom(false); // difference from other tests here
+            const banEvent = createRedactOnMembershipChange(CREATOR_USER_ID, MODERATOR_USER_ID, "ban");
+            await room.addLiveEvents([banEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, false);
         });
 
         it("should not apply to self-leaves", async () => {
-            const {room, messageEvents} = await setupRoom(true);
-            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"leave");
-            await room.addLiveEvents([leaveEvent], {addToState: true});
+            const { room, messageEvents } = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID, "leave");
+            await room.addLiveEvents([leaveEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, false);
         });
 
         it("should not apply to invites", async () => {
-            const {room, messageEvents} = await setupRoom(true);
-            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"invite");
-            await room.addLiveEvents([leaveEvent], {addToState: true});
+            const { room, messageEvents } = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID, "invite");
+            await room.addLiveEvents([leaveEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, false);
         });
 
         it("should not apply to joins", async () => {
-            const {room, messageEvents} = await setupRoom(true);
-            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"join");
-            await room.addLiveEvents([leaveEvent], {addToState: true});
+            const { room, messageEvents } = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID, "join");
+            await room.addLiveEvents([leaveEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, false);
         });
 
         it("should not apply to knocks", async () => {
-            const {room, messageEvents} = await setupRoom(true);
-            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"knock");
-            await room.addLiveEvents([leaveEvent], {addToState: true});
+            const { room, messageEvents } = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID, "knock");
+            await room.addLiveEvents([leaveEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, false);
         });
