@@ -99,17 +99,19 @@ export class FilterComponent {
      * Converts the filter component into the form expected over the wire
      */
     public toJSON(): object {
-        return {
-            types: this.filterJson.types || null,
-            not_types: this.filterJson.not_types || [],
-            rooms: this.filterJson.rooms || null,
-            not_rooms: this.filterJson.not_rooms || [],
-            senders: this.filterJson.senders || null,
-            not_senders: this.filterJson.not_senders || [],
-            contains_url: this.filterJson.contains_url || null,
-            [FILTER_RELATED_BY_SENDERS.name]: this.filterJson[FILTER_RELATED_BY_SENDERS.name] || [],
-            [FILTER_RELATED_BY_REL_TYPES.name]: this.filterJson[FILTER_RELATED_BY_REL_TYPES.name] || [],
-        };
+        return Object.fromEntries(
+            Object.entries({
+                types: this.filterJson.types,
+                not_types: this.filterJson.not_types,
+                rooms: this.filterJson.rooms,
+                not_rooms: this.filterJson.not_rooms,
+                senders: this.filterJson.senders,
+                not_senders: this.filterJson.not_senders,
+                contains_url: this.filterJson.contains_url,
+                [FILTER_RELATED_BY_SENDERS.name]: this.filterJson[FILTER_RELATED_BY_SENDERS.name],
+                [FILTER_RELATED_BY_REL_TYPES.name]: this.filterJson[FILTER_RELATED_BY_REL_TYPES.name],
+            }).filter(([_key, value]) => value),
+        );
     }
 
     /**
