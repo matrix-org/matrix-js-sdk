@@ -2641,7 +2641,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             const membership = event.getContent()["membership"];
             if (
                 membership !== KnownMembership.Ban &&
-                !(membership === KnownMembership.Leave && event.getStateKey() === event.getSender())
+                !(membership === KnownMembership.Leave && event.getStateKey() !== event.getSender())
             ) {
                 // Not a ban or kick, therefore not a membership event we care about here.
                 return;
