@@ -2468,7 +2468,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Adds events to a thread's timeline. Will fire "Thread.update"
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
-        events.forEach(this.applyRedaction);
+        events.forEach(this.tryApplyRedaction);
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
@@ -2579,7 +2579,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return thread;
     }
 
-    private blindlyApplyRedaction(redactionEvent: MatrixEvent, redactedEvent: MatrixEvent): void {
+    /**
+     * Applies an event as a redaction of another event, regardless of whether the redacting
+     * event is actually a redaction.
+     *
+     * Callers should use tryApplyRedaction instead.
+     *
+     * @param redactionEvent The event which redacts an event.
+     * @param redactedEvent The event being redacted.
+     * @private
+     */
+    private applyEventAsRedaction(redactionEvent: MatrixEvent, redactedEvent: MatrixEvent): void {
         const threadRootId = redactedEvent.threadRootId;
         redactedEvent.makeRedacted(redactionEvent, this);
 
@@ -2612,7 +2622,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    private applyRedaction = (event: MatrixEvent): void => {
+    private tryApplyRedaction = (event: MatrixEvent): void => {
         // FIXME: apply redactions to notification list
 
         // NB: We continue to add the redaction event to the timeline at the
@@ -2625,7 +2635,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactedEvent) {
-                this.blindlyApplyRedaction(event, redactedEvent);
+                this.applyEventAsRedaction(event, redactedEvent);
             }
         } else if (event.getType() === EventType.RoomMember) {
             const membership = event.getContent()["membership"];
@@ -2652,13 +2662,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 .map(t => t.getEvents().filter(e => e.getSender() === event.getStateKey()))
                 .reduce((p,c)=>{p.push(...c);return c;}, []);
             for (const toRedact of events) {
-                this.blindlyApplyRedaction(event, toRedact);
+                this.applyEventAsRedaction(event, toRedact);
             }
         }
     };
 
     private processLiveEvent(event: MatrixEvent): void {
-        this.applyRedaction(event);
+        this.tryApplyRedaction(event);
 
         // Implement MSC3531: hiding messages.
         if (event.isVisibilityEvent()) {
