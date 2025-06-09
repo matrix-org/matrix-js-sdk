@@ -141,7 +141,7 @@ describe("Room", () => {
             const banEvent = createRedactOnMembershipChange(CREATOR_USER_ID, MODERATOR_USER_ID,"ban");
             await room.addLiveEvents([banEvent], {addToState: true});
 
-            expectRedacted(messageEvents, room, false); // difference from other tests here
+            expectRedacted(messageEvents, room, false);
         });
 
         it("should not apply to self-leaves", async () => {
@@ -149,7 +149,31 @@ describe("Room", () => {
             const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"leave");
             await room.addLiveEvents([leaveEvent], {addToState: true});
 
-            expectRedacted(messageEvents, room, false); // difference from other tests here
-        })
+            expectRedacted(messageEvents, room, false);
+        });
+
+        it("should not apply to invites", async () => {
+            const {room, messageEvents} = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"invite");
+            await room.addLiveEvents([leaveEvent], {addToState: true});
+
+            expectRedacted(messageEvents, room, false);
+        });
+
+        it("should not apply to joins", async () => {
+            const {room, messageEvents} = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"join");
+            await room.addLiveEvents([leaveEvent], {addToState: true});
+
+            expectRedacted(messageEvents, room, false);
+        });
+
+        it("should not apply to knocks", async () => {
+            const {room, messageEvents} = await setupRoom(true);
+            const leaveEvent = createRedactOnMembershipChange(CREATOR_USER_ID, CREATOR_USER_ID,"knock");
+            await room.addLiveEvents([leaveEvent], {addToState: true});
+
+            expectRedacted(messageEvents, room, false);
+        });
     });
 });
