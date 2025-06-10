@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked, type SpyInstance } from "jest-mock";
+import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "fetch-mock-jest";
@@ -211,7 +211,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA1`, mockCipherKey);
 
             // @ts-ignore access to private function
-            const spy: SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const spy: jest.Spied<any> = jest.spyOn(downloader, "queryKeyBackup");
 
             const expectImported = expectSessionImported("!roomA", "sessionA1");
 
@@ -297,7 +297,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     });
 
     describe("Given no usable backup available", () => {
-        let getConfigSpy: SpyInstance;
+        let getConfigSpy: jest.Spied<any>;
 
         beforeEach(async () => {
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
