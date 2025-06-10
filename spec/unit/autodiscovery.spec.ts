@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterAll, describe, expect, it } from "@jest/globals";
 import MockHttpBackend from "matrix-mock-request";
 
 import { AutoDiscoveryAction } from "../../src";

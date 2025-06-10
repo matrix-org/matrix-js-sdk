@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, afterAll, describe, expect, it, jest } from "@jest/globals";
+
 import { REFERENCE_RELATION } from "../../../src/@types/extensible_events";
 import { MatrixEvent } from "../../../src";
 import { M_BEACON_INFO } from "../../../src/@types/beacon";

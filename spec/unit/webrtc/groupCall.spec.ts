@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { mocked } from "jest-mock";
 
 import {
@@ -137,7 +138,7 @@ describe("Group Call", function () {
     });
 
     describe("Basic functionality", function () {
-        let mockSendState: jest.Mock;
+        let mockSendState: jest.Mock<any>;
         let mockClient: MatrixClient;
         let room: Room;
         let groupCall: GroupCall;
@@ -1370,7 +1371,7 @@ describe("Group Call", function () {
         let groupCall: GroupCall;
         let mediaFeed1: CallFeed;
         let mediaFeed2: CallFeed;
-        let onActiveSpeakerEvent: jest.Mock<void, []>;
+        let onActiveSpeakerEvent: jest.Mock<(feed: CallFeed | undefined) => void>;
 
         beforeEach(async () => {
             jest.useFakeTimers();
@@ -1566,7 +1567,9 @@ describe("Group Call", function () {
             jest.setSystemTime(0);
         });
 
-        afterAll(() => jest.useRealTimers());
+        afterAll(() => {
+            jest.useRealTimers();
+        });
 
         beforeEach(async () => {
             const typedMockClient = new MockCallMatrixClient(FAKE_USER_ID_2, bobWeb.device_id, FAKE_SESSION_ID_2);
@@ -1677,7 +1680,9 @@ describe("Group Call", function () {
             jest.setSystemTime(0);
         });
 
-        afterAll(() => jest.useRealTimers());
+        afterAll(() => {
+            jest.useRealTimers();
+        });
 
         beforeEach(async () => {
             const typedMockClient = new MockCallMatrixClient(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1);

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { MatrixClient, MatrixEvent, MatrixEventEvent, type MatrixScheduler, Room } from "../../src";
 import { eventMapperFor } from "../../src/event-mapper";
 import { type IStore } from "../../src/store";

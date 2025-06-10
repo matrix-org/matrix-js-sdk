@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2025 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { jest } from "@jest/globals";
+import type { FunctionLike, Mock } from "jest-mock";
 
-jest.mock("../src/http-api/utils", () => ({
-    ...jest.requireActual<object>("../src/http-api/utils"),
-    // We mock timeoutSignal otherwise it causes tests to leave timers running
-    timeoutSignal: () => new AbortController().signal,
-}));
-
-// Don't make test fail too soon due to timeouts while debugging.
-if (process.env.VSCODE_INSPECTOR_OPTIONS) {
-    jest.setTimeout(60 * 1000 * 5); // 5 minutes
+declare module "jest-mock" {
+    export interface ModuleMocker {
+        fn<T extends FunctionLike>(implementation?: T): Mock<T>;
+    }
 }

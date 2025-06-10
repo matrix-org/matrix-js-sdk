@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type Mocked } from "jest-mock";
 import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";

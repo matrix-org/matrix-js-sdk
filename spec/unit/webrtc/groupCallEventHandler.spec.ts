@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { mocked } from "jest-mock";
 
 import { ClientEvent } from "../../../src/client";
@@ -229,7 +230,7 @@ describe("Group Call Event Handler", function () {
     });
 
     describe("ignoring invalid group call state events", () => {
-        let mockClientEmit: jest.Func;
+        let mockClientEmit: jest.Spied<any>;
 
         beforeEach(() => {
             mockClientEmit = mockClient.emit = jest.fn();

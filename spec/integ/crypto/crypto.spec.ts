@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
@@ -2300,7 +2301,7 @@ describe("crypto", () => {
             client2?.stopClient();
         });
 
-        test("Sending a message in a room where the server is hiding the state event does not send a plaintext event", async () => {
+        it("Sending a message in a room where the server is hiding the state event does not send a plaintext event", async () => {
             // Alice is in an encrypted room
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2" });
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
@@ -2319,7 +2320,7 @@ describe("crypto", () => {
             await expectSendMessageToFail(client2);
         });
 
-        test("Changes to the rotation period should be ignored", async () => {
+        it("Changes to the rotation period should be ignored", async () => {
             // Alice is in an encrypted room, where the rotation period is set to 2 messages
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));
@@ -2357,7 +2358,7 @@ describe("crypto", () => {
             expect(msg3Content.session_id).not.toEqual(msg1Content.session_id);
         });
 
-        test("Changes to the rotation period should be ignored after a client restart", async () => {
+        it("Changes to the rotation period should be ignored after a client restart", async () => {
             // Alice is in an encrypted room, where the rotation period is set to 2 messages
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });
             syncResponder.sendOrQueueSyncResponse(getSyncResponseWithState([encryptionState]));

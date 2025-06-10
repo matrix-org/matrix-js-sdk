@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
+
 // eslint-disable-next-line no-restricted-imports
 import type EventEmitter from "events";
 import type MockHttpBackend from "matrix-mock-request";

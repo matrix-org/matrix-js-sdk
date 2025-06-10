@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 /**
  * Here you can find two example Webrtc reports and use them for testing.
  * The reports were generated with Chrome/Mac and `RTCPeerConnection: getStats()` method.

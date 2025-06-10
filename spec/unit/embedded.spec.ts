@@ -22,6 +22,7 @@ limitations under the License.
 // project, which doesn't know about our TypeEventEmitter implementation at all
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
+import { afterEach, beforeEach, afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { type MockedObject } from "jest-mock";
 import {
     type WidgetApi,

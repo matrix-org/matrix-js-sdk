@@ -18,6 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
+import { afterEach, beforeEach, afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { mocked } from "jest-mock";
 import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, type Optional, PollStartEvent } from "matrix-events-sdk";
 

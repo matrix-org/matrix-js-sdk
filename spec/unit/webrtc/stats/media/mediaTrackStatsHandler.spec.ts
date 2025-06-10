@@ -13,6 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { type MediaTrackHandler } from "../../../../../src/webrtc/stats/media/mediaTrackHandler";
 import { MediaTrackStatsHandler } from "../../../../../src/webrtc/stats/media/mediaTrackStatsHandler";
 import { type MediaSsrcHandler } from "../../../../../src/webrtc/stats/media/mediaSsrcHandler";
