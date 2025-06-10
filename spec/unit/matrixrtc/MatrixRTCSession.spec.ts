@@ -438,24 +438,22 @@ describe("MatrixRTCSession", () => {
                 let firstEventSent = false;
 
                 try {
-                    const eventSentPromise = new Promise<void>((resolve) => {
+                    const eventSentPromise = new Promise<{ event_id: string }>((resolve) => {
                         sendEventMock.mockImplementation(() => {
                             if (!firstEventSent) {
-                                jest.advanceTimersByTime(10000);
-
                                 firstEventSent = true;
                                 const e = new Error() as MatrixError;
                                 e.data = {};
                                 throw e;
                             } else {
-                                resolve();
+                                resolve({ event_id: "id" });
                             }
                         });
                     });
 
                     sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
-                    await jest.runAllTimersAsync();
-
+                    // wait for the encryption event to get sent
+                    await jest.advanceTimersByTimeAsync(5000);
                     await eventSentPromise;
 
                     expect(sendEventMock).toHaveBeenCalledTimes(2);
