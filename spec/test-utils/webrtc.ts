@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { jest } from "@jest/globals";
+
 import {
     type ClientEvent,
     type ClientEventHandlerMap,
@@ -269,7 +271,7 @@ export class MockRTCRtpTransceiver {
         this.peerConn.needsNegotiation = true;
     }
 
-    public setCodecPreferences = jest.fn<void, RTCRtpCodec[]>();
+    public setCodecPreferences = jest.fn<(codecs: RTCRtpCodec[]) => void>();
 }
 
 export class MockMediaStreamTrack {
@@ -279,7 +281,7 @@ export class MockMediaStreamTrack {
         public enabled = true,
     ) {}
 
-    public stop = jest.fn<void, []>();
+    public stop = jest.fn<() => void>();
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -417,18 +419,18 @@ export class MockMediaHandler {
 
 export class MockMediaDevices {
     public enumerateDevices = jest
-        .fn<Promise<MediaDeviceInfo[]>, []>()
+        .fn<() => Promise<MediaDeviceInfo[]>>()
         .mockResolvedValue([
             new MockMediaDeviceInfo("audioinput").typed(),
             new MockMediaDeviceInfo("videoinput").typed(),
         ]);
 
     public getUserMedia = jest
-        .fn<Promise<MediaStream>, [MediaStreamConstraints]>()
+        .fn<(constraints: MediaStreamConstraints) => Promise<MediaStream>>()
         .mockReturnValue(Promise.resolve(new MockMediaStream("local_stream").typed()));
 
     public getDisplayMedia = jest
-        .fn<Promise<MediaStream>, [MediaStreamConstraints]>()
+        .fn<(constraints: MediaStreamConstraints) => Promise<MediaStream>>()
         .mockReturnValue(Promise.resolve(new MockMediaStream("local_display_stream").typed()));
 
     public typed(): MediaDevices {
@@ -462,14 +464,12 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
         calls: new Map<string, MatrixCall>(),
     };
 
-    public sendStateEvent = jest.fn<
-        Promise<ISendEventResponse>,
-        [roomId: string, eventType: EventType, content: any, statekey: string]
-    >();
-    public sendToDevice = jest.fn<
-        Promise<EmptyObject>,
-        [eventType: string, contentMap: SendToDeviceContentMap, txnId?: string]
-    >();
+    public sendStateEvent =
+        jest.fn<
+            (roomId: string, eventType: EventType, content: any, statekey: string) => Promise<ISendEventResponse>
+        >();
+    public sendToDevice =
+        jest.fn<(eventType: string, contentMap: SendToDeviceContentMap, txnId?: string) => Promise<EmptyObject>>();
 
     public isInitialSyncComplete(): boolean {
         return false;
@@ -499,9 +499,9 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     public getUseE2eForGroupCall = () => false;
     public checkTurnServers = () => null;
 
-    public getSyncState = jest.fn<SyncState | null, []>().mockReturnValue(SyncState.Syncing);
+    public getSyncState = jest.fn<() => SyncState | null>().mockReturnValue(SyncState.Syncing);
 
-    public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
+    public getRooms = jest.fn<() => Room[]>().mockReturnValue([]);
     public getRoom = jest.fn();
     public getFoci = jest.fn();
 
@@ -534,7 +534,7 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public opponentMember = { userId: this.opponentUserId };
     public callId = "1";
     public localUsermediaFeed = {
-        setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
+        setAudioVideoMuted: jest.fn<(audioMuted: boolean, videoMuted: boolean) => void>(),
         isAudioMuted: jest.fn().mockReturnValue(false),
         isVideoMuted: jest.fn().mockReturnValue(false),
         stream: new MockMediaStream("stream"),
@@ -542,12 +542,12 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public remoteUsermediaFeed?: CallFeed;
     public remoteScreensharingFeed?: CallFeed;
 
-    public reject = jest.fn<void, []>();
-    public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
-    public hangup = jest.fn<void, []>();
-    public initStats = jest.fn<void, []>();
+    public reject = jest.fn<() => void>();
+    public answerWithCallFeeds = jest.fn<(callFeeds: CallFeed[]) => void>();
+    public hangup = jest.fn<() => void>();
+    public initStats = jest.fn<() => void>();
 
-    public sendMetadataUpdate = jest.fn<void, []>();
+    public sendMetadataUpdate = jest.fn<() => void>();
 
     public getOpponentMember(): Partial<RoomMember> {
         return this.opponentMember;
@@ -607,7 +607,7 @@ export function installWebRTCMocks() {
 
     // @ts-ignore Mock
     globalThis.RTCRtpReceiver = {
-        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+        getCapabilities: jest.fn<(kind: string) => RTCRtpCapabilities>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
         }),
@@ -615,7 +615,7 @@ export function installWebRTCMocks() {
 
     // @ts-ignore Mock
     globalThis.RTCRtpSender = {
-        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+        getCapabilities: jest.fn<(kind: string) => RTCRtpCapabilities>().mockReturnValue({
             codecs: [],
             headerExtensions: [],
         }),

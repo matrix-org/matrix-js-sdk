@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it } from "@jest/globals";
 import fetchMockJest from "fetch-mock-jest";
 
 import { OidcError } from "../../../src/oidc/error";

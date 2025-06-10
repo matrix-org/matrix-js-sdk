@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { jest } from "@jest/globals";
 import { type MethodLikeKeys, mocked, type MockedObject } from "jest-mock";
 
 import { type ClientEventHandlerMap, type EmittedEvents, type MatrixClient } from "../../src/client";

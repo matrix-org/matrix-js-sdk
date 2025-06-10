@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { type IContent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { type Room } from "../../../src/models/room";
 import { RelationType, UNSTABLE_MSC3089_BRANCH } from "../../../src/@types/event";

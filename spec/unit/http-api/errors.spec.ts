@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { MatrixError } from "../../../src";
 
 type IErrorJson = MatrixError["data"];

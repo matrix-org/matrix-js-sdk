@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";

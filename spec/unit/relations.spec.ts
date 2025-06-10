@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
+
 import { M_POLL_START } from "../../src/@types/polls";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";

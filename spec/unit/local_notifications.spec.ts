@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { type LocalNotificationSettings } from "../../src/@types/local_notifications";
 import { LOCAL_NOTIFICATION_SETTINGS_PREFIX, type MatrixClient } from "../../src/matrix";
 import { TestClient } from "../TestClient";

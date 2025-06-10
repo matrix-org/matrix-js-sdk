@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import "fake-indexeddb/auto";
 
 import type HttpBackend from "matrix-mock-request";

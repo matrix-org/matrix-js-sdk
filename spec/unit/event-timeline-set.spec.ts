@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { mocked } from "jest-mock";
 
 import * as utils from "../test-utils/test-utils";
@@ -306,11 +307,11 @@ describe("EventTimelineSet", () => {
         });
 
         describe("with events to be decrypted", () => {
-            let messageEventShouldAttemptDecryptionSpy: jest.SpyInstance;
-            let messageEventIsDecryptionFailureSpy: jest.SpyInstance;
+            let messageEventShouldAttemptDecryptionSpy: jest.Spied<any>;
+            let messageEventIsDecryptionFailureSpy: jest.Spied<any>;
 
-            let replyEventShouldAttemptDecryptionSpy: jest.SpyInstance;
-            let replyEventIsDecryptionFailureSpy: jest.SpyInstance;
+            let replyEventShouldAttemptDecryptionSpy: jest.Spied<any>;
+            let replyEventIsDecryptionFailureSpy: jest.Spied<any>;
 
             beforeEach(() => {
                 messageEventShouldAttemptDecryptionSpy = jest.spyOn(messageEvent, "shouldAttemptDecryption");

@@ -3,6 +3,7 @@ import "../olm-loader";
 
 // eslint-disable-next-line no-restricted-imports
 import type EventEmitter from "events";
+import { jest } from "@jest/globals";
 import { logger } from "../../src/logger";
 import {
     type IContent,

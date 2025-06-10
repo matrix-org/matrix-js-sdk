@@ -16,6 +16,7 @@ limitations under the License.
 
 // eslint-disable-next-line no-restricted-imports
 import { fail } from "assert";
+import { afterEach, afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
 
 import type MockHttpBackend from "matrix-mock-request";
 import {

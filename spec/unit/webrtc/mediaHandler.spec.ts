@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+
 import { type GroupCall, type MatrixCall, type MatrixClient } from "../../../src";
 import { MediaHandler, MediaHandlerEvent } from "../../../src/webrtc/mediaHandler";
 import { MockMediaDeviceInfo, MockMediaDevices, MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
@@ -132,7 +134,7 @@ describe("Media Handler", function () {
     });
 
     describe("updateLocalUsermediaStreams", () => {
-        let localStreamsChangedHandler: jest.Mock<void, []>;
+        let localStreamsChangedHandler: jest.Mock<() => void>;
 
         beforeEach(() => {
             localStreamsChangedHandler = jest.fn();
@@ -155,7 +157,7 @@ describe("Media Handler", function () {
         });
 
         describe("with existing streams", () => {
-            let stopTrack: jest.Mock<void, []>;
+            let stopTrack: jest.Mock<() => void>;
             let updateLocalUsermediaStream: jest.Mock;
 
             beforeEach(() => {

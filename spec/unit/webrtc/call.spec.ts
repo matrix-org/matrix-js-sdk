@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { mocked } from "jest-mock";
 
 import { TestClient } from "../../TestClient";
@@ -46,7 +47,14 @@ import {
     MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { EventType, type IContent, type ISendEventResponse, type MatrixEvent, type Room } from "../../../src";
+import {
+    EventType,
+    type IContent,
+    type ISendEventResponse,
+    type MatrixEvent,
+    type Room,
+    type TimelineEvents,
+} from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import type { CryptoApi } from "../../../src/crypto-api";
 import { GroupCallUnknownDeviceError } from "../../../src/webrtc/groupCall";
@@ -116,7 +124,9 @@ describe("Call", function () {
     let prevDocument: Document;
     let prevWindow: Window & typeof globalThis;
     // We retain a reference to this in the correct Mock type
-    let mockSendEvent: jest.Mock<Promise<ISendEventResponse>, [string, string, IContent, string]>;
+    let mockSendEvent: jest.Mock<
+        (roomId: string, eventType: string, content: IContent, txnId?: string) => Promise<ISendEventResponse>
+    >;
 
     const errorListener = () => {};
 
@@ -824,7 +834,7 @@ describe("Call", function () {
 
     describe("ignoring streams with ids for which we already have a feed", () => {
         const STREAM_ID = "stream_id";
-        let FEEDS_CHANGED_CALLBACK: jest.Mock<void, []>;
+        let FEEDS_CHANGED_CALLBACK: jest.Mock<() => void>;
 
         beforeEach(async () => {
             FEEDS_CHANGED_CALLBACK = jest.fn();
@@ -899,7 +909,7 @@ describe("Call", function () {
     });
 
     describe("muting", () => {
-        let mockSendVoipEvent: jest.Mock<Promise<void>, [string, object]>;
+        let mockSendVoipEvent: jest.Mock<(type: string, content: object) => Promise<void>>;
         beforeEach(async () => {
             (call as any).sendVoipEvent = mockSendVoipEvent = jest.fn();
             await startVideoCall(client, call);
