@@ -26,7 +26,7 @@ import { type Focus } from "./focus.ts";
 import { isMyMembership, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type MembershipConfig } from "./MatrixRTCSession.ts";
-import { ActionScheduler, type ActionUpdate } from "./NewMembershipManagerActionScheduler.ts";
+import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import {
     MembershipManagerEvent,
@@ -233,7 +233,7 @@ export class MembershipManager
 
             if (this.scheduler.actions.find((a) => sendingMembershipActions.includes(a.type as MembershipActionType))) {
                 this.logger.error(
-                    "NewMembershipManger tried adding another `SendDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
+                    "tried adding another `SendDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
                     this.scheduler.actions,
                 );
             } else {
@@ -285,7 +285,7 @@ export class MembershipManager
         parentLogger?: Logger,
     ) {
         super();
-        this.logger = (parentLogger ?? rootLogger).getChild(`[NewMembershipManager]`);
+        this.logger = (parentLogger ?? rootLogger).getChild(`[MembershipManager]`);
         const [userId, deviceId] = [this.client.getUserId(), this.client.getDeviceId()];
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
