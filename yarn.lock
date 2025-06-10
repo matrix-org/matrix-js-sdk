@@ -2012,9 +2012,9 @@
     "@babel/types" "^7.20.7"
 
 "@types/content-type@^1.1.5":
-  version "1.1.8"
-  resolved "https://registry.yarnpkg.com/@types/content-type/-/content-type-1.1.8.tgz#319644d07ee6b4bfc734483008393b89b99f0219"
-  integrity sha512-1tBhmVUeso3+ahfyaKluXe38p+94lovUZdoVfQ3OnJo9uJC42JT7CBoN3k9HYhAae+GwiBYmHu+N9FZhOG+2Pg==
+  version "1.1.9"
+  resolved "https://registry.yarnpkg.com/@types/content-type/-/content-type-1.1.9.tgz#a0240a8141b33549ac0ca6847f4b801580012bca"
+  integrity sha512-Hq9IMnfekuOCsEmYl4QX2HBrT+XsfXiupfrLLY8Dcf3Puf4BkBOxSbWYTITSOQAhJoYPBez+b4MJRpIYL65z8A==
 
 "@types/debug@^4.1.7":
   version "4.1.12"
@@ -2101,9 +2101,9 @@
     undici-types "~5.26.4"
 
 "@types/node@18":
-  version "18.19.105"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.105.tgz#44bae77ea9832da4357e1d35df37cb86927e1405"
-  integrity sha512-a+DrwD2VyzqQR2W0EVF8EaCh6Em4ilQAYLEPZnMNkQHXR7ziWW7RUhZMWZAgRpkDDAdUIcJOXSPJT/zBEwz3sA==
+  version "18.19.111"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.111.tgz#e95b89efc24cc625834b43bcd70bd5591a5dfba5"
+  integrity sha512-90sGdgA+QLJr1F9X79tQuEut0gEYIfkX9pydI4XGRgvFo9g2JWswefI+WUSUHPYVBHYSEfTEqBxA5hQvAZB3Mw==
   dependencies:
     undici-types "~5.26.4"
 
@@ -2118,9 +2118,9 @@
   integrity sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==
 
 "@types/sdp-transform@^2.4.5":
-  version "2.4.9"
-  resolved "https://registry.yarnpkg.com/@types/sdp-transform/-/sdp-transform-2.4.9.tgz#26ef39f487a6909b0512f580b80920a366b27f52"
-  integrity sha512-bVr+/OoZZy7wrHlNcEAAa6PAgKA4BoXPYVN2EijMC5WnGgQ4ZEuixmKnVs2roiAvr7RhIFVH17QD27cojgIZCg==
+  version "2.4.10"
+  resolved "https://registry.yarnpkg.com/@types/sdp-transform/-/sdp-transform-2.4.10.tgz#f4e60fbc97f66527f221a3ae092be7c465c55f56"
+  integrity sha512-999diMTpgQGt+dj+tAEQNvBAJYkOip83NJn1RruqNmqeLYNZpQnUX/YrugR+ekXvdJ9pdkZtYg1jiM3mG3NhRg==
 
 "@types/stack-utils@^2.0.0":
   version "2.0.3"
@@ -2143,9 +2143,9 @@
   integrity sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==
 
 "@types/yargs@^17.0.8":
-  version "17.0.32"
-  resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-17.0.32.tgz#030774723a2f7faafebf645f4e5a48371dca6229"
-  integrity sha512-xQ67Yc/laOG5uMfX/093MRlGGCIBzZMarVa+gfNKJxWAIgykYpVGkBdbqEzGDDfCrVUj6Hiff4mTZ5BA6TmAog==
+  version "17.0.33"
+  resolved "https://registry.yarnpkg.com/@types/yargs/-/yargs-17.0.33.tgz#8c32303da83eec050a84b3c7ae7b9f922d13e32d"
+  integrity sha512-WpxBCKWPLr4xSsHgz511rFJAM+wS28w2zEO1QDNY5zM/S8ok70NNfztH0xwhqKyaK0OHCbN98LDAZuy1ctxDkA==
   dependencies:
     "@types/yargs-parser" "*"
 
