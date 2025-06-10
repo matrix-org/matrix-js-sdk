@@ -1,3 +1,10 @@
+Changes in [37.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.8.0) (2025-06-10)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* [Backport staging] Update dependency @matrix-org/matrix-sdk-crypto-wasm to v14.2.1 ([#4869](https://github.com/matrix-org/matrix-js-sdk/pull/4869)). Contributed by @RiotRobot.
+
+
 Changes in [37.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.7.0) (2025-06-03)
 ==================================================================================================
 ## 🦖 Deprecations
