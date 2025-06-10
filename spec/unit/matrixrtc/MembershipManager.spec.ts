@@ -314,7 +314,7 @@ describe("MembershipManager", () => {
 
         it("rejoins if delayed event is not found (404) !FailsForLegacy", async () => {
             const RESTART_DELAY = 15000;
-            const manager = new TestMembershipManager(
+            const manager = new MembershipManager(
                 { delayedLeaveEventRestartMs: RESTART_DELAY },
                 room,
                 client,
