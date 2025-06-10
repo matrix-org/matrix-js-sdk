@@ -358,9 +358,9 @@ describe("MatrixRTCSession", () => {
             let sendToDeviceMock: jest.Mock;
 
             beforeEach(() => {
-                sendStateEventMock = jest.fn();
-                sendDelayedStateMock = jest.fn();
-                sendEventMock = jest.fn();
+                sendStateEventMock = jest.fn().mockResolvedValue({ event_id: "id" });
+                sendDelayedStateMock = jest.fn().mockResolvedValue({ event_id: "id" });
+                sendEventMock = jest.fn().mockResolvedValue({ event_id: "id" });
                 sendToDeviceMock = jest.fn();
                 client.sendStateEvent = sendStateEventMock;
                 client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
