@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mocked } from "jest-mock";
 
-import { makeKey, makeMockEvent, makeMockRoom, membershipTemplate, mockCallMembership } from "./mocks";
+import { makeKey, makeMockEvent, makeMockRoom } from "./mocks";
 import { EventType, type IRoomTimelineData, type Room, RoomEvent, type MatrixClient } from "../../../src";
 import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import {
@@ -88,7 +88,9 @@ describe("RoomAndToDeviceTransport", () => {
     });
     it("only sends to device keys when sending a key", async () => {
         transport.start();
-        await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
+        await transport.sendKey("1235", 0, [
+            { userId: "@alice:example.org", deviceId: "ALICEDEVICE", membershipTs: 1234 },
+        ]);
         expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(1);
         expect(roomSendKeySpy).toHaveBeenCalledTimes(0);
         expect(transport.enabled.room).toBeFalsy();
@@ -118,7 +120,9 @@ describe("RoomAndToDeviceTransport", () => {
         expect(transport.enabled.room).toBeTruthy();
         expect(transport.enabled.toDevice).toBeFalsy();
 
-        await transport.sendKey("1235", 0, [mockCallMembership(membershipTemplate, roomId, "@alice:example.org")]);
+        await transport.sendKey("1235", 0, [
+            { userId: "@alice:example.org", deviceId: "AlICEDEV", membershipTs: 1234 },
+        ]);
         expect(sendEventMock).toHaveBeenCalledTimes(1);
         expect(roomSendKeySpy).toHaveBeenCalledTimes(1);
         expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(0);
