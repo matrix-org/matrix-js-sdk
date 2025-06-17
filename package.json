@@ -6,6 +6,7 @@
         "node": ">=22.0.0"
     },
     "scripts": {
+        "prepare": "yarn build",
         "prepack": "yarn build",
         "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
         "clean": "rimraf lib",
