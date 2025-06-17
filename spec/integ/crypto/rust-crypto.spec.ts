@@ -77,7 +77,7 @@ describe("MatrixClient.initRustCrypto", () => {
         // No databases.
         expect(await indexedDB.databases()).toHaveLength(0);
 
-        await matrixClient.initRustCrypto({ databasePrefix: "my-prefix" });
+        await matrixClient.initRustCrypto({ cryptoDatabasePrefix: "my-prefix" });
 
         // should have an indexed db now
         const databaseNames = (await indexedDB.databases()).map((db) => db.name);
@@ -503,11 +503,11 @@ describe("MatrixClient.clearStores", () => {
         // No databases.
         expect(await indexedDB.databases()).toHaveLength(0);
 
-        await matrixClient.initRustCrypto({ databasePrefix: "my-prefix" });
+        await matrixClient.initRustCrypto({ cryptoDatabasePrefix: "my-prefix" });
         expect(await indexedDB.databases()).toHaveLength(1);
         await matrixClient.stopClient();
 
-        await matrixClient.clearStores({ databasePrefix: "my-prefix" });
+        await matrixClient.clearStores({ cryptoDatabasePrefix: "my-prefix" });
         expect(await indexedDB.databases()).toHaveLength(0);
     });
 });
