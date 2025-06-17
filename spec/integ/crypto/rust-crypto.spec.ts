@@ -67,6 +67,23 @@ describe("MatrixClient.initRustCrypto", () => {
         expect(databaseNames).toEqual(expect.arrayContaining(["matrix-js-sdk::matrix-sdk-crypto"]));
     });
 
+    it("should create the indexed db with a custom prefix", async () => {
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        // No databases.
+        expect(await indexedDB.databases()).toHaveLength(0);
+
+        await matrixClient.initRustCrypto({ databasePrefix: "my-prefix" });
+
+        // should have an indexed db now
+        const databaseNames = (await indexedDB.databases()).map((db) => db.name);
+        expect(databaseNames).toEqual(expect.arrayContaining(["my-prefix::matrix-sdk-crypto"]));
+    });
+
     it("should create the meta db if given a storageKey", async () => {
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -474,5 +491,23 @@ describe("MatrixClient.clearStores", () => {
 
         await matrixClient.clearStores();
         // No error thrown in clearStores
+    });
+
+    it("should clear the indexeddbs with a custom prefix", async () => {
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        // No databases.
+        expect(await indexedDB.databases()).toHaveLength(0);
+
+        await matrixClient.initRustCrypto({ databasePrefix: "my-prefix" });
+        expect(await indexedDB.databases()).toHaveLength(1);
+        await matrixClient.stopClient();
+
+        await matrixClient.clearStores({ databasePrefix: "my-prefix" });
+        expect(await indexedDB.databases()).toHaveLength(0);
     });
 });
