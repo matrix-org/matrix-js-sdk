@@ -1,3 +1,12 @@
+Changes in [37.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.9.0) (2025-06-17)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Ensure we send spec-compliant filter strings by stripping out null values ([#4865](https://github.com/matrix-org/matrix-js-sdk/pull/4865)). Contributed by @t3chguy.
+* Fix MatrixRTC membership manager failing to rejoin in a race condition (sync vs not found response) ([#4861](https://github.com/matrix-org/matrix-js-sdk/pull/4861)). Contributed by @toger5.
+* Include extraParams in all HTTP requests ([#4860](https://github.com/matrix-org/matrix-js-sdk/pull/4860)). Contributed by @rsb-tbg.
+
+
 Changes in [37.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.8.0) (2025-06-10)
 ==================================================================================================
 ## 🐛 Bug Fixes
