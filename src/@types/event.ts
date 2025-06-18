@@ -379,6 +379,8 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     // Flag set by the rust SDK (Element X) and also used by us to mark that the user opted out of backup
     // (I don't know why it's m.org.matrix...)
     "m.org.matrix.custom.backup_disabled": { disabled: boolean };
+    // Indicate whether recovery is enabled or disabled
+    "io.element.recovery": { enabled: boolean };
     "m.identity_server": { base_url: string | null };
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
     [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
