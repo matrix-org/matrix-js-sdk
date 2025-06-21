@@ -35,7 +35,7 @@ import { type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts
 import { RoomEncryptor } from "./RoomEncryptor.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { KeyClaimManager } from "./KeyClaimManager.ts";
-import { logDuration, MapWithDefault } from "../utils.ts";
+import { MapWithDefault } from "../utils.ts";
 import {
     type BackupTrustInfo,
     type BootstrapCrossSigningOpts,
@@ -1494,17 +1494,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         unusedFallbackKeys?: Set<string>;
         devices?: RustSdkCryptoJs.DeviceLists;
     }): Promise<IToDeviceEvent[]> {
-        const result = await logDuration(logger, "receiveSyncChanges", async () => {
-            return await this.olmMachine.receiveSyncChanges(
-                events ? JSON.stringify(events) : "[]",
-                devices,
-                oneTimeKeysCounts,
-                unusedFallbackKeys,
-            );
-        });
+        const result = await this.olmMachine.receiveSyncChanges(
+            events ? JSON.stringify(events) : "[]",
+            devices,
+            oneTimeKeysCounts,
+            unusedFallbackKeys,
+        );
 
-        // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
-        return JSON.parse(result);
+        return result.map((processed) => JSON.parse(processed.rawEvent));
     }
 
     /** called by the sync loop to preprocess incoming to-device messages
