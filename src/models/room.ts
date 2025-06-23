@@ -17,15 +17,15 @@ limitations under the License.
 import { M_POLL_START, type Optional } from "matrix-events-sdk";
 
 import {
-    EventTimelineSet,
     DuplicateStrategy,
-    type IAddLiveEventOptions,
+    EventTimelineSet,
     type EventTimelineSetHandlerMap,
+    type IAddLiveEventOptions,
 } from "./event-timeline-set.ts";
 import { Direction, EventTimeline } from "./event-timeline.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
-import { removeElement } from "../utils.ts";
-import { normalize, noUnsafeEventProps } from "../utils.ts";
+import * as utils from "../utils.ts";
+import { normalize, noUnsafeEventProps, removeElement } from "../utils.ts";
 import {
     type IEvent,
     type IThreadBundledRelationship,
@@ -35,17 +35,17 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { type IRoomSummary, type Hero, RoomSummary } from "./room-summary.ts";
+import { type Hero, type IRoomSummary, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import {
+    EVENT_VISIBILITY_CHANGE_TYPE,
     EventType,
+    RelationType,
     RoomCreateTypeField,
     RoomType,
-    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
-    EVENT_VISIBILITY_CHANGE_TYPE,
-    RelationType,
     UNSIGNED_THREAD_ID_FIELD,
+    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
 } from "../@types/event.ts";
 import { type MatrixClient, PendingEventOrdering } from "../client.ts";
 import { type GuestAccess, type HistoryVisibility, type JoinRule, type ResizeMethod } from "../@types/partials.ts";
@@ -53,12 +53,12 @@ import { Filter, type IFilterDefinition } from "../filter.ts";
 import { type RoomState, RoomStateEvent, type RoomStateEventHandlerMap } from "./room-state.ts";
 import { BeaconEvent, type BeaconEventHandlerMap } from "./beacon.ts";
 import {
+    FILTER_RELATED_BY_REL_TYPES,
+    FILTER_RELATED_BY_SENDERS,
     Thread,
+    THREAD_RELATION_TYPE,
     ThreadEvent,
     type ThreadEventHandlerMap as ThreadHandlerMap,
-    FILTER_RELATED_BY_REL_TYPES,
-    THREAD_RELATION_TYPE,
-    FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread.ts";
 import {
@@ -74,7 +74,6 @@ import { ReadReceipt, synthesizeReceipt } from "./read-receipt.ts";
 import { isPollEvent, Poll, PollEvent } from "./poll.ts";
 import { RoomReceipts } from "./room-receipts.ts";
 import { compareEventOrdering } from "./compare-event-ordering.ts";
-import * as utils from "../utils.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 import { type MSC4186Hero } from "../sliding-sync.ts";
@@ -2469,7 +2468,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Adds events to a thread's timeline. Will fire "Thread.update"
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
-        events.forEach(this.applyRedaction);
+        events.forEach(this.tryApplyRedaction);
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
@@ -2580,55 +2579,105 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return thread;
     }
 
-    private applyRedaction = (event: MatrixEvent): void => {
+    /**
+     * Applies an event as a redaction of another event, regardless of whether the redacting
+     * event is actually a redaction.
+     *
+     * Callers should use tryApplyRedaction instead.
+     *
+     * @param redactionEvent The event which redacts an event.
+     * @param redactedEvent The event being redacted.
+     * @private
+     */
+    private applyEventAsRedaction(redactionEvent: MatrixEvent, redactedEvent: MatrixEvent): void {
+        const threadRootId = redactedEvent.threadRootId;
+        redactedEvent.makeRedacted(redactionEvent, this);
+
+        // If this is in the current state, replace it with the redacted version
+        if (redactedEvent.isState()) {
+            const currentStateEvent = this.currentState.getStateEvents(
+                redactedEvent.getType(),
+                redactedEvent.getStateKey()!,
+            );
+            if (currentStateEvent?.getId() === redactedEvent.getId()) {
+                this.currentState.setStateEvents([redactedEvent]);
+            }
+        }
+
+        this.emit(RoomEvent.Redaction, redactionEvent, this, threadRootId);
+
+        // TODO: we stash user displaynames (among other things) in
+        // RoomMember objects which are then attached to other events
+        // (in the sender and target fields). We should get those
+        // RoomMember objects to update themselves when the events that
+        // they are based on are changed.
+
+        // Remove any visibility change on this event.
+        this.visibilityEvents.delete(redactedEvent.getId()!);
+
+        // If this event is a visibility change event, remove it from the
+        // list of visibility changes and update any event affected by it.
+        if (redactedEvent.isVisibilityEvent()) {
+            this.redactVisibilityChangeEvent(redactionEvent);
+        }
+    }
+
+    private tryApplyRedaction = (event: MatrixEvent): void => {
+        // FIXME: apply redactions to notification list
+
+        // NB: We continue to add the redaction event to the timeline at the
+        // end of this function so clients can say "so and so redacted an event"
+        // if they wish to. Also this may be needed to trigger an update.
+
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactedEvent) {
-                const threadRootId = redactedEvent.threadRootId;
-                redactedEvent.makeRedacted(event, this);
-
-                // If this is in the current state, replace it with the redacted version
-                if (redactedEvent.isState()) {
-                    const currentStateEvent = this.currentState.getStateEvents(
-                        redactedEvent.getType(),
-                        redactedEvent.getStateKey()!,
-                    );
-                    if (currentStateEvent?.getId() === redactedEvent.getId()) {
-                        this.currentState.setStateEvents([redactedEvent]);
-                    }
-                }
-
-                this.emit(RoomEvent.Redaction, event, this, threadRootId);
-
-                // TODO: we stash user displaynames (among other things) in
-                // RoomMember objects which are then attached to other events
-                // (in the sender and target fields). We should get those
-                // RoomMember objects to update themselves when the events that
-                // they are based on are changed.
-
-                // Remove any visibility change on this event.
-                this.visibilityEvents.delete(redactId!);
-
-                // If this event is a visibility change event, remove it from the
-                // list of visibility changes and update any event affected by it.
-                if (redactedEvent.isVisibilityEvent()) {
-                    this.redactVisibilityChangeEvent(event);
-                }
+                this.applyEventAsRedaction(event, redactedEvent);
+            }
+        } else if (event.getType() === EventType.RoomMember) {
+            const membership = event.getContent()["membership"];
+            if (
+                membership !== KnownMembership.Ban &&
+                !(membership === KnownMembership.Leave && event.getStateKey() !== event.getSender())
+            ) {
+                // Not a ban or kick, therefore not a membership event we care about here.
+                return;
+            }
+            const redactEvents = event.getContent()["org.matrix.msc4293.redact_events"];
+            if (redactEvents !== true) {
+                // Invalid or not set - nothing to redact.
+                return;
+            }
+            const state = this.getLiveTimeline().getState(Direction.Forward)!;
+            if (!state.maySendRedactionForEvent(event, event.getSender()!)) {
+                // If the sender can't redact the membership event, then they won't be able to
+                // redact any of the target's events either, so skip.
+                return;
             }
 
-            // FIXME: apply redactions to notification list
-
-            // NB: We continue to add the redaction event to the timeline so
-            // clients can say "so and so redacted an event" if they wish to. Also
-            // this may be needed to trigger an update.
+            // The redaction is possible, so let's find all the events and apply it.
+            const events = this.getTimelineSets()
+                .map((s) => s.getTimelines())
+                .reduce((p, c) => {
+                    p.push(...c);
+                    return p;
+                }, [])
+                .map((t) => t.getEvents().filter((e) => e.getSender() === event.getStateKey()))
+                .reduce((p, c) => {
+                    p.push(...c);
+                    return c;
+                }, []);
+            for (const toRedact of events) {
+                this.applyEventAsRedaction(event, toRedact);
+            }
         }
     };
 
     private processLiveEvent(event: MatrixEvent): void {
-        this.applyRedaction(event);
+        this.tryApplyRedaction(event);
 
         // Implement MSC3531: hiding messages.
         if (event.isVisibilityEvent()) {
