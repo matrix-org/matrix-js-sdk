@@ -87,7 +87,7 @@ import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.t
 import { type MatrixScheduler } from "./scheduler.ts";
 import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
 import { type AuthDict } from "./interactive-auth.ts";
-import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
+import { type IMinimalEvent, type IRoomEvent, type IStateEvent, type IToDeviceMessage } from "./sync-accumulator.ts";
 import type { EventTimelineSet } from "./models/event-timeline-set.ts";
 import * as ContentHelpers from "./content-helpers.ts";
 import {
@@ -220,6 +220,7 @@ import {
     CryptoEvent,
     type CryptoEventHandlerMap,
     type CryptoCallbacks,
+    type OlmEncryptionInfo,
 } from "./crypto-api/index.ts";
 import {
     type SecretStorageKeyDescription,
@@ -885,7 +886,9 @@ const EVENT_ID_PREFIX = "$";
 export enum ClientEvent {
     Sync = "sync",
     Event = "event",
+    /** @deprecated Use `ReceivedToDeviceMessage`*/
     ToDeviceEvent = "toDeviceEvent",
+    ReceivedToDeviceMessage = "receivedToDeviceMessage",
     AccountData = "accountData",
     Room = "Room",
     DeleteRoom = "deleteRoom",
@@ -1088,6 +1091,23 @@ export type ClientEventHandlerMap = {
      * ```
      */
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
+    /**
+     * Fires whenever the SDK receives a new to-device message.
+     * @param msg - The to-device message which caused this event to fire.
+     * @param encryptionInfo - The encryptionInfo for this message, null if sent in clear.
+     * @example
+     * ```
+     * matrixClient.on("receivedToDeviceMessage", function(message, encryptionInfo){
+     *   var claimed_sender = encryptionInfo ? encryptionInfo.sender : message.sender;
+     *   var isVerified = encryptionInfo ? encryptionInfo.verified : false;
+     *   var type = message.type;
+     * });
+     * ```
+     */
+    [ClientEvent.ReceivedToDeviceMessage]: (
+        message: IToDeviceMessage,
+        encryptionInfo: OlmEncryptionInfo | null,
+    ) => void;
     /**
      * Fires if a to-device event is received that cannot be decrypted.
      * Encrypted to-device events will (generally) use plain Olm encryption,

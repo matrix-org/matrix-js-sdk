@@ -25,6 +25,7 @@ import { type IRoomSummary } from "./models/room-summary.ts";
 import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
+import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
 
 interface IOpts {
     /**
@@ -134,10 +135,34 @@ interface IAccountData {
     events: IMinimalEvent[];
 }
 
+/** A to-devive message as received from the sync. */
 export interface IToDeviceEvent {
     content: IContent;
     sender: string;
     type: string;
+}
+
+/**
+ * Successfully processed to-device message.
+ */
+export type IToDeviceMessage = IToDeviceEvent;
+
+/**
+ * A to-device message after it has been successfully processed by the sdk.
+ *
+ * If the message was encrypted, the `encryptionInfo` field will contain the encryption information.
+ * If the message was sent in clear, this field will be null.
+ *
+ * The `message` field contains the message `type`, `content`, and `sender` as if the message was sent in clear.
+ */
+export interface ReceivedToDeviceMessage {
+    /** The message type, content, and sender as if the message was sent in clear. */
+    message: IToDeviceMessage;
+    /**
+     * Information about the encryption of the message.
+     * Will be null if the message was sent in clear
+     */
+    encryptionInfo: OlmEncryptionInfo | null;
 }
 
 interface IToDevice {

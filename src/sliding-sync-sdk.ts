@@ -37,6 +37,7 @@ import {
     type IStateEvent,
     type IStrippedState,
     type ISyncResponse,
+    type ReceivedToDeviceMessage,
 } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -150,11 +151,22 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
     }
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
-        let events = data["events"] || [];
-        if (events.length > 0 && this.cryptoCallbacks) {
-            events = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        const events = data["events"] || [];
+        let processedEvents: ReceivedToDeviceMessage[];
+        if (this.cryptoCallbacks) {
+            processedEvents = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        } else {
+            processedEvents = events
+                .filter((e) => e.type !== EventType.RoomMessageEncrypted)
+                .map((clearEvent) => {
+                    // Crypto is not enabled, so we just return the clear events.
+                    return {
+                        message: clearEvent,
+                        encryptionInfo: null,
+                    };
+                });
         }
-        processToDeviceMessages(events, this.client);
+        processToDeviceMessages(processedEvents, this.client);
 
         this.nextBatch = data.next_batch;
     }

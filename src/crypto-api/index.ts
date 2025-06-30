@@ -1365,6 +1365,24 @@ export interface OwnDeviceKeys {
     curve25519: string;
 }
 
+export interface OlmEncryptionInfo {
+    /** The user ID of the event sender, note this is untrusted data unless `isVerified` is true **/
+    sender: string;
+    /**
+     * The device ID of the device that sent us the event,
+     * note this is untrusted data unless `isVerified` is true.
+     * If the device ID is not known, this will be `null`.
+     **/
+    senderDevice?: string;
+    /** The sender device key, base64 encoded **/
+    senderKeyPublicBase64: string;
+    /**
+     * The verification state of the device that sent us the event, note this
+     *  is the state of the device at the time of decryption.
+     */
+    isVerified: boolean;
+}
+
 export * from "./verification.ts";
 export type * from "./keybackup.ts";
 export * from "./recovery-key.ts";
