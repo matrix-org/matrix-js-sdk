@@ -551,11 +551,11 @@ describe("RustCrypto", () => {
             const inputs: IToDeviceEvent[] = [
                 { content: { key: "value" }, type: "org.matrix.test", sender: "@alice:example.com" },
             ];
-            const res = await rustCrypto.preprocessToDeviceMessages(inputs);
+            const res = (await rustCrypto.preprocessToDeviceMessages(inputs)).map((p) => p.message);
             expect(res).toEqual(inputs);
         });
 
-        it("should pass through bad encrypted messages", async () => {
+        it("should fail to process bad encrypted messages", async () => {
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
             const keys = olmMachine.identityKeys;
             const inputs: IToDeviceEvent[] = [
@@ -576,7 +576,7 @@ describe("RustCrypto", () => {
             ];
 
             const res = await rustCrypto.preprocessToDeviceMessages(inputs);
-            expect(res).toEqual(inputs);
+            expect(res.length).toEqual(0);
         });
 
         it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
