@@ -1147,11 +1147,12 @@ export class SyncApi {
         if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
             const toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
 
-            let processedEvents: ReceivedToDeviceMessage[];
+            let receivedToDeviceMessages: ReceivedToDeviceMessage[];
             if (this.syncOpts.cryptoCallbacks) {
-                processedEvents = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
+                receivedToDeviceMessages =
+                    await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
             } else {
-                processedEvents = toDeviceMessages
+                receivedToDeviceMessages = toDeviceMessages
                     .filter((e) => e.type !== EventType.RoomMessageEncrypted)
                     .map((clearEvent) => {
                         // Crypto is not enabled, so we just return the clear events.
@@ -1162,7 +1163,7 @@ export class SyncApi {
                     });
             }
 
-            processToDeviceMessages(processedEvents, client);
+            processToDeviceMessages(receivedToDeviceMessages, client);
         } else {
             // no more to-device events: we can stop polling with a short timeout.
             this.catchingUp = false;
@@ -1921,7 +1922,8 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
 /**
  * Process a list of (decrypted, where possible) received to-device events.
  *
- * Converts the events into `MatrixEvent`s, and emits appropriate {@link ClientEvent.ToDeviceEvent} events.
+ * Converts the to-device message and OlmEncryptionIngo and emits appropriate {@link ClientEvent.ReceivedToDeviceMessage} events.
+ * Converts the events into `MatrixEvent`s, and emits the now deprecated {@link ClientEvent.ToDeviceEvent} events for compatibility.
  * */
 export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessage[], client: MatrixClient): void {
     const cancelledKeyVerificationTxns: string[] = [];

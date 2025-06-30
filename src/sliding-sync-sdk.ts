@@ -152,11 +152,11 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
         const events = data["events"] || [];
-        let processedEvents: ReceivedToDeviceMessage[];
+        let receivedToDeviceMessages: ReceivedToDeviceMessage[];
         if (this.cryptoCallbacks) {
-            processedEvents = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+            receivedToDeviceMessages = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
         } else {
-            processedEvents = events
+            receivedToDeviceMessages = events
                 .filter((e) => e.type !== EventType.RoomMessageEncrypted)
                 .map((clearEvent) => {
                     // Crypto is not enabled, so we just return the clear events.
@@ -166,7 +166,7 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
                     };
                 });
         }
-        processToDeviceMessages(processedEvents, this.client);
+        processToDeviceMessages(receivedToDeviceMessages, this.client);
 
         this.nextBatch = data.next_batch;
     }
