@@ -1093,7 +1093,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
     /**
      * Fires whenever the SDK receives a new to-device message.
-     * @param msg - The to-device message which caused this event to fire.
+     * @param message - The to-device message which caused this event to fire.
      * @param encryptionInfo - The encryptionInfo for this message, null if sent in clear.
      * @example
      * ```
