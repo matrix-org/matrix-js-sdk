@@ -223,8 +223,7 @@ describe("to-device-messages", () => {
             expect(encryptionInfo!.senderDevice).toBe("DEVICE_ID");
 
             const oldFormat = await oldToDeviceResolver.promise;
-            // With the old format, we don't have the encryptionInfo. So there is no way to know if the
-            // message was sent encrypted or in clear.
+            expect(oldFormat.isEncrypted()).toBe(true);
             expect(oldFormat.getType()).toBe("m.test.type");
             expect(oldFormat.getContent()["body"]).toBe("foo");
         });
@@ -266,8 +265,7 @@ describe("to-device-messages", () => {
             expect(encryptionInfo).toBeNull();
 
             const oldFormat = await oldToDeviceResolver.promise;
-            // With the old format, we don't have the encryptionInfo. So there is no way to know if the
-            // message was sent encrypted or in clear.
+            expect(oldFormat.isEncrypted()).toBe(false);
             expect(oldFormat.getType()).toBe("m.test.type");
             expect(oldFormat.getContent()["body"]).toBe("foo");
         });

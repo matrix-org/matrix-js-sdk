@@ -1949,7 +1949,7 @@ export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessag
             {
                 const toDeviceEvent = processedEvent.message;
                 const content = toDeviceEvent.content;
-                const deprecatedCompatibilityEvent = new MatrixEvent(toDeviceEvent);
+                const deprecatedCompatibilityEvent = new MatrixEvent(Object.assign({}, toDeviceEvent));
                 if (
                     toDeviceEvent.type === "m.key.verification.start" ||
                     toDeviceEvent.type === "m.key.verification.request"
@@ -1958,6 +1958,16 @@ export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessag
                     if (cancelledKeyVerificationTxns.includes(txnId)) {
                         deprecatedCompatibilityEvent.flagCancelled();
                     }
+                }
+                if (processedEvent.encryptionInfo) {
+                    // Restore partially the legacy behavior to detect encrypted messages.
+                    // Now `event.isEncrypted()` will return true.
+                    deprecatedCompatibilityEvent.makeEncrypted(
+                        EventType.RoomMessageEncrypted,
+                        { ciphertext: "" },
+                        processedEvent.encryptionInfo.senderKeyPublicBase64,
+                        "",
+                    );
                 }
 
                 client.emit(ClientEvent.ToDeviceEvent, deprecatedCompatibilityEvent);
