@@ -888,78 +888,6 @@ interface IWhoamiResponse {
 const EVENT_ID_PREFIX = "$";
 
 export enum ClientEvent {
-    Sync = "sync",
-    Event = "event",
-    /** @deprecated Use {@link ReceivedToDeviceMessage}. */
-    ToDeviceEvent = "toDeviceEvent",
-    ReceivedToDeviceMessage = "receivedToDeviceMessage",
-    AccountData = "accountData",
-    Room = "Room",
-    DeleteRoom = "deleteRoom",
-    SyncUnexpectedError = "sync.unexpectedError",
-    ClientWellKnown = "WellKnown.client",
-    ReceivedVoipEvent = "received_voip_event",
-    UndecryptableToDeviceEvent = "toDeviceEvent.undecryptable",
-    TurnServers = "turnServers",
-    TurnServersError = "turnServers.error",
-}
-
-type RoomEvents =
-    | RoomEvent.Name
-    | RoomEvent.Redaction
-    | RoomEvent.RedactionCancelled
-    | RoomEvent.Receipt
-    | RoomEvent.Tags
-    | RoomEvent.LocalEchoUpdated
-    | RoomEvent.HistoryImportedWithinTimeline
-    | RoomEvent.AccountData
-    | RoomEvent.MyMembership
-    | RoomEvent.Timeline
-    | RoomEvent.TimelineReset;
-
-type RoomStateEvents =
-    | RoomStateEvent.Events
-    | RoomStateEvent.Members
-    | RoomStateEvent.NewMember
-    | RoomStateEvent.Update
-    | RoomStateEvent.Marker;
-
-type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
-
-type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
-
-type RoomMemberEvents =
-    | RoomMemberEvent.Name
-    | RoomMemberEvent.Typing
-    | RoomMemberEvent.PowerLevel
-    | RoomMemberEvent.Membership;
-
-type UserEvents =
-    | UserEvent.AvatarUrl
-    | UserEvent.DisplayName
-    | UserEvent.Presence
-    | UserEvent.CurrentlyActive
-    | UserEvent.LastPresenceTs;
-
-export type EmittedEvents =
-    | ClientEvent
-    | RoomEvents
-    | RoomStateEvents
-    | CryptoEvents
-    | MatrixEventEvents
-    | RoomMemberEvents
-    | UserEvents
-    | CallEvent // re-emitted by call.ts using Object.values
-    | CallEventHandlerEvent.Incoming
-    | GroupCallEventHandlerEvent.Incoming
-    | GroupCallEventHandlerEvent.Outgoing
-    | GroupCallEventHandlerEvent.Ended
-    | GroupCallEventHandlerEvent.Participants
-    | HttpApiEvent.SessionLoggedOut
-    | HttpApiEvent.NoConsent
-    | BeaconEvent;
-
-export type ClientEventHandlerMap = {
     /**
      * Fires whenever the SDK's syncing state is updated. The state can be one of:
      * <ul>
@@ -1042,13 +970,15 @@ export type ClientEventHandlerMap = {
      * trying to sync after stopClient has been called.</li>
      * </ul>
      *
-     * @param state - An enum representing the syncing state. One of "PREPARED",
+     * The payloads consits of the following 3 parameters:
+     *
+     * - state - An enum representing the syncing state. One of "PREPARED",
      * "SYNCING", "ERROR", "STOPPED".
      *
-     * @param prevState - An enum representing the previous syncing state.
+     * - prevState - An enum representing the previous syncing state.
      * One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.
      *
-     * @param data - Data about this transition.
+     * - data - Data about this transition.
      *
      * @example
      * ```
@@ -1068,14 +998,14 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.Sync]: (state: SyncState, prevState: SyncState | null, data?: ISyncStateData) => void;
+    Sync = "sync",
     /**
      * Fires whenever the SDK receives a new event.
      * <p>
      * This is only fired for live events received via /sync - it is not fired for
      * events received over context, search, or pagination APIs.
      *
-     * @param event - The matrix event which caused this event to fire.
+     * The payload is the matrix event which caused this event to fire.
      * @example
      * ```
      * matrixClient.on("event", function(event){
@@ -1083,10 +1013,10 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.Event]: (event: MatrixEvent) => void;
-    /**
+    Event = "event",
+    /** @deprecated Use {@link ReceivedToDeviceMessage}.
      * Fires whenever the SDK receives a new to-device event.
-     * @param event - The matrix event which caused this event to fire.
+     * The payload is the matrix event ({@link MatrixEvent}) which caused this event to fire.
      * @example
      * ```
      * matrixClient.on("toDeviceEvent", function(event){
@@ -1094,10 +1024,10 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
+    ToDeviceEvent = "toDeviceEvent",
     /**
-     * Fires whenever the SDK receives a new to-device message.
-     * @param payload - The message and encryptionInfo for this message (See {@link ReceivedToDeviceMessage}) which caused this event to fire.
+     * Fires whenever the SDK receives a new (potentially decrypted) to-device message.
+     * The payload is the to-device message and the encryption info for that message  ({@link ReceivedToDeviceMessage}).
      * @example
      * ```
      * matrixClient.on("receivedToDeviceMessage", function(payload){
@@ -1106,25 +1036,13 @@ export type ClientEventHandlerMap = {
      *   var isVerified = encryptionInfo ? encryptionInfo.verified : false;
      *   var type = message.type;
      * });
-     * ```
      */
-    [ClientEvent.ReceivedToDeviceMessage]: (payload: ReceivedToDeviceMessage) => void;
-    /**
-     * Fires if a to-device event is received that cannot be decrypted.
-     * Encrypted to-device events will (generally) use plain Olm encryption,
-     * in which case decryption failures are fatal: the event will never be
-     * decryptable, unlike Megolm encrypted events where the key may simply
-     * arrive later.
-     *
-     * An undecryptable to-device event is therefore likely to indicate problems.
-     *
-     * @param event - The undecyptable to-device event
-     */
-    [ClientEvent.UndecryptableToDeviceEvent]: (event: MatrixEvent) => void;
+    ReceivedToDeviceMessage = "receivedToDeviceMessage",
     /**
      * Fires whenever new user-scoped account_data is added.
-     * @param event - The event describing the account_data just added
-     * @param event - The previous account data, if known.
+     * The payload is a pair of event ({@link MatrixEvent}) describing the account_data just added, and the previous event, if known:
+     *  - event: The event describing the account_data just added
+     *  - oldEvent: The previous account data, if known.
      * @example
      * ```
      * matrixClient.on("accountData", function(event, oldEvent){
@@ -1132,12 +1050,13 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
+    AccountData = "accountData",
     /**
      * Fires whenever a new Room is added. This will fire when you are invited to a
      * room, as well as when you join a room. <strong>This event is experimental and
      * may change.</strong>
-     * @param room - The newly created, fully populated room.
+     *
+     * The payload is the newly created room, fully populated.
      * @example
      * ```
      * matrixClient.on("Room", function(room){
@@ -1145,11 +1064,11 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.Room]: (room: Room) => void;
+    Room = "Room",
     /**
      * Fires whenever a Room is removed. This will fire when you forget a room.
      * <strong>This event is experimental and may change.</strong>
-     * @param roomId - The deleted room ID.
+     * The payload is the roomId of the deleted room.
      * @example
      * ```
      * matrixClient.on("deleteRoom", function(roomId){
@@ -1157,13 +1076,87 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.DeleteRoom]: (roomId: string) => void;
-    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
+    DeleteRoom = "deleteRoom",
+    SyncUnexpectedError = "sync.unexpectedError",
     /**
      * Fires when the client .well-known info is fetched.
-     *
-     * @param data - The JSON object returned by the server
+     * The payload is the JSON object (see {@link IClientWellKnown}) returned by the server
      */
+    ClientWellKnown = "WellKnown.client",
+    ReceivedVoipEvent = "received_voip_event",
+    /**
+     * @deprecated This event is not supported anymore.
+     */
+    UndecryptableToDeviceEvent = "toDeviceEvent.undecryptable",
+    TurnServers = "turnServers",
+    TurnServersError = "turnServers.error",
+}
+
+type RoomEvents =
+    | RoomEvent.Name
+    | RoomEvent.Redaction
+    | RoomEvent.RedactionCancelled
+    | RoomEvent.Receipt
+    | RoomEvent.Tags
+    | RoomEvent.LocalEchoUpdated
+    | RoomEvent.HistoryImportedWithinTimeline
+    | RoomEvent.AccountData
+    | RoomEvent.MyMembership
+    | RoomEvent.Timeline
+    | RoomEvent.TimelineReset;
+
+type RoomStateEvents =
+    | RoomStateEvent.Events
+    | RoomStateEvent.Members
+    | RoomStateEvent.NewMember
+    | RoomStateEvent.Update
+    | RoomStateEvent.Marker;
+
+type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
+
+type MatrixEventEvents = MatrixEventEvent.Decrypted | MatrixEventEvent.Replaced | MatrixEventEvent.VisibilityChange;
+
+type RoomMemberEvents =
+    | RoomMemberEvent.Name
+    | RoomMemberEvent.Typing
+    | RoomMemberEvent.PowerLevel
+    | RoomMemberEvent.Membership;
+
+type UserEvents =
+    | UserEvent.AvatarUrl
+    | UserEvent.DisplayName
+    | UserEvent.Presence
+    | UserEvent.CurrentlyActive
+    | UserEvent.LastPresenceTs;
+
+export type EmittedEvents =
+    | ClientEvent
+    | RoomEvents
+    | RoomStateEvents
+    | CryptoEvents
+    | MatrixEventEvents
+    | RoomMemberEvents
+    | UserEvents
+    | CallEvent // re-emitted by call.ts using Object.values
+    | CallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Outgoing
+    | GroupCallEventHandlerEvent.Ended
+    | GroupCallEventHandlerEvent.Participants
+    | HttpApiEvent.SessionLoggedOut
+    | HttpApiEvent.NoConsent
+    | BeaconEvent;
+
+export type ClientEventHandlerMap = {
+    [ClientEvent.Sync]: (state: SyncState, prevState: SyncState | null, data?: ISyncStateData) => void;
+    [ClientEvent.Event]: (event: MatrixEvent) => void;
+    [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
+    [ClientEvent.ReceivedToDeviceMessage]: (payload: ReceivedToDeviceMessage) => void;
+    [ClientEvent.UndecryptableToDeviceEvent]: (event: MatrixEvent) => void;
+    [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
+    [ClientEvent.Room]: (room: Room) => void;
+    [ClientEvent.DeleteRoom]: (roomId: string) => void;
+    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
     [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
