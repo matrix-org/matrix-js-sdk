@@ -218,7 +218,7 @@ describe("to-device-messages", () => {
             expect(message.content["body"]).toBe("foo");
 
             expect(encryptionInfo).not.toBeNull();
-            expect(encryptionInfo!.isVerified).toBe(false);
+            expect(encryptionInfo!.senderVerified).toBe(false);
             expect(encryptionInfo!.sender).toBe("@bob:xyz");
             expect(encryptionInfo!.senderDevice).toBe("DEVICE_ID");
 

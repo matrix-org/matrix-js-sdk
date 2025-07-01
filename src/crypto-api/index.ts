@@ -1365,22 +1365,25 @@ export interface OwnDeviceKeys {
     curve25519: string;
 }
 
+/**
+ * Information about the encryption of a successfully decrypted to-device message.
+ */
 export interface OlmEncryptionInfo {
     /** The user ID of the event sender, note this is untrusted data unless `isVerified` is true **/
     sender: string;
     /**
-     * The device ID of the device that sent us the event,
-     * note this is untrusted data unless `isVerified` is true.
+     * The device ID of the device that sent us the event.
+     * Note this is untrusted data unless {@link senderVerified} is true.
      * If the device ID is not known, this will be `null`.
      **/
     senderDevice?: string;
-    /** The sender device key, base64 encoded **/
-    senderKeyPublicBase64: string;
+    /** The sender device's public Curve25519 key, base64 encoded **/
+    senderCurve25519KeyBase64: string;
     /**
-     * The verification state of the device that sent us the event, note this
-     *  is the state of the device at the time of decryption.
+     *  If true, this message is guaranteed to be authentic as it is coming from a device belonging to a user that we have verified.
+     *  This is the state at the time of decryption (the user could be verified later).
      */
-    isVerified: boolean;
+    senderVerified: boolean;
 }
 
 export * from "./verification.ts";

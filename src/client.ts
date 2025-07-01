@@ -886,7 +886,7 @@ const EVENT_ID_PREFIX = "$";
 export enum ClientEvent {
     Sync = "sync",
     Event = "event",
-    /** @deprecated Use `ReceivedToDeviceMessage`*/
+    /** @deprecated Use {@link ReceivedToDeviceMessage}. */
     ToDeviceEvent = "toDeviceEvent",
     ReceivedToDeviceMessage = "receivedToDeviceMessage",
     AccountData = "accountData",

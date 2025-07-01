@@ -1967,7 +1967,7 @@ export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessag
                     deprecatedCompatibilityEvent.makeEncrypted(
                         EventType.RoomMessageEncrypted,
                         { ciphertext: "" },
-                        processedEvent.encryptionInfo.senderKeyPublicBase64,
+                        processedEvent.encryptionInfo.senderCurve25519KeyBase64,
                         "",
                     );
                 }

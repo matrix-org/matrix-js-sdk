@@ -135,7 +135,7 @@ interface IAccountData {
     events: IMinimalEvent[];
 }
 
-/** A to-devive message as received from the sync. */
+/** A to-device message as received from the sync. */
 export interface IToDeviceEvent {
     content: IContent;
     sender: string;
@@ -148,7 +148,7 @@ export interface IToDeviceEvent {
 export type IToDeviceMessage = IToDeviceEvent;
 
 /**
- * A to-device message after it has been successfully processed by the sdk.
+ * A (possibly decrypted) to-device message after it has been successfully processed by the sdk.
  *
  * If the message was encrypted, the `encryptionInfo` field will contain the encryption information.
  * If the message was sent in clear, this field will be null.

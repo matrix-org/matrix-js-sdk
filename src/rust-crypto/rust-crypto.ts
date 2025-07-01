@@ -1539,8 +1539,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                         encryptionInfo: {
                             sender: encryptionInfo.sender.toString(),
                             senderDevice: encryptionInfo.senderDevice?.toString(),
-                            senderKeyPublicBase64: encryptionInfo.senderCurve25519Key,
-                            isVerified: encryptionInfo.isSenderVerified(),
+                            senderCurve25519KeyBase64: encryptionInfo.senderCurve25519Key,
+                            senderVerified: encryptionInfo.isSenderVerified(),
                         },
                     });
                     break;
