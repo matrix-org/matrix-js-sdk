@@ -1922,8 +1922,8 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
 /**
  * Process a list of (decrypted, where possible) received to-device events.
  *
- * Converts the to-device message and OlmEncryptionIngo and emits appropriate {@link ClientEvent.ReceivedToDeviceMessage} events.
- * Converts the events into `MatrixEvent`s, and emits the now deprecated {@link ClientEvent.ToDeviceEvent} events for compatibility.
+ * Emits the appropriate {@link ClientEvent.ReceivedToDeviceMessage} event.
+ * Also converts the events into `MatrixEvent`s, and emits the now deprecated {@link ClientEvent.ToDeviceEvent} events for compatibility.
  * */
 export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessage[], client: MatrixClient): void {
     const cancelledKeyVerificationTxns: string[] = [];
@@ -1951,6 +1951,9 @@ export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessag
             {
                 const toDeviceEvent = processedEvent.message;
                 const content = toDeviceEvent.content;
+                // The message is cloned before being passed to the MatrixEvent constructor, because
+                // the `makeEncrypted` method will mutate the type and content properties of the original message and will interfere
+                // with the emitted event for `ReceivedToDeviceMessage`.
                 const deprecatedCompatibilityEvent = new MatrixEvent(Object.assign({}, toDeviceEvent));
                 if (
                     toDeviceEvent.type === "m.key.verification.start" ||
