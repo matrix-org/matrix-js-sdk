@@ -2277,6 +2277,12 @@ function rustEncryptionInfoToJsEncryptionInfo(
         case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
             break;
+        case RustSdkCryptoJs.ShieldStateCode.MismatchedSender:
+            shieldReason = EventShieldReason.MISMATCHED_SENDER;
+            break;
+        default:
+            shieldReason = EventShieldReason.UNKNOWN;
+            break;
     }
 
     return { shieldColour, shieldReason };

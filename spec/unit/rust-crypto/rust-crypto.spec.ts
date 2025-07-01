@@ -1114,6 +1114,7 @@ describe("RustCrypto", () => {
 
         it.each([
             [undefined, undefined, null],
+            ["Other", -1, EventShieldReason.UNKNOWN],
             [
                 "Encrypted by an unverified user.",
                 RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity,
@@ -1139,6 +1140,11 @@ describe("RustCrypto", () => {
                 "Encrypted by a previously-verified user who is no longer verified.",
                 RustSdkCryptoJs.ShieldStateCode.VerificationViolation,
                 EventShieldReason.VERIFICATION_VIOLATION,
+            ],
+            [
+                "Mismatched sender",
+                RustSdkCryptoJs.ShieldStateCode.MismatchedSender,
+                EventShieldReason.MISMATCHED_SENDER,
             ],
         ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {
             // suppress the warning from the unknown shield reason
