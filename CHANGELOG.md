@@ -1,3 +1,13 @@
+Changes in [37.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.10.0) (2025-07-01)
+====================================================================================================
+## ✨ Features
+
+* Update matrix-sdk-crypto-wasm to `15.0.0` ([#4882](https://github.com/matrix-org/matrix-js-sdk/pull/4882)). Contributed by @richvdh.
+* Allow customizing the IndexedDB database prefix used by Rust crypto. ([#4878](https://github.com/matrix-org/matrix-js-sdk/pull/4878)). Contributed by @clokep.
+* Remove `@matrix-org/olm` from dependency list ([#4876](https://github.com/matrix-org/matrix-js-sdk/pull/4876)). Contributed by @richvdh.
+* Redact on ban: Client implementation ([#4867](https://github.com/matrix-org/matrix-js-sdk/pull/4867)). Contributed by @turt2live.
+
+
 Changes in [37.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.9.0) (2025-06-17)
 ==================================================================================================
 ## 🐛 Bug Fixes
