@@ -19,12 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import {
-    type IDeviceLists,
-    type IToDeviceEvent,
-    type IToDeviceMessage,
-    type ReceivedToDeviceMessage,
-} from "../sync-accumulator.ts";
+import { type IDeviceLists, type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
 import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
 import { type MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
@@ -1520,7 +1515,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const received: ReceivedToDeviceMessage[] = [];
 
         for (const message of processed) {
-            const parsedMessage: IToDeviceMessage = JSON.parse(message.rawEvent);
+            const parsedMessage: IToDeviceEvent = JSON.parse(message.rawEvent);
 
             // look for interesting to-device messages
             if (parsedMessage.type === EventType.KeyVerificationRequest) {

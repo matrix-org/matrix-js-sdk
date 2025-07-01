@@ -87,7 +87,7 @@ import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.t
 import { type MatrixScheduler } from "./scheduler.ts";
 import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
 import { type AuthDict } from "./interactive-auth.ts";
-import { type IMinimalEvent, type IRoomEvent, type IStateEvent, type IToDeviceMessage } from "./sync-accumulator.ts";
+import { type IMinimalEvent, type IRoomEvent, type IStateEvent, type IToDeviceEvent } from "./sync-accumulator.ts";
 import type { EventTimelineSet } from "./models/event-timeline-set.ts";
 import * as ContentHelpers from "./content-helpers.ts";
 import {
@@ -1104,10 +1104,7 @@ export type ClientEventHandlerMap = {
      * });
      * ```
      */
-    [ClientEvent.ReceivedToDeviceMessage]: (
-        message: IToDeviceMessage,
-        encryptionInfo: OlmEncryptionInfo | null,
-    ) => void;
+    [ClientEvent.ReceivedToDeviceMessage]: (message: IToDeviceEvent, encryptionInfo: OlmEncryptionInfo | null) => void;
     /**
      * Fires if a to-device event is received that cannot be decrypted.
      * Encrypted to-device events will (generally) use plain Olm encryption,

@@ -20,14 +20,7 @@ import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";
 
 import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
-import {
-    ClientEvent,
-    createClient,
-    type IToDeviceEvent,
-    type IToDeviceMessage,
-    type MatrixClient,
-    type MatrixEvent,
-} from "../../../src";
+import { ClientEvent, createClient, type IToDeviceEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { SyncResponder } from "../../test-utils/SyncResponder";
@@ -194,7 +187,7 @@ describe("to-device-messages", () => {
                 plaintype: "m.test.type",
             });
 
-            const processedToDeviceResolver: PromiseWithResolvers<[IToDeviceMessage, OlmEncryptionInfo | null]> =
+            const processedToDeviceResolver: PromiseWithResolvers<[IToDeviceEvent, OlmEncryptionInfo | null]> =
                 Promise.withResolvers();
 
             aliceClient.on(ClientEvent.ReceivedToDeviceMessage, (message, encryptionInfo) => {
@@ -240,7 +233,7 @@ describe("to-device-messages", () => {
                 },
             };
 
-            const processedToDeviceResolver: PromiseWithResolvers<[IToDeviceMessage, OlmEncryptionInfo | null]> =
+            const processedToDeviceResolver: PromiseWithResolvers<[IToDeviceEvent, OlmEncryptionInfo | null]> =
                 Promise.withResolvers();
 
             aliceClient.on(ClientEvent.ReceivedToDeviceMessage, (message, encryptionInfo) => {

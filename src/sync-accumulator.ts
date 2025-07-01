@@ -143,11 +143,6 @@ export interface IToDeviceEvent {
 }
 
 /**
- * Successfully processed to-device message.
- */
-export type IToDeviceMessage = IToDeviceEvent;
-
-/**
  * A (possibly decrypted) to-device message after it has been successfully processed by the sdk.
  *
  * If the message was encrypted, the `encryptionInfo` field will contain the encryption information.
@@ -157,7 +152,7 @@ export type IToDeviceMessage = IToDeviceEvent;
  */
 export interface ReceivedToDeviceMessage {
     /** The message type, content, and sender as if the message was sent in clear. */
-    message: IToDeviceMessage;
+    message: IToDeviceEvent;
     /**
      * Information about the encryption of the message.
      * Will be null if the message was sent in clear
