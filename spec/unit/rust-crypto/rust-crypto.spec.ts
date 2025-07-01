@@ -1140,6 +1140,11 @@ describe("RustCrypto", () => {
                 RustSdkCryptoJs.ShieldStateCode.VerificationViolation,
                 EventShieldReason.VERIFICATION_VIOLATION,
             ],
+            [
+                "Mismatched sender",
+                RustSdkCryptoJs.ShieldStateCode.MismatchedSender,
+                EventShieldReason.MISMATCHED_SENDER,
+            ],
         ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {
             // suppress the warning from the unknown shield reason
             jest.spyOn(console, "warn").mockImplementation(() => {});
