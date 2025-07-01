@@ -156,15 +156,13 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
         if (this.cryptoCallbacks) {
             receivedToDeviceMessages = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
         } else {
-            receivedToDeviceMessages = events
-                .filter((e) => e.type !== EventType.RoomMessageEncrypted)
-                .map((clearEvent) => {
-                    // Crypto is not enabled, so we just return the clear events.
-                    return {
-                        message: clearEvent,
-                        encryptionInfo: null,
-                    };
-                });
+            receivedToDeviceMessages = events.map((rawEvent) =>
+                // Crypto is not enabled, so we just return the events.
+                ({
+                    message: rawEvent,
+                    encryptionInfo: null,
+                }),
+            );
         }
         processToDeviceMessages(receivedToDeviceMessages, this.client);
 

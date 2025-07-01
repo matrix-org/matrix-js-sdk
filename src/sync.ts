@@ -1152,15 +1152,13 @@ export class SyncApi {
                 receivedToDeviceMessages =
                     await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
             } else {
-                receivedToDeviceMessages = toDeviceMessages
-                    .filter((e) => e.type !== EventType.RoomMessageEncrypted)
-                    .map((clearEvent) => {
-                        // Crypto is not enabled, so we just return the clear events.
-                        return {
-                            message: clearEvent,
-                            encryptionInfo: null,
-                        };
-                    });
+                receivedToDeviceMessages = toDeviceMessages.map((rawEvent) =>
+                    // Crypto is not enabled, so we just return the events.
+                    ({
+                        message: rawEvent,
+                        encryptionInfo: null,
+                    }),
+                );
             }
 
             processToDeviceMessages(receivedToDeviceMessages, client);
