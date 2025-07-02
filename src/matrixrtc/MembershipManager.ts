@@ -526,7 +526,7 @@ export class MembershipManager
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
-        const requestOptions: IRequestOpts = { localTimeoutMs: 1500, priority: "auto" };
+        const requestOptions: IRequestOpts = { localTimeoutMs: 2300, priority: "auto" };
         return await this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart, requestOptions)
             .then(() => {
