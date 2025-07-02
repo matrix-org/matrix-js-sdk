@@ -5,6 +5,7 @@ import { getMockClientWithEventEmitter } from "../test-utils/client";
 import { StubStore } from "../../src/store/stub";
 import { type IndexedToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { SyncState } from "../../src/sync";
+import { logger } from "../../src/logger.ts";
 
 describe("onResumedSync", () => {
     let batch: IndexedToDeviceBatch | null;
@@ -55,7 +56,7 @@ describe("onResumedSync", () => {
             }
         });
 
-        queue = new ToDeviceMessageQueue(mockClient);
+        queue = new ToDeviceMessageQueue(mockClient, logger);
     });
 
     it("resends queue after connectivity restored", async () => {
