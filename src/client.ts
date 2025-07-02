@@ -1364,7 +1364,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // the underlying session management and doesn't use any actual media capabilities
         this.matrixRTC = new MatrixRTCSessionManager(this);
 
-        this.serverCapabilitiesService = new ServerCapabilities(this.http);
+        this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
