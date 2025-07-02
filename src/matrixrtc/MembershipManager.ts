@@ -19,7 +19,7 @@ import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import { type MatrixClient } from "../client.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
-import { IRequestOpts } from "../http-api/index.ts";
+import { type IRequestOpts } from "../http-api/index.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
