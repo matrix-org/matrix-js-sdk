@@ -1630,6 +1630,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             existingEncryptor.onCryptoEvent(config);
         } else {
             this.roomEncryptors[room.roomId] = new RoomEncryptor(
+                this.logger.getChild(`[${room.roomId} encryption]`),
                 this.olmMachine,
                 this.keyClaimManager,
                 this.outgoingRequestsManager,

@@ -29,7 +29,7 @@ import {
 import { EventType } from "../@types/event.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
-import { type Logger, logger, LogSpan } from "../logger.ts";
+import { type Logger, LogSpan } from "../logger.ts";
 import { type KeyClaimManager } from "./KeyClaimManager.ts";
 import { type RoomMember } from "../models/room-member.ts";
 import { HistoryVisibility } from "../@types/partials.ts";
@@ -44,8 +44,6 @@ import { type DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api
  * @internal
  */
 export class RoomEncryptor {
-    private readonly prefixedLogger: Logger;
-
     /** whether the room members have been loaded and tracked for the first time */
     private lazyLoadedMembersResolved = false;
 
@@ -57,6 +55,7 @@ export class RoomEncryptor {
     private currentEncryptionPromise: Promise<void> = Promise.resolve();
 
     /**
+     * @param prefixedLogger - A logger to use for log messages.
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
      * @param outgoingRequestManager - The OutgoingRequestManager, which manages the queue of outgoing requests.
@@ -64,14 +63,13 @@ export class RoomEncryptor {
      * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
      */
     public constructor(
+        private readonly prefixedLogger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly keyClaimManager: KeyClaimManager,
         private readonly outgoingRequestManager: OutgoingRequestsManager,
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
-        this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
-
         // start tracking devices for any users already known to be in this room.
         // Do not load members here, would defeat lazy loading.
         const members = room.getJoinedMembers();
