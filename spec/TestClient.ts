@@ -22,6 +22,7 @@ limitations under the License.
 // load olm before the sdk if possible
 import "./olm-loader";
 
+import { expect } from "@jest/globals";
 import MockHttpBackend from "matrix-mock-request";
 
 import type { IDeviceKeys, IOneTimeKey } from "../src/@types/crypto";

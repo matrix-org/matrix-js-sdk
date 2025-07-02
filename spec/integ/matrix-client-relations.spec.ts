@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
+
 import type HttpBackend from "matrix-mock-request";
 import { Direction, type MatrixClient, MatrixScheduler } from "../../src/matrix";
 import { TestClient } from "../TestClient";

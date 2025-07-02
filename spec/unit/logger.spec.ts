@@ -16,6 +16,7 @@ limitations under the License.
 
 /* eslint-disable no-console */
 
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import loglevel from "loglevel";
 
 import { logger } from "../../src/logger.ts";

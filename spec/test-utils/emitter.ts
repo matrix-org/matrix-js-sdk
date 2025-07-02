@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type jest } from "@jest/globals";
+
 /**
  * Filter emitter.emit mock calls to find relevant events
  * eg:
@@ -24,5 +26,5 @@ limitations under the License.
  * expect(beaconLivenessEmits.length).toBe(1);
  * ```
  */
-export const filterEmitCallsByEventType = (eventType: string, spy: jest.SpyInstance<any, any[]>) =>
+export const filterEmitCallsByEventType = (eventType: string, spy: jest.Spied<(...args: any[]) => any>) =>
     spy.mock.calls.filter((args) => args[0] === eventType);

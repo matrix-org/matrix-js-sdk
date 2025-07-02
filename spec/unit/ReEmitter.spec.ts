@@ -16,6 +16,7 @@ limitations under the License.
 
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
+import { describe, expect, it, jest } from "@jest/globals";
 
 import { ReEmitter } from "../../src/ReEmitter";
 

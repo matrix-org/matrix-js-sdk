@@ -18,6 +18,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { beforeEach, beforeAll, describe, expect, it, jest } from "@jest/globals";
 import fetchMock from "fetch-mock-jest";
 import { mocked } from "jest-mock";
 import { jwtDecode } from "jwt-decode";

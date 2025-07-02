@@ -16,6 +16,7 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 
+import { afterEach, beforeEach, beforeAll, describe, expect, it, jest } from "@jest/globals";
 import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
