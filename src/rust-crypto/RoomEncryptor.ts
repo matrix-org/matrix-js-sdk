@@ -212,7 +212,7 @@ export class RoomEncryptor {
         // This could end up being racy (if two calls to ensureEncryptionSession happen at the same time), but that's
         // not a particular problem, since `OlmMachine.updateTrackedUsers` just adds any users that weren't already tracked.
         if (!this.lazyLoadedMembersResolved) {
-            await logDuration(this.prefixedLogger, "loadMembersIfNeeded: updateTrackedUsers", async () => {
+            await logDuration(logger, "loadMembersIfNeeded: updateTrackedUsers", async () => {
                 await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
             });
             logger.debug(`Updated tracked users`);
@@ -229,7 +229,7 @@ export class RoomEncryptor {
             // XXX future improvement process only KeysQueryRequests for the users that have never been queried.
             logger.debug(`Processing outgoing requests`);
 
-            await logDuration(this.prefixedLogger, "doProcessOutgoingRequests", async () => {
+            await logDuration(logger, "doProcessOutgoingRequests", async () => {
                 await this.outgoingRequestManager.doProcessOutgoingRequests();
             });
         } else {
@@ -250,7 +250,7 @@ export class RoomEncryptor {
 
         const userList = members.map((u) => new UserId(u.userId));
 
-        await logDuration(this.prefixedLogger, "ensureSessionsForUsers", async () => {
+        await logDuration(logger, "ensureSessionsForUsers", async () => {
             await this.keyClaimManager.ensureSessionsForUsers(logger, userList);
         });
 
@@ -289,7 +289,7 @@ export class RoomEncryptor {
                 break;
         }
 
-        await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
+        await logDuration(logger, "shareRoomKey", async () => {
             const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
                 new RoomId(this.room.roomId),
                 // safe to pass without cloning, as it's not reused here (before or after)
