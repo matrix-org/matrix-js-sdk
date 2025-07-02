@@ -22,7 +22,7 @@ import {
 
 import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type BootstrapCrossSigningOpts } from "../crypto-api/index.ts";
-import { logger } from "../logger.ts";
+import { type Logger } from "../logger.ts";
 import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
 import { type ServerSideSecretStorage } from "../secret-storage.ts";
@@ -33,6 +33,7 @@ import { type ServerSideSecretStorage } from "../secret-storage.ts";
  */
 export class CrossSigningIdentity {
     public constructor(
+        private readonly logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
         private readonly secretStorage: ServerSideSecretStorage,
@@ -61,7 +62,7 @@ export class CrossSigningIdentity {
             olmDeviceStatus.hasMaster && olmDeviceStatus.hasUserSigning && olmDeviceStatus.hasSelfSigning;
 
         // Log all relevant state for easier parsing of debug logs.
-        logger.log("bootstrapCrossSigning: starting", {
+        this.logger.debug("bootstrapCrossSigning: starting", {
             setupNewCrossSigning: opts.setupNewCrossSigning,
             olmDeviceHasMaster: olmDeviceStatus.hasMaster,
             olmDeviceHasUserSigning: olmDeviceStatus.hasUserSigning,
@@ -71,23 +72,23 @@ export class CrossSigningIdentity {
 
         if (olmDeviceHasKeys) {
             if (!(await this.secretStorage.hasKey())) {
-                logger.warn(
+                this.logger.warn(
                     "bootstrapCrossSigning: Olm device has private keys, but secret storage is not yet set up; doing nothing for now.",
                 );
                 // the keys should get uploaded to 4S once that is set up.
             } else if (!privateKeysInSecretStorage) {
                 // the device has the keys but they are not in 4S, so update it
-                logger.log("bootstrapCrossSigning: Olm device has private keys: exporting to secret storage");
+                this.logger.debug("bootstrapCrossSigning: Olm device has private keys: exporting to secret storage");
                 await this.exportCrossSigningKeysToStorage();
             } else {
-                logger.log(
+                this.logger.debug(
                     "bootstrapCrossSigning: Olm device has private keys and they are saved in secret storage; doing nothing",
                 );
             }
         } /* (!olmDeviceHasKeys) */ else {
             if (privateKeysInSecretStorage) {
                 // they are in 4S, so import from there
-                logger.log(
+                this.logger.debug(
                     "bootstrapCrossSigning: Cross-signing private keys not found locally, but they are available " +
                         "in secret storage, reading storage and caching locally",
                 );
@@ -116,7 +117,7 @@ export class CrossSigningIdentity {
                     device.free();
                 }
             } else {
-                logger.log(
+                this.logger.debug(
                     "bootstrapCrossSigning: Cross-signing private keys not found locally or in secret storage, creating new keys",
                 );
                 await this.resetCrossSigning(opts.authUploadDeviceSigningKeys);
@@ -125,7 +126,7 @@ export class CrossSigningIdentity {
 
         // TODO: we might previously have bootstrapped cross-signing but not completed uploading the keys to the
         //   server -- in which case we should call OlmDevice.bootstrap_cross_signing. How do we know?
-        logger.log("bootstrapCrossSigning: complete");
+        this.logger.debug("bootstrapCrossSigning: complete");
     }
 
     /** Reset our cross-signing keys
@@ -142,7 +143,7 @@ export class CrossSigningIdentity {
 
         // If 4S is configured we need to update it.
         if (!(await this.secretStorage.hasKey())) {
-            logger.warn(
+            this.logger.warn(
                 "resetCrossSigning: Secret storage is not yet set up; not exporting keys to secret storage yet.",
             );
             // the keys should get uploaded to 4S once that is set up.
@@ -150,11 +151,11 @@ export class CrossSigningIdentity {
             // Update 4S before uploading cross-signing keys, to stay consistent with legacy that asks
             // 4S passphrase before asking for account password.
             // Ultimately should be made atomic and resistant to forgotten password/passphrase.
-            logger.log("resetCrossSigning: exporting private keys to secret storage");
+            this.logger.debug("resetCrossSigning: exporting private keys to secret storage");
             await this.exportCrossSigningKeysToStorage();
         }
 
-        logger.log("resetCrossSigning: publishing public keys to server");
+        this.logger.debug("resetCrossSigning: publishing public keys to server");
         for (const req of [
             outgoingRequests.uploadKeysRequest,
             outgoingRequests.uploadSigningKeysRequest,
@@ -178,17 +179,17 @@ export class CrossSigningIdentity {
         if (exported?.masterKey) {
             await this.secretStorage.store("m.cross_signing.master", exported.masterKey);
         } else {
-            logger.error(`Cannot export MSK to secret storage, private key unknown`);
+            this.logger.error(`Cannot export MSK to secret storage, private key unknown`);
         }
         if (exported?.self_signing_key) {
             await this.secretStorage.store("m.cross_signing.self_signing", exported.self_signing_key);
         } else {
-            logger.error(`Cannot export SSK to secret storage, private key unknown`);
+            this.logger.error(`Cannot export SSK to secret storage, private key unknown`);
         }
         if (exported?.userSigningKey) {
             await this.secretStorage.store("m.cross_signing.user_signing", exported.userSigningKey);
         } else {
-            logger.error(`Cannot export USK to secret storage, private key unknown`);
+            this.logger.error(`Cannot export USK to secret storage, private key unknown`);
         }
     }
 }

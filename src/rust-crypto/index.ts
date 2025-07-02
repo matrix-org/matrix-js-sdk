@@ -155,6 +155,7 @@ async function initOlmMachine(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
+        logger,
     );
 
     // A final migration step, now that we have an OlmMachine.
