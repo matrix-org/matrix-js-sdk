@@ -163,7 +163,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         private readonly cryptoCallbacks: CryptoCallbacks,
     ) {
         super();
-        this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+        this.outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, http);
         this.outgoingRequestsManager = new OutgoingRequestsManager(
             this.logger,
             olmMachine,

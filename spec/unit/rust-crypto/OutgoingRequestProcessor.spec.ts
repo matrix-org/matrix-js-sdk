@@ -40,6 +40,7 @@ import {
     type UIAuthCallback,
 } from "../../../src";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
+import { logger } from "../../../src/logger.ts";
 
 describe("OutgoingRequestProcessor", () => {
     /** the OutgoingRequestProcessor implementation under test */
@@ -76,7 +77,7 @@ describe("OutgoingRequestProcessor", () => {
             markRequestAsSent: jest.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
-        processor = new OutgoingRequestProcessor(olmMachine, httpApi);
+        processor = new OutgoingRequestProcessor(logger, olmMachine, httpApi);
     });
 
     /* simple requests that map directly to the request body */
@@ -293,7 +294,7 @@ describe("OutgoingRequestProcessor", () => {
                     return await authRequestResultResolvers.promise;
                 },
             } as unknown as Mocked<MatrixHttpApi<IHttpOpts & { onlyData: true }>>;
-            processor = new OutgoingRequestProcessor(olmMachine, mockHttpApi);
+            processor = new OutgoingRequestProcessor(logger, olmMachine, mockHttpApi);
         });
 
         // build a request
@@ -325,7 +326,7 @@ describe("OutgoingRequestProcessor", () => {
                 onlyData: true,
             });
 
-            processor = new OutgoingRequestProcessor(olmMachine, httpApi);
+            processor = new OutgoingRequestProcessor(logger, olmMachine, httpApi);
         });
 
         afterEach(() => {
