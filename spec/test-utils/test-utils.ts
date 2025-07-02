@@ -1,6 +1,3 @@
-// load olm before the sdk if possible
-import "../olm-loader";
-
 // eslint-disable-next-line no-restricted-imports
 import type EventEmitter from "events";
 import { logger } from "../../src/logger";
