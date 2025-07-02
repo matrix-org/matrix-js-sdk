@@ -1386,7 +1386,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.roomNameGenerator = opts.roomNameGenerator;
 
-        this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
+        this.toDeviceMessageQueue = new ToDeviceMessageQueue(this, this.logger);
 
         // The SDK doesn't really provide a clean way for events to recalculate the push
         // actions for themselves, so we have to kinda help them out when they are encrypted.

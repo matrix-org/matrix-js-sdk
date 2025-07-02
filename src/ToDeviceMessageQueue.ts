@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { ToDeviceMessageId } from "./@types/event.ts";
-import { logger } from "./logger.ts";
+import { type Logger } from "./logger.ts";
 import { type MatrixClient, ClientEvent } from "./client.ts";
 import { type MatrixError } from "./http-api/index.ts";
 import {
@@ -40,7 +40,10 @@ export class ToDeviceMessageQueue {
     private retryTimeout: ReturnType<typeof setTimeout> | null = null;
     private retryAttempts = 0;
 
-    public constructor(private client: MatrixClient) {}
+    public constructor(
+        private client: MatrixClient,
+        private readonly logger: Logger,
+    ) {}
 
     public start(): void {
         this.running = true;
@@ -67,7 +70,7 @@ export class ToDeviceMessageQueue {
             const msgmap = batchWithTxnId.batch.map(
                 (msg) => `${msg.userId}/${msg.deviceId} (msgid ${msg.payload[ToDeviceMessageId]})`,
             );
-            logger.info(
+            this.logger.info(
                 `Enqueuing batch of to-device messages. type=${batch.eventType} txnid=${batchWithTxnId.txnId}`,
                 msgmap,
             );
@@ -83,7 +86,7 @@ export class ToDeviceMessageQueue {
 
         if (this.sending || !this.running) return;
 
-        logger.debug("Attempting to send queued to-device messages");
+        this.logger.debug("Attempting to send queued to-device messages");
 
         this.sending = true;
         let headBatch: IndexedToDeviceBatch | null;
@@ -99,7 +102,7 @@ export class ToDeviceMessageQueue {
             // Make sure we're still running after the async tasks: if not, stop.
             if (!this.running) return;
 
-            logger.debug("All queued to-device messages sent");
+            this.logger.debug("All queued to-device messages sent");
         } catch (e) {
             ++this.retryAttempts;
             // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -109,15 +112,15 @@ export class ToDeviceMessageQueue {
                 // the scheduler function doesn't differentiate between fatal errors and just getting
                 // bored and giving up for now
                 if (Math.floor((<MatrixError>e).httpStatus! / 100) === 4) {
-                    logger.error("Fatal error when sending to-device message - dropping to-device batch!", e);
+                    this.logger.error("Fatal error when sending to-device message - dropping to-device batch!", e);
                     await this.client.store.removeToDeviceBatch(headBatch!.id);
                 } else {
-                    logger.info("Automatic retry limit reached for to-device messages.");
+                    this.logger.info("Automatic retry limit reached for to-device messages.");
                 }
                 return;
             }
 
-            logger.info(`Failed to send batch of to-device messages. Will retry in ${retryDelay}ms`, e);
+            this.logger.info(`Failed to send batch of to-device messages. Will retry in ${retryDelay}ms`, e);
             this.retryTimeout = setTimeout(this.sendQueue, retryDelay);
         } finally {
             this.sending = false;
@@ -133,7 +136,7 @@ export class ToDeviceMessageQueue {
             contentMap.getOrCreate(item.userId).set(item.deviceId, item.payload);
         }
 
-        logger.info(
+        this.logger.info(
             `Sending batch of ${batch.batch.length} to-device messages with ID ${batch.id} and txnId ${batch.txnId}`,
         );
 
@@ -146,7 +149,7 @@ export class ToDeviceMessageQueue {
      */
     private onResumedSync = (state: SyncState | null, oldState: SyncState | null): void => {
         if (state === SyncState.Syncing && oldState !== SyncState.Syncing) {
-            logger.info(`Resuming queue after resumed sync`);
+            this.logger.info(`Resuming queue after resumed sync`);
             this.sendQueue();
         }
     };
