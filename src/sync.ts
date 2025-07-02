@@ -1976,6 +1976,6 @@ export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessag
                 client.emit(ClientEvent.ToDeviceEvent, deprecatedCompatibilityEvent);
             }
 
-            client.emit(ClientEvent.ReceivedToDeviceMessage, processedEvent.message, processedEvent.encryptionInfo);
+            client.emit(ClientEvent.ReceivedToDeviceMessage, processedEvent);
         });
 }

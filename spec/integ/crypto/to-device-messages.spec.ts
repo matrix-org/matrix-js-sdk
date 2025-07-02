@@ -20,13 +20,19 @@ import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";
 
 import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
-import { ClientEvent, createClient, type IToDeviceEvent, type MatrixClient, type MatrixEvent } from "../../../src";
+import {
+    ClientEvent,
+    createClient,
+    type IToDeviceEvent,
+    type MatrixClient,
+    type MatrixEvent,
+    type ReceivedToDeviceMessage,
+} from "../../../src";
 import * as testData from "../../test-utils/test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { encryptOlmEvent, establishOlmSession, getTestOlmAccountKeys } from "./olm-utils.ts";
-import { type OlmEncryptionInfo } from "../../../src/crypto-api";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -187,11 +193,10 @@ describe("to-device-messages", () => {
                 plaintype: "m.test.type",
             });
 
-            const processedToDeviceResolver: PromiseWithResolvers<[IToDeviceEvent, OlmEncryptionInfo | null]> =
-                Promise.withResolvers();
+            const processedToDeviceResolver: PromiseWithResolvers<ReceivedToDeviceMessage> = Promise.withResolvers();
 
-            aliceClient.on(ClientEvent.ReceivedToDeviceMessage, (message, encryptionInfo) => {
-                processedToDeviceResolver.resolve([message, encryptionInfo]);
+            aliceClient.on(ClientEvent.ReceivedToDeviceMessage, (payload) => {
+                processedToDeviceResolver.resolve(payload);
             });
 
             const oldToDeviceResolver: PromiseWithResolvers<MatrixEvent> = Promise.withResolvers();
@@ -205,7 +210,7 @@ describe("to-device-messages", () => {
             syncResponder.sendOrQueueSyncResponse({ to_device: { events: [toDeviceEvent] } });
             await syncPromise(aliceClient);
 
-            const [message, encryptionInfo] = await processedToDeviceResolver.promise;
+            const { message, encryptionInfo } = await processedToDeviceResolver.promise;
 
             expect(message.type).toBe("m.test.type");
             expect(message.content["body"]).toBe("foo");
@@ -233,11 +238,10 @@ describe("to-device-messages", () => {
                 },
             };
 
-            const processedToDeviceResolver: PromiseWithResolvers<[IToDeviceEvent, OlmEncryptionInfo | null]> =
-                Promise.withResolvers();
+            const processedToDeviceResolver: PromiseWithResolvers<ReceivedToDeviceMessage> = Promise.withResolvers();
 
-            aliceClient.on(ClientEvent.ReceivedToDeviceMessage, (message, encryptionInfo) => {
-                processedToDeviceResolver.resolve([message, encryptionInfo]);
+            aliceClient.on(ClientEvent.ReceivedToDeviceMessage, (payload) => {
+                processedToDeviceResolver.resolve(payload);
             });
 
             const oldToDeviceResolver: PromiseWithResolvers<MatrixEvent> = Promise.withResolvers();
@@ -249,7 +253,7 @@ describe("to-device-messages", () => {
             syncResponder.sendOrQueueSyncResponse({ to_device: { events: [toDeviceEvent] } });
             await syncPromise(aliceClient);
 
-            const [message, encryptionInfo] = await processedToDeviceResolver.promise;
+            const { message, encryptionInfo } = await processedToDeviceResolver.promise;
 
             expect(message.type).toBe("m.test.type");
             expect(message.content["body"]).toBe("foo");
