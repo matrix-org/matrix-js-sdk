@@ -87,7 +87,12 @@ import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.t
 import { type MatrixScheduler } from "./scheduler.ts";
 import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
 import { type AuthDict } from "./interactive-auth.ts";
-import { type IMinimalEvent, type IRoomEvent, type IStateEvent, type ReceivedToDeviceMessage } from "./sync-accumulator.ts";
+import {
+    type IMinimalEvent,
+    type IRoomEvent,
+    type IStateEvent,
+    type ReceivedToDeviceMessage,
+} from "./sync-accumulator.ts";
 import type { EventTimelineSet } from "./models/event-timeline-set.ts";
 import * as ContentHelpers from "./content-helpers.ts";
 import {
