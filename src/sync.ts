@@ -1945,7 +1945,7 @@ export function processToDeviceMessages(toDeviceMessages: ReceivedToDeviceMessag
             return processedMessage;
         })
         .forEach(function (processedEvent) {
-            // For backwards compatibility, we emit the event as a MatrixEvent
+            // For backwards compatibility, we also emit the event as a `MatrixEvent` using `ClientEvent.ToDeviceEvent`.
             {
                 const toDeviceEvent = processedEvent.message;
                 const content = toDeviceEvent.content;
