@@ -19,9 +19,9 @@ import anotherjson from "another-json";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import Olm from "@matrix-org/olm";
 
 import type FetchMock from "fetch-mock";
-import Olm from "@matrix-org/olm";
 import * as testUtils from "../../test-utils/test-utils";
 import {
     emitPromise,
