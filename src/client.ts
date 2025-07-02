@@ -1503,6 +1503,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 return this.canResetTimelineCallback(roomId);
             },
+            logger: this.logger.getChild("sync"),
         };
     }
 

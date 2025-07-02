@@ -126,7 +126,7 @@ describe("SlidingSyncSdk", () => {
     // assign client/httpBackend globals
     const setupClient = async (testOpts?: Partial<IStoredClientOpts & { withCrypto: boolean }>) => {
         testOpts = testOpts || {};
-        const syncOpts: SyncApiOptions = {};
+        const syncOpts: SyncApiOptions = { logger };
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
