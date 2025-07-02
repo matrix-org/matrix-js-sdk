@@ -19,7 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
+import { type IDeviceLists, type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
 import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
 import { type MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
@@ -1481,7 +1481,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param oneTimeKeysCounts - the received one time key counts
      * @param unusedFallbackKeys - the received unused fallback keys
      * @param devices - the received device list updates
-     * @returns A list of preprocessed to-device messages.
+     * @returns A list of processed to-device messages.
      */
     private async receiveSyncChanges({
         events,
@@ -1493,15 +1493,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         oneTimeKeysCounts?: Map<string, number>;
         unusedFallbackKeys?: Set<string>;
         devices?: RustSdkCryptoJs.DeviceLists;
-    }): Promise<IToDeviceEvent[]> {
-        const result = await this.olmMachine.receiveSyncChanges(
+    }): Promise<RustSdkCryptoJs.ProcessedToDeviceEvent[]> {
+        return await this.olmMachine.receiveSyncChanges(
             events ? JSON.stringify(events) : "[]",
             devices,
             oneTimeKeysCounts,
             unusedFallbackKeys,
         );
-
-        return result.map((processed) => JSON.parse(processed.rawEvent));
     }
 
     /** called by the sync loop to preprocess incoming to-device messages
@@ -1509,22 +1507,56 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param events - the received to-device messages
      * @returns A list of preprocessed to-device messages.
      */
-    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<ReceivedToDeviceMessage[]> {
         // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
         // one-time-keys, or fallback keys, so just pass empty data.
         const processed = await this.receiveSyncChanges({ events });
 
-        // look for interesting to-device messages
+        const received: ReceivedToDeviceMessage[] = [];
+
         for (const message of processed) {
-            if (message.type === EventType.KeyVerificationRequest) {
-                const sender = message.sender;
-                const transactionId = message.content.transaction_id;
+            const parsedMessage: IToDeviceEvent = JSON.parse(message.rawEvent);
+
+            // look for interesting to-device messages
+            if (parsedMessage.type === EventType.KeyVerificationRequest) {
+                const sender = parsedMessage.sender;
+                const transactionId = parsedMessage.content.transaction_id;
                 if (transactionId && sender) {
                     this.onIncomingKeyVerificationRequest(sender, transactionId);
                 }
             }
+
+            switch (message.type) {
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.Decrypted: {
+                    const encryptionInfo = (message as RustSdkCryptoJs.DecryptedToDeviceEvent).encryptionInfo;
+                    received.push({
+                        message: parsedMessage,
+                        encryptionInfo: {
+                            sender: encryptionInfo.sender.toString(),
+                            senderDevice: encryptionInfo.senderDevice?.toString(),
+                            senderCurve25519KeyBase64: encryptionInfo.senderCurve25519Key,
+                            senderVerified: encryptionInfo.isSenderVerified(),
+                        },
+                    });
+                    break;
+                }
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.PlainText: {
+                    received.push({
+                        message: parsedMessage,
+                        encryptionInfo: null,
+                    });
+                    break;
+                }
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.UnableToDecrypt:
+                    // ignore messages we cannot decrypt
+                    break;
+                case RustSdkCryptoJs.ProcessedToDeviceEventType.Invalid:
+                    // ignore invalid messages
+                    break;
+            }
         }
-        return processed;
+
+        return received;
     }
 
     /** called by the sync loop to process one time key counts and unused fallback keys

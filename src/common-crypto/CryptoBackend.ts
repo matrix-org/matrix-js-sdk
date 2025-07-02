@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IDeviceLists, IToDeviceEvent } from "../sync-accumulator.ts";
+import type { IDeviceLists, IToDeviceEvent, ReceivedToDeviceMessage } from "../sync-accumulator.ts";
 import { type IClearEvent, type MatrixEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
 import { type CryptoApi, type DecryptionFailureCode, type ImportRoomKeysOpts } from "../crypto-api/index.ts";
@@ -96,9 +96,11 @@ export interface SyncCryptoCallbacks {
      * messages, rather than the results of any decryption attempts.
      *
      * @param events - the received to-device messages
-     * @returns A list of preprocessed to-device messages.
+     * @returns A list of preprocessed to-device messages. This will not map 1:1 to the input list, as some messages may be invalid or
+     * failed to decrypt, and so will be omitted from the output list.
+     *
      */
-    preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+    preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<ReceivedToDeviceMessage[]>;
 
     /**
      * Called by the /sync loop when one time key counts and unused fallback key details are received.
