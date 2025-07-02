@@ -1027,7 +1027,7 @@ export enum ClientEvent {
     ToDeviceEvent = "toDeviceEvent",
     /**
      * Fires whenever the SDK receives a new (potentially decrypted) to-device message.
-     * The payload is the to-device message and the encryption info for that message  ({@link ReceivedToDeviceMessage}).
+     * The payload is the to-device message and the encryption info for that message ({@link ReceivedToDeviceMessage}).
      * @example
      * ```
      * matrixClient.on("receivedToDeviceMessage", function(payload){
