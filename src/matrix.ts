@@ -109,6 +109,7 @@ export { IdentityProviderBrand, SSOAction } from "./@types/auth.ts";
 export type { ISSOFlow as SSOFlow, LoginFlow } from "./@types/auth.ts";
 export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as HierarchyRoom } from "./@types/spaces.ts";
 export { LocationAssetType } from "./@types/location.ts";
+export { DebugLogger } from "./logger.ts";
 
 let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 

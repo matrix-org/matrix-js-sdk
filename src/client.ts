@@ -439,13 +439,13 @@ export interface ICreateClientOpts {
 
     /**
      * If true, group calls will not establish media connectivity and only create the signaling events,
-     * so that livekit media can be used in the application layert (js-sdk contains no livekit code).
+     * so that livekit media can be used in the application layer (js-sdk contains no livekit code).
      */
     useLivekitForGroupCalls?: boolean;
 
     /**
      * A logger to associate with this MatrixClient.
-     * Defaults to the built-in global logger.
+     * Defaults to the built-in global logger; see {@link DebugLogger} for an alternative.
      */
     logger?: Logger;
 }
