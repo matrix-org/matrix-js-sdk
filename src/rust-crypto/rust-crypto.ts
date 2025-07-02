@@ -206,7 +206,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             CryptoEvent.DehydratedDeviceRotationError,
         ]);
 
-        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
+        this.crossSigningIdentity = new CrossSigningIdentity(
+            logger,
+            olmMachine,
+            this.outgoingRequestProcessor,
+            secretStorage,
+        );
 
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
