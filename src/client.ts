@@ -888,17 +888,215 @@ interface IWhoamiResponse {
 const EVENT_ID_PREFIX = "$";
 
 export enum ClientEvent {
+    /**
+     * Fires whenever the SDK's syncing state is updated. The state can be one of:
+     * <ul>
+     *
+     * <li>PREPARED: The client has synced with the server at least once and is
+     * ready for methods to be called on it. This will be immediately followed by
+     * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
+     * previous API.</i></li>
+     *
+     * <li>CATCHUP: The client has detected the connection to the server might be
+     * available again and will now try to do a sync again. As this sync might take
+     * a long time (depending how long ago was last synced, and general server
+     * performance) the client is put in this mode so the UI can reflect trying
+     * to catch up with the server after losing connection.</li>
+     *
+     * <li>SYNCING : The client is currently polling for new events from the server.
+     * This will be called <i>after</i> processing latest events from a sync.</li>
+     *
+     * <li>ERROR : The client has had a problem syncing with the server. If this is
+     * called <i>before</i> PREPARED then there was a problem performing the initial
+     * sync. If this is called <i>after</i> PREPARED then there was a problem polling
+     * the server for updates. This may be called multiple times even if the state is
+     * already ERROR. <i>This is the equivalent of "syncError" in the previous
+     * API.</i></li>
+     *
+     * <li>RECONNECTING: The sync connection has dropped, but not (yet) in a way that
+     * should be considered erroneous.
+     * </li>
+     *
+     * <li>STOPPED: The client has stopped syncing with server due to stopClient
+     * being called.
+     * </li>
+     * </ul>
+     * State transition diagram:
+     * ```
+     *                                          +---->STOPPED
+     *                                          |
+     *              +----->PREPARED -------> SYNCING <--+
+     *              |                        ^  |  ^    |
+     *              |      CATCHUP ----------+  |  |    |
+     *              |        ^                  V  |    |
+     *   null ------+        |  +------- RECONNECTING   |
+     *              |        V  V                       |
+     *              +------->ERROR ---------------------+
+     *
+     * NB: 'null' will never be emitted by this event.
+     *
+     * ```
+     * Transitions:
+     * <ul>
+     *
+     * <li>`null -> PREPARED` : Occurs when the initial sync is completed
+     * first time. This involves setting up filters and obtaining push rules.
+     *
+     * <li>`null -> ERROR` : Occurs when the initial sync failed first time.
+     *
+     * <li>`ERROR -> PREPARED` : Occurs when the initial sync succeeds
+     * after previously failing.
+     *
+     * <li>`PREPARED -> SYNCING` : Occurs immediately after transitioning
+     * to PREPARED. Starts listening for live updates rather than catching up.
+     *
+     * <li>`SYNCING -> RECONNECTING` : Occurs when the live update fails.
+     *
+     * <li>`RECONNECTING -> RECONNECTING` : Can occur if the update calls
+     * continue to fail, but the keepalive calls (to /versions) succeed.
+     *
+     * <li>`RECONNECTING -> ERROR` : Occurs when the keepalive call also fails
+     *
+     * <li>`ERROR -> SYNCING` : Occurs when the client has performed a
+     * live update after having previously failed.
+     *
+     * <li>`ERROR -> ERROR` : Occurs when the client has failed to keepalive
+     * for a second time or more.</li>
+     *
+     * <li>`SYNCING -> SYNCING` : Occurs when the client has performed a live
+     * update. This is called <i>after</i> processing.</li>
+     *
+     * <li>`* -> STOPPED` : Occurs once the client has stopped syncing or
+     * trying to sync after stopClient has been called.</li>
+     * </ul>
+     *
+     * The payloads consits of the following 3 parameters:
+     *
+     * - state - An enum representing the syncing state. One of "PREPARED",
+     * "SYNCING", "ERROR", "STOPPED".
+     *
+     * - prevState - An enum representing the previous syncing state.
+     * One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.
+     *
+     * - data - Data about this transition.
+     *
+     * @example
+     * ```
+     * matrixClient.on("sync", function(state, prevState, data) {
+     *   switch (state) {
+     *     case "ERROR":
+     *       // update UI to say "Connection Lost"
+     *       break;
+     *     case "SYNCING":
+     *       // update UI to remove any "Connection Lost" message
+     *       break;
+     *     case "PREPARED":
+     *       // the client instance is ready to be queried.
+     *       var rooms = matrixClient.getRooms();
+     *       break;
+     *   }
+     * });
+     * ```
+     */
     Sync = "sync",
+    /**
+     * Fires whenever the SDK receives a new event.
+     * <p>
+     * This is only fired for live events received via /sync - it is not fired for
+     * events received over context, search, or pagination APIs.
+     *
+     * The payload is the matrix event which caused this event to fire.
+     * @example
+     * ```
+     * matrixClient.on("event", function(event){
+     *   var sender = event.getSender();
+     * });
+     * ```
+     */
     Event = "event",
-    /** @deprecated Use {@link ReceivedToDeviceMessage}. */
+    /** @deprecated Use {@link ReceivedToDeviceMessage}.
+     * Fires whenever the SDK receives a new to-device event.
+     * The payload is the matrix event ({@link MatrixEvent}) which caused this event to fire.
+     * @example
+     * ```
+     * matrixClient.on("toDeviceEvent", function(event){
+     *   var sender = event.getSender();
+     * });
+     * ```
+     */
     ToDeviceEvent = "toDeviceEvent",
+    /**
+     * Fires whenever the SDK receives a new (potentially decrypted) to-device message.
+     * The payload is the to-device message and the encryption info for that message  ({@link ReceivedToDeviceMessage}).
+     * @example
+     * ```
+     * matrixClient.on("receivedToDeviceMessage", function(payload){
+     *   const { message, encryptionInfo } = payload;
+     *   var claimed_sender = encryptionInfo ? encryptionInfo.sender : message.sender;
+     *   var isVerified = encryptionInfo ? encryptionInfo.verified : false;
+     *   var type = message.type;
+     * });
+     */
     ReceivedToDeviceMessage = "receivedToDeviceMessage",
+    /**
+     * Fires whenever new user-scoped account_data is added.
+     * The payload is a pair of event ({@link MatrixEvent}) describing the account_data just added, and the previous event, if known:
+     *  - event: The event describing the account_data just added
+     *  - oldEvent: The previous account data, if known.
+     * @example
+     * ```
+     * matrixClient.on("accountData", function(event, oldEvent){
+     *   myAccountData[event.type] = event.content;
+     * });
+     * ```
+     */
     AccountData = "accountData",
+    /**
+     * Fires whenever a new Room is added. This will fire when you are invited to a
+     * room, as well as when you join a room. <strong>This event is experimental and
+     * may change.</strong>
+     *
+     * The payload is the newly created room, fully populated.
+     * @example
+     * ```
+     * matrixClient.on("Room", function(room){
+     *   var roomId = room.roomId;
+     * });
+     * ```
+     */
     Room = "Room",
+    /**
+     * Fires whenever a Room is removed. This will fire when you forget a room.
+     * <strong>This event is experimental and may change.</strong>
+     * The payload is the roomId of the deleted room.
+     * @example
+     * ```
+     * matrixClient.on("deleteRoom", function(roomId){
+     *   // update UI from getRooms()
+     * });
+     * ```
+     */
     DeleteRoom = "deleteRoom",
     SyncUnexpectedError = "sync.unexpectedError",
+    /**
+     * Fires when the client .well-known info is fetched.
+     * The payload is the JSON object (see {@link IClientWellKnown}) returned by the server
+     */
     ClientWellKnown = "WellKnown.client",
     ReceivedVoipEvent = "received_voip_event",
+    /**
+     * @deprecated This event is not supported anymore.
+     *
+     * Fires if a to-device event is received that cannot be decrypted.
+     * Encrypted to-device events will (generally) use plain Olm encryption,
+     * in which case decryption failures are fatal: the event will never be
+     * decryptable, unlike Megolm encrypted events where the key may simply
+     * arrive later.
+     *
+     * An undecryptable to-device event is therefore likely to indicate problems.
+     *
+     * The payload is the undecyptable to-device event
+     */
     UndecryptableToDeviceEvent = "toDeviceEvent.undecryptable",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
