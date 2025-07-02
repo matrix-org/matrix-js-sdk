@@ -21,7 +21,7 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 import type FetchMock from "fetch-mock";
-import type Olm from "@matrix-org/olm";
+import Olm from "@matrix-org/olm";
 import * as testUtils from "../../test-utils/test-utils";
 import {
     emitPromise,
@@ -124,7 +124,6 @@ async function expectSendRoomKey(
     recipientOlmAccount: Olm.Account,
     recipientOlmSession: Olm.Session | null = null,
 ): Promise<Olm.InboundGroupSession> {
-    const Olm = globalThis.Olm;
     const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
 
     function onSendRoomKey(content: any): Olm.InboundGroupSession {
@@ -207,14 +206,6 @@ async function expectSendMegolmMessage(
 }
 
 describe("crypto", () => {
-    if (!globalThis.Olm) {
-        // currently we use libolm to implement the crypto in the tests, so need it to be present.
-        logger.warn("not running megolm tests: Olm not present");
-        return;
-    }
-
-    const Olm = globalThis.Olm;
-
     let testOlmAccount = {} as unknown as Olm.Account;
     let testSenderKey = "";
 
