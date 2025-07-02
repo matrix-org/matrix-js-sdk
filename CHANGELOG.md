@@ -1,3 +1,57 @@
+Changes in [37.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.10.0) (2025-07-01)
+====================================================================================================
+## ✨ Features
+
+* Update matrix-sdk-crypto-wasm to `15.0.0` ([#4882](https://github.com/matrix-org/matrix-js-sdk/pull/4882)). Contributed by @richvdh.
+* Allow customizing the IndexedDB database prefix used by Rust crypto. ([#4878](https://github.com/matrix-org/matrix-js-sdk/pull/4878)). Contributed by @clokep.
+* Remove `@matrix-org/olm` from dependency list ([#4876](https://github.com/matrix-org/matrix-js-sdk/pull/4876)). Contributed by @richvdh.
+* Redact on ban: Client implementation ([#4867](https://github.com/matrix-org/matrix-js-sdk/pull/4867)). Contributed by @turt2live.
+
+
+Changes in [37.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.9.0) (2025-06-17)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Ensure we send spec-compliant filter strings by stripping out null values ([#4865](https://github.com/matrix-org/matrix-js-sdk/pull/4865)). Contributed by @t3chguy.
+* Fix MatrixRTC membership manager failing to rejoin in a race condition (sync vs not found response) ([#4861](https://github.com/matrix-org/matrix-js-sdk/pull/4861)). Contributed by @toger5.
+* Include extraParams in all HTTP requests ([#4860](https://github.com/matrix-org/matrix-js-sdk/pull/4860)). Contributed by @rsb-tbg.
+
+
+Changes in [37.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.8.0) (2025-06-10)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* [Backport staging] Update dependency @matrix-org/matrix-sdk-crypto-wasm to v14.2.1 ([#4869](https://github.com/matrix-org/matrix-js-sdk/pull/4869)). Contributed by @RiotRobot.
+
+
+Changes in [37.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.7.0) (2025-06-03)
+==================================================================================================
+## 🦖 Deprecations
+
+* MatrixRTC: Rename `MembershipConfig` parameters ([#4714](https://github.com/matrix-org/matrix-js-sdk/pull/4714)). Contributed by @toger5.
+
+## ✨ Features
+
+* Allow the embedded client to work without update\_state support ([#4849](https://github.com/matrix-org/matrix-js-sdk/pull/4849)). Contributed by @robintown.
+* Check for `unknown variant` on to-device sending and fall back to room event encryption. ([#4847](https://github.com/matrix-org/matrix-js-sdk/pull/4847)). Contributed by @toger5.
+* Reapply "Distinguish room state and timeline events in embedded clients" ([#4790](https://github.com/matrix-org/matrix-js-sdk/pull/4790)). Contributed by @robintown.
+
+
+Changes in [37.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.6.0) (2025-05-20)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate utils function `defer` in favour of `Promise.withResolvers` ([#4829](https://github.com/matrix-org/matrix-js-sdk/pull/4829)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Update to Node 22 LTS ([#4832](https://github.com/matrix-org/matrix-js-sdk/pull/4832)). Contributed by @t3chguy.
+
+## 🐛 Bug Fixes
+
+* Fix autodiscovery handling of 2xx (non-200) codes ([#4833](https://github.com/matrix-org/matrix-js-sdk/pull/4833)). Contributed by @t3chguy.
+
+
 Changes in [37.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.5.0) (2025-05-06)
 ==================================================================================================
 ## ✨ Features

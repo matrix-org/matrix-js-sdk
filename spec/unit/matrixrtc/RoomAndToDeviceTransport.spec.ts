@@ -128,6 +128,39 @@ describe("RoomAndToDeviceTransport", () => {
         expect(toDeviceSendKeySpy).toHaveBeenCalledTimes(0);
         expect(onTransportEnabled).toHaveBeenCalledWith({ toDevice: false, room: true });
     });
+
+    it("enables room transport and disables to device transport on widget driver error", async () => {
+        mockClient.encryptAndSendToDevice.mockRejectedValue({
+            message:
+                "unknown variant `send_to_device`, expected one of `supported_api_versions`, `content_loaded`, `get_openid`, `org.matrix.msc2876.read_events`, `send_event`, `org.matrix.msc4157.update_delayed_event` at line 1 column 22",
+        });
+
+        transport.start();
+        const membership = mockCallMembership(membershipTemplate, roomId, "@alice:example.org");
+        const onTransportEnabled = jest.fn();
+        transport.on(RoomAndToDeviceEvents.EnabledTransportsChanged, onTransportEnabled);
+
+        // We start with toDevice transport enabled
+        expect(transport.enabled.room).toBeFalsy();
+        expect(transport.enabled.toDevice).toBeTruthy();
+
+        await transport.sendKey("1235", 0, [membership]);
+
+        // We switched transport, now room transport is enabled
+        expect(onTransportEnabled).toHaveBeenCalledWith({ toDevice: false, room: true });
+        expect(transport.enabled.room).toBeTruthy();
+        expect(transport.enabled.toDevice).toBeFalsy();
+
+        // sanity check that we called the failang to device send key.
+        expect(toDeviceKeyTransport.sendKey).toHaveBeenCalledWith("1235", 0, [membership]);
+        expect(toDeviceKeyTransport.sendKey).toHaveBeenCalledTimes(1);
+        // We re-sent the key via the room transport
+        expect(roomKeyTransport.sendKey).toHaveBeenCalledWith("1235", 0, [membership]);
+        expect(roomKeyTransport.sendKey).toHaveBeenCalledTimes(1);
+
+        mockClient.encryptAndSendToDevice.mockRestore();
+    });
+
     it("does log that it did nothing when disabled", () => {
         transport.start();
         const onNewKeyFromTransport = jest.fn();

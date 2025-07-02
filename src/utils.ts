@@ -435,7 +435,9 @@ export function immediate(): Promise<void> {
 export function isNullOrUndefined(val: any): boolean {
     return val === null || val === undefined;
 }
-
+/**
+ * @deprecated use {@link PromiseWithResolvers} instead.
+ */
 export type IDeferred<T> = PromiseWithResolvers<T>;
 
 /**

@@ -18,10 +18,12 @@ import { type ParticipantDeviceInfo } from "./types.ts";
 
 export enum KeyTransportEvents {
     ReceivedKeys = "received_keys",
+    NotSupportedError = "not_supported_error",
 }
 
 export type KeyTransportEventsHandlerMap = {
     [KeyTransportEvents.ReceivedKeys]: KeyTransportEventListener;
+    [KeyTransportEvents.NotSupportedError]: () => void;
 };
 
 export type KeyTransportEventListener = (

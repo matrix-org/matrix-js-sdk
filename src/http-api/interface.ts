@@ -16,6 +16,7 @@ limitations under the License.
 
 import { type MatrixError } from "./errors.ts";
 import { type Logger } from "../logger.ts";
+import { type QueryDict } from "../utils.ts";
 
 export type Body = Record<string, any> | BodyInit;
 
@@ -52,7 +53,7 @@ export interface IHttpOpts {
     baseUrl: string;
     idBaseUrl?: string;
     prefix: string;
-    extraParams?: Record<string, string>;
+    extraParams?: QueryDict;
 
     accessToken?: string;
     /**

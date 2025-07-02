@@ -28,7 +28,7 @@ import {
     defaultClientOpts,
     defaultSyncApiOpts,
     type SetPresence,
-    mapToDeviceEvent,
+    processToDeviceMessages,
 } from "./sync.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import {
@@ -37,6 +37,7 @@ import {
     type IStateEvent,
     type IStrippedState,
     type ISyncResponse,
+    type ReceivedToDeviceMessage,
 } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -150,51 +151,20 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
     }
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
-        const cancelledKeyVerificationTxns: string[] = [];
-        let events = data["events"] || [];
-        if (events.length > 0 && this.cryptoCallbacks) {
-            events = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        const events = data["events"] || [];
+        let receivedToDeviceMessages: ReceivedToDeviceMessage[];
+        if (this.cryptoCallbacks) {
+            receivedToDeviceMessages = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        } else {
+            receivedToDeviceMessages = events.map((rawEvent) =>
+                // Crypto is not enabled, so we just return the events.
+                ({
+                    message: rawEvent,
+                    encryptionInfo: null,
+                }),
+            );
         }
-        events
-            .map(mapToDeviceEvent)
-            .map((toDeviceEvent) => {
-                // map is a cheap inline forEach
-                // We want to flag m.key.verification.start events as cancelled
-                // if there's an accompanying m.key.verification.cancel event, so
-                // we pull out the transaction IDs from the cancellation events
-                // so we can flag the verification events as cancelled in the loop
-                // below.
-                if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                    const txnId: string | undefined = toDeviceEvent.getContent()["transaction_id"];
-                    if (txnId) {
-                        cancelledKeyVerificationTxns.push(txnId);
-                    }
-                }
-
-                // as mentioned above, .map is a cheap inline forEach, so return
-                // the unmodified event.
-                return toDeviceEvent;
-            })
-            .forEach((toDeviceEvent) => {
-                const content = toDeviceEvent.getContent();
-                if (toDeviceEvent.getType() == "m.room.message" && content.msgtype == "m.bad.encrypted") {
-                    // the mapper already logged a warning.
-                    logger.log("Ignoring undecryptable to-device event from " + toDeviceEvent.getSender());
-                    return;
-                }
-
-                if (
-                    toDeviceEvent.getType() === "m.key.verification.start" ||
-                    toDeviceEvent.getType() === "m.key.verification.request"
-                ) {
-                    const txnId = content["transaction_id"];
-                    if (cancelledKeyVerificationTxns.includes(txnId)) {
-                        toDeviceEvent.flagCancelled();
-                    }
-                }
-
-                this.client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
-            });
+        processToDeviceMessages(receivedToDeviceMessages, this.client);
 
         this.nextBatch = data.next_batch;
     }

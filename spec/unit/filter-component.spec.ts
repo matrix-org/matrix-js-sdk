@@ -170,4 +170,11 @@ describe("Filter Component", function () {
             expect(filter.check(noMatchEvent)).toBe(false);
         });
     });
+
+    describe("toJSON", () => {
+        it("should omit empty values", () => {
+            const filter = new FilterComponent({ types: ["m.room.message"], senders: ["@alice:example.com"] });
+            expect(filter.toJSON()).toEqual({ types: ["m.room.message"], senders: ["@alice:example.com"] });
+        });
+    });
 });

@@ -87,7 +87,12 @@ import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.t
 import { type MatrixScheduler } from "./scheduler.ts";
 import { type BeaconEvent, type BeaconEventHandlerMap } from "./models/beacon.ts";
 import { type AuthDict } from "./interactive-auth.ts";
-import { type IMinimalEvent, type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
+import {
+    type IMinimalEvent,
+    type IRoomEvent,
+    type IStateEvent,
+    type ReceivedToDeviceMessage,
+} from "./sync-accumulator.ts";
 import type { EventTimelineSet } from "./models/event-timeline-set.ts";
 import * as ContentHelpers from "./content-helpers.ts";
 import {
@@ -360,7 +365,7 @@ export interface ICreateClientOpts {
      * to all requests with this client. Useful for application services which require
      * `?user_id=`.
      */
-    queryParams?: Record<string, string>;
+    queryParams?: QueryDict;
 
     /**
      * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link ICreateClientOpts#cryptoStore}.
@@ -885,7 +890,9 @@ const EVENT_ID_PREFIX = "$";
 export enum ClientEvent {
     Sync = "sync",
     Event = "event",
+    /** @deprecated Use {@link ReceivedToDeviceMessage}. */
     ToDeviceEvent = "toDeviceEvent",
+    ReceivedToDeviceMessage = "receivedToDeviceMessage",
     AccountData = "accountData",
     Room = "Room",
     DeleteRoom = "deleteRoom",
@@ -1088,6 +1095,20 @@ export type ClientEventHandlerMap = {
      * ```
      */
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
+    /**
+     * Fires whenever the SDK receives a new to-device message.
+     * @param payload - The message and encryptionInfo for this message (See {@link ReceivedToDeviceMessage}) which caused this event to fire.
+     * @example
+     * ```
+     * matrixClient.on("receivedToDeviceMessage", function(payload){
+     *   const { message, encryptionInfo } = payload;
+     *   var claimed_sender = encryptionInfo ? encryptionInfo.sender : message.sender;
+     *   var isVerified = encryptionInfo ? encryptionInfo.verified : false;
+     *   var type = message.type;
+     * });
+     * ```
+     */
+    [ClientEvent.ReceivedToDeviceMessage]: (payload: ReceivedToDeviceMessage) => void;
     /**
      * Fires if a to-device event is received that cannot be decrypted.
      * Encrypted to-device events will (generally) use plain Olm encryption,
@@ -1527,9 +1548,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Clear any data out of the persistent stores used by the client.
      *
+     * @param args.cryptoDatabasePrefix - The database name to use for indexeddb, defaults to 'matrix-js-sdk'.
      * @returns Promise which resolves when the stores have been cleared.
      */
-    public clearStores(): Promise<void> {
+    public clearStores(
+        args: {
+            cryptoDatabasePrefix?: string;
+        } = {},
+    ): Promise<void> {
         if (this.clientRunning) {
             throw new Error("Cannot clear stores while client is running");
         }
@@ -1552,8 +1578,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return;
             }
             for (const dbname of [
-                `${RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto`,
-                `${RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto-meta`,
+                `${args.cryptoDatabasePrefix ?? RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto`,
+                `${args.cryptoDatabasePrefix ?? RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto-meta`,
             ]) {
                 const prom = new Promise((resolve, reject) => {
                     this.logger.info(`Removing IndexedDB instance ${dbname}`);
@@ -1901,6 +1927,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * ensuring that only one `MatrixClient` issue is instantiated at a time.
      *
      * @param args.useIndexedDB - True to use an indexeddb store, false to use an in-memory store. Defaults to 'true'.
+     * @param args.cryptoDatabasePrefix - The database name to use for indexeddb, defaults to 'matrix-js-sdk'.
+     *    Unused if useIndexedDB is 'false'.
      * @param args.storageKey - A key with which to encrypt the indexeddb store. If provided, it must be exactly
      *    32 bytes of data, and must be the same each time the client is initialised for a given device.
      *    If both this and `storagePassword` are unspecified, the store will be unencrypted.
@@ -1914,6 +1942,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async initRustCrypto(
         args: {
             useIndexedDB?: boolean;
+            cryptoDatabasePrefix?: string;
             storageKey?: Uint8Array;
             storagePassword?: string;
         } = {},
@@ -1950,7 +1979,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             deviceId: deviceId,
             secretStorage: this.secretStorage,
             cryptoCallbacks: this.cryptoCallbacks,
-            storePrefix: args.useIndexedDB === false ? null : RUST_SDK_STORE_PREFIX,
+            storePrefix: args.useIndexedDB === false ? null : (args.cryptoDatabasePrefix ?? RUST_SDK_STORE_PREFIX),
             storeKey: args.storageKey,
             storePassphrase: args.storagePassword,
 

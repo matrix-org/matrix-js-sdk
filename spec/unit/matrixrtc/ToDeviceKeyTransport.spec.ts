@@ -34,7 +34,7 @@ describe("ToDeviceKeyTransport", () => {
 
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
-            encryptAndSendToDevice: jest.fn(),
+            encryptAndSendToDevice: jest.fn().mockImplementation(() => Promise.resolve()),
         });
         mockLogger = {
             debug: jest.fn(),
