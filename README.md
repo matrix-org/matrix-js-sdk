@@ -6,7 +6,7 @@
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=bugs)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
 
-<div align="center">
+
 
 # Matrix JavaScript SDK
 
@@ -22,10 +22,10 @@ browser or in Node.js.
 </picture>
 
 <br><br>
-Development of the SDK is proudly sponsored and maintained by [Element](https://element.io). Element uses the SDK in their flagship [web](https://github.com/element-hq/element-web) and  [desktop](https://github.com/element-hq/element-desktop) clients.
+Development and maintenance is proudly sponsored by [Element](https://element.io). Element uses the SDK in their flagship [web](https://github.com/element-hq/element-web) and  [desktop](https://github.com/element-hq/element-desktop) clients.
 
 The SDK is also the basis for multiple Matrix projects and we welcome contributions from all.
-</div>
+
 
 #### Minimum Matrix server version: v1.1
 
