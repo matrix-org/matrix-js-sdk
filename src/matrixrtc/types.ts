@@ -23,6 +23,9 @@ export interface EncryptionKeyEntry {
     key: string;
 }
 
+/**
+ * The mxID, deviceId and membership timestamp of a RTC session participant.
+ */
 export type ParticipantDeviceInfo = {
     userId: string;
     deviceId: string;
@@ -39,6 +42,18 @@ export type InboundEncryptionSession = {
     creationTS: number;
 };
 
+/**
+ * The information about the key used to encrypt video streams.
+ */
+export type OutboundEncryptionSession = {
+    key: Uint8Array;
+    creationTS: number;
+    // The devices that this key is shared with.
+    sharedWith: Array<ParticipantDeviceInfo>;
+    // This is an index acting as the id of the key
+    keyId: number;
+};
+
 export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];
     device_id: string;
@@ -46,13 +61,15 @@ export interface EncryptionKeysEventContent {
     sent_ts?: number;
 }
 
+/**
+ * THe content of a to-device event that contains encryption keys.
+ */
 export interface EncryptionKeysToDeviceEventContent {
     keys: { index: number; key: string };
     member: {
-        // id: ParticipantId,
         // TODO Remove that it is claimed, need to get the sealed sender from decryption info
+        // Or add some validation on it based on the encryption info
         claimed_device_id: string;
-        // user_id: string
     };
     room_id: string;
     session: {
