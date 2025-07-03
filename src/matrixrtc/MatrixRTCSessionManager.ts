@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger as rootLogger, type Logger } from "../logger.ts";
+import { type Logger } from "../logger.ts";
 import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
@@ -48,8 +48,12 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     // longer the correct session object for the room.
     private roomSessions = new Map<string, MatrixRTCSession>();
 
-    private logger: Logger;
-    public constructor(private client: MatrixClient) {
+    private readonly logger: Logger;
+
+    public constructor(
+        rootLogger: Logger,
+        private client: MatrixClient,
+    ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
     }
