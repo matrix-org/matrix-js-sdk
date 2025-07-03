@@ -24,7 +24,7 @@ import {
     mockClientMethodsEvents,
     mockClientMethodsUser,
 } from "../../test-utils/client.ts";
-import { type Statistics } from "../../../src/matrixrtc";
+import { type ParticipantDeviceInfo, type Statistics } from "../../../src/matrixrtc";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { type Logger } from "../../../src/logger.ts";
 import { RoomAndToDeviceEvents, RoomAndToDeviceTransport } from "../../../src/matrixrtc/RoomAndToDeviceKeyTransport.ts";
@@ -136,7 +136,11 @@ describe("RoomAndToDeviceTransport", () => {
         });
 
         transport.start();
-        const membership = mockCallMembership(membershipTemplate, roomId, "@alice:example.org");
+        const membership: ParticipantDeviceInfo = {
+            userId: "@alice:example.org",
+            deviceId: "ALICEDEVICE",
+            membershipTs: 1234,
+        };
         const onTransportEnabled = jest.fn();
         transport.on(RoomAndToDeviceEvents.EnabledTransportsChanged, onTransportEnabled);
 
