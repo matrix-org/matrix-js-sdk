@@ -28,6 +28,7 @@ import {
     TweakName,
 } from "../../src";
 import { mockClientMethodsUser } from "../test-utils/client";
+import { logger } from "../../src/logger.ts";
 
 const msc3914RoomCallRule: IPushRule = {
     rule_id: ".org.matrix.msc3914.rule.room.call",
@@ -209,7 +210,7 @@ describe("NotificationService", function () {
                 msgtype: "m.text",
             },
         });
-        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules!);
+        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(logger, matrixClient.pushRules!);
         pushProcessor = new PushProcessor(matrixClient);
     });
 
@@ -731,7 +732,7 @@ describe("Test PushProcessor.partsForDottedKey", function () {
 
 describe("rewriteDefaultRules", () => {
     it("should add default rules in the correct order", () => {
-        const pushRules = PushProcessor.rewriteDefaultRules({
+        const pushRules = PushProcessor.rewriteDefaultRules(logger, {
             device: {},
             global: {
                 content: [],
@@ -867,7 +868,7 @@ describe("rewriteDefaultRules", () => {
     });
 
     it("should add missing msc3914 rule in correct place", () => {
-        const pushRules = PushProcessor.rewriteDefaultRules({
+        const pushRules = PushProcessor.rewriteDefaultRules(logger, {
             device: {},
             global: {
                 // Sample push rules from a Synapse user.

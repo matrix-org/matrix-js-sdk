@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { deepCompare, escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils.ts";
-import { logger } from "./logger.ts";
+import { type Logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import {
@@ -170,6 +170,7 @@ const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS: OrderedRules = [
 /**
  * Make sure that each of the rules listed in `defaultRuleIds` is listed in the given set of push rules.
  *
+ * @param logger - A `Logger` to write log messages to.
  * @param kind - the kind of push rule set being merged.
  * @param incomingRules - the existing set of known push rules for the user.
  * @param defaultRules - a lookup table for the default definitions of push rules.
@@ -178,6 +179,7 @@ const EXPECTED_DEFAULT_UNDERRIDE_RULE_IDS: OrderedRules = [
  * @returns A copy of `incomingRules`, with any missing default rules inserted in the right place.
  */
 function mergeRulesWithDefaults(
+    logger: Logger,
     kind: PushRuleKind,
     incomingRules: IPushRule[],
     defaultRules: Record<string, IPushRule>,
@@ -276,11 +278,17 @@ export class PushProcessor {
      * Rewrites conditions on a client's push rules to match the defaults
      * where applicable. Useful for upgrading push rules to more strict
      * conditions when the server is falling behind on defaults.
+     *
+     * @param logger - A `Logger` to write log messages to.
      * @param incomingRules - The client's existing push rules
      * @param userId - The Matrix ID of the client.
      * @returns The rewritten rules
      */
-    public static rewriteDefaultRules(incomingRules: IPushRules, userId: string | undefined = undefined): IPushRules {
+    public static rewriteDefaultRules(
+        logger: Logger,
+        incomingRules: IPushRules,
+        userId: string | undefined = undefined,
+    ): IPushRules {
         let newRules: IPushRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
 
         // These lines are mostly to make the tests happy. We shouldn't run into these
@@ -292,6 +300,7 @@ export class PushProcessor {
 
         // Merge the client-level defaults with the ones from the server
         newRules.global.override = mergeRulesWithDefaults(
+            logger,
             PushRuleKind.Override,
             newRules.global.override,
             DEFAULT_OVERRIDE_RULES,
@@ -299,6 +308,7 @@ export class PushProcessor {
         );
 
         newRules.global.underride = mergeRulesWithDefaults(
+            logger,
             PushRuleKind.Underride,
             newRules.global.underride,
             DEFAULT_UNDERRIDE_RULES,

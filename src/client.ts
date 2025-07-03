@@ -1364,7 +1364,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // the underlying session management and doesn't use any actual media capabilities
         this.matrixRTC = new MatrixRTCSessionManager(this);
 
-        this.serverCapabilitiesService = new ServerCapabilities(this.http);
+        this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1386,7 +1386,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.roomNameGenerator = opts.roomNameGenerator;
 
-        this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
+        this.toDeviceMessageQueue = new ToDeviceMessageQueue(this, this.logger);
 
         // The SDK doesn't really provide a clean way for events to recalculate the push
         // actions for themselves, so we have to kinda help them out when they are encrypted.
@@ -1503,6 +1503,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 return this.canResetTimelineCallback(roomId);
             },
+            logger: this.logger.getChild("sync"),
         };
     }
 
@@ -7324,7 +7325,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPushRules(rules: IPushRules): void {
         // Fix-up defaults, if applicable.
-        this.pushRules = PushProcessor.rewriteDefaultRules(rules, this.getUserId()!);
+        this.pushRules = PushProcessor.rewriteDefaultRules(this.logger, rules, this.getUserId()!);
         // Pre-calculate any necessary caches.
         this.pushProcessor.updateCachedPushRuleKeys(this.pushRules);
     }

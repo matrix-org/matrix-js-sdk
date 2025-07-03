@@ -31,7 +31,7 @@ import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
 import { deepCopy, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
-import { logger } from "./logger.ts";
+import { type Logger } from "./logger.ts";
 import {
     ClientEvent,
     type IStoredClientOpts,
@@ -67,8 +67,6 @@ import { type IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
 import { KnownMembership } from "./@types/membership.ts";
-
-const DEBUG = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -112,12 +110,6 @@ function getFilterName(userId: string, suffix?: string): string {
     return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
-/* istanbul ignore next */
-function debuglog(...params: any[]): void {
-    if (!DEBUG) return;
-    logger.log(...params);
-}
-
 /**
  * Options passed into the constructor of SyncApi by MatrixClient
  */
@@ -134,6 +126,9 @@ export interface SyncApiOptions {
      * there are other references to the timelines for this room.
      */
     canResetEntireTimeline?: ResetTimelineCallback;
+
+    /** Logger instance to use for writing debug logs. */
+    logger: Logger;
 }
 
 interface ISyncOptions {
@@ -202,7 +197,7 @@ export function defaultClientOpts(opts?: IStoredClientOpts): IStoredClientOpts {
     };
 }
 
-export function defaultSyncApiOpts(syncOpts?: SyncApiOptions): SyncApiOptions {
+export function defaultSyncApiOpts(syncOpts: SyncApiOptions): SyncApiOptions {
     return {
         canResetEntireTimeline: (_roomId): boolean => false,
         ...syncOpts,
@@ -236,8 +231,8 @@ export class SyncApi {
      */
     public constructor(
         private readonly client: MatrixClient,
-        opts?: IStoredClientOpts,
-        syncOpts?: SyncApiOptions,
+        opts: IStoredClientOpts | undefined,
+        syncOpts: SyncApiOptions,
     ) {
         this.opts = defaultClientOpts(opts);
         this.syncOpts = defaultSyncApiOpts(syncOpts);
@@ -277,7 +272,7 @@ export class SyncApi {
         //  2. If it's from the first state we're seeing after joining the room
         //  3. Or whether it's coming from `syncFromCache`
         if (timelineWasEmpty) {
-            logger.debug(
+            this.syncOpts.logger.debug(
                 `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} ` +
                     `because the timeline was empty before the marker arrived which means there is nothing to refresh.`,
             );
@@ -309,14 +304,14 @@ export class SyncApi {
         if (isValidMsc2716Event) {
             // Saw new marker event, let's let the clients know they should
             // refresh the timeline.
-            logger.debug(
+            this.syncOpts.logger.debug(
                 `MarkerState: Timeline needs to be refreshed because ` +
                     `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
             );
             room.setTimelineNeedsRefresh(true);
             room.emit(RoomEvent.HistoryImportedWithinTimeline, markerEvent, room);
         } else {
-            logger.debug(
+            this.syncOpts.logger.debug(
                 `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
                     `MSC2716 is not supported in the room version or for any room version, the marker wasn't sent ` +
                     `by the room creator.`,
@@ -489,7 +484,7 @@ export class SyncApi {
      */
     private peekPoll(peekRoom: Room, token?: string): void {
         if (this._peekRoom !== peekRoom) {
-            debuglog("Stopped peeking in room %s", peekRoom.roomId);
+            this.syncOpts.logger.debug("Stopped peeking in room %s", peekRoom.roomId);
             return;
         }
 
@@ -512,7 +507,7 @@ export class SyncApi {
             .then(
                 async (res) => {
                     if (this._peekRoom !== peekRoom) {
-                        debuglog("Stopped peeking in room %s", peekRoom.roomId);
+                        this.syncOpts.logger.debug("Stopped peeking in room %s", peekRoom.roomId);
                         return;
                     }
                     // We have a problem that we get presence both from /events and /sync
@@ -554,7 +549,7 @@ export class SyncApi {
                     this.peekPoll(peekRoom, res.end);
                 },
                 (err) => {
-                    logger.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
+                    this.syncOpts.logger.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
                     setTimeout(() => {
                         this.peekPoll(peekRoom, token);
                     }, 30 * 1000);
@@ -595,7 +590,7 @@ export class SyncApi {
     private shouldAbortSync(error: MatrixError): boolean {
         if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
-            logger.warn("Token no longer valid - assuming logout");
+            this.syncOpts.logger.warn("Token no longer valid - assuming logout");
             this.stop();
             this.updateSyncState(SyncState.Error, { error });
             return true;
@@ -605,17 +600,17 @@ export class SyncApi {
 
     private getPushRules = async (): Promise<void> => {
         try {
-            debuglog("Getting push rules...");
+            this.syncOpts.logger.debug("Getting push rules...");
             const result = await this.client.getPushRules();
-            debuglog("Got push rules");
+            this.syncOpts.logger.debug("Got push rules");
 
             this.client.pushRules = result;
         } catch (err) {
-            logger.error("Getting push rules failed", err);
+            this.syncOpts.logger.error("Getting push rules failed", err);
             if (this.shouldAbortSync(<MatrixError>err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            debuglog("Waiting for saved sync before retrying push rules...");
+            this.syncOpts.logger.debug("Waiting for saved sync before retrying push rules...");
             await this.recoverFromSyncStartupError(this.savedSyncPromise, <Error>err);
             return this.getPushRules(); // try again
         }
@@ -630,12 +625,12 @@ export class SyncApi {
     };
 
     private prepareLazyLoadingForSync = async (): Promise<void> => {
-        debuglog("Prepare lazy loading for sync...");
+        this.syncOpts.logger.debug("Prepare lazy loading for sync...");
         if (this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
-            debuglog("Enabling lazy load on sync filter...");
+            this.syncOpts.logger.debug("Enabling lazy load on sync filter...");
             if (!this.opts.filter) {
                 this.opts.filter = this.buildDefaultFilter();
             }
@@ -645,11 +640,11 @@ export class SyncApi {
 
     private storeClientOptions = async (): Promise<void> => {
         try {
-            debuglog("Storing client options...");
+            this.syncOpts.logger.debug("Storing client options...");
             await this.client.storeClientOptions();
-            debuglog("Stored client options");
+            this.syncOpts.logger.debug("Stored client options");
         } catch (err) {
-            logger.error("Storing client options failed", err);
+            this.syncOpts.logger.error("Storing client options failed", err);
             throw err;
         }
     };
@@ -658,7 +653,7 @@ export class SyncApi {
         filterId?: string;
         filter?: Filter;
     }> => {
-        debuglog("Getting filter...");
+        this.syncOpts.logger.debug("Getting filter...");
         let filter: Filter;
         if (this.opts.filter) {
             filter = this.opts.filter;
@@ -670,11 +665,11 @@ export class SyncApi {
         try {
             filterId = await this.client.getOrCreateFilter(getFilterName(this.client.credentials.userId!), filter);
         } catch (err) {
-            logger.error("Getting filter failed", err);
+            this.syncOpts.logger.error("Getting filter failed", err);
             if (this.shouldAbortSync(<MatrixError>err)) return {};
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            debuglog("Waiting for saved sync before retrying filter...");
+            this.syncOpts.logger.debug("Waiting for saved sync before retrying filter...");
             await this.recoverFromSyncStartupError(this.savedSyncPromise, <Error>err);
             return this.getFilter(); // try again
         }
@@ -700,22 +695,22 @@ export class SyncApi {
         // Pull the saved sync token out first, before the worker starts sending
         // all the sync data which could take a while. This will let us send our
         // first incremental sync request before we've processed our saved data.
-        debuglog("Getting saved sync token...");
+        this.syncOpts.logger.debug("Getting saved sync token...");
         const savedSyncTokenPromise = this.client.store.getSavedSyncToken().then((tok) => {
-            debuglog("Got saved sync token");
+            this.syncOpts.logger.debug("Got saved sync token");
             return tok;
         });
 
         this.savedSyncPromise = this.client.store
             .getSavedSync()
             .then((savedSync) => {
-                debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
+                this.syncOpts.logger.debug(`Got reply from saved sync, exists? ${!!savedSync}`);
                 if (savedSync) {
                     return this.syncFromCache(savedSync);
                 }
             })
             .catch((err) => {
-                logger.error("Getting saved sync failed", err);
+                this.syncOpts.logger.error("Getting saved sync failed", err);
             });
 
         // We need to do one-off checks before we can begin the /sync loop.
@@ -747,9 +742,9 @@ export class SyncApi {
             const savedSyncToken = await savedSyncTokenPromise;
 
             if (savedSyncToken) {
-                debuglog("Sending first sync request...");
+                this.syncOpts.logger.debug("Sending first sync request...");
             } else {
-                debuglog("Sending initial sync request...");
+                this.syncOpts.logger.debug("Sending initial sync request...");
                 const initialFilter = this.buildDefaultFilter();
                 initialFilter.setDefinition(filter.getDefinition());
                 initialFilter.setTimelineLimit(this.opts.initialSyncLimit!);
@@ -763,7 +758,7 @@ export class SyncApi {
         }
 
         // Now wait for the saved sync to finish...
-        debuglog("Waiting for saved sync before starting sync processing...");
+        this.syncOpts.logger.debug("Waiting for saved sync before starting sync processing...");
         await this.savedSyncPromise;
         // process the first sync request and continue syncing with the normal filterId
         return this.doSync({ filter: filterId });
@@ -773,7 +768,7 @@ export class SyncApi {
      * Stops the sync object from syncing.
      */
     public stop(): void {
-        debuglog("SyncApi.stop");
+        this.syncOpts.logger.debug("SyncApi.stop");
         // It is necessary to check for the existance of
         // globalThis.window AND globalThis.window.removeEventListener.
         // Some platforms (e.g. React Native) register globalThis.window,
@@ -805,7 +800,7 @@ export class SyncApi {
      * should have been acquired via client.store.getSavedSync().
      */
     private async syncFromCache(savedSync: ISavedSync): Promise<void> {
-        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+        this.syncOpts.logger.debug("sync(): not doing HTTP hit, instead returning stored /sync data");
 
         const nextSyncToken = savedSync.nextBatch;
 
@@ -830,7 +825,7 @@ export class SyncApi {
         try {
             await this.processSyncResponse(syncEventData, data);
         } catch (e) {
-            logger.error("Error processing cached sync", e);
+            this.syncOpts.logger.error("Error processing cached sync", e);
         }
 
         // Don't emit a prepared if we've bailed because the store is invalid:
@@ -881,7 +876,7 @@ export class SyncApi {
             } catch (e) {
                 // log the exception with stack if we have it, else fall back
                 // to the plain description
-                logger.error("Caught /sync error", e);
+                this.syncOpts.logger.error("Caught /sync error", e);
 
                 // Emit the exception for client handling
                 this.client.emit(ClientEvent.SyncUnexpectedError, <Error>e);
@@ -916,7 +911,7 @@ export class SyncApi {
         }
 
         if (!this.running) {
-            debuglog("Sync no longer running: exiting.");
+            this.syncOpts.logger.debug("Sync no longer running: exiting.");
             if (this.connectionReturnedResolvers) {
                 this.connectionReturnedResolvers.reject();
                 this.connectionReturnedResolvers = undefined;
@@ -999,7 +994,7 @@ export class SyncApi {
 
     private async onSyncError(err: MatrixError): Promise<boolean> {
         if (!this.running) {
-            debuglog("Sync no longer running: exiting");
+            this.syncOpts.logger.debug("Sync no longer running: exiting");
             if (this.connectionReturnedResolvers) {
                 this.connectionReturnedResolvers.reject();
                 this.connectionReturnedResolvers = undefined;
@@ -1008,16 +1003,16 @@ export class SyncApi {
             return true; // abort
         }
 
-        logger.error("/sync error %s", err);
+        this.syncOpts.logger.error("/sync error %s", err);
 
         if (this.shouldAbortSync(err)) {
             return true; // abort
         }
 
         this.failedSyncCount++;
-        logger.log("Number of consecutive failed sync requests:", this.failedSyncCount);
+        this.syncOpts.logger.debug("Number of consecutive failed sync requests:", this.failedSyncCount);
 
-        debuglog("Starting keep-alive");
+        this.syncOpts.logger.debug("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
         // lost yet: we only do this if a keepalive poke
         // fails, since long lived HTTP connections will
@@ -1324,7 +1319,7 @@ export class SyncApi {
                 for (let i = timelineEvents.length - 1; i >= 0; i--) {
                     const eventId = timelineEvents[i].getId()!;
                     if (room.getTimelineForEvent(eventId)) {
-                        debuglog(`Already have event ${eventId} in limited sync - not resetting`);
+                        this.syncOpts.logger.debug(`Already have event ${eventId} in limited sync - not resetting`);
                         limited = false;
 
                         // we might still be missing some of the events before i;
@@ -1384,7 +1379,7 @@ export class SyncApi {
                     await this.injectRoomEvents(room, stateEvents, undefined, timelineEvents, syncEventData.fromCache);
                 }
             } catch (e) {
-                logger.error(`Failed to process events on room ${room.roomId}:`, e);
+                this.syncOpts.logger.error(`Failed to process events on room ${room.roomId}:`, e);
             }
 
             // set summary after processing events,
@@ -1865,7 +1860,7 @@ export class SyncApi {
      * but this might help us reconnect a little faster.
      */
     private onOnline = (): void => {
-        debuglog("Browser thinks we are back online");
+        this.syncOpts.logger.debug("Browser thinks we are back online");
         this.startKeepAlives(0);
     };
 }
