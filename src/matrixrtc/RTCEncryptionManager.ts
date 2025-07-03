@@ -19,7 +19,7 @@ import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
-import { logger as rootLogger, type Logger } from "../logger.ts";
+import { type Logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
 import type { InboundEncryptionSession, ParticipantDeviceInfo, ParticipantId, Statistics } from "./types.ts";
 import { getParticipantId, KeyBuffer } from "./utils.ts";
@@ -73,7 +73,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      */
     private keyBuffer = new KeyBuffer(1000 /** 1 second */);
 
-    private logger: Logger;
+    private logger: Logger | undefined = undefined;
 
     public constructor(
         private userId: string,
@@ -88,16 +88,16 @@ export class RTCEncryptionManager implements IEncryptionManager {
         ) => void,
         parentLogger?: Logger,
     ) {
-        this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
+        this.logger = parentLogger?.getChild(`[EncryptionManager]`);
     }
 
     public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
-        // This is deprecated should be ignored. Only use by tests?
+        // This is deprecated should be ignored. Only used by tests?
         return new Map();
     }
 
     public join(joinConfig: EncryptionConfig | undefined): void {
-        this.logger.info(`Joining room`);
+        this.logger?.info(`Joining room`);
         this.delayRolloutTimeMillis = joinConfig?.useKeyDelay ?? 1000;
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         // Deprecate RoomKeyTransport: this can get removed.
@@ -115,7 +115,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private onTransportChanged: (enabled: EnabledTransports) => void = () => {
-        this.logger.info("Transport change detected, restarting key distribution");
+        this.logger?.info("Transport change detected, restarting key distribution");
         // Temporary for backwards compatibility
         if (this.currentKeyDistributionPromise) {
             this.currentKeyDistributionPromise
@@ -126,7 +126,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                     }
                 })
                 .catch((e) => {
-                    this.logger.error("Failed to restart key distribution", e);
+                    this.logger?.error("Failed to restart key distribution", e);
                 });
         } else {
             if (this.outboundSession) {
@@ -142,13 +142,13 @@ export class RTCEncryptionManager implements IEncryptionManager {
      */
     private ensureMediaKey(): void {
         if (this.currentKeyDistributionPromise == null) {
-            this.logger.debug(`No active rollout, start a new one`);
+            this.logger?.debug(`No active rollout, start a new one`);
             // start a rollout
             this.currentKeyDistributionPromise = this.rolloutOutboundKey().then(() => {
-                this.logger.debug(`Rollout completed`);
+                this.logger?.debug(`Rollout completed`);
                 this.currentKeyDistributionPromise = null;
                 if (this.needToEnsureKeyAgain) {
-                    this.logger.debug(`New Rollout needed`);
+                    this.logger?.debug(`New Rollout needed`);
                     this.needToEnsureKeyAgain = false;
                     // rollout a new one
                     this.ensureMediaKey();
@@ -157,13 +157,13 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } else {
             // There is a rollout in progress, but a key rotation is requested (could be caused by a membership change)
             // Remember that a new rotation is needed after the current one.
-            this.logger.debug(`Rollout in progress, a new rollout will be started after the current one`);
+            this.logger?.debug(`Rollout in progress, a new rollout will be started after the current one`);
             this.needToEnsureKeyAgain = true;
         }
     }
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
-        this.logger.debug(`Received key over transport ${userId}:${deviceId} at index ${index}`);
+        this.logger?.debug(`Received key over transport ${userId}:${deviceId} at index ${index}`);
 
         // We received a new key, notify the video layer of this new key so that it can decrypt the frames properly.
         const participantId = getParticipantId(userId, deviceId);
@@ -180,7 +180,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             this.onEncryptionKeysChanged(validSession.key, validSession.keyIndex, validSession.participantId);
             this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
-            this.logger.info(`Received an out of order key for ${userId}:${deviceId}, dropping it`);
+            this.logger?.info(`Received an out of order key for ${userId}:${deviceId}, dropping it`);
         }
     };
 
@@ -190,7 +190,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * @param oldMemberships
      */
     public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
-        this.logger.trace(`onMembershipsUpdate`);
+        this.logger?.trace(`onMembershipsUpdate`);
 
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
@@ -264,7 +264,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             };
             hasKeyChanged = true;
 
-            this.logger.info(`creating new outbound key index:${newOutboundKey.keyId}`);
+            this.logger?.info(`creating new outbound key index:${newOutboundKey.keyId}`);
             // Set this new key as the current one
             this.outboundSession = newOutboundKey;
 
@@ -282,19 +282,19 @@ export class RTCEncryptionManager implements IEncryptionManager {
         }
 
         try {
-            this.logger.trace(`Sending key...`);
+            this.logger?.trace(`Sending key...`);
             await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
             outboundKey.sharedWith.push(...toDistributeTo);
-            this.logger.trace(
+            this.logger?.trace(
                 `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
             );
             if (hasKeyChanged) {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
-                this.logger.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
+                this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
                 await sleep(this.delayRolloutTimeMillis);
-                this.logger.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
+                this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
                 this.onEncryptionKeysChanged(
                     outboundKey.key,
                     outboundKey.keyId,
@@ -302,7 +302,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 );
             }
         } catch (err) {
-            this.logger.error(`Failed to rollout key`, err);
+            this.logger?.error(`Failed to rollout key`, err);
         }
     }
 
