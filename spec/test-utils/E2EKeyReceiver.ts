@@ -234,4 +234,18 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
         await this.oneTimeKeysPromise;
         return this.oneTimeKeys;
     }
+
+    /**
+     * If no one-time keys have yet been uploaded, return `null`.
+     * Otherwise, pop a key from the uploaded list.
+     */
+    public getOneTimeKey(): [string, IOneTimeKey] | null {
+        const keys = Object.entries(this.oneTimeKeys);
+        if (keys.length == 0) {
+            return null;
+        }
+        const [otkId, otk] = keys[0];
+        delete this.oneTimeKeys[otkId];
+        return [otkId, otk];
+    }
 }
