@@ -5,7 +5,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
-import { isMyMembership, type Statistics } from "./types.ts";
+import { isMyMembership, type ParticipantId, type Statistics } from "./types.ts";
 import { getParticipantId } from "./utils.ts";
 import {
     type EnabledTransports,
@@ -45,6 +45,13 @@ export interface IEncryptionManager {
      * objects containing encryption keys and their associated timestamps.
      */
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
+
+    /**
+     * The ratcheting is done on the decoding layer, the encryption manager asks for a key to be ratcheted, then
+     * the lower layer will emit the ratcheted key to the encryption manager.
+     * This is called after the key a ratchet request has been performed.
+     */
+    onKeyRatcheted(key: ArrayBuffer, participantId: ParticipantId | undefined, keyIndex: number | undefined): void;
 }
 
 /**
@@ -98,6 +105,14 @@ export class EncryptionManager implements IEncryptionManager {
         parentLogger?: Logger,
     ) {
         this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
+    }
+
+    public onKeyRatcheted(
+        key: ArrayBuffer,
+        participantId: ParticipantId | undefined,
+        keyIndex: number | undefined,
+    ): void {
+        this.logger.warn("Ratcheting key is not implemented in EncryptionManager");
     }
 
     public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
