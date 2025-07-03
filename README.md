@@ -6,10 +6,26 @@
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=bugs)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
 
+<div align="center">
+
 # Matrix JavaScript SDK
 
 This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
 browser or in Node.js.
+
+<br><br>
+
+<picture>
+  <source srcset="contrib/element-logo-light.png" media="(prefers-color-scheme: dark)">
+  <source srcset="contrib/element-logo-dark.png" media="(prefers-color-scheme: light)">
+  <img src="contrib/element-logo-fallback.png" alt="Element logo">
+</picture>
+
+<br><br>
+Development of the SDK is proudly sponsored and maintained by [Element](https://element.io). Element uses the SDK in their flagship [web](https://github.com/element-hq/element-web) and  [desktop](https://github.com/element-hq/element-desktop) clients.
+
+The SDK is also the basis for multiple Matrix projects and we welcome contributions from all.
+</div>
 
 #### Minimum Matrix server version: v1.1
 
