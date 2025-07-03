@@ -39,18 +39,6 @@ export type InboundEncryptionSession = {
     creationTS: number;
 };
 
-/**
- * The information about the key beeing used to encrypt the outbound video/audio stream.
-*/
-export type OutboundEncryptionSession = {
-    key: Uint8Array;
-    creationTS: number;
-    sharedWith: Array<ParticipantDeviceInfo>;
-    // This is an index acting as the id of the key
-    keyId: number;
-};
-
-
 export interface EncryptionKeysEventContent {
     keys: EncryptionKeyEntry[];
     device_id: string;

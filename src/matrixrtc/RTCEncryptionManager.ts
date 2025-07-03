@@ -21,19 +21,21 @@ import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { logger as rootLogger, type Logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
-import type {
-    InboundEncryptionSession,
-    OutboundEncryptionSession,
-    ParticipantDeviceInfo,
-    ParticipantId,
-    Statistics,
-} from "./types.ts";
+import type { InboundEncryptionSession, ParticipantDeviceInfo, ParticipantId, Statistics } from "./types.ts";
 import { getParticipantId, KeyBuffer } from "./utils.ts";
 import {
     type EnabledTransports,
     RoomAndToDeviceEvents,
     RoomAndToDeviceTransport,
 } from "./RoomAndToDeviceKeyTransport.ts";
+
+type OutboundEncryptionSession = {
+    key: Uint8Array;
+    creationTS: number;
+    sharedWith: Array<ParticipantDeviceInfo>;
+    // This is an index acting as the id of the key
+    keyId: number;
+};
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -53,11 +55,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * Ensures that there is only one distribute operation at a time for that call.
      */
     private currentKeyDistributionPromise: Promise<void> | null = null;
-    /**
-     * The time to wait before using the outbound session after it has been distributed.
-     * This is to ensure that the key is delivered to all participants before it is used.
-     * When creating the first key, this is set to 0, so that the key can be used immediately.
-     */
+    /** The time to wait before using outbound session after it has been distributed */
     private delayRolloutTimeMillis = 1000;
     /**
      * If a new key distribution is being requested while one is going on, we will set this flag to true.
@@ -67,9 +65,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private needToEnsureKeyAgain = false;
 
     /**
-     * There is a possibility that keys arrive in the wrong order.
-     * For example, after a quick join/leave/join, there will be 2 keys of index 0 distributed, and
-     * if they are received in the wrong order, the stream won't be decryptable.
+     * There is a possibility that keys arrive in wrong order.
+     * For example after a quick join/leave/join, there will be 2 keys of index 0 distributed and
+     * if they are received in wrong order the stream won't be decryptable.
      * For that reason we keep a small buffer of keys for a limited time to disambiguate.
      * @private
      */
@@ -83,7 +81,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
         private statistics: Statistics,
-        // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array,
             encryptionKeyIndex: number,
@@ -117,16 +114,15 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.transport.stop();
     }
 
-    // Temporary for backwards compatibility
-    // TODO: Remove this in the future
     private onTransportChanged: (enabled: EnabledTransports) => void = () => {
         this.logger.info("Transport change detected, restarting key distribution");
+        // Temporary for backwards compatibility
         if (this.currentKeyDistributionPromise) {
             this.currentKeyDistributionPromise
                 .then(() => {
                     if (this.outboundSession) {
                         this.outboundSession.sharedWith = [];
-                        this.ensureMediaKeyDistribution();
+                        this.ensureMediaKey();
                     }
                 })
                 .catch((e) => {
@@ -135,18 +131,16 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } else {
             if (this.outboundSession) {
                 this.outboundSession.sharedWith = [];
-                this.ensureMediaKeyDistribution();
+                this.ensureMediaKey();
             }
         }
     };
 
     /**
      * Will ensure that a new key is distributed and used to encrypt our media.
-     * If there is already a key distribution in progress, it will schedule a new distribution round just after the current one is completed.
-     * If this function is called repeatedly while a distribution is in progress,
-     * the calls will be coalesced to a single new distribution (that will start just after the current one as completed)   .
+     * If this function is called repeatidly, the calls will be buffered to a single key rotation.
      */
-    private ensureMediaKeyDistribution(): void {
+    private ensureMediaKey(): void {
         if (this.currentKeyDistributionPromise == null) {
             this.logger.debug(`No active rollout, start a new one`);
             // start a rollout
@@ -156,8 +150,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 if (this.needToEnsureKeyAgain) {
                     this.logger.debug(`New Rollout needed`);
                     this.needToEnsureKeyAgain = false;
-                    // roll out a new one
-                    this.ensureMediaKeyDistribution();
+                    // rollout a new one
+                    this.ensureMediaKey();
                 }
             });
         } else {
@@ -200,7 +194,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
-        this.ensureMediaKeyDistribution();
+        this.ensureMediaKey();
     }
 
     private async rolloutOutboundKey(): Promise<void> {
@@ -289,9 +283,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         try {
             this.logger.trace(`Sending key...`);
-            // TODO: Better error handling.
-            // Currently the transport will handle some retrying but it is not ideal.
-            // In the future we want to have a more robust error handling and retry mechanism.
             await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
             outboundKey.sharedWith.push(...toDistributeTo);
