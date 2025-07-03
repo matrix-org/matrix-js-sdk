@@ -84,7 +84,7 @@ jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
 
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
-    await globalThis.Olm.init();
+    await Olm.init();
 });
 
 // load the rust library. This can take a few seconds on a slow GH worker.
@@ -110,7 +110,6 @@ const TEST_HOMESERVER_URL = "https://alice-server.com";
  * These tests work by intercepting HTTP requests via fetch-mock rather than mocking out bits of the client, so as
  * to provide the most effective integration tests possible.
  */
-// we test with both crypto stacks...
 describe("verification", () => {
     /** the client under test */
     let aliceClient: MatrixClient;
@@ -254,7 +253,7 @@ describe("verification", () => {
 
             // The dummy device makes up a curve25519 keypair and sends the public bit back in an `m.key.verification.key'
             // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
-            const olmSAS = new globalThis.Olm.SAS();
+            const olmSAS = new Olm.SAS();
             returnToDeviceMessageFromSync(buildSasKeyMessage(transactionId, olmSAS.get_pubkey()));
 
             // alice responds with a 'key' ...
@@ -348,7 +347,7 @@ describe("verification", () => {
 
             // The dummy device makes up a curve25519 keypair and uses the hash in an 'm.key.verification.accept'
             // We use the Curve25519, HMAC and HKDF implementations in libolm, for now
-            const olmSAS = new globalThis.Olm.SAS();
+            const olmSAS = new Olm.SAS();
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(toDeviceMessage);
 
             sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.key");

@@ -160,6 +160,9 @@ function getPrefixedLogger(prefix?: string): PrefixedLogger {
 /**
  * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
+ *
+ * @deprecated avoid the use of this unless you are the constructor of `MatrixClient`: you should be using the logger
+ *    associated with `MatrixClient`.
  */
 export const logger = getPrefixedLogger() as LoggerWithLogMethod;
 
