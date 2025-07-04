@@ -80,9 +80,6 @@ export async function migrateFromLegacyCrypto(args: {
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
 
-    // enable tracing in the rust-sdk
-    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
-
     if (!(await legacyStore.containsData())) {
         // This store was never used. Nothing to migrate.
         return;
@@ -230,7 +227,7 @@ async function migrateBaseData(
         pickleKey,
         "user_signing",
     );
-    await RustSdkCryptoJs.Migration.migrateBaseData(migrationData, pickleKey, storeHandle);
+    await RustSdkCryptoJs.Migration.migrateBaseData(migrationData, pickleKey, storeHandle, logger);
 }
 
 async function countOlmSessions(logger: Logger, legacyStore: CryptoStore): Promise<number> {
@@ -269,7 +266,7 @@ async function migrateOlmSessions(
             migrationData.push(pickledSession);
         }
 
-        await RustSdkCryptoJs.Migration.migrateOlmSessions(migrationData, pickleKey, storeHandle);
+        await RustSdkCryptoJs.Migration.migrateOlmSessions(migrationData, pickleKey, storeHandle, logger);
         await legacyStore.deleteEndToEndSessionsBatch(batch);
         onBatchDone(batch.length);
     }
@@ -343,7 +340,7 @@ async function migrateMegolmSessions(
             migrationData.push(pickledSession);
         }
 
-        await RustSdkCryptoJs.Migration.migrateMegolmSessions(migrationData, pickleKey, storeHandle);
+        await RustSdkCryptoJs.Migration.migrateMegolmSessions(migrationData, pickleKey, storeHandle, logger);
         await legacyStore.deleteEndToEndInboundGroupSessionsBatch(batch);
         onBatchDone(batch.length);
     }
