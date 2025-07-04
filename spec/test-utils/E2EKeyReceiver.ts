@@ -72,9 +72,11 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
      * [2]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keyssignaturesupload
      * [3]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keysdevice_signingupload
      *
-     * @param homeserverUrl - the Homeserver Url of the client under test.
+     * @param homeserverUrl - The Homeserver Url of the client under test.
+     * @param routeNamePrefix - An optional prefix to add to the fetchmock route names. Required if there is more than
+     *    one E2EKeyReceiver instance active.
      */
-    public constructor(homeserverUrl: string) {
+    public constructor(homeserverUrl: string, routeNamePrefix: string = "") {
         this.debug = debugFunc(`e2e-key-receiver:[${homeserverUrl}]`);
 
         // set up a listener for /keys/upload.
@@ -88,7 +90,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
         fetchMock.post(
             {
                 url: new URL("/_matrix/client/v3/keys/signatures/upload", homeserverUrl).toString(),
-                name: "upload-sigs",
+                name: routeNamePrefix + "upload-sigs",
             },
             (url, options) => this.onSignaturesUploadRequest(options),
         );
@@ -96,7 +98,7 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
         fetchMock.post(
             {
                 url: new URL("/_matrix/client/v3/keys/device_signing/upload", homeserverUrl).toString(),
-                name: "upload-cross-signing-keys",
+                name: routeNamePrefix + "upload-cross-signing-keys",
             },
             (url, options) => this.onSigningKeyUploadRequest(options),
         );

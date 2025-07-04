@@ -79,6 +79,19 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * @returns a promise which resolves once the keys have been imported
      */
     importBackedUpRoomKeys(keys: IMegolmSessionData[], backupVersion: string, opts?: ImportRoomKeysOpts): Promise<void>;
+
+    /**
+     * Having accepted an invite for the given room from the given user, attempt to
+     * find information about a room key bundle and, if found, download the
+     * bundle and import the room keys, as per {@link https://github.com/matrix-org/matrix-spec-proposals/pull/4268|MSC4268}.
+     *
+     * @param roomId - The room we were invited to, for which we want to check if a room
+     *   key bundle was received.
+     *
+     * @param inviter - The user who invited us to the room and is expected to have
+     *   sent the room key bundle.
+     */
+    maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void>;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
