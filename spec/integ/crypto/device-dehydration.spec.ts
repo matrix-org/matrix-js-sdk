@@ -181,7 +181,6 @@ async function initializeSecretStorage(
     const e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
     const e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
     e2eKeyResponder.addKeyReceiver(userId, e2eKeyReceiver);
-    fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {});
     fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {});
     const accountData: Map<string, object> = new Map();
     fetchMock.get("glob:http://*/_matrix/client/v3/user/*/account_data/*", (url, opts) => {

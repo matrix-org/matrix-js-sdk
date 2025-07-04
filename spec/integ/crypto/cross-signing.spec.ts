@@ -137,9 +137,9 @@ describe("cross-signing", () => {
             const authDict = { type: "test" };
             await bootstrapCrossSigning(authDict);
 
-            // check the cross-signing keys upload
-            expect(fetchMock.called("upload-keys")).toBeTruthy();
-            const [, keysOpts] = fetchMock.lastCall("upload-keys")!;
+            // check the cross-signing keys have been uploaded
+            expect(fetchMock.called("upload-cross-signing-keys")).toBeTruthy();
+            const [, keysOpts] = fetchMock.lastCall("upload-cross-signing-keys")!;
             const keysBody = JSON.parse(keysOpts!.body as string);
             expect(keysBody.auth).toEqual(authDict); // check uia dict was passed
             // there should be a key of each type
@@ -420,15 +420,18 @@ describe("cross-signing", () => {
             return new Promise<any>((resolve) => {
                 fetchMock.post(
                     {
-                        url: new RegExp("/_matrix/client/v3/keys/device_signing/upload"),
-                        name: "upload-keys",
+                        url: new URL(
+                            "/_matrix/client/v3/keys/device_signing/upload",
+                            aliceClient.getHomeserverUrl(),
+                        ).toString(),
+                        name: "upload-cross-signing-keys",
                     },
                     (url, options) => {
                         const content = JSON.parse(options.body as string);
                         resolve(content);
                         return {};
                     },
-                    // Override the routes define in `mockSetupCrossSigningRequests`
+                    // Override the route defined in E2EKeyReceiver
                     { overwriteRoutes: true },
                 );
             });

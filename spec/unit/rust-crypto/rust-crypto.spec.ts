@@ -1548,10 +1548,6 @@ describe("RustCrypto", () => {
             const e2eKeyReceiver = new E2EKeyReceiver("http://server");
             const e2eKeyResponder = new E2EKeyResponder("http://server");
             e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
-            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
-                status: 200,
-                body: {},
-            });
             fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
                 status: 200,
                 body: {},
@@ -1793,10 +1789,6 @@ describe("RustCrypto", () => {
                     error: "Not found",
                 },
             });
-            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
-                status: 200,
-                body: {},
-            });
             fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
                 status: 200,
                 body: {},
@@ -1933,10 +1925,6 @@ describe("RustCrypto", () => {
                         errcode: "M_NOT_FOUND",
                         error: "Not found",
                     },
-                });
-                fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
-                    status: 200,
-                    body: {},
                 });
                 fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
                     status: 200,
