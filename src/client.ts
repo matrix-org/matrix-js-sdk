@@ -223,9 +223,9 @@ import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
 import {
     type CrossSigningKeyInfo,
     type CryptoApi,
+    type CryptoCallbacks,
     CryptoEvent,
     type CryptoEventHandlerMap,
-    type CryptoCallbacks,
 } from "./crypto-api/index.ts";
 import {
     type SecretStorageKeyDescription,
@@ -2371,7 +2371,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async joinRoom(roomIdOrAlias: string, opts: IJoinRoomOpts = {}): Promise<Room> {
         const room = this.getRoom(roomIdOrAlias);
-        if (room?.hasMembershipState(this.credentials.userId!, KnownMembership.Join)) return room;
+        const preJoinMembership = room?.getMember(this.getSafeUserId());
+        const preJoinMembershipSender = preJoinMembership?.events.member?.getSender() ?? null;
+        this.logger.debug(
+            `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership?.membership}, preJoinMembershipSender=${preJoinMembershipSender}, opts=${JSON.stringify(opts)}`,
+        );
+        if (preJoinMembership?.membership == KnownMembership.Join) return room!;
 
         let signPromise: Promise<IThirdPartySigned | void> = Promise.resolve();
 
@@ -2398,6 +2403,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryParams, data);
 
         const roomId = res.room_id;
+        if (
+            opts.acceptSharedHistory &&
+            preJoinMembership?.membership == KnownMembership.Invite &&
+            preJoinMembershipSender &&
+            this.cryptoBackend
+        ) {
+            await this.cryptoBackend.maybeAcceptKeyBundle(roomId, preJoinMembershipSender);
+        }
+
         // In case we were originally given an alias, check the room cache again
         // with the resolved ID - this method is supposed to no-op if we already
         // were in the room, after all.
@@ -3764,11 +3778,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns An empty object.
      */
-    public invite(roomId: string, userId: string, opts: InviteOpts | string = {}): Promise<EmptyObject> {
+    public async invite(roomId: string, userId: string, opts: InviteOpts | string = {}): Promise<EmptyObject> {
         if (typeof opts != "object") {
             opts = { reason: opts };
         }
-        return this.membershipChange(roomId, userId, KnownMembership.Invite, opts.reason);
+
+        if (opts.shareEncryptedHistory) {
+            await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
+        }
+
+        return await this.membershipChange(roomId, userId, KnownMembership.Invite, opts.reason);
     }
 
     /**
