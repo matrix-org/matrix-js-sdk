@@ -36,6 +36,7 @@ import {
     AllDevicesIsolationMode,
     OnlySignedDevicesIsolationMode,
 } from "../../../src/crypto-api";
+import { logger } from "../../../src/logger.ts";
 
 describe("RoomEncryptor", () => {
     describe("History Visibility", () => {
@@ -108,6 +109,7 @@ describe("RoomEncryptor", () => {
             } as unknown as Mocked<Room>;
 
             roomEncryptor = new RoomEncryptor(
+                logger,
                 mockOlmMachine,
                 mockKeyClaimManager,
                 mockOutgoingRequestManager,

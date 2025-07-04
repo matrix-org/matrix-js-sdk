@@ -28,7 +28,7 @@ import {
     UploadSigningKeysRequest,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { logger } from "../logger.ts";
+import { type Logger } from "../logger.ts";
 import { calculateRetryBackoff, type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { logDuration, type QueryDict, sleep } from "../utils.ts";
 import { type AuthDict, type UIAuthCallback } from "../interactive-auth.ts";
@@ -49,6 +49,7 @@ import { UnstablePrefix as DehydrationUnstablePrefix } from "./DehydratedDeviceM
  */
 export class OutgoingRequestProcessor {
     public constructor(
+        private readonly logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     ) {}
@@ -100,13 +101,13 @@ export class OutgoingRequestProcessor {
             // PutDehydratedDeviceRequest does not implement OutgoingRequest and does not need to be marked as sent.
             return;
         } else {
-            logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
+            this.logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
             resp = "";
         }
 
         if (msg.id) {
             try {
-                await logDuration(logger, `Mark Request as sent ${msg.type}`, async () => {
+                await logDuration(this.logger, `Mark Request as sent ${msg.type}`, async () => {
                     await this.olmMachine.markRequestAsSent(msg.id!, msg.type, resp);
                 });
             } catch (e) {
@@ -116,13 +117,13 @@ export class OutgoingRequestProcessor {
                     e instanceof Error &&
                     (e.message === "Attempt to use a moved value" || e.message === "null pointer passed to rust")
                 ) {
-                    logger.log(`Ignoring error '${e.message}': client is likely shutting down`);
+                    this.logger.debug(`Ignoring error '${e.message}': client is likely shutting down`);
                 } else {
                     throw e;
                 }
             }
         } else {
-            logger.trace(`Outgoing request type:${msg.type} does not have an ID`);
+            this.logger.trace(`Outgoing request type:${msg.type} does not have an ID`);
         }
     }
 
@@ -143,7 +144,7 @@ export class OutgoingRequestProcessor {
             }
         }
 
-        logger.info(
+        this.logger.info(
             `Sending batch of to-device messages. type=${request.event_type} txnid=${request.txn_id}`,
             messageList,
         );

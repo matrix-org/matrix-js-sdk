@@ -29,7 +29,7 @@ import {
 import { EventType } from "../@types/event.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
-import { type Logger, logger, LogSpan } from "../logger.ts";
+import { type Logger, LogSpan } from "../logger.ts";
 import { type KeyClaimManager } from "./KeyClaimManager.ts";
 import { type RoomMember } from "../models/room-member.ts";
 import { HistoryVisibility } from "../@types/partials.ts";
@@ -44,8 +44,6 @@ import { type DeviceIsolationMode, DeviceIsolationModeKind } from "../crypto-api
  * @internal
  */
 export class RoomEncryptor {
-    private readonly prefixedLogger: Logger;
-
     /** whether the room members have been loaded and tracked for the first time */
     private lazyLoadedMembersResolved = false;
 
@@ -57,6 +55,7 @@ export class RoomEncryptor {
     private currentEncryptionPromise: Promise<void> = Promise.resolve();
 
     /**
+     * @param prefixedLogger - A logger to use for log messages.
      * @param olmMachine - The rust-sdk's OlmMachine
      * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
      * @param outgoingRequestManager - The OutgoingRequestManager, which manages the queue of outgoing requests.
@@ -64,14 +63,13 @@ export class RoomEncryptor {
      * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
      */
     public constructor(
+        private readonly prefixedLogger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly keyClaimManager: KeyClaimManager,
         private readonly outgoingRequestManager: OutgoingRequestsManager,
         private readonly room: Room,
         private encryptionSettings: IContent,
     ) {
-        this.prefixedLogger = logger.getChild(`[${room.roomId} encryption]`);
-
         // start tracking devices for any users already known to be in this room.
         // Do not load members here, would defeat lazy loading.
         const members = room.getJoinedMembers();
@@ -212,7 +210,7 @@ export class RoomEncryptor {
         // This could end up being racy (if two calls to ensureEncryptionSession happen at the same time), but that's
         // not a particular problem, since `OlmMachine.updateTrackedUsers` just adds any users that weren't already tracked.
         if (!this.lazyLoadedMembersResolved) {
-            await logDuration(this.prefixedLogger, "loadMembersIfNeeded: updateTrackedUsers", async () => {
+            await logDuration(logger, "loadMembersIfNeeded: updateTrackedUsers", async () => {
                 await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
             });
             logger.debug(`Updated tracked users`);
@@ -229,7 +227,7 @@ export class RoomEncryptor {
             // XXX future improvement process only KeysQueryRequests for the users that have never been queried.
             logger.debug(`Processing outgoing requests`);
 
-            await logDuration(this.prefixedLogger, "doProcessOutgoingRequests", async () => {
+            await logDuration(logger, "doProcessOutgoingRequests", async () => {
                 await this.outgoingRequestManager.doProcessOutgoingRequests();
             });
         } else {
@@ -250,7 +248,7 @@ export class RoomEncryptor {
 
         const userList = members.map((u) => new UserId(u.userId));
 
-        await logDuration(this.prefixedLogger, "ensureSessionsForUsers", async () => {
+        await logDuration(logger, "ensureSessionsForUsers", async () => {
             await this.keyClaimManager.ensureSessionsForUsers(logger, userList);
         });
 
@@ -289,7 +287,7 @@ export class RoomEncryptor {
                 break;
         }
 
-        await logDuration(this.prefixedLogger, "shareRoomKey", async () => {
+        await logDuration(logger, "shareRoomKey", async () => {
             const shareMessages: ToDeviceRequest[] = await this.olmMachine.shareRoomKey(
                 new RoomId(this.room.roomId),
                 // safe to pass without cloning, as it's not reused here (before or after)
