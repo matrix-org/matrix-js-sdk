@@ -88,6 +88,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should distribute keys to members on join", async () => {
+            jest.useFakeTimers();
             const members = [
                 aCallMembership("@bob:example.org", "BOBDEVICE"),
                 aCallMembership("@bob:example.org", "BOBDEVICE2"),
@@ -165,7 +166,7 @@ describe("RTCEncryptionManager", () => {
             );
         });
 
-        it("Should not rotate key when a user join", async () => {
+        it("Should not rotate key when a user join within the rotation grace period", async () => {
             jest.useFakeTimers();
 
             const members = [
@@ -174,8 +175,9 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
+            const gracePeriod = 15_000; // 15 seconds
             // initial rollout
-            encryptionManager.join(undefined);
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
             encryptionManager.onMembershipsUpdate([]);
             await jest.runOnlyPendingTimersAsync();
 
@@ -196,6 +198,8 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(updatedMembers);
 
+            await jest.advanceTimersByTimeAsync(8_000);
+
             encryptionManager.onMembershipsUpdate(updatedMembers);
 
             await jest.runOnlyPendingTimersAsync();
@@ -212,6 +216,104 @@ describe("RTCEncryptionManager", () => {
             await jest.advanceTimersByTimeAsync(1000);
 
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
+        });
+
+        it("Should rotate key when a user join past the rotation grace period", async () => {
+            jest.useFakeTimers();
+
+            const members = [
+                aCallMembership("@bob:example.org", "BOBDEVICE"),
+                aCallMembership("@bob:example.org", "BOBDEVICE2"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            const gracePeriod = 15_000; // 15 seconds
+            // initial rollout
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.onMembershipsUpdate([]);
+            await jest.runOnlyPendingTimersAsync();
+
+            onEncryptionKeysChanged.mockClear();
+            mockTransport.sendKey.mockClear();
+
+            const updatedMembers = [
+                aCallMembership("@bob:example.org", "BOBDEVICE"),
+                aCallMembership("@bob:example.org", "BOBDEVICE2"),
+                aCallMembership("@carl:example.org", "CARLDEVICE"),
+            ];
+            getMembershipMock.mockReturnValue(updatedMembers);
+
+            await jest.advanceTimersByTimeAsync(gracePeriod + 1000);
+
+            encryptionManager.onMembershipsUpdate(updatedMembers);
+
+            await jest.runOnlyPendingTimersAsync();
+
+            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+                expect.any(String),
+                // It should have incremented the key index
+                1,
+                // And send it to everyone
+                [
+                    expect.objectContaining({ userId: "@bob:example.org", deviceId: "BOBDEVICE" }),
+                    expect.objectContaining({ userId: "@bob:example.org", deviceId: "BOBDEVICE2" }),
+                    expect.objectContaining({ userId: "@carl:example.org", deviceId: "CARLDEVICE" }),
+                ],
+            );
+
+            expect(onEncryptionKeysChanged).toHaveBeenCalled();
+            await jest.advanceTimersByTimeAsync(1000);
+            expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
+        });
+
+        it("Should rotate key when several users join within the rotation grace period", async () => {
+            jest.useFakeTimers();
+
+            const members = [
+                aCallMembership("@bob:example.org", "BOBDEVICE"),
+                aCallMembership("@bob:example.org", "BOBDEVICE2"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            // initial rollout
+            encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate([]);
+            await jest.runOnlyPendingTimersAsync();
+
+            onEncryptionKeysChanged.mockClear();
+            mockTransport.sendKey.mockClear();
+
+            const newJoiners = [
+                aCallMembership("@carl:example.org", "CARLDEVICE"),
+                aCallMembership("@dave:example.org", "DAVEDEVICE"),
+                aCallMembership("@eve:example.org", "EVEDEVICE"),
+                aCallMembership("@frank:example.org", "FRANKDEVICE"),
+                aCallMembership("@george:example.org", "GEORGEDEVICE"),
+            ];
+
+            for (const newJoiner of newJoiners) {
+                members.push(newJoiner);
+                getMembershipMock.mockReturnValue(members);
+                await jest.advanceTimersByTimeAsync(1_000);
+                encryptionManager.onMembershipsUpdate(members);
+                await jest.runOnlyPendingTimersAsync();
+            }
+
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(newJoiners.length);
+
+            for (const newJoiner of newJoiners) {
+                expect(mockTransport.sendKey).toHaveBeenCalledWith(
+                    expect.any(String),
+                    // It should not have incremented the key index
+                    0,
+                    // And send it to the new joiners only
+                    expect.arrayContaining([
+                        expect.objectContaining({ userId: newJoiner.sender, deviceId: newJoiner.deviceId }),
+                    ]),
+                );
+            }
+
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
         });
 
         it("Should not resend keys when no changes", async () => {
