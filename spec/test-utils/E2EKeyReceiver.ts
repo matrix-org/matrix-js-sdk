@@ -18,7 +18,8 @@ import debugFunc, { type Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
-import type { CrossSigningKeys } from "../../src";
+import type { CrossSigningKeys, ISignedKey, KeySignatures } from "../../src";
+import type { CrossSigningKeyInfo } from "../../src/crypto-api";
 
 /** Interface implemented by classes that intercept `/keys/upload` requests from test clients to catch the uploaded keys
  *
@@ -62,9 +63,14 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     /**
      * Construct a new E2EKeyReceiver.
      *
-     * It will immediately register an intercept of `/keys/uploads` and `/keys/device_signing/upload` requests for the given homeserverUrl.
+     * It will immediately register an intercept of [`/keys/upload`][1], [`/keys/signatures/upload`][2] and
+     * [`/keys/device_signing/upload`][3] requests for the given homeserverUrl.
      * Only requests made to this server will be intercepted: this allows a single test to use more than one
      * client and have the keys collected separately.
+     *
+     * [1]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keysupload
+     * [2]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keyssignaturesupload
+     * [3]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keysdevice_signingupload
      *
      * @param homeserverUrl - the Homeserver Url of the client under test.
      */
@@ -78,6 +84,14 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
 
             fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
         });
+
+        fetchMock.post(
+            {
+                url: new URL("/_matrix/client/v3/keys/signatures/upload", homeserverUrl).toString(),
+                name: "upload-sigs",
+            },
+            (url, options) => this.onSignaturesUploadRequest(options),
+        );
 
         fetchMock.post(
             {
@@ -96,8 +110,10 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
             if (this.deviceKeys) {
                 throw new Error("Application attempted to upload E2E device keys multiple times");
             }
-            this.debug(`received device keys`);
             this.deviceKeys = content.device_keys;
+            this.debug(
+                `received device keys for user ID ${this.deviceKeys!.user_id}, device ID ${this.deviceKeys!.device_id}`,
+            );
         }
 
         if (content.one_time_keys && Object.keys(content.one_time_keys).length > 0) {
@@ -120,6 +136,35 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
                 signed_curve25519: Object.keys(this.oneTimeKeys).length,
             },
         };
+    }
+
+    private async onSignaturesUploadRequest(request: RequestInit): Promise<object> {
+        const content = JSON.parse(request.body as string) as KeySignatures;
+        for (const [userId, userKeys] of Object.entries(content)) {
+            for (const [deviceId, signedKey] of Object.entries(userKeys)) {
+                this.onDeviceSignatureUpload(userId, deviceId, signedKey);
+            }
+        }
+
+        return {};
+    }
+
+    private onDeviceSignatureUpload(userId: string, deviceId: string, signedKey: CrossSigningKeyInfo | ISignedKey) {
+        if (!this.deviceKeys || userId != this.deviceKeys.user_id || deviceId != this.deviceKeys.device_id) {
+            this.debug(
+                `Ignoring device key signature upload for unknown device user ID ${userId}, device ID ${deviceId}`,
+            );
+            return;
+        }
+
+        this.debug(`received device key signature for user ID ${userId}, device ID ${deviceId}`);
+        this.deviceKeys.signatures ??= {};
+        for (const [signingUser, signatures] of Object.entries(signedKey.signatures!)) {
+            this.deviceKeys.signatures[signingUser] = Object.assign(
+                this.deviceKeys.signatures[signingUser] ?? {},
+                signatures,
+            );
+        }
     }
 
     private async onSigningKeyUploadRequest(request: RequestInit): Promise<object> {
