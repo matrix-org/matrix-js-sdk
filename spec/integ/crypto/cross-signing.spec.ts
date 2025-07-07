@@ -225,9 +225,6 @@ describe("cross-signing", () => {
             await aliceClient.startClient();
             await syncPromise(aliceClient);
 
-            // we expect a request to upload signatures for our device ...
-            fetchMock.post({ url: "path:/_matrix/client/v3/keys/signatures/upload", name: "upload-sigs" }, {});
-
             // we expect the UserTrustStatusChanged event to be fired after the cross signing keys import
             const userTrustStatusChangedPromise = new Promise<string>((resolve) =>
                 aliceClient.on(CryptoEvent.UserTrustStatusChanged, resolve),

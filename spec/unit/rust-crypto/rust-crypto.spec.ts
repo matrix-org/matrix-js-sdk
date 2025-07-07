@@ -1554,10 +1554,6 @@ describe("RustCrypto", () => {
             const e2eKeyReceiver = new E2EKeyReceiver("http://server");
             const e2eKeyResponder = new E2EKeyResponder("http://server");
             e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
-            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
-                status: 200,
-                body: {},
-            });
             await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
             await expect(rustCrypto.pinCurrentUserIdentity(TEST_USER)).rejects.toThrow(
                 "Cannot pin identity of own user",
@@ -1795,10 +1791,6 @@ describe("RustCrypto", () => {
                     error: "Not found",
                 },
             });
-            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
-                status: 200,
-                body: {},
-            });
             const rustCrypto1 = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
 
             // dehydration requires secret storage and cross signing
@@ -1931,10 +1923,6 @@ describe("RustCrypto", () => {
                         errcode: "M_NOT_FOUND",
                         error: "Not found",
                     },
-                });
-                fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
-                    status: 200,
-                    body: {},
                 });
                 rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
 
