@@ -126,7 +126,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 .then(() => {
                     if (this.outboundSession) {
                         this.outboundSession.sharedWith = [];
-                        this.ensureMediaKeyDistribution();
+                        this.ensureKeyDistribution();
                     }
                 })
                 .catch((e) => {
@@ -135,7 +135,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } else {
             if (this.outboundSession) {
                 this.outboundSession.sharedWith = [];
-                this.ensureMediaKeyDistribution();
+                this.ensureKeyDistribution();
             }
         }
     };
@@ -143,9 +143,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * Will ensure that a new key is distributed and used to encrypt our media.
      * If there is already a key distribution in progress, it will schedule a new distribution round just after the current one is completed.
      * If this function is called repeatedly while a distribution is in progress,
-     * the calls will be coalesced to a single new distribution (that will start just after the current one as completed)   .
+     * the calls will be coalesced to a single new distribution (that will start just after the current one has completed).
      */
-    private ensureMediaKeyDistribution(): void {
+    private ensureKeyDistribution(): void {
         if (this.currentKeyDistributionPromise == null) {
             this.logger?.debug(`No active rollout, start a new one`);
             // start a rollout
@@ -156,7 +156,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                     this.logger?.debug(`New Rollout needed`);
                     this.needToEnsureKeyAgain = false;
                     // rollout a new one
-                    this.ensureMediaKeyDistribution();
+                    this.ensureKeyDistribution();
                 }
             });
         } else {
@@ -199,7 +199,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
-        this.ensureMediaKeyDistribution();
+        this.ensureKeyDistribution();
     }
 
     private async rolloutOutboundKey(): Promise<void> {
