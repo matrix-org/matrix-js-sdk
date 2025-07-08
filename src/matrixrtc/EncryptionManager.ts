@@ -43,6 +43,10 @@ export interface IEncryptionManager {
      *
      * @returns A map where the keys are identifiers and the values are arrays of
      * objects containing encryption keys and their associated timestamps.
+     * @deprecated This method is used internally for testing. It is also used to re-emit keys when there is a change
+     * of RTCSession (matrixKeyProvider#setRTCSession) -Not clear why/when switch RTCSession would occur-. Note that if we switch focus, we do keep the same RTC session,
+     * so no need to re-emit. But it requires the encryption manager to store all keys of all participants, and this is already done
+     * by the key provider. We don't want to add another layer of key storage.
      */
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
 }
