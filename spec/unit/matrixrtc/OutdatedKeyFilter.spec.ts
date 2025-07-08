@@ -14,49 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { KeyBuffer } from "../../../src/matrixrtc/utils.ts";
+import { OutdatedKeyFilter } from "../../../src/matrixrtc/utils.ts";
 import { type InboundEncryptionSession } from "../../../src/matrixrtc";
 
-describe("KeyBuffer Test", () => {
+describe("OutdatedKeyFilter Test", () => {
     it("Should buffer and disambiguate keys by timestamp", () => {
-        jest.useFakeTimers();
-
-        const buffer = new KeyBuffer(1000);
+        const filter = new OutdatedKeyFilter();
 
         const aKey = fakeInboundSessionWithTimestamp(1000);
         const olderKey = fakeInboundSessionWithTimestamp(300);
         // Simulate receiving out of order keys
 
-        const init = buffer.disambiguate(aKey.participantId, aKey);
-        expect(init).toEqual(aKey);
-        // Some time pass
-        jest.advanceTimersByTime(600);
+        expect(filter.isOutdated(aKey.participantId, aKey)).toBe(false);
         // Then we receive the most recent key out of order
-
-        const key = buffer.disambiguate(aKey.participantId, olderKey);
+        const isOutdated = filter.isOutdated(aKey.participantId, olderKey);
         // this key is older and should be ignored even if received after
-        expect(key).toBe(null);
-    });
-
-    it("Should clear buffer after ttl", () => {
-        jest.useFakeTimers();
-
-        const buffer = new KeyBuffer(1000);
-
-        const aKey = fakeInboundSessionWithTimestamp(1000);
-        const olderKey = fakeInboundSessionWithTimestamp(300);
-        // Simulate receiving out of order keys
-
-        const init = buffer.disambiguate(aKey.participantId, aKey);
-        expect(init).toEqual(aKey);
-
-        // Similar to previous test but there is too much delay
-        // We don't want to keep key material for too long
-        jest.advanceTimersByTime(1200);
-
-        const key = buffer.disambiguate(aKey.participantId, olderKey);
-        // The buffer is cleared so should return this key
-        expect(key).toBe(olderKey);
+        expect(isOutdated).toBe(true);
     });
 
     function fakeInboundSessionWithTimestamp(ts: number): InboundEncryptionSession {

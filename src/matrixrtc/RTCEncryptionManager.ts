@@ -28,7 +28,7 @@ import type {
     ParticipantId,
     Statistics,
 } from "./types.ts";
-import { getParticipantId, KeyBuffer } from "./utils.ts";
+import { getParticipantId, OutdatedKeyFilter } from "./utils.ts";
 import {
     type EnabledTransports,
     RoomAndToDeviceEvents,
@@ -73,7 +73,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * For that reason we keep a small buffer of keys for a limited time to disambiguate.
      * @private
      */
-    private keyBuffer = new KeyBuffer(1000 /** 1 second */);
+    private keyBuffer = new OutdatedKeyFilter();
 
     private logger: Logger | undefined = undefined;
 
@@ -112,7 +112,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public leave(): void {
-        this.keyBuffer.clear();
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.stop();
     }
@@ -180,9 +179,13 @@ export class RTCEncryptionManager implements IEncryptionManager {
             creationTS: timestamp,
         };
 
-        const validSession = this.keyBuffer.disambiguate(participantId, candidateInboundSession);
-        if (validSession) {
-            this.onEncryptionKeysChanged(validSession.key, validSession.keyIndex, validSession.participantId);
+        const outdated = this.keyBuffer.isOutdated(participantId, candidateInboundSession);
+        if (!outdated) {
+            this.onEncryptionKeysChanged(
+                candidateInboundSession.key,
+                candidateInboundSession.keyIndex,
+                candidateInboundSession.participantId,
+            );
             this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
             this.logger?.info(`Received an out of order key for ${userId}:${deviceId}, dropping it`);

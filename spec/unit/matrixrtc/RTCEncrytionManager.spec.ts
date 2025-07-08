@@ -411,7 +411,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@bob:example.org",
+                "@carol:example.org",
                 "CAROLDEVICE",
                 "AAAAAAAAAAA",
                 0 /* KeyId */,
@@ -422,7 +422,7 @@ describe("RTCEncryptionManager", () => {
 
             // The latest key used for carol should be the one with the latest timestamp
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
                 decodeBase64("BBBBBBBBBBB"),
                 0,
                 "@carol:example.org:CAROLDEVICE",

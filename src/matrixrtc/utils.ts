@@ -16,23 +16,14 @@ limitations under the License.
 
 import type { InboundEncryptionSession, ParticipantId } from "./types.ts";
 
-type BufferEntry = {
-    keys: Map<number, InboundEncryptionSession>;
-    timeout: any;
-};
-
 /**
- * Holds the key received for a few seconds before dropping them in order to support some edge case with
- * out of order keys.
+ * Detects when a key for a given index is outdated.
  */
-export class KeyBuffer {
-    private readonly ttl;
+export class OutdatedKeyFilter {
+    // Map of participantId -> keyIndex -> timestamp
+    private tsBuffer: Map<ParticipantId, Map<number, number>> = new Map();
 
-    private buffer: Map<ParticipantId, BufferEntry> = new Map();
-
-    public constructor(ttl?: number) {
-        this.ttl = ttl ?? 1000; // Default 1 second
-    }
+    public constructor() {}
 
     /**
      * Check if there is a recent key with the same keyId (index) and then use the creationTS to decide what to
@@ -40,43 +31,18 @@ export class KeyBuffer {
      * @param participantId
      * @param item
      */
-    public disambiguate(participantId: ParticipantId, item: InboundEncryptionSession): InboundEncryptionSession | null {
-        if (!this.buffer.has(participantId)) {
-            const timeout = setTimeout(() => {
-                this.buffer.delete(participantId);
-            }, this.ttl);
-
-            const map = new Map<number, InboundEncryptionSession>();
-            map.set(item.keyIndex, item);
-            const entry: BufferEntry = {
-                keys: map,
-                timeout,
-            };
-            this.buffer.set(participantId, entry);
-            return item;
+    public isOutdated(participantId: ParticipantId, item: InboundEncryptionSession): boolean {
+        if (!this.tsBuffer.has(participantId)) {
+            this.tsBuffer.set(participantId, new Map<number, number>());
         }
 
-        const entry = this.buffer.get(participantId)!;
-        clearTimeout(entry.timeout);
-        entry.timeout = setTimeout(() => {
-            this.buffer.delete(participantId);
-        }, this.ttl);
-
-        const existing = entry.keys.get(item.keyIndex);
-        if (existing && existing.creationTS > item.creationTS) {
-            // The existing is more recent just ignore this one, it is a key received out of order
-            return null;
-        } else {
-            entry.keys.set(item.keyIndex, item);
-            return item;
+        const latestTimestamp = this.tsBuffer.get(participantId)?.get(item.keyIndex);
+        if (latestTimestamp && latestTimestamp > item.creationTS) {
+            // The existing key is more recent, ignore this one
+            return true;
         }
-    }
-
-    public clear(): void {
-        this.buffer.forEach((entry) => {
-            clearTimeout(entry.timeout);
-        });
-        this.buffer.clear();
+        this.tsBuffer.get(participantId)!.set(item.keyIndex, item.creationTS);
+        return false;
     }
 }
 
