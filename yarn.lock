@@ -2103,9 +2103,9 @@
     undici-types "~5.26.4"
 
 "@types/node@18":
-  version "18.19.112"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.112.tgz#cd2aee9c075402e0e1942a44101428881dbeb110"
-  integrity sha512-i+Vukt9POdS/MBI7YrrkkI5fMfwFtOjphSmt4WXYLfwqsfr6z/HdCx7LqT9M7JktGob8WNgj8nFB4TbGNE4Cog==
+  version "18.19.115"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.115.tgz#cd94caf14472021b4443c99bcd7aac6bb5c4f672"
+  integrity sha512-kNrFiTgG4a9JAn1LMQeLOv3MvXIPokzXziohMrMsvpYgLpdEt/mMiVYc4sGKtDfyxM5gIDF4VgrPRyCw4fHOYg==
   dependencies:
     undici-types "~5.26.4"
 
