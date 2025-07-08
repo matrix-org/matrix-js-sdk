@@ -6,6 +6,7 @@ import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 import { isMyMembership, type Statistics } from "./types.ts";
+import { getParticipantId } from "./utils.ts";
 import {
     type EnabledTransports,
     RoomAndToDeviceEvents,
@@ -42,6 +43,10 @@ export interface IEncryptionManager {
      *
      * @returns A map where the keys are identifiers and the values are arrays of
      * objects containing encryption keys and their associated timestamps.
+     * @deprecated This method is used internally for testing. It is also used to re-emit keys when there is a change
+     * of RTCSession (matrixKeyProvider#setRTCSession) -Not clear why/when switch RTCSession would occur-. Note that if we switch focus, we do keep the same RTC session,
+     * so no need to re-emit. But it requires the encryption manager to store all keys of all participants, and this is already done
+     * by the key provider. We don't want to add another layer of key storage.
      */
     getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
 }
@@ -82,6 +87,7 @@ export class EncryptionManager implements IEncryptionManager {
     private latestGeneratedKeyIndex = -1;
     private joinConfig: EncryptionConfig | undefined;
     private logger: Logger;
+
     public constructor(
         private userId: string,
         private deviceId: string,
@@ -280,7 +286,18 @@ export class EncryptionManager implements IEncryptionManager {
 
         try {
             this.statistics.counters.roomEventEncryptionKeysSent += 1;
-            await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, this.getMemberships());
+            const targets = this.getMemberships()
+                .filter((membership) => {
+                    return membership.sender != undefined;
+                })
+                .map((membership) => {
+                    return {
+                        userId: membership.sender!,
+                        deviceId: membership.deviceId,
+                        membershipTs: membership.createdTs(),
+                    };
+                });
+            await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, targets);
             this.logger.debug(
                 `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
                 this.encryptionKeys,
@@ -407,8 +424,6 @@ export class EncryptionManager implements IEncryptionManager {
         void this.sendEncryptionKeysEvent(newKeyIndex);
     };
 }
-
-const getParticipantId = (userId: string, deviceId: string): string => `${userId}:${deviceId}`;
 
 function keysEqual(a: Uint8Array | undefined, b: Uint8Array | undefined): boolean {
     if (a === b) return true;

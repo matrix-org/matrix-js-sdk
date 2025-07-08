@@ -21,6 +21,7 @@ import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/
 import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
 import { makeMockEvent, makeMockRoom, makeMockRoomState, membershipTemplate, makeKey } from "./mocks";
+import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 
 const mockFocus = { type: "mock" };
 
@@ -745,11 +746,27 @@ describe("MatrixRTCSession", () => {
                     expect(sendKeySpy).toHaveBeenCalledTimes(1);
                     // check that we send the key with index 1 even though the send gets delayed when leaving.
                     // this makes sure we do not use an index that is one too old.
-                    expect(sendKeySpy).toHaveBeenLastCalledWith(expect.any(String), 1, sess.memberships);
+                    expect(sendKeySpy).toHaveBeenLastCalledWith(
+                        expect.any(String),
+                        1,
+                        sess.memberships.map((m) => ({
+                            userId: m.sender,
+                            deviceId: m.deviceId,
+                            membershipTs: m.createdTs(),
+                        })),
+                    );
                     // fake a condition in which we send another encryption key event.
                     // this could happen do to someone joining the call.
                     (sess as unknown as any).encryptionManager.sendEncryptionKeysEvent();
-                    expect(sendKeySpy).toHaveBeenLastCalledWith(expect.any(String), 1, sess.memberships);
+                    expect(sendKeySpy).toHaveBeenLastCalledWith(
+                        expect.any(String),
+                        1,
+                        sess.memberships.map((m) => ({
+                            userId: m.sender,
+                            deviceId: m.deviceId,
+                            membershipTs: m.createdTs(),
+                        })),
+                    );
                     jest.advanceTimersByTime(7000);
 
                     const secondKeysPayload = await keysSentPromise2;
@@ -862,10 +879,14 @@ describe("MatrixRTCSession", () => {
                         manageMediaKeys: true,
                         useExperimentalToDeviceTransport: true,
                     });
+                    sess.onRTCSessionMemberUpdate();
 
                     await keySentPromise;
 
                     expect(sendToDeviceMock).toHaveBeenCalled();
+
+                    // Access private to test
+                    expect(sess["encryptionManager"]).toBeInstanceOf(RTCEncryptionManager);
                 } finally {
                     jest.useRealTimers();
                 }

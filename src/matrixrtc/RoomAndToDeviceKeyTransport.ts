@@ -16,10 +16,10 @@ limitations under the License.
 
 import { logger as rootLogger, type Logger } from "../logger.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap, type IKeyTransport } from "./IKeyTransport.ts";
-import { type CallMembership } from "./CallMembership.ts";
 import type { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import { NotSupportedError, type ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
+import { type ParticipantDeviceInfo } from "./types.ts";
 
 // Deprecate RoomAndToDeviceTransport: This whole class is only a stop gap until we remove RoomKeyTransport.
 export interface EnabledTransports {
@@ -106,7 +106,7 @@ export class RoomAndToDeviceTransport
         this.toDeviceTransport.stop();
     }
 
-    public async sendKey(keyBase64Encoded: string, index: number, members: CallMembership[]): Promise<void> {
+    public async sendKey(keyBase64Encoded: string, index: number, members: ParticipantDeviceInfo[]): Promise<void> {
         this.logger.debug(
             `Sending key with index ${index} to call members (count=${members.length}) via:` +
                 (this._enabled.room ? "room transport" : "") +

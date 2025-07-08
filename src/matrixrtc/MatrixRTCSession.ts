@@ -30,6 +30,7 @@ import { logDurationSync } from "../utils.ts";
 import { type Statistics } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
+import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import {
     RoomAndToDeviceEvents,
     type RoomAndToDeviceEventsHandlerMap,
@@ -399,6 +400,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
+                this.logger.info("Using experimental to-device transport for encryption keys");
                 this.logger.info("Using to-device with room fallback transport for encryption keys");
                 const [uId, dId] = [this.client.getUserId()!, this.client.getDeviceId()!];
                 const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
@@ -409,20 +411,40 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
                 // Expose the changes so the ui can display the currently used transport.
                 this.reEmitter.reEmit(transport, [RoomAndToDeviceEvents.EnabledTransportsChanged]);
+                this.encryptionManager = new RTCEncryptionManager(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    () => this.memberships,
+                    transport,
+                    this.statistics,
+                    (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            participantId,
+                        );
+                    },
+                    this.logger,
+                );
             } else {
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
+                this.encryptionManager = new EncryptionManager(
+                    this.client.getUserId()!,
+                    this.client.getDeviceId()!,
+                    () => this.memberships,
+                    transport,
+                    this.statistics,
+                    (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            participantId,
+                        );
+                    },
+                );
             }
-            this.encryptionManager = new EncryptionManager(
-                this.client.getUserId()!,
-                this.client.getDeviceId()!,
-                () => this.memberships,
-                transport,
-                this.statistics,
-                (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
-                    this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, participantId);
-                },
-                this.logger,
-            );
         }
 
         // Join!
