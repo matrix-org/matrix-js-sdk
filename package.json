@@ -81,7 +81,7 @@
         "@casualbot/jest-sonar-reporter": "2.2.7",
         "@matrix-org/olm": "3.2.15",
         "@peculiar/webcrypto": "^1.4.5",
-        "@stylistic/eslint-plugin": "^4.0.0",
+        "@stylistic/eslint-plugin": "^5.0.0",
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
         "@types/jest": "^29.0.0",
