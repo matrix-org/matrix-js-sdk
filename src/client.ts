@@ -2209,7 +2209,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<EmptyObject> {
         // If the sync loop is not running, fall back to setAccountDataRaw.
         if (!this.clientRunning) {
-            logger.warn(
+            this.logger.warn(
                 "Calling `setAccountData` before the client is started: `getAccountData` may return inconsistent results.",
             );
             return await retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));

@@ -30,7 +30,7 @@ import {
     DecryptionError,
     type OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
-import { logger, type Logger, LogSpan } from "../logger.ts";
+import { type Logger, LogSpan } from "../logger.ts";
 import { type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { RoomEncryptor } from "./RoomEncryptor.ts";
 import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
@@ -826,18 +826,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     private async saveBackupKeyToStorage(): Promise<void> {
         const keyBackupInfo = await this.backupManager.getServerBackupInfo();
         if (!keyBackupInfo || !keyBackupInfo.version) {
-            logger.info("Not saving backup key to secret storage: no backup info");
+            this.logger.info("Not saving backup key to secret storage: no backup info");
             return;
         }
 
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
         if (!backupKeys.decryptionKey) {
-            logger.info("Not saving backup key to secret storage: no backup key");
+            this.logger.info("Not saving backup key to secret storage: no backup key");
             return;
         }
 
         if (!decryptionKeyMatchesKeyBackupInfo(backupKeys.decryptionKey, keyBackupInfo)) {
-            logger.info("Not saving backup key to secret storage: decryption key does not match backup info");
+            this.logger.info("Not saving backup key to secret storage: decryption key does not match backup info");
             return;
         }
 
@@ -1262,7 +1262,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         if (info?.version) {
             await this.deleteKeyBackupVersion(info.version);
         } else {
-            logger.error("Can't delete key backup version: no version available");
+            this.logger.error("Can't delete key backup version: no version available");
         }
 
         // also turn off 4S, since this is also storing keys on the server.
