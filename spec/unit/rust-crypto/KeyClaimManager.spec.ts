@@ -53,7 +53,7 @@ describe("KeyClaimManager", () => {
             markRequestAsSent: jest.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
-        const outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, httpApi);
+        const outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, httpApi);
 
         keyClaimManager = new KeyClaimManager(olmMachine, outgoingRequestProcessor);
     });

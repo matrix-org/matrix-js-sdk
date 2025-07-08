@@ -8,6 +8,7 @@ import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/Outgoing
 import * as testData from "../../test-utils/test-data";
 import * as TestData from "../../test-utils/test-data";
 import { RustBackupManager, type KeyBackup } from "../../../src/rust-crypto/backup";
+import { logger } from "../../../src/logger.ts";
 
 describe("Upload keys to backup", () => {
     /** The backup manager under test */
@@ -63,7 +64,7 @@ describe("Upload keys to backup", () => {
             makeOutgoingRequest: jest.fn(),
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
-        rustBackupManager = new RustBackupManager(mockOlmMachine, httpAPi, outgoingRequestProcessor);
+        rustBackupManager = new RustBackupManager(logger, mockOlmMachine, httpAPi, outgoingRequestProcessor);
 
         fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
     });

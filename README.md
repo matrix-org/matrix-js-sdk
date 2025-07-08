@@ -11,6 +11,22 @@
 This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
 browser or in Node.js.
 
+---
+
+<picture>
+  <source srcset="contrib/element-logo-light.png" media="(prefers-color-scheme: dark)">
+  <source srcset="contrib/element-logo-dark.png" media="(prefers-color-scheme: light)">
+  <img src="contrib/element-logo-fallback.png" alt="Element logo">
+</picture>
+
+<br>
+
+Development and maintenance is proudly sponsored by [Element](https://element.io). Element uses the SDK in their flagship [web](https://github.com/element-hq/element-web) and [desktop](https://github.com/element-hq/element-desktop) clients.
+
+The SDK is also the basis for multiple Matrix projects and we welcome contributions from all.
+
+---
+
 #### Minimum Matrix server version: v1.1
 
 The Matrix specification is constantly evolving - while this SDK aims for maximum backwards compatibility, it only

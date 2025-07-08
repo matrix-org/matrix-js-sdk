@@ -163,7 +163,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         private readonly cryptoCallbacks: CryptoCallbacks,
     ) {
         super();
-        this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+        this.outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, http);
         this.outgoingRequestsManager = new OutgoingRequestsManager(
             this.logger,
             olmMachine,
@@ -172,7 +172,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
 
-        this.backupManager = new RustBackupManager(olmMachine, http, this.outgoingRequestProcessor);
+        this.backupManager = new RustBackupManager(logger, olmMachine, http, this.outgoingRequestProcessor);
         this.perSessionBackupDownloader = new PerSessionKeyBackupDownloader(
             this.logger,
             this.olmMachine,
@@ -206,7 +206,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             CryptoEvent.DehydratedDeviceRotationError,
         ]);
 
-        this.crossSigningIdentity = new CrossSigningIdentity(olmMachine, this.outgoingRequestProcessor, secretStorage);
+        this.crossSigningIdentity = new CrossSigningIdentity(
+            logger,
+            olmMachine,
+            this.outgoingRequestProcessor,
+            secretStorage,
+        );
 
         // Check and start in background the key backup connection
         this.checkKeyBackupAndEnable();
@@ -1625,6 +1630,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             existingEncryptor.onCryptoEvent(config);
         } else {
             this.roomEncryptors[room.roomId] = new RoomEncryptor(
+                this.logger.getChild(`[${room.roomId} encryption]`),
                 this.olmMachine,
                 this.keyClaimManager,
                 this.outgoingRequestsManager,

@@ -20,6 +20,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { CrossSigningIdentity } from "../../../src/rust-crypto/CrossSigningIdentity";
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { type ServerSideSecretStorage } from "../../../src/secret-storage";
+import { logger } from "../../../src/logger.ts";
 
 describe("CrossSigningIdentity", () => {
     describe("bootstrapCrossSigning", () => {
@@ -55,7 +56,7 @@ describe("CrossSigningIdentity", () => {
                 store: jest.fn(),
             } as unknown as Mocked<ServerSideSecretStorage>;
 
-            crossSigning = new CrossSigningIdentity(olmMachine, outgoingRequestProcessor, secretStorage);
+            crossSigning = new CrossSigningIdentity(logger, olmMachine, outgoingRequestProcessor, secretStorage);
         });
 
         it("should do nothing if keys are present on-device and in secret storage", async () => {

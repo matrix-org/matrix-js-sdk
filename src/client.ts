@@ -1365,7 +1365,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // NB. We initialise MatrixRTC whether we have call support or not: this is just
         // the underlying session management and doesn't use any actual media capabilities
-        this.matrixRTC = new MatrixRTCSessionManager(this);
+        this.matrixRTC = new MatrixRTCSessionManager(this.logger, this);
 
         this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
 

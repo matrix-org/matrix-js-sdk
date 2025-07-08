@@ -28,7 +28,7 @@ import {
     type KeyBackupRestoreResult,
     type KeyBackupRoomSessions,
 } from "../crypto-api/keybackup.ts";
-import { logger } from "../logger.ts";
+import { type Logger } from "../logger.ts";
 import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { encodeUri, logDuration } from "../utils.ts";
@@ -81,6 +81,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     private backupKeysLoopRunning = false;
 
     public constructor(
+        private readonly logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
@@ -131,7 +132,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
         const decryptionKey = backupKeys?.decryptionKey;
         const backupMatchesSavedPrivateKey =
-            !!decryptionKey && backupInfoMatchesBackupDecryptionKey(info, decryptionKey);
+            !!decryptionKey && this.backupInfoMatchesBackupDecryptionKey(info, decryptionKey);
         return {
             matchesDecryptionKey: backupMatchesSavedPrivateKey,
             trusted: signatureVerification.trusted(),
@@ -171,14 +172,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         try {
             latestBackupInfo = await this.requestKeyBackupVersion();
         } catch (e) {
-            logger.warn("handleBackupSecretReceived: Error checking for latest key backup", e);
+            this.logger.warn("handleBackupSecretReceived: Error checking for latest key backup", e);
             return false;
         }
 
         if (!latestBackupInfo?.version) {
             // There is no server-side key backup.
             // This decryption key is useless to us.
-            logger.warn(
+            this.logger.warn(
                 "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
             );
             return false;
@@ -186,21 +187,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         try {
             const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
-            const privateKeyMatches = backupInfoMatchesBackupDecryptionKey(latestBackupInfo, backupDecryptionKey);
+            const privateKeyMatches = this.backupInfoMatchesBackupDecryptionKey(latestBackupInfo, backupDecryptionKey);
             if (!privateKeyMatches) {
-                logger.warn(
+                this.logger.warn(
                     `handleBackupSecretReceived: Private decryption key does not match the public key of the current remote backup.`,
                 );
                 // just ignore the secret
                 return false;
             }
-            logger.info(
+            this.logger.info(
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
             await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
             return true;
         } catch (e) {
-            logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
+            this.logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
         }
 
         return false;
@@ -282,19 +283,19 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /** Helper for `checkKeyBackup` */
     private async doCheckKeyBackup(): Promise<KeyBackupCheck | null> {
-        logger.log("Checking key backup status...");
+        this.logger.debug("Checking key backup status...");
         let backupInfo: KeyBackupInfo | null | undefined;
         try {
             backupInfo = await this.requestKeyBackupVersion();
         } catch (e) {
-            logger.warn("Error checking for active key backup", e);
+            this.logger.warn("Error checking for active key backup", e);
             this.serverBackupInfo = undefined;
             return null;
         }
         this.checkedForBackup = true;
 
         if (backupInfo && !backupInfo.version) {
-            logger.warn("active backup lacks a useful 'version'; ignoring it");
+            this.logger.warn("active backup lacks a useful 'version'; ignoring it");
             backupInfo = undefined;
         }
         this.serverBackupInfo = backupInfo;
@@ -303,10 +304,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         if (!backupInfo) {
             if (activeVersion !== null) {
-                logger.log("No key backup present on server: disabling key backup");
+                this.logger.debug("No key backup present on server: disabling key backup");
                 await this.disableKeyBackup();
             } else {
-                logger.log("No key backup present on server: not enabling key backup");
+                this.logger.debug("No key backup present on server: not enabling key backup");
             }
             return null;
         }
@@ -317,23 +318,25 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // (b) the public key matches the private decryption key that we have received from 4S.
         if (!trustInfo.matchesDecryptionKey && !trustInfo.trusted) {
             if (activeVersion !== null) {
-                logger.log("Key backup present on server but not trusted: disabling key backup");
+                this.logger.debug("Key backup present on server but not trusted: disabling key backup");
                 await this.disableKeyBackup();
             } else {
-                logger.log("Key backup present on server but not trusted: not enabling key backup");
+                this.logger.debug("Key backup present on server but not trusted: not enabling key backup");
             }
         } else {
             if (activeVersion === null) {
-                logger.log(`Found usable key backup v${backupInfo.version}: enabling key backups`);
+                this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
                 await this.enableKeyBackup(backupInfo);
             } else if (activeVersion !== backupInfo.version) {
-                logger.log(`On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`);
+                this.logger.debug(
+                    `On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`,
+                );
                 // This will remove any pending backup request, remove the backup key and reset the backup state of each room key we have.
                 await this.disableKeyBackup();
                 // Enabling will now trigger re-upload of all the keys
                 await this.enableKeyBackup(backupInfo);
             } else {
-                logger.log(`Backup version ${backupInfo.version} still current`);
+                this.logger.debug(`Backup version ${backupInfo.version} still current`);
             }
         }
         return { backupInfo, trustInfo };
@@ -374,12 +377,12 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     private async backupKeysLoop(maxDelay = 10000): Promise<void> {
         if (this.backupKeysLoopRunning) {
-            logger.log(`Backup loop already running`);
+            this.logger.debug(`Backup loop already running`);
             return;
         }
         this.backupKeysLoopRunning = true;
 
-        logger.log(`Backup: Starting keys upload loop for backup version:${this.activeBackupVersion}.`);
+        this.logger.debug(`Backup: Starting keys upload loop for backup version:${this.activeBackupVersion}.`);
 
         // wait between 0 and `maxDelay` seconds, to avoid backup
         // requests from different clients hitting the server all at
@@ -401,18 +404,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 let request: RustSdkCryptoJs.KeysBackupRequest | undefined = undefined;
                 try {
                     request = await logDuration(
-                        logger,
+                        this.logger,
                         "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
                         async () => {
                             return await this.olmMachine.backupRoomKeys();
                         },
                     );
                 } catch (err) {
-                    logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
+                    this.logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
                 }
 
                 if (!request || this.stopped || !this.activeBackupVersion) {
-                    logger.log(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
+                    this.logger.debug(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
                     if (!request) {
                         // nothing more to upload
                         this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
@@ -439,7 +442,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             const keyCount = await this.olmMachine.roomKeyCounts();
                             remainingToUploadCount = keyCount.total - keyCount.backedUp;
                         } catch (err) {
-                            logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                            this.logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
                         }
                     }
 
@@ -455,15 +458,15 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     }
                 } catch (err) {
                     numFailures++;
-                    logger.error("Backup: Error processing backup request for rust crypto-sdk", err);
+                    this.logger.error("Backup: Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
                         const errCode = err.data.errcode;
                         if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
-                            logger.log(`Backup: Failed to upload keys to current vesion: ${errCode}.`);
+                            this.logger.debug(`Backup: Failed to upload keys to current vesion: ${errCode}.`);
                             try {
                                 await this.disableKeyBackup();
                             } catch (error) {
-                                logger.error("Backup: An error occurred while disabling key backup:", error);
+                                this.logger.error("Backup: An error occurred while disabling key backup:", error);
                             }
                             this.emit(CryptoEvent.KeyBackupFailed, err.data.errcode!);
                             // There was an active backup and we are out of sync with the server
@@ -480,7 +483,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                                     continue;
                                 }
                             } catch (error) {
-                                logger.warn(
+                                this.logger.warn(
                                     "Backup: An error occurred while retrieving a rate-limit retry delay",
                                     error,
                                 );
@@ -590,7 +593,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param version - The backup version to delete.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
-        logger.debug(`deleteKeyBackupVersion v:${version}`);
+        this.logger.debug(`deleteKeyBackupVersion v:${version}`);
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
@@ -607,7 +610,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param decryptionKey - The private key to use for decryption.
      */
     public createBackupDecryptor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey): BackupDecryptor {
-        return new RustBackupDecryptor(decryptionKey);
+        return new RustBackupDecryptor(this.logger, decryptionKey);
     }
 
     /**
@@ -707,7 +710,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 totalFailures += currentChunk.length;
                 // We failed to import some keys, but we should still try to import the rest?
                 // Log the error and continue
-                logger.error("Error importing keys from backup", e);
+                this.logger.error("Error importing keys from backup", e);
             }
 
             opts?.progressCallback?.({
@@ -755,27 +758,28 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         return { total: totalKeyCount, imported: totalImported };
     }
-}
 
-/**
- * Checks if the provided backup info matches the given private key.
- *
- * @param info - The backup info to check.
- * @param backupDecryptionKey - The `BackupDecryptionKey` private key to check against.
- * @returns `true` if the private key can decrypt the backup, `false` otherwise.
- */
-function backupInfoMatchesBackupDecryptionKey(
-    info: KeyBackupInfo,
-    backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey,
-): boolean {
-    if (info.algorithm !== "m.megolm_backup.v1.curve25519-aes-sha2") {
-        logger.warn("backupMatchesPrivateKey: Unsupported backup algorithm", info.algorithm);
-        return false;
+    /**
+     * Checks if the provided backup info matches the given private key.
+     *
+     * @param info - The backup info to check.
+     * @param backupDecryptionKey - The `BackupDecryptionKey` private key to check against.
+     * @returns `true` if the private key can decrypt the backup, `false` otherwise.
+     */
+    private backupInfoMatchesBackupDecryptionKey(
+        info: KeyBackupInfo,
+        backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey,
+    ): boolean {
+        if (info.algorithm !== "m.megolm_backup.v1.curve25519-aes-sha2") {
+            this.logger.warn("backupMatchesPrivateKey: Unsupported backup algorithm", info.algorithm);
+            return false;
+        }
+
+        return (
+            (info.auth_data as Curve25519AuthData)?.public_key === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64
+        );
     }
-
-    return (info.auth_data as Curve25519AuthData)?.public_key === backupDecryptionKey.megolmV1PublicKey.publicKeyBase64;
 }
-
 /**
  * Implementation of {@link BackupDecryptor} for the rust crypto backend.
  */
@@ -783,7 +787,10 @@ export class RustBackupDecryptor implements BackupDecryptor {
     private decryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
     public sourceTrusted: boolean;
 
-    public constructor(decryptionKey: RustSdkCryptoJs.BackupDecryptionKey) {
+    public constructor(
+        private readonly logger: Logger,
+        decryptionKey: RustSdkCryptoJs.BackupDecryptionKey,
+    ) {
         this.decryptionKey = decryptionKey;
         this.sourceTrusted = false;
     }
@@ -807,7 +814,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
                 decrypted.session_id = sessionId;
                 keys.push(decrypted);
             } catch (e) {
-                logger.log("Failed to decrypt megolm session from backup", e, sessionData);
+                this.logger.debug("Failed to decrypt megolm session from backup", e, sessionData);
             }
         }
         return keys;
