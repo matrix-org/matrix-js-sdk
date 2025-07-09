@@ -516,27 +516,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * the keys.
      */
     public reemitEncryptionKeys(): void {
-        this.encryptionManager?.getEncryptionKeys().forEach((keys, participantId) => {
-            keys.forEach((key, index) => {
-                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
+        this.encryptionManager?.getEncryptionKeys().forEach((keyRing, participantId) => {
+            keyRing.forEach((keyInfo) => {
+                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyInfo.key, keyInfo.keyIndex, participantId);
             });
         });
-    }
-
-    /**
-     * A map of keys used to encrypt and decrypt (we are using a symmetric
-     * cipher) given participant's media. This also includes our own key
-     *
-     * @deprecated This will be made private in a future release.
-     */
-    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
-        const keys =
-            this.encryptionManager?.getEncryptionKeys() ??
-            new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
-        // the returned array doesn't contain the timestamps
-        return Array.from(keys.entries())
-            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
-            .values();
     }
 
     /**

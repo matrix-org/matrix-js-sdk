@@ -25,6 +25,7 @@ import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { RoomAndToDeviceTransport } from "../../../src/matrixrtc/RoomAndToDeviceKeyTransport.ts";
 import { type RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport.ts";
 import type { Logger } from "../../../src/logger.ts";
+import { getParticipantId } from "../../../src/matrixrtc/utils.ts";
 
 describe("RTCEncryptionManager", () => {
     // The manager being tested
@@ -427,6 +428,94 @@ describe("RTCEncryptionManager", () => {
                 0,
                 "@carol:example.org:CAROLDEVICE",
             );
+        });
+
+        it("Should store keys for later retrieval", async () => {
+            jest.useFakeTimers();
+
+            const members = [
+                aCallMembership("@bob:example.org", "BOBDEVICE"),
+                aCallMembership("@bob:example.org", "BOBDEVICE2"),
+                aCallMembership("@carl:example.org", "CARLDEVICE"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            // Let's join
+            encryptionManager.join(undefined);
+            encryptionManager.onMembershipsUpdate(members);
+
+            await jest.advanceTimersByTimeAsync(10);
+
+            // Simulate Carl leaving then joining back, and key received out of order
+
+            mockTransport.emit(
+                KeyTransportEvents.ReceivedKeys,
+                "@carl:example.org",
+                "CARLDEVICE",
+                "BBBBBBBBBBB",
+                0 /* KeyId */,
+                1000,
+            );
+
+            mockTransport.emit(
+                KeyTransportEvents.ReceivedKeys,
+                "@carl:example.org",
+                "CARLDEVICE",
+                "CCCCCCCCCCC",
+                5 /* KeyId */,
+                1000,
+            );
+
+            mockTransport.emit(
+                KeyTransportEvents.ReceivedKeys,
+                "@bob:example.org",
+                "BOBDEVICE2",
+                "DDDDDDDDDDD",
+                0 /* KeyId */,
+                1000,
+            );
+
+            const knownKeys = encryptionManager.getEncryptionKeys();
+
+            // My own key should be there
+            const myRing = knownKeys.get(getParticipantId("@alice:example.org", "DEVICE01"));
+            expect(myRing).toBeDefined();
+            expect(myRing).toHaveLength(1);
+            expect(myRing![0]).toMatchObject(
+                expect.objectContaining({
+                    keyIndex: 0,
+                    key: expect.any(Uint8Array),
+                }),
+            );
+
+            const carlRing = knownKeys.get(getParticipantId("@carl:example.org", "CARLDEVICE"));
+            expect(carlRing).toBeDefined();
+            expect(carlRing).toHaveLength(2);
+            expect(carlRing![0]).toMatchObject(
+                expect.objectContaining({
+                    keyIndex: 0,
+                    key: decodeBase64("BBBBBBBBBBB"),
+                }),
+            );
+            expect(carlRing![1]).toMatchObject(
+                expect.objectContaining({
+                    keyIndex: 5,
+                    key: decodeBase64("CCCCCCCCCCC"),
+                }),
+            );
+
+            const bobRing = knownKeys.get(getParticipantId("@bob:example.org", "BOBDEVICE2"));
+            expect(bobRing).toBeDefined();
+            expect(bobRing).toHaveLength(1);
+            expect(bobRing![0]).toMatchObject(
+                expect.objectContaining({
+                    keyIndex: 0,
+                    key: decodeBase64("DDDDDDDDDDD"),
+                }),
+            );
+
+            const bob1Ring = knownKeys.get(getParticipantId("@bob:example.org", "BOBDEVICE"));
+            expect(bob1Ring).not.toBeDefined();
         });
     });
 
