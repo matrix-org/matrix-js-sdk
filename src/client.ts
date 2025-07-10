@@ -439,13 +439,13 @@ export interface ICreateClientOpts {
 
     /**
      * If true, group calls will not establish media connectivity and only create the signaling events,
-     * so that livekit media can be used in the application layert (js-sdk contains no livekit code).
+     * so that livekit media can be used in the application layer (js-sdk contains no livekit code).
      */
     useLivekitForGroupCalls?: boolean;
 
     /**
      * A logger to associate with this MatrixClient.
-     * Defaults to the built-in global logger.
+     * Defaults to the built-in global logger; see {@link DebugLogger} for an alternative.
      */
     logger?: Logger;
 }
@@ -2209,7 +2209,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<EmptyObject> {
         // If the sync loop is not running, fall back to setAccountDataRaw.
         if (!this.clientRunning) {
-            logger.warn(
+            this.logger.warn(
                 "Calling `setAccountData` before the client is started: `getAccountData` may return inconsistent results.",
             );
             return await retryNetworkOperation(5, () => this.setAccountDataRaw(eventType, content));
@@ -2369,10 +2369,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public async joinRoom(roomIdOrAlias: string, opts: IJoinRoomOpts = {}): Promise<Room> {
-        if (opts.syncRoom === undefined) {
-            opts.syncRoom = true;
-        }
-
         const room = this.getRoom(roomIdOrAlias);
         if (room?.hasMembershipState(this.credentials.userId!, KnownMembership.Join)) return room;
 
@@ -2408,12 +2404,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (resolvedRoom?.hasMembershipState(this.credentials.userId!, KnownMembership.Join)) return resolvedRoom;
 
         const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-        const syncRoom = syncApi.createRoom(roomId);
-        if (opts.syncRoom) {
-            // v2 will do this for us
-            // return syncApi.syncRoom(room);
-        }
-        return syncRoom;
+        return syncApi.createRoom(roomId);
     }
 
     /**

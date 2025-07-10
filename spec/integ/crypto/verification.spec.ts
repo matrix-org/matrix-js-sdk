@@ -17,6 +17,7 @@ limitations under the License.
 import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
+import debug from "debug";
 import fetchMock from "fetch-mock-jest";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
@@ -25,6 +26,7 @@ import Olm from "@matrix-org/olm";
 import type FetchMock from "fetch-mock";
 import {
     createClient,
+    DebugLogger,
     DeviceVerification,
     type IContent,
     type ICreateClientOpts,
@@ -1475,6 +1477,7 @@ describe("verification", () => {
             userId: TEST_USER_ID,
             accessToken: "akjgkrgjs",
             deviceId: "device_under_test",
+            logger: new DebugLogger(debug(`matrix-js-sdk:verification`)),
             ...opts,
         });
         await client.initRustCrypto();

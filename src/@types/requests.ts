@@ -28,9 +28,7 @@ import { type EventType, type RelationType, type RoomType } from "./event.ts";
 
 export interface IJoinRoomOpts {
     /**
-     * True to do a room initial sync on the resulting
-     * room. If false, the <strong>returned Room object will have no current state.
-     * </strong> Default: true.
+     * @deprecated does nothing
      */
     syncRoom?: boolean;
 
