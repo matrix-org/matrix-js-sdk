@@ -23,6 +23,7 @@ import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { Method } from "./method.ts";
 import { ConnectionError, MatrixError, TokenRefreshError } from "./errors.ts";
 import {
+    type BaseRequestOpts,
     HttpApiEvent,
     type HttpApiEventHandlerMap,
     type IHttpOpts,
@@ -263,7 +264,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal" | "priority"> = {},
+        opts: BaseRequestOpts = {},
     ): Promise<ResponseType<T, O>> {
         const urlForLogs = this.sanitizeUrlForLogs(url);
         this.opts.logger?.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);

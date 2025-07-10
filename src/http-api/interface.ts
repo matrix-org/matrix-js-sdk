@@ -74,17 +74,8 @@ export interface IHttpOpts {
     logger?: Logger;
 }
 
-export interface IRequestOpts extends Pick<RequestInit, "priority"> {
-    /**
-     * The alternative base url to use.
-     * If not specified, uses this.opts.baseUrl
-     */
-    baseUrl?: string;
-    /**
-     * The full prefix to use e.g.
-     * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
-     */
-    prefix?: string;
+/** Options object for `FetchHttpApi.requestOtherUrl`. */
+export interface BaseRequestOpts extends Pick<RequestInit, "priority"> {
     /**
      * map of additional request headers
      */
@@ -97,6 +88,19 @@ export interface IRequestOpts extends Pick<RequestInit, "priority"> {
     localTimeoutMs?: number;
     keepAlive?: boolean; // defaults to false
     json?: boolean; // defaults to true
+}
+
+export interface IRequestOpts extends BaseRequestOpts {
+    /**
+     * The alternative base url to use.
+     * If not specified, uses this.opts.baseUrl
+     */
+    baseUrl?: string;
+    /**
+     * The full prefix to use e.g.
+     * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
+     */
+    prefix?: string;
 
     // Set to true to prevent the request function from emitting a Session.logged_out event.
     // This is intended for use on endpoints where M_UNKNOWN_TOKEN is a valid/notable error response,
