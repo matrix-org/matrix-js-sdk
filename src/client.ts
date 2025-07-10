@@ -2369,10 +2369,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public async joinRoom(roomIdOrAlias: string, opts: IJoinRoomOpts = {}): Promise<Room> {
-        if (opts.syncRoom === undefined) {
-            opts.syncRoom = true;
-        }
-
         const room = this.getRoom(roomIdOrAlias);
         if (room?.hasMembershipState(this.credentials.userId!, KnownMembership.Join)) return room;
 
@@ -2408,12 +2404,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (resolvedRoom?.hasMembershipState(this.credentials.userId!, KnownMembership.Join)) return resolvedRoom;
 
         const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
-        const syncRoom = syncApi.createRoom(roomId);
-        if (opts.syncRoom) {
-            // v2 will do this for us
-            // return syncApi.syncRoom(room);
-        }
-        return syncRoom;
+        return syncApi.createRoom(roomId);
     }
 
     /**
