@@ -28,11 +28,6 @@ import { type EventType, type RelationType, type RoomType } from "./event.ts";
 
 export interface IJoinRoomOpts {
     /**
-     * @deprecated does nothing
-     */
-    syncRoom?: boolean;
-
-    /**
      * If the caller has a keypair 3pid invite, the signing URL is passed in this parameter.
      */
     inviteSignUrl?: string;
