@@ -17,9 +17,10 @@ limitations under the License.
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
+import debug from "debug";
 
 import { syncPromise } from "../../test-utils/test-utils";
-import { type AuthDict, createClient, type MatrixClient } from "../../../src";
+import { type AuthDict, createClient, DebugLogger, type MatrixClient } from "../../../src";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints";
 import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
 import { type CryptoCallbacks, CrossSigningKey } from "../../../src/crypto-api";
@@ -91,6 +92,7 @@ describe("cross-signing", () => {
                 accessToken: "akjgkrgjs",
                 deviceId: TEST_DEVICE_ID,
                 cryptoCallbacks: createCryptoCallbacks(),
+                logger: new DebugLogger(debug(`matrix-js-sdk:cross-signing`)),
             });
 
             syncResponder = new SyncResponder(homeserverUrl);

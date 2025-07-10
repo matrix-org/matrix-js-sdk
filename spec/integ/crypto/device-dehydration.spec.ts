@@ -16,8 +16,9 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import fetchMock from "fetch-mock-jest";
+import debug from "debug";
 
-import { ClientEvent, createClient, type MatrixClient, MatrixEvent } from "../../../src";
+import { ClientEvent, createClient, DebugLogger, type MatrixClient, MatrixEvent } from "../../../src";
 import { CryptoEvent } from "../../../src/crypto-api/index";
 import { type RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { type AddSecretStorageKeyOpts } from "../../../src/secret-storage";
@@ -38,6 +39,7 @@ describe("Device dehydration", () => {
                     return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
                 },
             },
+            logger: new DebugLogger(debug(`matrix-js-sdk:dehydration`)),
         });
 
         await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");

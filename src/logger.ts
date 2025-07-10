@@ -1,6 +1,6 @@
 /*
 Copyright 2018 André Jaenisch
-Copyright 2019, 2021 The Matrix.org Foundation C.I.C.
+Copyright 2019-2025 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -204,5 +204,76 @@ export class LogSpan implements BaseLogger {
 
     public error(...msg: any[]): void {
         this.parent.error(this.name, ...msg);
+    }
+}
+
+/**
+ * A simplification of the `Debugger` type exposed by the `debug` library. We reimplement the bits we need here
+ * to avoid a dependency on `debug`.
+ */
+interface Debugger {
+    (formatter: any, ...args: any[]): void;
+    extend: (namespace: string, delimiter?: string) => Debugger;
+}
+
+/**
+ * A `Logger` instance, suitable for use in {@link ICreateClientOpts.logger}, which will write to the `debug` library.
+ *
+ * @example
+ * ```js
+ *     import debug from "debug";
+ *
+ *     const client = createClient({
+ *         baseUrl: homeserverUrl,
+ *         userId: userId,
+ *         accessToken: "akjgkrgjs",
+ *         deviceId: "xzcvb",
+ *         logger: new DebugLogger(debug(`matrix-js-sdk:${userId}`)),
+ *     });
+ * ```
+ */
+export class DebugLogger implements Logger {
+    public constructor(private debugInstance: Debugger) {}
+
+    public trace(...msg: any[]): void {
+        this.debugWithPrefix("[TRACE]", ...msg);
+    }
+
+    public debug(...msg: any[]): void {
+        this.debugWithPrefix("[DEBUG]", ...msg);
+    }
+
+    public info(...msg: any[]): void {
+        this.debugWithPrefix("[INFO]", ...msg);
+    }
+
+    public warn(...msg: any[]): void {
+        this.debugWithPrefix("[WARN]", ...msg);
+    }
+
+    public error(...msg: any[]): void {
+        this.debugWithPrefix("[ERROR]", ...msg);
+    }
+
+    public getChild(namespace: string): DebugLogger {
+        return new DebugLogger(this.debugInstance.extend(namespace));
+    }
+
+    private debugWithPrefix(prefix: string, ...msg: any[]): void {
+        let formatter: string;
+
+        // Convert the first argument to a string, so that we can safely add a prefix. This is much the same logic that
+        // `debug()` uses.
+        if (msg.length === 0) {
+            formatter = "";
+        } else if (msg[0] instanceof Error) {
+            const err = msg.shift();
+            formatter = err.stack || err.message;
+        } else if (typeof msg[0] == "string") {
+            formatter = msg.shift();
+        } else {
+            formatter = "%O";
+        }
+        this.debugInstance(prefix + " " + formatter, ...msg);
     }
 }

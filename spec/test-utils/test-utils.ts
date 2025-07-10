@@ -1,6 +1,7 @@
+import mkdebug from "debug";
+
 // eslint-disable-next-line no-restricted-imports
 import type EventEmitter from "events";
-import { logger } from "../../src/logger";
 import {
     type IContent,
     type IEvent,
@@ -24,6 +25,8 @@ import { eventMapperFor } from "../../src/event-mapper";
 import { TEST_ROOM_ID } from "./test-data";
 import { KnownMembership, type Membership } from "../../src/@types/membership";
 
+const debug = mkdebug("test-utils");
+
 /**
  * Return a promise that is resolved when the client next emits a
  * SYNCING event.
@@ -38,7 +41,7 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
 
     const p = new Promise<void>((resolve) => {
         const cb = (state: SyncState) => {
-            logger.log(`${Date.now()} syncPromise(${count}): ${state}`);
+            debug(`syncPromise(${count}): ${state}`);
             if (state === SyncState.Syncing) {
                 resolve();
             } else {
@@ -519,25 +522,25 @@ export async function awaitDecryption(
     // already
     if (event.getClearContent() !== null) {
         if (waitOnDecryptionFailure && event.isDecryptionFailure()) {
-            logger.log(`${Date.now()}: event ${event.getId()} got decryption error; waiting`);
+            debug(`event ${event.getId()} got decryption error; waiting`);
         } else {
             return event;
         }
     } else {
-        logger.log(`${Date.now()}: event ${event.getId()} is not yet decrypted; waiting`);
+        debug(`event ${event.getId()} is not yet decrypted; waiting`);
     }
 
     return new Promise((resolve) => {
         if (waitOnDecryptionFailure) {
             event.on(MatrixEventEvent.Decrypted, (ev, err) => {
-                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                debug(`MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
                 if (!err) {
                     resolve(ev);
                 }
             });
         } else {
             event.once(MatrixEventEvent.Decrypted, (ev, err) => {
-                logger.log(`${Date.now()}: MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
+                debug(`MatrixEventEvent.Decrypted for event ${event.getId()}: ${err ?? "success"}`);
                 resolve(ev);
             });
         }
