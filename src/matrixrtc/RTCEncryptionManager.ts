@@ -64,6 +64,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     /**
      * We want to avoid rolling out a new outbound key when the previous one was created less than `skipRotationGracePeriod` milliseconds ago.
      * This is to avoid expensive key rotations when users quickly join the call in a row.
+     *
+     * This must be higher than `delayRolloutTimeMillis` to have an effect.
+     * If it is lower, the current key will always be older than the grace period.
      * @private
      */
     private skipRotationGracePeriod = 10_000;
