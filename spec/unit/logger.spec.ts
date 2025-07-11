@@ -18,7 +18,7 @@ limitations under the License.
 
 import loglevel from "loglevel";
 
-import { logger } from "../../src/logger.ts";
+import { DebugLogger, logger } from "../../src/logger.ts";
 
 afterEach(() => {
     jest.restoreAllMocks();
@@ -47,5 +47,44 @@ describe("logger", () => {
         expect(loglevel.getLogger).toHaveBeenCalledWith("matrix-[prefix1][prefix2]");
         grandchildLogger.debug("test2");
         expect(console.debug).toHaveBeenCalledWith("[prefix1][prefix2]", "test2");
+    });
+});
+
+describe("DebugLogger", () => {
+    it("should handle empty log messages", () => {
+        const mockTarget = jest.fn();
+        const logger = new DebugLogger(mockTarget as any);
+        logger.info();
+        expect(mockTarget).toHaveBeenCalledTimes(1);
+        expect(mockTarget).toHaveBeenCalledWith("[INFO] ");
+    });
+
+    it("should handle logging an Error", () => {
+        const mockTarget = jest.fn();
+        const logger = new DebugLogger(mockTarget as any);
+
+        // If there is a stack and a message, we use the stack.
+        const error = new Error("I am an error");
+        logger.error(error);
+        expect(mockTarget).toHaveBeenCalledTimes(1);
+        expect(mockTarget).toHaveBeenCalledWith(expect.stringMatching(/^\[ERROR\] Error: I am an error\n\s*at/));
+
+        mockTarget.mockClear();
+
+        // If there is only a message, we use that.
+        error.stack = undefined;
+        logger.error(error);
+        expect(mockTarget).toHaveBeenCalledTimes(1);
+        expect(mockTarget).toHaveBeenCalledWith("[ERROR] I am an error");
+    });
+
+    it("should handle logging an object", () => {
+        const mockTarget = jest.fn();
+        const logger = new DebugLogger(mockTarget as any);
+
+        const obj = { a: 1 };
+        logger.warn(obj);
+        expect(mockTarget).toHaveBeenCalledTimes(1);
+        expect(mockTarget).toHaveBeenCalledWith("[WARN] %O", obj);
     });
 });
