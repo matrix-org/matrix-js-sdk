@@ -47,6 +47,8 @@ export type AccessTokens = {
  * Can be passed to HttpApi instance as {@link IHttpOpts.tokenRefreshFunction} during client creation {@link ICreateClientOpts}
  */
 export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
+
+/** Options object for `FetchHttpApi` and {@link MatrixHttpApi}. */
 export interface IHttpOpts {
     fetchFn?: typeof globalThis.fetch;
 
@@ -67,7 +69,12 @@ export interface IHttpOpts {
     tokenRefreshFunction?: TokenRefreshFunction;
     useAuthorizationHeader?: boolean; // defaults to true
 
+    /**
+     * Normally, methods in `FetchHttpApi` will return a {@link https://developer.mozilla.org/en-US/docs/Web/API/Response|Response} object.
+     * If this is set to `true`, they instead return the response body.
+     */
     onlyData?: boolean;
+
     localTimeoutMs?: number;
 
     /** Optional logger instance. If provided, requests and responses will be logged. */
@@ -87,7 +94,36 @@ export interface BaseRequestOpts extends Pick<RequestInit, "priority"> {
      */
     localTimeoutMs?: number;
     keepAlive?: boolean; // defaults to false
-    json?: boolean; // defaults to true
+
+    /**
+     * By default, we will:
+     *
+     *  *  If the `body` is an object, we will JSON-encode it and set `Content-Type: application/json` in the
+     *     request headers (again, unless overridden by {@link headers}).
+     *
+     *  * Set `Accept: application/json` in the request headers (unless overridden by {@link headers}).
+     *
+     *  * If `IHTTPOpts.onlyData` is set to `true` on the `FetchHttpApi` instance, parse the response as
+     *    JSON and return the parsed response.
+     *
+     * Setting this to `false` overrides inhibits all three behaviors, and the response is instead parsed as a UTF-8
+     * string. It defaults to `true`, unless {@link rawResponseBody} is set.
+     *
+     * @deprecated Instead of setting this to `false`, set {@link rawResponseBody} to `true`.
+     */
+    json?: boolean;
+
+    /**
+     * By default, we will:
+     *
+     *  * Set `Accept: application/json` in the request headers (unless overridden by {@link headers}).
+     *
+     *  * If `IHTTPOpts.onlyData` is set to `true` on the `FetchHttpApi` instance, parse the response as
+     *    JSON and return the parsed response.
+     *
+     * Setting this to `true` overrides inhibits this behavior, and the raw response is returned as a {@link https://developer.mozilla.org/en-US/docs/Web/API/Blob|Blob}.
+     */
+    rawResponseBody?: boolean;
 }
 
 export interface IRequestOpts extends BaseRequestOpts {

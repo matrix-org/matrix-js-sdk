@@ -266,19 +266,18 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         opts: BaseRequestOpts = {},
     ): Promise<ResponseType<T, O>> {
+        if (opts.json !== undefined && opts.rawResponseBody !== undefined) {
+            throw new Error("Invalid call to `FetchHttpApi` sets both `opts.json` and `opts.rawResponseBody`");
+        }
+
         const urlForLogs = this.sanitizeUrlForLogs(url);
+
         this.opts.logger?.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
         const headers = Object.assign({}, opts.headers || {});
-        const json = opts.json ?? true;
-        // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
-        const jsonBody = json && body?.constructor?.name === Object.name;
 
-        if (json) {
-            if (jsonBody && !headers["Content-Type"]) {
-                headers["Content-Type"] = "application/json";
-            }
-
+        const jsonResponse = opts.json !== false;
+        if (jsonResponse) {
             if (!headers["Accept"]) {
                 headers["Accept"] = "application/json";
             }
@@ -294,9 +293,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
             signals.push(opts.abortSignal);
         }
 
+        // If the body is an object, encode it as JSON and set the `Content-Type` header,
+        // unless that has been explicitly inhibited by setting `opts.json: false`.
+        // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
         let data: BodyInit;
-        if (jsonBody) {
+        if (opts.json !== false && body?.constructor?.name === Object.name) {
             data = JSON.stringify(body);
+            if (!headers["Content-Type"]) {
+                headers["Content-Type"] = "application/json";
+            }
         } else {
             data = body as BodyInit;
         }
@@ -338,10 +343,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
             throw parseErrorResponse(res, await res.text());
         }
 
-        if (this.opts.onlyData) {
-            return (json ? res.json() : res.text()) as ResponseType<T, O>;
+        if (!this.opts.onlyData) {
+            return res as ResponseType<T, O>;
+        } else if (opts.rawResponseBody) {
+            return (await res.blob()) as ResponseType<T, O>;
+        } else if (jsonResponse) {
+            return await res.json();
+        } else {
+            return (await res.text()) as ResponseType<T, O>;
         }
-        return res as ResponseType<T, O>;
     }
 
     private sanitizeUrlForLogs(url: URL | string): string {
