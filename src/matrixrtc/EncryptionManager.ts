@@ -108,7 +108,7 @@ export class EncryptionManager implements IEncryptionManager {
             }));
             keysMap.set(userId as ParticipantId, keys);
         }
-        return keysMap as ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>;
+        return keysMap;
     }
 
     private joined = false;

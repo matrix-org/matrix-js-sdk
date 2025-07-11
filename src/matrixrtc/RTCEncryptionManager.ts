@@ -102,8 +102,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
-        const map = new Map(this.participantKeyRings);
-        return map as ReadonlyMap<string, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>;
+        return new Map(this.participantKeyRings);
     }
 
     private addKeyToParticipant(key: Uint8Array, keyIndex: number, participantId: ParticipantId): void {
