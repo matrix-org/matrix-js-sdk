@@ -446,8 +446,6 @@ describe("RTCEncryptionManager", () => {
 
             await jest.advanceTimersByTimeAsync(10);
 
-            // Simulate Carl leaving then joining back, and key received out of order
-
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
                 "@carl:example.org",
