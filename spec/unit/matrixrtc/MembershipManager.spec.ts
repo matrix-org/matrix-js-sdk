@@ -602,6 +602,31 @@ describe("MembershipManager", () => {
             expect(connectEmit).toHaveBeenCalledWith(Status.Disconnecting, Status.Disconnected);
         });
     });
+    describe("local timeout error handling", () => {
+        it("retries sending restart delayed leave request after configure local timeout", async () => {
+            const manager = new MembershipManager(
+                { delayedEventRestartLocalTimeoutMs: 1000 },
+                room,
+                client,
+                () => undefined,
+            );
+            manager.join([focus], focusActive);
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            await jest.advanceTimersByTimeAsync(1);
+
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+
+            // Simulate a local timeout error
+            // (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue(new HTTPError("timeout", 408));
+            // Advance the timers so that the retry happens.
+            await jest.advanceTimersByTimeAsync(1100);
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledWith("id", "restart", {
+                localTimeoutMs: 1000,
+                priority: "auto",
+            });
+        });
+    });
+
     describe("server error handling", () => {
         // Types of server error: 429 rate limit with no retry-after header, 429 with retry-after, 50x server error (maybe retry every second), connection/socket timeout
         describe("retries sending delayed leave event", () => {

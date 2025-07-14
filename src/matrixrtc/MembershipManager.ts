@@ -375,6 +375,9 @@ export class MembershipManager
         return this.joinConfig?.maximumNetworkErrorRetryCount ?? 10;
     }
 
+    private get delayedEventRestartLocalTimeoutMs(): number | undefined {
+        return this.joinConfig?.delayedEventRestartLocalTimeoutMs;
+    }
     // LOOP HANDLER:
     private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
         switch (type) {
@@ -527,7 +530,7 @@ export class MembershipManager
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
         const requestOptions: IRequestOpts = {
-            localTimeoutMs: this.joinConfig?.delayedEventRestartLocalTimeoutMs,
+            localTimeoutMs: this.delayedEventRestartLocalTimeoutMs,
             priority: "auto",
         };
         return await this.client
