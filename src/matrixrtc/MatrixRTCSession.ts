@@ -137,6 +137,15 @@ export interface MembershipConfig {
     callMemberEventRetryDelayMinimum?: number;
 
     /**
+     * The time (in milliseconds) after which a we consider a delayed event restart http request to have failed.
+     * Setting this to a lower value will result in more frequent retries but also a higher chance of failiour.
+     *
+     * the default local timeout in the js-sdk is 5 seconds.
+     * @default 5000
+     */
+    delayedEventRestartLocalTimeoutMs?: number;
+
+    /**
      * If true, use the new to-device transport for sending encryption keys.
      */
     useExperimentalToDeviceTransport?: boolean;
