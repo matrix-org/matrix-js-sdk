@@ -494,6 +494,12 @@ export interface IStartClientOpts {
     pollTimeout?: number;
 
     /**
+     * The maximum amount of time to wait before timing out the `POST /_matrix/client/v1/delayed_events/{delay_id}` with `action = "restart"` requests.
+     * If not specified, the default `localTimeoutMs` will be used.
+     */
+    delayedEventRestartLocalTimeoutMS?: number;
+
+    /**
      * The filter to apply to /sync calls.
      */
     filter?: Filter;
@@ -3473,8 +3479,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const data = {
             action,
         };
-        return await this.http.authedRequest(Method.Post, path, undefined, data, {
+        const opts = {
+            localTimeoutMs: action === "restart" ? this.clientOpts?.delayedEventRestartLocalTimeoutMS : undefined,
             ...requestOptions,
+        };
+        return await this.http.authedRequest(Method.Post, path, undefined, data, {
+            ...opts,
             prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
         });
     }
