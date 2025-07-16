@@ -98,19 +98,16 @@ export async function initRustCrypto(args: {
     logger.debug("Initialising Rust crypto-sdk WASM artifact");
     await RustSdkCryptoJs.initAsync();
 
-    // enable tracing in the rust-sdk
-    new RustSdkCryptoJs.Tracing(RustSdkCryptoJs.LoggerLevel.Debug).turnOn();
-
     logger.debug("Opening Rust CryptoStore");
     let storeHandle;
     if (args.storePrefix) {
         if (args.storeKey) {
-            storeHandle = await StoreHandle.openWithKey(args.storePrefix, args.storeKey);
+            storeHandle = await StoreHandle.openWithKey(args.storePrefix, args.storeKey, logger);
         } else {
-            storeHandle = await StoreHandle.open(args.storePrefix, args.storePassphrase);
+            storeHandle = await StoreHandle.open(args.storePrefix, args.storePassphrase, logger);
         }
     } else {
-        storeHandle = await StoreHandle.open();
+        storeHandle = await StoreHandle.open(null, null, logger);
     }
 
     if (args.legacyCryptoStore) {
@@ -155,6 +152,7 @@ async function initOlmMachine(
         new RustSdkCryptoJs.UserId(userId),
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
+        logger,
     );
 
     // A final migration step, now that we have an OlmMachine.

@@ -130,8 +130,8 @@ describe("initRustCrypto", () => {
             storePassphrase: "storePassphrase",
         });
 
-        expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase");
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase", logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
     });
 
     it("passes through the store params (key)", async () => {
@@ -154,8 +154,8 @@ describe("initRustCrypto", () => {
             storeKey: storeKey,
         });
 
-        expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
     });
 
     it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
@@ -178,8 +178,8 @@ describe("initRustCrypto", () => {
             storePassphrase: "storePassphrase",
         });
 
-        expect(StoreHandle.open).toHaveBeenCalledWith();
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore);
+        expect(StoreHandle.open).toHaveBeenCalledWith(null, null, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
     });
 
     it("Should get secrets from inbox on start", async () => {
@@ -278,6 +278,7 @@ describe("initRustCrypto", () => {
                 expect.any(BaseMigrationData),
                 new Uint8Array(Buffer.from(PICKLE_KEY)),
                 mockStore,
+                logger,
             );
             const data = mocked(Migration.migrateBaseData).mock.calls[0][0];
             expect(data.pickledAccount).toEqual("not a real account");
@@ -294,6 +295,7 @@ describe("initRustCrypto", () => {
                 expect.any(Array),
                 new Uint8Array(Buffer.from(PICKLE_KEY)),
                 mockStore,
+                logger,
             );
             // First call should have 50 entries; second should have 10
             const sessions1: PickledSession[] = mocked(Migration.migrateOlmSessions).mock.calls[0][0];
@@ -316,6 +318,7 @@ describe("initRustCrypto", () => {
                 expect.any(Array),
                 new Uint8Array(Buffer.from(PICKLE_KEY)),
                 mockStore,
+                logger,
             );
             // First call should have 50 entries; second should have 10
             const megolmSessions1: PickledInboundGroupSession[] = mocked(Migration.migrateMegolmSessions).mock
@@ -424,6 +427,7 @@ describe("initRustCrypto", () => {
                 expect.any(Array),
                 new Uint8Array(Buffer.from(PICKLE_KEY)),
                 mockStore,
+                logger,
             );
             const megolmSessions: PickledInboundGroupSession[] = mocked(Migration.migrateMegolmSessions).mock
                 .calls[0][0];
