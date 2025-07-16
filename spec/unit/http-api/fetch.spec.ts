@@ -131,6 +131,29 @@ describe("FetchHttpApi", () => {
         ).resolves.toBe(text);
     });
 
+    it("should return a blob if rawResponseBody is true", async () => {
+        const blob = new Blob(["blobby"]);
+        const fetchFn = jest.fn().mockResolvedValue({ ok: true, blob: jest.fn().mockResolvedValue(blob) });
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
+        await expect(
+            api.requestOtherUrl(Method.Get, "http://url", undefined, {
+                rawResponseBody: true,
+            }),
+        ).resolves.toBe(blob);
+    });
+
+    it("should throw an error if both `json` and `rawResponseBody` are defined", async () => {
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+            baseUrl,
+            prefix,
+            fetchFn: jest.fn(),
+            onlyData: true,
+        });
+        await expect(
+            api.requestOtherUrl(Method.Get, "http://url", undefined, { rawResponseBody: false, json: true }),
+        ).rejects.toThrow("Invalid call to `FetchHttpApi`");
+    });
+
     it("should send token via query params if useAuthorizationHeader=false", async () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
