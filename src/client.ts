@@ -496,6 +496,13 @@ export interface IStartClientOpts {
     /**
      * The maximum amount of time to wait before timing out the `POST /_matrix/client/v1/delayed_events/{delay_id}` with `action = "restart"` requests.
      * If not specified, the default `localTimeoutMs` will be used.
+     * 
+     * This setting is used in the context of MatrixRTC. We need to restart the dealyed events to make sure
+     * the HomeServer is sending the delayed rtc leave event. In bad network environments we might end up
+     * waiting for too long for the event to arrive and we will not send another restart event until the local timeout is reached.
+     * 
+     * In those scenarios chances for success are higher if we use a lower local timeout to increase the tries we do instead of waiting
+     * for responses on requests which are stuck.
      */
     delayedEventRestartLocalTimeoutMS?: number;
 
