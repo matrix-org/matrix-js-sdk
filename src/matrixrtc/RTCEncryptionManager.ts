@@ -46,6 +46,13 @@ import {
  * XXX In the future we want to distribute a ratcheted key not the current one for new joiners.
  */
 export class RTCEncryptionManager implements IEncryptionManager {
+    /**
+     * Store the key rings for each participant.
+     * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
+     * The keys are stored and can be retrieved later when the application layer is ready {@link RTCEncryptionManager#getEncryptionKeys}.
+     */
+    private participantKeyRings = new Map<ParticipantId, Array<{ key: Uint8Array; keyIndex: number }>>();
+
     // The current per-sender media key for this device
     private outboundSession: OutboundEncryptionSession | null = null;
 
@@ -106,9 +113,16 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
     }
 
-    public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
-        // This is deprecated should be ignored. Only used by tests?
-        return new Map();
+    public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
+        return new Map(this.participantKeyRings);
+    }
+
+    private addKeyToParticipant(key: Uint8Array, keyIndex: number, participantId: ParticipantId): void {
+        if (!this.participantKeyRings.has(participantId)) {
+            this.participantKeyRings.set(participantId, []);
+        }
+        this.participantKeyRings.get(participantId)!.push({ key, keyIndex });
+        this.onEncryptionKeysChanged(key, keyIndex, participantId);
     }
 
     public join(joinConfig: EncryptionConfig | undefined): void {
@@ -127,6 +141,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     public leave(): void {
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.stop();
+        this.participantKeyRings.clear();
     }
 
     // Temporary for backwards compatibility
@@ -151,6 +166,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             }
         }
     };
+
     /**
      * Will ensure that a new key is distributed and used to encrypt our media.
      * If there is already a key distribution in progress, it will schedule a new distribution round just after the current one is completed.
@@ -194,7 +210,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         const outdated = this.keyBuffer.isOutdated(participantId, candidateInboundSession);
         if (!outdated) {
-            this.onEncryptionKeysChanged(
+            this.addKeyToParticipant(
                 candidateInboundSession.key,
                 candidateInboundSession.keyIndex,
                 candidateInboundSession.participantId,
@@ -228,7 +244,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 sharedWith: [],
                 keyId: 0,
             };
-            this.onEncryptionKeysChanged(
+            this.addKeyToParticipant(
                 this.outboundSession.key,
                 this.outboundSession.keyId,
                 getParticipantId(this.userId, this.deviceId),
@@ -318,7 +334,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
                 await sleep(this.delayRolloutTimeMillis);
                 this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
-                this.onEncryptionKeysChanged(
+                this.addKeyToParticipant(
                     outboundKey.key,
                     outboundKey.keyId,
                     getParticipantId(this.userId, this.deviceId),
