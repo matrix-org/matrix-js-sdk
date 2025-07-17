@@ -28,7 +28,7 @@ export interface RoomCreateEventContent {
     "creator"?: string;
     "m.federate"?: boolean;
     "predecessor"?: {
-        event_id: string;
+        event_id?: string;
         room_id: string;
     };
     "room_version"?: string;
