@@ -1325,10 +1325,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
         this.sessionId = secureRandomString(10);
+        this.delayedEventRestartLocalTimeoutMS = opts.delayedEventRestartLocalTimeoutMS;
 
         const userId = opts.userId || null;
         this.credentials = { userId };
-        this.delayedEventRestartLocalTimeoutMS = opts.delayedEventRestartLocalTimeoutMS;
+
         this.http = new MatrixHttpApi(this as ConstructorParameters<typeof MatrixHttpApi>[0], {
             fetchFn: opts.fetchFn,
             baseUrl: opts.baseUrl,
