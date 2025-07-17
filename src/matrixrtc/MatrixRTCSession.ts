@@ -19,7 +19,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
-import { EventType } from "../@types/event.ts";
+import { EventType, RelationType } from "../@types/event.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { type Statistics, type CallNotifyType, isMyMembership } from "./types.ts";
+import { type Statistics, type RTCNotificationType } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
@@ -71,7 +71,7 @@ export interface SessionConfig {
      * What kind of notification to send when starting the session.
      * @default `undefined` (no notification)
      */
-    notificationType?: CallNotifyType;
+    notificationType?: Exclude<RTCNotificationType, "decline">;
 }
 
 // The names follow these principles:
@@ -562,14 +562,30 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Sends a notification corresponding to the configured notify type.
      */
-    private sendCallNotify(): void {
-        if (this.joinConfig?.notificationType !== undefined) {
+    private sendCallNotify(parentEventId: string): void {
+        const notificationType = this.joinConfig?.notificationType;
+        if (notificationType !== undefined) {
+            // Send legacy event:
+
             this.client
                 .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
                     "application": "m.call",
                     "m.mentions": { user_ids: [], room: true },
-                    "notify_type": this.joinConfig.notificationType,
+                    "notify_type": notificationType === "notification" ? "notify" : notificationType,
                     "call_id": this.callId!,
+                })
+                .catch((e) => this.logger.error("Failed to send call notification", e));
+            // Send new event:
+            this.client
+                .sendEvent(this.roomSubset.roomId, EventType.RTCNotification, {
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": notificationType,
+                    "m.relates_to": {
+                        event_id: parentEventId,
+                        rel_type: RelationType.unstable_RTCParentEvent,
+                    },
+                    "sender_ts": Date.now(),
+                    "lifetime": 30_000, // 30 seconds
                 })
                 .catch((e) => this.logger.error("Failed to send call notification", e));
         }
