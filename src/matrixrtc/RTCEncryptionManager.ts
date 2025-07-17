@@ -64,15 +64,15 @@ export class RTCEncryptionManager implements IEncryptionManager {
     /**
      * The time to wait before using the outbound session after it has been distributed.
      * This is to ensure that the key is delivered to all participants before it is used.
-     * When creating the first key, this is set to 0, so that the key can be used immediately.
+     * When creating the first key, this is set to 0 so that the key can be used immediately.
      */
-    private delayRolloutTimeMillis = 5000;
+    private useKeyDelay = 5000;
 
     /**
      * We want to avoid rolling out a new outbound key when the previous one was created less than `skipRotationGracePeriod` milliseconds ago.
      * This is to avoid expensive key rotations when users quickly join the call in a row.
      *
-     * This must be higher than `delayRolloutTimeMillis` to have an effect.
+     * This must be higher than `useKeyDelay` to have an effect.
      * If it is lower, the current key will always be older than the grace period.
      * @private
      */
@@ -127,7 +127,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     public join(joinConfig: EncryptionConfig | undefined): void {
         this.logger?.info(`Joining room`);
-        this.delayRolloutTimeMillis = joinConfig?.useKeyDelay ?? 1000;
+        this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.skipRotationGracePeriod = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         // Deprecate RoomKeyTransport: this can get removed.
@@ -332,7 +332,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
                 this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
-                await sleep(this.delayRolloutTimeMillis);
+                await sleep(this.useKeyDelay);
                 this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
                 this.addKeyToParticipant(
                     outboundKey.key,
