@@ -69,14 +69,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private useKeyDelay = 5000;
 
     /**
-     * We want to avoid rolling out a new outbound key when the previous one was created less than `skipRotationGracePeriod` milliseconds ago.
+     * We want to avoid rolling out a new outbound key when the previous one was created less than `keyRotationGracePeriodMs` milliseconds ago.
      * This is to avoid expensive key rotations when users quickly join the call in a row.
      *
      * This must be higher than `useKeyDelay` to have an effect.
      * If it is lower, the current key will always be older than the grace period.
      * @private
      */
-    private skipRotationGracePeriod = 10_000;
+    private keyRotationGracePeriodMs = 10_000;
 
     /**
      * If a new key distribution is being requested while one is going on, we will set this flag to true.
@@ -128,7 +128,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     public join(joinConfig: EncryptionConfig | undefined): void {
         this.logger?.info(`Joining room`);
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
-        this.skipRotationGracePeriod = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
+        this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         // Deprecate RoomKeyTransport: this can get removed.
         if (this.transport instanceof RoomAndToDeviceTransport) {
@@ -300,8 +300,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } else if (anyJoined.length > 0) {
             const now = Date.now();
             const keyAge = now - this.outboundSession!.creationTS;
-            // If the current key is recently created (less than `skipRotationGracePeriod`), we can keep it and just distribute it to the new joiners.
-            if (keyAge < this.skipRotationGracePeriod) {
+            // If the current key is recently created (less than `keyRotationGracePeriodMs`), we can keep it and just distribute it to the new joiners.
+            if (keyAge < this.keyRotationGracePeriodMs) {
                 // keep the same key
                 // XXX In the future we want to distribute a ratcheted key, not the current one
                 this.logger?.debug(`New joiners detected, but the key is recent enough (age:${keyAge}), keeping it`);
