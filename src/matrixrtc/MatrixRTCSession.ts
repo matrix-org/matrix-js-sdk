@@ -71,7 +71,7 @@ export interface SessionConfig {
      * What kind of notification to send when starting the session.
      * @default `undefined` (no notification)
      */
-    notifyType?: CallNotifyType;
+    notificationType?: CallNotifyType;
 }
 
 // The names follow these principles:
@@ -573,12 +573,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Sends a notification corresponding to the configured notify type.
      */
     private sendCallNotify(): void {
-        if (this.joinConfig?.notifyType !== undefined) {
+        if (this.joinConfig?.notificationType !== undefined) {
             this.client
                 .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
                     "application": "m.call",
                     "m.mentions": { user_ids: [], room: true },
-                    "notify_type": this.joinConfig.notifyType,
+                    "notify_type": this.joinConfig.notificationType,
                     "call_id": this.callId!,
                 })
                 .catch((e) => this.logger.error("Failed to send call notification", e));

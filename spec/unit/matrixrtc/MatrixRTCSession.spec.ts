@@ -359,7 +359,7 @@ describe("MatrixRTCSession", () => {
 
         it("sends a notification when starting a call", async () => {
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notifyType: "ring" });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
@@ -378,7 +378,7 @@ describe("MatrixRTCSession", () => {
             sess!.onRTCSessionMemberUpdate();
 
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notifyType: "ring" });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
@@ -388,7 +388,7 @@ describe("MatrixRTCSession", () => {
 
         it("doesn't send a notification when someone else starts the call faster than us", async () => {
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notifyType: "ring" });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent
