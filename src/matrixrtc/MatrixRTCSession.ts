@@ -195,12 +195,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private logger: Logger;
 
     /**
-     * Whether we're trying to join the session but still waiting for room state
-     * to reflect our own membership.
-     */
-    private joining = false;
-
-    /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
      * emit when the next membership expires.
@@ -465,9 +459,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         this.joinConfig = joinConfig;
-        const userId = this.client.getUserId()!;
-        const deviceId = this.client.getDeviceId()!;
-        this.joining = !this.memberships.some((m) => isMyMembership(m, userId, deviceId));
 
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
@@ -498,7 +489,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         this.logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
 
-        this.joining = false;
         this.encryptionManager!.leave();
         const leavePromise = this.membershipManager!.leave(timeout);
 
@@ -625,14 +615,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
             });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
-
-            const userId = this.client.getUserId()!;
-            const deviceId = this.client.getDeviceId()!;
-            if (this.joining && this.memberships.some((m) => isMyMembership(m, userId, deviceId))) {
-                this.joining = false;
+            const ownMembership = this.membershipManager?.ownMembership;
+            if (ownMembership && oldMemberships.length === 0) {
                 // If we're the first member in the call, we're responsible for
                 // sending the notification event
-                if (oldMemberships.length === 0) this.sendCallNotify();
+                if (ownMembership.eventId) {
+                    this.sendCallNotify(ownMembership.eventId);
+                } else {
+                    this.logger.warn("Own membership eventId is undefined, cannot send call notification");
+                }
             }
         }
         // This also needs to be done if `changed` = false

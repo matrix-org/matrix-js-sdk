@@ -55,9 +55,13 @@ export interface IMembershipManager {
      * Get the actual connection status of the manager.
      */
     get status(): Status;
+
     /**
-     * The current status while the manager is activated
+     * The Current own state event if the manger is connected.
+     * `undefined` if not connected.
      */
+    get ownMembership(): CallMembership | undefined;
+
     /**
      * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
