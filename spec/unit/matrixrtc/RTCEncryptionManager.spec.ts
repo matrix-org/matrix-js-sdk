@@ -200,7 +200,7 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(updatedMembers);
 
-            await jest.advanceTimersByTimeAsync(8_000);
+            await jest.advanceTimersByTimeAsync(gracePeriod / 2);
 
             encryptionManager.onMembershipsUpdate(updatedMembers);
 
@@ -229,8 +229,8 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 3_000; // 15 seconds
-            const useKeyDelay = 5_000; // 5 seconds
+            const gracePeriod = 3_000; // 3 seconds
+            const useKeyDelay = gracePeriod + 2_000; // 5 seconds
             // initial rollout
             encryptionManager.join({
                 useKeyDelay,
@@ -252,7 +252,7 @@ describe("RTCEncryptionManager", () => {
 
             // A new member joins, within the grace period, but under the delay period
             members.push(aCallMembership("@david:example.org", "DAVDEVICE"));
-            await jest.advanceTimersByTimeAsync(3_000);
+            await jest.advanceTimersByTimeAsync((useKeyDelay - gracePeriod) / 2);
             encryptionManager.onMembershipsUpdate([]);
             await jest.runOnlyPendingTimersAsync();
 
