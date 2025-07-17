@@ -191,7 +191,6 @@ export function defaultClientOpts(opts?: IStoredClientOpts): IStoredClientOpts {
         initialSyncLimit: 8,
         resolveInvitesToProfiles: false,
         pollTimeout: 30 * 1000,
-        delayedEventRestartLocalTimeoutMS: 2300,
         pendingEventOrdering: PendingEventOrdering.Chronological,
         threadSupport: false,
         ...opts,

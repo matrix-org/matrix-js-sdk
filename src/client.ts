@@ -341,6 +341,19 @@ export interface ICreateClientOpts {
     localTimeoutMs?: number;
 
     /**
+     * The maximum amount of time to wait before timing out the `POST /_matrix/client/v1/delayed_events/{delay_id}` with `action = "restart"` requests.
+     * If not specified, it uses `localTimeoutMs` if set, otherwise there is no timeout.
+     *
+     * This setting is used in the context of MatrixRTC. We need to restart the dealyed events to make sure
+     * the HomeServer is sending the delayed rtc leave event. In bad network environments we might end up
+     * waiting for too long for the event to arrive and we will not send another restart event until the local timeout is reached.
+     *
+     * In those scenarios chances for success are higher if we use a lower local timeout to increase the tries we do instead of waiting
+     * for responses on requests which are stuck.
+     */
+    delayedEventRestartLocalTimeoutMS?: number;
+
+    /**
      * Set to false to send the access token to the server via a query parameter rather
      * than the Authorization HTTP header.
      *
@@ -492,19 +505,6 @@ export interface IStartClientOpts {
      * The number of milliseconds to wait on /sync. Default: 30000 (30 seconds).
      */
     pollTimeout?: number;
-
-    /**
-     * The maximum amount of time to wait before timing out the `POST /_matrix/client/v1/delayed_events/{delay_id}` with `action = "restart"` requests.
-     * If not specified, the default `localTimeoutMs` will be used.
-     * 
-     * This setting is used in the context of MatrixRTC. We need to restart the dealyed events to make sure
-     * the HomeServer is sending the delayed rtc leave event. In bad network environments we might end up
-     * waiting for too long for the event to arrive and we will not send another restart event until the local timeout is reached.
-     * 
-     * In those scenarios chances for success are higher if we use a lower local timeout to increase the tries we do instead of waiting
-     * for responses on requests which are stuck.
-     */
-    delayedEventRestartLocalTimeoutMS?: number;
 
     /**
      * The filter to apply to /sync calls.
@@ -1285,6 +1285,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
     protected sessionId: string;
+    protected delayedEventRestartLocalTimeoutMS: number | undefined;
 
     /** IDs of events which are currently being encrypted.
      *
@@ -1327,7 +1328,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const userId = opts.userId || null;
         this.credentials = { userId };
-
+        this.delayedEventRestartLocalTimeoutMS = opts.delayedEventRestartLocalTimeoutMS;
         this.http = new MatrixHttpApi(this as ConstructorParameters<typeof MatrixHttpApi>[0], {
             fetchFn: opts.fetchFn,
             baseUrl: opts.baseUrl,
@@ -3487,7 +3488,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             action,
         };
         const opts = {
-            localTimeoutMs: action === "restart" ? this.clientOpts?.delayedEventRestartLocalTimeoutMS : undefined,
+            localTimeoutMs: action === "restart" ? this.delayedEventRestartLocalTimeoutMS : undefined,
             ...requestOptions,
         };
         return await this.http.authedRequest(Method.Post, path, undefined, data, {

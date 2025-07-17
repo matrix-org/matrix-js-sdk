@@ -45,6 +45,7 @@ export const membershipTemplate: SessionMembershipData & { user_id: string } = {
 
 export type MockClient = Pick<
     MatrixClient,
+    | "http"
     | "getUserId"
     | "getDeviceId"
     | "sendEvent"
@@ -65,6 +66,7 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
         cancelPendingEvent: jest.fn(),
         _unstable_updateDelayedEvent: jest.fn(),
         _unstable_sendDelayedStateEvent: jest.fn(),
+        http: { authedRequest: jest.fn() } as any, // Mocking http request for compatibility
     };
 }
 
