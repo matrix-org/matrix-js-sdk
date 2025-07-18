@@ -19,6 +19,7 @@ import { UpdateDelayedEventAction } from "../@types/requests.ts";
 import { type MatrixClient } from "../client.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
+import { type IRequestOpts } from "../http-api/index.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
@@ -385,6 +386,9 @@ export class MembershipManager
         return this.joinConfig?.maximumNetworkErrorRetryCount ?? 10;
     }
 
+    private get delayedEventRestartLocalTimeoutMs(): number | undefined {
+        return this.joinConfig?.delayedEventRestartLocalTimeoutMs;
+    }
     // LOOP HANDLER:
     private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
         switch (type) {
@@ -536,8 +540,11 @@ export class MembershipManager
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
+        const requestOptions: IRequestOpts = {
+            localTimeoutMs: this.delayedEventRestartLocalTimeoutMs,
+        };
         return await this.client
-            ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart)
+            ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart, requestOptions)
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
                 return createInsertActionUpdate(
