@@ -95,7 +95,7 @@ export interface ICallNotifyContent {
     "call_id": string;
 }
 
-export type RTCNotificationType = "ring" | "notification" | "decline";
+export type RTCNotificationType = "ring" | "notification";
 export interface IRTCNotificationContent extends RelationEvent {
     "m.mentions": IMentions;
     "decline_reason"?: string;

@@ -71,7 +71,7 @@ export interface SessionConfig {
      * What kind of notification to send when starting the session.
      * @default `undefined` (no notification)
      */
-    notificationType?: Exclude<RTCNotificationType, "decline">;
+    notificationType?: RTCNotificationType;
 }
 
 // The names follow these principles:
@@ -194,7 +194,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private joinConfig?: SessionConfig;
     private logger: Logger;
 
-    private pendingNotificationToSend: undefined | Exclude<RTCNotificationType, "decline">;
+    private pendingNotificationToSend: undefined | RTCNotificationType;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -565,7 +565,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Sends a notification corresponding to the configured notify type.
      */
-    private sendCallNotify(parentEventId: string, notificationType: Exclude<RTCNotificationType, "decline">): void {
+    private sendCallNotify(parentEventId: string, notificationType: RTCNotificationType): void {
         // Send legacy event:
         this.client
             .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
