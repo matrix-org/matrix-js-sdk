@@ -363,7 +363,20 @@ describe("MatrixRTCSession", () => {
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
+            const ownMembershipId = sess?.memberships[0].eventId;
 
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": "ring",
+                "m.relates_to": {
+                    event_id: ownMembershipId,
+                    rel_type: "org.matrix.msc4075.rtc.notification.parent",
+                },
+                "lifetime": 30000,
+                "sender_ts": expect.any(Number),
+            });
+
+            // check if deprecated notify event is also sent
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
                 "application": "m.call",
                 "m.mentions": { user_ids: [], room: true },
