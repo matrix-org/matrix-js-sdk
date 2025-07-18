@@ -214,6 +214,9 @@ describe("RTCEncryptionManager", () => {
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
+        // Test an edge case where the use key delay is higher than the grace period.
+        // This means that no matter what, the key once rolled out will be too old to be re-used for the new member that
+        // joined within the grace period.
         it("test grace period lower than delay period", async () => {
             jest.useFakeTimers();
 
