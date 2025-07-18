@@ -162,18 +162,34 @@ export interface EncryptionConfig {
     /**
      * The minimum time (in milliseconds) between each attempt to send encryption key(s).
      * e.g. if this is set to 1000, then we will send at most one key event every second.
+     * @deprecated - Not used by the new encryption manager.
      */
     updateEncryptionKeyThrottle?: number;
+
+    /**
+     * Sometimes it is necessary to rotate the encryption key after a membership update.
+     * For performance reasons we might not want to rotate the key immediately but allow future memberships to use the same key.
+     * If 5 people join in a row in less than 5 seconds, we don't want to rotate the key for each of them.
+     * If 5 people leave in a row in less than 5 seconds, we don't want to rotate the key for each of them.
+     * So we do share the key which was already used live for <5s to new joiners.
+     * This does result in a potential leak up to the configured time of call media.
+     * This has to be considered when choosing a value for this property.
+     */
+    keyRotationGracePeriodMs?: number;
+
     /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
      * tend to leave calls at the same time.
+     * @deprecated - Not used by the new encryption manager.
      */
     makeKeyDelay?: number;
     /**
-     * The delay (in milliseconds) between creating and sending a new key and starting to encrypt with it. This
-     * gives other a chance to receive the new key to minimise the chance they don't get media they can't decrypt.
-     * The total time between a member leaving and the call switching to new keys is therefore:
-     * makeKeyDelay + useKeyDelay
+     * The delay (in milliseconds) between sending a new key and starting to encrypt with it. This
+     * gives others a chance to receive the new key to minimize the chance they get media they can't decrypt.
+     *
+     * The higher this value is, the better it is for existing members as they will have a smoother experience.
+     * But it impacts new joiners: They will always have to wait `useKeyDelay` before being able to decrypt the media
+     * (as it will be encrypted with the new key after the delay only), even if the key has already arrived before the delay.
      */
     useKeyDelay?: number;
 }

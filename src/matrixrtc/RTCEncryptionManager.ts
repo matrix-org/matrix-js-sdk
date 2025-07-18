@@ -60,12 +60,24 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * Ensures that there is only one distribute operation at a time for that call.
      */
     private currentKeyDistributionPromise: Promise<void> | null = null;
+
     /**
      * The time to wait before using the outbound session after it has been distributed.
      * This is to ensure that the key is delivered to all participants before it is used.
-     * When creating the first key, this is set to 0, so that the key can be used immediately.
+     * When creating the first key, this is set to 0 so that the key can be used immediately.
      */
-    private delayRolloutTimeMillis = 1000;
+    private useKeyDelay = 5000;
+
+    /**
+     * We want to avoid rolling out a new outbound key when the previous one was created less than `keyRotationGracePeriodMs` milliseconds ago.
+     * This is to avoid expensive key rotations when users quickly join the call in a row.
+     *
+     * This must be higher than `useKeyDelay` to have an effect.
+     * If it is lower, the current key will always be older than the grace period.
+     * @private
+     */
+    private keyRotationGracePeriodMs = 10_000;
+
     /**
      * If a new key distribution is being requested while one is going on, we will set this flag to true.
      * This will ensure that a new round is started after the current one.
@@ -115,7 +127,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     public join(joinConfig: EncryptionConfig | undefined): void {
         this.logger?.info(`Joining room`);
-        this.delayRolloutTimeMillis = joinConfig?.useKeyDelay ?? 1000;
+        this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
+        this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         // Deprecate RoomKeyTransport: this can get removed.
         if (this.transport instanceof RoomAndToDeviceTransport) {
@@ -211,9 +224,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     /**
      * Called when the membership of the call changes.
      * This encryption manager is very basic, it will rotate the key everytime this is called.
-     * @param oldMemberships
+     * @param oldMemberships - This parameter is not used here, but it is kept for compatibility with the interface.
      */
-    public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
+    public onMembershipsUpdate(oldMemberships: CallMembership[] = []): void {
         this.logger?.trace(`onMembershipsUpdate`);
 
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
@@ -280,26 +293,28 @@ export class RTCEncryptionManager implements IEncryptionManager {
         let hasKeyChanged = false;
         if (anyLeft.length > 0) {
             // We need to rotate the key
-            const newOutboundKey: OutboundEncryptionSession = {
-                key: this.generateRandomKey(),
-                creationTS: Date.now(),
-                sharedWith: [],
-                keyId: this.nextKeyIndex(),
-            };
+            const newOutboundKey = this.createNewOutboundSession();
             hasKeyChanged = true;
-
-            this.logger?.info(`creating new outbound key index:${newOutboundKey.keyId}`);
-            // Set this new key as the current one
-            this.outboundSession = newOutboundKey;
-
-            // Send
             toDistributeTo = toShareWith;
             outboundKey = newOutboundKey;
         } else if (anyJoined.length > 0) {
-            // keep the same key
-            // XXX In the future we want to distribute a ratcheted key not the current one
-            toDistributeTo = anyJoined;
-            outboundKey = this.outboundSession!;
+            const now = Date.now();
+            const keyAge = now - this.outboundSession!.creationTS;
+            // If the current key is recently created (less than `keyRotationGracePeriodMs`), we can keep it and just distribute it to the new joiners.
+            if (keyAge < this.keyRotationGracePeriodMs) {
+                // keep the same key
+                // XXX In the future we want to distribute a ratcheted key, not the current one
+                this.logger?.debug(`New joiners detected, but the key is recent enough (age:${keyAge}), keeping it`);
+                toDistributeTo = anyJoined;
+                outboundKey = this.outboundSession!;
+            } else {
+                // We need to rotate the key
+                this.logger?.debug(`New joiners detected, rotating the key`);
+                const newOutboundKey = this.createNewOutboundSession();
+                hasKeyChanged = true;
+                toDistributeTo = toShareWith;
+                outboundKey = newOutboundKey;
+            }
         } else {
             // no changes
             return;
@@ -317,7 +332,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
                 this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
-                await sleep(this.delayRolloutTimeMillis);
+                await sleep(this.useKeyDelay);
                 this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
                 this.addKeyToParticipant(
                     outboundKey.key,
@@ -328,6 +343,20 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } catch (err) {
             this.logger?.error(`Failed to rollout key`, err);
         }
+    }
+
+    private createNewOutboundSession(): OutboundEncryptionSession {
+        const newOutboundKey: OutboundEncryptionSession = {
+            key: this.generateRandomKey(),
+            creationTS: Date.now(),
+            sharedWith: [],
+            keyId: this.nextKeyIndex(),
+        };
+
+        this.logger?.info(`creating new outbound key index:${newOutboundKey.keyId}`);
+        // Set this new key as the current one
+        this.outboundSession = newOutboundKey;
+        return newOutboundKey;
     }
 
     private nextKeyIndex(): number {
