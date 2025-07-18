@@ -193,15 +193,9 @@ describe("RTCEncryptionManager", () => {
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            const updatedMembers = [
-                aCallMembership("@bob:example.org", "BOBDEVICE"),
-                aCallMembership("@bob:example.org", "BOBDEVICE2"),
-                aCallMembership("@carl:example.org", "CARLDEVICE"),
-            ];
-            getMembershipMock.mockReturnValue(updatedMembers);
-
+            // Carl joins, within the grace period
+            members.push(aCallMembership("@carl:example.org", "CARLDEVICE"));
             await jest.advanceTimersByTimeAsync(gracePeriod / 2);
-
             encryptionManager.onMembershipsUpdate();
 
             await jest.runOnlyPendingTimersAsync();
@@ -291,15 +285,8 @@ describe("RTCEncryptionManager", () => {
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            const updatedMembers = [
-                aCallMembership("@bob:example.org", "BOBDEVICE"),
-                aCallMembership("@bob:example.org", "BOBDEVICE2"),
-                aCallMembership("@carl:example.org", "CARLDEVICE"),
-            ];
-            getMembershipMock.mockReturnValue(updatedMembers);
-
+            members.push(aCallMembership("@carl:example.org", "CARLDEVICE"));
             await jest.advanceTimersByTimeAsync(gracePeriod + 1000);
-
             encryptionManager.onMembershipsUpdate();
 
             await jest.runOnlyPendingTimersAsync();
@@ -321,7 +308,7 @@ describe("RTCEncryptionManager", () => {
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
-        it("Should rotate key when several users join within the rotation grace period", async () => {
+        it("Should not rotate key when several users join within the rotation grace period", async () => {
             jest.useFakeTimers();
 
             const members = [
