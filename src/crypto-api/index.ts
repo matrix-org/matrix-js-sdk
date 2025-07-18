@@ -729,6 +729,20 @@ export interface CryptoApi {
      * @param secrets - The secrets bundle received from the other device
      */
     importSecretsBundle?(secrets: Awaited<ReturnType<SecretsBundle["to_json"]>>): Promise<void>;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Room key history sharing (MSC4268)
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Share any shareable E2EE history in the given room with the given recipient,
+     * as per [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)
+     *
+     * @experimental
+     */
+    shareRoomHistoryWithUser(roomId: string, userId: string): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */

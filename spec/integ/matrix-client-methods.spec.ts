@@ -267,6 +267,59 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("invite", function () {
+        it("should send request to /invite", async () => {
+            const roomId = "!roomId:server";
+            const userId = "@user:server";
+
+            httpBackend
+                .when("POST", `/rooms/${encodeURIComponent(roomId)}/invite`)
+                .check((request) => {
+                    expect(request.data).toEqual({ user_id: userId });
+                })
+                .respond(200, {});
+
+            const prom = client.invite(roomId, userId);
+            await httpBackend.flushAllExpected();
+            await prom;
+            httpBackend.verifyNoOutstandingExpectation();
+        });
+
+        it("accepts a stringy reason argument", async () => {
+            const roomId = "!roomId:server";
+            const userId = "@user:server";
+
+            httpBackend
+                .when("POST", `/rooms/${encodeURIComponent(roomId)}/invite`)
+                .check((request) => {
+                    expect(request.data).toEqual({ user_id: userId, reason: "testreason" });
+                })
+                .respond(200, {});
+
+            const prom = client.invite(roomId, userId, "testreason");
+            await httpBackend.flushAllExpected();
+            await prom;
+            httpBackend.verifyNoOutstandingExpectation();
+        });
+
+        it("accepts an options object with a reason", async () => {
+            const roomId = "!roomId:server";
+            const userId = "@user:server";
+
+            httpBackend
+                .when("POST", `/rooms/${encodeURIComponent(roomId)}/invite`)
+                .check((request) => {
+                    expect(request.data).toEqual({ user_id: userId, reason: "testreason" });
+                })
+                .respond(200, {});
+
+            const prom = client.invite(roomId, userId, { reason: "testreason" });
+            await httpBackend.flushAllExpected();
+            await prom;
+            httpBackend.verifyNoOutstandingExpectation();
+        });
+    });
+
     describe("knockRoom", function () {
         const roomId = "!some-room-id:example.org";
         const reason = "some reason";
