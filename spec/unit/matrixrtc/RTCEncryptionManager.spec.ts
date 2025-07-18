@@ -138,7 +138,7 @@ describe("RTCEncryptionManager", () => {
                     },
                 ],
             );
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
             // The key should have been rolled out immediately
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
 
@@ -181,7 +181,7 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -235,7 +235,7 @@ describe("RTCEncryptionManager", () => {
                 keyRotationGracePeriodMs: gracePeriod,
             });
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
@@ -246,15 +246,14 @@ describe("RTCEncryptionManager", () => {
             // A new member joins, that should trigger a key rotation.
             members.push(aCallMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
 
             // A new member joins, within the grace period, but under the delay period
             members.push(aCallMembership("@david:example.org", "DAVDEVICE"));
             await jest.advanceTimersByTimeAsync((useKeyDelay - gracePeriod) / 2);
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
 
-            // Wait pass the delay period
+            // Wait past the delay period
             await jest.advanceTimersByTimeAsync(5_000);
 
             // Even though the new member joined within the grace period, the key should be rotated because once the delay period has passed
@@ -284,16 +283,14 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            members.push(aCallMembership("@carl:example.org", "CARLDEVICE"));
             await jest.advanceTimersByTimeAsync(gracePeriod + 1000);
+            members.push(aCallMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
-
-            await jest.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
                 expect.any(String),
@@ -306,6 +303,9 @@ describe("RTCEncryptionManager", () => {
                     expect.objectContaining({ userId: "@carl:example.org", deviceId: "CARLDEVICE" }),
                 ],
             );
+
+            // Wait for useKeyDelay to pass
+            await jest.advanceTimersByTimeAsync(5000);
 
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
             await jest.advanceTimersByTimeAsync(1000);
@@ -324,7 +324,7 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
@@ -342,7 +342,7 @@ describe("RTCEncryptionManager", () => {
                 getMembershipMock.mockReturnValue(members);
                 await jest.advanceTimersByTimeAsync(1_000);
                 encryptionManager.onMembershipsUpdate();
-                await jest.runOnlyPendingTimersAsync();
+                await jest.advanceTimersByTimeAsync(1);
             }
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(newJoiners.length);
@@ -374,7 +374,7 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await jest.advanceTimersByTimeAsync(1);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             onEncryptionKeysChanged.mockClear();
@@ -811,7 +811,7 @@ describe("RTCEncryptionManager", () => {
 
         await jest.runOnlyPendingTimersAsync();
 
-        // The key should have beed re-distributed to the room transport
+        // The key should have been re-distributed to the room transport
         expect(mockRoomTransport.sendKey).toHaveBeenCalled();
         expect(mockToDeviceTransport.sendKey).toHaveBeenCalledWith(
             expect.any(String),
