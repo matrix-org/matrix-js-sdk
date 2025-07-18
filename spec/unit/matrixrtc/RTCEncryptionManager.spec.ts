@@ -824,9 +824,8 @@ describe("RTCEncryptionManager", () => {
 
     function aCallMembership(userId: string, deviceId: string, ts: number = 1000): CallMembership {
         return mockCallMembership(
-            Object.assign({}, membershipTemplate, { device_id: deviceId, created_ts: ts }),
+            { ...membershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
-            userId,
         );
     }
 });

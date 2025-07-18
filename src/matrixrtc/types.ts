@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import type { IMentions } from "../matrix.ts";
+import type { RelationEvent } from "../types.ts";
 import type { CallMembership } from "./CallMembership.ts";
 
 export type ParticipantId = string;
@@ -80,14 +81,27 @@ export interface EncryptionKeysToDeviceEventContent {
     // Why is this needed?
     sent_ts?: number;
 }
-
+/**
+ * @deprecated Use `RTCNotificationType` instead.
+ */
 export type CallNotifyType = "ring" | "notify";
-
+/**
+ * @deprecated Use `IRTCNotificationContent` instead.
+ */
 export interface ICallNotifyContent {
     "application": string;
     "m.mentions": IMentions;
     "notify_type": CallNotifyType;
     "call_id": string;
+}
+
+export type RTCNotificationType = "ring" | "notification";
+export interface IRTCNotificationContent extends RelationEvent {
+    "m.mentions": IMentions;
+    "decline_reason"?: string;
+    "notification_type": RTCNotificationType;
+    "sender_ts": number;
+    "lifetime": number;
 }
 
 export enum Status {
