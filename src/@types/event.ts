@@ -164,7 +164,6 @@ export enum RelationType {
     // Once we support *only* the stable prefix, THREAD_RELATION_TYPE can die and we can switch to this.
     Thread = "m.thread",
     unstable_RTCNotificationParent = "org.matrix.msc4075.rtc.notification.parent",
-    unstable_RTCNotificationDecline = "org.matrix.msc4075.rtc.notification.decline",
 }
 
 export enum MsgType {

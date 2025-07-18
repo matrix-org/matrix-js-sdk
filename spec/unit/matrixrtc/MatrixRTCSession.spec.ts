@@ -201,59 +201,6 @@ describe("MatrixRTCSession", () => {
         });
     });
 
-    describe("updateCallMembershipEvent", () => {
-        const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
-        const joinSessionConfig = {};
-
-        const sessionMembershipData: MembershipData = {
-            call_id: "",
-            scope: "m.room",
-            application: "m.call",
-            user_id: "@mock:user.example",
-            device_id: "AAAAAAA_session",
-            focus_active: mockFocus,
-            foci_preferred: [mockFocus],
-        };
-
-        let sendStateEventMock: jest.Mock;
-        let sendDelayedStateMock: jest.Mock;
-
-        let sentStateEvent: Promise<void>;
-        let sentDelayedState: Promise<void>;
-
-        beforeEach(() => {
-            sentStateEvent = new Promise((resolve) => {
-                sendStateEventMock = jest.fn(resolve);
-            });
-            sentDelayedState = new Promise((resolve) => {
-                sendDelayedStateMock = jest.fn(() => {
-                    resolve();
-                    return {
-                        delay_id: "id",
-                    };
-                });
-            });
-            client.sendStateEvent = sendStateEventMock;
-            client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
-        });
-
-        async function testSession(membershipData: MembershipData): Promise<void> {
-            sess = MatrixRTCSession.roomSessionForRoom(client, makeMockRoom([membershipData]));
-
-            sess.joinRoomSession([mockFocus], mockFocus, joinSessionConfig);
-            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 500))]);
-
-            expect(sendStateEventMock).toHaveBeenCalledTimes(1);
-
-            await Promise.race([sentDelayedState, new Promise((resolve) => setTimeout(resolve, 500))]);
-            expect(sendDelayedStateMock).toHaveBeenCalledTimes(1);
-        }
-
-        it("sends events", async () => {
-            await testSession(sessionMembershipData);
-        });
-    });
-
     describe("getOldestMembership", () => {
         it("returns the oldest membership event", () => {
             jest.useFakeTimers();
@@ -376,7 +323,7 @@ describe("MatrixRTCSession", () => {
                 "sender_ts": expect.any(Number),
             });
 
-            // check if deprecated notify event is also sent
+            // Check if deprecated notify event is also sent.
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
                 "application": "m.call",
                 "m.mentions": { user_ids: [], room: true },

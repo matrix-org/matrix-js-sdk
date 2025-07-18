@@ -194,6 +194,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private joinConfig?: SessionConfig;
     private logger: Logger;
 
+    private pendingNotificationToSend: undefined | Exclude<RTCNotificationType, "decline">;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -459,6 +460,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         this.joinConfig = joinConfig;
+        this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
@@ -490,9 +492,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.logger.info(`Leaving call session in room ${this.roomSubset.roomId}`);
 
         this.encryptionManager!.leave();
-        const leavePromise = this.membershipManager!.leave(timeout);
 
+        const leavePromise = this.membershipManager!.leave(timeout);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
+
         return await leavePromise;
     }
 
@@ -562,33 +565,30 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Sends a notification corresponding to the configured notify type.
      */
-    private sendCallNotify(parentEventId: string): void {
-        const notificationType = this.joinConfig?.notificationType;
-        if (notificationType !== undefined) {
-            // Send legacy event:
+    private sendCallNotify(parentEventId: string, notificationType: Exclude<RTCNotificationType, "decline">): void {
+        // Send legacy event:
+        this.client
+            .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
+                "application": "m.call",
+                "m.mentions": { user_ids: [], room: true },
+                "notify_type": notificationType === "notification" ? "notify" : notificationType,
+                "call_id": this.callId!,
+            })
+            .catch((e) => this.logger.error("Failed to send call notification", e));
 
-            this.client
-                .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
-                    "application": "m.call",
-                    "m.mentions": { user_ids: [], room: true },
-                    "notify_type": notificationType === "notification" ? "notify" : notificationType,
-                    "call_id": this.callId!,
-                })
-                .catch((e) => this.logger.error("Failed to send call notification", e));
-            // Send new event:
-            this.client
-                .sendEvent(this.roomSubset.roomId, EventType.RTCNotification, {
-                    "m.mentions": { user_ids: [], room: true },
-                    "notification_type": notificationType,
-                    "m.relates_to": {
-                        event_id: parentEventId,
-                        rel_type: RelationType.unstable_RTCNotificationParent,
-                    },
-                    "sender_ts": Date.now(),
-                    "lifetime": 30_000, // 30 seconds
-                })
-                .catch((e) => this.logger.error("Failed to send call notification", e));
-        }
+        // Send new event:
+        this.client
+            .sendEvent(this.roomSubset.roomId, EventType.RTCNotification, {
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": notificationType,
+                "m.relates_to": {
+                    event_id: parentEventId,
+                    rel_type: RelationType.unstable_RTCNotificationParent,
+                },
+                "sender_ts": Date.now(),
+                "lifetime": 30_000, // 30 seconds
+            })
+            .catch((e) => this.logger.error("Failed to send call notification", e));
     }
 
     /**
@@ -631,16 +631,20 @@ export class MatrixRTCSession extends TypedEventEmitter<
             });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+            // The `ownMembership` will be set when calling `onRTCSessionMemberUpdate`.
             const ownMembership = this.membershipManager?.ownMembership;
-            if (ownMembership && oldMemberships.length === 0) {
+            if (this.pendingNotificationToSend && ownMembership && oldMemberships.length === 0) {
                 // If we're the first member in the call, we're responsible for
                 // sending the notification event
-                if (ownMembership.eventId) {
-                    this.sendCallNotify(ownMembership.eventId);
+                if (ownMembership.eventId && this.joinConfig?.notificationType) {
+                    this.sendCallNotify(ownMembership.eventId, this.joinConfig.notificationType);
                 } else {
                     this.logger.warn("Own membership eventId is undefined, cannot send call notification");
                 }
             }
+            // If anyone else joins the session it is no longer our responsibility to send the notification.
+            // (If we were the joiner we already did sent the notification in the block above.)
+            if (this.memberships.length > 0) this.pendingNotificationToSend = undefined;
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
