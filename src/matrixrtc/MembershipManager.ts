@@ -221,7 +221,13 @@ export class MembershipManager
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
-        if (userId && deviceId && this.isJoined() && !memberships.some((m) => isMyMembership(m, userId, deviceId))) {
+        if (!userId || !deviceId) {
+            this.logger.error("MembershipManager.onRTCSessionMemberUpdate called without user or device id");
+            return Promise.resolve();
+        }
+        this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
+
+        if (this.isActivated() && !this._ownMembership) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
             // take care of our missing membership.
             const sendingMembershipActions = [
@@ -308,6 +314,11 @@ export class MembershipManager
             this.logger.debug(`MembershipManager before processing action. status=${this.oldStatus}`);
             return this.membershipLoopHandler(type);
         }, this.logger);
+    }
+
+    private _ownMembership?: CallMembership;
+    public get ownMembership(): CallMembership | undefined {
+        return this._ownMembership;
     }
 
     // scheduler

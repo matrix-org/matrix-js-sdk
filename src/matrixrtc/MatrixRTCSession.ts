@@ -19,7 +19,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
-import { EventType } from "../@types/event.ts";
+import { EventType, RelationType } from "../@types/event.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { type Statistics } from "./types.ts";
+import { type Statistics, type RTCNotificationType } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
@@ -65,6 +65,15 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
+
+export interface SessionConfig {
+    /**
+     * What kind of notification to send when starting the session.
+     * @default `undefined` (no notification)
+     */
+    notificationType?: RTCNotificationType;
+}
+
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
@@ -168,7 +177,7 @@ export interface EncryptionConfig {
      */
     useKeyDelay?: number;
 }
-export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
+export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionConfig;
 
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
@@ -182,7 +191,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
+    private joinConfig?: SessionConfig;
     private logger: Logger;
+
+    private pendingNotificationToSend: undefined | RTCNotificationType;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -447,6 +459,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
             }
         }
 
+        this.joinConfig = joinConfig;
+        this.pendingNotificationToSend = this.joinConfig?.notificationType;
+
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
@@ -548,6 +563,35 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Sends a notification corresponding to the configured notify type.
+     */
+    private sendCallNotify(parentEventId: string, notificationType: RTCNotificationType): void {
+        // Send legacy event:
+        this.client
+            .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
+                "application": "m.call",
+                "m.mentions": { user_ids: [], room: true },
+                "notify_type": notificationType === "notification" ? "notify" : notificationType,
+                "call_id": this.callId!,
+            })
+            .catch((e) => this.logger.error("Failed to send call notification", e));
+
+        // Send new event:
+        this.client
+            .sendEvent(this.roomSubset.roomId, EventType.RTCNotification, {
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": notificationType,
+                "m.relates_to": {
+                    event_id: parentEventId,
+                    rel_type: RelationType.unstable_RTCNotificationParent,
+                },
+                "sender_ts": Date.now(),
+                "lifetime": 30_000, // 30 seconds
+            })
+            .catch((e) => this.logger.error("Failed to send call notification", e));
+    }
+
+    /**
      * Call this when the Matrix room members have changed.
      */
     public onRoomMemberUpdate = (): void => {
@@ -587,6 +631,20 @@ export class MatrixRTCSession extends TypedEventEmitter<
             });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+            // The `ownMembership` will be set when calling `onRTCSessionMemberUpdate`.
+            const ownMembership = this.membershipManager?.ownMembership;
+            if (this.pendingNotificationToSend && ownMembership && oldMemberships.length === 0) {
+                // If we're the first member in the call, we're responsible for
+                // sending the notification event
+                if (ownMembership.eventId && this.joinConfig?.notificationType) {
+                    this.sendCallNotify(ownMembership.eventId, this.joinConfig.notificationType);
+                } else {
+                    this.logger.warn("Own membership eventId is undefined, cannot send call notification");
+                }
+            }
+            // If anyone else joins the session it is no longer our responsibility to send the notification.
+            // (If we were the joiner we already did sent the notification in the block above.)
+            if (this.memberships.length > 0) this.pendingNotificationToSend = undefined;
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)

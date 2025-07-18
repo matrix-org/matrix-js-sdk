@@ -664,7 +664,7 @@ describe("RTCEncryptionManager", () => {
 
         await jest.runOnlyPendingTimersAsync();
 
-        // The key should have beed re-distributed to the room transport
+        // The key should have been re-distributed to the room transport
         expect(mockRoomTransport.sendKey).toHaveBeenCalled();
         expect(mockToDeviceTransport.sendKey).toHaveBeenCalledWith(
             expect.any(String),
@@ -677,9 +677,8 @@ describe("RTCEncryptionManager", () => {
 
     function aCallMembership(userId: string, deviceId: string, ts: number = 1000): CallMembership {
         return mockCallMembership(
-            Object.assign({}, membershipTemplate, { device_id: deviceId, created_ts: ts }),
+            { ...membershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
-            userId,
         );
     }
 });
