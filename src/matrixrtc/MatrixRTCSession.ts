@@ -582,7 +582,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     "notification_type": notificationType,
                     "m.relates_to": {
                         event_id: parentEventId,
-                        rel_type: RelationType.unstable_RTCParentEvent,
+                        rel_type: RelationType.unstable_RTCNotificationParent,
                     },
                     "sender_ts": Date.now(),
                     "lifetime": 30_000, // 30 seconds
