@@ -482,7 +482,10 @@ describe("MembershipManager", () => {
 
             await manager.onRTCSessionMemberUpdate([
                 mockCallMembership(membershipTemplate, room.roomId),
-                mockCallMembership({ ...myMembership as SessionMembershipData, user_id: client.getUserId()! }, room.roomId),
+                mockCallMembership(
+                    { ...(myMembership as SessionMembershipData), user_id: client.getUserId()! },
+                    room.roomId,
+                ),
             ]);
 
             await jest.advanceTimersByTimeAsync(1);
