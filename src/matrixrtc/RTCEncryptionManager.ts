@@ -224,9 +224,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     /**
      * Called when the membership of the call changes.
      * This encryption manager is very basic, it will rotate the key everytime this is called.
-     * @param oldMemberships
+     * @param oldMemberships - This parameter is not used here, but it is kept for compatibility with the interface.
      */
-    public onMembershipsUpdate(oldMemberships: CallMembership[]): void {
+    public onMembershipsUpdate(oldMemberships: CallMembership[] = []): void {
         this.logger?.trace(`onMembershipsUpdate`);
 
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
