@@ -217,6 +217,7 @@ describe("RTCEncryptionManager", () => {
         // Test an edge case where the use key delay is higher than the grace period.
         // This means that no matter what, the key once rolled out will be too old to be re-used for the new member that
         // joined within the grace period.
+        // So we expect another rotation to happen in all cases where a new member joins.
         it("test grace period lower than delay period", async () => {
             jest.useFakeTimers();
 
@@ -256,8 +257,8 @@ describe("RTCEncryptionManager", () => {
             // Wait pass the delay period
             await jest.advanceTimersByTimeAsync(5_000);
 
-            // Even though the new member joined within the grace period, the key should be rotated because the delay period has passed
-            // and made the key too old to be reshared.
+            // Even though the new member joined within the grace period, the key should be rotated because once the delay period has passed
+            // also the grace period is exceeded/the key is too old to be reshared.
 
             // CARLDEVICE should have received a key with index 1 and another one with index 2
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 1, "@carl:example.org", "CARLDEVICE");
