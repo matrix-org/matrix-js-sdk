@@ -1082,6 +1082,32 @@ describe("MatrixClient", function () {
 
             await client._unstable_updateDelayedEvent(delayId, action);
         });
+
+        it("uses custom timeout for restart delayed event", async () => {
+            // make another client so we can pass creation opts
+            makeClient({ delayedEventRestartLocalTimeoutMS: 2300 });
+            const delayId = "id";
+            const action = UpdateDelayedEventAction.Restart;
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    data: {
+                        action,
+                    },
+                },
+            ];
+            await client._unstable_updateDelayedEvent(delayId, action);
+
+            expect(client.http.authedRequest).toHaveBeenLastCalledWith(
+                "POST",
+                "/delayed_events/id",
+                undefined,
+                { action: "restart" },
+                { localTimeoutMs: 2300, prefix: "/_matrix/client/unstable/org.matrix.msc4140" },
+            );
+        });
     });
 
     describe("extended profiles", () => {
