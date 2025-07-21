@@ -79,7 +79,7 @@ export interface SessionConfig {
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
 // - we use membershipEvent if the option is related to the rtc member state event.
 // - we use the technical term expiry if the option is related to the expiry field of the membership state event.
-// - we use a `MS` postfix if the option is a duration to avoid using words like:
+// - we use a `Ms` postfix if the option is a duration to avoid using words like:
 //   `time`, `duration`, `delay`, `timeout`... that might be mistaken/confused with technical terms.
 export interface MembershipConfig {
     /**
@@ -143,6 +143,7 @@ export interface MembershipConfig {
      * failed to send due to a network error. (send membership event, send delayed event, restart delayed event...)
      */
     networkErrorRetryMs?: number;
+
     /** @deprecated renamed to `networkErrorRetryMs`*/
     callMemberEventRetryDelayMinimum?: number;
 
@@ -150,6 +151,13 @@ export interface MembershipConfig {
      * If true, use the new to-device transport for sending encryption keys.
      */
     useExperimentalToDeviceTransport?: boolean;
+    /**
+     * In the presence of network packet loss (hurting TCP connections), the custom delayedEventRestartLocalTimeoutMs
+     * helps by keeping more delayed event reset candidates in flight,
+     * improving the chances of a successful reset. (its is equivalent to the js-sdk `localTimeout` configuration,
+     * but only applies to calls to the `_unstable_updateDelayedEvent` endpoint with a body of `{action:"restart"}`.)
+     */
+    delayedLeaveEventRestartLocalTimeoutMs?: number;
 }
 
 export interface EncryptionConfig {

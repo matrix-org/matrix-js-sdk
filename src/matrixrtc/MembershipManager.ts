@@ -85,19 +85,24 @@ export enum MembershipActionType {
     //  -> MembershipActionType.SendJoinEvent if successful
     //  -> DelayedLeaveActionType.SendDelayedEvent on error, retry sending the first delayed event.
     //  -> DelayedLeaveActionType.RestartDelayedEvent on success start updating the delayed event
+
     SendJoinEvent = "SendJoinEvent",
     //  -> MembershipActionType.SendJoinEvent if we run into a rate limit and need to retry
     //  -> MembershipActionType.Update if we successfully send the join event then schedule the expire event update
     //  -> DelayedLeaveActionType.RestartDelayedEvent to recheck the delayed event
+
     RestartDelayedEvent = "RestartDelayedEvent",
     //  -> DelayedLeaveActionType.SendMainDelayedEvent on missing delay id but there is a rtc state event
     //  -> DelayedLeaveActionType.SendDelayedEvent on missing delay id and there is no state event
     //  -> DelayedLeaveActionType.RestartDelayedEvent on success we schedule the next restart
+
     UpdateExpiry = "UpdateExpiry",
     //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
+
     SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent",
     //  -> MembershipActionType.SendLeaveEvent on failiour (not found) we need to send the leave manually and cannot use the scheduled delayed event
     //  -> DelayedLeaveActionType.SendScheduledDelayedLeaveEvent on error we try again.
+
     SendLeaveEvent = "SendLeaveEvent",
     // -> MembershipActionType.SendLeaveEvent
 }
@@ -385,6 +390,9 @@ export class MembershipManager
         return this.joinConfig?.maximumNetworkErrorRetryCount ?? 10;
     }
 
+    private get delayedLeaveEventRestartLocalTimeoutMs(): number {
+        return this.joinConfig?.delayedLeaveEventRestartLocalTimeoutMs ?? 2000;
+    }
     // LOOP HANDLER:
     private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
         switch (type) {
@@ -536,8 +544,17 @@ export class MembershipManager
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
-        return await this.client
-            ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart)
+        const TIMEOUT_ERROR = "TIMEOUT_ERROR";
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(TIMEOUT_ERROR);
+            }, this.delayedLeaveEventRestartLocalTimeoutMs);
+        });
+
+        return await Promise.race([
+            this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart),
+            timeoutPromise,
+        ])
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
                 return createInsertActionUpdate(
@@ -546,6 +563,15 @@ export class MembershipManager
                 );
             })
             .catch((e) => {
+                // This is a custom case that will only happen for the restartDelayed event action.
+                // It is important, that we sent the restart delayed event request before the delayed event times out.
+                // Using the default local timeout (5s) can result in failing to restart the delayed event before it times out.
+                // The `timeoutPromise` in combination with this block, basically mimics a custom local timeout for just this operation.
+                // Since restarting the delayed event is a "send and forget" kind of operation, it is acceptable that this might result in
+                // unhandled errors in the case of a timeout.
+                if (e === TIMEOUT_ERROR) {
+                    return createInsertActionUpdate(MembershipActionType.RestartDelayedEvent);
+                }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
                     this.state.delayId = undefined;
@@ -786,14 +812,19 @@ export class MembershipManager
     private actionUpdateFromNetworkErrorRetry(error: unknown, type: MembershipActionType): ActionUpdate | undefined {
         // "Is a network error"-boundary
         const retries = this.state.networkErrorRetries.get(type) ?? 0;
+
+        // Strings for error logging
         const retryDurationString = this.networkErrorRetryMs / 1000 + "s";
         const retryCounterString = "(" + retries + "/" + this.maximumNetworkErrorRetryCount + ")";
+
+        // Variables for scheduling the new event
+        let retryDuration = this.networkErrorRetryMs;
+
         if (error instanceof Error && error.name === "AbortError") {
+            // We do not wait for the timeout on local timeouts.
+            retryDuration = 0;
             this.logger.warn(
-                "Network local timeout error while sending event, retrying in " +
-                    retryDurationString +
-                    " " +
-                    retryCounterString,
+                "Network local timeout error while sending event, immediate retry (" + retryCounterString + ")",
                 error,
             );
         } else if (error instanceof Error && error.message.includes("updating delayed event")) {
@@ -836,7 +867,7 @@ export class MembershipManager
         // retry boundary
         if (retries < this.maximumNetworkErrorRetryCount) {
             this.state.networkErrorRetries.set(type, retries + 1);
-            return createInsertActionUpdate(type, this.networkErrorRetryMs);
+            return createInsertActionUpdate(type, retryDuration);
         }
 
         // Failure
