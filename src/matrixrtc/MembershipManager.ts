@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { AbortError } from "p-retry";
 
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
@@ -544,16 +545,17 @@ export class MembershipManager
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
-        const TIMEOUT_ERROR = "TIMEOUT_ERROR";
-        const timeoutPromise = new Promise((_, reject) => {
+        const abortPromise = new Promise((_, reject) => {
             setTimeout(() => {
-                reject(TIMEOUT_ERROR);
+                reject(new AbortError("Restart delayed event timed out before the HS responded"));
             }, this.delayedLeaveEventRestartLocalTimeoutMs);
         });
 
+        // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
+        // to the widget driver this information would ge lost. That is why we mimic the AbortError using the race.
         return await Promise.race([
             this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart),
-            timeoutPromise,
+            abortPromise,
         ])
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
@@ -563,21 +565,6 @@ export class MembershipManager
                 );
             })
             .catch((e) => {
-                // This is a custom case that will only happen for the restartDelayed event action.
-                // It is important, that we sent the restart delayed event request before the delayed event times out.
-                // Using the default local timeout (5s) can result in failing to restart the delayed event before it times out.
-                // The `timeoutPromise` in combination with this block, basically mimics a custom local timeout for just this operation.
-                // Since restarting the delayed event is a "send and forget" kind of operation, it is acceptable that this might result in
-                // unhandled errors in the case of a timeout.
-                if (e === TIMEOUT_ERROR) {
-                    // retry boundary
-                    const retries = this.state.networkErrorRetries.get(MembershipActionType.RestartDelayedEvent) ?? 0;
-
-                    if (retries < this.maximumNetworkErrorRetryCount) {
-                        this.state.networkErrorRetries.set(MembershipActionType.RestartDelayedEvent, retries + 1);
-                        return createInsertActionUpdate(MembershipActionType.RestartDelayedEvent);
-                    }
-                }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
                     this.state.delayId = undefined;
