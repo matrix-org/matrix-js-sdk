@@ -570,7 +570,13 @@ export class MembershipManager
                 // Since restarting the delayed event is a "send and forget" kind of operation, it is acceptable that this might result in
                 // unhandled errors in the case of a timeout.
                 if (e === TIMEOUT_ERROR) {
-                    return createInsertActionUpdate(MembershipActionType.RestartDelayedEvent);
+                    // retry boundary
+                    const retries = this.state.networkErrorRetries.get(MembershipActionType.RestartDelayedEvent) ?? 0;
+
+                    if (retries < this.maximumNetworkErrorRetryCount) {
+                        this.state.networkErrorRetries.set(MembershipActionType.RestartDelayedEvent, retries + 1);
+                        return createInsertActionUpdate(MembershipActionType.RestartDelayedEvent);
+                    }
                 }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
