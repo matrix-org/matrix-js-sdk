@@ -120,7 +120,15 @@ describe("FetchHttpApi", () => {
         await expect(api.requestOtherUrl(Method.Get, "http://url")).resolves.toBe(res);
     });
 
-    it("should return text if json=false", async () => {
+    it("should set an Accept header, and parse the response as JSON, by default", async () => {
+        const result = { a: 1 };
+        const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue(result) });
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
+        await expect(api.requestOtherUrl(Method.Get, "http://url")).resolves.toBe(result);
+        expect(fetchFn.mock.calls[0][1].headers.Accept).toBe("application/json");
+    });
+
+    it("should not set an Accept header, and should return text if json=false", async () => {
         const text = "418 I'm a teapot";
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, text: jest.fn().mockResolvedValue(text) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
@@ -129,9 +137,10 @@ describe("FetchHttpApi", () => {
                 json: false,
             }),
         ).resolves.toBe(text);
+        expect(fetchFn.mock.calls[0][1].headers.Accept).not.toBeDefined();
     });
 
-    it("should return a blob if rawResponseBody is true", async () => {
+    it("should not set an Accept header, and should return a blob, if rawResponseBody is true", async () => {
         const blob = new Blob(["blobby"]);
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, blob: jest.fn().mockResolvedValue(blob) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
@@ -140,6 +149,7 @@ describe("FetchHttpApi", () => {
                 rawResponseBody: true,
             }),
         ).resolves.toBe(blob);
+        expect(fetchFn.mock.calls[0][1].headers.Accept).not.toBeDefined();
     });
 
     it("should throw an error if both `json` and `rawResponseBody` are defined", async () => {

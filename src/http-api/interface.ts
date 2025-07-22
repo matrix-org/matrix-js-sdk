@@ -70,7 +70,7 @@ export interface IHttpOpts {
     useAuthorizationHeader?: boolean; // defaults to true
 
     /**
-     * Normally, methods in `FetchHttpApi` will return a {@link https://developer.mozilla.org/en-US/docs/Web/API/Response|Response} object.
+     * Normally, methods in `FetchHttpApi` will return a {@link https://developer.mozilla.org/en-US/docs/Web/API/Response Response} object.
      * If this is set to `true`, they instead return the response body.
      */
     onlyData?: boolean;
@@ -98,7 +98,7 @@ export interface BaseRequestOpts extends Pick<RequestInit, "priority"> {
     /**
      * By default, we will:
      *
-     *  *  If the `body` is an object, we will JSON-encode it and set `Content-Type: application/json` in the
+     *  *  If the `body` is an object, JSON-encode it and set `Content-Type: application/json` in the
      *     request headers (unless overridden by {@link headers}).
      *
      *  * Set `Accept: application/json` in the request headers (again, unless overridden by {@link headers}).

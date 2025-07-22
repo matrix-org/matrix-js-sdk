@@ -276,7 +276,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
         const headers = Object.assign({}, opts.headers || {});
 
-        const jsonResponse = opts.json !== false;
+        const jsonResponse = !opts.rawResponseBody && opts.json !== false;
         if (jsonResponse) {
             if (!headers["Accept"]) {
                 headers["Accept"] = "application/json";
