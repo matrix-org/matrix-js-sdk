@@ -7,11 +7,6 @@ import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
 import { isMyMembership, type ParticipantId, type Statistics } from "./types.ts";
 import { getParticipantId } from "./utils.ts";
-import {
-    type EnabledTransports,
-    RoomAndToDeviceEvents,
-    RoomAndToDeviceTransport,
-} from "./RoomAndToDeviceKeyTransport.ts";
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -119,10 +114,7 @@ export class EncryptionManager implements IEncryptionManager {
         this.manageMediaKeys = this.joinConfig?.manageMediaKeys ?? this.manageMediaKeys;
 
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
-        // Deprecate RoomKeyTransport: this can get removed.
-        if (this.transport instanceof RoomAndToDeviceTransport) {
-            this.transport.on(RoomAndToDeviceEvents.EnabledTransportsChanged, this.onTransportChanged);
-        }
+
         this.transport.start();
         if (this.joinConfig?.manageMediaKeys) {
             this.makeNewSenderKey();
@@ -313,10 +305,6 @@ export class EncryptionManager implements IEncryptionManager {
                 this.logger.info("Not scheduling key resend as another re-send is already pending");
             }
         }
-    };
-
-    private onTransportChanged: (enabled: EnabledTransports) => void = () => {
-        this.requestSendCurrentKey();
     };
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
