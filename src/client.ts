@@ -6843,9 +6843,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param opts -  options object
      *
-     * @returns Promise which resolves to response object, as
-     *    determined by this.opts.onlyData, opts.rawResponse, and
-     *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
+     * @returns Promise which resolves to response object, or rejects with an error (usually a MatrixError).
      */
     public uploadContent(file: FileType, opts?: UploadOpts): Promise<UploadResponse> {
         return this.http.uploadContent(file, opts);

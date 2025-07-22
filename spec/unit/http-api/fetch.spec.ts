@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
-
+import type { Mocked, MockedFunction } from "jest-mock";
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
@@ -43,8 +42,8 @@ describe("FetchHttpApi", () => {
     });
 
     it("should support aborting multiple times", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const fetchFn = makeMockFetchFn();
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
 
         api.request(Method.Get, "/foo");
         api.request(Method.Get, "/baz");
@@ -68,13 +67,13 @@ describe("FetchHttpApi", () => {
     it("should fall back to global fetch if fetchFn not provided", () => {
         globalThis.fetch = jest.fn();
         expect(globalThis.fetch).not.toHaveBeenCalled();
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         api.fetch("test");
         expect(globalThis.fetch).toHaveBeenCalled();
     });
 
     it("should update identity server base url", () => {
-        const api = new FetchHttpApi<IHttpOpts>(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new FetchHttpApi<IHttpOpts>(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         expect(api.opts.idBaseUrl).toBeUndefined();
         api.setIdBaseUrl("https://id.foo.bar");
         expect(api.opts.idBaseUrl).toBe("https://id.foo.bar");
@@ -82,23 +81,35 @@ describe("FetchHttpApi", () => {
 
     describe("idServerRequest", () => {
         it("should throw if no idBaseUrl", () => {
-            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
             expect(() => api.idServerRequest(Method.Get, "/test", {}, IdentityPrefix.V2)).toThrow(
                 "No identity server base URL set",
             );
         });
 
         it("should send params as query string for GET requests", () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
-            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, idBaseUrl, prefix, fetchFn });
+            const fetchFn = makeMockFetchFn();
+            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+                baseUrl,
+                idBaseUrl,
+                prefix,
+                fetchFn,
+                onlyData: true,
+            });
             api.idServerRequest(Method.Get, "/test", { foo: "bar", via: ["a", "b"] }, IdentityPrefix.V2);
             expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).toBe("bar");
             expect(fetchFn.mock.calls[0][0].searchParams.getAll("via")).toEqual(["a", "b"]);
         });
 
         it("should send params as body for non-GET requests", () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
-            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, idBaseUrl, prefix, fetchFn });
+            const fetchFn = makeMockFetchFn();
+            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+                baseUrl,
+                idBaseUrl,
+                prefix,
+                fetchFn,
+                onlyData: true,
+            });
             const params = { foo: "bar", via: ["a", "b"] };
             api.idServerRequest(Method.Post, "/test", params, IdentityPrefix.V2);
             expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).not.toBe("bar");
@@ -106,18 +117,27 @@ describe("FetchHttpApi", () => {
         });
 
         it("should add Authorization header if token provided", () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
-            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, idBaseUrl, prefix, fetchFn });
+            const fetchFn = makeMockFetchFn();
+            const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+                baseUrl,
+                idBaseUrl,
+                prefix,
+                fetchFn,
+                onlyData: true,
+            });
             api.idServerRequest(Method.Post, "/test", {}, IdentityPrefix.V2, "token");
             expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
         });
     });
 
-    it("should return the Response object if onlyData=false", async () => {
-        const res = { ok: true };
-        const fetchFn = jest.fn().mockResolvedValue(res);
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: false });
-        await expect(api.requestOtherUrl(Method.Get, "http://url")).resolves.toBe(res);
+    it("should complain if constructed without `onlyData: true`", async () => {
+        expect(
+            () =>
+                new FetchHttpApi(new TypedEventEmitter<any, any>(), {
+                    baseUrl,
+                    prefix,
+                }),
+        ).toThrow("Constructing FetchHttpApi without `onlyData=true` is no longer supported.");
     });
 
     it("should set an Accept header, and parse the response as JSON, by default", async () => {
@@ -165,37 +185,40 @@ describe("FetchHttpApi", () => {
     });
 
     it("should send token via query params if useAuthorizationHeader=false", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = makeMockFetchFn();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
             accessToken: "token",
             useAuthorizationHeader: false,
+            onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("token");
     });
 
     it("should send token via headers by default", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = makeMockFetchFn();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
             accessToken: "token",
+            onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
     });
 
     it("should not send a token if not calling `authedRequest`", () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = makeMockFetchFn();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
             accessToken: "token",
+            onlyData: true,
         });
         api.request(Method.Get, "/path");
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
@@ -203,13 +226,14 @@ describe("FetchHttpApi", () => {
     });
 
     it("should ensure no token is leaked out via query params if sending via headers", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = makeMockFetchFn();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
             accessToken: "token",
             useAuthorizationHeader: true,
+            onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", { access_token: "123" });
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
@@ -217,26 +241,28 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not override manually specified access token via query params", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = makeMockFetchFn();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
             accessToken: "token",
             useAuthorizationHeader: false,
+            onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
         expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("RealToken");
     });
 
     it("should not override manually specified access token via header", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+        const fetchFn = makeMockFetchFn();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
             accessToken: "token",
             useAuthorizationHeader: true,
+            onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Authorization: "Bearer RealToken" },
@@ -245,8 +271,8 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not override Accept header", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true });
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const fetchFn = makeMockFetchFn();
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Accept: "text/html" },
         });
@@ -269,7 +295,7 @@ describe("FetchHttpApi", () => {
             ),
         });
         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-        const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
+        const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, onlyData: true });
 
         await Promise.all([
             emitPromise(emitter, HttpApiEvent.NoConsent),
@@ -279,9 +305,9 @@ describe("FetchHttpApi", () => {
 
     describe("authedRequest", () => {
         it("should not include token if unset", async () => {
-            const fetchFn = jest.fn().mockResolvedValue({ ok: true });
+            const fetchFn = makeMockFetchFn();
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-            const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
+            const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, onlyData: true });
             await api.authedRequest(Method.Post, "/account/password");
             expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
         });
@@ -310,6 +336,7 @@ describe("FetchHttpApi", () => {
                 const okayResponse = {
                     ok: true,
                     status: 200,
+                    json: jest.fn().mockResolvedValue({ x: 1 }),
                 };
 
                 describe("without a tokenRefreshFunction", () => {
@@ -317,7 +344,14 @@ describe("FetchHttpApi", () => {
                         const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                         jest.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, accessToken, refreshToken });
+                        const api = new FetchHttpApi(emitter, {
+                            baseUrl,
+                            prefix,
+                            fetchFn,
+                            accessToken,
+                            refreshToken,
+                            onlyData: true,
+                        });
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
@@ -339,6 +373,7 @@ describe("FetchHttpApi", () => {
                             tokenRefreshFunction,
                             accessToken,
                             refreshToken,
+                            onlyData: true,
                         });
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
@@ -360,6 +395,7 @@ describe("FetchHttpApi", () => {
                             tokenRefreshFunction,
                             accessToken,
                             refreshToken,
+                            onlyData: true,
                         });
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
@@ -388,11 +424,12 @@ describe("FetchHttpApi", () => {
                             tokenRefreshFunction,
                             accessToken,
                             refreshToken,
+                            onlyData: true,
                         });
                         const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
                             headers: {},
                         });
-                        expect(result).toEqual(okayResponse);
+                        expect(result).toEqual({ x: 1 });
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
 
                         expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -431,6 +468,7 @@ describe("FetchHttpApi", () => {
                             tokenRefreshFunction,
                             accessToken,
                             refreshToken,
+                            onlyData: true,
                         });
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
@@ -486,6 +524,7 @@ describe("FetchHttpApi", () => {
                             tokenRefreshFunction,
                             accessToken,
                             refreshToken,
+                            onlyData: true,
                         });
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
@@ -506,7 +545,7 @@ describe("FetchHttpApi", () => {
         const makeApi = (thisBaseUrl = baseUrl): FetchHttpApi<any> => {
             const fetchFn = jest.fn();
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-            return new FetchHttpApi(emitter, { baseUrl: thisBaseUrl, prefix, fetchFn });
+            return new FetchHttpApi(emitter, { baseUrl: thisBaseUrl, prefix, fetchFn, onlyData: true });
         };
 
         type TestParams = {
@@ -559,7 +598,13 @@ describe("FetchHttpApi", () => {
             const makeApiWithExtraParams = (extraParams: QueryDict): FetchHttpApi<any> => {
                 const fetchFn = jest.fn();
                 const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                return new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn, extraParams });
+                return new FetchHttpApi(emitter, {
+                    baseUrl: localBaseUrl,
+                    prefix,
+                    fetchFn,
+                    onlyData: true,
+                    extraParams,
+                });
             };
 
             const userId = "@rsb-tbg:localhost";
@@ -612,7 +657,7 @@ describe("FetchHttpApi", () => {
             it("should work when extraParams is undefined", () => {
                 const fetchFn = jest.fn();
                 const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                const api = new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn });
+                const api = new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn, onlyData: true });
 
                 const queryParams = { userId: "123" };
                 const result = api.getUrl("/test", queryParams);
@@ -645,10 +690,11 @@ describe("FetchHttpApi", () => {
             prefix,
             fetchFn,
             logger: mockLogger,
+            onlyData: true,
         });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
         jest.advanceTimersByTime(1234);
-        responseResolvers.resolve({ ok: true, status: 200, text: () => Promise.resolve("RESPONSE") } as Response);
+        responseResolvers.resolve({ ok: true, status: 200, json: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");
         expect(mockLogger.debug).not.toHaveBeenCalledWith("query");
@@ -691,6 +737,7 @@ describe("FetchHttpApi", () => {
             tokenRefreshFunction,
             accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
+            onlyData: true,
         });
 
         const prom1 = api.authedRequest(Method.Get, "/path1");
@@ -746,6 +793,7 @@ describe("FetchHttpApi", () => {
             tokenRefreshFunction,
             accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
+            onlyData: true,
         });
 
         const prom1 = api.authedRequest(Method.Get, "/path1");
@@ -783,3 +831,7 @@ describe("FetchHttpApi", () => {
         expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });
 });
+
+function makeMockFetchFn(): MockedFunction<any> {
+    return jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
+}
