@@ -592,3 +592,99 @@ export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
 
     return await promise;
 }
+
+export function jestFakeTimersAreEnabled(): boolean {
+    return Object.prototype.hasOwnProperty.call(setTimeout, "clock");
+}
+
+/**
+ * Run `callback` in a loop, until it returns a successful result (i.e. it does not throw), or we reach a timeout
+ *
+ * Based on the function of the same name in the {@link https://testing-library.com/docs/dom-testing-library/api-async/#waitfor DOM testing library}.
+ *
+ * @param callback - The function to call to check if we can proceed. If it returns a result (including a falsey one),
+ *   `waitFor` returns that result. If it throws, `waitFor` continues to wait.
+ *
+ *   May return a promise, in which case no further checks are done until the promise resolves.
+ *
+ * @param timeout - The time to wait for, overall, in ms. If `callback` still hasn't returned a successful result after
+ *    this time, `waitFor` will throw an error.
+ *
+ *    Defaults to 1000.
+ *
+ * @param interval - How often to call `callback`. Defaults to 50.
+ */
+export async function waitFor<T>(
+    callback: () => Promise<T> | T,
+    {
+        timeout = 1000,
+        interval = 50,
+    }: {
+        timeout?: number;
+        interval?: number;
+    } = {},
+): Promise<T> {
+    return new Promise(async (resolve, reject) => {
+        let lastError: any;
+        let finished = false;
+        let intervalId: ReturnType<typeof setTimeout> | undefined;
+
+        const overallTimeoutTimer = setTimeout(handleTimeout, timeout);
+        const usingJestFakeTimers = jestFakeTimersAreEnabled();
+        if (usingJestFakeTimers) {
+            checkCallback();
+
+            while (!finished) {
+                jest.advanceTimersByTime(interval);
+
+                // Could have timed-out
+                if (finished) break;
+
+                checkCallback();
+            }
+        } else {
+            intervalId = setInterval(checkCallback, interval);
+            checkCallback();
+        }
+
+        let promisePending = false;
+
+        function checkCallback() {
+            if (promisePending) {
+                // still waiting for the previous check
+                return;
+            }
+
+            async function doCheck() {
+                try {
+                    const result = await callback();
+                    onDone();
+                    resolve(result);
+                } catch (error) {
+                    // Save the most recent callback error to reject the promise with it in the event of a timeout
+                    lastError = error;
+                }
+            }
+
+            promisePending = true;
+            doCheck().finally(() => {
+                promisePending = false;
+            });
+        }
+
+        function onDone(): void {
+            finished = true;
+            clearTimeout(overallTimeoutTimer);
+            if (intervalId !== undefined) clearInterval(intervalId);
+        }
+
+        function handleTimeout() {
+            onDone();
+            if (lastError) {
+                reject(lastError);
+            } else {
+                reject(new Error("Timed out in waitFor."));
+            }
+        }
+    });
+}

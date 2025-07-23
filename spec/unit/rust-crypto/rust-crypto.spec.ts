@@ -47,7 +47,7 @@ import {
     MemoryCryptoStore,
     TypedEventEmitter,
 } from "../../../src";
-import { emitPromise, mkEvent } from "../../test-utils/test-utils";
+import { emitPromise, mkEvent, waitFor } from "../../test-utils/test-utils";
 import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { type IEventDecryptionResult, type IMegolmSessionData } from "../../../src/@types/crypto";
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -2309,10 +2309,9 @@ describe("RustCrypto", () => {
             });
 
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
-            await flushPromises();
 
             // We have a key backup
-            expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull();
+            await waitFor(async () => expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull());
 
             const authUploadDeviceSigningKeys = jest.fn();
             await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
