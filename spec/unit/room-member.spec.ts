@@ -132,6 +132,24 @@ describe("RoomMember", function () {
             expect(memberB.powerLevel).toEqual(200);
         });
 
+        it("should set 'powerLevel' with a v12 room.", function () {
+            const powerLevelvent = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@bertha:bar": 200,
+                        "@invalid:user": 10, // shouldn't barf on this.
+                    },
+                },
+                event: true,
+            });
+            member.setPowerLevelEvent(powerLevelvent, createEvent, "12");
+            expect(member.powerLevel).toEqual(Infinity);
+        });
+
         it("should emit 'RoomMember.powerLevel' if the power level changes.", function () {
             const powerLevelvent = utils.mkEvent({
                 type: "m.room.power_levels",
