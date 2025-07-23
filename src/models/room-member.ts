@@ -241,7 +241,9 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         const oldPowerLevel = this.powerLevel;
 
         const creators = new Set<string>();
-        if (roomVersion === "org.matrix.hydra.11" || (Number.isInteger(roomVersion) && Number(roomVersion) > 12)) {
+        // This checks probably wants to be reversed once verson 12 has been around for longer
+        // (ie. assume v12 semantics except for other known versions)
+        if (roomVersion === "org.matrix.hydra.11" || roomVersion === "12") {
             const roomCreateSender = roomCreateEvent.getSender();
             if (roomCreateSender) creators.add(roomCreateSender);
             const additionalCreators = roomCreateEvent.getDirectionalContent().additional_creators;
