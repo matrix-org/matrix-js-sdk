@@ -173,6 +173,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
     private _liveBeaconIds: BeaconIdentifier[] = [];
 
+    // We only wants to print warnings about bad room state once.
+    private getVersionWarning = false;
+
     /**
      * Construct room state.
      *
@@ -207,6 +210,22 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     ) {
         super();
         this.updateModifiedTime();
+    }
+
+    /**
+     * Gets the version of the room
+     * @returns The version of the room, or null if it could not be determined
+     */
+    public getRoomVersion(): string {
+        const createEvent = this.getStateEvents(EventType.RoomCreate, "");
+        if (!createEvent) {
+            if (!this.getVersionWarning) {
+                logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
+                this.getVersionWarning = true;
+            }
+            return "1";
+        }
+        return createEvent.getContent()["room_version"] ?? "1";
     }
 
     /**
@@ -473,7 +492,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                     // power levels has been changed
                     // large room suffer from large re-rendering especially when not needed
                     const oldLastModified = member.getLastModifiedTime();
-                    member.setPowerLevelEvent(event);
+                    const createEvent = this.getStateEvents(EventType.RoomCreate, "");
+                    if (createEvent) member.setPowerLevelEvent(event, createEvent, this.getRoomVersion());
                     if (oldLastModified !== member.getLastModifiedTime()) {
                         this.emit(RoomStateEvent.Members, event, this, member);
                     }
@@ -625,9 +645,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     private updateMember(member: RoomMember): void {
         // this member may have a power level already, so set it.
+        const createEvent = this.getStateEvents(EventType.RoomCreate, "");
         const pwrLvlEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
-        if (pwrLvlEvent) {
-            member.setPowerLevelEvent(pwrLvlEvent);
+        if (pwrLvlEvent && createEvent) {
+            member.setPowerLevelEvent(pwrLvlEvent, createEvent, this.getRoomVersion());
         }
 
         // blow away the sentinel which is now outdated

@@ -102,8 +102,16 @@ describe("RoomMember", function () {
     });
 
     describe("setPowerLevelEvent", function () {
-        it("should set 'powerLevel' and 'powerLevelNorm'.", function () {
-            const event = utils.mkEvent({
+        const createEvent = utils.mkEvent({
+            type: "m.room.create",
+            room: roomId,
+            sender: userA,
+            content: {},
+            event: true,
+        });
+
+        it("should set 'powerLevel'.", function () {
+            const powerLevelvent = utils.mkEvent({
                 type: "m.room.power_levels",
                 room: roomId,
                 user: userA,
@@ -116,18 +124,16 @@ describe("RoomMember", function () {
                 },
                 event: true,
             });
-            member.setPowerLevelEvent(event);
+            member.setPowerLevelEvent(powerLevelvent, createEvent, "10");
             expect(member.powerLevel).toEqual(20);
-            expect(member.powerLevelNorm).toEqual(10);
 
             const memberB = new RoomMember(roomId, userB);
-            memberB.setPowerLevelEvent(event);
+            memberB.setPowerLevelEvent(powerLevelvent, createEvent, "10");
             expect(memberB.powerLevel).toEqual(200);
-            expect(memberB.powerLevelNorm).toEqual(100);
         });
 
         it("should emit 'RoomMember.powerLevel' if the power level changes.", function () {
-            const event = utils.mkEvent({
+            const powerLevelvent = utils.mkEvent({
                 type: "m.room.power_levels",
                 room: roomId,
                 user: userA,
@@ -145,17 +151,17 @@ describe("RoomMember", function () {
             member.on(RoomMemberEvent.PowerLevel, function (emitEvent, emitMember) {
                 emitCount += 1;
                 expect(emitMember).toEqual(member);
-                expect(emitEvent).toEqual(event);
+                expect(emitEvent).toEqual(powerLevelvent);
             });
 
-            member.setPowerLevelEvent(event);
+            member.setPowerLevelEvent(powerLevelvent, createEvent, "10");
             expect(emitCount).toEqual(1);
-            member.setPowerLevelEvent(event); // no-op
+            member.setPowerLevelEvent(powerLevelvent, createEvent, "10"); // no-op
             expect(emitCount).toEqual(1);
         });
 
         it("should honour power levels of zero.", function () {
-            const event = utils.mkEvent({
+            const powerLevelvent = utils.mkEvent({
                 type: "m.room.power_levels",
                 room: roomId,
                 user: userA,
@@ -176,16 +182,16 @@ describe("RoomMember", function () {
                 emitCount += 1;
                 expect(emitMember.userId).toEqual("@alice:bar");
                 expect(emitMember.powerLevel).toEqual(0);
-                expect(emitEvent).toEqual(event);
+                expect(emitEvent).toEqual(powerLevelvent);
             });
 
-            member.setPowerLevelEvent(event);
+            member.setPowerLevelEvent(powerLevelvent, createEvent, "10");
             expect(member.powerLevel).toEqual(0);
             expect(emitCount).toEqual(1);
         });
 
         it("should not honor string power levels.", function () {
-            const event = utils.mkEvent({
+            const powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels",
                 room: roomId,
                 user: userA,
@@ -203,10 +209,10 @@ describe("RoomMember", function () {
                 emitCount += 1;
                 expect(emitMember.userId).toEqual("@alice:bar");
                 expect(emitMember.powerLevel).toEqual(20);
-                expect(emitEvent).toEqual(event);
+                expect(emitEvent).toEqual(powerLevelEvent);
             });
 
-            member.setPowerLevelEvent(event);
+            member.setPowerLevelEvent(powerLevelEvent, createEvent, "10");
             expect(member.powerLevel).toEqual(20);
             expect(emitCount).toEqual(1);
         });
@@ -214,21 +220,22 @@ describe("RoomMember", function () {
         it("should no-op if given a non-state or unrelated event", () => {
             const fn = jest.spyOn(member, "emit");
             expect(fn).not.toHaveBeenCalledWith(RoomMemberEvent.PowerLevel);
-            member.setPowerLevelEvent(
-                utils.mkEvent({
-                    type: EventType.RoomPowerLevels,
-                    room: roomId,
-                    user: userA,
-                    content: {
-                        users_default: 20,
-                        users: {
-                            "@alice:bar": "5",
-                        },
+
+            const powerLevelEvent = utils.mkEvent({
+                type: EventType.RoomPowerLevels,
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": "5",
                     },
-                    skey: "invalid",
-                    event: true,
-                }),
-            );
+                },
+                skey: "invalid",
+                event: true,
+            });
+
+            member.setPowerLevelEvent(powerLevelEvent, createEvent, "10");
             const nonStateEv = utils.mkEvent({
                 type: EventType.RoomPowerLevels,
                 room: roomId,
@@ -242,7 +249,7 @@ describe("RoomMember", function () {
                 event: true,
             });
             delete nonStateEv.event.state_key;
-            member.setPowerLevelEvent(nonStateEv);
+            member.setPowerLevelEvent(nonStateEv, createEvent, "10");
             member.setPowerLevelEvent(
                 utils.mkEvent({
                     type: EventType.Sticker,
@@ -251,6 +258,8 @@ describe("RoomMember", function () {
                     content: {},
                     event: true,
                 }),
+                createEvent,
+                "10",
             );
             expect(fn).not.toHaveBeenCalledWith(RoomMemberEvent.PowerLevel);
         });
