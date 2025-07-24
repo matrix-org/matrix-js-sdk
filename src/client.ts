@@ -115,6 +115,7 @@ import {
     type IGuestAccessOpts,
     type IJoinRoomOpts,
     type INotificationsResponse,
+    type InviteOpts,
     type IPaginateOpts,
     type IPresenceOpts,
     type IRedactOpts,
@@ -3755,12 +3756,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param reason - Optional.
-     * @returns Promise which resolves: `{}` an empty object.
-     * @returns Rejects: with an error response.
+     * Send an invite to the given user to join the given room.
+     *
+     * @param roomId - The ID of the room to which the user should be invited.
+     * @param userId - The ID of the user that should be invited.
+     * @param opts - Optional reason object. For backwards compatibility, a string is also accepted, and will be interpreted as a reason.
+     *
+     * @returns An empty object.
      */
-    public invite(roomId: string, userId: string, reason?: string): Promise<EmptyObject> {
-        return this.membershipChange(roomId, userId, KnownMembership.Invite, reason);
+    public invite(roomId: string, userId: string, opts: InviteOpts | string = {}): Promise<EmptyObject> {
+        if (typeof opts != "object") {
+            opts = { reason: opts };
+        }
+        return this.membershipChange(roomId, userId, KnownMembership.Invite, opts.reason);
     }
 
     /**

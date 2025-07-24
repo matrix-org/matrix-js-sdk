@@ -5,7 +5,7 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
-import { isMyMembership, type Statistics } from "./types.ts";
+import { isMyMembership, type ParticipantId, type Statistics } from "./types.ts";
 import { getParticipantId } from "./utils.ts";
 import {
     type EnabledTransports,
@@ -41,14 +41,9 @@ export interface IEncryptionManager {
     /**
      * Retrieves the encryption keys currently managed by the encryption manager.
      *
-     * @returns A map where the keys are identifiers and the values are arrays of
-     * objects containing encryption keys and their associated timestamps.
-     * @deprecated This method is used internally for testing. It is also used to re-emit keys when there is a change
-     * of RTCSession (matrixKeyProvider#setRTCSession) -Not clear why/when switch RTCSession would occur-. Note that if we switch focus, we do keep the same RTC session,
-     * so no need to re-emit. But it requires the encryption manager to store all keys of all participants, and this is already done
-     * by the key provider. We don't want to add another layer of key storage.
+     * @returns A map of participant IDs to their encryption keys.
      */
-    getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>>;
+    getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>;
 }
 
 /**
@@ -104,8 +99,16 @@ export class EncryptionManager implements IEncryptionManager {
         this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
     }
 
-    public getEncryptionKeys(): Map<string, Array<{ key: Uint8Array; timestamp: number }>> {
-        return this.encryptionKeys;
+    public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
+        const keysMap = new Map<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>();
+        for (const [userId, userKeys] of this.encryptionKeys) {
+            const keys = userKeys.map((entry, index) => ({
+                key: entry.key,
+                keyIndex: index,
+            }));
+            keysMap.set(userId as ParticipantId, keys);
+        }
+        return keysMap;
     }
 
     private joined = false;
@@ -300,7 +303,6 @@ export class EncryptionManager implements IEncryptionManager {
             await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, targets);
             this.logger.debug(
                 `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
-                this.encryptionKeys,
             );
         } catch (error) {
             if (this.keysEventUpdateTimeout === undefined) {

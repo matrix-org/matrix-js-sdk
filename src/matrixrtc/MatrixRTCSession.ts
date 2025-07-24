@@ -19,7 +19,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
-import { EventType } from "../@types/event.ts";
+import { EventType, RelationType } from "../@types/event.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { logDurationSync } from "../utils.ts";
-import { type Statistics } from "./types.ts";
+import { type Statistics, type RTCNotificationType } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
@@ -65,12 +65,21 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
 };
+
+export interface SessionConfig {
+    /**
+     * What kind of notification to send when starting the session.
+     * @default `undefined` (no notification)
+     */
+    notificationType?: RTCNotificationType;
+}
+
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
 // - we use membershipEvent if the option is related to the rtc member state event.
 // - we use the technical term expiry if the option is related to the expiry field of the membership state event.
-// - we use a `MS` postfix if the option is a duration to avoid using words like:
+// - we use a `Ms` postfix if the option is a duration to avoid using words like:
 //   `time`, `duration`, `delay`, `timeout`... that might be mistaken/confused with technical terms.
 export interface MembershipConfig {
     /**
@@ -134,6 +143,7 @@ export interface MembershipConfig {
      * failed to send due to a network error. (send membership event, send delayed event, restart delayed event...)
      */
     networkErrorRetryMs?: number;
+
     /** @deprecated renamed to `networkErrorRetryMs`*/
     callMemberEventRetryDelayMinimum?: number;
 
@@ -141,6 +151,17 @@ export interface MembershipConfig {
      * If true, use the new to-device transport for sending encryption keys.
      */
     useExperimentalToDeviceTransport?: boolean;
+
+    /**
+     * The time (in milliseconds) after which a we consider a delayed event restart http request to have failed.
+     * Setting this to a lower value will result in more frequent retries but also a higher chance of failiour.
+     *
+     * In the presence of network packet loss (hurting TCP connections), the custom delayedEventRestartLocalTimeoutMs
+     * helps by keeping more delayed event reset candidates in flight,
+     * improving the chances of a successful reset. (its is equivalent to the js-sdk `localTimeout` configuration,
+     * but only applies to calls to the `_unstable_updateDelayedEvent` endpoint with a body of `{action:"restart"}`.)
+     */
+    delayedLeaveEventRestartLocalTimeoutMs?: number;
 }
 
 export interface EncryptionConfig {
@@ -153,22 +174,38 @@ export interface EncryptionConfig {
     /**
      * The minimum time (in milliseconds) between each attempt to send encryption key(s).
      * e.g. if this is set to 1000, then we will send at most one key event every second.
+     * @deprecated - Not used by the new encryption manager.
      */
     updateEncryptionKeyThrottle?: number;
+
+    /**
+     * Sometimes it is necessary to rotate the encryption key after a membership update.
+     * For performance reasons we might not want to rotate the key immediately but allow future memberships to use the same key.
+     * If 5 people join in a row in less than 5 seconds, we don't want to rotate the key for each of them.
+     * If 5 people leave in a row in less than 5 seconds, we don't want to rotate the key for each of them.
+     * So we do share the key which was already used live for <5s to new joiners.
+     * This does result in a potential leak up to the configured time of call media.
+     * This has to be considered when choosing a value for this property.
+     */
+    keyRotationGracePeriodMs?: number;
+
     /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
      * tend to leave calls at the same time.
+     * @deprecated - Not used by the new encryption manager.
      */
     makeKeyDelay?: number;
     /**
-     * The delay (in milliseconds) between creating and sending a new key and starting to encrypt with it. This
-     * gives other a chance to receive the new key to minimise the chance they don't get media they can't decrypt.
-     * The total time between a member leaving and the call switching to new keys is therefore:
-     * makeKeyDelay + useKeyDelay
+     * The delay (in milliseconds) between sending a new key and starting to encrypt with it. This
+     * gives others a chance to receive the new key to minimize the chance they get media they can't decrypt.
+     *
+     * The higher this value is, the better it is for existing members as they will have a smoother experience.
+     * But it impacts new joiners: They will always have to wait `useKeyDelay` before being able to decrypt the media
+     * (as it will be encrypted with the new key after the delay only), even if the key has already arrived before the delay.
      */
     useKeyDelay?: number;
 }
-export type JoinSessionConfig = MembershipConfig & EncryptionConfig;
+export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionConfig;
 
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
@@ -182,7 +219,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private encryptionManager?: IEncryptionManager;
     // The session Id of the call, this is the call_id of the call Member event.
     private _callId: string | undefined;
+    private joinConfig?: SessionConfig;
     private logger: Logger;
+
+    private pendingNotificationToSend: undefined | RTCNotificationType;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -447,6 +487,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
             }
         }
 
+        this.joinConfig = joinConfig;
+        this.pendingNotificationToSend = this.joinConfig?.notificationType;
+
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
@@ -516,27 +559,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * the keys.
      */
     public reemitEncryptionKeys(): void {
-        this.encryptionManager?.getEncryptionKeys().forEach((keys, participantId) => {
-            keys.forEach((key, index) => {
-                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, key.key, index, participantId);
+        this.encryptionManager?.getEncryptionKeys().forEach((keyRing, participantId) => {
+            keyRing.forEach((keyInfo) => {
+                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyInfo.key, keyInfo.keyIndex, participantId);
             });
         });
-    }
-
-    /**
-     * A map of keys used to encrypt and decrypt (we are using a symmetric
-     * cipher) given participant's media. This also includes our own key
-     *
-     * @deprecated This will be made private in a future release.
-     */
-    public getEncryptionKeys(): IterableIterator<[string, Array<Uint8Array>]> {
-        const keys =
-            this.encryptionManager?.getEncryptionKeys() ??
-            new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
-        // the returned array doesn't contain the timestamps
-        return Array.from(keys.entries())
-            .map(([participantId, keys]): [string, Uint8Array[]] => [participantId, keys.map((k) => k.key)])
-            .values();
     }
 
     /**
@@ -561,6 +588,35 @@ export class MatrixRTCSession extends TypedEventEmitter<
         if (soonestExpiry != undefined) {
             this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
         }
+    }
+
+    /**
+     * Sends a notification corresponding to the configured notify type.
+     */
+    private sendCallNotify(parentEventId: string, notificationType: RTCNotificationType): void {
+        // Send legacy event:
+        this.client
+            .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
+                "application": "m.call",
+                "m.mentions": { user_ids: [], room: true },
+                "notify_type": notificationType === "notification" ? "notify" : notificationType,
+                "call_id": this.callId!,
+            })
+            .catch((e) => this.logger.error("Failed to send call notification", e));
+
+        // Send new event:
+        this.client
+            .sendEvent(this.roomSubset.roomId, EventType.RTCNotification, {
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": notificationType,
+                "m.relates_to": {
+                    event_id: parentEventId,
+                    rel_type: RelationType.unstable_RTCNotificationParent,
+                },
+                "sender_ts": Date.now(),
+                "lifetime": 30_000, // 30 seconds
+            })
+            .catch((e) => this.logger.error("Failed to send call notification", e));
     }
 
     /**
@@ -603,6 +659,20 @@ export class MatrixRTCSession extends TypedEventEmitter<
             });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+            // The `ownMembership` will be set when calling `onRTCSessionMemberUpdate`.
+            const ownMembership = this.membershipManager?.ownMembership;
+            if (this.pendingNotificationToSend && ownMembership && oldMemberships.length === 0) {
+                // If we're the first member in the call, we're responsible for
+                // sending the notification event
+                if (ownMembership.eventId && this.joinConfig?.notificationType) {
+                    this.sendCallNotify(ownMembership.eventId, this.joinConfig.notificationType);
+                } else {
+                    this.logger.warn("Own membership eventId is undefined, cannot send call notification");
+                }
+            }
+            // If anyone else joins the session it is no longer our responsibility to send the notification.
+            // (If we were the joiner we already did sent the notification in the block above.)
+            if (this.memberships.length > 0) this.pendingNotificationToSend = undefined;
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)

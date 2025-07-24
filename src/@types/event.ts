@@ -51,7 +51,11 @@ import {
     type SDPStreamMetadata,
     type SDPStreamMetadataKey,
 } from "../webrtc/callEventTypes.ts";
-import { type EncryptionKeysEventContent, type ICallNotifyContent } from "../matrixrtc/types.ts";
+import {
+    type IRTCNotificationContent,
+    type EncryptionKeysEventContent,
+    type ICallNotifyContent,
+} from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
 import { type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
@@ -147,6 +151,7 @@ export enum EventType {
 
     // MatrixRTC events
     CallNotify = "org.matrix.msc4075.call.notify",
+    RTCNotification = "org.matrix.msc4075.rtc.notification",
 }
 
 export enum RelationType {
@@ -158,6 +163,7 @@ export enum RelationType {
     // moreover, our tests currently use the unstable prefix. Use THREAD_RELATION_TYPE.name.
     // Once we support *only* the stable prefix, THREAD_RELATION_TYPE can die and we can switch to this.
     Thread = "m.thread",
+    unstable_RTCNotificationParent = "org.matrix.msc4075.rtc.notification.parent",
 }
 
 export enum MsgType {
@@ -325,6 +331,7 @@ export interface TimelineEvents {
     [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase & { [SDPStreamMetadataKey]: SDPStreamMetadata };
     [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
     [EventType.CallNotify]: ICallNotifyContent;
+    [EventType.RTCNotification]: IRTCNotificationContent;
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;

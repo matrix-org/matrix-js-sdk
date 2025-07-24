@@ -38,11 +38,17 @@ interface TypedResponse<T> extends Response {
     json(): Promise<T>;
 }
 
-export type ResponseType<T, O extends IHttpOpts> = O extends { json: false }
-    ? string
-    : O extends { onlyData: true } | undefined
-      ? T
-      : TypedResponse<T>;
+/**
+ * The type returned by {@link FetchHttpApi.request}, etc.
+ *
+ * If {@link IHttpOpts.onlyData} is unset or false, then the request methods return a
+ * {@link https://developer.mozilla.org/en-US/docs/Web/API/Response Response} object,
+ * which we abstract via `TypedResponse`. Otherwise, we just cast it to `T`.
+ *
+ * @typeParam T - The type (specified by the application on the request method) that we will cast the response to.
+ * @typeParam O - The type of the options object on the {@link FetchHttpApi} instance.
+ */
+export type ResponseType<T, O extends IHttpOpts> = O extends { onlyData: true } | undefined ? T : TypedResponse<T>;
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();

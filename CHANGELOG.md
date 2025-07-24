@@ -1,3 +1,14 @@
+Changes in [37.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.11.0) (2025-07-15)
+====================================================================================================
+## ✨ Features
+
+* Update README to make Element sponsorship explicit ([#4901](https://github.com/matrix-org/matrix-js-sdk/pull/4901)). Contributed by @neilisfragile.
+* Use client logger in more places (crypto code) ([#4900](https://github.com/matrix-org/matrix-js-sdk/pull/4900)). Contributed by @richvdh.
+* Use client logger in `MatrixRTCSessionManager` ([#4898](https://github.com/matrix-org/matrix-js-sdk/pull/4898)). Contributed by @richvdh.
+* Use client logger in more places (core code) ([#4899](https://github.com/matrix-org/matrix-js-sdk/pull/4899)). Contributed by @richvdh.
+* crypto: Add new `ClientEvent.ReceivedToDeviceMessage` with proper `OlmEncryptionInfo` support ([#4891](https://github.com/matrix-org/matrix-js-sdk/pull/4891)). Contributed by @BillCarsonFr.
+
+
 Changes in [37.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.10.0) (2025-07-01)
 ====================================================================================================
 ## ✨ Features
