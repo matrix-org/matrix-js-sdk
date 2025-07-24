@@ -624,7 +624,7 @@ export function waitFor<T>(
         interval?: number;
     } = {},
 ): Promise<T> {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
         let lastError: any;
         let finished = false;
         let intervalId: ReturnType<typeof setTimeout> | undefined;
