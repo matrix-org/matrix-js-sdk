@@ -277,8 +277,16 @@ describe("RoomState", function () {
             jest.spyOn(state.members[userB], "setPowerLevelEvent");
             state.setStateEvents([powerLevelEvent]);
 
-            expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(powerLevelEvent);
-            expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(powerLevelEvent);
+            expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(
+                powerLevelEvent,
+                state.getStateEvents(EventType.RoomCreate, ""),
+                "1",
+            );
+            expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(
+                powerLevelEvent,
+                state.getStateEvents(EventType.RoomCreate, ""),
+                "1",
+            );
         });
 
         it("should call setPowerLevelEvent on a new RoomMember if power levels exist", function () {
