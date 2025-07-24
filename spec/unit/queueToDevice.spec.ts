@@ -126,13 +126,15 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
                 eventType: "org.example.foo",
                 batch: [FAKE_MSG],
             });
-            expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
+            // flush the 500 response
+            expect(await httpBackend.flush("/sendToDevice/org.example.foo/", 1, 20)).toEqual(1);
             await flushPromises();
 
             client.retryImmediately();
 
+            // flush the 200 response
             // longer timeout here to try & avoid flakiness
-            expect(await httpBackend.flush(undefined, 1, 3000)).toEqual(1);
+            expect(await httpBackend.flush("/sendToDevice/org.example.foo/", 1, 3000)).toEqual(1);
         });
 
         it("retries on when client is started", async function () {
@@ -150,13 +152,15 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
                 eventType: "org.example.foo",
                 batch: [FAKE_MSG],
             });
-            expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
+            // flush the 500 response
+            expect(await httpBackend.flush("/sendToDevice/org.example.foo/", 1, 20)).toEqual(1);
             await flushPromises();
 
             client.stopClient();
             await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
 
-            expect(await httpBackend.flush(undefined, 1, 20)).toEqual(1);
+            // flush the 200 response
+            expect(await httpBackend.flush("/sendToDevice/org.example.foo/", 1, 20)).toEqual(1);
         });
 
         it("retries when a message is retried", async function () {
