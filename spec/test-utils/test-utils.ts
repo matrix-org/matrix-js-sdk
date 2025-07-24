@@ -614,7 +614,7 @@ export function jestFakeTimersAreEnabled(): boolean {
  *
  * @param interval - How often to call `callback`. Defaults to 50.
  */
-export async function waitFor<T>(
+export function waitFor<T>(
     callback: () => Promise<T> | T,
     {
         timeout = 1000,
@@ -628,6 +628,7 @@ export async function waitFor<T>(
         let lastError: any;
         let finished = false;
         let intervalId: ReturnType<typeof setTimeout> | undefined;
+        let promisePending = false;
 
         const overallTimeoutTimer = setTimeout(handleTimeout, timeout);
         const usingJestFakeTimers = jestFakeTimersAreEnabled();
@@ -646,8 +647,6 @@ export async function waitFor<T>(
             intervalId = setInterval(checkCallback, interval);
             checkCallback();
         }
-
-        let promisePending = false;
 
         function checkCallback() {
             if (promisePending) {
