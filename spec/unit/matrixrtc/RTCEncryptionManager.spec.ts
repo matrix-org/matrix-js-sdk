@@ -448,6 +448,23 @@ describe("RTCEncryptionManager", () => {
 
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
+
+        it("Should not distribute keys if encryption is disabled", async () => {
+            jest.useFakeTimers();
+            const members = [
+                aCallMembership("@bob:example.org", "BOBDEVICE"),
+                aCallMembership("@bob:example.org", "BOBDEVICE2"),
+                aCallMembership("@carl:example.org", "CARLDEVICE"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            encryptionManager.join({ manageMediaKeys: false });
+            encryptionManager.onMembershipsUpdate();
+            await jest.runOnlyPendingTimersAsync();
+
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+        });
     });
 
     describe("Receiving Keys", () => {
