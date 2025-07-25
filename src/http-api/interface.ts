@@ -69,10 +69,7 @@ export interface IHttpOpts {
     tokenRefreshFunction?: TokenRefreshFunction;
     useAuthorizationHeader?: boolean; // defaults to true
 
-    /**
-     * Normally, methods in `FetchHttpApi` will return a {@link https://developer.mozilla.org/en-US/docs/Web/API/Response Response} object.
-     * If this is set to `true`, they instead return the response body.
-     */
+    /** For historical reasons, must be set to `true`. Will eventually be removed. */
     onlyData?: boolean;
 
     localTimeoutMs?: number;
@@ -103,11 +100,10 @@ export interface BaseRequestOpts extends Pick<RequestInit, "priority"> {
      *
      *  * Set `Accept: application/json` in the request headers (again, unless overridden by {@link headers}).
      *
-     *  * If `IHTTPOpts.onlyData` is set to `true` on the `FetchHttpApi` instance, parse the response as
-     *    JSON and return the parsed response.
+     *  * Parse the response as JSON and return the parsed response.
      *
-     * Setting this to `false` inhibits all three behaviors, and (if `IHTTPOpts.onlyData` is set to `true`) the response
-     * is instead parsed as a UTF-8 string. It defaults to `true`, unless {@link rawResponseBody} is set.
+     * Setting this to `false` inhibits all three behaviors, and the response is instead parsed as a UTF-8 string. It
+     * defaults to `true`, unless {@link rawResponseBody} is set.
      *
      * @deprecated Instead of setting this to `false`, set {@link rawResponseBody} to `true`.
      */
@@ -118,9 +114,8 @@ export interface BaseRequestOpts extends Pick<RequestInit, "priority"> {
      *
      *  * Inhibits the automatic addition of `Accept: application/json` in the request headers.
      *
-     *  * Assuming `IHTTPOpts.onlyData` is set to `true` on the `FetchHttpApi` instance, causes the
-     *    raw response to be returned as a {@link https://developer.mozilla.org/en-US/docs/Web/API/Blob|Blob}
-     *    instead of parsing it as `json`.
+     *  * Causes the raw response to be returned as a {@link https://developer.mozilla.org/en-US/docs/Web/API/Blob|Blob}
+     *    instead of parsing it as JSON.
      */
     rawResponseBody?: boolean;
 }
