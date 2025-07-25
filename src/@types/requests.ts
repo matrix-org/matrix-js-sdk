@@ -41,6 +41,14 @@ export interface IJoinRoomOpts {
      * The server names to try and join through in addition to those that are automatically chosen.
      */
     viaServers?: string[];
+
+    /**
+     * When accepting an invite, whether to accept encrypted history shared by the inviter via the experimental
+     * support for [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268).
+     *
+     * @experimental
+     */
+    acceptSharedHistory?: boolean;
 }
 
 /** Options object for {@link MatrixClient.invite}. */
@@ -49,6 +57,15 @@ export interface InviteOpts {
      * The reason for the invite.
      */
     reason?: string;
+
+    /**
+     * Before sending the invite, if the room is encrypted, share the keys for any messages sent while the history
+     * visibility was `shared`, via the experimental
+     * support for [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268).
+     *
+     * @experimental
+     */
+    shareEncryptedHistory?: boolean;
 }
 
 export interface KnockRoomOpts {

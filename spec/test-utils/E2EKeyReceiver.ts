@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import debugFunc from "debug";
-import { type Debugger } from "debug";
+import debugFunc, { type Debugger } from "debug";
 import fetchMock from "fetch-mock-jest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
+import type { CrossSigningKeys, ISignedKey, KeySignatures } from "../../src";
+import type { CrossSigningKeyInfo } from "../../src/crypto-api";
 
 /** Interface implemented by classes that intercept `/keys/upload` requests from test clients to catch the uploaded keys
  *
@@ -55,19 +56,27 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     private readonly debug: Debugger;
 
     private deviceKeys: IDeviceKeys | null = null;
+    private crossSigningKeys: CrossSigningKeys | null = null;
     private oneTimeKeys: Record<string, IOneTimeKey> = {};
     private readonly oneTimeKeysPromise: Promise<void>;
 
     /**
      * Construct a new E2EKeyReceiver.
      *
-     * It will immediately register an intercept of `/keys/uploads` requests for the given homeserverUrl.
-     * Only /upload requests made to this server will be intercepted: this allows a single test to use more than one
+     * It will immediately register an intercept of [`/keys/upload`][1], [`/keys/signatures/upload`][2] and
+     * [`/keys/device_signing/upload`][3] requests for the given homeserverUrl.
+     * Only requests made to this server will be intercepted: this allows a single test to use more than one
      * client and have the keys collected separately.
      *
-     * @param homeserverUrl - the Homeserver Url of the client under test.
+     * [1]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keysupload
+     * [2]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keyssignaturesupload
+     * [3]: https://spec.matrix.org/v1.14/client-server-api/#post_matrixclientv3keysdevice_signingupload
+     *
+     * @param homeserverUrl - The Homeserver Url of the client under test.
+     * @param routeNamePrefix - An optional prefix to add to the fetchmock route names. Required if there is more than
+     *    one E2EKeyReceiver instance active.
      */
-    public constructor(homeserverUrl: string) {
+    public constructor(homeserverUrl: string, routeNamePrefix: string = "") {
         this.debug = debugFunc(`e2e-key-receiver:[${homeserverUrl}]`);
 
         // set up a listener for /keys/upload.
@@ -77,6 +86,22 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
 
             fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
         });
+
+        fetchMock.post(
+            {
+                url: new URL("/_matrix/client/v3/keys/signatures/upload", homeserverUrl).toString(),
+                name: routeNamePrefix + "upload-sigs",
+            },
+            (url, options) => this.onSignaturesUploadRequest(options),
+        );
+
+        fetchMock.post(
+            {
+                url: new URL("/_matrix/client/v3/keys/device_signing/upload", homeserverUrl).toString(),
+                name: routeNamePrefix + "upload-cross-signing-keys",
+            },
+            (url, options) => this.onSigningKeyUploadRequest(options),
+        );
     }
 
     private async onKeyUploadRequest(onOnTimeKeysUploaded: () => void, options: RequestInit): Promise<object> {
@@ -87,8 +112,10 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
             if (this.deviceKeys) {
                 throw new Error("Application attempted to upload E2E device keys multiple times");
             }
-            this.debug(`received device keys`);
             this.deviceKeys = content.device_keys;
+            this.debug(
+                `received device keys for user ID ${this.deviceKeys!.user_id}, device ID ${this.deviceKeys!.device_id}`,
+            );
         }
 
         if (content.one_time_keys && Object.keys(content.one_time_keys).length > 0) {
@@ -111,6 +138,47 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
                 signed_curve25519: Object.keys(this.oneTimeKeys).length,
             },
         };
+    }
+
+    private async onSignaturesUploadRequest(request: RequestInit): Promise<object> {
+        const content = JSON.parse(request.body as string) as KeySignatures;
+        for (const [userId, userKeys] of Object.entries(content)) {
+            for (const [deviceId, signedKey] of Object.entries(userKeys)) {
+                this.onDeviceSignatureUpload(userId, deviceId, signedKey);
+            }
+        }
+
+        return {};
+    }
+
+    private onDeviceSignatureUpload(userId: string, deviceId: string, signedKey: CrossSigningKeyInfo | ISignedKey) {
+        if (!this.deviceKeys || userId != this.deviceKeys.user_id || deviceId != this.deviceKeys.device_id) {
+            this.debug(
+                `Ignoring device key signature upload for unknown device user ID ${userId}, device ID ${deviceId}`,
+            );
+            return;
+        }
+
+        this.debug(`received device key signature for user ID ${userId}, device ID ${deviceId}`);
+        this.deviceKeys.signatures ??= {};
+        for (const [signingUser, signatures] of Object.entries(signedKey.signatures!)) {
+            this.deviceKeys.signatures[signingUser] = Object.assign(
+                this.deviceKeys.signatures[signingUser] ?? {},
+                signatures,
+            );
+        }
+    }
+
+    private async onSigningKeyUploadRequest(request: RequestInit): Promise<object> {
+        const content = JSON.parse(request.body as string);
+        if (this.crossSigningKeys) {
+            throw new Error("Application attempted to upload E2E cross-signing keys multiple times");
+        }
+        this.debug(`received cross-signing keys`);
+        // Remove UIA data
+        delete content["auth"];
+        this.crossSigningKeys = content;
+        return {};
     }
 
     /** Get the uploaded Ed25519 key
@@ -151,6 +219,13 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     }
 
     /**
+     * If cross-signing keys have been uploaded, return them. Else return null.
+     */
+    public getUploadedCrossSigningKeys(): CrossSigningKeys | null {
+        return this.crossSigningKeys;
+    }
+
+    /**
      * If one-time keys have already been uploaded, return them. Otherwise,
      * set up an expectation that the keys will be uploaded, and wait for
      * that to happen.
@@ -160,5 +235,19 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     public async awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>> {
         await this.oneTimeKeysPromise;
         return this.oneTimeKeys;
+    }
+
+    /**
+     * If no one-time keys have yet been uploaded, return `null`.
+     * Otherwise, pop a key from the uploaded list.
+     */
+    public getOneTimeKey(): [string, IOneTimeKey] | null {
+        const keys = Object.entries(this.oneTimeKeys);
+        if (keys.length == 0) {
+            return null;
+        }
+        const [otkId, otk] = keys[0];
+        delete this.oneTimeKeys[otkId];
+        return [otkId, otk];
     }
 }
