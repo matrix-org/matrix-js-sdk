@@ -38,6 +38,14 @@ export interface IJoinRoomOpts {
     viaServers?: string[];
 }
 
+/** Options object for {@link MatrixClient.invite}. */
+export interface InviteOpts {
+    /**
+     * The reason for the invite.
+     */
+    reason?: string;
+}
+
 export interface KnockRoomOpts {
     /**
      * The reason for the knock.

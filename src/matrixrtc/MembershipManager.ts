@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { AbortError } from "p-retry";
 
 import { EventType } from "../@types/event.ts";
 import { UpdateDelayedEventAction } from "../@types/requests.ts";
@@ -85,19 +86,24 @@ export enum MembershipActionType {
     //  -> MembershipActionType.SendJoinEvent if successful
     //  -> DelayedLeaveActionType.SendDelayedEvent on error, retry sending the first delayed event.
     //  -> DelayedLeaveActionType.RestartDelayedEvent on success start updating the delayed event
+
     SendJoinEvent = "SendJoinEvent",
     //  -> MembershipActionType.SendJoinEvent if we run into a rate limit and need to retry
     //  -> MembershipActionType.Update if we successfully send the join event then schedule the expire event update
     //  -> DelayedLeaveActionType.RestartDelayedEvent to recheck the delayed event
+
     RestartDelayedEvent = "RestartDelayedEvent",
     //  -> DelayedLeaveActionType.SendMainDelayedEvent on missing delay id but there is a rtc state event
     //  -> DelayedLeaveActionType.SendDelayedEvent on missing delay id and there is no state event
     //  -> DelayedLeaveActionType.RestartDelayedEvent on success we schedule the next restart
+
     UpdateExpiry = "UpdateExpiry",
     //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
+
     SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent",
     //  -> MembershipActionType.SendLeaveEvent on failiour (not found) we need to send the leave manually and cannot use the scheduled delayed event
     //  -> DelayedLeaveActionType.SendScheduledDelayedLeaveEvent on error we try again.
+
     SendLeaveEvent = "SendLeaveEvent",
     // -> MembershipActionType.SendLeaveEvent
 }
@@ -221,7 +227,13 @@ export class MembershipManager
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
-        if (userId && deviceId && this.isJoined() && !memberships.some((m) => isMyMembership(m, userId, deviceId))) {
+        if (!userId || !deviceId) {
+            this.logger.error("MembershipManager.onRTCSessionMemberUpdate called without user or device id");
+            return Promise.resolve();
+        }
+        this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
+
+        if (this.isActivated() && !this._ownMembership) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
             // take care of our missing membership.
             const sendingMembershipActions = [
@@ -310,6 +322,11 @@ export class MembershipManager
         }, this.logger);
     }
 
+    private _ownMembership?: CallMembership;
+    public get ownMembership(): CallMembership | undefined {
+        return this._ownMembership;
+    }
+
     // scheduler
     private oldStatus?: Status;
     private scheduler: ActionScheduler;
@@ -374,6 +391,9 @@ export class MembershipManager
         return this.joinConfig?.maximumNetworkErrorRetryCount ?? 10;
     }
 
+    private get delayedLeaveEventRestartLocalTimeoutMs(): number {
+        return this.joinConfig?.delayedLeaveEventRestartLocalTimeoutMs ?? 2000;
+    }
     // LOOP HANDLER:
     private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
         switch (type) {
@@ -525,8 +545,18 @@ export class MembershipManager
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
-        return await this.client
-            ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart)
+        const abortPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new AbortError("Restart delayed event timed out before the HS responded"));
+            }, this.delayedLeaveEventRestartLocalTimeoutMs);
+        });
+
+        // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
+        // to the widget driver this information would ge lost. That is why we mimic the AbortError using the race.
+        return await Promise.race([
+            this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart),
+            abortPromise,
+        ])
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
                 return createInsertActionUpdate(
@@ -775,14 +805,19 @@ export class MembershipManager
     private actionUpdateFromNetworkErrorRetry(error: unknown, type: MembershipActionType): ActionUpdate | undefined {
         // "Is a network error"-boundary
         const retries = this.state.networkErrorRetries.get(type) ?? 0;
+
+        // Strings for error logging
         const retryDurationString = this.networkErrorRetryMs / 1000 + "s";
         const retryCounterString = "(" + retries + "/" + this.maximumNetworkErrorRetryCount + ")";
+
+        // Variables for scheduling the new event
+        let retryDuration = this.networkErrorRetryMs;
+
         if (error instanceof Error && error.name === "AbortError") {
+            // We do not wait for the timeout on local timeouts.
+            retryDuration = 0;
             this.logger.warn(
-                "Network local timeout error while sending event, retrying in " +
-                    retryDurationString +
-                    " " +
-                    retryCounterString,
+                "Network local timeout error while sending event, immediate retry (" + retryCounterString + ")",
                 error,
             );
         } else if (error instanceof Error && error.message.includes("updating delayed event")) {
@@ -825,7 +860,7 @@ export class MembershipManager
         // retry boundary
         if (retries < this.maximumNetworkErrorRetryCount) {
             this.state.networkErrorRetries.set(type, retries + 1);
-            return createInsertActionUpdate(type, this.networkErrorRetryMs);
+            return createInsertActionUpdate(type, retryDuration);
         }
 
         // Failure

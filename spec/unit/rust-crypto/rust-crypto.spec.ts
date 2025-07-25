@@ -47,7 +47,7 @@ import {
     MemoryCryptoStore,
     TypedEventEmitter,
 } from "../../../src";
-import { emitPromise, mkEvent } from "../../test-utils/test-utils";
+import { emitPromise, mkEvent, waitFor } from "../../test-utils/test-utils";
 import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 import { type IEventDecryptionResult, type IMegolmSessionData } from "../../../src/@types/crypto";
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -1113,6 +1113,7 @@ describe("RustCrypto", () => {
 
         it.each([
             [undefined, undefined, null],
+            ["Other", -1, EventShieldReason.UNKNOWN],
             [
                 "Encrypted by an unverified user.",
                 RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity,
@@ -1138,6 +1139,11 @@ describe("RustCrypto", () => {
                 "Encrypted by a previously-verified user who is no longer verified.",
                 RustSdkCryptoJs.ShieldStateCode.VerificationViolation,
                 EventShieldReason.VERIFICATION_VIOLATION,
+            ],
+            [
+                "Mismatched sender",
+                RustSdkCryptoJs.ShieldStateCode.MismatchedSender,
+                EventShieldReason.MISMATCHED_SENDER,
             ],
         ])("gets the right shield reason (%s)", async (rustReason, rustCode, expectedReason) => {
             // suppress the warning from the unknown shield reason
@@ -2302,8 +2308,9 @@ describe("RustCrypto", () => {
             });
 
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
+
             // We have a key backup
-            expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull();
+            await waitFor(async () => expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull());
 
             const authUploadDeviceSigningKeys = jest.fn();
             await rustCrypto.resetEncryption(authUploadDeviceSigningKeys);
