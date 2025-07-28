@@ -46,6 +46,11 @@ import {
  * XXX In the future we want to distribute a ratcheted key not the current one for new joiners.
  */
 export class RTCEncryptionManager implements IEncryptionManager {
+    // This is a stop-gap solution for now. The preferred way to handle this case would be instead
+    // to create a NoOpEncryptionManager that does nothing and use it for the session.
+    // This will be done when removing the legacy EncryptionManager.
+    private manageMediaKeys = false;
+
     /**
      * Store the key rings for each participant.
      * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
@@ -126,6 +131,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public join(joinConfig: EncryptionConfig | undefined): void {
+        this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
+
         this.logger?.info(`Joining room`);
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
@@ -174,6 +181,10 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * the calls will be coalesced to a single new distribution (that will start just after the current one has completed).
      */
     private ensureKeyDistribution(): void {
+        // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
+        // to create a NoOpEncryptionManager that does nothing and use it for the session.
+        // This will be done when removing the legacy EncryptionManager.
+        if (!this.manageMediaKeys) return;
         if (this.currentKeyDistributionPromise == null) {
             this.logger?.debug(`No active rollout, start a new one`);
             // start a rollout
@@ -196,6 +207,15 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
+        // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
+        // to create a NoOpEncryptionManager that does nothing and use it for the session.
+        // This will be done when removing the legacy EncryptionManager.
+        if (!this.manageMediaKeys) {
+            this.logger?.warn(
+                `Received key over transport ${userId}:${deviceId} at index ${index} but media keys are disabled`,
+            );
+            return;
+        }
         this.logger?.debug(`Received key over transport ${userId}:${deviceId} at index ${index}`);
 
         // We received a new key, notify the video layer of this new key so that it can decrypt the frames properly.
