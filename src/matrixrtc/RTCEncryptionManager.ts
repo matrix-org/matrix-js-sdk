@@ -46,6 +46,9 @@ import {
  * XXX In the future we want to distribute a ratcheted key not the current one for new joiners.
  */
 export class RTCEncryptionManager implements IEncryptionManager {
+    // This is a stop-gap solution for now. The preferred way to handle this case would be instead
+    // to create a NoOpEncryptionManager that does nothing and use it for the session.
+    // This will be done when removing the legacy EncryptionManager.
     private manageMediaKeys = false;
 
     /**
@@ -178,6 +181,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * the calls will be coalesced to a single new distribution (that will start just after the current one has completed).
      */
     private ensureKeyDistribution(): void {
+        // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
+        // to create a NoOpEncryptionManager that does nothing and use it for the session.
+        // This will be done when removing the legacy EncryptionManager.
         if (!this.manageMediaKeys) return;
         if (this.currentKeyDistributionPromise == null) {
             this.logger?.debug(`No active rollout, start a new one`);
@@ -201,6 +207,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
+        // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
+        // to create a NoOpEncryptionManager that does nothing and use it for the session.
+        // This will be done when removing the legacy EncryptionManager.
         if (!this.manageMediaKeys) {
             this.logger?.warn(
                 `Received key over transport ${userId}:${deviceId} at index ${index} but media keys are disabled`,
