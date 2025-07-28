@@ -2371,12 +2371,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async joinRoom(roomIdOrAlias: string, opts: IJoinRoomOpts = {}): Promise<Room> {
         const room = this.getRoom(roomIdOrAlias);
-        const preJoinMembership = room?.getMember(this.getSafeUserId());
-        const preJoinMembershipSender = preJoinMembership?.events.member?.getSender() ?? null;
+        const roomMember = room?.getMember(this.getSafeUserId());
+        const preJoinMembership = roomMember?.membership;
+
+        // If we were invited to the room, the ID of the user that sent the invite. Otherwise, `null`.
+        const inviter =
+            preJoinMembership == KnownMembership.Invite ? (roomMember?.events.member?.getSender() ?? null) : null;
+
         this.logger.debug(
-            `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership?.membership}, preJoinMembershipSender=${preJoinMembershipSender}, opts=${JSON.stringify(opts)}`,
+            `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership}, inviter=${inviter}, opts=${JSON.stringify(opts)}`,
         );
-        if (preJoinMembership?.membership == KnownMembership.Join) return room!;
+        if (preJoinMembership == KnownMembership.Join) return room!;
 
         let signPromise: Promise<IThirdPartySigned | void> = Promise.resolve();
 
@@ -2403,13 +2408,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryParams, data);
 
         const roomId = res.room_id;
-        if (
-            opts.acceptSharedHistory &&
-            preJoinMembership?.membership == KnownMembership.Invite &&
-            preJoinMembershipSender &&
-            this.cryptoBackend
-        ) {
-            await this.cryptoBackend.maybeAcceptKeyBundle(roomId, preJoinMembershipSender);
+        if (opts.acceptSharedHistory && inviter && this.cryptoBackend) {
+            await this.cryptoBackend.maybeAcceptKeyBundle(roomId, inviter);
         }
 
         // In case we were originally given an alias, check the room cache again
