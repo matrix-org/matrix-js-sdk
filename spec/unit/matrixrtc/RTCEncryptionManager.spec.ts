@@ -488,6 +488,29 @@ describe("RTCEncryptionManager", () => {
             );
         });
 
+        it("should not accept keys when manageMediaKeys is disabled", async () => {
+            jest.useFakeTimers();
+
+            const members = [aCallMembership("@bob:example.org", "BOBDEVICE")];
+            getMembershipMock.mockReturnValue(members);
+
+            encryptionManager.join({ manageMediaKeys: false });
+            encryptionManager.onMembershipsUpdate();
+            await jest.advanceTimersByTimeAsync(10);
+
+            mockTransport.emit(
+                KeyTransportEvents.ReceivedKeys,
+                "@bob:example.org",
+                "BOBDEVICE",
+                "AAAAAAAAAAA",
+                0 /* KeyId */,
+                0 /* Timestamp */,
+            );
+
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+            expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(0);
+        });
+
         it("should accept keys from transport", async () => {
             jest.useFakeTimers();
 
