@@ -1,3 +1,20 @@
+Changes in [37.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.12.0) (2025-07-29)
+====================================================================================================
+## 🦖 Deprecations
+
+* Deprecate non-functional `IJoinRoomOpts.syncRoom` ([#4913](https://github.com/matrix-org/matrix-js-sdk/pull/4913)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Custom abort timeout logic for restarting delayed events that is compatible with the widget api ([#4927](https://github.com/matrix-org/matrix-js-sdk/pull/4927)). Contributed by @toger5.
+* Allow sending notification events when starting a call ([#4826](https://github.com/matrix-org/matrix-js-sdk/pull/4826)). Contributed by @robintown.
+
+## 🐛 Bug Fixes
+
+* Fix deep import incompatibility (#4924) ([#4925](https://github.com/matrix-org/matrix-js-sdk/pull/4925)). Contributed by @toriningen.
+* Fix more incorrect logger use ([#4904](https://github.com/matrix-org/matrix-js-sdk/pull/4904)). Contributed by @richvdh.
+
+
 Changes in [37.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.11.0) (2025-07-15)
 ====================================================================================================
 ## ✨ Features
