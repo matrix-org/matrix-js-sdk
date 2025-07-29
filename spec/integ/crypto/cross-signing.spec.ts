@@ -137,7 +137,7 @@ describe("cross-signing", () => {
             const authDict = { type: "test" };
             await bootstrapCrossSigning(authDict);
 
-            // check the cross-signing keys have been uploaded
+            // check that the cross-signing keys have been uploaded
             expect(fetchMock.called("upload-cross-signing-keys")).toBeTruthy();
             const [, keysOpts] = fetchMock.lastCall("upload-cross-signing-keys")!;
             const keysBody = JSON.parse(keysOpts!.body as string);
