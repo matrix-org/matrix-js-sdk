@@ -34,22 +34,6 @@ import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
 import { type QueryDict } from "../utils.ts";
 import { TokenRefresher, TokenRefreshOutcome } from "./refresh.ts";
 
-interface TypedResponse<T> extends Response {
-    json(): Promise<T>;
-}
-
-/**
- * The type returned by {@link FetchHttpApi.request}, etc.
- *
- * If {@link IHttpOpts.onlyData} is unset or false, then the request methods return a
- * {@link https://developer.mozilla.org/en-US/docs/Web/API/Response Response} object,
- * which we abstract via `TypedResponse`. Otherwise, we just cast it to `T`.
- *
- * @typeParam T - The type (specified by the application on the request method) that we will cast the response to.
- * @typeParam O - The type of the options object on the {@link FetchHttpApi} instance.
- */
-export type ResponseType<T, O extends IHttpOpts> = O extends { onlyData: true } | undefined ? T : TypedResponse<T>;
-
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
     private readonly tokenRefresher: TokenRefresher;
@@ -59,7 +43,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
         public readonly opts: O,
     ) {
         checkObjectHasKeys(opts, ["baseUrl", "prefix"]);
-        opts.onlyData = !!opts.onlyData;
+        if (!opts.onlyData) {
+            throw new Error("Constructing FetchHttpApi without `onlyData=true` is no longer supported.");
+        }
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
 
         this.tokenRefresher = new TokenRefresher(opts);
@@ -91,7 +77,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         params: Record<string, string | string[]> | undefined,
         prefix: string,
         accessToken?: string,
-    ): Promise<ResponseType<T, O>> {
+    ): Promise<T> {
         if (!this.opts.idBaseUrl) {
             throw new Error("No identity server base URL set");
         }
@@ -132,17 +118,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * When `paramOpts.doNotAttemptTokenRefresh` is true, token refresh will not be attempted
      * when an expired token is encountered. Used to only attempt token refresh once.
      *
-     * @returns Promise which resolves to
-     * ```
-     * {
-     *     data: {Object},
-     *     headers: {Object},
-     *     code: {Number},
-     * }
-     * ```
-     * If `onlyData` is set, this will resolve to the `data` object only.
-     * @returns Rejects with an error if a problem occurred.
-     * This includes network problems and Matrix-specific error JSON.
+     * @returns The parsed response.
+     * @throws Error if a problem occurred. This includes network problems and Matrix-specific error JSON.
      */
     public authedRequest<T>(
         method: Method,
@@ -150,7 +127,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         queryParams: QueryDict = {},
         body?: Body,
         paramOpts: IRequestOpts = {},
-    ): Promise<ResponseType<T, O>> {
+    ): Promise<T> {
         return this.doAuthedRequest<T>(1, method, path, queryParams, body, paramOpts);
     }
 
@@ -162,7 +139,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         queryParams: QueryDict,
         body?: Body,
         paramOpts: IRequestOpts = {},
-    ): Promise<ResponseType<T, O>> {
+    ): Promise<T> {
         // avoid mutating paramOpts so they can be used on retry
         const opts = deepCopy(paramOpts);
         // we have to manually copy the abortSignal over as it is not a plain object
@@ -228,18 +205,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts - additional options
      *
-     * @returns Promise which resolves to
-     * ```
-     * {
-     *  data: {Object},
-     *  headers: {Object},
-     *  code: {Number},
-     * }
-     * ```
-     * If `onlyData</code> is set, this will resolve to the <code>data`
-     * object only.
-     * @returns Rejects with an error if a problem
-     * occurred. This includes network problems and Matrix-specific error JSON.
+     * @returns The parsed response.
+     * @throws Error if a problem occurred. This includes network problems and Matrix-specific error JSON.
      */
     public request<T>(
         method: Method,
@@ -247,7 +214,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         queryParams?: QueryDict,
         body?: Body,
         opts?: IRequestOpts,
-    ): Promise<ResponseType<T, O>> {
+    ): Promise<T> {
         const fullUri = this.getUrl(path, queryParams, opts?.prefix, opts?.baseUrl);
         return this.requestOtherUrl<T>(method, fullUri, body, opts);
     }
@@ -261,17 +228,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts - additional options
      *
-     * @returns Promise which resolves to data unless `onlyData` is specified as false,
-     * where the resolved value will be a fetch Response object.
-     * @returns Rejects with an error if a problem
-     * occurred. This includes network problems and Matrix-specific error JSON.
+     * @returns The parsed response.
+     * @throws Error if a problem occurred. This includes network problems and Matrix-specific error JSON.
      */
     public async requestOtherUrl<T>(
         method: Method,
         url: URL | string,
         body?: Body,
         opts: BaseRequestOpts = {},
-    ): Promise<ResponseType<T, O>> {
+    ): Promise<T> {
         if (opts.json !== undefined && opts.rawResponseBody !== undefined) {
             throw new Error("Invalid call to `FetchHttpApi` sets both `opts.json` and `opts.rawResponseBody`");
         }
@@ -349,14 +314,12 @@ export class FetchHttpApi<O extends IHttpOpts> {
             throw parseErrorResponse(res, await res.text());
         }
 
-        if (!this.opts.onlyData) {
-            return res as ResponseType<T, O>;
-        } else if (opts.rawResponseBody) {
-            return (await res.blob()) as ResponseType<T, O>;
+        if (opts.rawResponseBody) {
+            return (await res.blob()) as T;
         } else if (jsonResponse) {
             return await res.json();
         } else {
-            return (await res.text()) as ResponseType<T, O>;
+            return (await res.text()) as T;
         }
     }
 
