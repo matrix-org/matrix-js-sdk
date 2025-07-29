@@ -1558,14 +1558,6 @@ describe("RustCrypto", () => {
             const e2eKeyReceiver = new E2EKeyReceiver("http://server");
             const e2eKeyResponder = new E2EKeyResponder("http://server");
             e2eKeyResponder.addKeyReceiver(TEST_USER, e2eKeyReceiver);
-            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
-                status: 200,
-                body: {},
-            });
-            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
-                status: 200,
-                body: {},
-            });
             await rustCrypto.bootstrapCrossSigning({ setupNewCrossSigning: true });
             await expect(rustCrypto.pinCurrentUserIdentity(TEST_USER)).rejects.toThrow(
                 "Cannot pin identity of own user",
@@ -1803,14 +1795,6 @@ describe("RustCrypto", () => {
                     error: "Not found",
                 },
             });
-            fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
-                status: 200,
-                body: {},
-            });
-            fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
-                status: 200,
-                body: {},
-            });
             const rustCrypto1 = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
 
             // dehydration requires secret storage and cross signing
@@ -1943,14 +1927,6 @@ describe("RustCrypto", () => {
                         errcode: "M_NOT_FOUND",
                         error: "Not found",
                     },
-                });
-                fetchMock.post("path:/_matrix/client/v3/keys/device_signing/upload", {
-                    status: 200,
-                    body: {},
-                });
-                fetchMock.post("path:/_matrix/client/v3/keys/signatures/upload", {
-                    status: 200,
-                    body: {},
                 });
                 rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), TEST_USER, TEST_DEVICE_ID, secretStorage);
 
@@ -2368,6 +2344,76 @@ describe("RustCrypto", () => {
 
             expect(backupIsDeleted).toBeTruthy();
             expect(dehydratedDeviceIsDeleted).toBeTruthy();
+        });
+    });
+
+    describe("maybeAcceptKeyBundle", () => {
+        let mockOlmMachine: Mocked<OlmMachine>;
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            mockOlmMachine = {
+                getReceivedRoomKeyBundleData: jest.fn(),
+                receiveRoomKeyBundle: jest.fn(),
+            } as unknown as Mocked<OlmMachine>;
+
+            const http = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+
+            rustCrypto = new RustCrypto(
+                new DebugLogger(debug("matrix-js-sdk:test:rust-crypto.spec:maybeAcceptKeyBundle")),
+                mockOlmMachine,
+                http,
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("does nothing if there is no key bundle", async () => {
+            mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(undefined);
+            await rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org");
+            expect(mockOlmMachine.getReceivedRoomKeyBundleData).toHaveBeenCalledTimes(1);
+            expect(mockOlmMachine.getReceivedRoomKeyBundleData.mock.calls[0][0].toString()).toEqual("!room_id");
+            expect(mockOlmMachine.getReceivedRoomKeyBundleData.mock.calls[0][1].toString()).toEqual("@bob:example.org");
+
+            expect(mockOlmMachine.receiveRoomKeyBundle).not.toHaveBeenCalled();
+        });
+
+        it("fetches the bundle via http and throws an error on failure", async () => {
+            const bundleData = { url: "mxc://server/data" } as RustSdkCryptoJs.StoredRoomKeyBundleData;
+            mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(bundleData);
+
+            fetchMock.get("http://server/_matrix/client/v1/media/download/server/data?allow_redirect=true", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+
+            await expect(() => rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org")).rejects.toMatchObject({
+                errcode: "M_NOT_FOUND",
+                httpStatus: 404,
+            });
+        });
+
+        it("fetches the bundle via http and passes it back into the OlmMachine", async () => {
+            const bundleData = { url: "mxc://server/data" } as RustSdkCryptoJs.StoredRoomKeyBundleData;
+            mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(bundleData);
+
+            fetchMock.get("http://server/_matrix/client/v1/media/download/server/data?allow_redirect=true", {
+                body: "asdfghjkl",
+            });
+
+            await rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org");
+            expect(mockOlmMachine.receiveRoomKeyBundle).toHaveBeenCalledTimes(1);
+            expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][0]).toBe(bundleData);
+            expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][1]).toEqual(new TextEncoder().encode("asdfghjkl"));
         });
     });
 });
