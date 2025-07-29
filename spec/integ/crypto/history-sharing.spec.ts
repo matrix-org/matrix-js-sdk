@@ -114,7 +114,7 @@ describe("History Sharing", () => {
         await syncPromise(bobClient);
     });
 
-    test("Share room key", async () => {
+    test("Room keys are successfully shared on invite", async () => {
         // Alice is in an encrypted room
         const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], ROOM_ID);
         aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);

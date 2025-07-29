@@ -2342,6 +2342,76 @@ describe("RustCrypto", () => {
             expect(dehydratedDeviceIsDeleted).toBeTruthy();
         });
     });
+
+    describe("maybeAcceptKeyBundle", () => {
+        let mockOlmMachine: Mocked<OlmMachine>;
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            mockOlmMachine = {
+                getReceivedRoomKeyBundleData: jest.fn(),
+                receiveRoomKeyBundle: jest.fn(),
+            } as unknown as Mocked<OlmMachine>;
+
+            const http = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            });
+
+            rustCrypto = new RustCrypto(
+                new DebugLogger(debug("matrix-js-sdk:test:rust-crypto.spec:maybeAcceptKeyBundle")),
+                mockOlmMachine,
+                http,
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+        });
+
+        it("does nothing if there is no key bundle", async () => {
+            mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(undefined);
+            await rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org");
+            expect(mockOlmMachine.getReceivedRoomKeyBundleData).toHaveBeenCalledTimes(1);
+            expect(mockOlmMachine.getReceivedRoomKeyBundleData.mock.calls[0][0].toString()).toEqual("!room_id");
+            expect(mockOlmMachine.getReceivedRoomKeyBundleData.mock.calls[0][1].toString()).toEqual("@bob:example.org");
+
+            expect(mockOlmMachine.receiveRoomKeyBundle).not.toHaveBeenCalled();
+        });
+
+        it("fetches the bundle via http and throws an error on failure", async () => {
+            const bundleData = { url: "mxc://server/data" } as RustSdkCryptoJs.StoredRoomKeyBundleData;
+            mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(bundleData);
+
+            fetchMock.get("http://server/_matrix/client/v1/media/download/server/data?allow_redirect=true", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+
+            await expect(() => rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org")).rejects.toMatchObject({
+                errcode: "M_NOT_FOUND",
+                httpStatus: 404,
+            });
+        });
+
+        it("fetches the bundle via http and passes it back into the OlmMachine", async () => {
+            const bundleData = { url: "mxc://server/data" } as RustSdkCryptoJs.StoredRoomKeyBundleData;
+            mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(bundleData);
+
+            fetchMock.get("http://server/_matrix/client/v1/media/download/server/data?allow_redirect=true", {
+                body: "asdfghjkl",
+            });
+
+            await rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org");
+            expect(mockOlmMachine.receiveRoomKeyBundle).toHaveBeenCalledTimes(1);
+            expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][0]).toBe(bundleData);
+            expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][1]).toEqual(new TextEncoder().encode("asdfghjkl"));
+        });
+    });
 });
 
 /** Build a MatrixHttpApi instance */
