@@ -453,6 +453,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.roomSubset,
                 this.client,
                 () => this.getOldestMembership(),
+                this.sessionDescription,
                 this.logger,
             );
 
