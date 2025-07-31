@@ -20,7 +20,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type IDeviceLists, type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
-import type { ToDevicePayload, ToDeviceBatch } from "../models/ToDeviceMessage.ts";
+import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { type MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
 import { type RoomMember } from "../models/room-member.ts";
@@ -37,6 +37,7 @@ import { OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { KeyClaimManager } from "./KeyClaimManager.ts";
 import { MapWithDefault } from "../utils.ts";
 import {
+    AllDevicesIsolationMode,
     type BackupTrustInfo,
     type BootstrapCrossSigningOpts,
     type CreateSecretStorageOpts,
@@ -45,29 +46,28 @@ import {
     type CrossSigningStatus,
     type CryptoApi,
     type CryptoCallbacks,
+    CryptoEvent,
+    type CryptoEventHandlerMap,
     DecryptionFailureCode,
+    deriveRecoveryKeyFromPassphrase,
+    type DeviceIsolationMode,
+    DeviceIsolationModeKind,
     DeviceVerificationStatus,
+    encodeRecoveryKey,
     type EventEncryptionInfo,
     EventShieldColour,
     EventShieldReason,
     type GeneratedSecretStorageKey,
     type ImportRoomKeysOpts,
+    ImportRoomKeyStage,
     type KeyBackupCheck,
     type KeyBackupInfo,
-    type OwnDeviceKeys,
-    UserVerificationStatus,
-    type VerificationRequest,
-    encodeRecoveryKey,
-    deriveRecoveryKeyFromPassphrase,
-    type DeviceIsolationMode,
-    AllDevicesIsolationMode,
-    DeviceIsolationModeKind,
-    CryptoEvent,
-    type CryptoEventHandlerMap,
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
+    type OwnDeviceKeys,
     type StartDehydrationOpts,
-    ImportRoomKeyStage,
+    UserVerificationStatus,
+    type VerificationRequest,
 } from "../crypto-api/index.ts";
 import { deviceKeysToDeviceMap, rustDeviceToJsDevice } from "./device-converter.ts";
 import { type IDownloadKeyResult, type IQueryKeysRequest } from "../client.ts";
@@ -94,6 +94,7 @@ import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
 import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
+import { getHttpUriForMxc } from "../content-repo.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -321,6 +322,62 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         return await this.backupManager.importBackedUpRoomKeys(keys, backupVersion, opts);
     }
 
+    /**
+     * Implementation of {@link CryptoBackend.maybeAcceptKeyBundle}.
+     */
+    public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void> {
+        // TODO: retry this if it gets interrupted or it fails.
+        // TODO: do this in the background.
+        // TODO: handle the bundle message arriving after the invite.
+
+        const logger = new LogSpan(this.logger, `maybeAcceptKeyBundle(${roomId}, ${inviter})`);
+
+        const bundleData = await this.olmMachine.getReceivedRoomKeyBundleData(
+            new RustSdkCryptoJs.RoomId(roomId),
+            new RustSdkCryptoJs.UserId(inviter),
+        );
+        if (!bundleData) {
+            logger.info("No key bundle found for user");
+            return;
+        }
+
+        logger.info(`Fetching key bundle ${bundleData.url}`);
+        const url = getHttpUriForMxc(
+            this.http.opts.baseUrl,
+            bundleData.url,
+            undefined,
+            undefined,
+            undefined,
+            /* allowDirectLinks */ false,
+            /* allowRedirects */ true,
+            /* useAuthentication */ true,
+        );
+        let encryptedBundle: Blob;
+        try {
+            const bundleUrl = new URL(url);
+            encryptedBundle = await this.http.authedRequest<Blob>(
+                Method.Get,
+                bundleUrl.pathname + bundleUrl.search,
+                {},
+                undefined,
+                {
+                    rawResponseBody: true,
+                    prefix: "",
+                },
+            );
+        } catch (err) {
+            logger.warn(`Error downloading encrypted bundle from ${url}:`, err);
+            throw err;
+        }
+
+        logger.info(`Received blob of length ${encryptedBundle.size}`);
+        try {
+            await this.olmMachine.receiveRoomKeyBundle(bundleData, new Uint8Array(await encryptedBundle.arrayBuffer()));
+        } catch (err) {
+            logger.warn(`Error receiving encrypted bundle:`, err);
+            throw err;
+        }
+    }
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
@@ -1474,6 +1531,54 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await this.secretStorage.setDefaultKeyId(null);
     }
 
+    /**
+     * Implementation of {@link CryptoApi#shareRoomHistoryWithUser}.
+     */
+    public async shareRoomHistoryWithUser(roomId: string, userId: string): Promise<void> {
+        const logger = new LogSpan(this.logger, `shareRoomHistoryWithUser(${roomId}, ${userId})`);
+
+        // 0. We can only share room history if our user has set up cross-signing.
+        const identity = await this.getOwnIdentity();
+        if (!identity?.isVerified()) {
+            logger.warn(
+                "Not sharing message history as the current device is not verified by our cross-signing identity",
+            );
+            return;
+        }
+
+        logger.info("Sharing message history");
+
+        // 1. Construct the key bundle
+        const bundle = await this.getOlmMachineOrThrow().buildRoomKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
+        if (!bundle) {
+            logger.info("No keys to share");
+            return;
+        }
+
+        // 2. Upload the encrypted bundle to the server
+        const uploadResponse = await this.http.uploadContent(bundle.encryptedData);
+        logger.info(`Uploaded encrypted key blob: ${JSON.stringify(uploadResponse)}`);
+
+        // 3. We may not share a room with the user, so get a fresh list of devices for the invited user.
+        const req = this.getOlmMachineOrThrow().queryKeysForUsers([new RustSdkCryptoJs.UserId(userId)]);
+        await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+
+        // 4. Establish Olm sessions with all of the recipient's devices.
+        await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(userId)]);
+
+        // 5. Send to-device messages to the recipient to share the keys.
+        const requests = await this.getOlmMachineOrThrow().shareRoomKeyBundleData(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.RoomId(roomId),
+            uploadResponse.content_uri,
+            bundle.mediaEncryptionInfo,
+            RustSdkCryptoJs.CollectStrategy.identityBasedStrategy(),
+        );
+        for (const req of requests) {
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // SyncCryptoCallbacks implementation
@@ -2276,6 +2381,12 @@ function rustEncryptionInfoToJsEncryptionInfo(
             break;
         case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
+            break;
+        case RustSdkCryptoJs.ShieldStateCode.MismatchedSender:
+            shieldReason = EventShieldReason.MISMATCHED_SENDER;
+            break;
+        default:
+            shieldReason = EventShieldReason.UNKNOWN;
             break;
     }
 

@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "37.11.0",
+    "version": "37.12.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -49,7 +49,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^15.0.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^15.1.0",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^1.0.4",
