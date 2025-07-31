@@ -314,11 +314,22 @@ export class RoomEncryptor {
 
     private async encryptEventInner(logger: LogSpan, event: MatrixEvent): Promise<void> {
         logger.debug("Encrypting actual message content");
-        const encryptedContent = await this.olmMachine.encryptRoomEvent(
-            new RoomId(this.room.roomId),
-            event.getType(),
-            JSON.stringify(event.getContent()),
-        );
+
+        let encryptedContent;
+        if (event.isState()) {
+            encryptedContent = await this.olmMachine.encryptStateEvent(
+                new RoomId(this.room.roomId),
+                event.getType(),
+                event.getStateKey()!,
+                JSON.stringify(event.getContent()),
+            );
+        } else {
+            encryptedContent = await this.olmMachine.encryptRoomEvent(
+                new RoomId(this.room.roomId),
+                event.getType(),
+                JSON.stringify(event.getContent()),
+            );
+        }
 
         event.makeEncrypted(
             EventType.RoomMessageEncrypted,

@@ -1216,7 +1216,7 @@ export class SyncApi {
             // this helps large account to speed up faster
             // room::decryptCriticalEvent is in charge of decrypting all the events
             // required for a client to function properly
-            const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
+            const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room);
             const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
@@ -1364,6 +1364,10 @@ export class SyncApi {
                         await this.syncOpts.cryptoCallbacks.onCryptoEvent(room, e);
                     }
                 }
+            }
+
+            for (const ev of timelineEvents.filter((ev) => ev.isState())) {
+                await this.client.decryptEventIfNeeded(ev);
             }
 
             try {

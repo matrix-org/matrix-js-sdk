@@ -426,6 +426,11 @@ export interface ICreateClientOpts {
     cryptoCallbacks?: CryptoCallbacks;
 
     /**
+     * Enable encrypted state events.
+     */
+    enableEncryptedStateEvents?: boolean;
+
+    /**
      * Method to generate room names for empty rooms and rooms names based on membership.
      * Defaults to a built-in English handler with basic pluralisation.
      */
@@ -1206,6 +1211,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
     public cryptoCallbacks: CryptoCallbacks; // XXX: Intended private, used in code.
+    public enableEncryptedStateEvents: boolean;
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
@@ -1363,6 +1369,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.legacyCryptoStore = opts.cryptoStore;
         this.verificationMethods = opts.verificationMethods;
         this.cryptoCallbacks = opts.cryptoCallbacks || {};
+        this.enableEncryptedStateEvents = opts.enableEncryptedStateEvents ?? false;
 
         this.forceTURN = opts.forceTURN || false;
         this.iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
@@ -1979,6 +1986,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             legacyMigrationProgressListener: (progress: number, total: number): void => {
                 this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
             },
+
+            enableEncryptedStateEvents: this.enableEncryptedStateEvents,
         });
 
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
@@ -6041,6 +6050,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns A decryption promise
      */
     public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
+        if (event.isState() && !this.enableEncryptedStateEvents) {
+            return Promise.resolve();
+        }
+
         if (event.shouldAttemptDecryption() && this.getCrypto()) {
             event.attemptDecryption(this.cryptoBackend!, options);
         }
@@ -6625,23 +6638,80 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public sendStateEvent<K extends keyof StateEvents>(
+    public async sendStateEvent<K extends keyof StateEvents>(
         roomId: string,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
         opts: IRequestOpts = {},
     ): Promise<ISendEventResponse> {
+        const room = this.getRoom(roomId);
+        const event = new MatrixEvent({ room_id: roomId, type: eventType, state_key: stateKey, content });
+
+        await this.encryptStateEventIfNeeded(event, room ?? undefined);
+
         const pathParams = {
             $roomId: roomId,
-            $eventType: eventType,
-            $stateKey: stateKey,
+            $eventType: event.getWireType(),
+            $stateKey: event.getWireStateKey(),
         };
         let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, undefined, content as Body, opts);
+        return this.http.authedRequest(Method.Put, path, undefined, event.getWireContent(), opts);
+    }
+
+    private async encryptStateEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
+        if (!this.enableEncryptedStateEvents) {
+            return;
+        }
+
+        // If the room is unknown, we cannot encrypt for it
+        if (!room) return;
+
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
+        }
+
+        if (!this.cryptoBackend && this.usingExternalCrypto) {
+            // The client has opted to allow sending messages to encrypted
+            // rooms even if the room is encrypted, and we haven't set up
+            // crypto. This is useful for users of matrix-org/pantalaimon
+            return;
+        }
+
+        // Check regular encryption conditions.
+        if (!(await this.shouldEncryptEventForRoom(event, room))) {
+            this.logger.info("Discarded - does not match regular conditions");
+            return;
+        }
+
+        // If we have a crypto impl, and *it* thinks we shouldn't encrypt, then we shouldn't.
+        if (!(await this.cryptoBackend?.isStateEncryptionEnabledInRoom(room.roomId))) {
+            this.logger.info("Discarded - does not match state event conditions");
+            return;
+        }
+
+        // Check if the event is excluded under MSC3414
+        if (
+            [
+                "m.room.create",
+                "m.room.member",
+                "m.room.join_rules",
+                "m.room.power_levels",
+                "m.room.third_party_invite",
+                "m.room.history_visibility",
+                "m.room.guest_access",
+                "m.room.encryption",
+            ].includes(event.getType())
+        ) {
+            this.logger.info("Discarded - is a critical event");
+            return;
+        }
+
+        this.logger.info("Encrypting state event");
+        await this.cryptoBackend.encryptEvent(event, room);
     }
 
     /**

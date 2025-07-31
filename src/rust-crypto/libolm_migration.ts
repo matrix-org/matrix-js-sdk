@@ -395,6 +395,7 @@ export async function migrateRoomSettingsFromLegacyCrypto({
                 continue;
             }
             rustSettings.algorithm = RustSdkCryptoJs.EncryptionAlgorithm.MegolmV1AesSha2;
+            rustSettings.encryptStateEvents = false;
             rustSettings.sessionRotationPeriodMs = legacySettings.rotation_period_ms;
             rustSettings.sessionRotationPeriodMessages = legacySettings.rotation_period_msgs;
             await olmMachine.setRoomSettings(new RustSdkCryptoJs.RoomId(roomId), rustSettings);
