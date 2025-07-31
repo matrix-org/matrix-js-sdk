@@ -1366,6 +1366,13 @@ export class SyncApi {
                 }
             }
 
+            // Proactively decrypt state events: normally we decrypt on demand, but for state
+            // events we need them immediately, so we handle them here. Specifically, consumers
+            // (e.g. Element Web) expect state events to be unencrypted upon receipt.
+            for (const ev of timelineEvents.filter((ev) => ev.isState())) {
+                await this.client.decryptEventIfNeeded(ev);
+            }
+
             try {
                 if ("org.matrix.msc4222.state_after" in joinObj) {
                     await this.injectRoomEvents(

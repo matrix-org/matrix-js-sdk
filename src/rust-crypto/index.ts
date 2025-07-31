@@ -91,6 +91,11 @@ export async function initRustCrypto(args: {
      * Called with (-1, -1) to mark the end of migration.
      */
     legacyMigrationProgressListener?: (progress: number, total: number) => void;
+
+    /**
+     * Whether to enable support for encrypting state events.
+     */
+    enableEncryptedStateEvents?: boolean;
 }): Promise<RustCrypto> {
     const { logger } = args;
 
@@ -128,6 +133,7 @@ export async function initRustCrypto(args: {
         args.cryptoCallbacks,
         storeHandle,
         args.legacyCryptoStore,
+        args.enableEncryptedStateEvents,
     );
 
     storeHandle.free();
@@ -145,6 +151,7 @@ async function initOlmMachine(
     cryptoCallbacks: CryptoCallbacks,
     storeHandle: StoreHandle,
     legacyCryptoStore?: CryptoStore,
+    enableEncryptedStateEvents?: boolean,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
@@ -167,7 +174,16 @@ async function initOlmMachine(
     // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.
     olmMachine.roomKeyRequestsEnabled = false;
 
-    const rustCrypto = new RustCrypto(logger, olmMachine, http, userId, deviceId, secretStorage, cryptoCallbacks);
+    const rustCrypto = new RustCrypto(
+        logger,
+        olmMachine,
+        http,
+        userId,
+        deviceId,
+        secretStorage,
+        cryptoCallbacks,
+        enableEncryptedStateEvents,
+    );
 
     await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),

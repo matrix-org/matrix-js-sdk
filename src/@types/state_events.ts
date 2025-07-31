@@ -105,9 +105,10 @@ export interface RoomPinnedEventsEventContent {
 }
 
 export interface RoomEncryptionEventContent {
-    algorithm: "m.megolm.v1.aes-sha2";
-    rotation_period_ms?: number;
-    rotation_period_msgs?: number;
+    "algorithm": "m.megolm.v1.aes-sha2";
+    "io.element.msc3414.encrypt_state_events"?: boolean;
+    "rotation_period_ms"?: number;
+    "rotation_period_msgs"?: number;
 }
 
 export interface RoomHistoryVisibilityEventContent {
