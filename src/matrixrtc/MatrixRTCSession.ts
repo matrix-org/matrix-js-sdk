@@ -74,6 +74,12 @@ export interface SessionConfig {
     notificationType?: RTCNotificationType;
 }
 
+/// The session description is used to identify a session. Used in the state event.
+export interface SessionDescription {
+    id: string;
+    application: string;
+}
+
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
@@ -86,7 +92,7 @@ export interface MembershipConfig {
      * Use the new Manager.
      *
      * Default: `false`.
-     * @deprecated does nothing anymore we always default to the new memberhip manager.
+     * @deprecated does nothing anymore we always default to the new membership manager.
      */
     useNewMembershipManager?: boolean;
 
