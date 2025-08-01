@@ -243,7 +243,7 @@ export class MembershipManager
             this.logger.warn("Missing own membership: force re-join");
             this.state.hasMemberStateEvent = false;
 
-            if (this.scheduler.actions.find((a) => sendingMembershipActions.includes(a.type as MembershipActionType))) {
+            if (this.scheduler.actions.some((a) => sendingMembershipActions.includes(a.type as MembershipActionType))) {
                 this.logger.error(
                     "tried adding another `SendDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
                     this.scheduler.actions,
@@ -624,8 +624,21 @@ export class MembershipManager
                 this.state.expireUpdateIterations = 1;
                 this.state.hasMemberStateEvent = true;
                 this.resetRateLimitCounter(MembershipActionType.SendJoinEvent);
+                // An UpdateExpiry action might be left over from a previous join event.
+                // We can reach sendJoinEvent when the delayed leave event gets send by the HS.
+                // The branch where we might have a leftover UpdateExpiry action is:
+                // RestartDelayedEvent (cannot find it, server removed it)
+                // -> SendDelayedEvent (send new delayed event)
+                // -> SendJoinEvent (here with a still scheduled UpdateExpiry action)
+                const actionsWithoutUpdateExpiry = this.scheduler.actions.filter(
+                    (a) =>
+                        a.type !== MembershipActionType.UpdateExpiry && // A new UpdateExpiry action with an updated will be scheduled,
+                        a.type !== MembershipActionType.SendJoinEvent, // Manually remove the SendJoinEvent action,
+                );
                 return {
-                    insert: [
+                    replace: [
+                        ...actionsWithoutUpdateExpiry,
+                        // To check if the delayed event is still there or got removed by inserting the stateEvent, we need to restart it.
                         { ts: Date.now(), type: MembershipActionType.RestartDelayedEvent },
                         {
                             ts: this.computeNextExpiryActionTs(this.state.expireUpdateIterations),
