@@ -26,7 +26,7 @@ import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
-import { logDurationSync } from "../utils.ts";
+import { deepCompare, logDurationSync } from "../utils.ts";
 import { type Statistics, type RTCNotificationType } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
@@ -74,6 +74,12 @@ export interface SessionConfig {
     notificationType?: RTCNotificationType;
 }
 
+/// The session description is used to identify a session. Used in the state event.
+export interface SessionDescription {
+    id: string;
+    application: string;
+}
+
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
@@ -86,7 +92,7 @@ export interface MembershipConfig {
      * Use the new Manager.
      *
      * Default: `false`.
-     * @deprecated does nothing anymore we always default to the new memberhip manager.
+     * @deprecated does nothing anymore we always default to the new membership manager.
      */
     useNewMembershipManager?: boolean;
 
@@ -258,6 +264,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public static callMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+        sessionDescription: SessionDescription,
     ): CallMembership[] {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
@@ -289,6 +296,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
             for (const membershipData of membershipContents) {
                 try {
                     const membership = new CallMembership(memberEvent, membershipData);
+
+                    if (!deepCompare(membership.sessionDescription, sessionDescription)) {
+                        logger.info(
+                            `Ignoring membership of user ${membership.sender} for different application ${membership.application}`,
+                        );
+                        continue;
+                    }
 
                     if (membership.callId !== "" || membership.scope !== "m.room") {
                         // for now, just ignore anything that isn't a room scope call
@@ -325,10 +339,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Return the MatrixRTC session for the room, whether there are currently active members or not
      */
-    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
+    public static roomSessionForRoom(
+        client: MatrixClient,
+        room: Room,
+        sessionDescription: SessionDescription,
+    ): MatrixRTCSession {
+        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room, sessionDescription);
 
-        return new MatrixRTCSession(client, room, callMemberships);
+        return new MatrixRTCSession(client, room, callMemberships, sessionDescription);
     }
 
     /**
@@ -373,6 +391,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
         >,
         public memberships: CallMembership[],
+        public sessionDescription: SessionDescription,
     ) {
         super();
         this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
@@ -434,6 +453,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.roomSubset,
                 this.client,
                 () => this.getOldestMembership(),
+                this.sessionDescription,
                 this.logger,
             );
 
@@ -642,7 +662,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     private recalculateSessionMembers = (): void => {
         const oldMemberships = this.memberships;
-        this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
+        this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room, this.sessionDescription);
 
         this._callId = this._callId ?? this.memberships[0]?.callId;
 
