@@ -65,7 +65,7 @@ describe("RoomState", function () {
                 content: {
                     name: "Room name goes here",
                 },
-            })
+            }),
         ];
 
         state = new RoomState(roomId);
@@ -888,8 +888,7 @@ describe("RoomState", function () {
                     users_default: 0,
                     state_default: 100,
                     events_default: 100,
-                    users: {
-                    },
+                    users: {},
                 },
             });
             statev12.setStateEvents([powerLevelEvent]);
