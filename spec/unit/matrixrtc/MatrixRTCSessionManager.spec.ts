@@ -47,6 +47,21 @@ describe("MatrixRTCSessionManager", () => {
         }
     });
 
+    it("Doesn't fire event if unrelated sessions starts", () => {
+        const onStarted = jest.fn();
+        client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+
+        try {
+            const room1 = makeMockRoom([{ ...membershipTemplate, application: "m.other" }]);
+            jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+            client.emit(ClientEvent.Room, room1);
+            expect(onStarted).not.toHaveBeenCalled();
+        } finally {
+            client.matrixRTC.off(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+        }
+    });
+
     it("Fires event when session ends", () => {
         const onEnded = jest.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);

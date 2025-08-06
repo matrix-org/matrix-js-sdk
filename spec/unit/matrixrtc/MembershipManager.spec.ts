@@ -64,6 +64,8 @@ function createAsyncHandle<T>(method: MockedFunction<any>) {
     return { reject, resolve };
 }
 
+const callSession = { id: "", application: "m.call" };
+
 describe("MembershipManager", () => {
     let client: MockClient;
     let room: Room;
@@ -95,12 +97,12 @@ describe("MembershipManager", () => {
 
     describe("isActivated()", () => {
         it("defaults to false", () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             expect(manager.isActivated()).toEqual(false);
         });
 
         it("returns true after join()", () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
         });
@@ -114,7 +116,7 @@ describe("MembershipManager", () => {
                 const updateDelayedEventHandle = createAsyncHandle<void>(client._unstable_updateDelayedEvent as Mock);
 
                 // Test
-                const memberManager = new MembershipManager(undefined, room, client, () => undefined);
+                const memberManager = new MembershipManager(undefined, room, client, () => undefined, callSession);
                 memberManager.join([focus], focusActive);
                 // expects
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
@@ -130,7 +132,7 @@ describe("MembershipManager", () => {
                         focus_active: focusActive,
                         scope: "m.room",
                     },
-                    "_@alice:example.org_AAAAAAA",
+                    "_@alice:example.org_AAAAAAA_m.call",
                 );
                 updateDelayedEventHandle.resolve?.();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
@@ -138,13 +140,13 @@ describe("MembershipManager", () => {
                     { delay: 8000 },
                     "org.matrix.msc3401.call.member",
                     {},
-                    "_@alice:example.org_AAAAAAA",
+                    "_@alice:example.org_AAAAAAA_m.call",
                 );
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
             });
 
             it("reschedules delayed leave event if sending state cancels it", async () => {
-                const memberManager = new MembershipManager(undefined, room, client, () => undefined);
+                const memberManager = new MembershipManager(undefined, room, client, () => undefined, callSession);
                 const waitForSendState = waitForMockCall(client.sendStateEvent);
                 const waitForUpdateDelaye = waitForMockCallOnce(
                     client._unstable_updateDelayedEvent,
@@ -189,7 +191,7 @@ describe("MembershipManager", () => {
                         });
                     });
 
-                    const userStateKey = `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA`;
+                    const userStateKey = `${!useOwnedStateEvents ? "_" : ""}@alice:example.org_AAAAAAA_m.call`;
                     // preparing the delayed disconnect should handle ratelimiting
                     const sendDelayedStateAttempt = new Promise<void>((resolve) => {
                         const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
@@ -220,6 +222,7 @@ describe("MembershipManager", () => {
                         room,
                         client,
                         () => undefined,
+                        callSession,
                     );
                     manager.join([focus], focusActive);
 
@@ -276,7 +279,7 @@ describe("MembershipManager", () => {
         describe("delayed leave event", () => {
             it("does not try again to schedule a delayed leave event if not supported", () => {
                 const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
-                const manager = new MembershipManager({}, room, client, () => undefined);
+                const manager = new MembershipManager({}, room, client, () => undefined, callSession);
                 manager.join([focus], focusActive);
                 delayedHandle.reject?.(
                     new UnsupportedDelayedEventsEndpointError(
@@ -288,7 +291,7 @@ describe("MembershipManager", () => {
             });
             it("does try to schedule a delayed leave event again if rate limited", async () => {
                 const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
-                const manager = new MembershipManager({}, room, client, () => undefined);
+                const manager = new MembershipManager({}, room, client, () => undefined, callSession);
                 manager.join([focus], focusActive);
                 delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
                 await jest.advanceTimersByTimeAsync(5000);
@@ -300,6 +303,7 @@ describe("MembershipManager", () => {
                     room,
                     client,
                     () => undefined,
+                    callSession,
                 );
                 manager.join([focus], focusActive);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
@@ -307,7 +311,7 @@ describe("MembershipManager", () => {
                     { delay: 123456 },
                     "org.matrix.msc3401.call.member",
                     {},
-                    "_@alice:example.org_AAAAAAA",
+                    "_@alice:example.org_AAAAAAA_m.call",
                 );
             });
         });
@@ -319,6 +323,7 @@ describe("MembershipManager", () => {
                 room,
                 client,
                 () => undefined,
+                callSession,
             );
             // Join with the membership manager
             manager.join([focus], focusActive);
@@ -351,7 +356,13 @@ describe("MembershipManager", () => {
         });
 
         it("uses membershipEventExpiryMs from config", async () => {
-            const manager = new MembershipManager({ membershipEventExpiryMs: 1234567 }, room, client, () => undefined);
+            const manager = new MembershipManager(
+                { membershipEventExpiryMs: 1234567 },
+                room,
+                client,
+                () => undefined,
+                callSession,
+            );
 
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
@@ -370,12 +381,12 @@ describe("MembershipManager", () => {
                         type: "livekit",
                     },
                 },
-                "_@alice:example.org_AAAAAAA",
+                "_@alice:example.org_AAAAAAA_m.call",
             );
         });
 
         it("does nothing if join called when already joined", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
@@ -387,7 +398,7 @@ describe("MembershipManager", () => {
     describe("leave()", () => {
         // TODO add rate limit cases.
         it("resolves delayed leave event when leave is called", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             await manager.leave();
@@ -395,7 +406,7 @@ describe("MembershipManager", () => {
             expect(client.sendStateEvent).toHaveBeenCalled();
         });
         it("send leave event when leave is called and resolving delayed leave fails", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValue("unknown");
@@ -406,11 +417,11 @@ describe("MembershipManager", () => {
                 room.roomId,
                 "org.matrix.msc3401.call.member",
                 {},
-                "_@alice:example.org_AAAAAAA",
+                "_@alice:example.org_AAAAAAA_m.call",
             );
         });
         it("does nothing if not joined", () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             expect(async () => await manager.leave()).not.toThrow();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
@@ -420,7 +431,7 @@ describe("MembershipManager", () => {
     describe("getsActiveFocus", () => {
         it("gets the correct active focus with oldest_membership", () => {
             const getOldestMembership = jest.fn();
-            const manager = new MembershipManager({}, room, client, getOldestMembership);
+            const manager = new MembershipManager({}, room, client, getOldestMembership, callSession);
             // Before joining the active focus should be undefined (see FocusInUse on MatrixRTCSession)
             expect(manager.getActiveFocus()).toBe(undefined);
             manager.join([focus], focusActive);
@@ -455,7 +466,7 @@ describe("MembershipManager", () => {
         });
 
         it("does not provide focus if the selection method is unknown", () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], Object.assign(focusActive, { type: "unknown_type" }));
             expect(manager.getActiveFocus()).toBe(undefined);
         });
@@ -463,7 +474,7 @@ describe("MembershipManager", () => {
 
     describe("onRTCSessionMemberUpdate()", () => {
         it("does nothing if not joined", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
             await jest.advanceTimersToNextTimerAsync();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
@@ -471,7 +482,7 @@ describe("MembershipManager", () => {
             expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
         });
         it("does nothing if own membership still present", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             const myMembership = (client.sendStateEvent as Mock).mock.calls[0][2];
@@ -495,7 +506,7 @@ describe("MembershipManager", () => {
             expect(client._unstable_updateDelayedEvent).not.toHaveBeenCalled();
         });
         it("recreates membership if it is missing", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
@@ -513,7 +524,7 @@ describe("MembershipManager", () => {
         });
 
         it("updates the UpdateExpiry entry in the action scheduler", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
@@ -547,6 +558,7 @@ describe("MembershipManager", () => {
                 room,
                 client,
                 () => undefined,
+                { id: "", application: "m.call" },
             );
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
@@ -578,6 +590,7 @@ describe("MembershipManager", () => {
                 room,
                 client,
                 () => undefined,
+                { id: "", application: "m.call" },
             );
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
@@ -600,14 +613,14 @@ describe("MembershipManager", () => {
     });
     describe("status updates", () => {
         it("starts 'Disconnected'", () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             expect(manager.status).toBe(Status.Disconnected);
         });
         it("emits 'Connection' and 'Connected' after join", async () => {
             const handleDelayedEvent = createAsyncHandle<void>(client._unstable_sendDelayedStateEvent);
             const handleStateEvent = createAsyncHandle<void>(client.sendStateEvent);
 
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             expect(manager.status).toBe(Status.Disconnected);
             const connectEmit = jest.fn();
             manager.on(MembershipManagerEvent.StatusChanged, connectEmit);
@@ -621,7 +634,7 @@ describe("MembershipManager", () => {
             expect(connectEmit).toHaveBeenCalledWith(Status.Connecting, Status.Connected);
         });
         it("emits 'Disconnecting' and 'Disconnected' after leave", async () => {
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             const connectEmit = jest.fn();
             manager.on(MembershipManagerEvent.StatusChanged, connectEmit);
             manager.join([focus], focusActive);
@@ -637,7 +650,7 @@ describe("MembershipManager", () => {
             it("sends retry if call membership event is still valid at time of retry", async () => {
                 const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
-                const manager = new MembershipManager({}, room, client, () => undefined);
+                const manager = new MembershipManager({}, room, client, () => undefined, callSession);
                 manager.join([focus], focusActive);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
 
@@ -664,7 +677,7 @@ describe("MembershipManager", () => {
                         new Headers({ "Retry-After": "1" }),
                     ),
                 );
-                const manager = new MembershipManager({}, room, client, () => undefined);
+                const manager = new MembershipManager({}, room, client, () => undefined, callSession);
                 // Should call _unstable_sendDelayedStateEvent but not sendStateEvent because of the
                 // RateLimit error.
                 manager.join([focus], focusActive);
@@ -684,7 +697,7 @@ describe("MembershipManager", () => {
             it("abandons retry loop if leave() was called before sending state event", async () => {
                 const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
-                const manager = new MembershipManager({}, room, client, () => undefined);
+                const manager = new MembershipManager({}, room, client, () => undefined, callSession);
                 manager.join([focus], focusActive);
                 handle.reject?.(
                     new MatrixError(
@@ -719,7 +732,7 @@ describe("MembershipManager", () => {
                         new Headers({ "Retry-After": "1" }),
                     ),
                 );
-                const manager = new MembershipManager({}, room, client, () => undefined);
+                const manager = new MembershipManager({}, room, client, () => undefined, callSession);
                 manager.join([focus], focusActive);
 
                 // Hit rate limit
@@ -752,7 +765,7 @@ describe("MembershipManager", () => {
                     new Headers({ "Retry-After": "2" }),
                 ),
             );
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive, delayEventSendError);
 
             for (let i = 0; i < 10; i++) {
@@ -772,7 +785,7 @@ describe("MembershipManager", () => {
                     new Headers({ "Retry-After": "1" }),
                 ),
             );
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive, delayEventRestartError);
 
             for (let i = 0; i < 10; i++) {
@@ -783,7 +796,7 @@ describe("MembershipManager", () => {
         it("falls back to using pure state events when some error occurs while sending delayed events", async () => {
             const unrecoverableError = jest.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 601));
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive, unrecoverableError);
             await waitForMockCall(client.sendStateEvent);
             expect(unrecoverableError).not.toHaveBeenCalledWith();
@@ -797,6 +810,7 @@ describe("MembershipManager", () => {
                 room,
                 client,
                 () => undefined,
+                callSession,
             );
             manager.join([focus], focusActive, unrecoverableError);
             for (let retries = 0; retries < 7; retries++) {
@@ -814,7 +828,7 @@ describe("MembershipManager", () => {
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
                 new UnsupportedDelayedEventsEndpointError("not supported", "sendDelayedStateEvent"),
             );
-            const manager = new MembershipManager({}, room, client, () => undefined);
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
             manager.join([focus], focusActive, unrecoverableError);
             await jest.advanceTimersByTimeAsync(1);
 
@@ -828,7 +842,7 @@ it("Should prefix log with MembershipManager used", () => {
     const client = makeMockClient("@alice:example.org", "AAAAAAA");
     const room = makeMockRoom([membershipTemplate]);
 
-    const membershipManager = new MembershipManager(undefined, room, client, () => undefined, logger);
+    const membershipManager = new MembershipManager(undefined, room, client, () => undefined, callSession, logger);
 
     const spy = jest.spyOn(console, "error");
     // Double join
