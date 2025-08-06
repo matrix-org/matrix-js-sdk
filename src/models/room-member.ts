@@ -23,6 +23,7 @@ import { logger } from "../logger.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { EventType } from "../@types/event.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
+import { roomVersionIsHydra } from "src/utils/roomVersion.ts";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -243,7 +244,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         const creators = new Set<string>();
         // This checks probably wants to be reversed once verson 12 has been around for longer
         // (ie. assume v12 semantics except for other known versions)
-        if (roomVersion === "org.matrix.hydra.11" || roomVersion === "12") {
+        if (roomVersionIsHydra(roomVersion)) {
             const roomCreateSender = roomCreateEvent.getSender();
             if (roomCreateSender) creators.add(roomCreateSender);
             const additionalCreators = roomCreateEvent.getDirectionalContent().additional_creators;
