@@ -214,7 +214,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Gets the version of the room
-     * @returns The version of the room, or null if it could not be determined
+     * @returns The version of the room
      */
     public getRoomVersion(): string {
         const createEvent = this.getStateEvents(EventType.RoomCreate, "");
