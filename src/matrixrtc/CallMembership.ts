@@ -131,7 +131,9 @@ export class CallMembership {
         return this.parentEvent.getId();
     }
 
-    /// Deprecated id field. Use sessionDescription.id instead.
+    /**
+     *  @deprecated Use sessionDescription.id instead.
+     */
     public get callId(): string {
         return this.membershipData.call_id;
     }

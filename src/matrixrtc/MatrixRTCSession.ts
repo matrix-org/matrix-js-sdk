@@ -74,7 +74,9 @@ export interface SessionConfig {
     notificationType?: RTCNotificationType;
 }
 
-/// The session description is used to identify a session. Used in the state event.
+/**
+ * The session description is used to identify a session. Used in the state event.
+ */
 export interface SessionDescription {
     id: string;
     application: string;
