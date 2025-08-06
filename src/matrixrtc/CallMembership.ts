@@ -148,6 +148,7 @@ export class CallMembership {
             id: this.membershipData.call_id,
         };
     }
+
     public get application(): string | undefined {
         return this.membershipData.application;
     }

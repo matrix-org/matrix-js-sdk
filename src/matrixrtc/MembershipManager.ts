@@ -294,7 +294,7 @@ export class MembershipManager
             | "_unstable_updateDelayedEvent"
         >,
         private getOldestMembership: () => CallMembership | undefined,
-        public sessionDescription: SessionDescription,
+        public readonly sessionDescription: SessionDescription,
         parentLogger?: Logger,
     ) {
         super();

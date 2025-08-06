@@ -53,12 +53,12 @@ describe("MatrixRTCSession", () => {
 
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom, callSession);
             expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].callId).toEqual("");
+            expect(sess?.memberships[0].sessionDescription.id).toEqual("");
             expect(sess?.memberships[0].scope).toEqual("m.room");
             expect(sess?.memberships[0].application).toEqual("m.call");
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
-            expect(sess?.callId).toEqual("");
+            expect(sess?.sessionDescription.id).toEqual("");
         });
 
         it("ignores memberships where application is not m.call", () => {

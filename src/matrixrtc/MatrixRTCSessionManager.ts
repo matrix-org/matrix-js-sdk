@@ -37,8 +37,8 @@ type EventHandlerMap = {
 
 /**
  * Holds all active MatrixRTC session objects and creates new ones as events arrive.
- * One MatrixRTCSessionManager is required for each matrixRTC application type that the client wants to support.
- * if no application type is specified in the constructor, the default is "m.call".
+ * One `MatrixRTCSessionManager` is required for each MatrixRTC sessionDescription (application, session id) that the client wants to support.
+ * If no application type is specified in the constructor, the default is "m.call".
  *
  * This interface is UNSTABLE and may change without warning.
  */
@@ -56,7 +56,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private sessionDescription: SessionDescription = { id: "", application: "m.call" }, // Default to the Matrix Call application
+        private readonly sessionDescription: SessionDescription = { id: "", application: "m.call" }, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
