@@ -247,11 +247,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             const roomCreateSender = roomCreateEvent.getSender();
             if (roomCreateSender) creators.add(roomCreateSender);
             const additionalCreators = roomCreateEvent.getDirectionalContent().additional_creators;
-            if (additionalCreators && typeof additionalCreators === "object") {
-                for (const creator of additionalCreators) {
-                    creators.add(creator);
-                }
-            }
+            if (Array.isArray(additionalCreators)) creators.push(...additionalCreators);
         }
 
         if (creators.has(this.userId)) {
