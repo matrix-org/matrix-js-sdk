@@ -23,7 +23,6 @@ import { logger } from "../logger.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { EventType } from "../@types/event.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
-import { roomVersionIsHydra } from "src/utils/roomVersion.ts";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -222,47 +221,16 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     /**
-     * Update this room member's power level event. May fire
-     * "RoomMember.powerLevel" if this event updates this member's power levels.
-     * @param powerLevelEvent - The `m.room.power_levels` event
-     * @param roomCreateEvent - The `m.room.create` event.
-     * @param roomVersion - The room version of the room this member is in.
+     * Update this room member's power level event. Will fire
+     * "RoomMember.powerLevel" if the new power level is different
+     * @param powerLevel - The power level of the room member.
      *
      * @remarks
      * Fires {@link RoomMemberEvent.PowerLevel}
      */
-    public setPowerLevelEvent(powerLevelEvent: MatrixEvent, roomCreateEvent: MatrixEvent, roomVersion: string): void {
-        if (powerLevelEvent.getType() !== EventType.RoomPowerLevels || powerLevelEvent.getStateKey() !== "") {
-            return;
-        }
-
-        const evContent = powerLevelEvent.getDirectionalContent();
-
-        const users: { [userId: string]: number } = evContent.users || {};
+    public setPowerLevel(powerLevel: number, powerLevelEvent: MatrixEvent): void {
         const oldPowerLevel = this.powerLevel;
-
-        const creators = new Set<string>();
-        // This checks probably wants to be reversed once verson 12 has been around for longer
-        // (ie. assume v12 semantics except for other known versions)
-        if (roomVersionIsHydra(roomVersion)) {
-            const roomCreateSender = roomCreateEvent.getSender();
-            if (roomCreateSender) creators.add(roomCreateSender);
-            const additionalCreators = roomCreateEvent.getDirectionalContent().additional_creators;
-            if (Array.isArray(additionalCreators)) additionalCreators.forEach((c) => creators.add(c));
-        }
-
-        if (creators.has(this.userId)) {
-            // As of "Hydra", If the user is a creator, they always have the highest power level
-            this.powerLevel = Infinity;
-        } else {
-            if (users[this.userId] !== undefined && Number.isInteger(users[this.userId])) {
-                this.powerLevel = users[this.userId];
-            } else if (evContent.users_default !== undefined) {
-                this.powerLevel = evContent.users_default;
-            } else {
-                this.powerLevel = 0;
-            }
-        }
+        this.powerLevel = powerLevel;
 
         if (oldPowerLevel !== this.powerLevel) {
             this.updateModifiedTime();
