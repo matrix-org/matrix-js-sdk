@@ -15,21 +15,21 @@ limitations under the License.
 */
 
 /**
- * Checks if the given room version is a version that is known to use
- * new "hydra" power level semantics (ie. room version 12 or later)
+ * Room versions strings that we know about and do not use hydra semantics.
+ */
+const PRE_HYDRA_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"];
+
+/**
+ * Checks if the given room version is one where new "hydra" power level
+ * semantics (ie. room version 12 or later) should be used
  * (see https://github.com/matrix-org/matrix-spec-proposals/pull/4289).
- * Note that this will only return true for versions that are known to
- * the js-sdk': any room version created subsequently will need to be added here
- * if it uses hydra semantics.
- *
- * Once hydra has been rolled out in production for "long enough", it would probably
- * makes sense to assume hydra semantics by default and hence check instead for room
- * versions known to use the old semantics using a different function (which does not exist
- * currently).
+ * This will return false for versions that are known to the js-sdk' and
+ * do not use hydra: any room versions unknown to the js-sdk (experimental or
+ * otherwise) will cause the function to return true.
  *
  * @param roomVersion - The version of the room to check.
- * @returns `true` if the room version is known to use hydra semantics, `false` otherwise.
+ * @returns `true` if hydra semantics should be used for the room version, `false` otherwise.
  */
-export function roomVersionIsHydra(roomVersion: string): boolean {
-    return roomVersion === "org.matrix.hydra.11" || roomVersion === "12";
+export function shouldUseHydraForRoomVersion(roomVersion: string): boolean {
+    return !PRE_HYDRA_ROOM_VERSIONS.includes(roomVersion);
 }

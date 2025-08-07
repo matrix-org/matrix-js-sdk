@@ -33,7 +33,7 @@ import { TypedReEmitter } from "../ReEmitter.ts";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type RoomJoinRulesEventContent } from "../@types/state_events.ts";
-import { roomVersionIsHydra } from "../utils/roomVersion.ts";
+import { shouldUseHydraForRoomVersion } from "../utils/roomVersion.ts";
 
 export interface IMarkerFoundOptions {
     /** Whether the timeline was empty before the marker event arrived in the
@@ -1151,7 +1151,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
  */
 function getCreators(roomVersion: string, roomCreateEvent: MatrixEvent | null): Set<string> {
     const creators = new Set<string>();
-    if (roomVersionIsHydra(roomVersion) && roomCreateEvent) {
+    if (shouldUseHydraForRoomVersion(roomVersion) && roomCreateEvent) {
         const roomCreateSender = roomCreateEvent.getSender();
         if (roomCreateSender) creators.add(roomCreateSender);
         const additionalCreators = roomCreateEvent.getDirectionalContent().additional_creators;
