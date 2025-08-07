@@ -605,7 +605,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Gets the version of the room
-     * @returns The version of the room, or null if it could not be determined
+     * @returns The version of the room
      */
     public getVersion(): string {
         return this.currentState.getRoomVersion();
