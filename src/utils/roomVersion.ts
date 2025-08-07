@@ -14,6 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * Checks if the given room version is a version that is known to use
+ * new "hydra" power level semantics (as of room version 12)
+ * (see https://github.com/matrix-org/matrix-spec-proposals/pull/4289).
+ * Note that this will only return true for versions that are known to
+ * the js-sdk': any room version created subsequently will need to be added here
+ * if it uses hydra semantics.
+ *
+ * Once hydra has been rolled out in production for "long enough", it would probably
+ * makes sense to assume hydra semantiocs by default and hence check instead for room
+ * versions known to use the old semantics.
+ *
+ * @param roomVersion - The version of the room to check.
+ * @returns true if the room version is known to use hydra semantics, false otherwise.
+ */
 export function roomVersionIsHydra(roomVersion: string): boolean {
     return roomVersion === "org.matrix.hydra.11" || roomVersion === "12";
 }
