@@ -20,8 +20,7 @@ import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
 import {
     createClient,
-    EventType,
-    MatrixClient,
+    type MatrixClient,
     MatrixEvent,
     type RoomState,
     UNSTABLE_MSC2666_MUTUAL_ROOMS,
@@ -103,14 +102,6 @@ describe("RoomMember", function () {
     });
 
     describe("setPowerLevel", function () {
-        const createEvent = utils.mkEvent({
-            type: "m.room.create",
-            room: roomId,
-            sender: userA,
-            content: {},
-            event: true,
-        });
-
         it("should set 'powerLevel'.", function () {
             member.setPowerLevel(0, new MatrixEvent());
             expect(member.powerLevel).toEqual(0);
