@@ -39,10 +39,10 @@ describe("RoomState", function () {
     const userLazy = "@lazy:bar";
 
     let state = new RoomState(roomId);
+    let statev12 = new RoomState(roomId);
 
     beforeEach(function () {
-        state = new RoomState(roomId);
-        state.setStateEvents([
+        const commonEvents = [
             utils.mkMembership({
                 // userA joined
                 event: true,
@@ -67,6 +67,11 @@ describe("RoomState", function () {
                     name: "Room name goes here",
                 },
             }),
+        ];
+
+        state = new RoomState(roomId);
+        state.setStateEvents([
+            ...commonEvents,
             utils.mkEvent({
                 // Room creation
                 type: "m.room.create",
@@ -74,6 +79,19 @@ describe("RoomState", function () {
                 room: roomId,
                 event: true,
                 content: {},
+            }),
+        ]);
+
+        statev12 = new RoomState(roomId);
+        statev12.setStateEvents([
+            ...commonEvents,
+            utils.mkEvent({
+                // Room creation (v12 version)
+                type: "m.room.create",
+                user: userA,
+                room: roomId,
+                event: true,
+                content: { room_version: "12" },
             }),
         ]);
     });
@@ -1001,6 +1019,24 @@ describe("RoomState", function () {
 
             expect(state.maySendEvent("m.room.other_thing", userA)).toEqual(true);
             expect(state.maySendEvent("m.room.other_thing", userB)).toEqual(false);
+        });
+
+        it("should recognise power level of room creators in v12 rooms", function () {
+            const powerLevelEvent = new MatrixEvent({
+                type: "m.room.power_levels",
+                room_id: roomId,
+                sender: userA,
+                state_key: "",
+                content: {
+                    users_default: 0,
+                    state_default: 100,
+                    events_default: 100,
+                    users: {},
+                },
+            });
+            statev12.setStateEvents([powerLevelEvent]);
+
+            expect(statev12.maySendEvent("m.room.name", userA)).toEqual(true);
         });
     });
 
