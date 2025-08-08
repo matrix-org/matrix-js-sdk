@@ -904,7 +904,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         let stateDefault = 0;
         let eventsDefault = 0;
-        let powerLevel = 0;
         if (powerLevelsEvent) {
             powerLevels = powerLevelsEvent.getContent();
             eventsLevels = powerLevels.events || {};
@@ -913,13 +912,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 stateDefault = powerLevels.state_default!;
             } else {
                 stateDefault = 50;
-            }
-
-            const userPowerLevel = powerLevels.users && powerLevels.users[userId];
-            if (Number.isSafeInteger(userPowerLevel)) {
-                powerLevel = userPowerLevel!;
-            } else if (Number.isSafeInteger(powerLevels.users_default)) {
-                powerLevel = powerLevels.users_default!;
             }
 
             if (Number.isSafeInteger(powerLevels.events_default)) {
@@ -931,7 +923,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (Number.isSafeInteger(eventsLevels[eventType])) {
             requiredLevel = eventsLevels[eventType];
         }
-        return powerLevel >= requiredLevel;
+
+        const roomMember = this.getMember(userId);
+        const userPowerLevel = roomMember?.powerLevel ?? 0;
+
+        return userPowerLevel >= requiredLevel;
     }
 
     /**
