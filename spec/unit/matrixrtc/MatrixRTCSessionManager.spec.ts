@@ -79,4 +79,22 @@ describe("MatrixRTCSessionManager", () => {
 
         expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
     });
+
+    it("Doesn't fire event if unrelated sessions ends", () => {
+        const onEnded = jest.fn();
+        client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
+        const room1 = makeMockRoom([{ ...membershipTemplate, application: "m.other_app" }]);
+        jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+        jest.spyOn(client, "getRoom").mockReturnValue(room1);
+
+        client.emit(ClientEvent.Room, room1);
+
+        mockRoomState(room1, [{ user_id: membershipTemplate.user_id }]);
+
+        const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+        const membEvent = roomState.getStateEvents("")[0];
+        client.emit(RoomStateEvent.Events, membEvent, roomState, null);
+
+        expect(onEnded).not.toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
+    });
 });
