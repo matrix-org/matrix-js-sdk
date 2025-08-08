@@ -23,7 +23,7 @@ const PRE_HYDRA_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "1
  * Checks if the given room version is one where new "hydra" power level
  * semantics (ie. room version 12 or later) should be used
  * (see https://github.com/matrix-org/matrix-spec-proposals/pull/4289).
- * This will return false for versions that are known to the js-sdk' and
+ * This will return `false` for versions that are known to the js-sdk and
  * do not use hydra: any room versions unknown to the js-sdk (experimental or
  * otherwise) will cause the function to return true.
  *
