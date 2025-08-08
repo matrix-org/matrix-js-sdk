@@ -374,7 +374,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private heroes: Hero[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
-    private getVersionWarning = false;
     private membersPromise?: Promise<boolean>;
 
     // XXX: These should be read-only
@@ -606,18 +605,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Gets the version of the room
-     * @returns The version of the room, or null if it could not be determined
+     * @returns The version of the room
      */
     public getVersion(): string {
-        const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
-        if (!createEvent) {
-            if (!this.getVersionWarning) {
-                logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
-                this.getVersionWarning = true;
-            }
-            return "1";
-        }
-        return createEvent.getContent()["room_version"] ?? "1";
+        return this.currentState.getRoomVersion();
     }
 
     /**

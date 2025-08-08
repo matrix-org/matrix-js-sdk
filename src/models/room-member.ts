@@ -66,7 +66,6 @@ export type RoomMemberEventHandlerMap = {
      * ```
      * matrixClient.on("RoomMember.powerLevel", function(event, member){
      *   var newPowerLevel = member.powerLevel;
-     *   var newNormPowerLevel = member.powerLevelNorm;
      * });
      * ```
      */
@@ -109,10 +108,6 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * The power level for this room member.
      */
     public powerLevel = 0;
-    /**
-     * The normalised power level (0-100) for this room member.
-     */
-    public powerLevelNorm = 0;
     /**
      * The User object for this room member, if one exists.
      */
@@ -226,43 +221,18 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     /**
-     * Update this room member's power level event. May fire
-     * "RoomMember.powerLevel" if this event updates this member's power levels.
-     * @param powerLevelEvent - The `m.room.power_levels` event
+     * Update this room member's power level event. Will fire
+     * "RoomMember.powerLevel" if the new power level is different
+     * @param powerLevel - The power level of the room member.
      *
      * @remarks
      * Fires {@link RoomMemberEvent.PowerLevel}
      */
-    public setPowerLevelEvent(powerLevelEvent: MatrixEvent): void {
-        if (powerLevelEvent.getType() !== EventType.RoomPowerLevels || powerLevelEvent.getStateKey() !== "") {
-            return;
-        }
-
-        const evContent = powerLevelEvent.getDirectionalContent();
-
-        let maxLevel = evContent.users_default || 0;
-        const users: { [userId: string]: number } = evContent.users || {};
-        Object.values(users).forEach((lvl: number) => {
-            maxLevel = Math.max(maxLevel, lvl);
-        });
+    public setPowerLevel(powerLevel: number, powerLevelEvent: MatrixEvent): void {
         const oldPowerLevel = this.powerLevel;
-        const oldPowerLevelNorm = this.powerLevelNorm;
+        this.powerLevel = powerLevel;
 
-        if (users[this.userId] !== undefined && Number.isInteger(users[this.userId])) {
-            this.powerLevel = users[this.userId];
-        } else if (evContent.users_default !== undefined) {
-            this.powerLevel = evContent.users_default;
-        } else {
-            this.powerLevel = 0;
-        }
-        this.powerLevelNorm = 0;
-        if (maxLevel > 0) {
-            this.powerLevelNorm = (this.powerLevel * 100) / maxLevel;
-        }
-
-        // emit for changes in powerLevelNorm as well (since the app will need to
-        // redraw everyone's level if the max has changed)
-        if (oldPowerLevel !== this.powerLevel || oldPowerLevelNorm !== this.powerLevelNorm) {
+        if (oldPowerLevel !== this.powerLevel) {
             this.updateModifiedTime();
             this.emit(RoomMemberEvent.PowerLevel, powerLevelEvent, this);
         }
