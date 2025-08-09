@@ -342,17 +342,6 @@ export interface ICreateClientOpts {
     localTimeoutMs?: number;
 
     /**
-     * Set to false to send the access token to the server via a query parameter rather
-     * than the Authorization HTTP header.
-     *
-     * Note that as of v1.11 of the Matrix spec, sending the access token via a query
-     * is deprecated.
-     *
-     * Default true.
-     */
-    useAuthorizationHeader?: boolean;
-
-    /**
      * Set to true to enable
      * improved timeline support, see {@link MatrixClient#getEventTimeline}.
      * It is disabled by default for compatibility with older clients - in particular to
@@ -1327,7 +1316,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             onlyData: true,
             extraParams: opts.queryParams,
             localTimeoutMs: opts.localTimeoutMs,
-            useAuthorizationHeader: opts.useAuthorizationHeader,
             logger: this.logger,
         });
 
