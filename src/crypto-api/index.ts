@@ -469,16 +469,6 @@ export interface CryptoApi {
     getVerificationRequestsToDeviceInProgress(userId: string): VerificationRequest[];
 
     /**
-     * Finds a DM verification request that is already in progress for the given room id
-     *
-     * @param roomId - the room to use for verification
-     *
-     * @returns the VerificationRequest that is in progress, if any
-     * @deprecated prefer `userId` parameter variant.
-     */
-    findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined;
-
-    /**
      * Finds a DM verification request that is already in progress for the given room and user.
      *
      * @param roomId - the room to use for verification.
@@ -544,18 +534,6 @@ export interface CryptoApi {
      * @returns the key, if any, or null
      */
     getSessionBackupPrivateKey(): Promise<Uint8Array | null>;
-
-    /**
-     * Store the backup decryption key.
-     *
-     * This should be called if the client has received the key from another device via secret sharing (gossiping).
-     * It is the responsability of the caller to check that the decryption key is valid for the current backup version.
-     *
-     * @param key - the backup decryption key
-     *
-     * @deprecated prefer the variant with a `version` parameter.
-     */
-    storeSessionBackupPrivateKey(key: Uint8Array): Promise<void>;
 
     /**
      * Store the backup decryption key.
