@@ -8397,21 +8397,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the OIDC issuer responsible for authentication on this server, if any
-     * @returns Resolves: A promise of an object containing the OIDC issuer if configured
-     * @returns Rejects: when the request fails (module:http-api.MatrixError)
-     * @experimental - part of MSC2965
-     * @deprecated in favour of getAuthMetadata
-     */
-    public async getAuthIssuer(): Promise<{
-        issuer: string;
-    }> {
-        return this.http.request(Method.Get, "/auth_issuer", undefined, undefined, {
-            prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
-        });
-    }
-
-    /**
      * Discover and validate delegated auth configuration
      * - delegated auth issuer openid-configuration is reachable
      * - delegated auth issuer openid-configuration is configured correctly for us
@@ -8430,7 +8415,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                const { issuer } = await this.getAuthIssuer();
+                // Fall back to older variant of MSC2965
+                const { issuer } = await this.http.request<{
+                    issuer: string;
+                }>(Method.Get, "/auth_issuer", undefined, undefined, {
+                    prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+                });
                 return discoverAndValidateOIDCIssuerWellKnown(issuer);
             }
             throw e;
