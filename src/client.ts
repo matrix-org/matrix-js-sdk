@@ -1085,20 +1085,6 @@ export enum ClientEvent {
      */
     ClientWellKnown = "WellKnown.client",
     ReceivedVoipEvent = "received_voip_event",
-    /**
-     * @deprecated This event is not supported anymore.
-     *
-     * Fires if a to-device event is received that cannot be decrypted.
-     * Encrypted to-device events will (generally) use plain Olm encryption,
-     * in which case decryption failures are fatal: the event will never be
-     * decryptable, unlike Megolm encrypted events where the key may simply
-     * arrive later.
-     *
-     * An undecryptable to-device event is therefore likely to indicate problems.
-     *
-     * The payload is the undecyptable to-device event
-     */
-    UndecryptableToDeviceEvent = "toDeviceEvent.undecryptable",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
 }
@@ -1163,7 +1149,6 @@ export type ClientEventHandlerMap = {
     [ClientEvent.Event]: (event: MatrixEvent) => void;
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.ReceivedToDeviceMessage]: (payload: ReceivedToDeviceMessage) => void;
-    [ClientEvent.UndecryptableToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
     [ClientEvent.Room]: (room: Room) => void;
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
