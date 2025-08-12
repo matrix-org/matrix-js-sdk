@@ -22,9 +22,3 @@ import { type AuthDict } from "../interactive-auth.ts";
 export type UIARequest<T> = T & {
     auth?: AuthDict;
 };
-
-/**
- * Helper type to represent HTTP response body for a UIA enabled endpoint
- * @deprecated - a successful response for a UIA enabled endpoint is no different, UIA is signalled via an error
- */
-export type UIAResponse<T> = T;
