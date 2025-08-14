@@ -61,7 +61,7 @@ describe("MatrixRTCSession", () => {
 
         it("ignores memberships where application is not m.call", () => {
             const testMembership = Object.assign({}, membershipTemplate, {
-            application: "not-m.call",
+                application: "not-m.call",
             });
             const mockRoom = makeMockRoom([testMembership]);
             const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
@@ -70,8 +70,8 @@ describe("MatrixRTCSession", () => {
 
         it("ignores memberships where callId is not empty", () => {
             const testMembership = Object.assign({}, membershipTemplate, {
-            call_id: "not-empty",
-            scope: "m.room",
+                call_id: "not-empty",
+                scope: "m.room",
             });
             const mockRoom = makeMockRoom([testMembership]);
             const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
