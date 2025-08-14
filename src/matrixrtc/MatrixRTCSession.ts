@@ -290,6 +290,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 try {
                     const membership = new CallMembership(memberEvent, membershipData);
 
+                    if (membership.application !== "m.call") {
+                        // Only process MatrixRTC sessions associated with calls
+                        logger.info("Skipping non-call MatrixRTC session");
+                        continue;
+                    }
+
                     if (membership.callId !== "" || membership.scope !== "m.room") {
                         // for now, just ignore anything that isn't a room scope call
                         logger.info(`Ignoring user-scoped call`);
