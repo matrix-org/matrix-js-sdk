@@ -59,6 +59,25 @@ describe("MatrixRTCSession", () => {
             expect(sess?.callId).toEqual("");
         });
 
+        it("ignores memberships where application is not m.call", () => {
+            const testMembership = Object.assign({}, membershipTemplate, {
+            application: "not-m.call",
+            });
+            const mockRoom = makeMockRoom([testMembership]);
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            expect(sess?.memberships).toHaveLength(0);
+        });
+
+        it("ignores memberships where callId is not empty", () => {
+            const testMembership = Object.assign({}, membershipTemplate, {
+            call_id: "not-empty",
+            scope: "m.room",
+            });
+            const mockRoom = makeMockRoom([testMembership]);
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            expect(sess?.memberships).toHaveLength(0);
+        });
+
         it("ignores expired memberships events", () => {
             jest.useFakeTimers();
             const expiredMembership = Object.assign({}, membershipTemplate);
