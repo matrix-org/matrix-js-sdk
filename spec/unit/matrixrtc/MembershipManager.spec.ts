@@ -511,6 +511,32 @@ describe("MembershipManager", () => {
 
             expect(client._unstable_updateDelayedEvent).toHaveBeenCalled();
         });
+
+        it("updates the UpdateExpiry entry in the action scheduler", async () => {
+            const manager = new MembershipManager({}, room, client, () => undefined);
+            manager.join([focus], focusActive);
+            await jest.advanceTimersByTimeAsync(1);
+            // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
+            (client.sendStateEvent as Mock).mockClear();
+            (client._unstable_updateDelayedEvent as Mock).mockClear();
+            (client._unstable_sendDelayedStateEvent as Mock).mockClear();
+
+            (client._unstable_updateDelayedEvent as Mock<any>).mockRejectedValueOnce(
+                new MatrixError({ errcode: "M_NOT_FOUND" }),
+            );
+
+            const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+            await jest.advanceTimersByTimeAsync(10_000);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            resolve({ delay_id: "id" });
+            await jest.advanceTimersByTimeAsync(10_000);
+
+            expect(client.sendStateEvent).toHaveBeenCalled();
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
+
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalled();
+            expect(manager.status).toBe(Status.Connected);
+        });
     });
 
     // TODO: Not sure about this name

@@ -1,3 +1,24 @@
+Changes in [37.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.13.0) (2025-08-11)
+====================================================================================================
+This release supports new v12 Matrix rooms and consequently has a breaking change, removing powerLevelNorm from the RoomMember object as this can't be supported with infinite power levels. Apps should use the non-normalised `powerLevel` instead.
+
+## 🚨 BREAKING CHANGES
+
+* [Backport staging] Support for creator power level ([#4954](https://github.com/matrix-org/matrix-js-sdk/pull/4954)). Contributed by @RiotRobot.
+
+## ✨ Features
+
+* [Backport staging] Support v12 rooms in maySendEvent ([#4956](https://github.com/matrix-org/matrix-js-sdk/pull/4956)). Contributed by @RiotRobot.
+* [Backport staging] Support for creator power level ([#4954](https://github.com/matrix-org/matrix-js-sdk/pull/4954)). Contributed by @RiotRobot.
+* Experimental support for sharing encrypted history on invite ([#4920](https://github.com/matrix-org/matrix-js-sdk/pull/4920)). Contributed by @richvdh.
+* Use the logger associated with MatrixClient in rust sdk ([#4918](https://github.com/matrix-org/matrix-js-sdk/pull/4918)). Contributed by @richvdh.
+* Update to matrix-sdk-crypto-wasm 15.1.0, and add new `ShieldStateCode.MismatchedSender` ([#4916](https://github.com/matrix-org/matrix-js-sdk/pull/4916)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix unknown/broken state in the RTC Membership Manager causing unnecassary error logging. ([#4944](https://github.com/matrix-org/matrix-js-sdk/pull/4944)). Contributed by @toger5.
+
+
 Changes in [37.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.12.0) (2025-07-29)
 ====================================================================================================
 ## 🦖 Deprecations
