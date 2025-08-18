@@ -66,7 +66,7 @@ describe("MatrixRTCSession", () => {
                 application: "not-m.call",
             });
             const mockRoom = makeMockRoom([testMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom, callSession);
             expect(sess?.memberships).toHaveLength(0);
         });
 
@@ -76,7 +76,7 @@ describe("MatrixRTCSession", () => {
                 scope: "m.room",
             });
             const mockRoom = makeMockRoom([testMembership]);
-            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+            const sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom, callSession);
             expect(sess?.memberships).toHaveLength(0);
         });
 
