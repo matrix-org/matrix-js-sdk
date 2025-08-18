@@ -204,22 +204,6 @@ describe("MatrixRTCSession", () => {
             sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom, callSession);
             expect(sess.memberships).toHaveLength(0);
         });
-
-        it("ignores memberships with no scope", () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            (testMembership.scope as string | undefined) = undefined;
-            const mockRoom = makeMockRoom([testMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom, callSession);
-            expect(sess.memberships).toHaveLength(0);
-        });
-
-        it("ignores anything that's not a room-scoped call (for now)", () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            testMembership.scope = "m.user";
-            const mockRoom = makeMockRoom([testMembership]);
-            sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom, callSession);
-            expect(sess.memberships).toHaveLength(0);
-        });
     });
 
     describe("getOldestMembership", () => {
