@@ -125,6 +125,8 @@ export const generateAuthorizationUrl = async (
  * @param prompt - indicates to the OP which flow the user should see - eg login or registration
  *          See https://openid.net/specs/openid-connect-prompt-create-1_0.html#name-prompt-parameter
  * @param urlState - value to append to the opaque state identifier to uniquely identify the callback
+ * @param loginHint - value to send as the `login_hint` to the OP, giving a hint about the login identifier the user might use to log in.
+ *          See {@link https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest OIDC core 3.1.2.1}.
  * @returns a Promise with the url as a string
  */
 export const generateOidcAuthorizationUrl = async ({
@@ -136,6 +138,7 @@ export const generateOidcAuthorizationUrl = async ({
     nonce,
     prompt,
     urlState,
+    loginHint,
 }: {
     clientId: string;
     metadata: ValidatedAuthMetadata;
@@ -145,6 +148,7 @@ export const generateOidcAuthorizationUrl = async ({
     nonce: string;
     prompt?: string;
     urlState?: string;
+    loginHint?: string;
 }): Promise<string> => {
     const scope = generateScope();
     const oidcClient = new OidcClient({
@@ -163,6 +167,7 @@ export const generateOidcAuthorizationUrl = async ({
         nonce,
         prompt,
         url_state: urlState,
+        login_hint: loginHint,
     });
 
     return request.url;
