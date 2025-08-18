@@ -264,8 +264,21 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
+     *
+     * @deprecated Use `MatrixRTCSession.sessionMembershipsForRoom` instead.
      */
-    public static callMembershipsForRoom(
+    public callMembershipsForRoom(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+        sessionDescription: SessionDescription,
+    ): CallMembership[] {
+        return MatrixRTCSession.sessionMembershipsForRoom(room, sessionDescription);
+    }
+
+    /**
+     * Returns all the call memberships for a room that match the provided `sessionDescription`,
+     * oldest first.
+     */
+    public static sessionMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
         sessionDescription: SessionDescription,
     ): CallMembership[] {
@@ -349,7 +362,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         room: Room,
         sessionDescription: SessionDescription,
     ): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room, sessionDescription);
+        const callMemberships = MatrixRTCSession.sessionMembershipsForRoom(room, sessionDescription);
 
         return new MatrixRTCSession(client, room, callMemberships, sessionDescription);
     }
@@ -671,7 +684,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     private recalculateSessionMembers = (): void => {
         const oldMemberships = this.memberships;
-        this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room, this.sessionDescription);
+        this.memberships = MatrixRTCSession.sessionMembershipsForRoom(this.room, this.sessionDescription);
 
         this._callId = this._callId ?? this.memberships[0]?.sessionDescription.id;
 
