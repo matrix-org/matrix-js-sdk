@@ -17,13 +17,16 @@ limitations under the License.
 import type { CallMembership } from "./CallMembership.ts";
 import type { Focus } from "./focus.ts";
 import type { Status } from "./types.ts";
+import { type TypedEventEmitter } from "src/matrix.ts";
 
 export enum MembershipManagerEvent {
     StatusChanged = "StatusChanged",
+    ProbablyLeft = "ProbablyLeft",
 }
 
 export type MembershipManagerEventHandlerMap = {
     [MembershipManagerEvent.StatusChanged]: (prefStatus: Status, newStatus: Status) => void;
+    [MembershipManagerEvent.ProbablyLeft]: (probablyLeft: boolean) => void;
 };
 
 /**
@@ -33,7 +36,8 @@ export type MembershipManagerEventHandlerMap = {
  *
  * @internal
  */
-export interface IMembershipManager {
+export interface IMembershipManager
+    extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap> {
     /**
      * If we are trying to join, or have successfully joined the session.
      * It does not reflect if the room state is already configured to represent us being joined.
@@ -85,8 +89,4 @@ export interface IMembershipManager {
      * @returns the used active focus in the currently joined session or undefined if not joined.
      */
     getActiveFocus(): Focus | undefined;
-
-    // TypedEventEmitter methods:
-    on(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: Status, newStatus: Status) => void): this;
-    off(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: Status, newStatus: Status) => void): this;
 }

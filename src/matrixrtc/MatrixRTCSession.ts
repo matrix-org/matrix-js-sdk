@@ -29,7 +29,11 @@ import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.
 import { deepCompare, logDurationSync } from "../utils.ts";
 import { type Statistics, type RTCNotificationType } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import type { IMembershipManager } from "./IMembershipManager.ts";
+import {
+    MembershipManagerEvent,
+    type MembershipManagerEventHandlerMap,
+    type IMembershipManager,
+} from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import {
     RoomAndToDeviceEvents,
@@ -220,8 +224,8 @@ export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionCon
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<
-    MatrixRTCSessionEvent | RoomAndToDeviceEvents,
-    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap
+    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
+    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
@@ -456,8 +460,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
     }
     private reEmitter = new TypedReEmitter<
-        MatrixRTCSessionEvent | RoomAndToDeviceEvents,
-        MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap
+        MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
+        MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
     >(this);
 
     /**
@@ -490,6 +494,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.logger,
             );
 
+            this.reEmitter.reEmit(this.membershipManager!, [MembershipManagerEvent.ProbablyLeft]);
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {

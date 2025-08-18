@@ -611,6 +611,7 @@ describe("MembershipManager", () => {
             await testExpires(10_000, 1_000);
         });
     });
+
     describe("status updates", () => {
         it("starts 'Disconnected'", () => {
             const manager = new MembershipManager({}, room, client, () => undefined, callSession);
@@ -834,6 +835,45 @@ describe("MembershipManager", () => {
 
             expect(unrecoverableError).not.toHaveBeenCalled();
             expect(client.sendStateEvent).toHaveBeenCalled();
+        });
+    });
+    describe("probablyLeft", () => {
+        it("emits probablyLeft when the membership manager could not hear back from the server for the duration of the delayed event", async () => {
+            const manager = new MembershipManager({ delayedLeaveEventDelayMs: 10000 }, room, client, () => undefined);
+            const probablyLeftEmit = jest.fn();
+            manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
+            manager.join([focus], focusActive);
+
+            // Let the scheduler run one iteration so that we can send the join state event
+            await waitForMockCall(client._unstable_updateDelayedEvent);
+
+            client._unstable_updateDelayedEvent = jest.fn(() => {
+                return new Promise((resolve) => {
+                    // We never resolve the delayed event so that we can test the probablyLeft event.
+                    // This simulates the case where the server does not respond to the delayed event.
+                });
+            });
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(manager.status).toBe(Status.Connected);
+            expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
+            // We expect the probablyLeft event to be emitted after the `delayedLeaveEventDelayMs` = 10000.
+            // We also track the calls to updated the delayed event that all will never resolve to simulate the server not responding.
+            // The numbers are a bit arbitrary since we use the local timeout that does not perfectly match the 5s check interval in this test.
+            await jest.advanceTimersByTimeAsync(5000);
+            // no emission after 5s
+            expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+
+            // no emission after 10s
+            await jest.advanceTimersByTimeAsync(5000);
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(4);
+
+            expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
+
+            // but just an instance later.
+            await jest.advanceTimersByTimeAsync(1);
+            expect(probablyLeftEmit).toHaveBeenCalledWith(true);
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(5);
         });
     });
 });

@@ -129,6 +129,12 @@ export interface MembershipManagerState {
     rateLimitRetries: Map<MembershipActionType, number>;
     /** Retry counter for other errors */
     networkErrorRetries: Map<MembershipActionType, number>;
+    /** The time at which we expect the server to send the delayed leave event. */
+    expectedServerDelayLeaveTs?: number;
+    /** This is used to track if the client expects the scheduled delayed leave event to have
+     * been sent because restarting failed during the available time.
+     * Once we resend the delayed event or successfully restarted it will get unset. */
+    probablyLeft: boolean;
 }
 
 /**
@@ -343,6 +349,7 @@ export class MembershipManager
             rateLimitRetries: new Map(),
             networkErrorRetries: new Map(),
             expireUpdateIterations: 1,
+            probablyLeft: false,
         };
     }
     // Membership Event static parameters:
@@ -466,6 +473,7 @@ export class MembershipManager
                 this.stateKey,
             )
             .then((response) => {
+                this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
                 this.state.delayId = response.delay_id;
@@ -545,27 +553,46 @@ export class MembershipManager
             });
     }
 
+    private setAndEmitProbablyLeft(probablyLeft: boolean): void {
+        if (this.state.probablyLeft === probablyLeft) {
+            return;
+        }
+        this.state.probablyLeft = probablyLeft;
+        this.emit(MembershipManagerEvent.ProbablyLeft, this.state.probablyLeft);
+    }
+
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
         const abortPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-                reject(new AbortError("Restart delayed event timed out before the HS responded"));
-            }, this.delayedLeaveEventRestartLocalTimeoutMs);
+            setTimeout(
+                () => {
+                    reject(new AbortError("Restart delayed event timed out before the HS responded"));
+                },
+                Math.min(
+                    this.delayedLeaveEventRestartLocalTimeoutMs,
+                    (this.state.expectedServerDelayLeaveTs ?? Number.MAX_SAFE_INTEGER) - Date.now(),
+                ),
+            );
         });
 
         // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
-        // to the widget driver this information would ge lost. That is why we mimic the AbortError using the race.
+        // to the widget driver this information would get lost. That is why we mimic the AbortError using the race.
         return await Promise.race([
             this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart),
             abortPromise,
         ])
             .then(() => {
+                this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
+                this.setAndEmitProbablyLeft(false);
                 return createInsertActionUpdate(
                     MembershipActionType.RestartDelayedEvent,
                     this.delayedLeaveEventRestartMs,
                 );
             })
             .catch((e) => {
+                if (this.state.expectedServerDelayLeaveTs && this.state.expectedServerDelayLeaveTs < Date.now()) {
+                    this.setAndEmitProbablyLeft(true);
+                }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
                     this.state.delayId = undefined;
@@ -620,6 +647,7 @@ export class MembershipManager
                 this.stateKey,
             )
             .then(() => {
+                this.setAndEmitProbablyLeft(false);
                 this.state.startTime = Date.now();
                 // The next update should already use twice the membershipEventExpiryTimeout
                 this.state.expireUpdateIterations = 1;
