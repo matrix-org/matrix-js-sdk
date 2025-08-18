@@ -320,12 +320,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
                         continue;
                     }
 
-                    if (membership.sessionDescription.id !== "" || membership.scope !== "m.room") {
-                        // for now, just ignore anything that isn't a room scope call
-                        logger.info(`Ignoring user-scoped call`);
-                        continue;
-                    }
-
                     if (membership.isExpired()) {
                         logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
                         continue;
