@@ -21,6 +21,11 @@ import { type TypedEventEmitter } from "src/matrix.ts";
 
 export enum MembershipManagerEvent {
     StatusChanged = "StatusChanged",
+    /**
+     * Emitted when the membership manager has not heard back from the server for the duration
+     * of the delayed event and hence failed to restart the delayed event.
+     * This means that the user is probably not joined anymore and the leave event was distributed to other session members.
+     */
     ProbablyLeft = "ProbablyLeft",
 }
 
