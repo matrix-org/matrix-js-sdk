@@ -267,11 +267,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * @deprecated Use `MatrixRTCSession.sessionMembershipsForRoom` instead.
      */
-    public callMembershipsForRoom(
+    public static callMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
-        sessionDescription: SessionDescription,
     ): CallMembership[] {
-        return MatrixRTCSession.sessionMembershipsForRoom(room, sessionDescription);
+        return MatrixRTCSession.sessionMembershipsForRoom(room, {
+            id: "",
+            application: "m.call",
+        });
     }
 
     /**
