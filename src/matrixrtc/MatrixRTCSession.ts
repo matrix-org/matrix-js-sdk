@@ -348,7 +348,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     /**
      * Return the MatrixRTC session for the room.
-     * This returned session can be used to find out if there are currently active
+     * This returned session can be used to find out if there are active sessions
      * for the requested room and `sessionDescription`.
      */
     public static roomSessionForRoom(
@@ -405,7 +405,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         public memberships: CallMembership[],
         /**
          * The session description is used to define the exact session this object is tracking.
-         * A session is unique to another session if one of those properties differ: `roomSubset.roomId`, `sessionDescription.application`, `sessionDescription.id`.
+         * A session is distinct from another session if one of those properties differ: `roomSubset.roomId`, `sessionDescription.application`, `sessionDescription.id`.
          */
         public readonly sessionDescription: SessionDescription,
     ) {

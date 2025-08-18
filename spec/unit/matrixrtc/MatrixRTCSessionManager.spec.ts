@@ -74,7 +74,7 @@ describe("MatrixRTCSessionManager", () => {
         mockRoomState(room1, [{ user_id: membershipTemplate.user_id }]);
 
         const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-        const membEvent = roomState.getStateEvents("")[0];
+        const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
         client.emit(RoomStateEvent.Events, membEvent, roomState, null);
 
         expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
@@ -92,7 +92,7 @@ describe("MatrixRTCSessionManager", () => {
         mockRoomState(room1, [{ user_id: membershipTemplate.user_id }]);
 
         const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-        const membEvent = roomState.getStateEvents("")[0];
+        const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
         client.emit(RoomStateEvent.Events, membEvent, roomState, null);
 
         expect(onEnded).not.toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));

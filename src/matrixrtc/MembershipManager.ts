@@ -701,7 +701,7 @@ export class MembershipManager
 
     // HELPERS
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
-        const stateKey = `${localUserId}_${localDeviceId}_${this.sessionDescription.application + this.sessionDescription.id}`;
+        const stateKey = `${localUserId}_${localDeviceId}_${this.sessionDescription.application}${this.sessionDescription.id}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
             return stateKey;
         } else {
