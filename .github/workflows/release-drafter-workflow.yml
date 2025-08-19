@@ -16,7 +16,7 @@ jobs:
             contents: write
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+              uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
               with:
                   ref: staging
                   fetch-depth: 0
@@ -37,7 +37,7 @@ jobs:
                   disable-autolabeler: true
 
             - name: Get actions scripts
-              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+              uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
