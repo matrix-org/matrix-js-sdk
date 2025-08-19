@@ -224,8 +224,10 @@ export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionCon
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<
-    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
-    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
+    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent.ProbablyLeft,
+    MatrixRTCSessionEventHandlerMap &
+        RoomAndToDeviceEventsHandlerMap &
+        Pick<MembershipManagerEventHandlerMap, MembershipManagerEvent.ProbablyLeft>
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
