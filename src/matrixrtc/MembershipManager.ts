@@ -562,15 +562,22 @@ export class MembershipManager
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
+        // Compute the duration until we expect the server to send the delayed leave event.
+        const durationUntilServerDelayedLeave = this.state.expectedServerDelayLeaveTs
+            ? this.state.expectedServerDelayLeaveTs - Date.now()
+            : undefined;
         const abortPromise = new Promise((_, reject) => {
             setTimeout(
                 () => {
                     reject(new AbortError("Restart delayed event timed out before the HS responded"));
                 },
-                Math.min(
-                    this.delayedLeaveEventRestartLocalTimeoutMs,
-                    (this.state.expectedServerDelayLeaveTs ?? Number.MAX_SAFE_INTEGER) - Date.now(),
-                ),
+                // We abort immediately at the time where we expect the server to send the delayed leave event.
+                // At this point we want the catch block to run and set the `probablyLeft` state.
+                //
+                // While we are already in probablyLeft state, we use the unaltered delayedLeaveEventRestartLocalTimeoutMs.
+                durationUntilServerDelayedLeave !== undefined && !this.state.probablyLeft
+                    ? Math.min(this.delayedLeaveEventRestartLocalTimeoutMs, durationUntilServerDelayedLeave)
+                    : this.delayedLeaveEventRestartLocalTimeoutMs,
             );
         });
 
@@ -581,6 +588,9 @@ export class MembershipManager
             abortPromise,
         ])
             .then(() => {
+                // Whenever we successfully restart the delayed event we update the `state.expectedServerDelayLeaveTs`
+                // which stores the predicted timestamp at which the server will send the delayed leave event if there wont be any further
+                // successful restart requests.
                 this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
                 this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
                 this.setAndEmitProbablyLeft(false);
@@ -590,7 +600,9 @@ export class MembershipManager
                 );
             })
             .catch((e) => {
-                if (this.state.expectedServerDelayLeaveTs && this.state.expectedServerDelayLeaveTs < Date.now()) {
+                if (this.state.expectedServerDelayLeaveTs && this.state.expectedServerDelayLeaveTs <= Date.now()) {
+                    // Once we reach this point we know that the server did send the delayed leave event so we emit `probablyLeft = true`.
+                    // It will emit `probablyLeft = false` once we notice about our leave through sync and successfully setup a new state event.
                     this.setAndEmitProbablyLeft(true);
                 }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
