@@ -115,25 +115,6 @@ export interface VerificationRequest
     cancel(params?: { reason?: string; code?: string }): Promise<void>;
 
     /**
-     * Create a {@link Verifier} to do this verification via a particular method.
-     *
-     * If a verifier has already been created for this request, returns that verifier.
-     *
-     * This does *not* send the `m.key.verification.start` event - to do so, call {@link Verifier.verify} on the
-     * returned verifier.
-     *
-     * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
-     *
-     * @param method - the name of the verification method to use.
-     * @param targetDevice - details of where to send the request to.
-     *
-     * @returns The verifier which will do the actual verification.
-     *
-     * @deprecated Use {@link VerificationRequest#startVerification} instead.
-     */
-    beginKeyVerification(method: string, targetDevice?: { userId?: string; deviceId?: string }): Verifier;
-
-    /**
      * Send an `m.key.verification.start` event to start verification via a particular method.
      *
      * This is normally used when starting a verification via emojis (ie, `method` is set to `m.sas.v1`).
@@ -162,15 +143,6 @@ export interface VerificationRequest
      * Only defined when the `phase` is Started.
      */
     get verifier(): Verifier | undefined;
-
-    /**
-     * Get the data for a QR code allowing the other device to verify this one, if it supports it.
-     *
-     * Only set after a .ready if the other party can scan a QR code, otherwise undefined.
-     *
-     * @deprecated Not supported in Rust Crypto. Use {@link VerificationRequest#generateQRCode} instead.
-     */
-    getQRCodeBytes(): Uint8ClampedArray | undefined;
 
     /**
      * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
