@@ -26,7 +26,7 @@ import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipDat
 import { type Focus } from "./focus.ts";
 import { isMyMembership, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { type MembershipConfig } from "./MatrixRTCSession.ts";
+import { type SessionDescription, type MembershipConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import {
@@ -101,7 +101,7 @@ export enum MembershipActionType {
     //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
 
     SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent",
-    //  -> MembershipActionType.SendLeaveEvent on failiour (not found) we need to send the leave manually and cannot use the scheduled delayed event
+    //  -> MembershipActionType.SendLeaveEvent on failure (not found) we need to send the leave manually and cannot use the scheduled delayed event
     //  -> DelayedLeaveActionType.SendScheduledDelayedLeaveEvent on error we try again.
 
     SendLeaveEvent = "SendLeaveEvent",
@@ -294,6 +294,7 @@ export class MembershipManager
             | "_unstable_updateDelayedEvent"
         >,
         private getOldestMembership: () => CallMembership | undefined,
+        public readonly sessionDescription: SessionDescription,
         parentLogger?: Logger,
     ) {
         super();
@@ -700,7 +701,7 @@ export class MembershipManager
 
     // HELPERS
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
-        const stateKey = `${localUserId}_${localDeviceId}`;
+        const stateKey = `${localUserId}_${localDeviceId}_${this.sessionDescription.application}${this.sessionDescription.id}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
             return stateKey;
         } else {
@@ -713,9 +714,10 @@ export class MembershipManager
      */
     private makeMyMembership(expires: number): SessionMembershipData {
         return {
-            call_id: "",
+            // TODO: use the new format for m.rtc.member events where call_id becomes session.id
+            application: this.sessionDescription.application,
+            call_id: this.sessionDescription.id,
             scope: "m.room",
-            application: "m.call",
             device_id: this.deviceId,
             expires,
             focus_active: { type: "livekit", focus_selection: "oldest_membership" },

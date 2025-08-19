@@ -18,6 +18,7 @@ import { type MatrixEvent } from "../matrix.ts";
 import { deepCompare } from "../utils.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
+import { type SessionDescription } from "./MatrixRTCSession.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -130,12 +131,22 @@ export class CallMembership {
         return this.parentEvent.getId();
     }
 
+    /**
+     *  @deprecated Use sessionDescription.id instead.
+     */
     public get callId(): string {
         return this.membershipData.call_id;
     }
 
     public get deviceId(): string {
         return this.membershipData.device_id;
+    }
+
+    public get sessionDescription(): SessionDescription {
+        return {
+            application: this.membershipData.application,
+            id: this.membershipData.call_id,
+        };
     }
 
     public get application(): string | undefined {

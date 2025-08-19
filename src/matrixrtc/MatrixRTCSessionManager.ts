@@ -20,7 +20,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession, type SessionDescription } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
 
 export enum MatrixRTCSessionManagerEvents {
@@ -37,6 +37,9 @@ type EventHandlerMap = {
 
 /**
  * Holds all active MatrixRTC session objects and creates new ones as events arrive.
+ * One `MatrixRTCSessionManager` is required for each MatrixRTC sessionDescription (application, session id) that the client wants to support.
+ * If no application type is specified in the constructor, the default is "m.call".
+ *
  * This interface is UNSTABLE and may change without warning.
  */
 export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionManagerEvents, EventHandlerMap> {
@@ -53,6 +56,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
+        private readonly sessionDescription: SessionDescription = { id: "", application: "m.call" }, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
@@ -62,7 +66,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
         // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
-            const session = MatrixRTCSession.roomSessionForRoom(this.client, room);
+            const session = MatrixRTCSession.sessionForRoom(this.client, room, this.sessionDescription);
             if (session.memberships.length > 0) {
                 this.roomSessions.set(room.roomId, session);
             }
@@ -96,7 +100,10 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
      */
     public getRoomSession(room: Room): MatrixRTCSession {
         if (!this.roomSessions.has(room.roomId)) {
-            this.roomSessions.set(room.roomId, MatrixRTCSession.roomSessionForRoom(this.client, room));
+            this.roomSessions.set(
+                room.roomId,
+                MatrixRTCSession.sessionForRoom(this.client, room, this.sessionDescription),
+            );
         }
 
         return this.roomSessions.get(room.roomId)!;

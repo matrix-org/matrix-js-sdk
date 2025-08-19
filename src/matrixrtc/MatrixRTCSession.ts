@@ -26,7 +26,7 @@ import { type Focus } from "./focus.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
-import { logDurationSync } from "../utils.ts";
+import { deepCompare, logDurationSync } from "../utils.ts";
 import { type Statistics, type RTCNotificationType } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import type { IMembershipManager } from "./IMembershipManager.ts";
@@ -74,6 +74,14 @@ export interface SessionConfig {
     notificationType?: RTCNotificationType;
 }
 
+/**
+ * The session description is used to identify a session. Used in the state event.
+ */
+export interface SessionDescription {
+    id: string;
+    application: string;
+}
+
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
 // - we use delayedLeaveEvent if the option is related to the delayed leave event.
@@ -86,7 +94,7 @@ export interface MembershipConfig {
      * Use the new Manager.
      *
      * Default: `false`.
-     * @deprecated does nothing anymore we always default to the new memberhip manager.
+     * @deprecated does nothing anymore we always default to the new membership manager.
      */
     useNewMembershipManager?: boolean;
 
@@ -254,10 +262,27 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * Returns all the call memberships for a room, oldest first
+     * Returns all the call memberships for a room that match the provided `sessionDescription`,
+     * oldest first.
+     *
+     * @deprecated Use `MatrixRTCSession.sessionMembershipsForRoom` instead.
      */
     public static callMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+    ): CallMembership[] {
+        return MatrixRTCSession.sessionMembershipsForRoom(room, {
+            id: "",
+            application: "m.call",
+        });
+    }
+
+    /**
+     * Returns all the call memberships for a room that match the provided `sessionDescription`,
+     * oldest first.
+     */
+    public static sessionMembershipsForRoom(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+        sessionDescription: SessionDescription,
     ): CallMembership[] {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
@@ -290,15 +315,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 try {
                     const membership = new CallMembership(memberEvent, membershipData);
 
-                    if (membership.application !== "m.call") {
-                        // Only process MatrixRTC sessions associated with calls
-                        logger.info("Skipping non-call MatrixRTC session");
-                        continue;
-                    }
-
-                    if (membership.callId !== "" || membership.scope !== "m.room") {
-                        // for now, just ignore anything that isn't a room scope call
-                        logger.info(`Ignoring user-scoped call`);
+                    if (!deepCompare(membership.sessionDescription, sessionDescription)) {
+                        logger.info(
+                            `Ignoring membership of user ${membership.sender} for a different session:  ${JSON.stringify(membership.sessionDescription)}`,
+                        );
                         continue;
                     }
 
@@ -329,12 +349,33 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * Return the MatrixRTC session for the room, whether there are currently active members or not
+     * Return the MatrixRTC session for the room.
+     * This returned session can be used to find out if there are active room call sessions
+     * for the requested room.
+     *
+     * This method is an alias for `MatrixRTCSession.sessionForRoom` with
+     * sessionDescription `{ id: "", application: "m.call" }`.
+     *
+     * @deprecated Use `MatrixRTCSession.sessionForRoom` with sessionDescription `{ id: "", application: "m.call" }` instead.
      */
     public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.callMembershipsForRoom(room);
+        const callMemberships = MatrixRTCSession.sessionMembershipsForRoom(room, { id: "", application: "m.call" });
+        return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
+    }
 
-        return new MatrixRTCSession(client, room, callMemberships);
+    /**
+     * Return the MatrixRTC session for the room.
+     * This returned session can be used to find out if there are active sessions
+     * for the requested room and `sessionDescription`.
+     */
+    public static sessionForRoom(
+        client: MatrixClient,
+        room: Room,
+        sessionDescription: SessionDescription,
+    ): MatrixRTCSession {
+        const callMemberships = MatrixRTCSession.sessionMembershipsForRoom(room, sessionDescription);
+
+        return new MatrixRTCSession(client, room, callMemberships, sessionDescription);
     }
 
     /**
@@ -379,10 +420,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
             "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
         >,
         public memberships: CallMembership[],
+        /**
+         * The session description is used to define the exact session this object is tracking.
+         * A session is distinct from another session if one of those properties differ: `roomSubset.roomId`, `sessionDescription.application`, `sessionDescription.id`.
+         */
+        public readonly sessionDescription: SessionDescription,
     ) {
         super();
         this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
-        this._callId = memberships[0]?.callId;
+        this._callId = memberships[0]?.sessionDescription.id;
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
@@ -440,6 +486,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.roomSubset,
                 this.client,
                 () => this.getOldestMembership(),
+                this.sessionDescription,
                 this.logger,
             );
 
@@ -648,9 +695,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     private recalculateSessionMembers = (): void => {
         const oldMemberships = this.memberships;
-        this.memberships = MatrixRTCSession.callMembershipsForRoom(this.room);
+        this.memberships = MatrixRTCSession.sessionMembershipsForRoom(this.room, this.sessionDescription);
 
-        this._callId = this._callId ?? this.memberships[0]?.callId;
+        this._callId = this._callId ?? this.memberships[0]?.sessionDescription.id;
 
         const changed =
             oldMemberships.length != this.memberships.length ||
