@@ -29,11 +29,6 @@ import type {
     Statistics,
 } from "./types.ts";
 import { getParticipantId, OutdatedKeyFilter } from "./utils.ts";
-import {
-    type EnabledTransports,
-    RoomAndToDeviceEvents,
-    RoomAndToDeviceTransport,
-} from "./RoomAndToDeviceKeyTransport.ts";
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -137,10 +132,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
-        // Deprecate RoomKeyTransport: this can get removed.
-        if (this.transport instanceof RoomAndToDeviceTransport) {
-            this.transport.on(RoomAndToDeviceEvents.EnabledTransportsChanged, this.onTransportChanged);
-        }
 
         this.transport.start();
     }
@@ -150,29 +141,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.transport.stop();
         this.participantKeyRings.clear();
     }
-
-    // Temporary for backwards compatibility
-    // TODO: Remove this in the future
-    private onTransportChanged: (enabled: EnabledTransports) => void = () => {
-        this.logger?.info("Transport change detected, restarting key distribution");
-        if (this.currentKeyDistributionPromise) {
-            this.currentKeyDistributionPromise
-                .then(() => {
-                    if (this.outboundSession) {
-                        this.outboundSession.sharedWith = [];
-                        this.ensureKeyDistribution();
-                    }
-                })
-                .catch((e) => {
-                    this.logger?.error("Failed to restart key distribution", e);
-                });
-        } else {
-            if (this.outboundSession) {
-                this.outboundSession.sharedWith = [];
-                this.ensureKeyDistribution();
-            }
-        }
-    };
 
     /**
      * Will ensure that a new key is distributed and used to encrypt our media.
