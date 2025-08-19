@@ -350,10 +350,25 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     /**
      * Return the MatrixRTC session for the room.
+     * This returned session can be used to find out if there are active room call sessions
+     * for the requested room.
+     *
+     * This method is an alias for `MatrixRTCSession.sessionForRoom` with
+     * sessionDescription `{ id: "", application: "m.call" }`.
+     *
+     * @deprecated Use `MatrixRTCSession.sessionForRoom` with sessionDescription `{ id: "", application: "m.call" }` instead.
+     */
+    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
+        const callMemberships = MatrixRTCSession.sessionMembershipsForRoom(room, { id: "", application: "m.call" });
+        return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
+    }
+
+    /**
+     * Return the MatrixRTC session for the room.
      * This returned session can be used to find out if there are active sessions
      * for the requested room and `sessionDescription`.
      */
-    public static roomSessionForRoom(
+    public static sessionForRoom(
         client: MatrixClient,
         room: Room,
         sessionDescription: SessionDescription,
