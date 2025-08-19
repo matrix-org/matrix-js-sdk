@@ -871,18 +871,18 @@ describe("MembershipManager", () => {
             expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
             expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
 
+            // Reset mocks before we setup the next delayed event restart by advancing the timers 1 more ms.
+            (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue({});
+
             // Emit after 10s
             await jest.advanceTimersByTimeAsync(1);
             expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(4);
             expect(probablyLeftEmit).toHaveBeenCalledWith(true);
 
-            // Reset mocks
-            (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue({});
-
             // Mock a sync which does not include our own membership
             await manager.onRTCSessionMemberUpdate([]);
-            // Wait for all timers to be setup
-            await jest.advanceTimersByTimeAsync(5000);
+            // Wait for the current ongoing delayed event sending to finish
+            await jest.advanceTimersByTimeAsync(1);
             // We should send a new state event and an associated delayed leave event.
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
