@@ -863,19 +863,18 @@ describe("MembershipManager", () => {
             // We also track the calls to updated the delayed event that all will never resolve to simulate the server not responding.
             // The numbers are a bit arbitrary since we use the local timeout that does not perfectly match the 5s check interval in this test.
             await jest.advanceTimersByTimeAsync(5000);
-            // no emission after 5s
+            // No emission after 5s
             expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
             expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
 
-            // no emission after 10s
-            await jest.advanceTimersByTimeAsync(5000);
-            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(4);
+            await jest.advanceTimersByTimeAsync(4999);
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
             expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
 
-            // but just an instant later.
+            // Emit after 10s
             await jest.advanceTimersByTimeAsync(1);
+            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(4);
             expect(probablyLeftEmit).toHaveBeenCalledWith(true);
-            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(5);
 
             // Reset mocks
             (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue({});
@@ -883,7 +882,7 @@ describe("MembershipManager", () => {
             // Mock a sync which does not include our own membership
             await manager.onRTCSessionMemberUpdate([]);
             // Wait for all timers to be setup
-            await jest.advanceTimersByTimeAsync(1000);
+            await jest.advanceTimersByTimeAsync(5000);
             // We should send a new state event and an associated delayed leave event.
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
