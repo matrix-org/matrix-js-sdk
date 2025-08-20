@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
-import { type Statistics, type RTCNotificationType } from "./types.ts";
+import { type Statistics, type RTCNotificationType, Status } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
     MembershipManagerEvent,
@@ -254,6 +254,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
             roomEventEncryptionKeysReceivedTotalAge: 0,
         },
     };
+
+    public get membershipManagerStatus(): Status | undefined {
+        return this.membershipManager?.status;
+    }
 
     /**
      * The callId (sessionId) of the call.
