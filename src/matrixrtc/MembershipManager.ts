@@ -984,6 +984,10 @@ export class MembershipManager
         this.logger.error("MembershipManager has an unknown state. Actions: ", actions);
         return Status.Unknown;
     }
+
+    public get probablyLeft(): boolean {
+        return this.state.probablyLeft;
+    }
 }
 
 function createInsertActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {

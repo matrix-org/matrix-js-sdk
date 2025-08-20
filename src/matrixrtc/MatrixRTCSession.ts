@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
-import { type Statistics, type RTCNotificationType } from "./types.ts";
+import { type Statistics, type RTCNotificationType, type Status } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
     MembershipManagerEvent,
@@ -224,10 +224,8 @@ export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionCon
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<
-    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent.ProbablyLeft,
-    MatrixRTCSessionEventHandlerMap &
-        RoomAndToDeviceEventsHandlerMap &
-        Pick<MembershipManagerEventHandlerMap, MembershipManagerEvent.ProbablyLeft>
+    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
+    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
@@ -256,6 +254,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
             roomEventEncryptionKeysReceivedTotalAge: 0,
         },
     };
+
+    public get membershipStatus(): Status | undefined {
+        return this.membershipManager?.status;
+    }
+
+    public get probablyLeft(): boolean | undefined {
+        return this.membershipManager?.probablyLeft;
+    }
 
     /**
      * The callId (sessionId) of the call.
@@ -496,7 +502,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.logger,
             );
 
-            this.reEmitter.reEmit(this.membershipManager!, [MembershipManagerEvent.ProbablyLeft]);
+            this.reEmitter.reEmit(this.membershipManager!, [
+                MembershipManagerEvent.ProbablyLeft,
+                MembershipManagerEvent.StatusChanged,
+            ]);
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {

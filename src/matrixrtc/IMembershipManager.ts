@@ -72,6 +72,12 @@ export interface IMembershipManager
     get ownMembership(): CallMembership | undefined;
 
     /**
+     * If the membership manager has reason to believe that the hs sent a leave event
+     * and as a consequence the current user is perceived as left for other session participants.
+     */
+    get probablyLeft(): boolean;
+
+    /**
      * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
      * @param fociActive the active focus to use in the joined RTC membership event.
