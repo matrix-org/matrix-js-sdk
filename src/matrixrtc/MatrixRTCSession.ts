@@ -27,7 +27,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
-import { type Statistics, type RTCNotificationType, Status } from "./types.ts";
+import { type Statistics, type RTCNotificationType, type Status } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
     MembershipManagerEvent,
@@ -255,8 +255,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         },
     };
 
-    public get membershipManagerStatus(): Status | undefined {
+    public get membershipStatus(): Status | undefined {
         return this.membershipManager?.status;
+    }
+
+    public get probablyLeft(): boolean | undefined {
+        return this.membershipManager?.probablyLeft;
     }
 
     /**
