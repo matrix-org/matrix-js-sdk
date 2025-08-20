@@ -846,7 +846,13 @@ describe("MembershipManager", () => {
     });
     describe("probablyLeft", () => {
         it("emits probablyLeft when the membership manager could not hear back from the server for the duration of the delayed event", async () => {
-            const manager = new MembershipManager({ delayedLeaveEventDelayMs: 10000 }, room, client, () => undefined);
+            const manager = new MembershipManager(
+                { delayedLeaveEventDelayMs: 10000 },
+                room,
+                client,
+                () => undefined,
+                callSession,
+            );
             const { promise: stuckPromise, reject: rejectStuckPromise } = Promise.withResolvers<EmptyObject>();
             const probablyLeftEmit = jest.fn();
             manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
