@@ -473,6 +473,7 @@ export class MembershipManager
                 this.stateKey,
             )
             .then((response) => {
+                this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
@@ -601,7 +602,7 @@ export class MembershipManager
             })
             .catch((e) => {
                 if (this.state.expectedServerDelayLeaveTs && this.state.expectedServerDelayLeaveTs <= Date.now()) {
-                    // Once we reach this point we know that the server did send the delayed leave event so we emit `probablyLeft = true`.
+                    // Once we reach this point it's likely that the server is sending the delayed leave event so we emit `probablyLeft = true`.
                     // It will emit `probablyLeft = false` once we notice about our leave through sync and successfully setup a new state event.
                     this.setAndEmitProbablyLeft(true);
                 }

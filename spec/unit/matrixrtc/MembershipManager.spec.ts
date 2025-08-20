@@ -851,44 +851,48 @@ describe("MembershipManager", () => {
             const probablyLeftEmit = jest.fn();
             manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
             manager.join([focus], focusActive);
+            try {
+                // Let the scheduler run one iteration so that we can send the join state event
+                await waitForMockCall(client._unstable_updateDelayedEvent);
 
-            // Let the scheduler run one iteration so that we can send the join state event
-            await waitForMockCall(client._unstable_updateDelayedEvent);
+                // We never resolve the delayed event so that we can test the probablyLeft event.
+                // This simulates the case where the server does not respond to the delayed event.
+                client._unstable_updateDelayedEvent = jest.fn(() => stuckPromise);
+                expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+                expect(manager.status).toBe(Status.Connected);
+                expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
+                // We expect the probablyLeft event to be emitted after the `delayedLeaveEventDelayMs` = 10000.
+                // We also track the calls to updated the delayed event that all will never resolve to simulate the server not responding.
+                // The numbers are a bit arbitrary since we use the local timeout that does not perfectly match the 5s check interval in this test.
+                await jest.advanceTimersByTimeAsync(5000);
+                // No emission after 5s
+                expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
 
-            client._unstable_updateDelayedEvent = jest.fn(() => stuckPromise);
-            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-            expect(manager.status).toBe(Status.Connected);
-            expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
-            // We expect the probablyLeft event to be emitted after the `delayedLeaveEventDelayMs` = 10000.
-            // We also track the calls to updated the delayed event that all will never resolve to simulate the server not responding.
-            // The numbers are a bit arbitrary since we use the local timeout that does not perfectly match the 5s check interval in this test.
-            await jest.advanceTimersByTimeAsync(5000);
-            // No emission after 5s
-            expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
-            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(1);
+                await jest.advanceTimersByTimeAsync(4999);
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
+                expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
 
-            await jest.advanceTimersByTimeAsync(4999);
-            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(3);
-            expect(probablyLeftEmit).not.toHaveBeenCalledWith(true);
+                // Reset mocks before we setup the next delayed event restart by advancing the timers 1 more ms.
+                (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue({});
 
-            // Reset mocks before we setup the next delayed event restart by advancing the timers 1 more ms.
-            (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue({});
+                // Emit after 10s
+                await jest.advanceTimersByTimeAsync(1);
+                expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(4);
+                expect(probablyLeftEmit).toHaveBeenCalledWith(true);
 
-            // Emit after 10s
-            await jest.advanceTimersByTimeAsync(1);
-            expect(client._unstable_updateDelayedEvent).toHaveBeenCalledTimes(4);
-            expect(probablyLeftEmit).toHaveBeenCalledWith(true);
-
-            // Mock a sync which does not include our own membership
-            await manager.onRTCSessionMemberUpdate([]);
-            // Wait for the current ongoing delayed event sending to finish
-            await jest.advanceTimersByTimeAsync(1);
-            // We should send a new state event and an associated delayed leave event.
-            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
-            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
-            // At the same time we expect the probablyLeft event to be emitted with false so we are back operational.
-            expect(probablyLeftEmit).toHaveBeenCalledWith(false);
-            rejectStuckPromise();
+                // Mock a sync which does not include our own membership
+                await manager.onRTCSessionMemberUpdate([]);
+                // Wait for the current ongoing delayed event sending to finish
+                await jest.advanceTimersByTimeAsync(1);
+                // We should send a new state event and an associated delayed leave event.
+                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+                expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+                // At the same time we expect the probablyLeft event to be emitted with false so we are back operational.
+                expect(probablyLeftEmit).toHaveBeenCalledWith(false);
+            } finally {
+                rejectStuckPromise();
+            }
         });
     });
 });
