@@ -17,7 +17,7 @@ limitations under the License.
 import type { CallMembership } from "./CallMembership.ts";
 import type { Focus } from "./focus.ts";
 import type { Status } from "./types.ts";
-import { type TypedEventEmitter } from "src/matrix.ts";
+import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 export enum MembershipManagerEvent {
     StatusChanged = "StatusChanged",
