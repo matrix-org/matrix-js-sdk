@@ -224,10 +224,8 @@ export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionCon
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<
-    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent.ProbablyLeft,
-    MatrixRTCSessionEventHandlerMap &
-        RoomAndToDeviceEventsHandlerMap &
-        Pick<MembershipManagerEventHandlerMap, MembershipManagerEvent.ProbablyLeft>
+    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
+    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
@@ -496,7 +494,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.logger,
             );
 
-            this.reEmitter.reEmit(this.membershipManager!, [MembershipManagerEvent.ProbablyLeft]);
+            this.reEmitter.reEmit(this.membershipManager!, [
+                MembershipManagerEvent.ProbablyLeft,
+                MembershipManagerEvent.StatusChanged,
+            ]);
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {
