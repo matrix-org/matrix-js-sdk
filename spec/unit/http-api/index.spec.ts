@@ -62,7 +62,7 @@ describe("MatrixHttpApi", () => {
     it("should fall back to `fetch` where xhr is unavailable", async () => {
         globalThis.XMLHttpRequest = undefined!;
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         upload = api.uploadContent({} as File);
         await upload;
         expect(fetchFn).toHaveBeenCalled();
@@ -70,7 +70,7 @@ describe("MatrixHttpApi", () => {
 
     it("should prefer xhr where available", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         upload = api.uploadContent({} as File);
         expect(fetchFn).not.toHaveBeenCalled();
         expect(xhr.open).toHaveBeenCalled();
@@ -82,6 +82,7 @@ describe("MatrixHttpApi", () => {
             prefix,
             accessToken: "token",
             useAuthorizationHeader: false,
+            onlyData: true,
         });
         upload = api.uploadContent({} as File);
         expect(xhr.open).toHaveBeenCalledWith(
@@ -96,6 +97,7 @@ describe("MatrixHttpApi", () => {
             baseUrl,
             prefix,
             accessToken: "token",
+            onlyData: true,
         });
         upload = api.uploadContent({} as File);
         expect(xhr.open).toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/v3/upload");
@@ -103,7 +105,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should include filename by default", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File, { name: "name" });
         expect(xhr.open).toHaveBeenCalledWith(
             Method.Post,
@@ -112,13 +114,13 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should allow not sending the filename", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File, { name: "name", includeFilename: false });
         expect(xhr.open).toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/v3/upload");
     });
 
     it("should abort xhr when the upload is aborted", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
         api.cancelUpload(upload);
         expect(xhr.abort).toHaveBeenCalled();
@@ -126,7 +128,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should timeout if no progress in 30s", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
         jest.advanceTimersByTime(25000);
         // @ts-ignore
@@ -138,7 +140,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should call progressHandler", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         const progressHandler = jest.fn();
         upload = api.uploadContent({} as File, { progressHandler });
         const progressEvent = new Event("progress") as ProgressEvent;
@@ -154,7 +156,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should error when no response body", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
         xhr.readyState = DONE;
@@ -167,7 +169,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should error on a 400-code", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
         xhr.readyState = DONE;
@@ -184,7 +186,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should return response on successful upload", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
         xhr.readyState = DONE;
@@ -198,14 +200,14 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should abort xhr when calling `cancelUpload`", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
         expect(api.cancelUpload(upload)).toBeTruthy();
         expect(xhr.abort).toHaveBeenCalled();
     });
 
     it("should return false when `cancelUpload` is called but unsuccessful", async () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
         xhr.readyState = DONE;
@@ -220,7 +222,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should return active uploads in `getCurrentUploads`", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
         expect(api.getCurrentUploads().find((u) => u.promise === upload)).toBeTruthy();
         api.cancelUpload(upload);
@@ -228,7 +230,12 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should return expected object from `getContentUri`", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, accessToken: "token" });
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), {
+            baseUrl,
+            prefix,
+            accessToken: "token",
+            onlyData: true,
+        });
         expect(api.getContentUri()).toMatchSnapshot();
     });
 });
