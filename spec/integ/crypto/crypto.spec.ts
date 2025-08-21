@@ -1491,8 +1491,10 @@ describe("crypto", () => {
 
                     expect(ev.decryptionFailureReason).toEqual(expectedErrorCode);
 
-                    // `isEncryptedDisabledForUnverifiedDevices` should be true for `m.unverified` and false for other errors.
-                    expect(ev.isEncryptedDisabledForUnverifiedDevices).toEqual(withheldCode === "m.unverified");
+                    // `decryptionFailureReason` should be `MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE` for `m.unverified`
+                    expect(
+                        ev.decryptionFailureReason === DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+                    ).toEqual(withheldCode === "m.unverified");
                 });
             },
         );

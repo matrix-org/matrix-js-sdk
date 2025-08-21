@@ -362,35 +362,22 @@ export class MembershipManager
     private delayedLeaveEventDelayMsOverride?: number;
 
     private get networkErrorRetryMs(): number {
-        return this.joinConfig?.networkErrorRetryMs ?? this.joinConfig?.callMemberEventRetryDelayMinimum ?? 3_000;
+        return this.joinConfig?.networkErrorRetryMs ?? 3_000;
     }
     private get membershipEventExpiryMs(): number {
-        return (
-            this.joinConfig?.membershipEventExpiryMs ??
-            this.joinConfig?.membershipExpiryTimeout ??
-            DEFAULT_EXPIRE_DURATION
-        );
+        return this.joinConfig?.membershipEventExpiryMs ?? DEFAULT_EXPIRE_DURATION;
     }
     private get membershipEventExpiryHeadroomMs(): number {
-        return (
-            this.joinConfig?.membershipEventExpiryHeadroomMs ??
-            this.joinConfig?.membershipExpiryTimeoutHeadroom ??
-            5_000
-        );
+        return this.joinConfig?.membershipEventExpiryHeadroomMs ?? 5_000;
     }
     private computeNextExpiryActionTs(iteration: number): number {
         return this.state.startTime + this.membershipEventExpiryMs * iteration - this.membershipEventExpiryHeadroomMs;
     }
     private get delayedLeaveEventDelayMs(): number {
-        return (
-            this.delayedLeaveEventDelayMsOverride ??
-            this.joinConfig?.delayedLeaveEventDelayMs ??
-            this.joinConfig?.membershipServerSideExpiryTimeout ??
-            8_000
-        );
+        return this.delayedLeaveEventDelayMsOverride ?? this.joinConfig?.delayedLeaveEventDelayMs ?? 8_000;
     }
     private get delayedLeaveEventRestartMs(): number {
-        return this.joinConfig?.delayedLeaveEventRestartMs ?? this.joinConfig?.membershipKeepAlivePeriod ?? 5_000;
+        return this.joinConfig?.delayedLeaveEventRestartMs ?? 5_000;
     }
     private get maximumRateLimitRetryCount(): number {
         return this.joinConfig?.maximumRateLimitRetryCount ?? 10;
