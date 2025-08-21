@@ -25,9 +25,6 @@ export interface MapperOpts {
     preventReEmit?: boolean;
     // decrypt event proactively
     decrypt?: boolean;
-
-    /** @deprecated no longer used */
-    toDevice?: boolean;
 }
 
 export function eventMapperFor(client: MatrixClient, options: MapperOpts): EventMapper {

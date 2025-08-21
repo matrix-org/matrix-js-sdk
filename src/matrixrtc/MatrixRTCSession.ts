@@ -27,9 +27,13 @@ import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
-import { type Statistics, type RTCNotificationType } from "./types.ts";
+import { type Statistics, type RTCNotificationType, type Status } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import type { IMembershipManager } from "./IMembershipManager.ts";
+import {
+    MembershipManagerEvent,
+    type MembershipManagerEventHandlerMap,
+    type IMembershipManager,
+} from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import {
     RoomAndToDeviceEvents,
@@ -105,8 +109,6 @@ export interface MembershipConfig {
      * This is what goes into the m.rtc.member event expiry field and is typically set to a number of hours.
      */
     membershipEventExpiryMs?: number;
-    /** @deprecated renamed to `membershipEventExpiryMs`*/
-    membershipExpiryTimeout?: number;
 
     /**
      * The time in (in milliseconds) which the manager will prematurely send the updated state event before the membership `expires` time to make sure it
@@ -118,23 +120,17 @@ export interface MembershipConfig {
      * This value does not have an effect on the value of `SessionMembershipData.expires`.
      */
     membershipEventExpiryHeadroomMs?: number;
-    /** @deprecated  renamed to `membershipEventExpiryHeadroomMs`*/
-    membershipExpiryTimeoutHeadroom?: number;
 
     /**
      * The timeout (in milliseconds) with which the deleayed leave event on the server is configured.
      * After this time the server will set the event to the disconnected stat if it has not received a keep-alive from the client.
      */
     delayedLeaveEventDelayMs?: number;
-    /** @deprecated renamed to `delayedLeaveEventDelayMs`*/
-    membershipServerSideExpiryTimeout?: number;
 
     /**
      * The interval (in milliseconds) in which the client will send membership keep-alives to the server.
      */
     delayedLeaveEventRestartMs?: number;
-    /** @deprecated renamed to `delayedLeaveEventRestartMs`*/
-    membershipKeepAlivePeriod?: number;
 
     /**
      * The maximum number of retries that the manager will do for delayed event sending/updating and state event sending when a server rate limit has been hit.
@@ -151,9 +147,6 @@ export interface MembershipConfig {
      * failed to send due to a network error. (send membership event, send delayed event, restart delayed event...)
      */
     networkErrorRetryMs?: number;
-
-    /** @deprecated renamed to `networkErrorRetryMs`*/
-    callMemberEventRetryDelayMinimum?: number;
 
     /**
      * If true, use the new to-device transport for sending encryption keys.
@@ -220,8 +213,8 @@ export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionCon
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<
-    MatrixRTCSessionEvent | RoomAndToDeviceEvents,
-    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap
+    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
+    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
@@ -250,6 +243,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
             roomEventEncryptionKeysReceivedTotalAge: 0,
         },
     };
+
+    public get membershipStatus(): Status | undefined {
+        return this.membershipManager?.status;
+    }
+
+    public get probablyLeft(): boolean | undefined {
+        return this.membershipManager?.probablyLeft;
+    }
 
     /**
      * The callId (sessionId) of the call.
@@ -456,8 +457,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
     }
     private reEmitter = new TypedReEmitter<
-        MatrixRTCSessionEvent | RoomAndToDeviceEvents,
-        MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap
+        MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
+        MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
     >(this);
 
     /**
@@ -490,6 +491,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.logger,
             );
 
+            this.reEmitter.reEmit(this.membershipManager!, [
+                MembershipManagerEvent.ProbablyLeft,
+                MembershipManagerEvent.StatusChanged,
+            ]);
             // Create Encryption manager
             let transport;
             if (joinConfig?.useExperimentalToDeviceTransport) {

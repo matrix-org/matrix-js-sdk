@@ -504,7 +504,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.pendingEventList = [];
             this.client.store.getPendingEvents(this.roomId).then((events) => {
                 const mapper = this.client.getEventMapper({
-                    toDevice: false,
                     decrypt: false,
                 });
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {

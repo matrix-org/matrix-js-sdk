@@ -48,9 +48,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      *
      * @param opts - options object
      *
-     * @returns Promise which resolves to response object, as
-     *    determined by this.opts.onlyData, opts.rawResponse, and
-     *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
+     * @returns Promise which resolves to response object, or rejects with an error (usually a MatrixError).
      */
     public uploadContent(file: FileType, opts: UploadOpts = {}): Promise<UploadResponse> {
         const includeFilename = opts.includeFilename ?? true;
@@ -149,11 +147,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 prefix: MediaPrefix.V3,
                 headers,
                 abortSignal: abortController.signal,
-            })
-                .then((response) => {
-                    return this.opts.onlyData ? <UploadResponse>response : response.json();
-                })
-                .then(uploadResolvers.resolve, uploadResolvers.reject);
+            }).then(uploadResolvers.resolve, uploadResolvers.reject);
         }
 
         // remove the upload from the list on completion

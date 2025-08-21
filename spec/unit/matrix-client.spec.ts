@@ -3597,24 +3597,6 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("getAuthIssuer", () => {
-        it("should use unstable prefix", async () => {
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_issuer`,
-                    data: {
-                        issuer: "https://issuer/",
-                    },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-
-            await expect(client.getAuthIssuer()).resolves.toEqual({ issuer: "https://issuer/" });
-            expect(httpLookups.length).toEqual(0);
-        });
-    });
-
     describe("getAuthMetadata", () => {
         beforeEach(() => {
             fetchMock.mockReset();

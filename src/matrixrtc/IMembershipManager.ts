@@ -17,13 +17,21 @@ limitations under the License.
 import type { CallMembership } from "./CallMembership.ts";
 import type { Focus } from "./focus.ts";
 import type { Status } from "./types.ts";
+import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 export enum MembershipManagerEvent {
     StatusChanged = "StatusChanged",
+    /**
+     * Emitted when the membership manager has not heard back from the server for the duration
+     * of the delayed event and hence failed to restart the delayed event.
+     * This means that the user is probably not joined anymore and the leave event was distributed to other session members.
+     */
+    ProbablyLeft = "ProbablyLeft",
 }
 
 export type MembershipManagerEventHandlerMap = {
     [MembershipManagerEvent.StatusChanged]: (prefStatus: Status, newStatus: Status) => void;
+    [MembershipManagerEvent.ProbablyLeft]: (probablyLeft: boolean) => void;
 };
 
 /**
@@ -33,7 +41,8 @@ export type MembershipManagerEventHandlerMap = {
  *
  * @internal
  */
-export interface IMembershipManager {
+export interface IMembershipManager
+    extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap> {
     /**
      * If we are trying to join, or have successfully joined the session.
      * It does not reflect if the room state is already configured to represent us being joined.
@@ -63,6 +72,12 @@ export interface IMembershipManager {
     get ownMembership(): CallMembership | undefined;
 
     /**
+     * If the membership manager has reason to believe that the hs sent a leave event
+     * and as a consequence the current user is perceived as left for other session participants.
+     */
+    get probablyLeft(): boolean;
+
+    /**
      * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
      * @param fociActive the active focus to use in the joined RTC membership event.
@@ -85,8 +100,4 @@ export interface IMembershipManager {
      * @returns the used active focus in the currently joined session or undefined if not joined.
      */
     getActiveFocus(): Focus | undefined;
-
-    // TypedEventEmitter methods:
-    on(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: Status, newStatus: Status) => void): this;
-    off(event: MembershipManagerEvent.StatusChanged, listener: (oldStatus: Status, newStatus: Status) => void): this;
 }

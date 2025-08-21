@@ -1085,20 +1085,6 @@ export enum ClientEvent {
      */
     ClientWellKnown = "WellKnown.client",
     ReceivedVoipEvent = "received_voip_event",
-    /**
-     * @deprecated This event is not supported anymore.
-     *
-     * Fires if a to-device event is received that cannot be decrypted.
-     * Encrypted to-device events will (generally) use plain Olm encryption,
-     * in which case decryption failures are fatal: the event will never be
-     * decryptable, unlike Megolm encrypted events where the key may simply
-     * arrive later.
-     *
-     * An undecryptable to-device event is therefore likely to indicate problems.
-     *
-     * The payload is the undecyptable to-device event
-     */
-    UndecryptableToDeviceEvent = "toDeviceEvent.undecryptable",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
 }
@@ -1163,7 +1149,6 @@ export type ClientEventHandlerMap = {
     [ClientEvent.Event]: (event: MatrixEvent) => void;
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.ReceivedToDeviceMessage]: (payload: ReceivedToDeviceMessage) => void;
-    [ClientEvent.UndecryptableToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
     [ClientEvent.Room]: (room: Room) => void;
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
@@ -6862,9 +6847,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param opts -  options object
      *
-     * @returns Promise which resolves to response object, as
-     *    determined by this.opts.onlyData, opts.rawResponse, and
-     *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
+     * @returns Promise which resolves to response object, or rejects with an error (usually a MatrixError).
      */
     public uploadContent(file: FileType, opts?: UploadOpts): Promise<UploadResponse> {
         return this.http.uploadContent(file, opts);
@@ -8418,21 +8401,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get the OIDC issuer responsible for authentication on this server, if any
-     * @returns Resolves: A promise of an object containing the OIDC issuer if configured
-     * @returns Rejects: when the request fails (module:http-api.MatrixError)
-     * @experimental - part of MSC2965
-     * @deprecated in favour of getAuthMetadata
-     */
-    public async getAuthIssuer(): Promise<{
-        issuer: string;
-    }> {
-        return this.http.request(Method.Get, "/auth_issuer", undefined, undefined, {
-            prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
-        });
-    }
-
-    /**
      * Discover and validate delegated auth configuration
      * - delegated auth issuer openid-configuration is reachable
      * - delegated auth issuer openid-configuration is configured correctly for us
@@ -8451,7 +8419,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                const { issuer } = await this.getAuthIssuer();
+                // Fall back to older variant of MSC2965
+                const { issuer } = await this.http.request<{
+                    issuer: string;
+                }>(Method.Get, "/auth_issuer", undefined, undefined, {
+                    prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+                });
                 return discoverAndValidateOIDCIssuerWellKnown(issuer);
             }
             throw e;

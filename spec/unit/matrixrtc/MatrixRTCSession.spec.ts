@@ -17,7 +17,7 @@ limitations under the License.
 import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
-import { type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
+import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
 import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey, type MembershipData, mockRoomState } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
@@ -1224,6 +1224,32 @@ describe("MatrixRTCSession", () => {
                 } finally {
                     jest.useRealTimers();
                 }
+            });
+        });
+        describe("read status", () => {
+            it("returns the correct probablyLeft status", () => {
+                const mockRoom = makeMockRoom([membershipTemplate]);
+                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                expect(sess!.probablyLeft).toBe(undefined);
+
+                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                expect(sess!.probablyLeft).toBe(false);
+
+                // Simulate the membership manager believing the user has left
+                const accessPrivateFieldsSession = sess as unknown as {
+                    membershipManager: { state: { probablyLeft: boolean } };
+                };
+                accessPrivateFieldsSession.membershipManager.state.probablyLeft = true;
+                expect(sess!.probablyLeft).toBe(true);
+            });
+
+            it("returns membershipStatus once joinRoomSession got called", () => {
+                const mockRoom = makeMockRoom([membershipTemplate]);
+                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                expect(sess!.membershipStatus).toBe(undefined);
+
+                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                expect(sess!.membershipStatus).toBe(Status.Connecting);
             });
         });
     });
