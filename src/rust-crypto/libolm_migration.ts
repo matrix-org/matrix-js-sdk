@@ -161,7 +161,7 @@ async function migrateBaseData(
     userId: string,
     deviceId: string,
     legacyStore: CryptoStore,
-    pickleKey: Uint8Array,
+    pickleKey: Uint8Array<ArrayBuffer>,
     storeHandle: RustSdkCryptoJs.StoreHandle,
     logger: Logger,
 ): Promise<void> {
@@ -414,7 +414,7 @@ export async function migrateRoomSettingsFromLegacyCrypto({
 
 async function getAndDecryptCachedSecretKey(
     legacyStore: CryptoStore,
-    legacyPickleKey: Uint8Array,
+    legacyPickleKey: Uint8Array<ArrayBuffer>,
     name: string,
 ): Promise<string | undefined> {
     const key = await new Promise<any>((resolve) => {

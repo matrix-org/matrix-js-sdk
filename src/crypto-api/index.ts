@@ -1191,12 +1191,12 @@ export interface CryptoCallbacks {
             keys: Record<string, SecretStorageKeyDescription>;
         },
         name: string,
-    ) => Promise<[string, Uint8Array] | null>;
+    ) => Promise<[string, Uint8Array<ArrayBuffer>] | null>;
 
     /** @deprecated: unused with the Rust crypto stack. */
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array<ArrayBuffer> | null>;
     /** @deprecated: unused with the Rust crypto stack. */
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array<ArrayBuffer>>) => void;
     /** @deprecated: unused with the Rust crypto stack. */
     shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
 
@@ -1210,7 +1210,7 @@ export interface CryptoCallbacks {
      * @param keyInfo - secret storage key info
      * @param key - private key to store
      */
-    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array<ArrayBuffer>) => void;
 
     /** @deprecated: unused with the Rust crypto stack. */
     onSecretRequested?: (
@@ -1224,11 +1224,11 @@ export interface CryptoCallbacks {
     /** @deprecated: unused with the Rust crypto stack. */
     getDehydrationKey?: (
         keyInfo: SecretStorageKeyDescription,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
+        checkFunc: (key: Uint8Array<ArrayBuffer>) => void,
+    ) => Promise<Uint8Array<ArrayBuffer>>;
 
     /** @deprecated: unused with the Rust crypto stack. */
-    getBackupKey?: () => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array<ArrayBuffer>>;
 }
 
 /**
@@ -1304,7 +1304,7 @@ export interface GeneratedSecretStorageKey {
         name?: string;
     };
     /** The raw generated private key. */
-    privateKey: Uint8Array;
+    privateKey: Uint8Array<ArrayBuffer>;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
 }
