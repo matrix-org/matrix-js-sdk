@@ -379,7 +379,9 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
             expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
             expect(encryptedEvent.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_ERROR);
-            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
+            expect(encryptedEvent.decryptionFailureReason).not.toBe(
+                DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+            );
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
@@ -403,7 +405,9 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).toEqual(
                 DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID,
             );
-            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
+            expect(encryptedEvent.decryptionFailureReason).not.toBe(
+                DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+            );
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: uisi **",
@@ -427,7 +431,9 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
             expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
             expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
-            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeTruthy();
+            expect(encryptedEvent.decryptionFailureReason).toBe(
+                DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
+            );
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",

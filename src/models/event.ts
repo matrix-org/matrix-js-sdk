@@ -822,16 +822,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this._decryptionFailureReason;
     }
 
-    /**
-     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
-     * the sender has disabled encrypting to unverified devices.
-     *
-     * @deprecated: Prefer `event.decryptionFailureReason === DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE`.
-     */
-    public get isEncryptedDisabledForUnverifiedDevices(): boolean {
-        return this.decryptionFailureReason === DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE;
-    }
-
     public shouldAttemptDecryption(): boolean {
         if (this.isRedacted()) return false;
         if (this.isBeingDecrypted()) return false;
