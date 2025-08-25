@@ -78,8 +78,8 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
-        notificationContentNew: IRTCNotificationContent,
-        notificationContentLegacy: ICallNotifyContent,
+        notificationContentNew: { event_id: string } & IRTCNotificationContent,
+        notificationContentLegacy: { event_id: string } & ICallNotifyContent,
     ) => void;
 };
 
