@@ -317,7 +317,10 @@ export class SyncAccumulator {
                 break;
 
             case Category.Join:
-                if (this.inviteRooms[roomId]) {
+                if (this.knockRooms[roomId]) {
+                    // delete knock state on join
+                    delete this.knockRooms[roomId];
+                } else if (this.inviteRooms[roomId]) {
                     // (1)
                     // was previously invite, now join. We expect /sync to give
                     // the entire state and timeline on 'join', so delete previous
