@@ -3589,6 +3589,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return await this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
     }
 
+    public sendRtcDecline(roomId: string, notificationEventId: string): Promise<ISendEventResponse> {
+        return this.sendEvent(roomId, EventType.RTCDecline, {
+            "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
+        });
+    }
+
     /**
      * Get a preview of the given URL as of (roughly) the given point in time,
      * described as an object with OpenGraph keys and associated values.
