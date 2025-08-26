@@ -20,10 +20,11 @@ import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
-import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
@@ -48,8 +49,10 @@ import {
 } from "./RoomAndToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
-import { type ISendEventResponse } from "src/matrix.ts";
 
+/**
+ * Events emitted by MatrixRTCSession
+ */
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
     MembershipsChanged = "memberships_changed",
