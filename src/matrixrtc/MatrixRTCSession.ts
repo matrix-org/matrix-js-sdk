@@ -20,14 +20,21 @@ import { EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
+import { KnownMembership } from "../@types/membership.ts";
+import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type Focus } from "./focus.ts";
-import { KnownMembership } from "../@types/membership.ts";
 import { MembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
-import { type Statistics, type RTCNotificationType, type Status } from "./types.ts";
+import {
+    type Statistics,
+    type RTCNotificationType,
+    type Status,
+    type IRTCNotificationContent,
+    type ICallNotifyContent,
+} from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
     MembershipManagerEvent,
@@ -43,6 +50,9 @@ import {
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 
+/**
+ * Events emitted by MatrixRTCSession
+ */
 export enum MatrixRTCSessionEvent {
     // A member joined, left, or updated a property of their membership.
     MembershipsChanged = "memberships_changed",
@@ -54,6 +64,8 @@ export enum MatrixRTCSessionEvent {
     EncryptionKeyChanged = "encryption_key_changed",
     /** The membership manager had to shut down caused by an unrecoverable error */
     MembershipManagerError = "membership_manager_error",
+    /** The RTCSession did send a call notification caused by joining the call as the first member */
+    DidSendCallNotification = "did_send_call_notification",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -68,6 +80,10 @@ export type MatrixRTCSessionEventHandlerMap = {
         participantId: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
+    [MatrixRTCSessionEvent.DidSendCallNotification]: (
+        notificationContentNew: { event_id: string } & IRTCNotificationContent,
+        notificationContentLegacy: { event_id: string } & ICallNotifyContent,
+    ) => void;
 };
 
 export interface SessionConfig {
@@ -652,19 +668,24 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Sends a notification corresponding to the configured notify type.
      */
     private sendCallNotify(parentEventId: string, notificationType: RTCNotificationType): void {
-        // Send legacy event:
-        this.client
-            .sendEvent(this.roomSubset.roomId, EventType.CallNotify, {
+        const sendLegacyNotificationEvent = async (): Promise<{
+            response: ISendEventResponse;
+            content: ICallNotifyContent;
+        }> => {
+            const content: ICallNotifyContent = {
                 "application": "m.call",
                 "m.mentions": { user_ids: [], room: true },
                 "notify_type": notificationType === "notification" ? "notify" : notificationType,
                 "call_id": this.callId!,
-            })
-            .catch((e) => this.logger.error("Failed to send call notification", e));
-
-        // Send new event:
-        this.client
-            .sendEvent(this.roomSubset.roomId, EventType.RTCNotification, {
+            };
+            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.CallNotify, content);
+            return { response, content };
+        };
+        const sendNewNotificationEvent = async (): Promise<{
+            response: ISendEventResponse;
+            content: IRTCNotificationContent;
+        }> => {
+            const content: IRTCNotificationContent = {
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": notificationType,
                 "m.relates_to": {
@@ -673,8 +694,21 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 },
                 "sender_ts": Date.now(),
                 "lifetime": 30_000, // 30 seconds
+            };
+            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);
+            return { response, content };
+        };
+
+        void Promise.all([sendLegacyNotificationEvent(), sendNewNotificationEvent()])
+            .then(([legacy, newNotification]) => {
+                // Join event_id and origin event content
+                const legacyResult = { ...legacy.response, ...legacy.content };
+                const newResult = { ...newNotification.response, ...newNotification.content };
+                this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult, legacyResult);
             })
-            .catch((e) => this.logger.error("Failed to send call notification", e));
+            .catch(([errorLegacy, errorNew]) =>
+                this.logger.error("Failed to send call notification", errorLegacy, errorNew),
+            );
     }
 
     /**
