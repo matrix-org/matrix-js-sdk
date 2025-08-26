@@ -53,6 +53,7 @@ import {
 } from "../webrtc/callEventTypes.ts";
 import {
     type IRTCNotificationContent,
+    type IRTCDeclineContent,
     type EncryptionKeysEventContent,
     type ICallNotifyContent,
 } from "../matrixrtc/types.ts";
@@ -152,6 +153,7 @@ export enum EventType {
     // MatrixRTC events
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
+    RTCDecline = "org.matrix.msc4310.rtc.decline",
 }
 
 export enum RelationType {
@@ -332,6 +334,7 @@ export interface TimelineEvents {
     [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
     [EventType.CallNotify]: ICallNotifyContent;
     [EventType.RTCNotification]: IRTCNotificationContent;
+    [EventType.RTCDecline]: IRTCDeclineContent;
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;

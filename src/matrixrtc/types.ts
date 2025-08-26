@@ -104,6 +104,15 @@ export interface IRTCNotificationContent extends RelationEvent {
     "lifetime": number;
 }
 
+/**
+ * MSC4310 decline event content for `org.matrix.msc4310.rtc.decline`.
+ * Sent as a standard m.reference relation to an `org.matrix.msc4075.rtc.notification` event.
+ */
+export interface IRTCDeclineContent extends RelationEvent {
+    /** Optional human-readable reason for the decline */
+    reason?: string;
+}
+
 export enum Status {
     Disconnected = "Disconnected",
     Connecting = "Connecting",
