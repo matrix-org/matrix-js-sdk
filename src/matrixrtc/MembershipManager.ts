@@ -24,9 +24,9 @@ import { CallMembership, DEFAULT_EXPIRE_DURATION, SessionMembershipData } from "
 import { Focus } from "./focus.ts";
 import { isLivekitFocusSelection } from "./LivekitFocus.ts";
 import { MembershipConfig, SessionDescription } from "./MatrixRTCSession.ts";
-import { TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "src/matrix.ts";
+import { TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "../matrix.ts";
 import { IMembershipManager, MembershipManagerEvent, MembershipManagerEventHandlerMap } from "./IMembershipManager.ts";
-import { Logger, logger as rootLogger } from "src/logger.ts";
+import { Logger, logger as rootLogger } from "../logger.ts";
 import { ActionScheduler, ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { isMyMembership, Status } from "./types.ts";
 
