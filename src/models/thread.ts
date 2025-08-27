@@ -440,8 +440,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
              */
             this.replayEvents?.push(event);
 
-            // For annotations (reactions), aggregate immediately (pre-init)
-            // Only aggregate as child: parent aggregation is unnecessary here
+            // For annotations (reactions), aggregate immediately (pre-init) to keep
+            // reaction counts/summary visible while the thread is still initialising.
+            // Only aggregate as child: parent aggregation is unnecessary here.
             if (event.isRelation(RelationType.Annotation)) {
                 this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
             }
