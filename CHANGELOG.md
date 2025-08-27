@@ -1,3 +1,27 @@
+Changes in [38.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.0.0) (2025-08-27)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Release tranche of breaking changes ([#4975](https://github.com/matrix-org/matrix-js-sdk/pull/4975)). 
+* Remove support for FetchHttpApi `onlyData = false`
+* Remove deprecated `IJoinRoomOpts.syncRoom`
+* Remove deprecated methods which are unsupported in rust crypto
+* Remove deprecated getAuthIssuer method
+* Remove deprecated beginKeyVerification method
+* Remove deprecated isEncryptedDisabledForUnverifiedDevices getter 
+* Remove deprecated UndecryptableToDeviceEvent MatrixClient emit
+* Remove deprecated defer utility method
+* Remove deprecated UIAResponse dummy type 
+* Remove deprecated MatrixRTCSession MembershipConfig fields 
+* Remove deprecated findVerificationRequestDMInProgress and storeSessionBackupPrivateKey methods in favour of overloads
+
+## ✨ Features
+
+* Allow multiple rtc sessions per room (with different sessionDescriptions) ([#4945](https://github.com/matrix-org/matrix-js-sdk/pull/4945)). Contributed by @toger5.
+* Add support for login\_hint in authorization url generation ([#4943](https://github.com/matrix-org/matrix-js-sdk/pull/4943)). Contributed by @odelcroi.
+* Only process MatrixRTC sessions associated with calls for `callMembershipsForRoom` ([#4960](https://github.com/matrix-org/matrix-js-sdk/pull/4960)). Contributed by @fkwp.
+
+
 Changes in [37.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v37.13.0) (2025-08-11)
 ====================================================================================================
 This release supports new v12 Matrix rooms and consequently has a breaking change, removing powerLevelNorm from the RoomMember object as this can't be supported with infinite power levels. Apps should use the non-normalised `powerLevel` instead.
