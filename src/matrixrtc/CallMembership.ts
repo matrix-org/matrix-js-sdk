@@ -93,7 +93,7 @@ const checkSessionsMembershipData = (data: any, errors: string[]): data is Sessi
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
-    if (!Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
+    if (data.foci_preferred !== undefined && !Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
     // optional parameters
     if (data.created_ts && typeof data.created_ts !== "number") errors.push(prefix + "created_ts must be number");
 
