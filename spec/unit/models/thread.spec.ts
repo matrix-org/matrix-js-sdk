@@ -22,7 +22,7 @@ import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../..
 import { makeThreadEvent, mkThread, populateThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkEdit, mkMessage, mkReaction, mock } from "../../test-utils/test-utils";
-import { Direction, EventStatus, EventType, MatrixEvent } from "../../../src";
+import { Direction, EventStatus, EventType, MatrixEvent, RelationType } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
@@ -772,6 +772,211 @@ describe("Thread", () => {
                 const firstEvent = thread.timeline.at(0)!;
                 expect(lastEvent).toBe(message1);
                 expect(firstEvent).toBe(message2);
+            });
+
+            it("Edit events are properly aggregated in threads with server-side support", async () => {
+                // This test reproduces the race condition bug from https://github.com/element-hq/element-web/issues/30617
+                // The bug occurs when edits arrive while the thread is not initialized,
+                // causing aggregation to fail because the target event isn't in the timeline yet
+                
+                // Given a thread exists with server-side support enabled
+                const myUserId = "@alice:example.org";
+                const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, { timelineSupport: false });
+                const client = testClient.client;
+                client.supportsThreads = jest.fn().mockReturnValue(true);
+                
+                const room = new Room("!room:z", client, myUserId, {
+                    pendingEventOrdering: PendingEventOrdering.Detached,
+                });
+                jest.spyOn(client, "getRoom").mockReturnValue(room);
+                
+                // Create a root event
+                const rootEvent = mkMessage({
+                    room: room.roomId,
+                    user: myUserId,
+                    msg: "Root message",
+                    event: true,
+                });
+                
+                // Create thread manually - starts with initialEventsFetched = false
+                const thread = new Thread(rootEvent.getId()!, rootEvent, {
+                    room: room,
+                    client: client,
+                    pendingEventOrdering: PendingEventOrdering.Detached,
+                });
+                
+                // The thread is NOT initialized - this is the key to reproducing the bug!
+                expect(thread.initialEventsFetched).toBe(false);
+                
+                // Create a message that will be edited
+                const originalMessage = mkMessage({
+                    room: room.roomId,
+                    user: myUserId,
+                    msg: "Original message in thread",
+                    relatesTo: {
+                        rel_type: THREAD_RELATION_TYPE.name,
+                        event_id: thread.id,
+                        "m.in_reply_to": {
+                            event_id: thread.id,
+                        }
+                    },
+                    event: true,
+                });
+                
+                // Create edit events BEFORE the original message is in the timeline
+                const edit1 = mkEdit(originalMessage, client, myUserId, room.roomId, "Edit 1");
+                const edit2 = mkEdit(originalMessage, client, myUserId, room.roomId, "Edit 2"); 
+                const edit3 = mkEdit(originalMessage, client, myUserId, room.roomId, "Final edit");
+
+                // CRITICAL: Add edits while thread is NOT initialized
+                // They will be queued in replayEvents and aggregation will be attempted but fail
+                await thread.addEvent(edit1, false);
+                
+                // Check the aggregation state after adding first edit
+                // With our fix: edits should NOT be aggregated yet (thread not initialized)
+                // Without fix: edits would be aggregated but fail to link to target
+                const relationsAfterFirstEdit = thread.timelineSet.relations?.getChildEventsForEvent(
+                    originalMessage.getId()!,
+                    RelationType.Replace,
+                    EventType.RoomMessage
+                );
+                
+                // With the fix, no aggregation happens yet (which is correct)
+                // Without the fix, aggregation would happen but fail silently
+                expect(relationsAfterFirstEdit).toBeUndefined();
+                
+                // Add remaining edits
+                await thread.addEvent(edit2, false);
+                await thread.addEvent(edit3, false);
+                
+                // Check that edits went to replayEvents
+                expect(thread.replayEvents).toHaveLength(3);
+                
+                // Now initialize the thread and add the original message
+                thread.initialEventsFetched = true;
+                
+                // Clear replayEvents and add the original message
+                const replayEvents = [...(thread.replayEvents || [])];
+                thread.replayEvents = [];
+                
+                // Add original message first
+                await thread.addEvent(originalMessage, false);
+                
+                // At this point, the original message should NOT have the edits aggregated yet
+                // because they were attempted when the target wasn't in timeline
+                const replacingEventBeforeReplay = originalMessage.replacingEvent();
+                // With the fix, edits should not be aggregated yet (pre-init)
+                expect(replacingEventBeforeReplay).toBeNull();
+                
+                // Then replay the edits
+                for (const event of replayEvents) {
+                    await thread.addEvent(event, false);
+                }
+                
+                // After replay, check aggregation
+                const replacingEvent = originalMessage.replacingEvent();
+                
+                // This should now work because edits were re-aggregated when replayed
+                expect(replacingEvent).toBe(edit3);
+                
+                // The content should also be updated
+                expect(originalMessage.getContent().body).toBe("Final edit");
+
+                // Relations for replaces should now exist and include all edits in order
+                const replaceRels = thread.timelineSet.relations!.getChildEventsForEvent(
+                    originalMessage.getId()!,
+                    RelationType.Replace,
+                    EventType.RoomMessage,
+                )!;
+                const replaceIds = replaceRels.getRelations().map((e) => e.getId());
+                expect(replaceIds).toHaveLength(3);
+                expect(replaceIds[0]).toBe(edit1.getId());
+                expect(replaceIds[1]).toBe(edit2.getId());
+                expect(replaceIds[2]).toBe(edit3.getId());
+            });
+
+            it("Reactions aggregate pre-init and remain idempotent on replay", async () => {
+                const myUserId = "@alice:example.org";
+                const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, { timelineSupport: false });
+                const client = testClient.client;
+                client.supportsThreads = jest.fn().mockReturnValue(true);
+
+                // Force server-side support so threads start uninitialised
+                const prevSupport = Thread.hasServerSideSupport;
+                Thread.setServerSideSupport(FeatureSupport.Stable);
+
+                try {
+                    const room = new Room("!room:z", client, myUserId, {
+                        pendingEventOrdering: PendingEventOrdering.Detached,
+                    });
+                    jest.spyOn(client, "getRoom").mockReturnValue(room);
+
+                    // Create a root event and thread
+                    const rootEvent = mkMessage({ room: room.roomId, user: myUserId, msg: "Root", event: true });
+                    const thread = new Thread(rootEvent.getId()!, rootEvent, {
+                        room,
+                        client,
+                        pendingEventOrdering: PendingEventOrdering.Detached,
+                    });
+
+                    expect(thread.initialEventsFetched).toBe(false);
+
+                    // A message inside the thread to react to
+                    const originalMessage = mkMessage({
+                        room: room.roomId,
+                        user: myUserId,
+                        msg: "Thread message",
+                        relatesTo: {
+                            rel_type: THREAD_RELATION_TYPE.name,
+                            event_id: thread.id,
+                            "m.in_reply_to": { event_id: thread.id },
+                        },
+                        event: true,
+                    });
+
+                    // Create 2 reactions before the message is in the timeline (pre-init)
+                    const reaction1 = mkReaction(originalMessage, client, myUserId, room.roomId);
+                    const reaction2 = mkReaction(originalMessage, client, myUserId, room.roomId);
+
+                    // Add reactions while thread is NOT initialised
+                    thread.addEvent(reaction1, false);
+                    thread.addEvent(reaction2, false);
+
+                    // Relations should already include the reactions pre-init
+                    const relsBefore = thread.timelineSet.relations!.getChildEventsForEvent(
+                        originalMessage.getId()!,
+                        RelationType.Annotation,
+                        EventType.Reaction,
+                    )!;
+                    expect(relsBefore).toBeTruthy();
+                    const beforeIds = new Set(relsBefore.getRelations().map((e) => e.getId()));
+                    expect(beforeIds.size).toBe(2);
+
+                    // Now initialise and replay
+                    // Ensure reactions are queued for replay as well
+                    expect(thread.replayEvents).toHaveLength(2);
+                    const replay = [...(thread.replayEvents || [])];
+                    thread.replayEvents = [];
+                    thread.initialEventsFetched = true;
+
+                    // Add the original message first so it becomes findable
+                    thread.addEvent(originalMessage, false);
+                    // Replay reactions
+                    for (const ev of replay) thread.addEvent(ev, false);
+
+                    // Ensure no duplicates after replay (idempotent aggregation)
+                    const relsAfter = thread.timelineSet.relations!.getChildEventsForEvent(
+                        originalMessage.getId()!,
+                        RelationType.Annotation,
+                        EventType.Reaction,
+                    )!;
+                    const afterIds = new Set(relsAfter.getRelations().map((e) => e.getId()));
+                    expect(afterIds.size).toBe(2);
+                    expect(afterIds).toEqual(beforeIds);
+                } finally {
+                    // restore
+                    Thread.setServerSideSupport(prevSupport);
+                }
             });
         });
     });
