@@ -30,6 +30,48 @@ import { Logger, logger as rootLogger } from "src/logger.ts";
 import { ActionScheduler, ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { isMyMembership, Status } from "./types.ts";
 
+/* MembershipActionTypes:
+                           
+On Join:  ───────────────┐   ┌───────────────(1)───────────┐
+                         ▼   ▼                             │
+                   ┌────────────────┐                      │
+                   │SendDelayedEvent│ ──────(2)───┐        │
+                   └────────────────┘             │        │ 
+                           │(3)                   │        │
+                           ▼                      │        │
+                    ┌─────────────┐               │        │
+       ┌──────(4)───│SendJoinEvent│────(4)─────┐  │        │
+       │            └─────────────┘            │  │        │
+       │  ┌─────┐                  ┌──────┐    │  │        │
+       ▼  ▼     │                  │      ▼    ▼  ▼        │
+┌────────────┐  │                  │ ┌───────────────────┐ │
+│UpdateExpiry│ (s)                (s)|RestartDelayedEvent│ │
+└────────────┘  │                  │ └───────────────────┘ │
+          │     │                  │      │        │       │       
+          └─────┘                  └──────┘        └───────┘ 
+     
+On Leave: ─────────  STOP ALL ABOVE
+                           ▼
+            ┌────────────────────────────────┐
+            │ SendScheduledDelayedLeaveEvent │
+            └────────────────────────────────┘
+                           │(5)
+                           ▼
+                    ┌──────────────┐
+                    │SendLeaveEvent│
+                    └──────────────┘
+(1) [Not found error] results in resending the delayed event
+(2) [hasMemberEvent = true] Sending the delayed event if we
+    already have a call member event results jumping to the
+    RestartDelayedEvent loop directly
+(3) [hasMemberEvent = false] if there is not call member event
+    sending it is the next step
+(4) Both (UpdateExpiry and RestartDelayedEvent) actions are
+    scheduled when successfully sending the state event
+(5) Only if delayed event sending failed (fallback)
+(s) Successful restart/resend
+*/
+
 /**
  * The different types of actions the MembershipManager can take.
  * @internal
