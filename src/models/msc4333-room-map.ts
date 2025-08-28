@@ -54,7 +54,7 @@ export class MSC4333RoomMap {
                 if (room.getMember(moderationConfig.getSender()!)?.membership !== KnownMembership.Join) {
                     continue; // bot isn't in the room
                 }
-                const protectedRooms = moderationConfig.getContent()["protected_rooms"] as string[];
+                const protectedRooms = moderationConfig.getContent()["protected_room_ids"] as string[];
                 if (!protectedRooms?.includes(roomId)) {
                     continue; // not a protected room for this management room
                 }
@@ -66,8 +66,8 @@ export class MSC4333RoomMap {
                 const parsedCommands = new MSC4332BotCommands(botCommands);
 
                 const parse = (action: string): MSC4333ActionCommand | null => {
-                    const actionConfig = moderationConfig.getContent()[action] as MSC4333ModerationCommand;
-                    const command = parsedCommands.getCommand(actionConfig.use);
+                    const actionConfig = moderationConfig.getContent()["commands"]?.[action] as MSC4333ModerationCommand;
+                    const command = parsedCommands.getCommand(actionConfig?.use);
                     if (!command) {
                         return null;
                     }
