@@ -571,6 +571,49 @@ describe("SyncAccumulator", function () {
         expect(sa.getJSON().roomsData.knock["!knock:bar"]).toBeUndefined();
     });
 
+    it("should delete knock state when room transitions from knock to join", () => {
+        const initKnockState = makeKnockState();
+        sa.accumulate(
+            syncSkeleton(
+                {},
+                {},
+                {},
+                {
+                    knock_state: initKnockState,
+                },
+            ),
+        );
+        expect(sa.getJSON().roomsData.knock["!knock:bar"].knock_state).toBe(initKnockState);
+
+        // Room transitions from knock to join (e.g., after approval and joining)
+        const joinState = {
+            account_data: { events: [] },
+            ephemeral: { events: [] },
+            unread_notifications: {},
+            state: {
+                events: [member("bob", KnownMembership.Join)],
+            },
+        };
+
+        const syncResponse = {
+            next_batch: "abc",
+            rooms: {
+                join: {
+                    "!knock:bar": joinState,
+                },
+                invite: {},
+                leave: {},
+            },
+        } as unknown as ISyncResponse;
+
+        sa.accumulate(syncResponse);
+
+        expect(sa.getJSON().roomsData.knock["!knock:bar"]).toBeUndefined();
+        expect(sa.getJSON().roomsData.join["!knock:bar"].state?.events[0]?.content.membership).toEqual(
+            KnownMembership.Join,
+        );
+    });
+
     it("should accumulate read receipts", () => {
         const receipt1 = {
             type: "m.receipt",
