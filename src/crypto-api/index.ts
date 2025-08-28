@@ -1128,7 +1128,7 @@ export interface CryptoCallbacks {
             keys: Record<string, SecretStorageKeyDescription>;
         },
         name: string,
-    ) => Promise<[string, Uint8Array] | null>;
+    ) => Promise<[string, Uint8Array<ArrayBuffer>] | null>;
 
     /**
      * Called by {@link CryptoApi.bootstrapSecretStorage} when a new default secret storage key is created.
@@ -1140,7 +1140,7 @@ export interface CryptoCallbacks {
      * @param keyInfo - secret storage key info
      * @param key - private key to store
      */
-    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array<ArrayBuffer>) => void;
 }
 
 /**
@@ -1197,7 +1197,7 @@ export interface GeneratedSecretStorageKey {
         name?: string;
     };
     /** The raw generated private key. */
-    privateKey: Uint8Array;
+    privateKey: Uint8Array<ArrayBuffer>;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
 }

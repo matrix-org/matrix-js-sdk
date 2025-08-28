@@ -85,7 +85,7 @@
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
         "@types/jest": "^29.0.0",
-        "@types/node": "18",
+        "@types/node": "^22",
         "@types/sdp-transform": "^2.4.5",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
