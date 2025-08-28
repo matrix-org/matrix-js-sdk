@@ -247,6 +247,7 @@ import {
 } from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError } from "./errors.ts";
+import {MSC4333RoomMap} from "./models/msc4333-room-map.ts";
 
 export type Store = IStore;
 
@@ -1278,6 +1279,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
+
+    public readonly msc4333Moderation = new MSC4333RoomMap(this);
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
