@@ -333,7 +333,7 @@ describe("MatrixRTCSession", () => {
                 "notification_type": "ring",
                 "m.relates_to": {
                     event_id: ownMembershipId,
-                    rel_type: "org.matrix.msc4075.rtc.notification.parent",
+                    rel_type: "m.reference",
                 },
                 "lifetime": 30000,
                 "sender_ts": expect.any(Number),
