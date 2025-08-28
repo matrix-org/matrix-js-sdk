@@ -439,6 +439,13 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
              * has been initialised properly.
              */
             this.replayEvents?.push(event);
+
+            // For annotations (reactions), aggregate immediately (pre-init) to keep
+            // reaction counts/summary visible while the thread is still initialising.
+            // Only aggregate as child: parent aggregation is unnecessary here.
+            if (event.isRelation(RelationType.Annotation)) {
+                this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
+            }
         } else {
             // Case 2: this is happening later, and we have a timeline. In
             // this case, these events might be out-of order.
@@ -465,10 +472,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             } else {
                 this.addEventToTimeline(event, toStartOfTimeline);
             }
+            // Aggregation is handled by EventTimelineSet when inserting/adding.
         }
-        // Apply annotations and replace relations to the relations of the timeline only
-        this.timelineSet.relations?.aggregateParentEvent(event);
-        this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
     }
 
     public async processEvent(event: Optional<MatrixEvent>): Promise<void> {
