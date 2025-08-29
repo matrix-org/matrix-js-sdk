@@ -27,10 +27,10 @@ import {KnownMembership} from "../@types/membership.ts";
 export interface MSC4333RoomModerationConfig {
     managementRoomId: string;
     botUserId: string;
-    banCommand: MSC4332BotCommand;
-    kickCommand: MSC4332BotCommand;
-    redactEventCommand: MSC4332BotCommand;
-    redactUserCommand: MSC4332BotCommand;
+    banCommand: MSC4333UserActionCommand;
+    kickCommand: MSC4333UserActionCommand;
+    redactEventCommand: MSC4333EventActionCommand;
+    redactUserCommand: MSC4333UserActionCommand;
 }
 
 interface MSC4333ModerationCommand {
@@ -65,22 +65,26 @@ export class MSC4333RoomMap {
                 }
                 const parsedCommands = new MSC4332BotCommands(botCommands);
 
-                const parse = (action: string): MSC4333ActionCommand | null => {
+                const parse = <E extends MSC4333ActionCommand>(action: string): E | null => {
                     const actionConfig = moderationConfig.getContent()["commands"]?.[action] as MSC4333ModerationCommand;
                     const command = parsedCommands.getCommand(actionConfig?.use);
                     if (!command) {
                         return null;
                     }
-                    return new MSC4333ActionCommand(parsedCommands, {
+                    const definition: MSC4333ModerationCommandDefinition = {
                         prefillVariables: actionConfig.prefill_variables,
                         ...command.definition,
-                    });
+                    };
+                    if (action === "redact_event") {
+                        return new MSC4333EventActionCommand(parsedCommands, definition) as E;
+                    }
+                    return new MSC4333UserActionCommand(parsedCommands, definition) as E;
                 };
 
-                const banCommand = parse("ban");
-                const kickCommand = parse("kick");
-                const redactEventCommand = parse("redact_event");
-                const redactUserCommand = parse("redact_user");
+                const banCommand = parse<MSC4333UserActionCommand>("ban");
+                const kickCommand = parse<MSC4333UserActionCommand>("kick");
+                const redactEventCommand = parse<MSC4333EventActionCommand>("redact_event");
+                const redactUserCommand = parse<MSC4333UserActionCommand>("redact_user");
                 if (banCommand && kickCommand && redactEventCommand && redactUserCommand) {
                     return {
                         managementRoomId: moderationConfig.getRoomId()!,
@@ -102,13 +106,17 @@ export interface MSC4333ModerationCommandDefinition extends MSC4332BotCommandDef
     prefillVariables?: Record<string, string>;
 }
 
-export class MSC4333ActionCommand extends MSC4332BotCommand {
-    public constructor(botCommands: MSC4332BotCommands, definition: MSC4333ModerationCommandDefinition) {
-        super(botCommands, definition);
+export type MSC4333ActionCommand = MSC4333UserActionCommand | MSC4333EventActionCommand;
+
+export class MSC4333UserActionCommand {
+    private command: MSC4332BotCommand;
+
+    public constructor(botCommands: MSC4332BotCommands, private definition: MSC4333ModerationCommandDefinition) {
+        this.command = new MSC4332BotCommand(botCommands, definition);
     }
 
-    public renderAsUserAction(againstUserId: string, inRoomId: string, forReason: string): MSC4332MRoomMessageContent {
-        return super.render({
+    public render(againstUserId: string, inRoomId: string, forReason: string): MSC4332MRoomMessageContent {
+        return this.command.render({
             // Apply prefill first so we can override it
             ...(this.definition as MSC4333ModerationCommandDefinition).prefillVariables,
 
@@ -119,9 +127,17 @@ export class MSC4333ActionCommand extends MSC4332BotCommand {
             permalink: `https://matrix.to/#/${encodeURIComponent(againstUserId)}`,
         });
     }
+}
 
-    public renderAsEventAction(againstEventId: string, inRoomId: string, forReason: string): MSC4332MRoomMessageContent {
-        return super.render({
+export class MSC4333EventActionCommand {
+    private command: MSC4332BotCommand;
+
+    public constructor(botCommands: MSC4332BotCommands, private definition: MSC4333ModerationCommandDefinition) {
+        this.command = new MSC4332BotCommand(botCommands, definition);
+    }
+
+    public render(againstEventId: string, inRoomId: string, forReason: string): MSC4332MRoomMessageContent {
+        return this.command.render({
             // Apply prefill first so we can override it
             ...(this.definition as MSC4333ModerationCommandDefinition).prefillVariables,
 

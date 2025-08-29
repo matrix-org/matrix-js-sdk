@@ -160,12 +160,12 @@ export class MSC4332BotCommand {
         for (const [name, val] of Object.entries(variables)) {
             const variable = this.definition.variables[name];
             if (!variable) {
-                throw new Error(`Variable ${name} not defined`);
+                continue; // don't error - it's possible the caller is giving more context for compatibility reasons
             }
             rendered = rendered.replace(`{${name}}`, val);
         }
         for (const name of Object.keys(this.definition.variables)) {
-            if (!variables[name]) {
+            if (variables[name] === undefined || variables[name] === null) {
                 throw new Error(`Variable ${name} not supplied`);
             }
         }
