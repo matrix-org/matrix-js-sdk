@@ -6916,8 +6916,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async doesServerSupportExtendedProfiles(): Promise<boolean> {
         return (
-            this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES) ||
-            this.doesServerSupportUnstableFeature(STABLE_MSC4133_EXTENDED_PROFILES)
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES)) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC4133_EXTENDED_PROFILES))
         );
     }
 
