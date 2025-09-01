@@ -183,39 +183,43 @@ describe("Topic content helpers", () => {
         it("creates fully defined event content without html", () => {
             expect(makeTopicContent("pizza")).toEqual({
                 topic: "pizza",
-                [M_TOPIC.name]: [
-                    {
-                        body: "pizza",
-                        mimetype: "text/plain",
-                    },
-                ],
+                [M_TOPIC.name]: {
+                    "m.text": [
+                        {
+                            body: "pizza",
+                            mimetype: "text/plain",
+                        },
+                    ],
+                },
             });
         });
 
         it("creates fully defined event content with html", () => {
             expect(makeTopicContent("pizza", "<b>pizza</b>")).toEqual({
                 topic: "pizza",
-                [M_TOPIC.name]: [
-                    {
-                        body: "<b>pizza</b>",
-                        mimetype: "text/html",
-                    },
-                    {
-                        body: "pizza",
-                        mimetype: "text/plain",
-                    },
-                ],
+                [M_TOPIC.name]: {
+                    "m.text": [
+                        {
+                            body: "<b>pizza</b>",
+                            mimetype: "text/html",
+                        },
+                        {
+                            body: "pizza",
+                            mimetype: "text/plain",
+                        },
+                    ],
+                },
             });
         });
 
         it("creates an empty event when the topic is falsey", () => {
             expect(makeTopicContent(undefined)).toEqual({
                 topic: undefined,
-                [M_TOPIC.name]: [],
+                [M_TOPIC.name]: {"m.text": []},
             });
             expect(makeTopicContent(null)).toEqual({
                 topic: null,
-                [M_TOPIC.name]: [],
+                [M_TOPIC.name]: {"m.text": []},
             });
         });
     });
@@ -225,11 +229,13 @@ describe("Topic content helpers", () => {
             expect(
                 parseTopicContent({
                     topic: "pizza",
-                    [M_TOPIC.name]: [
-                        {
-                            body: "pizza",
-                        },
-                    ],
+                    [M_TOPIC.name]: {
+                        "m.text": [
+                            {
+                                body: "pizza",
+                            },
+                        ],
+                    },
                 }),
             ).toEqual({
                 text: "pizza",
@@ -240,12 +246,14 @@ describe("Topic content helpers", () => {
             expect(
                 parseTopicContent({
                     topic: "pizza",
-                    [M_TOPIC.name]: [
-                        {
-                            body: "pizza",
-                            mimetype: "text/plain",
-                        },
-                    ],
+                    [M_TOPIC.name]: {
+                        "m.text": [
+                            {
+                                body: "pizza",
+                                mimetype: "text/plain",
+                            },
+                        ],
+                    },
                 }),
             ).toEqual({
                 text: "pizza",
@@ -256,12 +264,14 @@ describe("Topic content helpers", () => {
             expect(
                 parseTopicContent({
                     topic: "pizza",
-                    [M_TOPIC.name]: [
-                        {
-                            body: "<b>pizza</b>",
-                            mimetype: "text/html",
-                        },
-                    ],
+                    [M_TOPIC.name]: {
+                        "m.text": [
+                            {
+                                body: "<b>pizza</b>",
+                                mimetype: "text/html",
+                            },
+                        ],
+                    },
                 }),
             ).toEqual({
                 text: "pizza",
@@ -283,7 +293,12 @@ describe("Topic content helpers", () => {
             expect(
                 parseTopicContent({
                     "topic": "pizza",
-                    "m.topic": {} as any,
+                    "m.topic": [
+                        {
+                            body: "<b>pizza</b>",
+                            mimetype: "text/html",
+                        },
+                    ] as any,
                 }),
             ).toEqual({
                 text: "pizza",
