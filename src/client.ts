@@ -542,6 +542,7 @@ export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_m
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
+export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
 
 enum CrossSigningKeyType {
     MasterKey = "master_key",
@@ -6903,7 +6904,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns `true` if supported, otherwise `false`
      */
     public async doesServerSupportExtendedProfiles(): Promise<boolean> {
-        return this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES);
+        return (
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES)) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC4133_EXTENDED_PROFILES))
+        );
     }
 
     /**
