@@ -206,7 +206,11 @@ export type TopicState = {
 };
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
-    const mtopic = M_TOPIC.findIn<MTopicContent>(content)?.["m.text"];
+    const mtopicParent = M_TOPIC.findIn<MTopicContent>(content);
+    const mtopic = Array.isArray(mtopicParent) ? mtopicParent : mtopicParent?.["m.text"];
+    // TODO remove support for the old malformed m.topic arrays after a few releases (only allow array in m.text)
+    //      https://github.com/matrix-org/matrix-js-sdk/pull/4984#pullrequestreview-3174251065
+    //const mtopic = M_TOPIC.findIn<MTopicContent>(content)?.["m.text"];
     if (!Array.isArray(mtopic)) {
         return { text: content.topic ?? undefined };
     }

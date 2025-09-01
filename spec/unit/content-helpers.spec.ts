@@ -289,7 +289,25 @@ describe("Topic content helpers", () => {
             });
         });
 
-        it("uses legacy event content when new topic key is invalid", () => {
+        // TODO delete this test and re-enable the next one after support for the invalid form is removed
+        //      https://github.com/matrix-org/matrix-js-sdk/pull/4984#pullrequestreview-3174251065
+        it("parses malformed event content with html topic", () => {
+            expect(
+                parseTopicContent({
+                    "topic": "pizza",
+                    "m.topic": [
+                        {
+                            body: "<b>pizza</b>",
+                            mimetype: "text/html",
+                        },
+                    ] as any,
+                }),
+            ).toEqual({
+                text: "pizza",
+                html: "<b>pizza</b>",
+            });
+        });
+        it.skip("uses legacy event content when new topic key is invalid", () => {
             expect(
                 parseTopicContent({
                     "topic": "pizza",
