@@ -197,7 +197,7 @@ export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
     if (isProvided(topic)) {
         renderings.push({ body: topic, mimetype: "text/plain" });
     }
-    return { topic, [M_TOPIC.name]: renderings };
+    return { topic, [M_TOPIC.name]: { "m.text": renderings } };
 };
 
 export type TopicState = {
@@ -206,7 +206,7 @@ export type TopicState = {
 };
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
-    const mtopic = M_TOPIC.findIn<MTopicContent>(content);
+    const mtopic = M_TOPIC.findIn<MTopicContent>(content)?.["m.text"];
     if (!Array.isArray(mtopic)) {
         return { text: content.topic ?? undefined };
     }

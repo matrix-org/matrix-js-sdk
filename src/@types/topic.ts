@@ -47,7 +47,7 @@ export const M_TOPIC = new NamespacedValue("m.topic");
 /**
  * The event content for an m.topic event (in content)
  */
-export type MTopicContent = IMessageRendering[];
+export type MTopicContent = { "m.text": IMessageRendering[] };
 
 /**
  * The event definition for an m.topic event (in content)
