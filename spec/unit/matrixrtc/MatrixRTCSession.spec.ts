@@ -355,7 +355,7 @@ describe("MatrixRTCSession", () => {
                     "m.mentions": { room: true, user_ids: [] },
                     "m.relates_to": {
                         event_id: expect.any(String),
-                        rel_type: "org.matrix.msc4075.rtc.notification.parent",
+                        rel_type: "m.reference",
                     },
                     "notification_type": "ring",
                     "sender_ts": expect.any(Number),
