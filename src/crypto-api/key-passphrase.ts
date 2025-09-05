@@ -30,7 +30,7 @@ export async function deriveRecoveryKeyFromPassphrase(
     salt: string,
     iterations: number,
     numBits = DEFAULT_BIT_SIZE,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
     if (!globalThis.crypto.subtle || !TextEncoder) {
         throw new Error("Password-based backup is not available on this platform");
     }

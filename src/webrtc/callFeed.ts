@@ -84,7 +84,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private measuringVolumeActivity = false;
     private audioContext?: AudioContext;
     private analyser?: AnalyserNode;
-    private frequencyBinCount?: Float32Array;
+    private frequencyBinCount?: Float32Array<ArrayBuffer>;
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout?: ReturnType<typeof setTimeout>;
