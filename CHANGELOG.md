@@ -1,3 +1,21 @@
+Changes in [38.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.1.0) (2025-09-09)
+==================================================================================================
+## ✨ Features
+
+* Remove custom `org.matrix.msc4075.rtc.notification.parent` relation type ([#4979](https://github.com/matrix-org/matrix-js-sdk/pull/4979)). Contributed by @toger5.
+* MatrixRTC: Add RTC decline event ([#4978](https://github.com/matrix-org/matrix-js-sdk/pull/4978)). Contributed by @toger5.
+* Make a MatrixRTCSession emit once the RTCNotification is sent ([#4976](https://github.com/matrix-org/matrix-js-sdk/pull/4976)). Contributed by @toger5.
+* Use hydra semantics for unknown room versions ([#4957](https://github.com/matrix-org/matrix-js-sdk/pull/4957)). Contributed by @dbkr.
+* Expose the StatusChanged event through the RTCSession ([#4974](https://github.com/matrix-org/matrix-js-sdk/pull/4974)). Contributed by @toger5.
+* Add `probablyLeft` event to the MatrixRTCSession ([#4962](https://github.com/matrix-org/matrix-js-sdk/pull/4962)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Fix `m.topic` format ([#4984](https://github.com/matrix-org/matrix-js-sdk/pull/4984)). Contributed by @tulir.
+* Fix stable-suffixed MSC4133 support ([#4983](https://github.com/matrix-org/matrix-js-sdk/pull/4983)). Contributed by @dbkr.
+* Fix thread edit aggregation race condition ([#4980](https://github.com/matrix-org/matrix-js-sdk/pull/4980)). Contributed by @basnijholt.
+
+
 Changes in [38.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.0.0) (2025-08-27)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
