@@ -1086,7 +1086,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 verificationMethodIdentifierToMethod(method),
             );
             // Get the request content to send to the DM room
-            const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+            const verCont: string = await userIdentity.verificationRequestContent(methods);
+
+            // TODO: due to https://github.com/matrix-org/matrix-rust-sdk/issues/5643, we need to fix up the verification request content to include `msgtype`.
+            const verContObj = JSON.parse(verCont);
+            verContObj["msgtype"] = "m.key.verification.request";
+            const verificationEventContent: string = JSON.stringify(verContObj);
 
             // Send the request content to send to the DM room
             const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);

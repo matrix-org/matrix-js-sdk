@@ -156,6 +156,8 @@ describe("VerificationRequest", () => {
             );
 
             const verificationRequestContent = JSON.parse(await bobUserIdentity.verificationRequestContent(methods));
+            todoFixupVerificationRequestContent(verificationRequestContent);
+
             await bobOlmMachine.receiveVerificationEvent(
                 JSON.stringify({
                     type: "m.room.message",
@@ -289,6 +291,8 @@ describe("VerificationRequest", () => {
             );
 
             const verificationRequestContent = JSON.parse(await bobUserIdentity.verificationRequestContent(methods));
+            todoFixupVerificationRequestContent(verificationRequestContent);
+
             await bobOlmMachine.receiveVerificationEvent(
                 JSON.stringify({
                     type: "m.room.message",
@@ -405,6 +409,8 @@ describe("VerificationRequest", () => {
             );
 
             const verificationRequestContent = JSON.parse(await bobUserIdentity.verificationRequestContent(methods));
+            todoFixupVerificationRequestContent(verificationRequestContent);
+
             await bobOlmMachine.receiveVerificationEvent(
                 JSON.stringify({
                     type: "m.room.message",
@@ -459,6 +465,15 @@ describe("VerificationRequest", () => {
         }
     });
 });
+
+/**
+ * Needed until https://github.com/matrix-org/matrix-rust-sdk/issues/5643 is fixed.
+ *
+ * Modify the content of the supplied content to include `msgtype: m.key.verification.request`.
+ */
+function todoFixupVerificationRequestContent(content: any) {
+    content.msgtype = "m.key.verification.request";
+}
 
 describe("isVerificationEvent", () => {
     it.each([
