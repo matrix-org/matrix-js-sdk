@@ -326,11 +326,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoBackend.maybeAcceptKeyBundle}.
      */
     public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void> {
-        // TODO: retry this if it gets interrupted or it fails.
+        // TODO: retry this if it gets interrupted or it fails. (https://github.com/matrix-org/matrix-rust-sdk/issues/5112)
         // TODO: do this in the background.
-        // TODO: handle the bundle message arriving after the invite.
+        // TODO: handle the bundle message arriving after the invite (https://github.com/element-hq/element-web/issues/30740)
 
         const logger = new LogSpan(this.logger, `maybeAcceptKeyBundle(${roomId}, ${inviter})`);
+
+        // Make sure we have an up-to-date idea of the inviter's cross-signing keys, so that we can check if the
+        // device that sent us the bundle data was correctly cross-signed.
+        //
+        // TODO: it would be nice to skip this step if we have an up-to-date copy of the inviter's cross-signing keys,
+        //   but we don't have an easy way to check that.
+        logger.info(`Checking inviter cross-signing keys`);
+        const request = this.olmMachine.queryKeysForUsers([new RustSdkCryptoJs.UserId(inviter)]);
+        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
 
         const bundleData = await this.olmMachine.getReceivedRoomKeyBundleData(
             new RustSdkCryptoJs.RoomId(roomId),
