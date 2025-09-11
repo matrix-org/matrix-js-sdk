@@ -336,7 +336,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         // device that sent us the bundle data was correctly cross-signed.
         //
         // TODO: it would be nice to skip this step if we have an up-to-date copy of the inviter's cross-signing keys,
-        //   but we don't have an easy way to check that.
+        //   but we don't have an easy way to check that. Possibly the rust side could trigger a key request and then
+        //   block until it happens.
         logger.info(`Checking inviter cross-signing keys`);
         const request = this.olmMachine.queryKeysForUsers([new RustSdkCryptoJs.UserId(inviter)]);
         await this.outgoingRequestProcessor.makeOutgoingRequest(request);
