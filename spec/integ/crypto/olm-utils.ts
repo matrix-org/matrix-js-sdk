@@ -16,6 +16,7 @@ limitations under the License.
 
 import Olm from "@matrix-org/olm";
 import anotherjson from "another-json";
+import fetchMock from "fetch-mock-jest";
 
 import {
     type IContent,
@@ -30,6 +31,8 @@ import { type IE2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { type ISyncResponder } from "../../test-utils/SyncResponder";
 import { syncPromise } from "../../test-utils/test-utils";
 import { type KeyBackupInfo } from "../../../src/crypto-api";
+import { logger } from "../../../src/logger";
+import type FetchMock from "fetch-mock";
 
 /**
  * @module
@@ -302,6 +305,7 @@ export function encryptMegolmEventRawPlainText(opts: {
         },
         type: "m.room.encrypted",
         unsigned: {},
+        state_key: opts.plaintext.state_key ? `${opts.plaintext.type}:${opts.plaintext.state_key}` : undefined,
     };
 }
 
@@ -413,4 +417,149 @@ export async function establishOlmSession(
     });
     await syncPromise(testClient);
     return p2pSession;
+}
+
+/**
+ * Expect that the client shares keys with the given recipient
+ *
+ * Waits for an HTTP request to send the encrypted m.room_key to-device message; decrypts it and uses it
+ * to establish an Olm InboundGroupSession.
+ *
+ * @param recipientUserID - the user id of the expected recipient
+ *
+ * @param recipientOlmAccount - Olm.Account for the recipient
+ *
+ * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
+ *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
+ *
+ * @returns the established inbound group session
+ */
+export async function expectSendRoomKey(
+    recipientUserID: string,
+    recipientOlmAccount: Olm.Account,
+    recipientOlmSession: Olm.Session | null = null,
+): Promise<Olm.InboundGroupSession> {
+    const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
+
+    function onSendRoomKey(content: any): Olm.InboundGroupSession {
+        const m = content.messages[recipientUserID].DEVICE_ID;
+        const ct = m.ciphertext[testRecipientKey];
+
+        if (!recipientOlmSession) {
+            expect(ct.type).toEqual(0); // pre-key message
+            recipientOlmSession = new Olm.Session();
+            recipientOlmSession.create_inbound(recipientOlmAccount, ct.body);
+        } else {
+            expect(ct.type).toEqual(1); // regular message
+        }
+
+        const decrypted = JSON.parse(recipientOlmSession.decrypt(ct.type, ct.body));
+        expect(decrypted.type).toEqual("m.room_key");
+        const inboundGroupSession = new Olm.InboundGroupSession();
+        inboundGroupSession.create(decrypted.content.session_key);
+        return inboundGroupSession;
+    }
+    return await new Promise<Olm.InboundGroupSession>((resolve) => {
+        fetchMock.putOnce(
+            new RegExp("/sendToDevice/m.room.encrypted/"),
+            (url: string, opts: RequestInit): FetchMock.MockResponse => {
+                const content = JSON.parse(opts.body as string);
+                resolve(onSendRoomKey(content));
+                return {};
+            },
+            {
+                // append to the list of intercepts on this path (since we have some tests that call
+                // this function multiple times)
+                overwriteRoutes: false,
+            },
+        );
+    });
+}
+
+/**
+ * Return the event received on rooms/{roomId}/send/m.room.encrypted endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
+ * @returns the content of the encrypted event
+ */
+export function expectEncryptedSendMessageEvent() {
+    return new Promise<IContent>((resolve) => {
+        fetchMock.putOnce(
+            new RegExp("/send/m.room.encrypted/"),
+            (url, request) => {
+                const content = JSON.parse(request.body as string);
+                resolve(content);
+                return { event_id: "$event_id" };
+            },
+            // append to the list of intercepts on this path (since we have some tests that call
+            // this function multiple times)
+            { overwriteRoutes: false },
+        );
+    });
+}
+
+/**
+ * Return the event received on rooms/{roomId}/state/m.room.encrypted/{stateKey} endpoint.
+ * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidstateeventtypestatekey
+ * @returns the content of the encrypted event
+ */
+function expectEncryptedSendStateEvent() {
+    return new Promise<IContent>((resolve) => {
+        fetchMock.putOnce(
+            new RegExp("/state/m.room.encrypted/"),
+            (url, request) => {
+                const content = JSON.parse(request.body as string);
+                resolve(content);
+                return { event_id: "$event_id" };
+            },
+            // append to the list of intercepts on this path (since we have some tests that call
+            // this function multiple times)
+            { overwriteRoutes: false },
+        );
+    });
+}
+
+/**
+ * Expect that the client sends an encrypted message event
+ *
+ * Waits for an HTTP request to send an encrypted message in the test room.
+ *
+ * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
+ *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
+ *
+ * @returns The content of the successfully-decrypted event
+ */
+export async function expectSendMegolmMessageEvent(
+    inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
+): Promise<Partial<IEvent>> {
+    const encryptedMessageContent = await expectEncryptedSendMessageEvent();
+
+    // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
+    const inboundGroupSession = await inboundGroupSessionPromise;
+
+    const r: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+    logger.log("Decrypted received megolm message", r);
+    return JSON.parse(r.plaintext);
+}
+
+/**
+ * Expect that the client sends an encrypted state event
+ *
+ * Waits for an HTTP request to send an encrypted state event in the test room.
+ *
+ * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
+ *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
+ *
+ * @returns The content of the successfully-decrypted state event
+ */
+export async function expectSendMegolmStateEvent(
+    inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
+): Promise<Partial<IEvent>> {
+    const encryptedStateContent = await expectEncryptedSendStateEvent();
+
+    // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
+    const inboundGroupSession = await inboundGroupSessionPromise;
+
+    const r: any = inboundGroupSession.decrypt(encryptedStateContent!.ciphertext);
+    logger.log("Decrypted received megolm state event", r);
+    return JSON.parse(r.plaintext);
 }

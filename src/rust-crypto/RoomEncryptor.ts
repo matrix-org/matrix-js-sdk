@@ -27,7 +27,7 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event.ts";
-import { type IContent, type MatrixEvent } from "../models/event.ts";
+import { type MatrixEvent, type IContent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
 import { type Logger, LogSpan } from "../logger.ts";
 import { type KeyClaimManager } from "./KeyClaimManager.ts";

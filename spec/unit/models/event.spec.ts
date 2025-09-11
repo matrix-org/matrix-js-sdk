@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type MockedObject } from "jest-mock";
 
-import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import { type IContent, MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
@@ -331,6 +331,25 @@ describe("MatrixEvent", () => {
             return new MatrixEvent({
                 type: "m.room.redaction",
                 redacts: redactedEventid,
+            });
+        }
+    });
+
+    describe("state key packing", () => {
+        it("should pack the state key during encryption", () => {
+            const ev = createStateEvent("$event1:server", "m.room.topic", "", { topic: "" });
+            expect(ev.getStateKey()).toStrictEqual("");
+            ev.makeEncrypted("m.room.encrypted", { ciphertext: "xyz" }, "", "");
+            expect(ev.getStateKey()).toStrictEqual("");
+            expect(ev.getWireStateKey()).toStrictEqual("m.room.topic:");
+        });
+
+        function createStateEvent(eventId: string, type: string, stateKey: string, content?: IContent): MatrixEvent {
+            return new MatrixEvent({
+                type,
+                state_key: stateKey,
+                content,
+                event_id: eventId,
             });
         }
     });
