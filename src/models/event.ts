@@ -158,6 +158,7 @@ export interface IMarkedUnreadEvent {
 export interface IClearEvent {
     room_id?: string;
     type: string;
+    state_key?: string;
     content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
     unsigned?: IUnsigned;
 }
@@ -728,11 +729,23 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Get the event state_key if it has one. This will return <code>undefined
+     * Get the (decrypted, if necessary) event state_key if it has one. This will return <code>undefined
      * </code> for message events.
      * @returns The event's `state_key`.
      */
     public getStateKey(): string | undefined {
+        if (this.clearEvent) {
+            return this.clearEvent.state_key;
+        }
+        return this.event.state_key;
+    }
+
+    /**
+     * Get the (possibly encrypted) event state_key if it has one. This will return <code>undefined
+     * </code> for message events.
+     * @returns The event's `state_key`.
+     */
+    public getWireStateKey(): string | undefined {
         return this.event.state_key;
     }
 
@@ -785,11 +798,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.clearEvent = {
             type: this.event.type!,
             content: this.event.content!,
+            state_key: this.event.state_key,
         };
         this.event.type = cryptoType;
         this.event.content = cryptoContent;
         this.senderCurve25519Key = senderCurve25519Key;
         this.claimedEd25519Key = claimedEd25519Key;
+
+        // if this is a state event, pack cleartext type and statekey
+        if (this.isState()) {
+            this.event.state_key = `${this.clearEvent!.type}:${this.clearEvent!.state_key}`;
+        }
     }
 
     /**
@@ -1025,7 +1044,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns True if this event is encrypted.
      */
     public isEncrypted(): boolean {
-        return !this.isState() && this.event.type === EventType.RoomMessageEncrypted;
+        return this.event.type === EventType.RoomMessageEncrypted;
     }
 
     /**

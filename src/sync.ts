@@ -1366,6 +1366,12 @@ export class SyncApi {
                 }
             }
 
+            // The JS SDK does not proactively decrypt state events, but this is not applicable for state events
+            // since we should process their contents immediately.
+            for (const ev of timelineEvents.filter((ev) => ev.isState())) {
+                await this.client.decryptEventIfNeeded(ev);
+            }
+
             try {
                 if ("org.matrix.msc4222.state_after" in joinObj) {
                     await this.injectRoomEvents(

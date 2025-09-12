@@ -27,7 +27,7 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { EventType } from "../@types/event.ts";
-import { type IContent, type MatrixEvent } from "../models/event.ts";
+import { type MatrixEvent, type IContent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
 import { type Logger, LogSpan } from "../logger.ts";
 import { type KeyClaimManager } from "./KeyClaimManager.ts";
@@ -314,11 +314,22 @@ export class RoomEncryptor {
 
     private async encryptEventInner(logger: LogSpan, event: MatrixEvent): Promise<void> {
         logger.debug("Encrypting actual message content");
-        const encryptedContent = await this.olmMachine.encryptRoomEvent(
-            new RoomId(this.room.roomId),
-            event.getType(),
-            JSON.stringify(event.getContent()),
-        );
+
+        let encryptedContent;
+        if (event.isState()) {
+            encryptedContent = await this.olmMachine.encryptStateEvent(
+                new RoomId(this.room.roomId),
+                event.getType(),
+                event.getStateKey()!,
+                JSON.stringify(event.getContent()),
+            );
+        } else {
+            encryptedContent = await this.olmMachine.encryptRoomEvent(
+                new RoomId(this.room.roomId),
+                event.getType(),
+                JSON.stringify(event.getContent()),
+            );
+        }
 
         event.makeEncrypted(
             EventType.RoomMessageEncrypted,

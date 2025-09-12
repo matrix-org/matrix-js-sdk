@@ -88,7 +88,10 @@ import {
     encryptMegolmEventRawPlainText,
     establishOlmSession,
     getTestOlmAccountKeys,
-} from "./olm-utils";
+    expectSendRoomKey,
+    expectSendMegolmMessageEvent,
+    expectEncryptedSendMessageEvent,
+} from "./olm-utils.ts";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
@@ -103,107 +106,6 @@ afterEach(() => {
 
     jest.useRealTimers();
 });
-
-/**
- * Expect that the client shares keys with the given recipient
- *
- * Waits for an HTTP request to send the encrypted m.room_key to-device message; decrypts it and uses it
- * to establish an Olm InboundGroupSession.
- *
- * @param recipientUserID - the user id of the expected recipient
- *
- * @param recipientOlmAccount - Olm.Account for the recipient
- *
- * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
- *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
- *
- * @returns the established inbound group session
- */
-async function expectSendRoomKey(
-    recipientUserID: string,
-    recipientOlmAccount: Olm.Account,
-    recipientOlmSession: Olm.Session | null = null,
-): Promise<Olm.InboundGroupSession> {
-    const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
-
-    function onSendRoomKey(content: any): Olm.InboundGroupSession {
-        const m = content.messages[recipientUserID].DEVICE_ID;
-        const ct = m.ciphertext[testRecipientKey];
-
-        if (!recipientOlmSession) {
-            expect(ct.type).toEqual(0); // pre-key message
-            recipientOlmSession = new Olm.Session();
-            recipientOlmSession.create_inbound(recipientOlmAccount, ct.body);
-        } else {
-            expect(ct.type).toEqual(1); // regular message
-        }
-
-        const decrypted = JSON.parse(recipientOlmSession.decrypt(ct.type, ct.body));
-        expect(decrypted.type).toEqual("m.room_key");
-        const inboundGroupSession = new Olm.InboundGroupSession();
-        inboundGroupSession.create(decrypted.content.session_key);
-        return inboundGroupSession;
-    }
-    return await new Promise<Olm.InboundGroupSession>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/sendToDevice/m.room.encrypted/"),
-            (url: string, opts: RequestInit): FetchMock.MockResponse => {
-                const content = JSON.parse(opts.body as string);
-                resolve(onSendRoomKey(content));
-                return {};
-            },
-            {
-                // append to the list of intercepts on this path (since we have some tests that call
-                // this function multiple times)
-                overwriteRoutes: false,
-            },
-        );
-    });
-}
-
-/**
- * Return the event received on rooms/{roomId}/send/m.room.encrypted endpoint.
- * See https://spec.matrix.org/latest/client-server-api/#put_matrixclientv3roomsroomidsendeventtypetxnid
- * @returns the content of the encrypted event
- */
-function expectEncryptedSendMessage() {
-    return new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/send/m.room.encrypted/"),
-            (url, request) => {
-                const content = JSON.parse(request.body as string);
-                resolve(content);
-                return { event_id: "$event_id" };
-            },
-            // append to the list of intercepts on this path (since we have some tests that call
-            // this function multiple times)
-            { overwriteRoutes: false },
-        );
-    });
-}
-
-/**
- * Expect that the client sends an encrypted event
- *
- * Waits for an HTTP request to send an encrypted message in the test room.
- *
- * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
- *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
- *
- * @returns The content of the successfully-decrypted event
- */
-async function expectSendMegolmMessage(
-    inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
-): Promise<Partial<IEvent>> {
-    const encryptedMessageContent = await expectEncryptedSendMessage();
-
-    // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
-    const inboundGroupSession = await inboundGroupSessionPromise;
-
-    const r: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
-    logger.log("Decrypted received megolm message", r);
-    return JSON.parse(r.plaintext);
-}
 
 describe("crypto", () => {
     let testOlmAccount = {} as unknown as Olm.Account;
@@ -991,7 +893,7 @@ describe("crypto", () => {
         // Finally, send the message, and expect to get an `m.room.encrypted` event that we can decrypt.
         await Promise.all([
             aliceClient.sendTextMessage(ROOM_ID, "test"),
-            expectSendMegolmMessage(inboundGroupSessionPromise),
+            expectSendMegolmMessageEvent(inboundGroupSessionPromise),
         ]);
     });
 
@@ -1018,7 +920,7 @@ describe("crypto", () => {
         // Send the first message, and check we can decrypt it.
         await Promise.all([
             aliceClient.sendTextMessage(ROOM_ID, "test"),
-            expectSendMegolmMessage(inboundGroupSessionPromise),
+            expectSendMegolmMessageEvent(inboundGroupSessionPromise),
         ]);
 
         // Finally the interesting part: discard the session.
@@ -1026,7 +928,7 @@ describe("crypto", () => {
 
         // Now when we send the next message, we should get a *new* megolm session.
         const inboundGroupSessionPromise2 = expectSendRoomKey("@bob:xyz", testOlmAccount);
-        const p2 = expectSendMegolmMessage(inboundGroupSessionPromise2);
+        const p2 = expectSendMegolmMessageEvent(inboundGroupSessionPromise2);
         await Promise.all([aliceClient.sendTextMessage(ROOM_ID, "test2"), p2]);
     });
 
@@ -1037,7 +939,7 @@ describe("crypto", () => {
          */
         async function sendEncryptedMessage(): Promise<IContent> {
             const [encryptedMessage] = await Promise.all([
-                expectEncryptedSendMessage(),
+                expectEncryptedSendMessageEvent(),
                 aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
             return encryptedMessage;
@@ -1159,7 +1061,7 @@ describe("crypto", () => {
         let [, , encryptedMessage] = await Promise.all([
             aliceClient.sendTextMessage(ROOM_ID, "test"),
             expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
-            expectEncryptedSendMessage(),
+            expectEncryptedSendMessageEvent(),
         ]);
 
         // Check that the session id exists
@@ -1187,7 +1089,7 @@ describe("crypto", () => {
         [, , encryptedMessage] = await Promise.all([
             aliceClient.sendTextMessage(ROOM_ID, "test"),
             expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession),
-            expectEncryptedSendMessage(),
+            expectEncryptedSendMessageEvent(),
         ]);
 
         // Check that the new session id exists
@@ -1385,7 +1287,7 @@ describe("crypto", () => {
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
             // and finally the megolm message
-            const megolmMessagePromise = expectSendMegolmMessage(inboundGroupSessionPromise);
+            const megolmMessagePromise = expectSendMegolmMessageEvent(inboundGroupSessionPromise);
 
             // kick it off
             const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test");
@@ -1408,7 +1310,7 @@ describe("crypto", () => {
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
             // and finally the megolm message
-            const megolmMessagePromise = expectSendMegolmMessage(inboundGroupSessionPromise);
+            const megolmMessagePromise = expectSendMegolmMessageEvent(inboundGroupSessionPromise);
 
             // kick it off
             const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test");
@@ -2300,7 +2202,7 @@ describe("crypto", () => {
             await syncPromise(client1);
 
             // Send a message, and expect to get an `m.room.encrypted` event.
-            await Promise.all([client1.sendTextMessage(ROOM_ID, "test"), expectEncryptedSendMessage()]);
+            await Promise.all([client1.sendTextMessage(ROOM_ID, "test"), expectEncryptedSendMessageEvent()]);
 
             // We now replace the client, and allow the new one to resync, *without* the encryption event.
             client2 = await replaceClient(client1);
@@ -2321,7 +2223,7 @@ describe("crypto", () => {
             // Send a message, and expect to get an `m.room.encrypted` event.
             const [, msg1Content] = await Promise.all([
                 client1.sendTextMessage(ROOM_ID, "test1"),
-                expectEncryptedSendMessage(),
+                expectEncryptedSendMessageEvent(),
             ]);
 
             // Replace the state with one which bumps the rotation period. This should be ignored, though it's not
@@ -2340,12 +2242,12 @@ describe("crypto", () => {
             // use a different one.
             const [, msg2Content] = await Promise.all([
                 client1.sendTextMessage(ROOM_ID, "test2"),
-                expectEncryptedSendMessage(),
+                expectEncryptedSendMessageEvent(),
             ]);
             expect(msg2Content.session_id).toEqual(msg1Content.session_id);
             const [, msg3Content] = await Promise.all([
                 client1.sendTextMessage(ROOM_ID, "test3"),
-                expectEncryptedSendMessage(),
+                expectEncryptedSendMessageEvent(),
             ]);
             expect(msg3Content.session_id).not.toEqual(msg1Content.session_id);
         });
@@ -2357,7 +2259,7 @@ describe("crypto", () => {
             await syncPromise(client1);
 
             // Send a message, and expect to get an `m.room.encrypted` event.
-            await Promise.all([client1.sendTextMessage(ROOM_ID, "test1"), expectEncryptedSendMessage()]);
+            await Promise.all([client1.sendTextMessage(ROOM_ID, "test1"), expectEncryptedSendMessageEvent()]);
 
             // We now replace the client, and allow the new one to resync with a *different* encryption event.
             client2 = await replaceClient(client1);
