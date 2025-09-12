@@ -1210,8 +1210,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
 
     private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
+    private readonly enableEncryptedStateEvents: boolean;
     public cryptoCallbacks: CryptoCallbacks; // XXX: Intended private, used in code.
-    public enableEncryptedStateEvents: boolean;
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
