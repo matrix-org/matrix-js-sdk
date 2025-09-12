@@ -53,7 +53,8 @@ describe("oidc authorization", () => {
         jest.setSystemTime(now);
 
         fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
-        globalThis.TextEncoder = TextEncoder;
+        // XXX: jsdom lacks a TextEncoder and Node's implementation has marginally different types, so we fudge it
+        (globalThis as any).TextEncoder = TextEncoder;
     });
 
     beforeEach(() => {

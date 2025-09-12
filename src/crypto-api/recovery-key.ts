@@ -44,7 +44,7 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
  * Decode a recovery key encoded with the Matrix {@link https://spec.matrix.org/v1.11/appendices/#cryptographic-key-representation | Cryptographic key representation} encoding.
  * @param recoveryKey
  */
-export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
+export function decodeRecoveryKey(recoveryKey: string): Uint8Array<ArrayBuffer> {
     const result = bs58.decode(recoveryKey.replace(/ /g, ""));
 
     let parity = 0;

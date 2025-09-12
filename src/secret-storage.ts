@@ -109,7 +109,7 @@ export interface AddSecretStorageKeyOpts {
     /** Optional name of the key. */
     name?: string;
     /** The private key. Will be used to generate the key check values in the key info; it will not be stored on the server */
-    key: Uint8Array;
+    key: Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -202,7 +202,7 @@ export interface SecretStorageCallbacks {
             keys: Record<string, SecretStorageKeyDescription>;
         },
         name: string,
-    ) => Promise<[string, Uint8Array] | null>;
+    ) => Promise<[string, Uint8Array<ArrayBuffer>] | null>;
 }
 
 /**
@@ -493,7 +493,7 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
      *
      * @returns whether or not the key matches
      */
-    public async checkKey(key: Uint8Array, info: SecretStorageKeyDescriptionAesV1): Promise<boolean> {
+    public async checkKey(key: Uint8Array<ArrayBuffer>, info: SecretStorageKeyDescriptionAesV1): Promise<boolean> {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const { mac } = await calculateKeyCheck(key, info.iv);
@@ -706,6 +706,9 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
  *     If omitted, a random initialization vector will be created.
  * @returns An object that contains, `mac` and `iv` properties.
  */
-export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<AESEncryptedSecretStoragePayload> {
+export function calculateKeyCheck(
+    key: Uint8Array<ArrayBuffer>,
+    iv?: string,
+): Promise<AESEncryptedSecretStoragePayload> {
     return encryptAESSecretStorageItem(ZERO_STR, key, "", iv);
 }

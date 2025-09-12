@@ -33,11 +33,11 @@ import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSec
  */
 export default async function encryptAESSecretStorageItem(
     data: string,
-    key: Uint8Array,
+    key: Uint8Array<ArrayBuffer>,
     name: string,
     ivStr?: string,
 ): Promise<AESEncryptedSecretStoragePayload> {
-    let iv: Uint8Array;
+    let iv: Uint8Array<ArrayBuffer>;
     if (ivStr) {
         iv = decodeBase64(ivStr);
     } else {

@@ -74,7 +74,7 @@ describe("cross-signing", () => {
     function createCryptoCallbacks(): CryptoCallbacks {
         return {
             getSecretStorageKey: (keys, name) => {
-                return Promise.resolve<[string, Uint8Array]>(["key_id", encryptionKey]);
+                return Promise.resolve<[string, Uint8Array<ArrayBuffer>]>(["key_id", encryptionKey]);
             },
         };
     }
