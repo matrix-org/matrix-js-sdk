@@ -6670,15 +6670,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // If the room is unknown, we cannot encrypt for it
         if (!room) return;
 
-        if (!this.cryptoBackend) {
-            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
-        }
-
         if (!this.cryptoBackend && this.usingExternalCrypto) {
             // The client has opted to allow sending messages to encrypted
             // rooms even if the room is encrypted, and we haven't set up
             // crypto. This is useful for users of matrix-org/pantalaimon
             return;
+        }
+
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
         // Check regular encryption conditions.
@@ -6687,8 +6687,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        // If we have a crypto impl, and *it* thinks we shouldn't encrypt, then we shouldn't.
-        if (!(await this.cryptoBackend?.isStateEncryptionEnabledInRoom(room.roomId))) {
+        // If the crypto impl thinks we shouldn't encrypt, then we shouldn't.
+        // Safety: we checked the crypto impl exists above.
+        if (!(await this.cryptoBackend!.isStateEncryptionEnabledInRoom(room.roomId))) {
             this.logger.info("Discarded - does not match state event conditions");
             return;
         }
@@ -6710,7 +6711,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        this.logger.info("Encrypting state event");
         await this.cryptoBackend.encryptEvent(event, room);
     }
 
