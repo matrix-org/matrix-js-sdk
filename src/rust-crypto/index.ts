@@ -93,7 +93,7 @@ export async function initRustCrypto(args: {
     legacyMigrationProgressListener?: (progress: number, total: number) => void;
 
     /**
-     * Enable support for state encrypt
+     * Whether to enable support for encrypting state events.
      */
     enableEncryptedStateEvents?: boolean;
 }): Promise<RustCrypto> {
