@@ -1216,7 +1216,7 @@ export class SyncApi {
             // this helps large account to speed up faster
             // room::decryptCriticalEvent is in charge of decrypting all the events
             // required for a client to function properly
-            const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room);
+            const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
             const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
@@ -1366,6 +1366,8 @@ export class SyncApi {
                 }
             }
 
+            // The JS SDK does not proactively decrypt state events, but this is not applicable for state events
+            // since we should process their contents immediately.
             for (const ev of timelineEvents.filter((ev) => ev.isState())) {
                 await this.client.decryptEventIfNeeded(ev);
             }
