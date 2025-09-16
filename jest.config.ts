@@ -23,7 +23,7 @@ const config: Config = {
     collectCoverageFrom: ["<rootDir>/src/**/*.{js,ts}"],
     coverageReporters: ["text-summary", "lcov"],
     testResultsProcessor: "@casualbot/jest-sonar-reporter",
-    transformIgnorePatterns: ["/node_modules/(?!(uuid)).+$"],
+    transformIgnorePatterns: ["/node_modules/(?!(uuid|p-retry|is-network-error)).+$"],
 
     // Always print out a summary if there are any failing tests. Normally
     // a summary is only printed if there are more than 20 test *suites*.
