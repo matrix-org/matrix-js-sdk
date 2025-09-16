@@ -1,3 +1,9 @@
+Changes in [38.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.2.0) (2025-09-16)
+==================================================================================================
+Fix [CVE-2025-59160](https://www.cve.org/CVERecord?id=CVE-2025-59160) / [GHSA-mp7c-m3rh-r56v](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-mp7c-m3rh-r56v)
+
+
+
 Changes in [38.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.1.0) (2025-09-09)
 ==================================================================================================
 ## ✨ Features
