@@ -96,10 +96,12 @@ export interface ICallNotifyContent {
 }
 
 export type RTCNotificationType = "ring" | "notification";
+export type RTCMediaHint = "audio" | "video";
 export interface IRTCNotificationContent extends RelationEvent {
     "m.mentions": IMentions;
     "decline_reason"?: string;
     "notification_type": RTCNotificationType;
+    "media_hint"?: RTCMediaHint;
     "sender_ts": number;
     "lifetime": number;
 }
