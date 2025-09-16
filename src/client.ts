@@ -2141,21 +2141,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public getVisibleRooms(msc3946ProcessDynamicPredecessor = false): Room[] {
         const allRooms = this.store.getRooms();
 
-        const replacedRooms = new Set();
-        for (const r of allRooms) {
-            const predecessor = r.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
-            if (predecessor) {
-                replacedRooms.add(predecessor);
+        const visibleRooms = new Set(allRooms);
+        for (const room of visibleRooms) {
+            const predecessors = this.findPredecessorRooms(room, true, msc3946ProcessDynamicPredecessor);
+            for (const predecessor of predecessors) {
+                visibleRooms.delete(predecessor);
             }
         }
-
-        return allRooms.filter((r) => {
-            const tombstone = r.currentState.getStateEvents(EventType.RoomTombstone, "");
-            if (tombstone && replacedRooms.has(r.roomId)) {
-                return false;
-            }
-            return true;
-        });
+        return Array.from(visibleRooms);
     }
 
     /**
@@ -3852,7 +3845,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         includeFuture = true,
     ): Promise<{ [roomId: string]: Error | MatrixError | null }> {
-        const upgradeHistory = this.getRoomUpgradeHistory(roomId);
+        const upgradeHistory = this.getRoomUpgradeHistory(roomId, true);
 
         let eligibleToLeave = upgradeHistory;
         if (!includeFuture) {
