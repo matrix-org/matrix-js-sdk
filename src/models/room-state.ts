@@ -464,19 +464,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
             if (event.getType() === EventType.RoomMember) {
                 const userId = event.getStateKey()!;
-
-                // leave events apparently elide the displayname or avatar_url,
-                // so let's fake one up so that we don't leak user ids
-                // into the timeline
-                if (
-                    event.getContent().membership === KnownMembership.Leave ||
-                    event.getContent().membership === KnownMembership.Ban
-                ) {
-                    event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
-                    event.getContent().displayname =
-                        event.getContent().displayname || event.getPrevContent().displayname;
-                }
-
                 const member = this.getOrCreateMember(userId, event);
                 member.setMembershipEvent(event, this);
                 this.updateMember(member);
