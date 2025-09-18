@@ -64,6 +64,10 @@ export interface Capabilities {
     "m.set_displayname"?: ISetDisplayNameCapability;
     "m.set_avatar_url"?: ISetAvatarUrlCapability;
     "uk.tcpip.msc4133.profile_fields"?: IProfileFieldsCapability;
+    /**
+     * Since Matrix v1.16
+     */
+    "m.profile_fields"?: IProfileFieldsCapability;
 }
 
 type CapabilitiesResponse = {
