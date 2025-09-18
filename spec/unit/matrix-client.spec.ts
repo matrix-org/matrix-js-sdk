@@ -2998,6 +2998,8 @@ describe("MatrixClient", function () {
                     replacedByDynamicPredecessor2,
                     room2,
                 ];
+                client.store.getRoom = (roomId: string) =>
+                    client.store.getRooms().find((r) => r.roomId === roomId) || null;
                 room1.addLiveEvents(
                     [
                         roomCreateEvent(room1.roomId, replacedByCreate1.roomId),
@@ -3036,6 +3038,7 @@ describe("MatrixClient", function () {
                     replacedByDynamicPredecessor2,
                 };
             }
+
             it("Returns an empty list if there are no rooms", () => {
                 client.store = new StubStore();
                 client.store.getRooms = () => [];
@@ -3062,6 +3065,8 @@ describe("MatrixClient", function () {
                 const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
                 client.store = new StubStore();
                 client.store.getRooms = () => [room1, replacedRoom1, replacedRoom2, room2];
+                client.store.getRoom = (roomId: string) =>
+                    client.store.getRooms().find((r) => r.roomId === roomId) || null;
                 room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], { addToState: true });
                 room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], { addToState: true });
                 replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], { addToState: true });
@@ -3124,6 +3129,24 @@ describe("MatrixClient", function () {
                 expect(rooms).not.toContain(replacedByDynamicPredecessor2);
                 expect(rooms).toContain(replacedByCreate1);
                 expect(rooms).toContain(replacedByCreate2);
+                expect(rooms).toContain(room1);
+                expect(rooms).toContain(room2);
+            });
+
+            it("should ignore room replacements which are not reciprocated by the predecessor", () => {
+                const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+                // Room 2 claims to replace room 1 but room 1 does not agree
+                const room2 = new Room("replacedRoom1", client, "@daryl:alexandria.example.com");
+
+                client.store = new StubStore();
+                client.store.getRooms = () => [room1, room2];
+                client.store.getRoom = (roomId: string) =>
+                    client.store.getRooms().find((r) => r.roomId === roomId) || null;
+
+                room2.addLiveEvents([roomCreateEvent(room2.roomId, room1.roomId)], { addToState: true });
+
+                // When we ask for the visible rooms
+                const rooms = client.getVisibleRooms();
                 expect(rooms).toContain(room1);
                 expect(rooms).toContain(room2);
             });

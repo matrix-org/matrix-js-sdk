@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "38.1.0",
+    "version": "38.2.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -58,10 +58,10 @@
         "matrix-events-sdk": "0.0.1",
         "matrix-widget-api": "^1.10.0",
         "oidc-client-ts": "^3.0.1",
-        "p-retry": "4",
+        "p-retry": "7",
         "sdp-transform": "^2.14.1",
         "unhomoglyph": "^1.0.6",
-        "uuid": "11"
+        "uuid": "13"
     },
     "devDependencies": {
         "@action-validator/cli": "^0.6.0",

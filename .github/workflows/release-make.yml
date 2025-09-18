@@ -106,7 +106,7 @@ jobs:
               run: echo "VERSION=$(echo $VERSION | cut -d- -f1)" >> $GITHUB_ENV
 
             - name: Check version number not in use
-              uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
               with:
                   script: |
                       const { VERSION } = process.env;
@@ -125,7 +125,7 @@ jobs:
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
 
-            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+            - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
               with:
                   cache: "yarn"
                   node-version-file: package.json
@@ -218,7 +218,7 @@ jobs:
 
             - name: Validate release has expected assets
               if: inputs.expected-asset-count
-              uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
               env:
                   RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   EXPECTED_ASSET_COUNT: ${{ inputs.expected-asset-count }}
@@ -246,7 +246,7 @@ jobs:
                   git push origin master
 
             - name: Publish release
-              uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
               env:
                   RELEASE_ID: ${{ steps.draft-release.outputs.id }}
                   FINAL: ${{ inputs.final }}
