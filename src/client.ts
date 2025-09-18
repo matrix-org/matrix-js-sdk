@@ -6683,14 +6683,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // Check regular encryption conditions.
         if (!(await this.shouldEncryptEventForRoom(event, room))) {
-            this.logger.info("Discarded - does not match regular conditions");
             return;
         }
 
         // If the crypto impl thinks we shouldn't encrypt, then we shouldn't.
         // Safety: we checked the crypto impl exists above.
         if (!(await this.cryptoBackend!.isStateEncryptionEnabledInRoom(room.roomId))) {
-            this.logger.info("Discarded - does not match state event conditions");
             return;
         }
 
@@ -6707,7 +6705,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "m.room.encryption",
             ].includes(event.getType())
         ) {
-            this.logger.info("Discarded - is a critical event");
             return;
         }
 
