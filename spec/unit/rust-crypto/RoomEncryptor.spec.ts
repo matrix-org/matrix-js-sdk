@@ -72,6 +72,7 @@ describe("RoomEncryptor", () => {
                     body: text,
                     msgtype: "m.text",
                 }),
+                isState: () => false,
                 makeEncrypted: jest.fn().mockReturnValue(undefined),
             } as unknown as Mocked<MatrixEvent>;
         }
