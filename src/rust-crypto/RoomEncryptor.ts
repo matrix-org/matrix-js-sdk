@@ -321,7 +321,13 @@ export class RoomEncryptor {
 
         let encryptedContent;
         if (event.isState()) {
-            encryptedContent = await this.olmMachine.encryptStateEvent(room, type, event.getStateKey()!, content);
+            encryptedContent = await this.olmMachine.encryptStateEvent(
+                room,
+                type,
+                // Safety: we've already checked above that this is a state event, so the state key must exist.
+                event.getStateKey()!,
+                content,
+            );
         } else {
             encryptedContent = await this.olmMachine.encryptRoomEvent(room, type, content);
         }
