@@ -4,5 +4,7 @@
  *
  * @see https://github.com/matrix-org/matrix-spec-proposals/blob/clokep/profile-tz/proposals/4175-profile-field-time-zone.md
  * @experimental
+ * @deprecated Use `ProfileKeyTimezone`
  */
 export const ProfileKeyMSC4175Timezone = "us.cloke.msc4175.tz";
+export const ProfileKeyTimezone = "m.tz";
