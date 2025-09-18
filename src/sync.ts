@@ -1366,8 +1366,9 @@ export class SyncApi {
                 }
             }
 
-            // The JS SDK does not proactively decrypt state events, but this is not applicable for state events
-            // since we should process their contents immediately.
+            // Proactively decrypt state events: normally we decrypt on demand, but for state
+            // events we need them immediately, so we handle them here. Specifically, consumers
+            // (e.g. Element Web) expect state events to be unencrypted upon receipt.
             for (const ev of timelineEvents.filter((ev) => ev.isState())) {
                 await this.client.decryptEventIfNeeded(ev);
             }
