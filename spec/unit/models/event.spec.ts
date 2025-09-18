@@ -342,6 +342,12 @@ describe("MatrixEvent", () => {
             ev.makeEncrypted("m.room.encrypted", { ciphertext: "xyz" }, "", "");
             expect(ev.getStateKey()).toStrictEqual("");
             expect(ev.getWireStateKey()).toStrictEqual("m.room.topic:");
+
+            const keyedEv = createStateEvent("$event2:server", "m.beacon_info", "@alice:server", {});
+            expect(keyedEv.getStateKey()).toStrictEqual("@alice:server");
+            keyedEv.makeEncrypted("m.room.encrypted", { ciphertext: "xyz" }, "", "");
+            expect(keyedEv.getStateKey()).toStrictEqual("@alice:server");
+            expect(keyedEv.getWireStateKey()).toStrictEqual("m.beacon_info:@alice:server");
         });
 
         function createStateEvent(eventId: string, type: string, stateKey: string, content?: IContent): MatrixEvent {
