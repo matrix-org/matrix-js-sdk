@@ -96,7 +96,7 @@ export type SessionMembershipData = {
 };
 
 const checkSessionsMembershipData = (
-    data: Record<keyof SessionMembershipData, any>,
+    data: Partial<Record<keyof SessionMembershipData, any>>,
     errors: string[],
 ): data is SessionMembershipData => {
     const prefix = "Malformed session membership event: ";
