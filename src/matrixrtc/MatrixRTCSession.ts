@@ -34,7 +34,7 @@ import {
     type Status,
     type IRTCNotificationContent,
     type ICallNotifyContent,
-    type RTCMediaHint,
+    type RTCCallIntent,
 } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
@@ -89,20 +89,15 @@ export type MatrixRTCSessionEventHandlerMap = {
 
 export interface SessionConfig {
     /**
-     * Should the session send a notification.
+     * What kind of notification to send when starting the session.
      * @default `undefined` (no notification)
      */
-    notification?: {
-        /**
-         * What kind of notification to send when starting the session.
-         */
-        type: RTCNotificationType;
-        /**
-         * What kind of call should this be?
-         * @default `undefined` (ambigious call)
-         */
-        hint?: RTCMediaHint;
-    };
+    notificationType?: RTCNotificationType;
+
+    /**
+     * Determines the kind of call this will be.
+     */
+    callIntent?: RTCCallIntent;
 }
 
 /**
@@ -250,7 +245,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private joinConfig?: SessionConfig;
     private logger: Logger;
 
-    private pendingNotificationToSend: SessionConfig["notification"];
+    private pendingNotificationToSend: undefined | RTCNotificationType;
     /**
      * This timeout is responsible to track any expiration. We need to know when we have to start
      * to ignore other call members. There is no callback for this. This timeout will always be configured to
@@ -573,7 +568,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         this.joinConfig = joinConfig;
-        this.pendingNotificationToSend = this.joinConfig?.notification;
+        this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
         this.membershipManager!.join(fociPreferred, fociActive, (e) => {
@@ -681,7 +676,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private sendCallNotify(
         parentEventId: string,
         notificationType: RTCNotificationType,
-        mediaHint?: RTCMediaHint,
+        callIntent?: RTCCallIntent,
     ): void {
         const sendLegacyNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
@@ -710,8 +705,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 "sender_ts": Date.now(),
                 "lifetime": 30_000, // 30 seconds
             };
-            if (mediaHint) {
-                content.media_hint = mediaHint;
+            if (callIntent) {
+                content["m.call.intent"] = callIntent;
             }
             const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);
             return { response, content };
@@ -774,11 +769,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
             if (this.pendingNotificationToSend && ownMembership && oldMemberships.length === 0) {
                 // If we're the first member in the call, we're responsible for
                 // sending the notification event
-                if (ownMembership.eventId && this.joinConfig?.notification) {
+                if (ownMembership.eventId && this.joinConfig?.notificationType) {
                     this.sendCallNotify(
                         ownMembership.eventId,
-                        this.joinConfig.notification.type,
-                        this.joinConfig.notification.hint,
+                        this.joinConfig.notificationType,
+                        ownMembership.callIntent,
                     );
                 } else {
                     this.logger.warn("Own membership eventId is undefined, cannot send call notification");
