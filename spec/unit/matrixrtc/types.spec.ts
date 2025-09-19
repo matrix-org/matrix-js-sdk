@@ -58,14 +58,13 @@ describe("IRTCNotificationContent", () => {
         expect(res.lifetime).toBe(120000);
     });
 
-    it("throws on missing m.mentions", () => {
+    it("throws on malformed m.mentions", () => {
         expect(() =>
             parseCallNotificationContent({
-                notification_type: "notification",
-                sender_ts: 123,
-                lifetime: 1000,
+                ...validBase,
+                "m.mentions": "not an object",
             } as any),
-        ).toThrow("Missing m.mentions");
+        ).toThrow("malformed m.mentions");
     });
 
     it("throws on missing or invalid notification_type", () => {
@@ -114,15 +113,6 @@ describe("IRTCNotificationContent", () => {
                 lifetime: "1000" as any,
             } as any),
         ).toThrow("Missing or invalid lifetime");
-    });
-
-    it("throws on invalid decline_reason type", () => {
-        expect(() =>
-            parseCallNotificationContent({
-                ...validBase,
-                decline_reason: 42 as any,
-            } as any),
-        ).toThrow("Invalid decline_reason");
     });
 
     it("accepts valid relation (m.reference)", () => {

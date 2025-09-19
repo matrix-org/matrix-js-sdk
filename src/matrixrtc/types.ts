@@ -111,8 +111,8 @@ export type RTCCallIntent = "audio" | "video" | string;
  * @returns a parsed IRTCNotificationContent
  */
 export function parseCallNotificationContent(content: IContent): IRTCNotificationContent {
-    if (typeof content["m.mentions"] !== "object") {
-        throw new Error("Missing m.mentions");
+    if (content["m.mentions"] && typeof content["m.mentions"] !== "object") {
+        throw new Error("malformed m.mentions");
     }
     if (typeof content["notification_type"] !== "string") {
         throw new Error("Missing or invalid notification_type");
@@ -124,9 +124,6 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
         throw new Error("Missing or invalid lifetime");
     }
 
-    if (content["decline_reason"] && typeof content["decline_reason"] !== "string") {
-        throw new Error("Invalid decline_reason");
-    }
     if (content["relation"] && content["relation"]["rel_type"] !== "m.reference") {
         throw new Error("Invalid relation");
     }
@@ -143,8 +140,7 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
  * Don't cast event content to this directly. Use `parseCallNotificationContent` instead to validate the content first.
  */
 export interface IRTCNotificationContent extends RelationEvent {
-    "m.mentions": IMentions;
-    "decline_reason"?: string;
+    "m.mentions"?: IMentions;
     "notification_type": RTCNotificationType;
     /**
      * The initial intent of the calling user.
