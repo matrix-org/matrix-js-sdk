@@ -322,7 +322,7 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring" } });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
@@ -370,13 +370,76 @@ describe("MatrixRTCSession", () => {
             );
         });
 
+        it("sends a notification with a hint when starting a call and emits DidSendCallNotification", async () => {
+            // Simulate a join, including the update to the room state
+            // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
+            sendEventMock
+                .mockResolvedValueOnce({ event_id: "legacy-evt" })
+                .mockResolvedValueOnce({ event_id: "new-evt" });
+            const didSendEventFn = jest.fn();
+            sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
+            // Create an additional listener to create a promise that resolves after the emission.
+            const didSendNotification = new Promise((resolve) => {
+                sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
+            });
+
+            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring", hint: "video" } });
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
+            sess!.onRTCSessionMemberUpdate();
+            const ownMembershipId = sess?.memberships[0].eventId;
+
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": "ring",
+                "media_hint": "video",
+                "m.relates_to": {
+                    event_id: ownMembershipId,
+                    rel_type: "m.reference",
+                },
+                "lifetime": 30000,
+                "sender_ts": expect.any(Number),
+            });
+
+            // Check if deprecated notify event is also sent.
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
+                "application": "m.call",
+                "m.mentions": { user_ids: [], room: true },
+                "notify_type": "ring",
+                "call_id": "",
+            });
+            await didSendNotification;
+            // And ensure we emitted the DidSendCallNotification event with both payloads
+            expect(didSendEventFn).toHaveBeenCalledWith(
+                {
+                    "event_id": "new-evt",
+                    "lifetime": 30000,
+                    "m.mentions": { room: true, user_ids: [] },
+                    "m.relates_to": {
+                        event_id: expect.any(String),
+                        rel_type: "m.reference",
+                    },
+                    "notification_type": "ring",
+                    "media_hint": "video",
+                    "sender_ts": expect.any(Number),
+                },
+                {
+                    "application": "m.call",
+                    "call_id": "",
+                    "event_id": "legacy-evt",
+                    "m.mentions": { room: true, user_ids: [] },
+                    "notify_type": "ring",
+                },
+            );
+        });
+
         it("doesn't send a notification when joining an existing call", async () => {
             // Add another member to the call so that it is considered an existing call
             mockRoomState(mockRoom, [membershipTemplate]);
             sess!.onRTCSessionMemberUpdate();
 
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring" } });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
@@ -386,7 +449,7 @@ describe("MatrixRTCSession", () => {
 
         it("doesn't send a notification when someone else starts the call faster than us", async () => {
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring" } });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent

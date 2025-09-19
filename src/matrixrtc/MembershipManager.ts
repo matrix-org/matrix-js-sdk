@@ -24,9 +24,9 @@ import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
-import { isMyMembership, Status } from "./types.ts";
+import { isMyMembership, RTCCallIntent, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { type SessionDescription, type MembershipConfig } from "./MatrixRTCSession.ts";
+import { type SessionDescription, type MembershipConfig, SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import {
@@ -156,6 +156,7 @@ export class MembershipManager
 {
     private activated = false;
     private logger: Logger;
+    private callIntent: RTCCallIntent | undefined;
 
     public isActivated(): boolean {
         return this.activated;
@@ -281,6 +282,10 @@ export class MembershipManager
         }
     }
 
+    public updateCallIntent(callIntent: RTCCallIntent) {
+        this.callIntent = callIntent;
+    }
+
     /**
      * @throws if the client does not return user or device id.
      * @param joinConfig
@@ -289,7 +294,7 @@ export class MembershipManager
      * @param getOldestMembership
      */
     public constructor(
-        private joinConfig: MembershipConfig | undefined,
+        private joinConfig: (SessionConfig & MembershipConfig) | undefined,
         private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
         private client: Pick<
             MatrixClient,
@@ -311,6 +316,7 @@ export class MembershipManager
         this.deviceId = deviceId;
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
+        this.callIntent = joinConfig?.callIntent;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
@@ -743,13 +749,14 @@ export class MembershipManager
     private makeMyMembership(expires: number): SessionMembershipData {
         return {
             // TODO: use the new format for m.rtc.member events where call_id becomes session.id
-            application: this.sessionDescription.application,
-            call_id: this.sessionDescription.id,
-            scope: "m.room",
-            device_id: this.deviceId,
+            "application": this.sessionDescription.application,
+            "call_id": this.sessionDescription.id,
+            "scope": "m.room",
+            "device_id": this.deviceId,
             expires,
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-            foci_preferred: this.fociPreferred ?? [],
+            "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+            "foci_preferred": this.fociPreferred ?? [],
+            "m.call.intent": this.callIntent,
         };
     }
 
