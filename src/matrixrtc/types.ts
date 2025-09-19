@@ -104,8 +104,8 @@ export type RTCNotificationType = "ring" | "notification";
  * @returns a parsed IRTCNotificationContent
  */
 export function parseCallNotificationContent(content: IContent): IRTCNotificationContent {
-    if (!content["m.mentions"]) {
-        throw new Error("Missing m.mentions");
+    if (content["m.mentions"] && typeof content["m.mentions"] !== "object") {
+        throw new Error("malformed m.mentions");
     }
     if (typeof content["notification_type"] !== "string") {
         throw new Error("Missing or invalid notification_type");
@@ -117,9 +117,6 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
         throw new Error("Missing or invalid lifetime");
     }
 
-    if (content["decline_reason"] && typeof content["decline_reason"] !== "string") {
-        throw new Error("Invalid decline_reason");
-    }
     if (content["relation"] && content["relation"]["rel_type"] !== "m.reference") {
         throw new Error("Invalid relation");
     }
@@ -133,7 +130,6 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
  */
 export interface IRTCNotificationContent extends RelationEvent {
     "m.mentions": IMentions;
-    "decline_reason"?: string;
     "notification_type": RTCNotificationType;
     "sender_ts": number;
     "lifetime": number;
