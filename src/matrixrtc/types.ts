@@ -135,7 +135,7 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
     }
 
     const cappedLifetime = content["lifetime"] >= 120000 ? 120000 : content["lifetime"];
-    return { lifetime: cappedLifetime, ...content } as IRTCNotificationContent;
+    return { ...content, lifetime: cappedLifetime } as IRTCNotificationContent;
 }
 
 /**
