@@ -621,6 +621,24 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Get the call intent for the current call, based on what members are advertising. If one or more
+     * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
+     *
+     * If all members that specify a call intent agree, that value is returned.
+     * @returns A call intent, or `undefined` if no consensus or not given. 
+     */
+    public getConsensusCallIntent(): RTCCallIntent|undefined {
+        const getFirstCallIntent = this.memberships.find(m => !!m.callIntent)?.callIntent;
+        if (!getFirstCallIntent) {
+            return undefined;
+        }
+        if (this.memberships.some(m => !m.callIntent || m.callIntent === getFirstCallIntent)) {
+            return getFirstCallIntent;
+        }
+        return undefined;
+    }
+
+    /**
      * This method is used when the user is not yet connected to the Session but wants to know what focus
      * the users in the session are using to make a decision how it wants/should connect.
      *
