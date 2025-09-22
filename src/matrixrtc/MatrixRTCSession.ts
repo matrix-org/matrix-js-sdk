@@ -35,7 +35,6 @@ import {
     type IRTCNotificationContent,
     type ICallNotifyContent,
 } from "./types.ts";
-import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
     MembershipManagerEvent,
     type MembershipManagerEventHandlerMap,
@@ -44,6 +43,7 @@ import {
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import { TypedReEmitter } from "../ReEmitter.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -224,8 +224,8 @@ export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionCon
  * This class doesn't deal with media at all, just membership & properties of a session.
  */
 export class MatrixRTCSession extends TypedEventEmitter<
-    MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
-    MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
+    MatrixRTCSessionEvent | MembershipManagerEvent,
+    MatrixRTCSessionEventHandlerMap & MembershipManagerEventHandlerMap
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
@@ -468,8 +468,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
     }
     private reEmitter = new TypedReEmitter<
-        MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
-        MatrixRTCSessionEventHandlerMap & RoomAndToDeviceEventsHandlerMap & MembershipManagerEventHandlerMap
+        MatrixRTCSessionEvent | MembershipManagerEvent,
+        MatrixRTCSessionEventHandlerMap & MembershipManagerEventHandlerMap
     >(this);
 
     /**
