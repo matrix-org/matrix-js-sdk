@@ -1040,7 +1040,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             new RustSdkCryptoJs.UserId(userId),
         );
         return requests
-            .filter((request) => request.roomId === undefined)
+            .filter((request) => request.roomId === undefined && !request.isCancelled())
             .map((request) => this.makeVerificationRequest(request));
     }
 
@@ -1063,7 +1063,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         // Search for the verification request for the given room id
-        const request = requests.find((request) => request.roomId?.toString() === roomId);
+        const request = requests.find((request) => request.roomId?.toString() === roomId && !request.isCancelled());
 
         if (request) {
             return this.makeVerificationRequest(request);

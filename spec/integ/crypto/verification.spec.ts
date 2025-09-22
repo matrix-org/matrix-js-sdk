@@ -735,6 +735,35 @@ describe("verification", () => {
             expect(request.cancellingUserId).toEqual("@alice:localhost");
         });
 
+        it("does not include cancelled requests in the list of requests", async () => {
+            // Given Alice started a verification request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+
+            // Sanity: the request is listed
+            const requestsBeforeCancel = aliceClient
+                .getCrypto()!
+                .getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+
+            expect(requestsBeforeCancel).toHaveLength(1);
+
+            // When Alice cancels it
+            await Promise.all([expectSendToDeviceMessage("m.key.verification.cancel"), request.cancel()]);
+
+            // Then it is no longer listed as in progress
+            const requestsAfterCancel = aliceClient
+                .getCrypto()!
+                .getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+
+            expect(requestsAfterCancel).toHaveLength(0);
+        });
+
         it("can cancel during the SAS phase", async () => {
             // have alice initiate a verification. She should send a m.key.verification.request
             const [, request] = await Promise.all([
@@ -1067,6 +1096,29 @@ describe("verification", () => {
 
             // check that an event has not been raised, and that the request is not found
             expect(eventHandler).not.toHaveBeenCalled();
+            expect(
+                aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
+            ).not.toBeDefined();
+        });
+
+        it("ignores cancelled verification requests", async () => {
+            // Given a verification request exists
+            const event = createVerificationRequestEvent();
+            returnRoomMessageFromSync(TEST_ROOM_ID, event);
+
+            // Wait for the request to be received
+            await emitPromise(aliceClient, CryptoEvent.VerificationRequestReceived);
+
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+
+            // When I cancel it
+            fetchMock.put("express:/_matrix/client/v3/rooms/:roomId/send/m.key.verification.cancel/:id", {
+                event_id: event.event_id,
+            });
+            await request!.cancel();
+            expect(request!.phase).toEqual(VerificationPhase.Cancelled);
+
+            // Then it is no longer found
             expect(
                 aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
             ).not.toBeDefined();
