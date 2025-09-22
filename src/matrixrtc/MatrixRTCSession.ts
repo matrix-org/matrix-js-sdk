@@ -625,14 +625,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
      *
      * If all members that specify a call intent agree, that value is returned.
-     * @returns A call intent, or `undefined` if no consensus or not given. 
+     * @returns A call intent, or `undefined` if no consensus or not given.
      */
-    public getConsensusCallIntent(): RTCCallIntent|undefined {
-        const getFirstCallIntent = this.memberships.find(m => !!m.callIntent)?.callIntent;
+    public getConsensusCallIntent(): RTCCallIntent | undefined {
+        const getFirstCallIntent = this.memberships.find((m) => !!m.callIntent)?.callIntent;
         if (!getFirstCallIntent) {
             return undefined;
         }
-        if (this.memberships.some(m => !m.callIntent || m.callIntent === getFirstCallIntent)) {
+        if (this.memberships.every((m) => !m.callIntent || m.callIntent === getFirstCallIntent)) {
             return getFirstCallIntent;
         }
         return undefined;

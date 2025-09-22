@@ -19,7 +19,7 @@ import { deepCompare } from "../utils.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type SessionDescription } from "./MatrixRTCSession.ts";
-import { RTCCallIntent } from "./types.ts";
+import { type RTCCallIntent } from "./types.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -106,14 +106,16 @@ const checkSessionsMembershipData = (
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
     if (!Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
     // optional parameters
-    if (data.created_ts !== undefined && typeof data.created_ts !== "number")
+    if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
         errors.push(prefix + "created_ts must be number");
+    }
 
     // application specific data (we first need to check if they exist)
     if (data.scope !== undefined && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
 
-    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string")
+    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
         errors.push(prefix + "m.call.intent must be a string");
+    }
 
     return errors.length === 0;
 };

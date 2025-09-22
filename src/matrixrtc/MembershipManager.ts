@@ -24,9 +24,9 @@ import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
-import { isMyMembership, RTCCallIntent, Status } from "./types.ts";
+import { isMyMembership, type RTCCallIntent, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { type SessionDescription, type MembershipConfig, SessionConfig } from "./MatrixRTCSession.ts";
+import { type SessionDescription, type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import {
@@ -282,8 +282,14 @@ export class MembershipManager
         }
     }
 
-    public updateCallIntent(callIntent: RTCCallIntent) {
+    /**
+     * Update the intent of a membership on the call (e.g. user is now providing a video feed)
+     * @param callIntent The new intent to set.
+     */
+    public updateCallIntent(callIntent: RTCCallIntent): void {
         this.callIntent = callIntent;
+        // Kick off a new membership event as a result.
+        void this.sendJoinEvent();
     }
 
     /**

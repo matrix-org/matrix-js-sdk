@@ -222,6 +222,27 @@ describe("MatrixRTCSession", () => {
         });
     });
 
+    describe("getConsensusCallIntent", () => {
+        it.each([
+            [undefined, undefined, undefined],
+            ["audio", undefined, "audio"],
+            [undefined, "audio", "audio"],
+            ["audio", "audio", "audio"],
+            ["audio", "video", undefined],
+        ])("gets correct consensus for %s + %s = %s", (intentA, intentB, result) => {
+            jest.useFakeTimers();
+            jest.setSystemTime(4000);
+            const mockRoom = makeMockRoom([
+                Object.assign({}, membershipTemplate, { "m.call.intent": intentA }),
+                Object.assign({}, membershipTemplate, { "m.call.intent": intentB }),
+            ]);
+
+            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            expect(sess.getConsensusCallIntent()).toEqual(result);
+            jest.useRealTimers();
+        });
+    });
+
     describe("getsActiveFocus", () => {
         const firstPreferredFocus = {
             type: "livekit",
@@ -322,7 +343,7 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring" } });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
@@ -370,7 +391,7 @@ describe("MatrixRTCSession", () => {
             );
         });
 
-        it("sends a notification with a hint when starting a call and emits DidSendCallNotification", async () => {
+        it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
             sendEventMock
@@ -383,16 +404,26 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring", hint: "video" } });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring", callIntent: "audio" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
-            mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
+
+            mockRoomState(mockRoom, [
+                {
+                    ...membershipTemplate,
+                    "user_id": client.getUserId()!,
+                    // This is what triggers the intent type on the notification event.
+                    "m.call.intent": "audio",
+                },
+            ]);
+
             sess!.onRTCSessionMemberUpdate();
             const ownMembershipId = sess?.memberships[0].eventId;
+            expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": "ring",
-                "media_hint": "video",
+                "m.call.intent": "audio",
                 "m.relates_to": {
                     event_id: ownMembershipId,
                     rel_type: "m.reference",
@@ -420,7 +451,7 @@ describe("MatrixRTCSession", () => {
                         rel_type: "m.reference",
                     },
                     "notification_type": "ring",
-                    "media_hint": "video",
+                    "m.call.intent": "audio",
                     "sender_ts": expect.any(Number),
                 },
                 {
@@ -439,7 +470,7 @@ describe("MatrixRTCSession", () => {
             sess!.onRTCSessionMemberUpdate();
 
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring" } });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
             sess!.onRTCSessionMemberUpdate();
@@ -449,7 +480,7 @@ describe("MatrixRTCSession", () => {
 
         it("doesn't send a notification when someone else starts the call faster than us", async () => {
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notification: { type: "ring" } });
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent
