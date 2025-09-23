@@ -1,3 +1,10 @@
+Changes in [38.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.3.0) (2025-09-23)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Remove knocked room when membership changes to join ([#4977](https://github.com/matrix-org/matrix-js-sdk/pull/4977)). Contributed by @svajunas-budrys.
+
+
 Changes in [38.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.2.0) (2025-09-16)
 ==================================================================================================
 Fix [CVE-2025-59160](https://www.cve.org/CVERecord?id=CVE-2025-59160) / [GHSA-mp7c-m3rh-r56v](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-mp7c-m3rh-r56v)
