@@ -6639,7 +6639,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         opts: IRequestOpts = {},
     ): Promise<ISendEventResponse> {
         const room = this.getRoom(roomId);
-        const event = new MatrixEvent({ room_id: roomId, type: eventType, state_key: stateKey, content });
+        const event = new MatrixEvent({
+            room_id: roomId,
+            type: eventType,
+            state_key: stateKey,
+            // Cast safety: StateEvents[K] is a stronger bound than IContent, which has [key: string]: any
+            content: content as IContent,
+        });
 
         await this.encryptStateEventIfNeeded(event, room ?? undefined);
 
