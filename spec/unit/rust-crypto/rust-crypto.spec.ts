@@ -830,6 +830,7 @@ describe("RustCrypto", () => {
                 TEST_DEVICE_ID,
                 secretStorage,
                 {} as CryptoCallbacks,
+                false,
             );
 
             async function createSecretStorageKey() {
