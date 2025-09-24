@@ -16,7 +16,11 @@ limitations under the License.
 import { AbortError } from "p-retry";
 
 import { EventType } from "../@types/event.ts";
-import { UpdateDelayedEventAction } from "../@types/requests.ts";
+import {
+    type ISendEventResponse,
+    type SendDelayedEventResponse,
+    UpdateDelayedEventAction,
+} from "../@types/requests.ts";
 import { type MatrixClient } from "../client.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
@@ -314,6 +318,8 @@ export class MembershipManager
             MatrixClient,
             | "getUserId"
             | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
             | "_unstable_sendStickyEvent"
             | "_unstable_sendStickyDelayedEvent"
@@ -413,6 +419,11 @@ export class MembershipManager
     private get delayedLeaveEventRestartLocalTimeoutMs(): number {
         return this.joinConfig?.delayedLeaveEventRestartLocalTimeoutMs ?? 2000;
     }
+
+    private get useStickyEvents(): boolean {
+        return this.joinConfig?.useStickyEvents ?? false;
+    }
+
     // LOOP HANDLER:
     private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
         switch (type) {
@@ -467,23 +478,36 @@ export class MembershipManager
         }
     }
 
+    // an abstraction to switch between sending state or a sticky event
+    private clientSendDelayedEvent: (myMembership: EmptyObject) => Promise<SendDelayedEventResponse> = (
+        myMembership,
+    ) =>
+        this.useStickyEvents
+            ? this.client._unstable_sendStickyDelayedEvent(
+                  this.room.roomId,
+                  STICK_DURATION_MS,
+                  { delay: this.delayedLeaveEventDelayMs },
+                  null,
+                  EventType.GroupCallMemberPrefix,
+                  Object.assign(myMembership, { sticky_key: this.stateKey }),
+              )
+            : this.client._unstable_sendDelayedStateEvent(
+                  this.room.roomId,
+                  { delay: this.delayedLeaveEventDelayMs },
+                  EventType.GroupCallMemberPrefix,
+                  myMembership,
+                  this.stateKey,
+              );
+    private sendDelayedEventMethodName: () => string = () =>
+        this.useStickyEvents ? "_unstable_sendStickyDelayedEvent" : "_unstable_sendDelayedStateEvent";
+
     // HANDLERS (used in the membershipLoopHandler)
     private async sendOrResendDelayedLeaveEvent(): Promise<ActionUpdate> {
         // We can reach this at the start of a call (where we do not yet have a membership: state.hasMemberStateEvent=false)
         // or during a call if the state event canceled our delayed event or caused by an unexpected error that removed our delayed event.
         // (Another client could have canceled it, the homeserver might have removed/lost it due to a restart, ...)
         // In the `then` and `catch` block we treat both cases differently. "if (this.state.hasMemberStateEvent) {} else {}"
-        return await this.client
-            ._unstable_sendStickyDelayedEvent(
-                this.room.roomId,
-                STICK_DURATION_MS,
-                {
-                    delay: this.delayedLeaveEventDelayMs,
-                },
-                null,
-                EventType.GroupCallMemberPrefix,
-                { sticky_key: this.stateKey } as EmptyObject & { sticky_key: string }, // leave event
-            )
+        return await this.clientSendDelayedEvent({})
             .then((response) => {
                 this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
                 this.setAndEmitProbablyLeft(false);
@@ -507,7 +531,7 @@ export class MembershipManager
                 if (this.manageMaxDelayExceededSituation(e)) {
                     return createInsertActionUpdate(repeatActionType);
                 }
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "_unstable_sendStickyDelayedEvent");
+                const update = this.actionUpdateFromErrors(e, repeatActionType, this.sendDelayedEventMethodName());
                 if (update) return update;
 
                 if (this.state.hasMemberStateEvent) {
@@ -663,12 +687,27 @@ export class MembershipManager
             });
     }
 
+    private clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> = (
+        myMembership,
+    ) =>
+        this.useStickyEvents
+            ? this.client._unstable_sendStickyEvent(
+                  this.room.roomId,
+                  STICK_DURATION_MS,
+                  null,
+                  EventType.GroupCallMemberPrefix,
+                  Object.assign(myMembership, { sticky_key: this.stateKey }),
+              )
+            : this.client.sendStateEvent(
+                  this.room.roomId,
+                  EventType.GroupCallMemberPrefix,
+                  myMembership,
+                  this.stateKey,
+              );
+    private sendMembershipMethodName: () => string = () =>
+        this.useStickyEvents ? "_unstable_sendStickyEvent" : "sendStateEvent";
     private async sendJoinEvent(): Promise<ActionUpdate> {
-        return await this.client
-            ._unstable_sendStickyEvent(this.room.roomId, STICK_DURATION_MS, null, EventType.GroupCallMemberPrefix, {
-                ...this.makeMyMembership(this.membershipEventExpiryMs),
-                sticky_key: this.stateKey,
-            })
+        return await this.clientSendMembership(this.makeMyMembership(this.membershipEventExpiryMs))
             .then(() => {
                 this.setAndEmitProbablyLeft(false);
                 this.state.startTime = Date.now();
@@ -703,7 +742,7 @@ export class MembershipManager
                 const update = this.actionUpdateFromErrors(
                     e,
                     MembershipActionType.SendJoinEvent,
-                    "_unstable_sendStickyEvent",
+                    this.sendMembershipMethodName(),
                 );
                 if (update) return update;
                 throw e;
@@ -712,11 +751,9 @@ export class MembershipManager
 
     private async updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;
-        return await this.client
-            ._unstable_sendStickyEvent(this.room.roomId, STICK_DURATION_MS, null, EventType.GroupCallMemberPrefix, {
-                ...this.makeMyMembership(this.membershipEventExpiryMs),
-                sticky_key: this.stateKey,
-            })
+        return await this.clientSendMembership(
+            this.makeMyMembership(this.membershipEventExpiryMs * nextExpireUpdateIteration),
+        )
             .then(() => {
                 // Success, we reset retries and schedule update.
                 this.resetRateLimitCounter(MembershipActionType.UpdateExpiry);
@@ -734,7 +771,7 @@ export class MembershipManager
                 const update = this.actionUpdateFromErrors(
                     e,
                     MembershipActionType.UpdateExpiry,
-                    "_unstable_sendStickyEvent",
+                    this.sendMembershipMethodName(),
                 );
                 if (update) return update;
 
@@ -742,14 +779,7 @@ export class MembershipManager
             });
     }
     private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
-        return await this.client
-            ._unstable_sendStickyEvent(
-                this.room.roomId,
-                STICK_DURATION_MS,
-                null,
-                EventType.GroupCallMemberPrefix,
-                { sticky_key: this.stateKey } as EmptyObject & { sticky_key: string }, // leave event
-            )
+        return await this.clientSendMembership({})
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
@@ -759,7 +789,7 @@ export class MembershipManager
                 const update = this.actionUpdateFromErrors(
                     e,
                     MembershipActionType.SendLeaveEvent,
-                    "_unstable_sendStickyEvent",
+                    this.sendMembershipMethodName(),
                 );
                 if (update) return update;
                 throw e;

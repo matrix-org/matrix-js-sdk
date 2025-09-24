@@ -186,6 +186,12 @@ export interface MembershipConfig {
      * but only applies to calls to the `_unstable_updateDelayedEvent` endpoint with a body of `{action:"restart"}`.)
      */
     delayedLeaveEventRestartLocalTimeoutMs?: number;
+
+    /**
+     * If the membership manager should publish its own membership via sticky events or via the room state.
+     * @default false (room state)
+     */
+    useStickyEvents?: boolean;
 }
 
 export interface EncryptionConfig {
@@ -307,21 +313,31 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public static sessionMembershipsForRoom(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "getStickyEventsMap">,
         sessionDescription: SessionDescription,
+        // default both true this implied we combine sticky and state events for the final call state
+        // (prefer sticky events in case of a duplicate)
         useStickyEvents: boolean = true,
+        useStateEvents: boolean = true,
     ): CallMembership[] {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
-        let callMemberEvents;
+        let callMemberEvents = [] as MatrixEvent[];
         if (useStickyEvents) {
+            // prefill with sticky events
             callMemberEvents = Array.from(room.getStickyEventsMap().values()).filter(
                 (e) => e.getType() === EventType.GroupCallMemberPrefix,
             );
-        } else {
+        }
+        if (useStateEvents) {
             const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
             if (!roomState) {
                 logger.warn("Couldn't get state for room " + room.roomId);
                 throw new Error("Could't get state for room " + room.roomId);
             }
-            callMemberEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
+            const callMemberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
+            // only care about state events which have keys which we have not yet seen in the sticky events.
+            callMemberStateEvents.filter((e) =>
+                callMemberEvents.some((stickyEvent) => stickyEvent.getContent().state_key === e.getStateKey()),
+            );
+            callMemberEvents.concat(callMemberStateEvents);
         }
 
         const callMemberships: CallMembership[] = [];
@@ -438,6 +454,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
             | "getUserId"
             | "getDeviceId"
             | "sendEvent"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
             | "_unstable_sendStickyEvent"
             | "_unstable_sendStickyDelayedEvent"
