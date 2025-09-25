@@ -99,6 +99,7 @@ export type RTCNotificationType = "ring" | "notification";
 
 /**
  * Represents the intention of the call from the perspective of the sending user.
+ * May be any string, although `"audio"` and `"video"` are commonly accepted values.
  */
 export type RTCCallIntent = "audio" | "video" | string;
 export interface IRTCNotificationContent extends RelationEvent {

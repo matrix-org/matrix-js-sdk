@@ -700,7 +700,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * Sends a notification corresponding to the configured notify type.
+     * Sends notification events to indiciate the call has started.
+     * Note: This does not return a promise, instead scheduling the notification events to be sent.
+     * @param parentEventId Event id linking to your RTC call membership event.
+     * @param notificationType The type of notification to send
+     * @param callIntent The type of call this is (e.g. "audio").
      */
     private sendCallNotify(
         parentEventId: string,
