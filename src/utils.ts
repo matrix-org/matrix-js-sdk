@@ -765,3 +765,24 @@ export class MapWithDefault<K, V> extends Map<K, V> {
         return this.get(key)!;
     }
 }
+
+export class MultiKeyMap<V> {
+    private map = new Map<string, V>();
+    public get(key: Array<string>): V | undefined {
+        return this.map.get(JSON.stringify(key));
+    }
+    public set(key: Array<string>, value: V): void {
+        this.map.set(JSON.stringify(key), value);
+    }
+    public values(): MapIterator<V> {
+        return this.map.values();
+    }
+    public entries(): MapIterator<[string[], V]> {
+        return Array.from(this.map.entries())
+            .map<[string[], V]>(([k, v]) => [JSON.parse(k) as string[], v])
+            .values();
+    }
+    public delete(key: Array<string>): boolean {
+        return this.map.delete(JSON.stringify(key));
+    }
+}
