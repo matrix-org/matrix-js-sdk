@@ -638,6 +638,17 @@ export class MatrixRTCSession extends TypedEventEmitter<
         return undefined;
     }
 
+    public updateCallIntent(callIntent: RTCCallIntent): undefined {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error('Not connected yet');
+        }
+        if (myMembership.callIntent === callIntent) {
+            return; // No-op
+        }
+        this.membershipManager?.updateCallIntent(callIntent);
+    }
+
     /**
      * This method is used when the user is not yet connected to the Session but wants to know what focus
      * the users in the session are using to make a decision how it wants/should connect.

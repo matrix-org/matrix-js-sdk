@@ -282,10 +282,6 @@ export class MembershipManager
         }
     }
 
-    /**
-     * Update the intent of a membership on the call (e.g. user is now providing a video feed)
-     * @param callIntent The new intent to set.
-     */
     public updateCallIntent(callIntent: RTCCallIntent): void {
         this.callIntent = callIntent;
         // Kick off a new membership event as a result.
