@@ -830,6 +830,7 @@ describe("RustCrypto", () => {
                 TEST_DEVICE_ID,
                 secretStorage,
                 {} as CryptoCallbacks,
+                false,
             );
 
             async function createSecretStorageKey() {
@@ -2353,6 +2354,7 @@ describe("RustCrypto", () => {
 
         beforeEach(async () => {
             mockOlmMachine = {
+                queryKeysForUsers: jest.fn().mockReturnValue({}),
                 getReceivedRoomKeyBundleData: jest.fn(),
                 receiveRoomKeyBundle: jest.fn(),
             } as unknown as Mocked<OlmMachine>;
@@ -2377,6 +2379,7 @@ describe("RustCrypto", () => {
         it("does nothing if there is no key bundle", async () => {
             mockOlmMachine.getReceivedRoomKeyBundleData.mockResolvedValue(undefined);
             await rustCrypto.maybeAcceptKeyBundle("!room_id", "@bob:example.org");
+            expect(mockOlmMachine.queryKeysForUsers).toHaveBeenCalledTimes(1);
             expect(mockOlmMachine.getReceivedRoomKeyBundleData).toHaveBeenCalledTimes(1);
             expect(mockOlmMachine.getReceivedRoomKeyBundleData.mock.calls[0][0].toString()).toEqual("!room_id");
             expect(mockOlmMachine.getReceivedRoomKeyBundleData.mock.calls[0][1].toString()).toEqual("@bob:example.org");

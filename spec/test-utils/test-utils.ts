@@ -63,7 +63,11 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
  *
  * @returns the sync response
  */
-export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): ISyncResponse {
+export function getSyncResponse(
+    roomMembers: string[],
+    roomId = TEST_ROOM_ID,
+    encryptStateEvents = false,
+): ISyncResponse {
     const roomResponse: IJoinedRoom = {
         summary: {
             "m.heroes": [],
@@ -77,7 +81,8 @@ export function getSyncResponse(roomMembers: string[], roomId = TEST_ROOM_ID): I
                     type: "m.room.encryption",
                     state_key: "",
                     content: {
-                        algorithm: "m.megolm.v1.aes-sha2",
+                        "algorithm": "m.megolm.v1.aes-sha2",
+                        "io.element.msc3414.encrypt_state_events": encryptStateEvents,
                     },
                 }),
             ],

@@ -34,6 +34,7 @@ import {
     type Status,
     type IRTCNotificationContent,
     type ICallNotifyContent,
+    type RTCCallIntent,
 } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
@@ -92,6 +93,11 @@ export interface SessionConfig {
      * @default `undefined` (no notification)
      */
     notificationType?: RTCNotificationType;
+
+    /**
+     * Determines the kind of call this will be.
+     */
+    callIntent?: RTCCallIntent;
 }
 
 /**
@@ -615,6 +621,32 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Get the call intent for the current call, based on what members are advertising. If one or more
+     * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
+     *
+     * If all members that specify a call intent agree, that value is returned.
+     * @returns A call intent, or `undefined` if no consensus or not given.
+     */
+    public getConsensusCallIntent(): RTCCallIntent | undefined {
+        const getFirstCallIntent = this.memberships.find((m) => !!m.callIntent)?.callIntent;
+        if (!getFirstCallIntent) {
+            return undefined;
+        }
+        if (this.memberships.every((m) => !m.callIntent || m.callIntent === getFirstCallIntent)) {
+            return getFirstCallIntent;
+        }
+        return undefined;
+    }
+
+    public async updateCallIntent(callIntent: RTCCallIntent): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateCallIntent(callIntent);
+    }
+
+    /**
      * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
      * the keys.
      */
@@ -651,9 +683,17 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * Sends a notification corresponding to the configured notify type.
+     * Sends notification events to indiciate the call has started.
+     * Note: This does not return a promise, instead scheduling the notification events to be sent.
+     * @param parentEventId Event id linking to your RTC call membership event.
+     * @param notificationType The type of notification to send
+     * @param callIntent The type of call this is (e.g. "audio").
      */
-    private sendCallNotify(parentEventId: string, notificationType: RTCNotificationType): void {
+    private sendCallNotify(
+        parentEventId: string,
+        notificationType: RTCNotificationType,
+        callIntent?: RTCCallIntent,
+    ): void {
         const sendLegacyNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: ICallNotifyContent;
@@ -676,11 +716,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 "notification_type": notificationType,
                 "m.relates_to": {
                     event_id: parentEventId,
-                    rel_type: RelationType.unstable_RTCNotificationParent,
+                    rel_type: RelationType.Reference,
                 },
                 "sender_ts": Date.now(),
                 "lifetime": 30_000, // 30 seconds
             };
+            if (callIntent) {
+                content["m.call.intent"] = callIntent;
+            }
             const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);
             return { response, content };
         };
@@ -743,7 +786,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 // If we're the first member in the call, we're responsible for
                 // sending the notification event
                 if (ownMembership.eventId && this.joinConfig?.notificationType) {
-                    this.sendCallNotify(ownMembership.eventId, this.joinConfig.notificationType);
+                    this.sendCallNotify(
+                        ownMembership.eventId,
+                        this.joinConfig.notificationType,
+                        ownMembership.callIntent,
+                    );
                 } else {
                     this.logger.warn("Own membership eventId is undefined, cannot send call notification");
                 }

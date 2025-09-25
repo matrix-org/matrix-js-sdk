@@ -16,7 +16,7 @@ limitations under the License.
 
 import type { CallMembership } from "./CallMembership.ts";
 import type { Focus } from "./focus.ts";
-import type { Status } from "./types.ts";
+import type { RTCCallIntent, Status } from "./types.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 export enum MembershipManagerEvent {
@@ -99,4 +99,10 @@ export interface IMembershipManager
      * Determines the active focus used by the given session member, or undefined if not joined.
      */
     resolveActiveFocus(member: CallMembership): Focus | undefined;
+
+    /**
+     * Update the intent of a membership on the call (e.g. user is now providing a video feed)
+     * @param callIntent The new intent to set.
+     */
+    updateCallIntent(callIntent: RTCCallIntent): Promise<void>;
 }

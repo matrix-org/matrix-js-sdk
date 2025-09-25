@@ -162,6 +162,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
+
+        /** Enable support for encrypted state events under MSC3414. */
+        private readonly enableEncryptedStateEvents: boolean = false,
     ) {
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, http);
@@ -326,11 +329,21 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoBackend.maybeAcceptKeyBundle}.
      */
     public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void> {
-        // TODO: retry this if it gets interrupted or it fails.
+        // TODO: retry this if it gets interrupted or it fails. (https://github.com/matrix-org/matrix-rust-sdk/issues/5112)
         // TODO: do this in the background.
-        // TODO: handle the bundle message arriving after the invite.
+        // TODO: handle the bundle message arriving after the invite (https://github.com/element-hq/element-web/issues/30740)
 
         const logger = new LogSpan(this.logger, `maybeAcceptKeyBundle(${roomId}, ${inviter})`);
+
+        // Make sure we have an up-to-date idea of the inviter's cross-signing keys, so that we can check if the
+        // device that sent us the bundle data was correctly cross-signed.
+        //
+        // TODO: it would be nice to skip this step if we have an up-to-date copy of the inviter's cross-signing keys,
+        //   but we don't have an easy way to check that. Possibly the rust side could trigger a key request and then
+        //   block until it happens.
+        logger.info(`Checking inviter cross-signing keys`);
+        const request = this.olmMachine.queryKeysForUsers([new RustSdkCryptoJs.UserId(inviter)]);
+        await this.outgoingRequestProcessor.makeOutgoingRequest(request);
 
         const bundleData = await this.olmMachine.getReceivedRoomKeyBundleData(
             new RustSdkCryptoJs.RoomId(roomId),
@@ -409,6 +422,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             new RustSdkCryptoJs.RoomId(roomId),
         );
         return Boolean(roomSettings?.algorithm);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isStateEncryptionEnabledInRoom}.
+     */
+    public async isStateEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        const roomSettings: RustSdkCryptoJs.RoomSettings | undefined = await this.olmMachine.getRoomSettings(
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
+        return Boolean(roomSettings?.encryptStateEvents);
     }
 
     /**
@@ -1030,7 +1053,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             new RustSdkCryptoJs.UserId(userId),
         );
         return requests
-            .filter((request) => request.roomId === undefined)
+            .filter((request) => request.roomId === undefined && !request.isCancelled())
             .map((request) => this.makeVerificationRequest(request));
     }
 
@@ -1053,7 +1076,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         // Search for the verification request for the given room id
-        const request = requests.find((request) => request.roomId?.toString() === roomId);
+        const request = requests.find((request) => request.roomId?.toString() === roomId && !request.isCancelled());
 
         if (request) {
             return this.makeVerificationRequest(request);
@@ -1076,7 +1099,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 verificationMethodIdentifierToMethod(method),
             );
             // Get the request content to send to the DM room
-            const verificationEventContent: string = await userIdentity.verificationRequestContent(methods);
+            const verCont: string = await userIdentity.verificationRequestContent(methods);
+
+            // TODO: due to https://github.com/matrix-org/matrix-rust-sdk/issues/5643, we need to fix up the verification request content to include `msgtype`.
+            const verContObj = JSON.parse(verCont);
+            verContObj["msgtype"] = "m.key.verification.request";
+            const verificationEventContent: string = JSON.stringify(verContObj);
 
             // Send the request content to send to the DM room
             const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
@@ -1702,7 +1730,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await this.receiveSyncChanges({ devices });
     }
 
-    /** called by the sync loop on m.room.encrypted events
+    /** called by the sync loop on m.room.encryption events
      *
      * @param room - in which the event was received
      * @param event - encryption event to be processed
@@ -1717,6 +1745,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             // Among other situations, this happens if the crypto state event is redacted.
             this.logger.warn(`Room ${room.roomId}: ignoring crypto event with invalid algorithm ${config.algorithm}`);
             return;
+        }
+
+        if (config["io.element.msc3414.encrypt_state_events"] && this.enableEncryptedStateEvents) {
+            this.logger.info("crypto Enabling state event encryption...");
+            settings.encryptStateEvents = true;
         }
 
         try {
