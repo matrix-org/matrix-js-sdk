@@ -105,5 +105,5 @@ export interface IMembershipManager
      * Update the intent of a membership on the call (e.g. user is now providing a video feed)
      * @param callIntent The new intent to set.
      */
-    updateCallIntent(callIntent: RTCCallIntent): void;
+    updateCallIntent(callIntent: RTCCallIntent): Promise<void>;
 }

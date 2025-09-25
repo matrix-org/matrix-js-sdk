@@ -638,12 +638,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         return undefined;
     }
 
-    public updateCallIntent(callIntent: RTCCallIntent): undefined {
+    public async updateCallIntent(callIntent: RTCCallIntent): Promise<void> {
         const myMembership = this.membershipManager?.ownMembership;
         if (!myMembership) {
             throw Error("Not connected yet");
         }
-        this.membershipManager?.updateCallIntent(callIntent);
+        await this.membershipManager?.updateCallIntent(callIntent);
     }
 
     /**

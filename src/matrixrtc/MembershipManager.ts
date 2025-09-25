@@ -231,15 +231,15 @@ export class MembershipManager
 
     private leavePromiseResolvers?: PromiseWithResolvers<boolean>;
 
-    public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
+    public onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
         if (!this.isActivated()) {
-            return;
+            return Promise.resolve();
         }
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
         if (!userId || !deviceId) {
             this.logger.error("MembershipManager.onRTCSessionMemberUpdate called without user or device id");
-            return;
+            return Promise.resolve();
         }
         this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
 
@@ -263,6 +263,7 @@ export class MembershipManager
                 this.scheduler.initiateJoin();
             }
         }
+        return Promise.resolve();
     }
 
     public getActiveFocus(): Focus | undefined {
@@ -286,7 +287,6 @@ export class MembershipManager
 
     public async updateCallIntent(callIntent: RTCCallIntent): Promise<void> {
         if (!this.activated || !this.ownMembership) {
-            console.log(new Error().stack);
             throw Error("You cannot update your intent before joining the call");
         }
         if (this.ownMembership.callIntent === callIntent) {

@@ -908,8 +908,8 @@ describe("MembershipManager", () => {
             // After joining we want our own focus to be the one we select.
             try {
                 await manager.updateCallIntent("video");
-                fail("Should have thrown");
-            } catch (ex) {}
+                throw Error("Should have thrown");
+            } catch {}
         });
 
         it("can adjust the intent", async () => {
