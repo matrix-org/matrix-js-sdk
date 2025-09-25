@@ -641,10 +641,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public updateCallIntent(callIntent: RTCCallIntent): undefined {
         const myMembership = this.membershipManager?.ownMembership;
         if (!myMembership) {
-            throw Error('Not connected yet');
-        }
-        if (myMembership.callIntent === callIntent) {
-            return; // No-op
+            throw Error("Not connected yet");
         }
         this.membershipManager?.updateCallIntent(callIntent);
     }

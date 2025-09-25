@@ -901,6 +901,43 @@ describe("MembershipManager", () => {
             }
         });
     });
+
+    describe("updateCallIntent()", () => {
+        it("should fail if the user has not joined the call", async () => {
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
+            // After joining we want our own focus to be the one we select.
+            try {
+                await manager.updateCallIntent("video");
+                fail("Should have thrown");
+            } catch (ex) {}
+        });
+
+        it("can adjust the intent", async () => {
+            const manager = new MembershipManager({}, room, client, () => undefined, callSession);
+            manager.join([]);
+            expect(manager.isActivated()).toEqual(true);
+            const membership = mockCallMembership({ ...membershipTemplate, user_id: client.getUserId()! }, room.roomId);
+            await manager.onRTCSessionMemberUpdate([membership]);
+            await manager.updateCallIntent("video");
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            const eventContent = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
+            expect(eventContent["created_ts"]).toEqual(membership.createdTs());
+            expect(eventContent["m.call.intent"]).toEqual("video");
+        });
+
+        it("does nothing if the intent doesn't change", async () => {
+            const manager = new MembershipManager({ callIntent: "video" }, room, client, () => undefined, callSession);
+            manager.join([]);
+            expect(manager.isActivated()).toEqual(true);
+            const membership = mockCallMembership(
+                { ...membershipTemplate, "user_id": client.getUserId()!, "m.call.intent": "video" },
+                room.roomId,
+            );
+            await manager.onRTCSessionMemberUpdate([membership]);
+            await manager.updateCallIntent("video");
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(0);
+        });
+    });
 });
 
 it("Should prefix log with MembershipManager used", () => {

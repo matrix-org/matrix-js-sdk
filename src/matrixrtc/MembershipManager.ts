@@ -232,15 +232,18 @@ export class MembershipManager
     private leavePromiseResolvers?: PromiseWithResolvers<boolean>;
 
     public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
+        if (!this.isActivated()) {
+            return;
+        }
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
         if (!userId || !deviceId) {
             this.logger.error("MembershipManager.onRTCSessionMemberUpdate called without user or device id");
-            return Promise.resolve();
+            return;
         }
         this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
 
-        if (this.isActivated() && !this._ownMembership) {
+        if (!this._ownMembership) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
             // take care of our missing membership.
             const sendingMembershipActions = [
@@ -260,7 +263,6 @@ export class MembershipManager
                 this.scheduler.initiateJoin();
             }
         }
-        return Promise.resolve();
     }
 
     public getActiveFocus(): Focus | undefined {
@@ -282,10 +284,17 @@ export class MembershipManager
         }
     }
 
-    public updateCallIntent(callIntent: RTCCallIntent): void {
+    public async updateCallIntent(callIntent: RTCCallIntent): Promise<void> {
+        if (!this.activated || !this.ownMembership) {
+            console.log(new Error().stack);
+            throw Error("You cannot update your intent before joining the call");
+        }
+        if (this.ownMembership.callIntent === callIntent) {
+            return; // No-op
+        }
         this.callIntent = callIntent;
         // Kick off a new membership event as a result.
-        void this.sendJoinEvent();
+        await this.sendJoinEvent();
     }
 
     /**
@@ -749,6 +758,7 @@ export class MembershipManager
      * Constructs our own membership
      */
     private makeMyMembership(expires: number): SessionMembershipData {
+        const hasPreviousEvent = !!this.ownMembership;
         return {
             // TODO: use the new format for m.rtc.member events where call_id becomes session.id
             "application": this.sessionDescription.application,
@@ -759,6 +769,7 @@ export class MembershipManager
             "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
             "foci_preferred": this.fociPreferred ?? [],
             "m.call.intent": this.callIntent,
+            ...(hasPreviousEvent ? { created_ts: this.ownMembership?.createdTs() } : undefined),
         };
     }
 
