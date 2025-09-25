@@ -19,6 +19,7 @@ import { deepCompare } from "../utils.ts";
 import { type Focus } from "./focus.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
 import { type SessionDescription } from "./MatrixRTCSession.ts";
+import { type RTCCallIntent } from "./types.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -31,13 +32,13 @@ type CallScope = "m.room" | "m.user";
 
 /**
  * MSC4143 (MatrixRTC) session membership data.
- * Represents an entry in the memberships section of an m.call.member event as it is on the wire.
+ * Represents the `session` in the memberships section of an m.call.member event as it is on the wire.
  **/
 export type SessionMembershipData = {
     /**
      * The RTC application defines the type of the RTC session.
      */
-    application: string;
+    "application": string;
 
     /**
      * The id of this session.
@@ -45,23 +46,23 @@ export type SessionMembershipData = {
      * multiple session in one room. A room wide session that is not associated with a user,
      * and therefore immune to creation race conflicts, uses the `call_id: ""`.
      */
-    call_id: string;
+    "call_id": string;
 
     /**
      * The Matrix device ID of this session. A single user can have multiple sessions on different devices.
      */
-    device_id: string;
+    "device_id": string;
 
     /**
      * The focus selection system this user/membership is using.
      */
-    focus_active: Focus;
+    "focus_active": Focus;
 
     /**
      * A list of possible foci this uses knows about. One of them might be used based on the focus_active
      * selection system.
      */
-    foci_preferred: Focus[];
+    "foci_preferred": Focus[];
 
     /**
      * Optional field that contains the creation of the session. If it is undefined the creation
@@ -70,7 +71,7 @@ export type SessionMembershipData = {
      *  - If it is undefined it can be interpreted as a "Join".
      *  - If it is defined it can be interpreted as an "Update"
      */
-    created_ts?: number;
+    "created_ts"?: number;
 
     // Application specific data
 
@@ -78,17 +79,26 @@ export type SessionMembershipData = {
      * If the `application` = `"m.call"` this defines if it is a room or user owned call.
      * There can always be one room scroped call but multiple user owned calls (breakout sessions)
      */
-    scope?: CallScope;
+    "scope"?: CallScope;
 
     /**
      * Optionally we allow to define a delta to the `created_ts` that defines when the event is expired/invalid.
      * This should be set to multiple hours. The only reason it exist is to deal with failed delayed events.
      * (for example caused by a homeserver crashes)
      **/
-    expires?: number;
+    "expires"?: number;
+
+    /**
+     * The intent of the call from the perspective of this user. This may be an audio call, video call or
+     * something else.
+     */
+    "m.call.intent"?: RTCCallIntent;
 };
 
-const checkSessionsMembershipData = (data: any, errors: string[]): data is SessionMembershipData => {
+const checkSessionsMembershipData = (
+    data: Partial<Record<keyof SessionMembershipData, any>>,
+    errors: string[],
+): data is SessionMembershipData => {
     const prefix = "Malformed session membership event: ";
     if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
@@ -96,10 +106,17 @@ const checkSessionsMembershipData = (data: any, errors: string[]): data is Sessi
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
     if (!Array.isArray(data.foci_preferred)) errors.push(prefix + "foci_preferred must be an array");
     // optional parameters
-    if (data.created_ts && typeof data.created_ts !== "number") errors.push(prefix + "created_ts must be number");
+    if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
+        errors.push(prefix + "created_ts must be number");
+    }
 
     // application specific data (we first need to check if they exist)
-    if (data.scope && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
+    if (data.scope !== undefined && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
+
+    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
+        errors.push(prefix + "m.call.intent must be a string");
+    }
+
     return errors.length === 0;
 };
 
@@ -140,6 +157,10 @@ export class CallMembership {
 
     public get deviceId(): string {
         return this.membershipData.device_id;
+    }
+
+    public get callIntent(): RTCCallIntent | undefined {
+        return this.membershipData["m.call.intent"];
     }
 
     public get sessionDescription(): SessionDescription {

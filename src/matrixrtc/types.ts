@@ -96,10 +96,20 @@ export interface ICallNotifyContent {
 }
 
 export type RTCNotificationType = "ring" | "notification";
+
+/**
+ * Represents the intention of the call from the perspective of the sending user.
+ * May be any string, although `"audio"` and `"video"` are commonly accepted values.
+ */
+export type RTCCallIntent = "audio" | "video" | string;
 export interface IRTCNotificationContent extends RelationEvent {
     "m.mentions": IMentions;
     "decline_reason"?: string;
     "notification_type": RTCNotificationType;
+    /**
+     * The initial intent of the calling user.
+     */
+    "m.call.intent"?: RTCCallIntent;
     "sender_ts": number;
     "lifetime": number;
 }

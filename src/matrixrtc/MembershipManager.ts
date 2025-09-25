@@ -24,9 +24,9 @@ import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION, type SessionMembershipData } from "./CallMembership.ts";
 import { type Focus } from "./focus.ts";
-import { isMyMembership, Status } from "./types.ts";
+import { isMyMembership, type RTCCallIntent, Status } from "./types.ts";
 import { isLivekitFocusActive } from "./LivekitFocus.ts";
-import { type SessionDescription, type MembershipConfig } from "./MatrixRTCSession.ts";
+import { type SessionDescription, type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import {
@@ -156,6 +156,7 @@ export class MembershipManager
 {
     private activated = false;
     private logger: Logger;
+    private callIntent: RTCCallIntent | undefined;
 
     public isActivated(): boolean {
         return this.activated;
@@ -230,7 +231,10 @@ export class MembershipManager
 
     private leavePromiseResolvers?: PromiseWithResolvers<boolean>;
 
-    public async onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
+    public onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void> {
+        if (!this.isActivated()) {
+            return Promise.resolve();
+        }
         const userId = this.client.getUserId();
         const deviceId = this.client.getDeviceId();
         if (!userId || !deviceId) {
@@ -239,7 +243,7 @@ export class MembershipManager
         }
         this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
 
-        if (this.isActivated() && !this._ownMembership) {
+        if (!this._ownMembership) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
             // take care of our missing membership.
             const sendingMembershipActions = [
@@ -281,6 +285,18 @@ export class MembershipManager
         }
     }
 
+    public async updateCallIntent(callIntent: RTCCallIntent): Promise<void> {
+        if (!this.activated || !this.ownMembership) {
+            throw Error("You cannot update your intent before joining the call");
+        }
+        if (this.ownMembership.callIntent === callIntent) {
+            return; // No-op
+        }
+        this.callIntent = callIntent;
+        // Kick off a new membership event as a result.
+        await this.sendJoinEvent();
+    }
+
     /**
      * @throws if the client does not return user or device id.
      * @param joinConfig
@@ -289,7 +305,7 @@ export class MembershipManager
      * @param getOldestMembership
      */
     public constructor(
-        private joinConfig: MembershipConfig | undefined,
+        private joinConfig: (SessionConfig & MembershipConfig) | undefined,
         private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
         private client: Pick<
             MatrixClient,
@@ -311,6 +327,7 @@ export class MembershipManager
         this.deviceId = deviceId;
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
+        this.callIntent = joinConfig?.callIntent;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
@@ -741,15 +758,18 @@ export class MembershipManager
      * Constructs our own membership
      */
     private makeMyMembership(expires: number): SessionMembershipData {
+        const hasPreviousEvent = !!this.ownMembership;
         return {
             // TODO: use the new format for m.rtc.member events where call_id becomes session.id
-            application: this.sessionDescription.application,
-            call_id: this.sessionDescription.id,
-            scope: "m.room",
-            device_id: this.deviceId,
+            "application": this.sessionDescription.application,
+            "call_id": this.sessionDescription.id,
+            "scope": "m.room",
+            "device_id": this.deviceId,
             expires,
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-            foci_preferred: this.fociPreferred ?? [],
+            "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+            "foci_preferred": this.fociPreferred ?? [],
+            "m.call.intent": this.callIntent,
+            ...(hasPreviousEvent ? { created_ts: this.ownMembership?.createdTs() } : undefined),
         };
     }
 

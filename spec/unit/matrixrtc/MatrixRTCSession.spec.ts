@@ -222,6 +222,27 @@ describe("MatrixRTCSession", () => {
         });
     });
 
+    describe("getConsensusCallIntent", () => {
+        it.each([
+            [undefined, undefined, undefined],
+            ["audio", undefined, "audio"],
+            [undefined, "audio", "audio"],
+            ["audio", "audio", "audio"],
+            ["audio", "video", undefined],
+        ])("gets correct consensus for %s + %s = %s", (intentA, intentB, result) => {
+            jest.useFakeTimers();
+            jest.setSystemTime(4000);
+            const mockRoom = makeMockRoom([
+                Object.assign({}, membershipTemplate, { "m.call.intent": intentA }),
+                Object.assign({}, membershipTemplate, { "m.call.intent": intentB }),
+            ]);
+
+            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            expect(sess.getConsensusCallIntent()).toEqual(result);
+            jest.useRealTimers();
+        });
+    });
+
     describe("getsActiveFocus", () => {
         const firstPreferredFocus = {
             type: "livekit",
@@ -358,6 +379,79 @@ describe("MatrixRTCSession", () => {
                         rel_type: "m.reference",
                     },
                     "notification_type": "ring",
+                    "sender_ts": expect.any(Number),
+                },
+                {
+                    "application": "m.call",
+                    "call_id": "",
+                    "event_id": "legacy-evt",
+                    "m.mentions": { room: true, user_ids: [] },
+                    "notify_type": "ring",
+                },
+            );
+        });
+
+        it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
+            // Simulate a join, including the update to the room state
+            // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
+            sendEventMock
+                .mockResolvedValueOnce({ event_id: "legacy-evt" })
+                .mockResolvedValueOnce({ event_id: "new-evt" });
+            const didSendEventFn = jest.fn();
+            sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
+            // Create an additional listener to create a promise that resolves after the emission.
+            const didSendNotification = new Promise((resolve) => {
+                sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
+            });
+
+            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring", callIntent: "audio" });
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+
+            mockRoomState(mockRoom, [
+                {
+                    ...membershipTemplate,
+                    "user_id": client.getUserId()!,
+                    // This is what triggers the intent type on the notification event.
+                    "m.call.intent": "audio",
+                },
+            ]);
+
+            sess!.onRTCSessionMemberUpdate();
+            const ownMembershipId = sess?.memberships[0].eventId;
+            expect(sess!.getConsensusCallIntent()).toEqual("audio");
+
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": "ring",
+                "m.call.intent": "audio",
+                "m.relates_to": {
+                    event_id: ownMembershipId,
+                    rel_type: "m.reference",
+                },
+                "lifetime": 30000,
+                "sender_ts": expect.any(Number),
+            });
+
+            // Check if deprecated notify event is also sent.
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
+                "application": "m.call",
+                "m.mentions": { user_ids: [], room: true },
+                "notify_type": "ring",
+                "call_id": "",
+            });
+            await didSendNotification;
+            // And ensure we emitted the DidSendCallNotification event with both payloads
+            expect(didSendEventFn).toHaveBeenCalledWith(
+                {
+                    "event_id": "new-evt",
+                    "lifetime": 30000,
+                    "m.mentions": { room: true, user_ids: [] },
+                    "m.relates_to": {
+                        event_id: expect.any(String),
+                        rel_type: "m.reference",
+                    },
+                    "notification_type": "ring",
+                    "m.call.intent": "audio",
                     "sender_ts": expect.any(Number),
                 },
                 {
