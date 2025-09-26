@@ -26,11 +26,7 @@ import {
     type ILeftRoom,
     type IRoomEvent,
     type IStateEvent,
-<<<<<<< HEAD
     type IStickyEvent,
-=======
-    IStickyEvent,
->>>>>>> 7750916d3 (Add tests)
     type IStrippedState,
     type ISyncResponse,
     SyncAccumulator,
@@ -1073,11 +1069,7 @@ describe("SyncAccumulator", function () {
         });
     });
 
-<<<<<<< HEAD
     describe("MSC4354 sticky events", () => {
-=======
-    describe.only("MSC4354 sticky events", () => {
->>>>>>> 7750916d3 (Add tests)
         function stickyEvent(ts = 0): IStickyEvent {
             const msgData = msg("test", "test text");
             return {
