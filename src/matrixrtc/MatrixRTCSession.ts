@@ -298,7 +298,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @deprecated Use `MatrixRTCSession.sessionMembershipsForRoom` instead.
      */
     public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "getStickyEventsMap">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "unstableGetStickyEvents">,
     ): CallMembership[] {
         return MatrixRTCSession.sessionMembershipsForRoom(room, {
             id: "",
@@ -311,7 +311,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * oldest first.
      */
     public static sessionMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "getStickyEventsMap">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "unstableGetStickyEvents">,
         sessionDescription: SessionDescription,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
@@ -322,7 +322,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         let callMemberEvents = [] as MatrixEvent[];
         if (useStickyEvents) {
             // prefill with sticky events
-            callMemberEvents = Array.from(room.getStickyEventsMap().values()).filter(
+            callMemberEvents = Array.from(room.unstableGetStickyEvents()).filter(
                 (e) => e.getType() === EventType.GroupCallMemberPrefix,
             );
         }
@@ -790,8 +790,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.recalculateSessionMembers();
     };
 
-    private onStickyEventUpdate = (stickyEvents: Map<string, MatrixEvent>, room: Room): void => {
-        if (Array.from(stickyEvents.values()).some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
+    private onStickyEventUpdate = (added: MatrixEvent[], _removed: MatrixEvent[], room: Room): void => {
+        if ([...added, ..._removed].some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
             this.recalculateSessionMembers();
         }
     };
