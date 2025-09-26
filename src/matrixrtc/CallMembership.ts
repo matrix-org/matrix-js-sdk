@@ -93,6 +93,10 @@ export type SessionMembershipData = {
      * something else.
      */
     "m.call.intent"?: RTCCallIntent;
+    /**
+     * the sticky key for sticky events packed application + device_id making up the used slot + device.
+     */
+    "sticky_key"?: string;
 };
 
 const checkSessionsMembershipData = (

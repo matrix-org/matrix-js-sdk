@@ -17,7 +17,7 @@ limitations under the License.
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
-import { type Room } from "../models/room.ts";
+import { RoomEvent, type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
 import { KnownMembership } from "../@types/membership.ts";
@@ -50,6 +50,7 @@ import {
 } from "./RoomAndToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
+import { type MatrixEvent } from "src/matrix.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -291,7 +292,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @deprecated Use `MatrixRTCSession.sessionMembershipsForRoom` instead.
      */
     public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "getStickyEventsMap">,
     ): CallMembership[] {
         return MatrixRTCSession.sessionMembershipsForRoom(room, {
             id: "",
@@ -304,16 +305,24 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * oldest first.
      */
     public static sessionMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "getStickyEventsMap">,
         sessionDescription: SessionDescription,
+        useStickyEvents: boolean = true,
     ): CallMembership[] {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
-        const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        if (!roomState) {
-            logger.warn("Couldn't get state for room " + room.roomId);
-            throw new Error("Could't get state for room " + room.roomId);
+        let callMemberEvents;
+        if (useStickyEvents) {
+            callMemberEvents = Array.from(room.getStickyEventsMap().values()).filter(
+                (e) => e.getType() === EventType.GroupCallMemberPrefix,
+            );
+        } else {
+            const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+            if (!roomState) {
+                logger.warn("Couldn't get state for room " + room.roomId);
+                throw new Error("Could't get state for room " + room.roomId);
+            }
+            callMemberEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
         }
-        const callMemberEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
 
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
@@ -428,10 +437,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
             MatrixClient,
             | "getUserId"
             | "getDeviceId"
-            | "sendStateEvent"
-            | "_unstable_sendDelayedStateEvent"
-            | "_unstable_updateDelayedEvent"
             | "sendEvent"
+            | "_unstable_updateDelayedEvent"
+            | "_unstable_sendStickyEvent"
+            | "_unstable_sendStickyDelayedEvent"
             | "cancelPendingEvent"
             | "encryptAndSendToDevice"
             | "off"
@@ -455,9 +464,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        this.roomSubset.on(RoomEvent.StickyEvents, this.onStickyEventUpdate);
+
         this.setExpiryTimer();
     }
-
     /*
      * Returns true if we intend to be participating in the MatrixRTC session.
      * This is determined by checking if the relativeExpiry has been set.
@@ -477,6 +487,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        this.roomSubset.off(RoomEvent.StickyEvents, this.onStickyEventUpdate);
     }
     private reEmitter = new TypedReEmitter<
         MatrixRTCSessionEvent | RoomAndToDeviceEvents | MembershipManagerEvent,
@@ -759,6 +770,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public onRoomMemberUpdate = (): void => {
         this.recalculateSessionMembers();
+    };
+
+    private onStickyEventUpdate = (stickyEvents: Map<string, MatrixEvent>, room: Room): void => {
+        if (Array.from(stickyEvents.values()).some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
+            this.recalculateSessionMembers();
+        }
     };
 
     /**
