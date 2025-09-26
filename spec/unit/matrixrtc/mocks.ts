@@ -81,6 +81,7 @@ export function makeMockRoom(
             getState: jest.fn().mockReturnValue(roomState),
         }),
         getVersion: jest.fn().mockReturnValue("default"),
+        unstableGetStickyEvents: jest.fn().mockReturnValue([]),
     }) as unknown as Room;
     return Object.assign(room, {
         emitTimelineEvent: (event: MatrixEvent) =>
