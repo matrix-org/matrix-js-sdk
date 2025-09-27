@@ -280,7 +280,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const { signal, cleanup } = anySignal(signals);
 
         // Set cache mode based on presence of Authorization header.
-        // Proxies do not cache responses to requests with Authorization headers.
+        // Browsers/proxies do not cache responses to requests with Authorization headers.
         // So specifying "no-cache" is redundant, and actually prevents caching
         // of preflight requests in CORS scenarios. As such, we only set "no-cache"
         // when there is no Authorization header.
