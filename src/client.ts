@@ -444,6 +444,12 @@ export interface ICreateClientOpts {
     isVoipWithNoMediaAllowed?: boolean;
 
     /**
+     * Disable VoIP support (prevents fetching TURN servers, etc.)
+     * Default: false (VoIP enabled)
+     */
+    disableVoip?: boolean;
+
+    /**
      * If true, group calls will not establish media connectivity and only create the signaling events,
      * so that livekit media can be used in the application layer (js-sdk contains no livekit code).
      */
@@ -1220,6 +1226,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public idBaseUrl?: string;
     public baseUrl: string;
     public readonly isVoipWithNoMediaAllowed;
+    public disableVoip: boolean;
 
     public useLivekitForGroupCalls: boolean;
 
@@ -1346,7 +1353,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         }
 
-        if (supportsMatrixCall()) {
+        this.disableVoip = opts.disableVoip ?? false;
+
+        if (!this.disableVoip && supportsMatrixCall()) {
             this.callEventHandler = new CallEventHandler(this);
             this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
@@ -1433,7 +1442,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // periodically poll for turn servers if we support voip
-        if (this.canSupportVoip) {
+        if (this.supportsVoip()) {
             this.checkTurnServersIntervalID = setInterval(() => {
                 this.checkTurnServers();
             }, TURN_CHECK_INTERVAL);
@@ -1670,7 +1679,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns True if VoIP is supported.
      */
     public supportsVoip(): boolean {
-        return this.canSupportVoip;
+        return !this.disableVoip && this.canSupportVoip;
     }
 
     /**
@@ -5622,7 +5631,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     // XXX: Intended private, used in code.
     public async checkTurnServers(): Promise<boolean | undefined> {
-        if (!this.canSupportVoip) {
+        if (!this.supportsVoip()) {
             return;
         }
 
