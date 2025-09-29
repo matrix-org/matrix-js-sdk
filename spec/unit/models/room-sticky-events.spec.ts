@@ -126,6 +126,23 @@ describe("RoomStickyEvents", () => {
         });
     });
 
+    describe("unstableAddStickyEvents", () => {
+        it("should emit when a new sticky event is added", () => {
+            const emitSpy = jest.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+            });
+            stickyEvents.addStickyEvents([
+                new MatrixEvent({
+                    ...stickyEvent,
+                }),
+            ]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
+            expect(emitSpy).toHaveBeenCalledWith([ev], []);
+        });
+    });
+
     describe("getStickyEvents", () => {
         it("should have zero sticky events", () => {
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
@@ -257,6 +274,54 @@ describe("RoomStickyEvents", () => {
             stickyEvents.addStickyEvents([ev]);
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
+        });
+    });
+
+    describe("cleanExpiredStickyEvents", () => {
+        beforeAll(() => {
+            jest.useFakeTimers();
+        });
+        afterAll(() => {
+            jest.useRealTimers();
+        });
+
+        it("should emit when a sticky event expires", () => {
+            const stickyEvents = new RoomStickyEventsStore();
+            const emitSpy = jest.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            jest.setSystemTime(0);
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([ev]);
+            jest.setSystemTime(15000);
+            jest.advanceTimersByTime(15000);
+            expect(emitSpy).toHaveBeenCalledWith([], [ev]);
+        });
+        it("should emit two events when both expire at the same time", () => {
+            const stickyEvents = new RoomStickyEventsStore();
+            const emitSpy = jest.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            jest.setSystemTime(0);
+            const ev1 = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$eventA",
+                origin_server_ts: 0,
+            });
+            const ev2 = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$eventB",
+                content: {
+                    msc4354_sticky_key: "key_2",
+                },
+                origin_server_ts: 0,
+            });
+            stickyEvents.addStickyEvents([ev1, ev2]);
+            expect(emitSpy).toHaveBeenCalledWith([ev1, ev2], []);
+            jest.setSystemTime(15000);
+            jest.advanceTimersByTime(15000);
+            expect(emitSpy).toHaveBeenCalledWith([], [ev1, ev2]);
         });
     });
 });
