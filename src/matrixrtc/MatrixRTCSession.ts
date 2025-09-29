@@ -335,10 +335,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
             }
             const callMemberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
             // only care about state events which have keys which we have not yet seen in the sticky events.
-            callMemberStateEvents.filter((e) =>
-                callMemberEvents.some((stickyEvent) => stickyEvent.getContent().state_key === e.getStateKey()),
-            );
-            callMemberEvents = callMemberEvents.concat(callMemberStateEvents);
+            callMemberEvents = callMemberEvents.concat(callMemberStateEvents.filter((e) =>
+                callMemberEvents.some((stickyEvent) => stickyEvent.getContent().msc4354_sticky_key === e.getStateKey()),
+            ));
         }
 
         const callMemberships: CallMembership[] = [];
@@ -805,10 +804,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Call this when the Matrix room members have changed.
      */
-    public onRoomMemberUpdate = (): void => {
+    private onRoomMemberUpdate = (): void => {
         this.recalculateSessionMembers();
     };
 
+    /**
+     * Call this when a sticky event update has occured.
+     */
     private onStickyEventUpdate = (added: MatrixEvent[], _removed: MatrixEvent[]): void => {
         if ([...added, ..._removed].some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
             this.recalculateSessionMembers();
