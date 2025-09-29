@@ -74,10 +74,11 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
 
 export function makeMockRoom(
     membershipData: MembershipData[],
+    useStickyEvents = false,
 ): Room & { emitTimelineEvent: (event: MatrixEvent) => void } {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
-    const roomState = makeMockRoomState(membershipData, roomId);
+    const roomState = makeMockRoomState(useStickyEvents ? [] : membershipData, roomId);
     const room = Object.assign(new EventEmitter(), {
         roomId: roomId,
         hasMembershipState: jest.fn().mockReturnValue(true),
@@ -85,7 +86,9 @@ export function makeMockRoom(
             getState: jest.fn().mockReturnValue(roomState),
         }),
         getVersion: jest.fn().mockReturnValue("default"),
-        unstableGetStickyEvents: jest.fn().mockReturnValue([]),
+        unstableGetStickyEvents: jest
+            .fn()
+            .mockReturnValue(useStickyEvents ? membershipData.map((m) => mockRTCEvent(m, roomId)) : []),
     }) as unknown as Room;
     return Object.assign(room, {
         emitTimelineEvent: (event: MatrixEvent) =>

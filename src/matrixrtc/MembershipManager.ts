@@ -144,6 +144,18 @@ export interface MembershipManagerState {
     probablyLeft: boolean;
 }
 
+function createInsertActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
+    return {
+        insert: [{ ts: Date.now() + (offset ?? 0), type }],
+    };
+}
+
+function createReplaceActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
+    return {
+        replace: [{ ts: Date.now() + (offset ?? 0), type }],
+    };
+}
+
 /**
  * This class is responsible for sending all events relating to the own membership of a matrixRTC call.
  * It has the following tasks:
@@ -313,7 +325,7 @@ export class MembershipManager
      */
     public constructor(
         private joinConfig: (SessionConfig & MembershipConfig) | undefined,
-        private room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
+        protected room: Pick<Room, "roomId" | "getVersion">,
         private client: Pick<
             MatrixClient,
             | "getUserId"
@@ -321,8 +333,6 @@ export class MembershipManager
             | "sendStateEvent"
             | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
-            | "_unstable_sendStickyEvent"
-            | "_unstable_sendStickyDelayedEvent"
         >,
         private getOldestMembership: () => CallMembership | undefined,
         public readonly sessionDescription: SessionDescription,
@@ -380,7 +390,7 @@ export class MembershipManager
     }
     // Membership Event static parameters:
     private deviceId: string;
-    private stateKey: string;
+    protected stateKey: string;
     private fociPreferred?: Focus[];
     private focusActive?: Focus;
 
@@ -403,7 +413,7 @@ export class MembershipManager
             this.membershipEventExpiryHeadroomMs
         );
     }
-    private get delayedLeaveEventDelayMs(): number {
+    protected get delayedLeaveEventDelayMs(): number {
         return this.delayedLeaveEventDelayMsOverride ?? this.joinConfig?.delayedLeaveEventDelayMs ?? 8_000;
     }
     private get delayedLeaveEventRestartMs(): number {
@@ -418,10 +428,6 @@ export class MembershipManager
 
     private get delayedLeaveEventRestartLocalTimeoutMs(): number {
         return this.joinConfig?.delayedLeaveEventRestartLocalTimeoutMs ?? 2000;
-    }
-
-    private get useStickyEvents(): boolean {
-        return this.joinConfig?.useStickyEvents ?? false;
     }
 
     // LOOP HANDLER:
@@ -479,27 +485,16 @@ export class MembershipManager
     }
 
     // an abstraction to switch between sending state or a sticky event
-    private clientSendDelayedEvent: (myMembership: EmptyObject) => Promise<SendDelayedEventResponse> = (
+    protected clientSendDelayedEvent: (myMembership: EmptyObject) => Promise<SendDelayedEventResponse> = (
         myMembership,
     ) =>
-        this.useStickyEvents
-            ? this.client._unstable_sendStickyDelayedEvent(
-                  this.room.roomId,
-                  STICK_DURATION_MS,
-                  { delay: this.delayedLeaveEventDelayMs },
-                  null,
-                  EventType.GroupCallMemberPrefix,
-                  Object.assign(myMembership, { sticky_key: this.stateKey }),
-              )
-            : this.client._unstable_sendDelayedStateEvent(
-                  this.room.roomId,
-                  { delay: this.delayedLeaveEventDelayMs },
-                  EventType.GroupCallMemberPrefix,
-                  myMembership,
-                  this.stateKey,
-              );
-    private sendDelayedEventMethodName: () => string = () =>
-        this.useStickyEvents ? "_unstable_sendStickyDelayedEvent" : "_unstable_sendDelayedStateEvent";
+        this.client._unstable_sendDelayedStateEvent(
+            this.room.roomId,
+            { delay: this.delayedLeaveEventDelayMs },
+            EventType.GroupCallMemberPrefix,
+            myMembership,
+            this.stateKey,
+        );
 
     // HANDLERS (used in the membershipLoopHandler)
     private async sendOrResendDelayedLeaveEvent(): Promise<ActionUpdate> {
@@ -531,7 +526,7 @@ export class MembershipManager
                 if (this.manageMaxDelayExceededSituation(e)) {
                     return createInsertActionUpdate(repeatActionType);
                 }
-                const update = this.actionUpdateFromErrors(e, repeatActionType, this.sendDelayedEventMethodName());
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "_unstable_sendDelayedStateEvent");
                 if (update) return update;
 
                 if (this.state.hasMemberStateEvent) {
@@ -687,25 +682,10 @@ export class MembershipManager
             });
     }
 
-    private clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> = (
-        myMembership,
-    ) =>
-        this.useStickyEvents
-            ? this.client._unstable_sendStickyEvent(
-                  this.room.roomId,
-                  STICK_DURATION_MS,
-                  null,
-                  EventType.GroupCallMemberPrefix,
-                  Object.assign(myMembership, { sticky_key: this.stateKey }),
-              )
-            : this.client.sendStateEvent(
-                  this.room.roomId,
-                  EventType.GroupCallMemberPrefix,
-                  myMembership,
-                  this.stateKey,
-              );
-    private sendMembershipMethodName: () => string = () =>
-        this.useStickyEvents ? "_unstable_sendStickyEvent" : "sendStateEvent";
+    protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
+        (myMembership) =>
+            this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, myMembership, this.stateKey);
+
     private async sendJoinEvent(): Promise<ActionUpdate> {
         return await this.clientSendMembership(this.makeMyMembership(this.membershipEventExpiryMs))
             .then(() => {
@@ -739,11 +719,7 @@ export class MembershipManager
                 };
             })
             .catch((e) => {
-                const update = this.actionUpdateFromErrors(
-                    e,
-                    MembershipActionType.SendJoinEvent,
-                    this.sendMembershipMethodName(),
-                );
+                const update = this.actionUpdateFromErrors(e, MembershipActionType.SendJoinEvent, "sendStateEvent");
                 if (update) return update;
                 throw e;
             });
@@ -768,11 +744,7 @@ export class MembershipManager
                 };
             })
             .catch((e) => {
-                const update = this.actionUpdateFromErrors(
-                    e,
-                    MembershipActionType.UpdateExpiry,
-                    this.sendMembershipMethodName(),
-                );
+                const update = this.actionUpdateFromErrors(e, MembershipActionType.UpdateExpiry, "sendStateEvent");
                 if (update) return update;
 
                 throw e;
@@ -786,11 +758,7 @@ export class MembershipManager
                 return { replace: [] };
             })
             .catch((e) => {
-                const update = this.actionUpdateFromErrors(
-                    e,
-                    MembershipActionType.SendLeaveEvent,
-                    this.sendMembershipMethodName(),
-                );
+                const update = this.actionUpdateFromErrors(e, MembershipActionType.SendLeaveEvent, "sendStateEvent");
                 if (update) return update;
                 throw e;
             });
@@ -857,7 +825,7 @@ export class MembershipManager
         return false;
     }
 
-    private actionUpdateFromErrors(
+    protected actionUpdateFromErrors(
         error: unknown,
         type: MembershipActionType,
         method: string,
@@ -905,7 +873,7 @@ export class MembershipManager
             return createInsertActionUpdate(type, resendDelay);
         }
 
-        throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + "): " + (error as Error));
+        throw Error("Exceeded maximum retries for " + type + " attempts (client." + method + ")", { cause: error });
     }
 
     /**
@@ -1049,14 +1017,64 @@ export class MembershipManager
     }
 }
 
-function createInsertActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
-    return {
-        insert: [{ ts: Date.now() + (offset ?? 0), type }],
-    };
-}
+/**
+ * Implementation of the Membership manager that uses sticky events
+ * rather than state events.
+ */
+export class StickyEventMembershipManager extends MembershipManager {
+    public constructor(
+        joinConfig: (SessionConfig & MembershipConfig) | undefined,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
+        private readonly clientWithSticky: Pick<
+            MatrixClient,
+            | "getUserId"
+            | "getDeviceId"
+            | "sendStateEvent"
+            | "_unstable_sendDelayedStateEvent"
+            | "_unstable_updateDelayedEvent"
+            | "_unstable_sendStickyEvent"
+            | "_unstable_sendStickyDelayedEvent"
+        >,
+        getOldestMembership: () => CallMembership | undefined,
+        sessionDescription: SessionDescription,
+        parentLogger?: Logger,
+    ) {
+        super(joinConfig, room, clientWithSticky, getOldestMembership, sessionDescription, parentLogger);
+    }
 
-function createReplaceActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
-    return {
-        replace: [{ ts: Date.now() + (offset ?? 0), type }],
-    };
+    protected clientSendDelayedEvent: (myMembership: EmptyObject) => Promise<SendDelayedEventResponse> = (
+        myMembership,
+    ) =>
+        this.clientWithSticky._unstable_sendStickyDelayedEvent(
+            this.room.roomId,
+            STICK_DURATION_MS,
+            { delay: this.delayedLeaveEventDelayMs },
+            null,
+            EventType.GroupCallMemberPrefix,
+            Object.assign(myMembership, { sticky_key: this.stateKey }),
+        );
+
+    protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
+        (myMembership) =>
+            this.clientWithSticky._unstable_sendStickyEvent(
+                this.room.roomId,
+                STICK_DURATION_MS,
+                null,
+                EventType.GroupCallMemberPrefix,
+                Object.assign(myMembership, { sticky_key: this.stateKey }),
+            );
+
+    protected actionUpdateFromErrors(
+        error: unknown,
+        type: MembershipActionType,
+        method: string,
+    ): ActionUpdate | undefined {
+        // Override method name.
+        if (method === "sendStateEvent") {
+            method = "_unstable_sendStickyEvent";
+        } else if (method === "_unstable_sendDelayedStateEvent") {
+            method = "_unstable_sendStickyDelayedEvent";
+        }
+        return super.actionUpdateFromErrors(error, type, method);
+    }
 }
