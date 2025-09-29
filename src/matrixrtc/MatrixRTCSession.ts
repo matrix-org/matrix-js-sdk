@@ -335,9 +335,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
             }
             const callMemberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
             // only care about state events which have keys which we have not yet seen in the sticky events.
-            callMemberEvents = callMemberEvents.concat(callMemberStateEvents.filter((e) =>
-                callMemberEvents.some((stickyEvent) => stickyEvent.getContent().msc4354_sticky_key === e.getStateKey()),
-            ));
+            callMemberEvents = callMemberEvents.concat(
+                callMemberStateEvents.filter((e) =>
+                    callMemberEvents.some(
+                        (stickyEvent) => stickyEvent.getContent().msc4354_sticky_key === e.getStateKey(),
+                    ),
+                ),
+            );
         }
 
         const callMemberships: CallMembership[] = [];
