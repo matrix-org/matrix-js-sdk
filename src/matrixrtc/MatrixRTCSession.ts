@@ -398,6 +398,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 callMemberships.map((m) => [m.createdTs(), m.sender]),
             );
         }
+        console.log("Calculated RTC membership to be", callMemberships, "from", callMemberEvents);
 
         return callMemberships;
     }
@@ -817,8 +818,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Call this when a sticky event update has occured.
      */
-    private onStickyEventUpdate = (added: MatrixEvent[], _removed: MatrixEvent[]): void => {
-        if ([...added, ..._removed].some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
+    private onStickyEventUpdate = (added: MatrixEvent[], removed: MatrixEvent[]): void => {
+        this.logger.debug("Sticky event update", {added, removed});
+        if ([...added, ...removed].some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
             this.recalculateSessionMembers();
         }
     };
@@ -851,6 +853,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.logger.info(
                 `Memberships for call in room ${this.roomSubset.roomId} have changed: emitting (${this.memberships.length} members)`,
             );
+            console.log({ old: oldMemberships, new: this.memberships });
             logDurationSync(this.logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
                 this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
             });
