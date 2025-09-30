@@ -253,7 +253,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.member.user_id;
-            case "session":
+            default: // "session":
                 return this.parentEventData.sender;
         }
     }
@@ -271,7 +271,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.slot_id;
-            case "session":
+            default: // "session":
                 return slotDescriptionToId({ application: this.application, id: data.call_id });
         }
     }
@@ -281,7 +281,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.member.device_id;
-            case "session":
+            default: // "session":
                 return data.device_id;
         }
     }
@@ -302,7 +302,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.application.type;
-            case "session":
+            default: // "session":
                 return data.application;
         }
     }
@@ -311,7 +311,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.application;
-            case "session":
+            default: // "session":
                 return { "type": data.application, "m.call.intent": data["m.call.intent"] };
         }
     }
@@ -322,10 +322,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return undefined;
-            case "session":
+            default: // "session":
                 return data.scope;
-            default:
-                return undefined;
         }
     }
 
@@ -337,7 +335,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.member.id;
-            case "session":
+            default: // "session":
                 return (this.createdTs() ?? "").toString();
         }
     }
@@ -348,7 +346,7 @@ export class CallMembership {
             case "rtc":
                 // TODO we need to read the referenced (relation) event if available to get the real created_ts
                 return this.parentEvent.getTs();
-            case "session":
+            default: // "session":
                 return data.created_ts ?? this.parentEvent.getTs();
         }
     }
@@ -362,7 +360,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return undefined;
-            case "session":
+            default: // "session":
                 // TODO: calculate this from the MatrixRTCSession join configuration directly
                 return this.createdTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
         }
@@ -376,7 +374,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return undefined;
-            case "session":
+            default: // "session":
                 // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
                 // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
                 // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
@@ -392,7 +390,7 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return false;
-            case "session":
+            default: // "session":
                 return this.getMsUntilExpiry()! <= 0;
         }
     }
@@ -409,21 +407,22 @@ export class CallMembership {
                 return data.rtc_transports[0];
             case "session":
                 switch (data.focus_active.focus_selection) {
+                    case "multi_sfu":
+                        return data.foci_preferred[0];
                     case "oldest_membership":
                         if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
                         if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
                         break;
-                    case "multi_sfu":
-                        return data.foci_preferred[0];
                 }
         }
+        return undefined;
     }
     public get transports(): Transport[] {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
                 return data.rtc_transports;
-            case "session":
+            default: // "session":
                 return data.foci_preferred;
         }
     }
