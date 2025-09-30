@@ -96,7 +96,7 @@ export type SessionMembershipData = {
     /**
      * the sticky key for sticky events packed application + device_id making up the used slot + device.
      */
-    "sticky_key"?: string;
+    "msc4354_sticky_key"?: string;
 };
 
 const checkSessionsMembershipData = (

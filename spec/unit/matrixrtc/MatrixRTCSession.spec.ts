@@ -14,11 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
+import {
+    encodeBase64,
+    type EventTimeline,
+    EventType,
+    MatrixClient,
+    type MatrixError,
+    type MatrixEvent,
+    type Room,
+} from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
-import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey, type MembershipData, mockRoomState } from "./mocks";
+import {
+    makeMockEvent,
+    makeMockRoom,
+    membershipTemplate,
+    makeKey,
+    type MembershipData,
+    mockRoomState,
+    mockRTCEvent,
+} from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 
 const mockFocus = { type: "mock" };
@@ -118,7 +134,7 @@ describe("MatrixRTCSession", () => {
 
             it("ignores memberships events of members not in the room", () => {
                 const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
-                mockRoom.hasMembershipState = (state) => state === KnownMembership.Join;
+                mockRoom.hasMembershipState.mockImplementation((state) => state === KnownMembership.Join);
                 sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
                 expect(sess?.memberships.length).toEqual(0);
             });
@@ -150,7 +166,7 @@ describe("MatrixRTCSession", () => {
                     getLocalAge: jest.fn().mockReturnValue(0),
                 };
                 const mockRoom = makeMockRoom([]);
-                mockRoom.getLiveTimeline = jest.fn().mockReturnValue({
+                mockRoom.getLiveTimeline.mockReturnValue({
                     getState: jest.fn().mockReturnValue({
                         on: jest.fn(),
                         off: jest.fn(),
@@ -167,7 +183,7 @@ describe("MatrixRTCSession", () => {
                             ],
                         ]),
                     }),
-                });
+                } as unknown as EventTimeline);
                 sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
                 expect(sess.memberships).toHaveLength(0);
             });
@@ -181,7 +197,7 @@ describe("MatrixRTCSession", () => {
                     getLocalAge: jest.fn().mockReturnValue(0),
                 };
                 const mockRoom = makeMockRoom([]);
-                mockRoom.getLiveTimeline = jest.fn().mockReturnValue({
+                mockRoom.getLiveTimeline.mockReturnValue({
                     getState: jest.fn().mockReturnValue({
                         on: jest.fn(),
                         off: jest.fn(),
@@ -198,7 +214,7 @@ describe("MatrixRTCSession", () => {
                             ],
                         ]),
                     }),
-                });
+                } as unknown as EventTimeline);
                 sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
                 expect(sess.memberships).toHaveLength(0);
             });
@@ -220,6 +236,69 @@ describe("MatrixRTCSession", () => {
             });
         },
     );
+
+    describe("roomSessionForRoom combined state", () => {
+        it("perfers sticky events when both membership and sticky events appear for the same user", () => {
+            // Create a room with identical member state and sticky state for the same user.
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            mockRoom.unstableGetStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent(
+                    {
+                        ...membershipTemplate,
+                        msc4354_sticky_key: `_${membershipTemplate.user_id}_${membershipTemplate.device_id}`,
+                    },
+                    mockRoom.roomId,
+                );
+                return [ev];
+            });
+
+            // Expect for there to be one membership as the state has been merged down.
+            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            expect(sess?.memberships.length).toEqual(1);
+            expect(sess?.memberships[0].sessionDescription.id).toEqual("");
+            expect(sess?.memberships[0].scope).toEqual("m.room");
+            expect(sess?.memberships[0].application).toEqual("m.call");
+            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+            expect(sess?.memberships[0].isExpired()).toEqual(false);
+            expect(sess?.sessionDescription.id).toEqual("");
+        });
+        it("combines sticky and membership events when both exist", () => {
+            // Create a room with identical member state and sticky state for the same user.
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            const otherUserId = "@othermock:user.example";
+            mockRoom.unstableGetStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent(
+                    {
+                        ...membershipTemplate,
+                        user_id: otherUserId,
+                        msc4354_sticky_key: `_${otherUserId}_${membershipTemplate.device_id}`,
+                    },
+                    mockRoom.roomId,
+                );
+                return [ev];
+            });
+
+            // Expect two membership events, sticky events always coming first.
+            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            expect(sess?.memberships.length).toEqual(2);
+            expect(sess?.memberships[0].sender).toEqual(otherUserId);
+            expect(sess?.memberships[0].sessionDescription.id).toEqual("");
+            expect(sess?.memberships[0].scope).toEqual("m.room");
+            expect(sess?.memberships[0].application).toEqual("m.call");
+            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+            expect(sess?.memberships[0].isExpired()).toEqual(false);
+
+            expect(sess?.memberships[1].sender).toEqual(membershipTemplate.user_id);
+
+            expect(sess?.sessionDescription.id).toEqual("");
+        });
+    });
 
     describe("getOldestMembership", () => {
         it("returns the oldest membership event", () => {

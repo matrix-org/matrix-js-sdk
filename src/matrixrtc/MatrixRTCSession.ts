@@ -322,7 +322,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         let callMemberEvents = [] as MatrixEvent[];
         if (listenForStickyEvents) {
             // prefill with sticky events
-            callMemberEvents = Array.from(room.unstableGetStickyEvents()).filter(
+            callMemberEvents = [...room.unstableGetStickyEvents()].filter(
                 (e) => e.getType() === EventType.GroupCallMemberPrefix,
             );
         }
