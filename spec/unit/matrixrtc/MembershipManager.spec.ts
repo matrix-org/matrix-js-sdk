@@ -163,7 +163,7 @@ describe("MembershipManager", () => {
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    "org.matrix.msc3401.call.member",
+                    "org.matrix.msc4143.rtc.member",
                     {
                         application: { type: "m.call", id: "" },
                         member: {
@@ -181,7 +181,7 @@ describe("MembershipManager", () => {
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
                     { delay: 8000 },
-                    "org.matrix.msc3401.call.member",
+                    "org.matrix.msc4143.rtc.member",
                     {},
                     "_@alice:example.org_AAAAAAA_m.call",
                 );
