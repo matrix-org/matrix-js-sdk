@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientEvent, EventTimeline, MatrixClient, Room } from "../../../src";
+import { ClientEvent, EventTimeline, MatrixClient, type Room } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
-import { makeMockRoom, MembershipData, membershipTemplate, mockRoomState, mockRTCEvent } from "./mocks";
+import { makeMockRoom, type MembershipData, membershipTemplate, mockRoomState, mockRTCEvent } from "./mocks";
 import { logger } from "../../../src/logger";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
@@ -77,7 +77,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             }
         });
 
-        it("Fires event when session ends", async () => {
+        it("Fires event when session ends", () => {
             const onEnded = jest.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
             const membershipData: MembershipData[] = [membershipTemplate];

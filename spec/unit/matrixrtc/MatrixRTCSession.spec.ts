@@ -68,7 +68,7 @@ describe("MatrixRTCSession", () => {
             testCreateSticky: true,
         },
     ])(
-        "roomSessionForRoom listenForSticky=$listenForStickyEvents listenForMemberStateEvents=$listenForStickyEvents testCreateSticky=$testCreateSticky",
+        "roomSessionForRoom listenForSticky=$listenForStickyEvents listenForMemberStateEvents=$listenForMemberStateEvents testCreateSticky=$testCreateSticky",
         (testConfig) => {
             it("creates a room-scoped session from room state", () => {
                 const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);

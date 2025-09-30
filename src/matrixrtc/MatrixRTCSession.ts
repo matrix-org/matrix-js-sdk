@@ -321,7 +321,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         let callMemberEvents = [] as MatrixEvent[];
         if (listenForStickyEvents) {
-            logger.info("useStickyEvents");
             // prefill with sticky events
             callMemberEvents = Array.from(room.unstableGetStickyEvents()).filter(
                 (e) => e.getType() === EventType.GroupCallMemberPrefix,
