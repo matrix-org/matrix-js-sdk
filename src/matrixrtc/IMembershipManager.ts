@@ -15,8 +15,7 @@ limitations under the License.
 */
 
 import type { CallMembership } from "./CallMembership.ts";
-import type { Focus } from "./focus.ts";
-import type { RTCCallIntent, Status } from "./types.ts";
+import type { RTCCallIntent, Status, Transport } from "./types.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 export enum MembershipManagerEvent {
@@ -80,10 +79,11 @@ export interface IMembershipManager
     /**
      * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * @param fociActive the active focus to use in the joined RTC membership event.
+     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
+     * membership manager will use multi sfu. Use `undefined` to not use `oldest_membership` selection based sfu.
      * @throws can throw if it exceeds a configured maximum retry.
      */
-    join(fociPreferred: Focus[], fociActive?: Focus, onError?: (error: unknown) => void): void;
+    join(fociPreferred: Transport[], multiSfuFocus?: Transport, onError?: (error: unknown) => void): void;
     /**
      * Send all necessary events to make this user leave the RTC session.
      * @param timeout the maximum duration in ms until the promise is forced to resolve.
@@ -95,10 +95,6 @@ export interface IMembershipManager
      * Call this if the MatrixRTC session members have changed.
      */
     onRTCSessionMemberUpdate(memberships: CallMembership[]): Promise<void>;
-    /**
-     * Determines the active focus used by the given session member, or undefined if not joined.
-     */
-    resolveActiveFocus(member: CallMembership): Focus | undefined;
 
     /**
      * Update the intent of a membership on the call (e.g. user is now providing a video feed)

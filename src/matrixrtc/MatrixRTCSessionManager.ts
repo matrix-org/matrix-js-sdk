@@ -20,7 +20,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession, type SessionDescription } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession, type SlotDescription } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
 
 export enum MatrixRTCSessionManagerEvents {
@@ -56,7 +56,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private readonly sessionDescription: SessionDescription = { id: "", application: "m.call" }, // Default to the Matrix Call application
+        private readonly sessionDescription: SlotDescription = { application: "m.call", id: "" }, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");

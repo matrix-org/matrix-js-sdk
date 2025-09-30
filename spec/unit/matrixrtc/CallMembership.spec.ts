@@ -19,6 +19,7 @@ import {
     CallMembership,
     type SessionMembershipData,
     DEFAULT_EXPIRE_DURATION,
+    type RtcMembershipData,
 } from "../../../src/matrixrtc/CallMembership";
 import { membershipTemplate } from "./mocks";
 
@@ -44,7 +45,7 @@ describe("CallMembership", () => {
             scope: "m.room",
             application: "m.call",
             device_id: "AAAAAAA",
-            focus_active: { type: "livekit" },
+            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
             foci_preferred: [{ type: "livekit" }],
         };
 
@@ -94,11 +95,138 @@ describe("CallMembership", () => {
         it("returns preferred foci", () => {
             const fakeEvent = makeMockEvent();
             const mockFocus = { type: "this_is_a_mock_focus" };
-            const membership = new CallMembership(
-                fakeEvent,
-                Object.assign({}, membershipTemplate, { foci_preferred: [mockFocus] }),
-            );
-            expect(membership.getPreferredFoci()).toEqual([mockFocus]);
+            const membership = new CallMembership(fakeEvent, { ...membershipTemplate, foci_preferred: [mockFocus] });
+            expect(membership.transports).toEqual([mockFocus]);
+        });
+        describe("getTransport", () => {
+            const mockFocus = { type: "this_is_a_mock_focus" };
+            const oldestMembership = new CallMembership(makeMockEvent(), membershipTemplate);
+            it("gets the correct active transport with oldest_membership", () => {
+                const membership = new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    foci_preferred: [mockFocus],
+                    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+                });
+
+                // if we are the oldest member we use our focus.
+                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
+
+                // If there is an older member we use its focus.
+                expect(membership.getTransport(oldestMembership)).toBe(membershipTemplate.foci_preferred[0]);
+            });
+
+            it("does not provide focus if the selection method is unknown", () => {
+                const membership = new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    foci_preferred: [mockFocus],
+                    focus_active: { type: "livekit", focus_selection: "multi_sfu" },
+                });
+
+                // if we are the oldest member we use our focus.
+                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
+
+                // If there is an older member we still use our own focus in multi sfu.
+                expect(membership.getTransport(oldestMembership)).toBe(mockFocus);
+            });
+        });
+    });
+
+    describe("RtcMembershipData", () => {
+        beforeEach(() => {
+            jest.useFakeTimers();
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        const membershipTemplate: RtcMembershipData = {
+            slot_id: "m.call#1",
+            application: { type: "m.call" },
+            member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+            rtc_transports: [{ type: "livekit" }],
+            versions: [],
+        };
+
+        it("rejects membership with no slot_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: undefined });
+            }).toThrow();
+        });
+
+        it("rejects membership with no application", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, application: undefined });
+            }).toThrow();
+        });
+
+        it("rejects membership with incorrect application", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { wrong_type_key: "unknown" },
+                });
+            }).toThrow();
+        });
+
+        it("rejects membership with no member", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, member: undefined });
+            }).toThrow();
+        });
+
+        it("rejects membership with incorrect  member", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, member: { i: "test" } });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { id: "test", device_id: "test", user_id_wrong: "test" },
+                });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { id: "test", device_id_wrong: "test", user_id_wrong: "test" },
+                });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { id: "test", device_id: "test", user_id: "@@test" },
+                });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { id: "test", device_id: "test", user_id: "@test:user.id" },
+                });
+            }).not.toThrow();
+        });
+
+        it("considers memberships unexpired if local age low enough", () => {
+            // TODO link prev event
+        });
+
+        it("considers memberships expired if local age large enough", () => {
+            // TODO link prev event
+        });
+
+        describe("getTransport", () => {
+            it("gets the correct active transport with oldest_membership", () => {
+                const oldestMembership = new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    rtc_transports: [{ type: "oldest_transport" }],
+                });
+                const membership = new CallMembership(makeMockEvent(), membershipTemplate);
+
+                // if we are the oldest member we use our focus.
+                expect(membership.getTransport(membership)).toStrictEqual({ type: "livekit" });
+
+                // If there is an older member we use our own focus focus. (RtcMembershipData always uses multi sfu)
+                expect(membership.getTransport(oldestMembership)).toStrictEqual({ type: "livekit" });
+            });
         });
     });
 

@@ -58,7 +58,7 @@ import {
     type ICallNotifyContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
-import { type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
@@ -368,7 +368,11 @@ export interface StateEvents {
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
+    [EventType.GroupCallMemberPrefix]:
+        | IGroupCallRoomMemberState
+        | SessionMembershipData
+        | RtcMembershipData
+        | EmptyObject;
 
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;

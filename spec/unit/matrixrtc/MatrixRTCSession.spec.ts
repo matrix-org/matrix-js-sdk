@@ -53,12 +53,12 @@ describe("MatrixRTCSession", () => {
 
             sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
             expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].sessionDescription.id).toEqual("");
+            expect(sess?.memberships[0].slotDescription.id).toEqual("");
             expect(sess?.memberships[0].scope).toEqual("m.room");
             expect(sess?.memberships[0].application).toEqual("m.call");
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
-            expect(sess?.sessionDescription.id).toEqual("");
+            expect(sess?.slotDescription.id).toEqual("");
         });
 
         it("ignores memberships where application is not m.call", () => {
@@ -268,7 +268,9 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "oldest_membership",
             });
-            expect(sess.resolveActiveFocus()).toBe(firstPreferredFocus);
+            expect(sess.resolveActiveFocus(sess.memberships.find((m) => m.deviceId === "old"))).toBe(
+                firstPreferredFocus,
+            );
             jest.useRealTimers();
         });
         it("does not provide focus if the selection method is unknown", () => {
@@ -288,7 +290,7 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "unknown",
             });
-            expect(sess.resolveActiveFocus()).toBe(undefined);
+            expect(sess.resolveActiveFocus(sess.memberships.find((m) => m.deviceId === "old"))).toBe(undefined);
         });
     });
 

@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixEvent } from "../matrix.ts";
+import { MXID_PATTERN } from "../models/room-member.ts";
 import { deepCompare } from "../utils.ts";
-import { type Focus } from "./focus.ts";
-import { type SessionDescription } from "./MatrixRTCSession.ts";
-import { type RTCCallIntent } from "./types.ts";
+import { isLivekitFocusSelection, type LivekitFocusSelection } from "./LivekitFocus.ts";
+import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
+import { type RTCCallIntent, type Transport } from "./types.ts";
+import { type RelationType } from "src/types.ts";
+import { type MatrixEvent } from "../models/event.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -28,6 +30,91 @@ import { type RTCCallIntent } from "./types.ts";
 export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 
 type CallScope = "m.room" | "m.user";
+type Member = { user_id: string; device_id: string; id: string };
+
+export interface RtcMembershipData {
+    "slot_id": string;
+    "member": Member;
+    "m.relates_to"?: {
+        event_id: string;
+        rel_type: RelationType.Reference;
+    };
+    "application": {
+        type: string;
+        // other application specific keys
+        [key: string]: any;
+    };
+    "rtc_transports": Transport[];
+    "versions": string[];
+    "created_ts"?: number;
+    "sticky_key"?: string;
+    /**
+     * The intent of the call from the perspective of this user. This may be an audio call, video call or
+     * something else.
+     */
+    "m.call.intent"?: RTCCallIntent;
+}
+
+const checkRtcMembershipData = (
+    data: Partial<Record<keyof RtcMembershipData, any>>,
+    errors: string[],
+): data is RtcMembershipData => {
+    const prefix = "Malformed rtc membership event: ";
+
+    // required fields
+    if (typeof data.slot_id !== "string") errors.push(prefix + "slot_id must be string");
+    if (typeof data.member !== "object" || data.member === null) {
+        errors.push(prefix + "member must be an object");
+    } else {
+        if (typeof data.member.user_id !== "string") errors.push(prefix + "member.user_id must be string");
+        else if (!MXID_PATTERN.test(data.member.user_id)) errors.push(prefix + "member.user_id must be a valid mxid");
+        if (typeof data.member.device_id !== "string") errors.push(prefix + "member.device_id must be string");
+        if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
+    }
+    if (typeof data.application !== "object" || data.application === null) {
+        errors.push(prefix + "application must be an object");
+    } else {
+        if (typeof data.application.type !== "string") errors.push(prefix + "application.type must be a string");
+    }
+    if (data.rtc_transports === undefined || !Array.isArray(data.rtc_transports)) {
+        errors.push(prefix + "rtc_transports must be an array");
+    } else {
+        // validate that each transport has at least a string 'type'
+        for (const t of data.rtc_transports) {
+            if (typeof t !== "object" || typeof (t as any).type !== "string") {
+                errors.push(prefix + "rtc_transports entries must be objects with a string type");
+                break;
+            }
+        }
+    }
+    if (data.versions === undefined || !Array.isArray(data.versions)) {
+        errors.push(prefix + "versions must be an array");
+    } else if (!data.versions.every((v) => typeof v === "string")) {
+        errors.push(prefix + "versions must be an array of strings");
+    }
+
+    // optional fields
+    if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
+        errors.push(prefix + "created_ts must be number");
+    }
+    if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
+        errors.push(prefix + "sticky_key must be a string");
+    }
+    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
+        errors.push(prefix + "m.call.intent must be a string");
+    }
+    if (data["m.relates_to"] !== undefined) {
+        const rel = data["m.relates_to"] as RtcMembershipData["m.relates_to"];
+        if (typeof rel !== "object" || rel === null) {
+            errors.push(prefix + "m.relates_to must be an object if provided");
+        } else {
+            if (typeof rel.event_id !== "string") errors.push(prefix + "m.relates_to.event_id must be a string");
+            if (rel.rel_type !== "m.reference") errors.push(prefix + "m.relates_to.rel_type must be m.reference");
+        }
+    }
+
+    return errors.length === 0;
+};
 
 /**
  * MSC4143 (MatrixRTC) session membership data.
@@ -55,13 +142,13 @@ export type SessionMembershipData = {
     /**
      * The focus selection system this user/membership is using.
      */
-    "focus_active": Focus;
+    "focus_active": LivekitFocusSelection;
 
     /**
-     * A list of possible foci this uses knows about. One of them might be used based on the focus_active
+     * A list of possible foci this user knows about. One of them might be used based on the focus_active
      * selection system.
      */
-    "foci_preferred"?: Focus[];
+    "foci_preferred": Transport[];
 
     /**
      * Optional field that contains the creation of the session. If it is undefined the creation
@@ -76,7 +163,7 @@ export type SessionMembershipData = {
 
     /**
      * If the `application` = `"m.call"` this defines if it is a room or user owned call.
-     * There can always be one room scroped call but multiple user owned calls (breakout sessions)
+     * There can always be one room scoped call but multiple user owned calls (breakout sessions)
      */
     "scope"?: CallScope;
 
@@ -103,8 +190,12 @@ const checkSessionsMembershipData = (
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
-    if (data.foci_preferred !== undefined && !Array.isArray(data.foci_preferred))
-        {errors.push(prefix + "foci_preferred must be an array");}
+    if (data.focus_active !== undefined && !isLivekitFocusSelection(data.focus_active)) {
+        errors.push(prefix + "focus_active has an invalid type");
+    }
+    if (data.foci_preferred !== undefined && !Array.isArray(data.foci_preferred)) {
+        errors.push(prefix + "foci_preferred must be an array");
+    }
     // optional parameters
     if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
         errors.push(prefix + "created_ts must be number");
@@ -120,28 +211,43 @@ const checkSessionsMembershipData = (
     return errors.length === 0;
 };
 
+type MembershipData = { kind: "rtc"; data: RtcMembershipData } | { kind: "session"; data: SessionMembershipData };
 export class CallMembership {
     public static equal(a: CallMembership, b: CallMembership): boolean {
+        if (a === undefined || b === undefined) return a === b;
         return deepCompare(a.membershipData, b.membershipData);
     }
-    private membershipData: SessionMembershipData;
+
+    private membershipData: MembershipData;
 
     public constructor(
         private parentEvent: MatrixEvent,
         data: any,
     ) {
         const sessionErrors: string[] = [];
-        if (!checkSessionsMembershipData(data, sessionErrors)) {
-            throw Error(
-                `unknown CallMembership data. Does not match MSC4143 call.member (${sessionErrors.join(" & ")}) events this could be a legacy membership event: (${data})`,
-            );
+        const rtcErrors: string[] = [];
+        if (checkSessionsMembershipData(data, sessionErrors)) {
+            this.membershipData = { kind: "session", data };
+        } else if (checkRtcMembershipData(data, rtcErrors)) {
+            this.membershipData = { kind: "rtc", data };
         } else {
-            this.membershipData = data;
+            throw Error(
+                `unknown CallMembership data.` +
+                    `Does not match MSC4143 call.member (${sessionErrors.join(" & ")})\n` +
+                    `Does not match MSC4143 rtc.member (${rtcErrors.join(" & ")})\n` +
+                    `events this could be a legacy membership event: (${data})`,
+            );
         }
     }
 
     public get sender(): string | undefined {
-        return this.parentEvent.getSender();
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.member.user_id;
+            case "session":
+                return this.parentEvent.getSender();
+        }
     }
 
     public get eventId(): string | undefined {
@@ -149,77 +255,156 @@ export class CallMembership {
     }
 
     /**
-     *  @deprecated Use sessionDescription.id instead.
+     * The slot id to find all member building one session `slot_id` (format `{application}#{id}`).
+     * This is computed in case SessionMembershipData is used.
      */
-    public get callId(): string {
-        return this.membershipData.call_id;
+    public get slotId(): string {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.slot_id;
+            case "session":
+                return slotDescriptionToId({ application: this.application, id: data.call_id });
+        }
     }
 
     public get deviceId(): string {
-        return this.membershipData.device_id;
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.member.device_id;
+            case "session":
+                return data.device_id;
+        }
     }
 
     public get callIntent(): RTCCallIntent | undefined {
-        return this.membershipData["m.call.intent"];
+        return this.membershipData.data["m.call.intent"];
     }
 
-    public get sessionDescription(): SessionDescription {
-        return {
-            application: this.membershipData.application,
-            id: this.membershipData.call_id,
-        };
+    /**
+     * Parsed `slot_id` (format `{application}#{id}`) into its components (application and id).
+     */
+    public get slotDescription(): SlotDescription {
+        return slotIdToDescription(this.slotId);
     }
 
-    public get application(): string | undefined {
-        return this.membershipData.application;
+    public get application(): string {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.application.type;
+            case "session":
+                return data.application;
+        }
     }
 
     public get scope(): CallScope | undefined {
-        return this.membershipData.scope;
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return undefined;
+            case "session":
+                return data.scope;
+        }
     }
 
     public get membershipID(): string {
         // the createdTs behaves equivalent to the membershipID.
-        // we only need the field for the legacy member envents where we needed to update them
+        // we only need the field for the legacy member events where we needed to update them
         // synapse ignores sending state events if they have the same content.
-        return this.createdTs().toString();
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.member.id;
+            case "session":
+                return (this.createdTs() ?? "").toString();
+        }
     }
 
     public createdTs(): number {
-        return this.membershipData.created_ts ?? this.parentEvent.getTs();
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                // TODO we need to read the referenced (relation) event if available to get the real created_ts
+                return this.parentEvent.getTs();
+            case "session":
+                return data.created_ts ?? this.parentEvent.getTs();
+        }
     }
 
     /**
      * Gets the absolute expiry timestamp of the membership.
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
-    public getAbsoluteExpiry(): number {
-        // TODO: calculate this from the MatrixRTCSession join configuration directly
-        return this.createdTs() + (this.membershipData.expires ?? DEFAULT_EXPIRE_DURATION);
+    public getAbsoluteExpiry(): number | undefined {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return undefined;
+            case "session":
+                // TODO: calculate this from the MatrixRTCSession join configuration directly
+                return this.createdTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
+        }
     }
 
     /**
      * @returns The number of milliseconds until the membership expires or undefined if applicable
      */
-    public getMsUntilExpiry(): number {
-        // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
-        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-        // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-        return this.getAbsoluteExpiry() - Date.now();
+    public getMsUntilExpiry(): number | undefined {
+        const { kind } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return undefined;
+            case "session":
+                // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
+                // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
+                // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
+                return this.getAbsoluteExpiry()! - Date.now();
+        }
     }
 
     /**
      * @returns true if the membership has expired, otherwise false
      */
     public isExpired(): boolean {
-        return this.getMsUntilExpiry() <= 0;
+        const { kind } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return false;
+            case "session":
+                return this.getMsUntilExpiry()! <= 0;
+        }
     }
 
-    public getPreferredFoci(): Focus[] {
-        return this.membershipData.foci_preferred ?? [];
+    /**
+     *
+     * @param oldestMembership For backwards compatibility with session membership (legacy).
+     * @returns
+     */
+    public getTransport(oldestMembership: CallMembership): Transport | undefined {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.rtc_transports[0];
+            case "session":
+                switch (data.focus_active.focus_selection) {
+                    case "oldest_membership":
+                        if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
+                        if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
+                        break;
+                    case "multi_sfu":
+                        return data.foci_preferred[0];
+                }
+        }
     }
-
-    public getFocusActive(): Focus {
-        return this.membershipData.focus_active;
+    public get transports(): Transport[] {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.rtc_transports;
+            case "session":
+                return data.foci_preferred;
+        }
     }
 }

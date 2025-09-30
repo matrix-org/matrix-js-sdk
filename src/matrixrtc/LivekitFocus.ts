@@ -14,26 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Focus } from "./focus.ts";
+import { type Transport } from "./types.ts";
 
-export interface LivekitFocusConfig extends Focus {
+export interface LivekitTransportConfig extends Transport {
     type: "livekit";
     livekit_service_url: string;
 }
 
-export const isLivekitFocusConfig = (object: any): object is LivekitFocusConfig =>
+export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
     object.type === "livekit" && "livekit_service_url" in object;
 
-export interface LivekitFocus extends LivekitFocusConfig {
+export interface LivekitTransport extends LivekitTransportConfig {
     livekit_alias: string;
 }
 
-export const isLivekitFocus = (object: any): object is LivekitFocus =>
-    isLivekitFocusConfig(object) && "livekit_alias" in object;
+export const isLivekitTransport = (object: any): object is LivekitTransport =>
+    isLivekitTransportConfig(object) && "livekit_alias" in object;
 
-export interface LivekitFocusSelection extends Focus {
+/**
+ * Deprecated, this is just needed for the old focus active / focus fields of a call membership.
+ * Not needed for new implementations.
+ */
+export interface LivekitFocusSelection extends Transport {
     type: "livekit";
-    focus_selection: "oldest_membership";
+    focus_selection: "oldest_membership" | "multi_sfu";
 }
+/**
+ * deprecated see LivekitFocusSelection
+ */
 export const isLivekitFocusSelection = (object: any): object is LivekitFocusSelection =>
     object.type === "livekit" && "focus_selection" in object;
