@@ -132,7 +132,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         } else {
             this.unkeyedStickyEvents.add(event as StickyMatrixEvent);
         }
-
         // Recalculate the next expiry time.
         this.nextStickyEventExpiryTs = Math.min(event.unstableStickyExpiresAt, this.nextStickyEventExpiryTs);
 
