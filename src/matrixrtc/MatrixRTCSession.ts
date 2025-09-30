@@ -334,12 +334,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 throw new Error("Could't get state for room " + room.roomId);
             }
             const callMemberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
-            // only care about state events which have keys which we have not yet seen in the sticky events.
             callMemberEvents = callMemberEvents.concat(
-                callMemberStateEvents.filter((e) =>
-                    callMemberEvents.some(
-                        (stickyEvent) => stickyEvent.getContent().msc4354_sticky_key === e.getStateKey(),
-                    ),
+                callMemberStateEvents.filter(
+                    (callMemberStateEvent) =>
+                        !callMemberEvents.some(
+                            // only care about state events which have keys which we have not yet seen in the sticky events.
+                            (stickyEvent) =>
+                                stickyEvent.getContent().msc4354_sticky_key === callMemberStateEvent.getStateKey(),
+                        ),
                 ),
             );
         }
