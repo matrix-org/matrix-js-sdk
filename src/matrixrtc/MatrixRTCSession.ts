@@ -818,7 +818,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Call this when a sticky event update has occured.
      */
     private onStickyEventUpdate = (added: MatrixEvent[], removed: MatrixEvent[]): void => {
-        this.logger.debug("Sticky event update", {added, removed});
+        this.logger.debug("Sticky event update", { added, removed });
         if ([...added, ...removed].some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
             this.recalculateSessionMembers();
         }

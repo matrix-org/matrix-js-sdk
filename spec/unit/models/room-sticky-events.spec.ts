@@ -275,6 +275,20 @@ describe("RoomStickyEvents", () => {
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
+        it("should emit when a unkeyed sticky event expires", () => {
+            const emitSpy = jest.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            jest.setSystemTime(0);
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                content: {},
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([ev]);
+            jest.setSystemTime(15000);
+            jest.advanceTimersByTime(15000);
+            expect(emitSpy).toHaveBeenCalledWith([], [ev]);
+        });
     });
 
     describe("cleanExpiredStickyEvents", () => {
