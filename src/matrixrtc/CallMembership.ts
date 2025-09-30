@@ -306,7 +306,17 @@ export class CallMembership {
                 return data.application;
         }
     }
+    public get applicationData(): { type: string } & Record<string, any> {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.application;
+            case "session":
+                return { "type": data.application, "m.call.intent": data["m.call.intent"] };
+        }
+    }
 
+    /** @deprecated scope is not used and will be removed in future versions. replaced by application specific types.*/
     public get scope(): CallScope | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {

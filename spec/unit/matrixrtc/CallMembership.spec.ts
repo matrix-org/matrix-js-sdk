@@ -27,6 +27,7 @@ function makeMockEvent(originTs = 0): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
         getSender: jest.fn().mockReturnValue("@alice:example.org"),
+        getId: jest.fn().mockReturnValue("$eventid"),
     } as unknown as MatrixEvent;
 }
 
@@ -41,12 +42,13 @@ describe("CallMembership", () => {
         });
 
         const membershipTemplate: SessionMembershipData = {
-            call_id: "",
-            scope: "m.room",
-            application: "m.call",
-            device_id: "AAAAAAA",
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-            foci_preferred: [{ type: "livekit" }],
+            "call_id": "",
+            "scope": "m.room",
+            "application": "m.call",
+            "device_id": "AAAAAAA",
+            "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+            "foci_preferred": [{ type: "livekit" }],
+            "m.call.intent": "voice",
         };
 
         it("rejects membership with no device_id", () => {
@@ -98,6 +100,7 @@ describe("CallMembership", () => {
             const membership = new CallMembership(fakeEvent, { ...membershipTemplate, foci_preferred: [mockFocus] });
             expect(membership.transports).toEqual([mockFocus]);
         });
+
         describe("getTransport", () => {
             const mockFocus = { type: "this_is_a_mock_focus" };
             const oldestMembership = new CallMembership(makeMockEvent(), membershipTemplate);
@@ -129,6 +132,42 @@ describe("CallMembership", () => {
                 expect(membership.getTransport(oldestMembership)).toBe(mockFocus);
             });
         });
+        describe("correct values from computed fields", () => {
+            const membership = new CallMembership(makeMockEvent(), membershipTemplate);
+            it("returns correct sender", () => {
+                expect(membership.sender).toBe("@alice:example.org");
+            });
+            it("returns correct eventId", () => {
+                expect(membership.eventId).toBe("$eventid");
+            });
+            it("returns correct slot_id", () => {
+                expect(membership.slotId).toBe("m.call#");
+                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+            });
+            it("returns correct deviceId", () => {
+                expect(membership.deviceId).toBe("AAAAAAA");
+            });
+            it("returns correct call intent", () => {
+                expect(membership.callIntent).toBe("voice");
+            });
+            it("returns correct application", () => {
+                expect(membership.application).toStrictEqual("m.call");
+            });
+            it("returns correct applicationData", () => {
+                expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
+            });
+            it("returns correct scope", () => {
+                expect(membership.scope).toBe("m.room");
+            });
+            it("returns correct membershipID", () => {
+                expect(membership.membershipID).toBe("0");
+            });
+            it("returns correct unused fields", () => {
+                expect(membership.getAbsoluteExpiry()).toBe(14400000);
+                expect(membership.getMsUntilExpiry()).toBe(14400000 - Date.now());
+                expect(membership.isExpired()).toBe(true);
+            });
+        });
     });
 
     describe("RtcMembershipData", () => {
@@ -141,11 +180,12 @@ describe("CallMembership", () => {
         });
 
         const membershipTemplate: RtcMembershipData = {
-            slot_id: "m.call#1",
-            application: { type: "m.call" },
-            member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
-            rtc_transports: [{ type: "livekit" }],
-            versions: [],
+            "slot_id": "m.call#",
+            "application": { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+            "member": { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+            "rtc_transports": [{ type: "livekit" }],
+            "m.call.intent": "voice",
+            "versions": [],
         };
 
         it("rejects membership with no slot_id", () => {
@@ -226,6 +266,46 @@ describe("CallMembership", () => {
 
                 // If there is an older member we use our own focus focus. (RtcMembershipData always uses multi sfu)
                 expect(membership.getTransport(oldestMembership)).toStrictEqual({ type: "livekit" });
+            });
+        });
+        describe("correct values from computed fields", () => {
+            const membership = new CallMembership(makeMockEvent(), membershipTemplate);
+            it("returns correct sender", () => {
+                expect(membership.sender).toBe("@alice:example.org");
+            });
+            it("returns correct eventId", () => {
+                expect(membership.eventId).toBe("$eventid");
+            });
+            it("returns correct slot_id", () => {
+                expect(membership.slotId).toBe("m.call#");
+                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+            });
+            it("returns correct deviceId", () => {
+                expect(membership.deviceId).toBe("AAAAAAA");
+            });
+            it("returns correct call intent", () => {
+                expect(membership.callIntent).toBe("voice");
+            });
+            it("returns correct application", () => {
+                expect(membership.application).toStrictEqual("m.call");
+            });
+            it("returns correct applicationData", () => {
+                expect(membership.applicationData).toStrictEqual({
+                    "type": "m.call",
+                    "m.call.id": "",
+                    "m.call.intent": "voice",
+                });
+            });
+            it("returns correct scope", () => {
+                expect(membership.scope).toBe(undefined);
+            });
+            it("returns correct membershipID", () => {
+                expect(membership.membershipID).toBe("xyzHASHxyz");
+            });
+            it("returns correct unused fields", () => {
+                expect(membership.getAbsoluteExpiry()).toBe(undefined);
+                expect(membership.getMsUntilExpiry()).toBe(undefined);
+                expect(membership.isExpired()).toBe(false);
             });
         });
     });
