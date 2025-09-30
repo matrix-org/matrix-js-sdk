@@ -88,7 +88,9 @@ export function makeMockRoom(
         getVersion: jest.fn().mockReturnValue("default"),
         unstableGetStickyEvents: jest
             .fn()
-            .mockReturnValue(useStickyEvents ? membershipData.map((m) => mockRTCEvent(m, roomId)) : []),
+            .mockImplementation(() =>
+                useStickyEvents ? membershipData.map((m) => mockRTCEvent(m, roomId, 10000)) : [],
+            ),
     }) as unknown as Room;
     return Object.assign(room, {
         emitTimelineEvent: (event: MatrixEvent) =>
@@ -149,8 +151,17 @@ export function makeMockEvent(
     } as unknown as MatrixEvent;
 }
 
-export function mockRTCEvent({ user_id: sender, ...membershipData }: MembershipData, roomId: string): MatrixEvent {
-    return makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData);
+export function mockRTCEvent(
+    { user_id: sender, ...membershipData }: MembershipData,
+    roomId: string,
+    stickyDuration?: number,
+): MatrixEvent {
+    return {
+        ...makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData),
+        unstableStickyContent: {
+            duration_ms: stickyDuration,
+        },
+    } as unknown as MatrixEvent;
 }
 
 export function mockCallMembership(membershipData: MembershipData, roomId: string): CallMembership {
