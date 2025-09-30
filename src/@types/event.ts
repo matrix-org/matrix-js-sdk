@@ -151,6 +151,7 @@ export enum EventType {
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events
+    RTCMembership = "org.matrix.msc4143.rtc.member",
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
     RTCDecline = "org.matrix.msc4310.rtc.decline",
@@ -368,12 +369,8 @@ export interface StateEvents {
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]:
-        | IGroupCallRoomMemberState
-        | SessionMembershipData
-        | RtcMembershipData
-        | EmptyObject;
-
+    [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
+    [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
 

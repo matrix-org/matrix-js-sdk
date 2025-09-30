@@ -463,7 +463,7 @@ export class MembershipManager
                 {
                     delay: this.delayedLeaveEventDelayMs,
                 },
-                EventType.GroupCallMemberPrefix,
+                this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
                 {}, // leave event
                 this.memberId,
             )
@@ -650,7 +650,7 @@ export class MembershipManager
         return await this.client
             .sendStateEvent(
                 this.room.roomId,
-                EventType.GroupCallMemberPrefix,
+                this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
                 this.makeMyMembership(this.membershipEventExpiryMs),
                 this.memberId,
             )
@@ -696,7 +696,7 @@ export class MembershipManager
         return await this.client
             .sendStateEvent(
                 this.room.roomId,
-                EventType.GroupCallMemberPrefix,
+                this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
                 this.makeMyMembership(this.membershipEventExpiryMs * nextExpireUpdateIteration),
                 this.memberId,
             )
@@ -722,7 +722,12 @@ export class MembershipManager
     }
     private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
         return await this.client
-            .sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, {}, this.memberId)
+            .sendStateEvent(
+                this.room.roomId,
+                this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
+                {},
+                this.memberId,
+            )
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
