@@ -46,7 +46,6 @@ export interface RtcMembershipData {
     };
     "rtc_transports": Transport[];
     "versions": string[];
-    "created_ts"?: number;
     "sticky_key"?: string;
     /**
      * The intent of the call from the perspective of this user. This may be an audio call, video call or
@@ -94,9 +93,6 @@ const checkRtcMembershipData = (
     }
 
     // optional fields
-    if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
-        errors.push(prefix + "created_ts must be number");
-    }
     if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
         errors.push(prefix + "sticky_key must be a string");
     }
