@@ -18,9 +18,9 @@ import { MXID_PATTERN } from "../models/room-member.ts";
 import { deepCompare } from "../utils.ts";
 import { isLivekitFocusSelection, type LivekitFocusSelection } from "./LivekitFocus.ts";
 import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
-import { type RTCCallIntent, type Transport } from "./types.ts";
-import { type RelationType } from "src/types.ts";
+import type { RTCCallIntent, Transport } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
+import { type RelationType } from "../@types/event.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
