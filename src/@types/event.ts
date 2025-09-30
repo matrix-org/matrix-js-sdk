@@ -337,9 +337,7 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
-    // MSC3401 Adding this to the timeline events as well for sending this event as a sticky event.
-    // { sticky_key: string } is the empty object but we always need a sticky key
-    [EventType.GroupCallMemberPrefix]: SessionMembershipData | EmptyObject;
+    [EventType.GroupCallMemberPrefix]: SessionMembershipData | {};
 }
 
 /**

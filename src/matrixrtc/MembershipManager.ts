@@ -1051,7 +1051,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             { delay: this.delayedLeaveEventDelayMs },
             null,
             EventType.GroupCallMemberPrefix,
-            Object.assign(myMembership, { sticky_key: this.stateKey }),
+            { msc4354_sticky_key: this.stateKey },
         );
 
     protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
@@ -1061,7 +1061,7 @@ export class StickyEventMembershipManager extends MembershipManager {
                 STICK_DURATION_MS,
                 null,
                 EventType.GroupCallMemberPrefix,
-                Object.assign(myMembership, { sticky_key: this.stateKey }),
+                { ...myMembership, msc4354_sticky_key: this.stateKey },
             );
 
     protected actionUpdateFromErrors(

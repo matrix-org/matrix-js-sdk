@@ -348,7 +348,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const callMemberships: CallMembership[] = [];
         for (const memberEvent of callMemberEvents) {
             const content = memberEvent.getContent();
-            const eventKeysCount = Object.keys(content).length;
+            // Ignore sticky keys for the count
+            const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
             // Dont even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
             if (eventKeysCount === 0) continue;
 
