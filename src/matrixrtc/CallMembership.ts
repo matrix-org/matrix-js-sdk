@@ -220,6 +220,7 @@ export class CallMembership {
 
     private membershipData: MembershipData;
 
+    private parentEventData: { eventId: string; sender: string };
     public constructor(
         private parentEvent: MatrixEvent,
         data: any,
@@ -238,20 +239,27 @@ export class CallMembership {
                     `events this could be a legacy membership event: (${data})`,
             );
         }
+
+        const eventId = parentEvent.getId();
+        const sender = parentEvent.getSender();
+
+        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
+        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+        this.parentEventData = { eventId, sender };
     }
 
-    public get sender(): string | undefined {
+    public get sender(): string {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
                 return data.member.user_id;
             case "session":
-                return this.parentEvent.getSender();
+                return this.parentEventData.sender;
         }
     }
 
-    public get eventId(): string | undefined {
-        return this.parentEvent.getId();
+    public get eventId(): string {
+        return this.parentEventData.eventId;
     }
 
     /**
@@ -306,6 +314,8 @@ export class CallMembership {
                 return undefined;
             case "session":
                 return data.scope;
+            default:
+                return undefined;
         }
     }
 
