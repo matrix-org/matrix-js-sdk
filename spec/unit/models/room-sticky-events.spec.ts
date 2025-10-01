@@ -110,7 +110,7 @@ describe("RoomStickyEvents", () => {
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
-            stickyEvents._unstable_addStickyEvents(([ev]));
+            stickyEvents._unstable_addStickyEvents([ev]);
             expect([...stickyEvents._unstable_getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], []);
         });
@@ -121,7 +121,7 @@ describe("RoomStickyEvents", () => {
                 ...stickyEvent,
                 content: {},
             });
-            stickyEvents._unstable_addStickyEvents(([ev]));
+            stickyEvents._unstable_addStickyEvents([ev]);
             expect([...stickyEvents._unstable_getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], []);
         });
@@ -197,7 +197,7 @@ describe("RoomStickyEvents", () => {
                 },
                 origin_server_ts: 0,
             });
-            stickyEvents._unstable_addStickyEvents(([ev1, ev2]));
+            stickyEvents._unstable_addStickyEvents([ev1, ev2]);
             expect(emitSpy).toHaveBeenCalledWith([ev1, ev2], []);
             jest.setSystemTime(15000);
             jest.advanceTimersByTime(15000);
