@@ -2070,6 +2070,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const isRoomVerificationRequest =
             event.getType() === EventType.RoomMessage && event.getContent().msgtype === MsgType.KeyVerificationRequest;
 
+        if (isRoomVerificationRequest) {
+            // Before processing an in-room verification request, we need to
+            // make sure we have the sender's device information - otherwise we
+            // will immediately abort verification. So we explicitly fetch it
+            // from /keys/query and wait for that request to complete before we
+            // call receiveVerificationEvent.
+            const req = this.getOlmMachineOrThrow().queryKeysForUsers([new RustSdkCryptoJs.UserId(senderId)]);
+            await this.outgoingRequestProcessor.makeOutgoingRequest(req);
+        }
+
         await this.getOlmMachineOrThrow().receiveVerificationEvent(
             JSON.stringify({
                 event_id: event.getId(),
