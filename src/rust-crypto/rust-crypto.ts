@@ -2053,20 +2053,28 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     private async onKeyVerificationEvent(event: MatrixEvent): Promise<void> {
         const roomId = event.getRoomId();
+        const senderId = event.getSender();
 
         if (!roomId) {
             throw new Error("missing roomId in the event");
+        }
+
+        if (!senderId) {
+            throw new Error("missing sender in the event");
         }
 
         this.logger.debug(
             `Incoming verification event ${event.getId()} type ${event.getType()} from ${event.getSender()}`,
         );
 
+        const isRoomVerificationRequest =
+            event.getType() === EventType.RoomMessage && event.getContent().msgtype === MsgType.KeyVerificationRequest;
+
         await this.getOlmMachineOrThrow().receiveVerificationEvent(
             JSON.stringify({
                 event_id: event.getId(),
                 type: event.getType(),
-                sender: event.getSender(),
+                sender: senderId,
                 state_key: event.getStateKey(),
                 content: event.getContent(),
                 origin_server_ts: event.getTs(),
@@ -2074,11 +2082,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             new RustSdkCryptoJs.RoomId(roomId),
         );
 
-        if (
-            event.getType() === EventType.RoomMessage &&
-            event.getContent().msgtype === MsgType.KeyVerificationRequest
-        ) {
-            this.onIncomingKeyVerificationRequest(event.getSender()!, event.getId()!);
+        if (isRoomVerificationRequest) {
+            this.onIncomingKeyVerificationRequest(senderId, event.getId()!);
         }
 
         // that may have caused us to queue up outgoing requests, so make sure we send them.
