@@ -123,7 +123,7 @@ export class RoomStickyEvents extends TypedEventEmitter<RoomStickyEventsEvent, R
      * @param events A set of new sticky events.
      */
     // eslint-disable-next-line
-    public _unstable_AddStickyEvents(events: MatrixEvent[]): void {
+    public _unstable_addStickyEvents(events: MatrixEvent[]): void {
         const added = [];
         const removed = [];
         for (const e of events) {

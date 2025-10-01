@@ -28,26 +28,26 @@ describe("RoomStickyEvents", () => {
 
     describe("addStickyEvents", () => {
         it("should allow adding an event without a msc4354_sticky_key", () => {
-            stickyEvents.unstableAddStickyEvent(new MatrixEvent({ ...stickyEvent, content: {} }));
+            stickyEvents._unstable_addStickyEvent(new MatrixEvent({ ...stickyEvent, content: {} }));
         });
         it("should not allow adding an event without a msc4354_sticky property", () => {
             expect(() =>
-                stickyEvents.unstableAddStickyEvent(new MatrixEvent({ ...stickyEvent, msc4354_sticky: undefined })),
+                stickyEvents._unstable_addStickyEvent(new MatrixEvent({ ...stickyEvent, msc4354_sticky: undefined })),
             ).toThrow(`${stickyEvent.event_id} is missing msc4354_sticky.duration_ms`);
             expect(() =>
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({ ...stickyEvent, msc4354_sticky: { duration_ms: undefined } as any }),
                 ),
             ).toThrow(`${stickyEvent.event_id} is missing msc4354_sticky.duration_ms`);
         });
         it("should not allow adding an event without a sender", () => {
             expect(() =>
-                stickyEvents.unstableAddStickyEvent(new MatrixEvent({ ...stickyEvent, sender: undefined })),
+                stickyEvents._unstable_addStickyEvent(new MatrixEvent({ ...stickyEvent, sender: undefined })),
             ).toThrow(`${stickyEvent.event_id} is missing a sender`);
         });
         it("should ignore old events", () => {
             expect(
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({
                         ...stickyEvent,
                         origin_server_ts: 0,
@@ -60,14 +60,14 @@ describe("RoomStickyEvents", () => {
         });
         it("should not replace newer events", () => {
             expect(
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({
                         ...stickyEvent,
                     }),
                 ),
             ).toEqual({ added: true });
             expect(
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({
                         ...stickyEvent,
                         origin_server_ts: 1,
@@ -77,14 +77,14 @@ describe("RoomStickyEvents", () => {
         });
         it("should not replace events on ID tie break", () => {
             expect(
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({
                         ...stickyEvent,
                     }),
                 ),
             ).toEqual({ added: true });
             expect(
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({
                         ...stickyEvent,
                         event_id: "$abc:bar",
@@ -94,7 +94,7 @@ describe("RoomStickyEvents", () => {
         });
         it("should be able to just add an event", () => {
             expect(
-                stickyEvents.unstableAddStickyEvent(
+                stickyEvents._unstable_addStickyEvent(
                     new MatrixEvent({
                         ...stickyEvent,
                     }),
@@ -103,14 +103,14 @@ describe("RoomStickyEvents", () => {
         });
     });
 
-    describe("unstableAddStickyEvents", () => {
+    describe("_unstable_addStickyEvents(", () => {
         it("should emit when a new sticky event is added", () => {
             const emitSpy = jest.fn();
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
-            stickyEvents.unstableAddStickyEvents([ev]);
+            stickyEvents._unstable_addStickyEvents(([ev]));
             expect([...stickyEvents._unstable_getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], []);
         });
@@ -121,7 +121,7 @@ describe("RoomStickyEvents", () => {
                 ...stickyEvent,
                 content: {},
             });
-            stickyEvents.unstableAddStickyEvents([ev]);
+            stickyEvents._unstable_addStickyEvents(([ev]));
             expect([...stickyEvents._unstable_getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], []);
         });
@@ -135,7 +135,7 @@ describe("RoomStickyEvents", () => {
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
-            stickyEvents.unstableAddStickyEvent(
+            stickyEvents._unstable_addStickyEvent(
                 new MatrixEvent({
                     ...stickyEvent,
                 }),
@@ -153,8 +153,8 @@ describe("RoomStickyEvents", () => {
                     msc4354_sticky_key: "bibble",
                 },
             });
-            stickyEvents.unstableAddStickyEvent(ev);
-            stickyEvents.unstableAddStickyEvent(ev2);
+            stickyEvents._unstable_addStickyEvent(ev);
+            stickyEvents._unstable_addStickyEvent(ev2);
             expect([...stickyEvents._unstable_getStickyEvents()]).toEqual([ev, ev2]);
         });
     });
@@ -175,7 +175,7 @@ describe("RoomStickyEvents", () => {
                 ...stickyEvent,
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.unstableAddStickyEvent(ev);
+            stickyEvents._unstable_addStickyEvent(ev);
             jest.setSystemTime(15000);
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [ev]);
@@ -197,7 +197,7 @@ describe("RoomStickyEvents", () => {
                 },
                 origin_server_ts: 0,
             });
-            stickyEvents.unstableAddStickyEvents([ev1, ev2]);
+            stickyEvents._unstable_addStickyEvents(([ev1, ev2]));
             expect(emitSpy).toHaveBeenCalledWith([ev1, ev2], []);
             jest.setSystemTime(15000);
             jest.advanceTimersByTime(15000);
@@ -212,7 +212,7 @@ describe("RoomStickyEvents", () => {
                 content: {},
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.unstableAddStickyEvent(ev);
+            stickyEvents._unstable_addStickyEvent(ev);
             jest.setSystemTime(15000);
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [ev]);

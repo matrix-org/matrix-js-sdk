@@ -3452,8 +3452,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param events A set of new sticky events.
      */
     // eslint-disable-next-line
-    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEvents["_unstable_AddStickyEvents"]> {
-        return this.stickyEvents._unstable_AddStickyEvents(events);
+    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEvents["_unstable_addStickyEvents"]> {
+        return this.stickyEvents._unstable_addStickyEvents(events);
     }
 
     /**
