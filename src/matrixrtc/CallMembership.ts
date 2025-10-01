@@ -208,6 +208,7 @@ const checkSessionsMembershipData = (
 };
 
 type MembershipData = { kind: "rtc"; data: RtcMembershipData } | { kind: "session"; data: SessionMembershipData };
+// TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
 export class CallMembership {
     public static equal(a: CallMembership, b: CallMembership): boolean {
         if (a === undefined || b === undefined) return a === b;
@@ -392,10 +393,23 @@ export class CallMembership {
     }
 
     /**
+     * ## RTC Membership
+     * Gets the transport to use for this RTC membership (m.rtc.member).
+     * This will return the primary transport that is used by this call membership to publish their media.
+     * Directly relates to the `rtc_transports` field.
      *
-     * @param oldestMembership For backwards compatibility with session membership (legacy).
-     * @returns
+     * ## Legacy session membership
+     * In case of a legacy session membership (m.call.member) this will return the selected transport where
+     * media is published. How this selection happens depends on the `focus_active` field of the session membership.
+     * If the `focus_selection` is `oldest_membership` this will return the transport of the oldest membership
+     * in the room (based on the `created_ts` field of the session membership).
+     * If the `focus_selection` is `multi_sfu` it will return the first transport of the `foci_preferred` list.
+     * (`multi_sfu` is equivalent to how `m.rtc.member` `rtc_transports` work).
+     * @param oldestMembership For backwards compatibility with session membership (legacy). Unused in case of RTC membership.
+     * Always required to make the consumer not care if it deals with RTC or session memberships.
+     * @returns The transport this membership uses to publish media or undefined if no transport is available.
      */
+    // TODO: make this return all transports used to publish media once this is supported.
     public getTransport(oldestMembership: CallMembership): Transport | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
