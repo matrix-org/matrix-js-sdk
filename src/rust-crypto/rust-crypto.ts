@@ -2062,7 +2062,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             `Incoming verification event ${event.getId()} type ${event.getType()} from ${event.getSender()}`,
         );
 
-        await this.olmMachine.receiveVerificationEvent(
+        await this.getOlmMachineOrThrow().receiveVerificationEvent(
             JSON.stringify({
                 event_id: event.getId(),
                 type: event.getType(),
