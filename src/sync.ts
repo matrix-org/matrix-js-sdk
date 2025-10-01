@@ -1082,6 +1082,8 @@ export class SyncApi {
         //              highlight_count: 0,
         //              notification_count: 0,
         //          }
+        //          "org.matrix.msc4222.state_after": { events: [] },  // only if "org.matrix.msc4222.use_state_after" is true
+        //          msc4354_sticky: { events: [] }, // only if "org.matrix.msc4354.sticky" is true
         //        }
         //      },
         //      leave: {
@@ -1219,6 +1221,7 @@ export class SyncApi {
             const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
             const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
+            const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky);
 
             // If state_after is present, this is the events that form the state at the end of the timeline block and
             // regular timeline events do *not* count towards state. If it's not present, then the state is formed by
@@ -1402,6 +1405,14 @@ export class SyncApi {
             // we deliberately don't add accountData to the timeline
             room.addAccountData(accountDataEvents);
 
+            // events from the sticky section of the sync come first (those are the ones that would be skipped due to gappy syncs)
+            // hence we consider them as older.
+            // and we add the events from the timeline at the end (newer)
+            const stickyEventsAndStickyEventsFromTheTimeline = stickyEvents.concat(
+                timelineEvents.filter((e) => e.unstableStickyContent !== undefined),
+            );
+            room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
+
             room.recalculate();
             if (joinObj.isBrandNewRoom) {
                 client.store.storeRoom(room);
@@ -1411,11 +1422,19 @@ export class SyncApi {
             this.processEventsForNotifs(room, timelineEvents);
 
             const emitEvent = (e: MatrixEvent): boolean => client.emit(ClientEvent.Event, e);
+            // this fires a couple of times for some events. (eg state events are in the timeline and the state)
+            // should this get a sync section as an additional event emission param (e, syncSection))?
             stateEvents.forEach(emitEvent);
             timelineEvents.forEach(emitEvent);
             ephemeralEvents.forEach(emitEvent);
             accountDataEvents.forEach(emitEvent);
-
+            stickyEvents
+                .filter(
+                    (e) =>
+                        // Ensure we do not emit twice.
+                        !timelineEvents.some((te) => te.getId() === e.getId()),
+                )
+                .forEach(emitEvent);
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
             // notification count

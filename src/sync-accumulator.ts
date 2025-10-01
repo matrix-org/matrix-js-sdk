@@ -76,11 +76,24 @@ export interface ITimeline {
     prev_batch: string | null;
 }
 
+export interface IStickyEvent extends IRoomEvent {
+    msc4354_sticky: { duration_ms: number };
+}
+
+export interface IStickyStateEvent extends IStateEvent {
+    msc4354_sticky: { duration_ms: number };
+}
+
+export interface ISticky {
+    events: Array<IStickyEvent | IStickyStateEvent>;
+}
+
 export interface IJoinedRoom {
     "summary": IRoomSummary;
     // One of `state` or `state_after` is required.
     "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
+    "msc4354_sticky"?: ISticky; // https://github.com/matrix-org/matrix-spec-proposals/pull/4354
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -201,6 +214,7 @@ interface IRoom {
     _unreadNotifications: Partial<UnreadNotificationCounts>;
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
     _receipts: ReceiptAccumulator;
+    _stickyEvents: (IStickyEvent | IStickyStateEvent)[];
 }
 
 export interface ISyncData {
@@ -457,6 +471,7 @@ export class SyncAccumulator {
                 _unreadThreadNotifications: {},
                 _summary: {},
                 _receipts: new ReceiptAccumulator(),
+                _stickyEvents: [],
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -540,6 +555,15 @@ export class SyncAccumulator {
             });
         });
 
+        // We want this to be fast, so don't worry about clobbering events here.
+        if (data.msc4354_sticky?.events) {
+            currentData._stickyEvents = currentData._stickyEvents.concat(data.msc4354_sticky?.events);
+        }
+        // But always prune any stale events, as we don't need to keep those in storage.
+        currentData._stickyEvents = currentData._stickyEvents.filter((ev) => {
+            return Date.now() < ev.msc4354_sticky.duration_ms + ev.origin_server_ts;
+        });
+
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
         if (currentData._timeline.length > this.opts.maxTimelineEntries!) {
@@ -611,6 +635,11 @@ export class SyncAccumulator {
                 "unread_notifications": roomData._unreadNotifications,
                 "unread_thread_notifications": roomData._unreadThreadNotifications,
                 "summary": roomData._summary as IRoomSummary,
+                "msc4354_sticky": roomData._stickyEvents?.length
+                    ? {
+                          events: roomData._stickyEvents,
+                      }
+                    : undefined,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {

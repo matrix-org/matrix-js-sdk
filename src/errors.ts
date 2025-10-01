@@ -54,7 +54,7 @@ export class ClientStoppedError extends Error {
 }
 
 /**
- * This error is thrown when the Homeserver does not support the delayed events enpdpoints.
+ * This error is thrown when the Homeserver does not support the delayed events endpoints.
  */
 export class UnsupportedDelayedEventsEndpointError extends Error {
     public constructor(
@@ -63,5 +63,18 @@ export class UnsupportedDelayedEventsEndpointError extends Error {
     ) {
         super(message);
         this.name = "UnsupportedDelayedEventsEndpointError";
+    }
+}
+
+/**
+ * This error is thrown when the Homeserver does not support the sticky events endpoints.
+ */
+export class UnsupportedStickyEventsEndpointError extends Error {
+    public constructor(
+        message: string,
+        public clientEndpoint: "sendStickyEvent" | "sendStickyStateEvent",
+    ) {
+        super(message);
+        this.name = "UnsupportedStickyEventsEndpointError";
     }
 }

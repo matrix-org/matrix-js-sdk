@@ -75,6 +75,7 @@ export interface IUnsigned {
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
+    "msc4354_sticky_duration_ttl_ms"?: number;
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
 }
 
@@ -96,6 +97,7 @@ export interface IEvent {
     membership?: Membership;
     unsigned: IUnsigned;
     redacts?: string;
+    msc4354_sticky?: { duration_ms: number };
 }
 
 export interface IAggregatedRelation {
@@ -213,6 +215,7 @@ export interface IMessageVisibilityHidden {
 }
 // A singleton implementing `IMessageVisibilityVisible`.
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
+const MAX_STICKY_DURATION_MS = 3600000;
 
 export enum MatrixEventEvent {
     /**
@@ -409,6 +412,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
     /**
+     * The timestamp for when this event should expire, in milliseconds.
+     * Prefers using the serve-provided value, but will fall back to local calculation.
+     * If the event is not a sticky event (or not supported by the server),
+     * then this returns `undefined`.
+     */
+    public readonly unstableStickyExpiresAt: number | undefined;
+
+    /**
      * Construct a Matrix Event object
      *
      * @param event - The raw (possibly encrypted) event. <b>Do not access
@@ -449,6 +460,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const age = this.getAge();
         this.localTimestamp = age !== undefined ? Date.now() - age : (this.getTs() ?? Date.now());
         this.reEmitter = new TypedReEmitter(this);
+        if (this.unstableStickyContent) {
+            if (this.unstableStickyContent.duration_ttl_ms) {
+                this.unstableStickyExpiresAt = Date.now() + this.unstableStickyContent.duration_ttl_ms;
+            } else {
+                this.unstableStickyExpiresAt = this.getTs() + this.unstableStickyContent.duration_ms;
+            }
+        }
     }
 
     /**
@@ -1738,6 +1756,22 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     public setThreadId(threadId?: string): void {
         this.threadId = threadId;
+    }
+
+    /**
+     * Unstable getter to try and get the sticky information for the event.
+     * If the event is not a sticky event (or not supported by the server),
+     * then this returns `undefined`.
+     */
+    public get unstableStickyContent(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
+        if (!this.event.msc4354_sticky?.duration_ms) {
+            return undefined;
+        }
+        return {
+            duration_ms: Math.min(MAX_STICKY_DURATION_MS, this.event.msc4354_sticky.duration_ms),
+            // This is assumed to be bounded server-side.
+            duration_ttl_ms: this.event.unsigned?.msc4354_sticky_duration_ttl_ms,
+        };
     }
 }
 

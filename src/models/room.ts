@@ -77,6 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 import { type MSC4186Hero } from "../sliding-sync.ts";
+import { RoomStickyEvents, RoomStickyEventsEvent } from "./room-sticky-events.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -158,6 +159,7 @@ export enum RoomEvent {
     HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
     UnreadNotifications = "Room.UnreadNotifications",
     Summary = "Room.Summary",
+    StickyEvents = "Room.StickyEvents",
 }
 
 export type RoomEmittedEvents =
@@ -311,6 +313,19 @@ export type RoomEventHandlerMap = {
      * @param summary - the room summary object
      */
     [RoomEvent.Summary]: (summary: IRoomSummary) => void;
+    /**
+     * Fires when sticky events are updated for a room.
+     * For a list of all updated events use:
+     * `const updated = added.filter(e => removed.includes(e));`
+     * for a list of all new events use:
+     * `const addedNew = added.filter(e => !removed.includes(e));`
+     * for a list of all removed events use:
+     * `const removedOnly = removed.filter(e => !added.includes(e));`
+     * @param added - The events that were added to the map of sticky events (can be updated events for existing keys or new keys)
+     * @param removed - The events that were removed from the map of sticky events (caused by expiration or updated keys)
+     * @param room - The room containing the sticky events
+     */
+    [RoomEvent.StickyEvents]: (added: MatrixEvent[], removed: MatrixEvent[], room: Room) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
     /**
      * Fires when a new poll instance is added to the room state
@@ -447,6 +462,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private roomReceipts = new RoomReceipts(this);
 
     /**
+     * Stores and tracks sticky events
+     */
+    private stickyEvents = new RoomStickyEvents();
+
+    /**
      * Construct a new Room.
      *
      * <p>For a room, we store an ordered sequence of timelines, which may or may not
@@ -492,6 +512,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Listen to our own receipt event as a more modular way of processing our own
         // receipts. No need to remove the listener: it's on ourself anyway.
         this.on(RoomEvent.Receipt, this.onReceipt);
+
+        this.stickyEvents.on(RoomStickyEventsEvent.Update, (added, removed) =>
+            this.emit(RoomEvent.StickyEvents, added, removed, this),
+        );
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
@@ -3412,6 +3436,24 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getAccountData(type: EventType | string): MatrixEvent | undefined {
         return this.accountData.get(type);
+    }
+
+    /**
+     * Get an iterator of currently active sticky events.
+     */
+    // eslint-disable-next-line
+    public _unstable_getStickyEvents(): ReturnType<RoomStickyEvents["_unstable_getStickyEvents"]> {
+        return this.stickyEvents._unstable_getStickyEvents();
+    }
+
+    /**
+     * Add a series of sticky events, emitting `RoomEvent.StickyEvents` if any
+     * changes were made.
+     * @param events A set of new sticky events.
+     */
+    // eslint-disable-next-line
+    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEvents["_unstable_AddStickyEvents"]> {
+        return this.stickyEvents._unstable_AddStickyEvents(events);
     }
 
     /**

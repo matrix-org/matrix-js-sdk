@@ -107,6 +107,9 @@ export type SendActionDelayedEventRequestOpts = ParentDelayId;
 
 export type SendDelayedEventRequestOpts = SendTimeoutDelayedEventRequestOpts | SendActionDelayedEventRequestOpts;
 
+export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
+    return (opts as TimeoutDelay).delay !== undefined || (opts as ParentDelayId).parent_delay_id !== undefined;
+}
 export type SendDelayedEventResponse = {
     delay_id: string;
 };
