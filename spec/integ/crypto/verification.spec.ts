@@ -46,8 +46,8 @@ import {
     type Verifier,
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
-import { escapeRegExp } from "../../../src/utils";
-import { awaitDecryption, emitPromise, getSyncResponse, syncPromise } from "../../test-utils/test-utils";
+import { escapeRegExp, sleep } from "../../../src/utils";
+import { awaitDecryption, emitPromise, getSyncResponse, syncPromise, waitFor } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     BACKUP_DECRYPTION_KEY_BASE64,
@@ -79,11 +79,6 @@ import {
 import { type KeyBackupInfo, CryptoEvent } from "../../../src/crypto-api";
 import { encodeBase64 } from "../../../src/base64";
 
-// The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
-// to ensure that we don't end up with dangling timeouts.
-// But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
     await Olm.init();
@@ -95,6 +90,13 @@ beforeAll(async () => {
     const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
+
+beforeEach(() => {
+    // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
+    // to ensure that we don't end up with dangling timeouts.
+    // But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+    jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+});
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -1080,6 +1082,13 @@ describe("verification", () => {
         });
 
         it("ignores old verification requests", async () => {
+            const debug = jest.fn();
+            const info = jest.fn();
+            const warn = jest.fn();
+
+            // @ts-ignore overriding RustCrypto's logger
+            aliceClient.getCrypto()!.logger = { debug, info, warn };
+
             const eventHandler = jest.fn();
             aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
 
@@ -1093,6 +1102,16 @@ describe("verification", () => {
             const room = aliceClient.getRoom(TEST_ROOM_ID)!;
             const matrixEvent = room.getLiveTimeline().getEvents()[0];
             expect(matrixEvent.getId()).toEqual(verificationRequestEvent.event_id);
+
+            // Wait until the request has been processed. We use a real sleep()
+            // here to make sure any background async tasks are completed.
+            jest.useRealTimers();
+            await waitFor(async () => {
+                expect(info).toHaveBeenCalledWith(
+                    expect.stringMatching(/^Ignoring just-received verification request/),
+                );
+                sleep(100);
+            });
 
             // check that an event has not been raised, and that the request is not found
             expect(eventHandler).not.toHaveBeenCalled();
