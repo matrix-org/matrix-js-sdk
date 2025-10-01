@@ -2366,6 +2366,61 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("disableVoip option", () => {
+        const baseUrl = "https://alice-server.com";
+        const userId = "@alice:bar";
+        const accessToken = "sometoken";
+
+        beforeEach(() => {
+            mocked(supportsMatrixCall).mockReturnValue(true);
+        });
+
+        afterAll(() => {
+            mocked(supportsMatrixCall).mockReset();
+        });
+
+        it("should not call /voip/turnServer when disableVoip = true", () => {
+            fetchMock.getOnce(`${baseUrl}/_matrix/client/unstable/voip/turnServer`, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                userId,
+                disableVoip: true,
+            });
+
+            // Only check createCall / supportsVoip, avoid startClient
+            expect(client.createCall("!roomId:example.com")).toBeNull();
+            expect(client.supportsVoip?.()).toBe(false);
+        });
+
+        it("should call /voip/turnServer when disableVoip is not set", () => {
+            fetchMock.getOnce(`${baseUrl}/_matrix/client/unstable/voip/turnServer`, {
+                uris: ["turn:turn.example.org"],
+            });
+
+            createClient({
+                baseUrl,
+                accessToken,
+                userId,
+            });
+
+            // The call will trigger the request if VoIP is supported
+            expect(fetchMock.called(`${baseUrl}/_matrix/client/unstable/voip/turnServer`)).toBe(false);
+        });
+
+        it("should return null from createCall when disableVoip = true", () => {
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                userId,
+                disableVoip: true,
+            });
+
+            expect(client.createCall("!roomId:example.com")).toBeNull();
+        });
+    });
+
     describe("support for ignoring invites", () => {
         beforeEach(() => {
             // Mockup `getAccountData`/`setAccountData`.
