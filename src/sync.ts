@@ -1409,7 +1409,7 @@ export class SyncApi {
             // hence we consider them as older.
             // and we add the events from the timeline at the end (newer)
             const stickyEventsAndStickyEventsFromTheTimeline = stickyEvents.concat(
-                timelineEvents.filter((e) => e.unstableStickyContent !== undefined),
+                timelineEvents.filter((e) => e.unstableStickyInfo !== undefined),
             );
             room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
 

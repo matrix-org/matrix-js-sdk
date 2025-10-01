@@ -23,7 +23,11 @@ export type RoomStickyEventsMap = {
     [RoomStickyEventsEvent.Update]: (added: MatrixEvent[], removed: MatrixEvent[]) => void;
 };
 
-export class RoomStickyEvents extends TypedEventEmitter<RoomStickyEventsEvent, RoomStickyEventsMap> {
+/**
+ * Tracks sticky events on behalf of one room, and fires an event
+ * whenever a sticky even is updated or replaced.
+ */
+export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEvent, RoomStickyEventsMap> {
     private stickyEventsMap = new Map<string, Array<MatrixEvent>>(); // stickyKey+userId -> events
     private stickyEventTimer?: NodeJS.Timeout;
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
@@ -33,12 +37,26 @@ export class RoomStickyEvents extends TypedEventEmitter<RoomStickyEventsEvent, R
         super();
     }
 
+    /**
+     * Get all sticky events that are currently active.
+     * @returns An iterable set of events.
+     */
     // eslint-disable-next-line
-    public *_unstable_getStickyEvents(): Iterable<MatrixEvent> {
+    public *getStickyEvents(): Iterable<MatrixEvent> {
         yield* this.unkeyedStickyEvents;
         for (const element of this.stickyEventsMap.values()) {
             yield* element;
         }
+    }
+
+    /**
+     * Get all sticky events that match a `sender` and `stickyKey`
+     * @param sender The sender of the sticky event.
+     * @param stickyKey The sticky key used by the event.
+     * @returns An iterable set of events.
+     */
+    public getStickyEventsBySenderAndKey(sender: string, stickyKey: string): Iterable<MatrixEvent> {
+        return this.stickyEventsMap.get(`${stickyKey}${sender}`) ?? [];
     }
 
     /**
@@ -52,7 +70,7 @@ export class RoomStickyEvents extends TypedEventEmitter<RoomStickyEventsEvent, R
      *          and the previous event it may have replaced.
      */
     // eslint-disable-next-line
-    public _unstable_addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: MatrixEvent } | { added: false } {
+    private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: MatrixEvent } | { added: false } {
         const stickyKey = event.getContent().msc4354_sticky_key;
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
             throw Error(`${event.getId()} is missing msc4354_sticky_key`);
@@ -112,8 +130,7 @@ export class RoomStickyEvents extends TypedEventEmitter<RoomStickyEventsEvent, R
         // Recalculate the next expiry time.
         this.nextStickyEventExpiryTs = Math.min(expiresAtTs, this.nextStickyEventExpiryTs);
 
-        // Schedule this in the background
-        setTimeout(() => this.scheduleStickyTimer(), 1);
+        this.scheduleStickyTimer();
         return { added: true, prevEvent };
     }
 
@@ -123,12 +140,12 @@ export class RoomStickyEvents extends TypedEventEmitter<RoomStickyEventsEvent, R
      * @param events A set of new sticky events.
      */
     // eslint-disable-next-line
-    public _unstable_addStickyEvents(events: MatrixEvent[]): void {
+    public addStickyEvents(events: MatrixEvent[]): void {
         const added = [];
         const removed = [];
         for (const e of events) {
             try {
-                const result = this._unstable_addStickyEvent(e);
+                const result = this.addStickyEvent(e);
                 if (result.added) {
                     added.push(e);
                     if (result.prevEvent) {

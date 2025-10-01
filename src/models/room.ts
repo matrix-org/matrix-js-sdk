@@ -77,7 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 import { type MSC4186Hero } from "../sliding-sync.ts";
-import { RoomStickyEvents, RoomStickyEventsEvent } from "./room-sticky-events.ts";
+import { RoomStickyEventsStore, RoomStickyEventsEvent } from "./room-sticky-events.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -464,7 +464,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Stores and tracks sticky events
      */
-    private stickyEvents = new RoomStickyEvents();
+    private stickyEvents = new RoomStickyEventsStore();
 
     /**
      * Construct a new Room.
@@ -3442,8 +3442,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Get an iterator of currently active sticky events.
      */
     // eslint-disable-next-line
-    public _unstable_getStickyEvents(): ReturnType<RoomStickyEvents["_unstable_getStickyEvents"]> {
-        return this.stickyEvents._unstable_getStickyEvents();
+    public _unstable_getStickyEvents(): ReturnType<RoomStickyEventsStore["getStickyEvents"]> {
+        return this.stickyEvents.getStickyEvents();
     }
 
     /**
@@ -3452,8 +3452,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param events A set of new sticky events.
      */
     // eslint-disable-next-line
-    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEvents["_unstable_addStickyEvents"]> {
-        return this.stickyEvents._unstable_addStickyEvents(events);
+    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEventsStore["addStickyEvents"]> {
+        return this.stickyEvents.addStickyEvents(events);
     }
 
     /**

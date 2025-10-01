@@ -555,14 +555,17 @@ export class SyncAccumulator {
             });
         });
 
-        // We want this to be fast, so don't worry about clobbering events here.
-        if (data.msc4354_sticky?.events) {
-            currentData._stickyEvents = currentData._stickyEvents.concat(data.msc4354_sticky?.events);
-        }
-        // But always prune any stale events, as we don't need to keep those in storage.
+        // Prune out any events in our stores that have since expired, do this before we
+        // insert new events.
         currentData._stickyEvents = currentData._stickyEvents.filter((ev) => {
             return Date.now() < ev.msc4354_sticky.duration_ms + ev.origin_server_ts;
         });
+
+        // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
+        // process these events into the correct mapped order.
+        if (data.msc4354_sticky?.events) {
+            currentData._stickyEvents = currentData._stickyEvents.concat(data.msc4354_sticky?.events);
+        }
 
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.

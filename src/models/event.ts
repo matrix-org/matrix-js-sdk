@@ -460,11 +460,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const age = this.getAge();
         this.localTimestamp = age !== undefined ? Date.now() - age : (this.getTs() ?? Date.now());
         this.reEmitter = new TypedReEmitter(this);
-        if (this.unstableStickyContent) {
-            if (this.unstableStickyContent.duration_ttl_ms) {
-                this.unstableStickyExpiresAt = Date.now() + this.unstableStickyContent.duration_ttl_ms;
+        if (this.unstableStickyInfo) {
+            if (this.unstableStickyInfo.duration_ttl_ms) {
+                this.unstableStickyExpiresAt = Date.now() + this.unstableStickyInfo.duration_ttl_ms;
             } else {
-                this.unstableStickyExpiresAt = this.getTs() + this.unstableStickyContent.duration_ms;
+                this.unstableStickyExpiresAt = this.getTs() + this.unstableStickyInfo.duration_ms;
             }
         }
     }
@@ -1763,7 +1763,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * If the event is not a sticky event (or not supported by the server),
      * then this returns `undefined`.
      */
-    public get unstableStickyContent(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
+    public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
         if (!this.event.msc4354_sticky?.duration_ms) {
             return undefined;
         }

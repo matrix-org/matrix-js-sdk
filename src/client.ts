@@ -3419,10 +3419,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Send a delayed timeline event.
+     * Send a delayed sticky timeline event.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
-     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) and
+     *   [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354) for more details.
      */
     // eslint-disable-next-line
     public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
@@ -3434,6 +3435,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key: string },
         txnId?: string,
     ): Promise<SendDelayedEventResponse> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "getDelayedEvents",
+            );
+        }
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
             throw new UnsupportedStickyEventsEndpointError(
                 "Server does not support the sticky events",
@@ -3446,7 +3453,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { msc4354_stick_duration_ms: stickDuration },
+            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
             delayOpts,
             txnId,
         });
@@ -3487,10 +3494,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Send a delayed timeline event.
+     * Send a sticky timeline event.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
-     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *   Check progress on [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354) for more details.
      */
     // eslint-disable-next-line
     public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
@@ -3513,7 +3520,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { msc4354_stick_duration_ms: stickDuration },
+            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
             txnId,
         });
     }
