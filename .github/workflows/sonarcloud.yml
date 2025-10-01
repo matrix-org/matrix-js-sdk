@@ -27,7 +27,7 @@ jobs:
         steps:
             # We create the status here and then update it to success/failure in the `report` stage
             # This provides an easy link to this workflow_run from the PR before Sonarcloud is done.
-            - uses: guibranco/github-status-action-v2@741ea90ba6c3ca76fe0d43ba11a90cda97d5e685
+            - uses: guibranco/github-status-action-v2@5530c593759f489bba08272e96986ffc571c1ea1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: pending
@@ -87,7 +87,7 @@ jobs:
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
 
-            - uses: guibranco/github-status-action-v2@741ea90ba6c3ca76fe0d43ba11a90cda97d5e685
+            - uses: guibranco/github-status-action-v2@5530c593759f489bba08272e96986ffc571c1ea1
               if: always()
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
