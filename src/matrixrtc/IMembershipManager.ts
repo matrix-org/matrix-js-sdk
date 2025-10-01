@@ -80,7 +80,8 @@ export interface IMembershipManager
      * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
      * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will use multi sfu. Use `undefined` to not use `oldest_membership` selection based sfu.
+     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
+     * transport selection will be used instead.
      * @throws can throw if it exceeds a configured maximum retry.
      */
     join(fociPreferred: Transport[], multiSfuFocus?: Transport, onError?: (error: unknown) => void): void;
