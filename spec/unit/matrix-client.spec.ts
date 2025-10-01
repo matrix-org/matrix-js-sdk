@@ -2399,7 +2399,7 @@ describe("MatrixClient", function () {
                 uris: ["turn:turn.example.org"],
             });
 
-            const client = createClient({
+            createClient({
                 baseUrl,
                 accessToken,
                 userId,
