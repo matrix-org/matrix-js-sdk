@@ -18,7 +18,7 @@ import {
     isLivekitTransport,
     isLivekitFocusSelection,
     isLivekitTransportConfig,
-} from "../../../src/matrixrtc/LivekitFocus";
+} from "../../../src/matrixrtc/LivekitTransport";
 
 describe("LivekitFocus", () => {
     it("isLivekitFocus", () => {

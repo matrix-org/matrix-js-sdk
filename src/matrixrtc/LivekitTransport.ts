@@ -32,7 +32,7 @@ export const isLivekitTransport = (object: any): object is LivekitTransport =>
     isLivekitTransportConfig(object) && "livekit_alias" in object;
 
 /**
- * Deprecated, this is just needed for the old focus active / focus fields of a call membership.
+ * @deprecated, this is just needed for the old focus active / focus fields of a call membership.
  * Not needed for new implementations.
  */
 export interface LivekitFocusSelection extends Transport {
@@ -40,7 +40,7 @@ export interface LivekitFocusSelection extends Transport {
     focus_selection: "oldest_membership" | "multi_sfu";
 }
 /**
- * deprecated see LivekitFocusSelection
+ * @deprecated see LivekitFocusSelection
  */
 export const isLivekitFocusSelection = (object: any): object is LivekitFocusSelection =>
     object.type === "livekit" && "focus_selection" in object;
