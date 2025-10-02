@@ -41,7 +41,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * Get all sticky events that are currently active.
      * @returns An iterable set of events.
      */
-    // eslint-disable-next-line
     public *getStickyEvents(): Iterable<MatrixEvent> {
         yield* this.unkeyedStickyEvents;
         for (const innerMap of this.stickyEventsMap.values()) {
@@ -57,7 +56,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @returns A matching active sticky event, or undefined.
      */
     public getStickyEvent(sender: string, stickyKey: string, type: string): MatrixEvent | undefined {
-        return this.stickyEventsMap.get("type")?.get(`${stickyKey}${sender}`);
+        return this.stickyEventsMap.get(type)?.get(`${stickyKey}${sender}`);
     }
 
     /**
@@ -70,7 +69,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @returns An object describing whether the event was added to the map,
      *          and the previous event it may have replaced.
      */
-    // eslint-disable-next-line
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: MatrixEvent } | { added: false } {
         const stickyKey = event.getContent().msc4354_sticky_key;
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
@@ -139,7 +137,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * changes were made.
      * @param events A set of new sticky events.
      */
-    // eslint-disable-next-line
     public addStickyEvents(events: MatrixEvent[]): void {
         const added = [];
         const removed = [];
