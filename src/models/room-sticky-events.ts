@@ -23,13 +23,15 @@ export type RoomStickyEventsMap = {
     [RoomStickyEventsEvent.Update]: (added: MatrixEvent[], removed: MatrixEvent[]) => void;
 };
 
+type StickyMatrixEvent = MatrixEvent & { unstableStickyExpiresAt: number };
+
 /**
  * Tracks sticky events on behalf of one room, and fires an event
  * whenever a sticky even is updated or replaced.
  */
 export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEvent, RoomStickyEventsMap> {
-    private readonly stickyEventsMap = new Map<string, Map<string, MatrixEvent>>(); // (type -> stickyKey+userId) -> event
-    private unkeyedStickyEvents = new Set<MatrixEvent>();
+    private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent>>(); // (type -> stickyKey+userId) -> event
+    private readonly unkeyedStickyEvents = new Set<StickyMatrixEvent>();
 
     private stickyEventTimer?: NodeJS.Timeout;
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
@@ -116,7 +118,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             const prevEvent = this.stickyEventsMap.get(type)?.get(innerMapKey);
 
             // sticky events are not allowed to expire sooner than their predecessor.
-            if (prevEvent && event.unstableStickyExpiresAt! < prevEvent.unstableStickyExpiresAt!) {
+            if (prevEvent && event.unstableStickyExpiresAt < prevEvent.unstableStickyExpiresAt) {
                 logger.info("ignored sticky event with older expiry time", stickyKey);
                 return { added: false };
             } else if (
@@ -131,9 +133,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             if (!this.stickyEventsMap.has(type)) {
                 this.stickyEventsMap.set(type, new Map());
             }
-            this.stickyEventsMap.get(type)!.set(innerMapKey, event);
+            this.stickyEventsMap.get(type)!.set(innerMapKey, event as StickyMatrixEvent);
         } else {
-            this.unkeyedStickyEvents.add(event);
+            this.unkeyedStickyEvents.add(event as StickyMatrixEvent);
         }
 
         // Recalculate the next expiry time.
@@ -187,8 +189,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     /**
      * Clean out any expired sticky events.
      */
-    private cleanExpiredStickyEvents = (): void => {
-        //logger.info('Running event expiry');
+    private readonly cleanExpiredStickyEvents = (): void => {
         const now = Date.now();
         const removedEvents: MatrixEvent[] = [];
 
@@ -196,39 +197,28 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         this.nextStickyEventExpiryTs = Number.MAX_SAFE_INTEGER;
         for (const [eventType, innerEvents] of this.stickyEventsMap.entries()) {
             for (const [innerMapKey, event] of innerEvents) {
-                const expiresAtTs = event.unstableStickyExpiresAt;
-                if (!expiresAtTs) {
-                    // We will have checked this already, but just for type safety skip this.
-                    logger.error("Should not have an event with a missing duration_ms!");
-                    removedEvents.push(event);
-                    break;
-                }
                 // we only added items with `sticky` into this map so we can assert non-null here
-                if (now >= expiresAtTs) {
+                if (now >= event.unstableStickyExpiresAt) {
                     logger.debug("Expiring sticky event", event.getId());
                     removedEvents.push(event);
                     this.stickyEventsMap.get(eventType)!.delete(innerMapKey);
                 } else {
                     // If not removing the event, check to see if it's the next lowest expiry.
-                    this.nextStickyEventExpiryTs = Math.min(this.nextStickyEventExpiryTs, expiresAtTs);
+                    this.nextStickyEventExpiryTs = Math.min(
+                        this.nextStickyEventExpiryTs,
+                        event.unstableStickyExpiresAt,
+                    );
                 }
             }
         }
         for (const event of this.unkeyedStickyEvents) {
-            const expiresAtTs = event.unstableStickyExpiresAt;
-            if (!expiresAtTs) {
-                // We will have checked this already, but just for type safety skip this.
-                logger.error("Should not have an event with a missing duration_ms!");
-                removedEvents.push(event);
-                break;
-            }
-            if (now >= expiresAtTs) {
+            if (now >= event.unstableStickyExpiresAt) {
                 logger.debug("Expiring sticky event", event.getId());
                 this.unkeyedStickyEvents.delete(event);
                 removedEvents.push(event);
             } else {
                 // If not removing the event, check to see if it's the next lowest expiry.
-                this.nextStickyEventExpiryTs = Math.min(this.nextStickyEventExpiryTs, expiresAtTs);
+                this.nextStickyEventExpiryTs = Math.min(this.nextStickyEventExpiryTs, event.unstableStickyExpiresAt);
             }
         }
         if (removedEvents.length) {
