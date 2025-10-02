@@ -223,11 +223,17 @@ export class CallMembership {
      * To access checked eventId and sender from the matrixEvent.
      * Class construction will fail if these values cannot get obtained. */
     private matrixEventData: { eventId: string; sender: string };
+    /**
+     * Constructs a CallMembership from a Matrix event.
+     * @param matrixEvent The Matrix event that this membership is based on
+     * @param relatedEvent The fetched event linked via the `event_id` from the `m.relates_to` field if present.
+     * @throws if the data does not match any known membership format.
+     */
     public constructor(
-        /** The Matrix event that this membership is based on */
         private matrixEvent: MatrixEvent,
-        data: any,
+        private relatedEvent?: MatrixEvent,
     ) {
+        const data = matrixEvent.getContent() as any;
         const sessionErrors: string[] = [];
         const rtcErrors: string[] = [];
         if (checkSessionsMembershipData(data, sessionErrors)) {
@@ -354,8 +360,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
-                // TODO we need to read the referenced (relation) event if available to get the real created_ts
-                return this.matrixEvent.getTs();
+                return this.relatedEvent?.getTs() ?? this.matrixEvent.getTs();
             case "session":
             default:
                 return data.created_ts ?? this.matrixEvent.getTs();
@@ -370,7 +375,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
-                return undefined;
+                return this.createdTs() + DEFAULT_EXPIRE_DURATION;
             case "session":
             default:
                 // TODO: calculate this from the MatrixRTCSession join configuration directly
@@ -382,17 +387,10 @@ export class CallMembership {
      * @returns The number of milliseconds until the membership expires or undefined if applicable
      */
     public getMsUntilExpiry(): number | undefined {
-        const { kind } = this.membershipData;
-        switch (kind) {
-            case "rtc":
-                return undefined;
-            case "session":
-            default:
-                // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
-                // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-                // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-                return this.getAbsoluteExpiry()! - Date.now();
-        }
+        // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
+        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
+        // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
+        return this.getAbsoluteExpiry()! - Date.now();
     }
 
     /**

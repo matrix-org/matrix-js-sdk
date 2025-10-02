@@ -23,11 +23,12 @@ import {
 } from "../../../src/matrixrtc/CallMembership";
 import { membershipTemplate } from "./mocks";
 
-function makeMockEvent(originTs = 0): MatrixEvent {
+function makeMockEvent(originTs = 0, content = {}): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
         getSender: jest.fn().mockReturnValue("@alice:example.org"),
         getId: jest.fn().mockReturnValue("$eventid"),
+        getContent: jest.fn().mockReturnValue(content),
     } as unknown as MatrixEvent;
 }
 
@@ -53,63 +54,64 @@ describe("CallMembership", () => {
 
         it("rejects membership with no device_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { device_id: undefined }));
+                new CallMembership(makeMockEvent(0, Object.assign({}, membershipTemplate, { device_id: undefined })));
             }).toThrow();
         });
 
         it("rejects membership with no call_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { call_id: undefined }));
+                new CallMembership(makeMockEvent(0, Object.assign({}, membershipTemplate, { call_id: undefined })));
             }).toThrow();
         });
 
         it("allow membership with no scope", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
+                new CallMembership(makeMockEvent(0, Object.assign({}, membershipTemplate, { scope: undefined })));
             }).not.toThrow();
         });
 
         it("uses event timestamp if no created_ts", () => {
-            const membership = new CallMembership(makeMockEvent(12345), membershipTemplate);
+            const membership = new CallMembership(makeMockEvent(12345, membershipTemplate));
             expect(membership.createdTs()).toEqual(12345);
         });
 
         it("uses created_ts if present", () => {
             const membership = new CallMembership(
-                makeMockEvent(12345),
-                Object.assign({}, membershipTemplate, { created_ts: 67890 }),
+                makeMockEvent(12345, Object.assign({}, membershipTemplate, { created_ts: 67890 })),
             );
             expect(membership.createdTs()).toEqual(67890);
         });
 
         it("considers memberships unexpired if local age low enough", () => {
-            const fakeEvent = makeMockEvent(1000);
+            const fakeEvent = makeMockEvent(1000, membershipTemplate);
             fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
-            expect(new CallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(false);
+            expect(new CallMembership(fakeEvent).isExpired()).toEqual(false);
         });
 
         it("considers memberships expired if local age large enough", () => {
-            const fakeEvent = makeMockEvent(1000);
+            const fakeEvent = makeMockEvent(1000, membershipTemplate);
             fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
-            expect(new CallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(true);
+            expect(new CallMembership(fakeEvent).isExpired()).toEqual(true);
         });
 
         it("returns preferred foci", () => {
-            const fakeEvent = makeMockEvent();
             const mockFocus = { type: "this_is_a_mock_focus" };
-            const membership = new CallMembership(fakeEvent, { ...membershipTemplate, foci_preferred: [mockFocus] });
+            const fakeEvent = makeMockEvent(0, { ...membershipTemplate, foci_preferred: [mockFocus] });
+            const membership = new CallMembership(fakeEvent);
             expect(membership.transports).toEqual([mockFocus]);
         });
 
         describe("getTransport", () => {
             const mockFocus = { type: "this_is_a_mock_focus" };
-            const oldestMembership = new CallMembership(makeMockEvent(), membershipTemplate);
+            const oldestMembership = new CallMembership(makeMockEvent(0, membershipTemplate));
             it("gets the correct active transport with oldest_membership", () => {
-                const membership = new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-                });
+                const membership = new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        foci_preferred: [mockFocus],
+                        focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+                    }),
+                );
 
                 // if we are the oldest member we use our focus.
                 expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
@@ -119,11 +121,13 @@ describe("CallMembership", () => {
             });
 
             it("gets the correct active transport with multi_sfu", () => {
-                const membership = new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "multi_sfu" },
-                });
+                const membership = new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        foci_preferred: [mockFocus],
+                        focus_active: { type: "livekit", focus_selection: "multi_sfu" },
+                    }),
+                );
 
                 // if we are the oldest member we use our focus.
                 expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
@@ -132,18 +136,20 @@ describe("CallMembership", () => {
                 expect(membership.getTransport(oldestMembership)).toBe(mockFocus);
             });
             it("does not provide focus if the selection method is unknown", () => {
-                const membership = new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "unknown" },
-                });
+                const membership = new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        foci_preferred: [mockFocus],
+                        focus_active: { type: "livekit", focus_selection: "unknown" },
+                    }),
+                );
 
                 // if we are the oldest member we use our focus.
                 expect(membership.getTransport(membership)).toBeUndefined();
             });
         });
         describe("correct values from computed fields", () => {
-            const membership = new CallMembership(makeMockEvent(), membershipTemplate);
+            const membership = new CallMembership(makeMockEvent(0, membershipTemplate));
             it("returns correct sender", () => {
                 expect(membership.sender).toBe("@alice:example.org");
             });
@@ -192,58 +198,68 @@ describe("CallMembership", () => {
 
         it("rejects membership with no slot_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: undefined });
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, slot_id: undefined }));
             }).toThrow();
         });
 
         it("rejects membership with no application", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), { ...membershipTemplate, application: undefined });
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, application: undefined }));
             }).toThrow();
         });
 
         it("rejects membership with incorrect application", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    application: { wrong_type_key: "unknown" },
-                });
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        application: { wrong_type_key: "unknown" },
+                    }),
+                );
             }).toThrow();
         });
 
         it("rejects membership with no member", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), { ...membershipTemplate, member: undefined });
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, member: undefined }));
             }).toThrow();
         });
 
         it("rejects membership with incorrect  member", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(), { ...membershipTemplate, member: { i: "test" } });
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, member: { i: "test" } }));
             }).toThrow();
             expect(() => {
-                new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    member: { id: "test", device_id: "test", user_id_wrong: "test" },
-                });
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        member: { id: "test", device_id: "test", user_id_wrong: "test" },
+                    }),
+                );
             }).toThrow();
             expect(() => {
-                new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    member: { id: "test", device_id_wrong: "test", user_id_wrong: "test" },
-                });
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        member: { id: "test", device_id_wrong: "test", user_id_wrong: "test" },
+                    }),
+                );
             }).toThrow();
             expect(() => {
-                new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    member: { id: "test", device_id: "test", user_id: "@@test" },
-                });
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        member: { id: "test", device_id: "test", user_id: "@@test" },
+                    }),
+                );
             }).toThrow();
             expect(() => {
-                new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    member: { id: "test", device_id: "test", user_id: "@test:user.id" },
-                });
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        member: { id: "test", device_id: "test", user_id: "@test:user.id" },
+                    }),
+                );
             }).not.toThrow();
         });
 
@@ -257,11 +273,13 @@ describe("CallMembership", () => {
 
         describe("getTransport", () => {
             it("gets the correct active transport with oldest_membership", () => {
-                const oldestMembership = new CallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    rtc_transports: [{ type: "oldest_transport" }],
-                });
-                const membership = new CallMembership(makeMockEvent(), membershipTemplate);
+                const oldestMembership = new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        rtc_transports: [{ type: "oldest_transport" }],
+                    }),
+                );
+                const membership = new CallMembership(makeMockEvent(0, membershipTemplate));
 
                 // if we are the oldest member we use our focus.
                 expect(membership.getTransport(membership)).toStrictEqual({ type: "livekit" });
@@ -271,7 +289,7 @@ describe("CallMembership", () => {
             });
         });
         describe("correct values from computed fields", () => {
-            const membership = new CallMembership(makeMockEvent(), membershipTemplate);
+            const membership = new CallMembership(makeMockEvent(0, membershipTemplate));
             it("returns correct sender", () => {
                 expect(membership.sender).toBe("@alice:example.org");
             });
@@ -304,9 +322,9 @@ describe("CallMembership", () => {
             it("returns correct membershipID", () => {
                 expect(membership.membershipID).toBe("xyzHASHxyz");
             });
-            it("returns correct unused fields", () => {
-                expect(membership.getAbsoluteExpiry()).toBe(undefined);
-                expect(membership.getMsUntilExpiry()).toBe(undefined);
+            it("returns correct expiration fields", () => {
+                expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
+                expect(membership.getMsUntilExpiry()).toBe(DEFAULT_EXPIRE_DURATION - Date.now());
                 expect(membership.isExpired()).toBe(false);
             });
         });
@@ -318,8 +336,8 @@ describe("CallMembership", () => {
 
         beforeEach(() => {
             // server origin timestamp for this event is 1000
-            fakeEvent = makeMockEvent(1000);
-            membership = new CallMembership(fakeEvent!, membershipTemplate);
+            fakeEvent = makeMockEvent(1000, membershipTemplate);
+            membership = new CallMembership(fakeEvent!);
 
             jest.useFakeTimers();
         });
