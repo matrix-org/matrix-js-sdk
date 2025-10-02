@@ -76,6 +76,15 @@ describe("RoomStickyEvents", () => {
             ]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
         });
+        it("should allow multiple events with the same sticky key for different event types", () => {
+            const originalEv = new MatrixEvent({ ...stickyEvent });
+            const anotherEv = new MatrixEvent({
+                ...stickyEvent,
+                type: "org.example.another_type",
+            });
+            stickyEvents.addStickyEvents([originalEv, anotherEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv, anotherEv]);
+        });
     });
 
     describe("_unstable_addStickyEvents(", () => {
