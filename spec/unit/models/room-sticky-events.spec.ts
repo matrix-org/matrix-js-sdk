@@ -1,9 +1,9 @@
-import { type IEvent, MatrixEvent } from "../../../src";
+import { type IStickyEvent, MatrixEvent } from "../../../src";
 import { RoomStickyEventsStore, RoomStickyEventsEvent } from "../../../src/models/room-sticky-events";
 
 describe("RoomStickyEvents", () => {
     let stickyEvents: RoomStickyEventsStore;
-    const stickyEvent: IEvent = {
+    const stickyEvent: IStickyEvent = {
         event_id: "$foo:bar",
         room_id: "!roomId",
         type: "org.example.any_type",
@@ -43,6 +43,10 @@ describe("RoomStickyEvents", () => {
             stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, sender: undefined })]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
         });
+        it("should not allow adding an event with an invalid sender", () => {
+            stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, sender: "not_a_real_sender" })]);
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+        });
         it("should ignore old events", () => {
             stickyEvents.addStickyEvents([
                 new MatrixEvent({ ...stickyEvent, origin_server_ts: 0, msc4354_sticky: { duration_ms: 1 } }),
@@ -52,17 +56,6 @@ describe("RoomStickyEvents", () => {
         it("should be able to just add an event", () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
             stickyEvents.addStickyEvents([originalEv]);
-            expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
-        });
-        it("should not replace newer events", () => {
-            const originalEv = new MatrixEvent({ ...stickyEvent });
-            stickyEvents.addStickyEvents([originalEv]);
-            stickyEvents.addStickyEvents([
-                new MatrixEvent({
-                    ...stickyEvent,
-                    origin_server_ts: 1,
-                }),
-            ]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
         });
         it("should not replace events on ID tie break", () => {
@@ -76,6 +69,27 @@ describe("RoomStickyEvents", () => {
             ]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
         });
+        it("should not replace a newer event with an older event", () => {
+            const originalEv = new MatrixEvent({ ...stickyEvent });
+            stickyEvents.addStickyEvents([originalEv]);
+            stickyEvents.addStickyEvents([
+                new MatrixEvent({
+                    ...stickyEvent,
+                    origin_server_ts: 1,
+                }),
+            ]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
+        });
+        it("should replace an older event with a newer event", () => {
+            const originalEv = new MatrixEvent({ ...stickyEvent });
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now() + 2000,
+            });
+            stickyEvents.addStickyEvents([originalEv]);
+            stickyEvents.addStickyEvents([newerEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
+        });
         it("should allow multiple events with the same sticky key for different event types", () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
             const anotherEv = new MatrixEvent({
@@ -85,9 +99,7 @@ describe("RoomStickyEvents", () => {
             stickyEvents.addStickyEvents([originalEv, anotherEv]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv, anotherEv]);
         });
-    });
 
-    describe("_unstable_addStickyEvents(", () => {
         it("should emit when a new sticky event is added", () => {
             const emitSpy = jest.fn();
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
@@ -98,7 +110,7 @@ describe("RoomStickyEvents", () => {
             expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], []);
         });
-        it("should emit when a new unketed sticky event is added", () => {
+        it("should emit when a new unkeyed sticky event is added", () => {
             const emitSpy = jest.fn();
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             const ev = new MatrixEvent({
@@ -138,6 +150,47 @@ describe("RoomStickyEvents", () => {
         });
     });
 
+    describe("getKeyedStickyEvent", () => {
+        it("should have zero sticky events", () => {
+            expect(
+                stickyEvents.getKeyedStickyEvent(
+                    stickyEvent.sender,
+                    stickyEvent.type,
+                    stickyEvent.content.msc4354_sticky_key!,
+                ),
+            ).toBeUndefined();
+        });
+        it("should return a sticky event", () => {
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+            });
+            stickyEvents.addStickyEvents([ev]);
+            expect(
+                stickyEvents.getKeyedStickyEvent(
+                    stickyEvent.sender,
+                    stickyEvent.type,
+                    stickyEvent.content.msc4354_sticky_key!,
+                ),
+            ).toEqual(ev);
+        });
+    });
+
+    describe("getUnkeyedStickyEvent", () => {
+        it("should have zero sticky events", () => {
+            expect(stickyEvents.getUnkeyedStickyEvent(stickyEvent.sender, stickyEvent.type)).toEqual([]);
+        });
+        it("should return a sticky event", () => {
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                content: {
+                    msc4354_sticky_key: undefined,
+                },
+            });
+            stickyEvents.addStickyEvents([ev]);
+            expect(stickyEvents.getUnkeyedStickyEvent(stickyEvent.sender, stickyEvent.type)).toEqual([ev]);
+        });
+    });
+
     describe("cleanExpiredStickyEvents", () => {
         beforeAll(() => {
             jest.useFakeTimers();
@@ -147,17 +200,25 @@ describe("RoomStickyEvents", () => {
         });
 
         it("should emit when a sticky event expires", () => {
-            const emitSpy = jest.fn();
-            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             jest.setSystemTime(0);
             const ev = new MatrixEvent({
                 ...stickyEvent,
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.addStickyEvents([ev]);
-            jest.setSystemTime(15000);
+            const evLater = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$baz:bar",
+                sender: "@bob:example.org",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, evLater]);
+            const emitSpy = jest.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [ev]);
+            // Then expire the next event
+            jest.advanceTimersByTime(1000);
+            expect(emitSpy).toHaveBeenCalledWith([], [evLater]);
         });
         it("should emit two events when both expire at the same time", () => {
             const emitSpy = jest.fn();
@@ -178,7 +239,6 @@ describe("RoomStickyEvents", () => {
             });
             stickyEvents.addStickyEvents([ev1, ev2]);
             expect(emitSpy).toHaveBeenCalledWith([ev1, ev2], []);
-            jest.setSystemTime(15000);
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [ev1, ev2]);
         });
@@ -192,7 +252,6 @@ describe("RoomStickyEvents", () => {
                 origin_server_ts: Date.now(),
             });
             stickyEvents.addStickyEvents([ev]);
-            jest.setSystemTime(15000);
             jest.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [ev]);
         });

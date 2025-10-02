@@ -3454,8 +3454,26 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns A matching active sticky event, or undefined.
      */
     // eslint-disable-next-line
-    public _unstable_getStickyEvent(sender: string, stickyKey: string, type: string): ReturnType<RoomStickyEventsStore["getStickyEvent"]> {
-        return this.stickyEvents.getStickyEvent(sender, stickyKey, type);
+    public _unstable_getKeyedStickyEvent(
+        sender: string,
+        type: string,
+        stickyKey: string,
+    ): ReturnType<RoomStickyEventsStore["getKeyedStickyEvent"]> {
+        return this.stickyEvents.getKeyedStickyEvent(sender, type, stickyKey);
+    }
+
+    /**
+     * Get an active sticky events that match the given `type` and `sender`.
+     * @param type The event `type`.
+     * @param sender The sender of the sticky event.
+     * @returns An array of matching sticky events.
+     */
+    // eslint-disable-next-line
+    public _unstable_getUnkeyedStickyEvent(
+        sender: string,
+        type: string,
+    ): ReturnType<RoomStickyEventsStore["getUnkeyedStickyEvent"]> {
+        return this.stickyEvents.getUnkeyedStickyEvent(sender, type);
     }
 
     /**

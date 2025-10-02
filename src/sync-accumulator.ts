@@ -76,13 +76,14 @@ export interface ITimeline {
     prev_batch: string | null;
 }
 
-export interface IStickyEvent extends IRoomEvent {
+type StickyEventFields = {
     msc4354_sticky: { duration_ms: number };
-}
+    content: IRoomEvent["content"] & { msc4354_sticky_key?: string };
+};
 
-export interface IStickyStateEvent extends IStateEvent {
-    msc4354_sticky: { duration_ms: number };
-}
+export type IStickyEvent = IRoomEvent & StickyEventFields;
+
+export type IStickyStateEvent = IStateEvent & StickyEventFields;
 
 export interface ISticky {
     events: Array<IStickyEvent | IStickyStateEvent>;

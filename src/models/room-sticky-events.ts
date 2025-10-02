@@ -28,10 +28,11 @@ export type RoomStickyEventsMap = {
  * whenever a sticky even is updated or replaced.
  */
 export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEvent, RoomStickyEventsMap> {
-    private stickyEventsMap = new Map<string, Map<string, MatrixEvent>>(); // (type -> stickyKey+userId) -> event
+    private readonly stickyEventsMap = new Map<string, Map<string, MatrixEvent>>(); // (type -> stickyKey+userId) -> event
+    private unkeyedStickyEvents = new Set<MatrixEvent>();
+
     private stickyEventTimer?: NodeJS.Timeout;
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
-    private unkeyedStickyEvents = new Set<MatrixEvent>();
 
     public constructor() {
         super();
@@ -49,14 +50,24 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     }
 
     /**
-     * Get a sticky event that match the given `type`, `sender`, and `stickyKey`
+     * Get an active sticky event that match the given `type`, `sender`, and `stickyKey`
      * @param type The event `type`.
      * @param sender The sender of the sticky event.
-     * @param stickyKey The sticky key used by the event.
+     * @param stickyKey The sticky key used by the event. If not provided, this will search the unkeyed sticky events.
      * @returns A matching active sticky event, or undefined.
      */
-    public getStickyEvent(sender: string, stickyKey: string, type: string): MatrixEvent | undefined {
+    public getKeyedStickyEvent(sender: string, type: string, stickyKey: string): MatrixEvent | undefined {
         return this.stickyEventsMap.get(type)?.get(`${stickyKey}${sender}`);
+    }
+
+    /**
+     * Get an active sticky events that match the given `type` and `sender`.
+     * @param type The event `type`.
+     * @param sender The sender of the sticky event.
+     * @returns An array of matching sticky events.
+     */
+    public getUnkeyedStickyEvent(sender: string, type: string): MatrixEvent[] {
+        return [...this.unkeyedStickyEvents].filter((ev) => ev.getType() === type && ev.getSender() === sender);
     }
 
     /**
@@ -72,17 +83,17 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: MatrixEvent } | { added: false } {
         const stickyKey = event.getContent().msc4354_sticky_key;
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
-            throw Error(`${event.getId()} is missing msc4354_sticky_key`);
+            throw new Error(`${event.getId()} is missing msc4354_sticky_key`);
         }
 
         // With this we have the guarantee, that all events in stickyEventsMap are correctly formatted
         if (event.unstableStickyExpiresAt === undefined) {
-            throw Error(`${event.getId()} is missing msc4354_sticky.duration_ms`);
+            throw new Error(`${event.getId()} is missing msc4354_sticky.duration_ms`);
         }
         const sender = event.getSender();
         const type = event.getType();
         if (!sender) {
-            throw Error(`${event.getId()} is missing a sender`);
+            throw new Error(`${event.getId()} is missing a sender`);
         } else if (event.unstableStickyExpiresAt <= Date.now()) {
             logger.info("ignored sticky event with older expiration time than current time", stickyKey);
             return { added: false };
@@ -91,7 +102,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         // While we fully expect the server to always provide the correct value,
         // this is just insurance to protect against attacks on our Map.
         if (!sender.startsWith("@")) {
-            throw Error("Expected sender to start with @");
+            throw new Error("Expected sender to start with @");
         }
 
         let prevEvent: MatrixEvent | undefined;
@@ -168,10 +179,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         }
         if (this.nextStickyEventExpiryTs === Number.MAX_SAFE_INTEGER) {
             // We have no events due to expire.
-            return;
-        } else if (Date.now() > this.nextStickyEventExpiryTs) {
-            // Event has ALREADY expired, so run immediately.
-            this.cleanExpiredStickyEvents();
             return;
         } // otherwise, schedule in the future
         this.stickyEventTimer = setTimeout(this.cleanExpiredStickyEvents, this.nextStickyEventExpiryTs - Date.now());
