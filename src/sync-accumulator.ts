@@ -558,7 +558,7 @@ export class SyncAccumulator {
         // Prune out any events in our stores that have since expired, do this before we
         // insert new events.
         currentData._stickyEvents = currentData._stickyEvents.filter((ev) => {
-            return Date.now() < ev.msc4354_sticky.duration_ms + ev.origin_server_ts;
+            return Date.now() > ev.msc4354_sticky.duration_ms + ev.origin_server_ts;
         });
 
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will

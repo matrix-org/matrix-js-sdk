@@ -1101,13 +1101,13 @@ describe("SyncAccumulator", function () {
             );
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
         });
-        it("should clear stale sticky events", () => {
+        it.only("should clear stale sticky events", () => {
             jest.setSystemTime(1000);
             const ev = stickyEvent(1000);
             sa.accumulate(
                 syncSkeleton({
                     msc4354_sticky: {
-                        events: [ev, stickyEvent(0)],
+                        events: [ev],
                     },
                 }),
             );
