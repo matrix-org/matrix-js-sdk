@@ -286,15 +286,16 @@ describe("MatrixRTCSession", () => {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
-            expect(sess?.memberships.length).toEqual(2);
-            expect(sess?.memberships[0].sender).toEqual(otherUserId);
-            expect(sess?.memberships[0].sessionDescription.id).toEqual("");
-            expect(sess?.memberships[0].scope).toEqual("m.room");
-            expect(sess?.memberships[0].application).toEqual("m.call");
-            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            expect(sess?.memberships[0].isExpired()).toEqual(false);
+            const memberships = sess.memberships.sort((a,b) => [a.sender,b.sender].sort().indexOf(a.sender));
+            expect(memberships.length).toEqual(2);
+            expect(memberships[0].sender).toEqual(otherUserId);
+            expect(memberships[0].sessionDescription.id).toEqual("");
+            expect(memberships[0].scope).toEqual("m.room");
+            expect(memberships[0].application).toEqual("m.call");
+            expect(memberships[0].deviceId).toEqual("AAAAAAA");
+            expect(memberships[0].isExpired()).toEqual(false);
 
-            expect(sess?.memberships[1].sender).toEqual(membershipTemplate.user_id);
+            expect(memberships[1].sender).toEqual(membershipTemplate.user_id);
 
             expect(sess?.sessionDescription.id).toEqual("");
         });
