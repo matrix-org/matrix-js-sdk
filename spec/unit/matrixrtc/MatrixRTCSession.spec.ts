@@ -241,7 +241,7 @@ describe("MatrixRTCSession", () => {
         it("perfers sticky events when both membership and sticky events appear for the same user", () => {
             // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([membershipTemplate]);
-            mockRoom.unstableGetStickyEvents.mockImplementation(() => {
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
                 const ev = mockRTCEvent(
                     {
                         ...membershipTemplate,
@@ -269,7 +269,7 @@ describe("MatrixRTCSession", () => {
             // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([membershipTemplate]);
             const otherUserId = "@othermock:user.example";
-            mockRoom.unstableGetStickyEvents.mockImplementation(() => {
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
                 const ev = mockRTCEvent(
                     {
                         ...membershipTemplate,
