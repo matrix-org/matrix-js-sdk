@@ -170,9 +170,7 @@ export function mockRTCEvent(
             timestamp,
             !stickyDuration && "device_id" in membershipData ? `_${sender}_${membershipData.device_id}` : "",
         ),
-        unstableStickyContent: {
-            duration_ms: stickyDuration,
-        },
+        unstableStickyExpiresAt:stickyDuration,
     } as unknown as MatrixEvent;
 }
 
