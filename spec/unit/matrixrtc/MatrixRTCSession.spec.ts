@@ -286,7 +286,7 @@ describe("MatrixRTCSession", () => {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
-            const memberships = sess.memberships.sort((a,b) => [a.sender,b.sender].sort().indexOf(a.sender));
+            const memberships = sess.memberships.sort((a, b) => [a.sender, b.sender].sort().indexOf(a.sender));
             expect(memberships.length).toEqual(2);
             expect(memberships[0].sender).toEqual(otherUserId);
             expect(memberships[0].sessionDescription.id).toEqual("");
