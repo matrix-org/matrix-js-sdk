@@ -314,18 +314,17 @@ export type RoomEventHandlerMap = {
      */
     [RoomEvent.Summary]: (summary: IRoomSummary) => void;
     /**
-     * Fires when sticky events are updated for a room.
-     * For a list of all updated events use:
-     * `const updated = added.filter(e => removed.includes(e));`
-     * for a list of all new events use:
-     * `const addedNew = added.filter(e => !removed.includes(e));`
-     * for a list of all removed events use:
-     * `const removedOnly = removed.filter(e => !added.includes(e));`
-     * @param added - The events that were added to the map of sticky events (can be updated events for existing keys or new keys)
-     * @param removed - The events that were removed from the map of sticky events (caused by expiration or updated keys)
-     * @param room - The room containing the sticky events
+     * Fires when any sticky event changes happen in a room.
+     * @param added Any new sticky events with no predecessor events (matching sender, type, and sticky_key)
+     * @param updated Any sticky events that supersede an existing event (matching sender, type, and sticky_key)
+     * @param removed The events that were removed from the map due to expiry.
      */
-    [RoomEvent.StickyEvents]: (added: MatrixEvent[], removed: MatrixEvent[], room: Room) => void;
+    [RoomEvent.StickyEvents]: (
+        added: MatrixEvent[],
+        updated: { current: MatrixEvent; previous: MatrixEvent }[],
+        removed: MatrixEvent[],
+        room: Room,
+    ) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
     /**
      * Fires when a new poll instance is added to the room state
@@ -513,8 +512,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // receipts. No need to remove the listener: it's on ourself anyway.
         this.on(RoomEvent.Receipt, this.onReceipt);
 
-        this.stickyEvents.on(RoomStickyEventsEvent.Update, (added, removed) =>
-            this.emit(RoomEvent.StickyEvents, added, removed, this),
+        this.stickyEvents.on(RoomStickyEventsEvent.Update, (...props) =>
+            this.emit(RoomEvent.StickyEvents, ...props, this),
         );
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
@@ -3463,7 +3462,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Get an active sticky events that match the given `type` and `sender`.
+     * Get an active sticky event that match the given `type` and `sender`.
      * @param type The event `type`.
      * @param sender The sender of the sticky event.
      * @returns An array of matching sticky events.

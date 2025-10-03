@@ -1405,12 +1405,16 @@ export class SyncApi {
             // we deliberately don't add accountData to the timeline
             room.addAccountData(accountDataEvents);
 
-            // events from the sticky section of the sync come first (those are the ones that would be skipped due to gappy syncs)
-            // hence we consider them as older.
-            // and we add the events from the timeline at the end (newer)
+            // Sticky events primarily come via the `timeline` field, with the
+            // sticky info field marking them as sticky.
+            // If the sync is "gappy" (meaning it is skipping events to catch up) then
+            // sticky events will instead come down the sticky section.
+            // This ensures we collect sticky events from both places.
             const stickyEventsAndStickyEventsFromTheTimeline = stickyEvents.concat(
                 timelineEvents.filter((e) => e.unstableStickyInfo !== undefined),
             );
+            // Note: We calculate sticky events before emitting `.Room` as it's nice to have
+            // sticky events calculated and ready to go.
             room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
 
             room.recalculate();
@@ -1430,9 +1434,11 @@ export class SyncApi {
             accountDataEvents.forEach(emitEvent);
             stickyEvents
                 .filter(
-                    (e) =>
-                        // Ensure we do not emit twice.
-                        !timelineEvents.some((te) => te.getId() === e.getId()),
+                    (stickyEvent) =>
+                        // This is highly unlikey, but in the case where a sticky event
+                        // has appeared in the timeline AND the sticky section, we only
+                        // want to emit the event once.
+                        !timelineEvents.some((timelineEvent) => timelineEvent.getId() === stickyEvent.getId()),
                 )
                 .forEach(emitEvent);
             // Decrypt only the last message in all rooms to make sure we can generate a preview

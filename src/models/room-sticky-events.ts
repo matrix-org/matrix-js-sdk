@@ -10,17 +10,16 @@ export enum RoomStickyEventsEvent {
 
 export type RoomStickyEventsMap = {
     /**
-     * Fires when sticky events are updated for a room.
-     * For a list of all updated events use:
-     * `const updated = added.filter(e => removed.includes(e));`
-     * for a list of all new events use:
-     * `const addedNew = added.filter(e => !removed.includes(e));`
-     * for a list of all removed events use:
-     * `const removedOnly = removed.filter(e => !added.includes(e));`
-     * @param added - The events that were added to the map of sticky events (can be updated events for existing keys or new keys)
-     * @param removed - The events that were removed from the map of sticky events (caused by expiration or updated keys)
+     * Fires when any sticky event changes happen in a room.
+     * @param added Any new sticky events with no predecessor events (matching sender, type, and sticky_key)
+     * @param updated Any sticky events that supersede an existing event (matching sender, type, and sticky_key)
+     * @param removed The events that were removed from the map due to expiry.
      */
-    [RoomStickyEventsEvent.Update]: (added: MatrixEvent[], removed: MatrixEvent[]) => void;
+    [RoomStickyEventsEvent.Update]: (
+        added: MatrixEvent[],
+        updated: { current: MatrixEvent; previous: MatrixEvent }[],
+        removed: MatrixEvent[],
+    ) => void;
 };
 
 type StickyMatrixEvent = MatrixEvent & { unstableStickyExpiresAt: number };
@@ -63,7 +62,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     }
 
     /**
-     * Get an active sticky events that match the given `type` and `sender`.
+     * Get an active sticky event that match the given `type` and `sender`.
      * @param type The event `type`.
      * @param sender The sender of the sticky event.
      * @returns An array of matching sticky events.
@@ -107,7 +106,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             throw new Error("Expected sender to start with @");
         }
 
-        let prevEvent: MatrixEvent | undefined;
+        let prevEvent: StickyMatrixEvent | undefined;
         if (stickyKey) {
             // Why this is safe:
             // A type may contain anything but the *sender* is tightly
@@ -115,7 +114,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             // E.g. Where a malicous event type might be "rtc.member.event@foo:bar" the key becomes:
             // "rtc.member.event.@foo:bar@bar:baz"
             const innerMapKey = `${stickyKey}${sender}`;
-            const prevEvent = this.stickyEventsMap.get(type)?.get(innerMapKey);
+            prevEvent = this.stickyEventsMap.get(type)?.get(innerMapKey);
 
             // sticky events are not allowed to expire sooner than their predecessor.
             if (prevEvent && event.unstableStickyExpiresAt < prevEvent.unstableStickyExpiresAt) {
@@ -151,22 +150,23 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @param events A set of new sticky events.
      */
     public addStickyEvents(events: MatrixEvent[]): void {
-        const added = [];
-        const removed = [];
+        const added: MatrixEvent[] = [];
+        const updated: { current: MatrixEvent; previous: MatrixEvent }[] = [];
         for (const e of events) {
             try {
                 const result = this.addStickyEvent(e);
                 if (result.added) {
-                    added.push(e);
                     if (result.prevEvent) {
-                        removed.push(result.prevEvent);
+                        updated.push({ current: e, previous: result.prevEvent });
+                    } else {
+                        added.push(e);
                     }
                 }
             } catch (ex) {
                 logger.warn("ignored invalid sticky event", ex);
             }
         }
-        if (added.length) this.emit(RoomStickyEventsEvent.Update, added, removed);
+        if (added.length || updated.length) this.emit(RoomStickyEventsEvent.Update, added, updated, []);
         this.scheduleStickyTimer();
     }
 
@@ -222,7 +222,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             }
         }
         if (removedEvents.length) {
-            this.emit(RoomStickyEventsEvent.Update, [], removedEvents);
+            this.emit(RoomStickyEventsEvent.Update, [], [], removedEvents);
         }
         // Finally, schedule the next run.
         this.scheduleStickyTimer();

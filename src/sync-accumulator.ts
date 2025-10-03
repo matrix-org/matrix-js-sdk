@@ -78,7 +78,7 @@ export interface ITimeline {
 
 type StickyEventFields = {
     msc4354_sticky: { duration_ms: number };
-    content: IRoomEvent["content"] & { msc4354_sticky_key?: string };
+    content: { msc4354_sticky_key?: string };
 };
 
 export type IStickyEvent = IRoomEvent & StickyEventFields;
@@ -558,8 +558,10 @@ export class SyncAccumulator {
 
         // Prune out any events in our stores that have since expired, do this before we
         // insert new events.
+        const now = Date.now();
         currentData._stickyEvents = currentData._stickyEvents.filter((ev) => {
-            return Date.now() < ev.msc4354_sticky.duration_ms + ev.origin_server_ts;
+            // If `origin_server_ts` claims to have been from the future, we still bound it to now.
+            return now < ev.msc4354_sticky.duration_ms + Math.min(now, ev.origin_server_ts);
         });
 
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
