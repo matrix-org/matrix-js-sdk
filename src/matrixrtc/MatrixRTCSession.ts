@@ -51,6 +51,7 @@ import {
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type MatrixEvent } from "src/matrix.ts";
+import { type RoomStickyEventsEvent, type RoomStickyEventsMap } from "src/models/room-sticky-events.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -296,7 +297,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @deprecated Use `MatrixRTCSession.sessionMembershipsForRoom` instead.
      */
     public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "unstableGetStickyEvents">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
     ): CallMembership[] {
         return MatrixRTCSession.sessionMembershipsForRoom(room, {
             id: "",
@@ -309,7 +310,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * oldest first.
      */
     public static sessionMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "unstableGetStickyEvents">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
         sessionDescription: SessionDescription,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
@@ -322,7 +323,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         let callMemberEvents = [] as MatrixEvent[];
         if (listenForStickyEvents) {
             // prefill with sticky events
-            callMemberEvents = [...room.unstableGetStickyEvents()].filter(
+            callMemberEvents = [...room._unstable_getStickyEvents()].filter(
                 (e) => e.getType() === EventType.GroupCallMemberPrefix,
             );
         }
@@ -817,9 +818,17 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Call this when a sticky event update has occured.
      */
-    private onStickyEventUpdate = (added: MatrixEvent[], removed: MatrixEvent[]): void => {
+    private onStickyEventUpdate: RoomStickyEventsMap[RoomStickyEventsEvent.Update] = (
+        added,
+        updated,
+        removed,
+    ): void => {
         this.logger.debug("Sticky event update", { added, removed });
-        if ([...added, ...removed].some((e) => e.getType() === EventType.GroupCallMemberPrefix)) {
+        if (
+            [...added, ...removed, ...updated.flatMap((v) => [v.current, v.previous])].some(
+                (e) => e.getType() === EventType.GroupCallMemberPrefix,
+            )
+        ) {
             this.recalculateSessionMembers();
         }
     };
