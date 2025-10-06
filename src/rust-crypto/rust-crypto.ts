@@ -162,6 +162,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
+
+        /** Enable support for encrypted state events under MSC3414. */
+        private readonly enableEncryptedStateEvents: boolean = false,
     ) {
         super();
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, http);
@@ -419,6 +422,16 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             new RustSdkCryptoJs.RoomId(roomId),
         );
         return Boolean(roomSettings?.algorithm);
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#isStateEncryptionEnabledInRoom}.
+     */
+    public async isStateEncryptionEnabledInRoom(roomId: string): Promise<boolean> {
+        const roomSettings: RustSdkCryptoJs.RoomSettings | undefined = await this.olmMachine.getRoomSettings(
+            new RustSdkCryptoJs.RoomId(roomId),
+        );
+        return Boolean(roomSettings?.encryptStateEvents);
     }
 
     /**
@@ -1040,7 +1053,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             new RustSdkCryptoJs.UserId(userId),
         );
         return requests
-            .filter((request) => request.roomId === undefined)
+            .filter((request) => request.roomId === undefined && !request.isCancelled())
             .map((request) => this.makeVerificationRequest(request));
     }
 
@@ -1063,7 +1076,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         // Search for the verification request for the given room id
-        const request = requests.find((request) => request.roomId?.toString() === roomId);
+        const request = requests.find((request) => request.roomId?.toString() === roomId && !request.isCancelled());
 
         if (request) {
             return this.makeVerificationRequest(request);
@@ -1717,7 +1730,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await this.receiveSyncChanges({ devices });
     }
 
-    /** called by the sync loop on m.room.encrypted events
+    /** called by the sync loop on m.room.encryption events
      *
      * @param room - in which the event was received
      * @param event - encryption event to be processed
@@ -1732,6 +1745,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             // Among other situations, this happens if the crypto state event is redacted.
             this.logger.warn(`Room ${room.roomId}: ignoring crypto event with invalid algorithm ${config.algorithm}`);
             return;
+        }
+
+        if (config["io.element.msc3414.encrypt_state_events"] && this.enableEncryptedStateEvents) {
+            this.logger.info("crypto Enabling state event encryption...");
+            settings.encryptStateEvents = true;
         }
 
         try {

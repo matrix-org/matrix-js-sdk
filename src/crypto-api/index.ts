@@ -119,6 +119,11 @@ export interface CryptoApi {
     isEncryptionEnabledInRoom(roomId: string): Promise<boolean>;
 
     /**
+     * Check if we believe the given room supports encrypted state events.
+     */
+    isStateEncryptionEnabledInRoom(roomId: string): Promise<boolean>;
+
+    /**
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
