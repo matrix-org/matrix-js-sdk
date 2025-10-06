@@ -823,7 +823,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         updated,
         removed,
     ): void => {
-        this.logger.debug("Sticky event update", { added, removed });
+        this.logger.debug("Sticky event update", { added, updated, removed });
         if (
             [...added, ...removed, ...updated.flatMap((v) => [v.current, v.previous])].some(
                 (e) => e.getType() === EventType.GroupCallMemberPrefix,
