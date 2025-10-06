@@ -135,7 +135,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // wasActiveAndKnown = session.memberships.length > 0 and
         // nowActive = session.memberships.length
         // Alternatively we would need to setup some event emission when the RTC session ended.
-        session.onRTCSessionMemberUpdate();
+        await session.onRTCSessionMemberUpdate();
 
         const nowActive = session.memberships.length > 0;
 

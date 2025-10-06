@@ -731,7 +731,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
+            this.expiryTimeout = setTimeout(() => void this.onRTCSessionMemberUpdate(), soonestExpiry);
         }
     }
 
@@ -803,8 +803,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
      */
-    public onRTCSessionMemberUpdate = (): void => {
-        void this.recalculateSessionMembers();
+    public onRTCSessionMemberUpdate = (): Promise<void> => {
+        return this.recalculateSessionMembers();
     };
 
     /**
@@ -838,7 +838,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
             });
 
-            void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+            await this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
             // The `ownMembership` will be set when calling `onRTCSessionMemberUpdate`.
             const ownMembership = this.membershipManager?.ownMembership;
             if (this.pendingNotificationToSend && ownMembership && oldMemberships.length === 0) {

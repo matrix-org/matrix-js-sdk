@@ -398,7 +398,7 @@ export class MembershipManager
         return this.joinConfig?.useRtcMemberFormat ?? false;
     }
     // LOOP HANDLER:
-    private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
+    private membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
         switch (type) {
             case MembershipActionType.SendDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
@@ -418,19 +418,19 @@ export class MembershipManager
             case MembershipActionType.RestartDelayedEvent: {
                 if (!this.state.delayId) {
                     // Delay id got reset. This action was used to check if the hs canceled the delayed event when the join state got sent.
-                    return createInsertActionUpdate(MembershipActionType.SendDelayedEvent);
+                    return Promise.resolve(createInsertActionUpdate(MembershipActionType.SendDelayedEvent));
                 }
                 return this.restartDelayedEvent(this.state.delayId);
             }
             case MembershipActionType.SendScheduledDelayedLeaveEvent: {
                 // We are already good
                 if (!this.state.hasMemberStateEvent) {
-                    return { replace: [] };
+                    return Promise.resolve({ replace: [] });
                 }
                 if (this.state.delayId) {
                     return this.sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(this.state.delayId);
                 } else {
-                    return createInsertActionUpdate(MembershipActionType.SendLeaveEvent);
+                    return Promise.resolve(createInsertActionUpdate(MembershipActionType.SendLeaveEvent));
                 }
             }
             case MembershipActionType.SendJoinEvent: {
@@ -442,7 +442,7 @@ export class MembershipManager
             case MembershipActionType.SendLeaveEvent: {
                 // We are good already
                 if (!this.state.hasMemberStateEvent) {
-                    return { replace: [] };
+                    return Promise.resolve({ replace: [] });
                 }
                 // This is only a fallback in case we do not have working delayed events support.
                 // first we should try to just send the scheduled leave event
@@ -452,12 +452,12 @@ export class MembershipManager
     }
 
     // HANDLERS (used in the membershipLoopHandler)
-    private async sendOrResendDelayedLeaveEvent(): Promise<ActionUpdate> {
+    private sendOrResendDelayedLeaveEvent(): Promise<ActionUpdate> {
         // We can reach this at the start of a call (where we do not yet have a membership: state.hasMemberStateEvent=false)
         // or during a call if the state event canceled our delayed event or caused by an unexpected error that removed our delayed event.
         // (Another client could have canceled it, the homeserver might have removed/lost it due to a restart, ...)
         // In the `then` and `catch` block we treat both cases differently. "if (this.state.hasMemberStateEvent) {} else {}"
-        return await this.client
+        return this.client
             ._unstable_sendDelayedStateEvent(
                 this.room.roomId,
                 {
@@ -514,9 +514,9 @@ export class MembershipManager
             });
     }
 
-    private async cancelKnownDelayIdBeforeSendDelayedEvent(delayId: string): Promise<ActionUpdate> {
+    private cancelKnownDelayIdBeforeSendDelayedEvent(delayId: string): Promise<ActionUpdate> {
         // Remove all running updates and restarts
-        return await this.client
+        return this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel)
             .then(() => {
                 this.state.delayId = undefined;
@@ -557,7 +557,7 @@ export class MembershipManager
         this.emit(MembershipManagerEvent.ProbablyLeft, this.state.probablyLeft);
     }
 
-    private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
+    private restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
         // Compute the duration until we expect the server to send the delayed leave event.
         const durationUntilServerDelayedLeave = this.state.expectedServerDelayLeaveTs
             ? this.state.expectedServerDelayLeaveTs - Date.now()
@@ -579,7 +579,7 @@ export class MembershipManager
 
         // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
         // to the widget driver this information would get lost. That is why we mimic the AbortError using the race.
-        return await Promise.race([
+        return Promise.race([
             this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart),
             abortPromise,
         ])
@@ -618,8 +618,8 @@ export class MembershipManager
             });
     }
 
-    private async sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(delayId: string): Promise<ActionUpdate> {
-        return await this.client
+    private sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(delayId: string): Promise<ActionUpdate> {
+        return this.client
             ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send)
             .then(() => {
                 this.state.hasMemberStateEvent = false;
@@ -646,8 +646,8 @@ export class MembershipManager
             });
     }
 
-    private async sendJoinEvent(): Promise<ActionUpdate> {
-        return await this.client
+    private sendJoinEvent(): Promise<ActionUpdate> {
+        return this.client
             .sendStateEvent(
                 this.room.roomId,
                 this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
@@ -691,9 +691,9 @@ export class MembershipManager
             });
     }
 
-    private async updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
+    private updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;
-        return await this.client
+        return this.client
             .sendStateEvent(
                 this.room.roomId,
                 this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
@@ -720,8 +720,8 @@ export class MembershipManager
                 throw e;
             });
     }
-    private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
-        return await this.client
+    private sendFallbackLeaveEvent(): Promise<ActionUpdate> {
+        return this.client
             .sendStateEvent(
                 this.room.roomId,
                 this.useRtcMemberFormat ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
