@@ -221,23 +221,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                 this.nextStickyEventExpiryTs = Math.min(this.nextStickyEventExpiryTs, event.unstableStickyExpiresAt);
             }
         }
-        for (const event of this.unkeyedStickyEvents) {
-            const expiresAtTs = event.unstableStickyExpiresAt;
-            if (!expiresAtTs) {
-                // We will have checked this already, but just for type safety skip this.
-                logger.error("Should not have an event with a missing duration_ms!");
-                removedEvents.push(event);
-                break;
-            }
-            if (now >= expiresAtTs) {
-                logger.debug("Expiring sticky event", event.getId());
-                this.unkeyedStickyEvents.delete(event);
-                removedEvents.push(event);
-            } else {
-                // If not removing the event, check to see if it's the next lowest expiry.
-                this.nextStickyEventExpiryTs = Math.min(this.nextStickyEventExpiryTs, expiresAtTs);
-            }
-        }
         if (removedEvents.length) {
             this.emit(RoomStickyEventsEvent.Update, [], [], removedEvents);
         }
