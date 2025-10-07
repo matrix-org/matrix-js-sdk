@@ -7075,6 +7075,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async doesServerSupportExtendedProfiles(): Promise<boolean> {
         return (
+            (await this.isVersionSupported("v1.16")) ||
             (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES)) ||
             (await this.doesServerSupportUnstableFeature(STABLE_MSC4133_EXTENDED_PROFILES))
         );
@@ -7086,7 +7087,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The prefix for use with `authedRequest`
      */
     private async getExtendedProfileRequestPrefix(): Promise<string> {
-        if (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable")) {
+        if (
+            (await this.isVersionSupported("v1.16")) ||
+            (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+        ) {
             return ClientPrefix.V3;
         }
         return "/_matrix/client/unstable/uk.tcpip.msc4133";
