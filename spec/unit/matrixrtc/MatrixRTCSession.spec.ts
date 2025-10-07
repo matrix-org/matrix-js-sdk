@@ -269,33 +269,36 @@ describe("MatrixRTCSession", () => {
         it("combines sticky and membership events when both exist", () => {
             // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([membershipTemplate]);
-            const otherUserId = "@othermock:user.example";
+            const stickyUserId = "@stickyev:user.example";
             mockRoom._unstable_getStickyEvents.mockImplementation(() => {
                 const ev = mockRTCEvent(
                     {
                         ...membershipTemplate,
-                        user_id: otherUserId,
-                        msc4354_sticky_key: `_${otherUserId}_${membershipTemplate.device_id}`,
+                        user_id: stickyUserId,
+                        msc4354_sticky_key: `_${stickyUserId}_${membershipTemplate.device_id}`,
                     },
                     mockRoom.roomId,
+                    15000,
+                    Date.now() - 1000, // Sticky event comes first.
                 );
                 return [ev as StickyMatrixEvent];
             });
 
-            // Expect two membership events, sticky events always coming first.
             sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
-            const memberships = sess.memberships.sort((a, b) => [a.sender, b.sender].sort().indexOf(a.sender));
+            
+            const memberships = sess.memberships;
             expect(memberships.length).toEqual(2);
-            expect(memberships[0].sender).toEqual(otherUserId);
+            expect(memberships[0].sender).toEqual(stickyUserId);
             expect(memberships[0].sessionDescription.id).toEqual("");
             expect(memberships[0].scope).toEqual("m.room");
             expect(memberships[0].application).toEqual("m.call");
             expect(memberships[0].deviceId).toEqual("AAAAAAA");
             expect(memberships[0].isExpired()).toEqual(false);
 
+            // Then state
             expect(memberships[1].sender).toEqual(membershipTemplate.user_id);
 
             expect(sess?.sessionDescription.id).toEqual("");
