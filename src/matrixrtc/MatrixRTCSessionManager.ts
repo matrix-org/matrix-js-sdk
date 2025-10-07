@@ -115,7 +115,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.refreshRoom(room);
     };
 
-    private onEvent = (event: MatrixEvent): void => {
+    private readonly onEvent = (event: MatrixEvent): void => {
         if (!event.unstableStickyExpiresAt) {
             return; // Not sticky, not interested.
         }
@@ -129,7 +129,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         this.refreshRoom(room);
     };
 
-    private onRoomState = (event: MatrixEvent): void => {
+    private readonly onRoomState = (event: MatrixEvent): void => {
         if (event.getType() !== EventType.GroupCallMemberPrefix) {
             return;
         }

@@ -68,6 +68,12 @@ describe("MatrixRTCSession", () => {
             listenForStickyEvents: true,
             listenForMemberStateEvents: true,
             testCreateSticky: false,
+            createWithDefaults: true, // Create MatrixRTCSession with defaults
+        },
+        {
+            listenForStickyEvents: true,
+            listenForMemberStateEvents: true,
+            testCreateSticky: false,
         },
         {
             listenForStickyEvents: false,
@@ -87,10 +93,33 @@ describe("MatrixRTCSession", () => {
     ])(
         "roomSessionForRoom listenForSticky=$listenForStickyEvents listenForMemberStateEvents=$listenForMemberStateEvents testCreateSticky=$testCreateSticky",
         (testConfig) => {
+            it(`will ${testConfig.listenForMemberStateEvents ? "" : "NOT"} throw if the room does not have any state stored`, () => {
+                const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
+                mockRoom.getLiveTimeline.mockReturnValue({
+                    getState: jest.fn().mockReturnValue(undefined),
+                } as unknown as EventTimeline);
+                if (testConfig.listenForMemberStateEvents) {
+                    // eslint-disable-next-line jest/no-conditional-expect
+                    expect(() => {
+                        MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                    }).toThrow();
+                } else {
+                    // eslint-disable-next-line jest/no-conditional-expect
+                    expect(() => {
+                        MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                    }).not.toThrow();
+                }
+            });
+
             it("creates a room-scoped session from room state", () => {
                 const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
 
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships.length).toEqual(1);
                 expect(sess?.memberships[0].sessionDescription.id).toEqual("");
                 expect(sess?.memberships[0].scope).toEqual("m.room");
@@ -105,7 +134,12 @@ describe("MatrixRTCSession", () => {
                     application: "not-m.call",
                 });
                 const mockRoom = makeMockRoom([testMembership], testConfig.testCreateSticky);
-                const sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                const sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships).toHaveLength(0);
             });
 
@@ -115,7 +149,12 @@ describe("MatrixRTCSession", () => {
                     scope: "m.room",
                 });
                 const mockRoom = makeMockRoom([testMembership], testConfig.testCreateSticky);
-                const sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                const sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships).toHaveLength(0);
             });
 
@@ -127,7 +166,12 @@ describe("MatrixRTCSession", () => {
                 const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], testConfig.testCreateSticky);
 
                 jest.advanceTimersByTime(2000);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships.length).toEqual(1);
                 expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
                 jest.useRealTimers();
@@ -136,7 +180,25 @@ describe("MatrixRTCSession", () => {
             it("ignores memberships events of members not in the room", () => {
                 const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
                 mockRoom.hasMembershipState.mockImplementation((state) => state === KnownMembership.Join);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships.length).toEqual(0);
+            });
+
+            it("ignores memberships events with no sender", () => {
+                // Force the sender to be undefined.
+                const mockRoom = makeMockRoom([{ ...membershipTemplate, user_id: "" }], testConfig.testCreateSticky);
+                mockRoom.hasMembershipState.mockImplementation((state) => state === KnownMembership.Join);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships.length).toEqual(0);
             });
 
@@ -147,14 +209,24 @@ describe("MatrixRTCSession", () => {
                 expiredMembership.created_ts = 500;
                 expiredMembership.expires = 1000;
                 const mockRoom = makeMockRoom([expiredMembership], testConfig.testCreateSticky);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
                 jest.useRealTimers();
             });
 
             it("returns empty session if no membership events are present", () => {
                 const mockRoom = makeMockRoom([], testConfig.testCreateSticky);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess?.memberships).toHaveLength(0);
             });
 
@@ -185,7 +257,12 @@ describe("MatrixRTCSession", () => {
                         ]),
                     }),
                 } as unknown as EventTimeline);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess.memberships).toHaveLength(0);
             });
 
@@ -216,7 +293,12 @@ describe("MatrixRTCSession", () => {
                         ]),
                     }),
                 } as unknown as EventTimeline);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess.memberships).toHaveLength(0);
             });
 
@@ -224,7 +306,12 @@ describe("MatrixRTCSession", () => {
                 const testMembership = Object.assign({}, membershipTemplate);
                 (testMembership.device_id as string | undefined) = undefined;
                 const mockRoom = makeMockRoom([testMembership]);
-                const sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                const sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess.memberships).toHaveLength(0);
             });
 
@@ -232,7 +319,12 @@ describe("MatrixRTCSession", () => {
                 const testMembership = Object.assign({}, membershipTemplate);
                 (testMembership.call_id as string | undefined) = undefined;
                 const mockRoom = makeMockRoom([testMembership]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, testConfig);
+                sess = MatrixRTCSession.sessionForRoom(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
                 expect(sess.memberships).toHaveLength(0);
             });
         },
@@ -288,7 +380,7 @@ describe("MatrixRTCSession", () => {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
-            
+
             const memberships = sess.memberships;
             expect(memberships.length).toEqual(2);
             expect(memberships[0].sender).toEqual(stickyUserId);

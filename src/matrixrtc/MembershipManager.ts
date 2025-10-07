@@ -179,7 +179,7 @@ export class MembershipManager
     implements IMembershipManager
 {
     private activated = false;
-    private logger: Logger;
+    private readonly logger: Logger;
     private callIntent: RTCCallIntent | undefined;
 
     public isActivated(): boolean {
@@ -329,10 +329,10 @@ export class MembershipManager
      * @param getOldestMembership
      */
     public constructor(
-        private joinConfig: (SessionConfig & MembershipConfig) | undefined,
-        protected room: Pick<Room, "roomId" | "getVersion">,
-        private client: MembershipManagerClient,
-        private getOldestMembership: () => CallMembership | undefined,
+        private readonly joinConfig: (SessionConfig & MembershipConfig) | undefined,
+        protected readonly room: Pick<Room, "roomId" | "getVersion">,
+        private readonly client: MembershipManagerClient,
+        private readonly getOldestMembership: () => CallMembership | undefined,
         public readonly sessionDescription: SessionDescription,
         parentLogger?: Logger,
     ) {
