@@ -32,7 +32,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent>>(); // (type -> stickyKey+userId) -> event
     private readonly unkeyedStickyEvents = new Set<StickyMatrixEvent>();
 
-    private stickyEventTimer?: NodeJS.Timeout;
+    private stickyEventTimer?: ReturnType<typeof setTimeout>;
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
 
     /**
