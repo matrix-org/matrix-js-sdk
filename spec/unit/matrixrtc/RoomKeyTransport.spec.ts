@@ -31,7 +31,7 @@ describe("RoomKeyTransport", () => {
     let mockLogger: Mocked<Logger>;
 
     const onCallEncryptionMock = jest.fn();
-    beforeEach(() => {
+    beforeEach(async () => {
         onCallEncryptionMock.mockReset();
         mockLogger = {
             debug: jest.fn(),
@@ -50,7 +50,7 @@ describe("RoomKeyTransport", () => {
         };
         room = makeMockRoom([membershipTemplate]);
         client = new MatrixClient({ baseUrl: "base_url" });
-        client.matrixRTC.start();
+        await client.matrixRTC.start();
         transport = new RoomKeyTransport(room, client, statistics, {
             getChild: jest.fn().mockReturnValue(mockLogger),
         } as unknown as Mocked<Logger>);

@@ -33,6 +33,7 @@ import {
 } from "../../../src/matrixrtc";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
+import { waitFor } from "../../test-utils/test-utils.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -923,18 +924,18 @@ describe("MembershipManager", () => {
     });
 });
 
-it("Should prefix log with MembershipManager used", () => {
+it("Should prefix log with MembershipManager used", async () => {
+    const spy = jest.spyOn(console, "error");
     const client = makeMockClient("@alice:example.org", "AAAAAAA");
     const room = makeMockRoom([membershipTemplate]);
 
     const membershipManager = new MembershipManager(undefined, room, client, callSession);
 
-    const spy = jest.spyOn(console, "error");
     // Double join
     membershipManager.join([]);
     membershipManager.join([]);
 
-    expect(spy).toHaveBeenCalled();
+    await waitFor(() => expect(spy).toHaveBeenCalled());
     const logline: string = spy.mock.calls[0][0];
     expect(logline.startsWith("[MembershipManager]")).toBe(true);
 });

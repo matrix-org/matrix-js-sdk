@@ -363,8 +363,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     return eventData ? new MatrixEvent(eventData) : undefined;
                 };
                 const relatedEvent = relatedEventId
-                    ? room.findEventById(relatedEventId)
-                    : await getRelatedMatrixEvent();
+                    ? (room.findEventById(relatedEventId) ?? (await getRelatedMatrixEvent()))
+                    : undefined;
 
                 try {
                     membership = new CallMembership(memberEvent, relatedEvent);
