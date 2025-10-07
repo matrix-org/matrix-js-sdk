@@ -15,12 +15,7 @@ limitations under the License.
 */
 
 import { type MatrixEvent } from "../../../src";
-import {
-    CallMembership,
-    type SessionMembershipData,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-} from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, DEFAULT_EXPIRE_DURATION, type RtcMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { membershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0, content = {}): MatrixEvent {
@@ -41,16 +36,6 @@ describe("CallMembership", () => {
         afterEach(() => {
             jest.useRealTimers();
         });
-
-        const membershipTemplate: SessionMembershipData = {
-            "call_id": "",
-            "scope": "m.room",
-            "application": "m.call",
-            "device_id": "AAAAAAA",
-            "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
-            "foci_preferred": [{ type: "livekit" }],
-            "m.call.intent": "voice",
-        };
 
         it("rejects membership with no device_id", () => {
             expect(() => {
@@ -182,6 +167,19 @@ describe("CallMembership", () => {
                 expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
                 expect(membership.getMsUntilExpiry()).toBe(DEFAULT_EXPIRE_DURATION - Date.now());
                 expect(membership.isExpired()).toBe(true);
+            });
+        });
+        describe("expiry calculation", () => {
+            beforeEach(() => jest.useFakeTimers());
+            afterEach(() => jest.useRealTimers());
+
+            it("calculates time until expiry", () => {
+                // server origin timestamp for this event is 1000
+                const fakeEvent = makeMockEvent(1000, membershipTemplate);
+                const membership = new CallMembership(fakeEvent);
+                jest.setSystemTime(2000);
+                // should be using absolute expiry time
+                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
             });
         });
     });
@@ -328,28 +326,25 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-    });
 
-    describe("expiry calculation", () => {
-        let fakeEvent: MatrixEvent;
-        let membership: CallMembership;
+        describe("expiry calculation", () => {
+            beforeEach(() => jest.useFakeTimers());
+            afterEach(() => jest.useRealTimers());
 
-        beforeEach(() => {
-            // server origin timestamp for this event is 1000
-            fakeEvent = makeMockEvent(1000, membershipTemplate);
-            membership = new CallMembership(fakeEvent!);
+            afterEach(() => {
+                jest.useRealTimers();
+            });
 
-            jest.useFakeTimers();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
-        it("calculates time until expiry", () => {
-            jest.setSystemTime(2000);
-            // should be using absolute expiry time
-            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+            it("calculates time until expiry", () => {
+                // server origin timestamp for this event is 1000
+                // The related event used for created_ts is at 500
+                const fakeEvent = makeMockEvent(1000, membershipTemplate);
+                const initialEvent = makeMockEvent(500, membershipTemplate);
+                const membership = new CallMembership(fakeEvent, initialEvent);
+                jest.setSystemTime(2000);
+                // should be using absolute expiry time
+                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1500);
+            });
         });
     });
 });

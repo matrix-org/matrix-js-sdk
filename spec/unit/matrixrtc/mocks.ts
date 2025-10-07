@@ -23,13 +23,13 @@ import { secureRandomString } from "../../../src/randomstring";
 export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
 
 export const membershipTemplate: SessionMembershipData & { user_id: string } = {
-    application: "m.call",
-    call_id: "",
-    user_id: "@mock:user.example",
-    device_id: "AAAAAAA",
-    scope: "m.room",
-    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-    foci_preferred: [
+    "application": "m.call",
+    "call_id": "",
+    "user_id": "@mock:user.example",
+    "device_id": "AAAAAAA",
+    "scope": "m.room",
+    "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+    "foci_preferred": [
         {
             livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
@@ -41,6 +41,7 @@ export const membershipTemplate: SessionMembershipData & { user_id: string } = {
             type: "livekit",
         },
     ],
+    "m.call.intent": "voice",
 };
 
 export type MockClient = Pick<
