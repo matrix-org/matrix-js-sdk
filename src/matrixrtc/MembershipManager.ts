@@ -679,8 +679,14 @@ export class MembershipManager
     }
 
     protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
-        (myMembership) =>
-            this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, myMembership, this.stateKey);
+        (myMembership) => {
+            return this.client.sendStateEvent(
+                this.room.roomId,
+                EventType.GroupCallMemberPrefix,
+                myMembership,
+                this.stateKey,
+            );
+        };
 
     private async sendJoinEvent(): Promise<ActionUpdate> {
         return await this.clientSendMembership(this.makeMyMembership(this.membershipEventExpiryMs))
@@ -1030,7 +1036,7 @@ export class StickyEventMembershipManager extends MembershipManager {
         super(joinConfig, room, clientWithSticky, getOldestMembership, sessionDescription, parentLogger);
     }
 
-    protected clientSendDelayedEvent: () => Promise<SendDelayedEventResponse> = () =>
+    protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
         this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
             STICK_DURATION_MS,
@@ -1041,14 +1047,15 @@ export class StickyEventMembershipManager extends MembershipManager {
         );
 
     protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
-        (myMembership) =>
-            this.clientWithSticky._unstable_sendStickyEvent(
+        (myMembership) => {
+            return this.clientWithSticky._unstable_sendStickyEvent(
                 this.room.roomId,
                 STICK_DURATION_MS,
                 null,
                 EventType.GroupCallMemberPrefix,
                 { ...myMembership, msc4354_sticky_key: this.stateKey },
             );
+        };
 
     protected actionUpdateFromErrors(
         error: unknown,

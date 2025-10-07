@@ -23,6 +23,7 @@ import {
     MatrixError,
     UnsupportedDelayedEventsEndpointError,
     type Room,
+    MAX_STICKY_DURATION_MS,
 } from "../../../src";
 import {
     MembershipManagerEvent,
@@ -33,7 +34,7 @@ import {
 } from "../../../src/matrixrtc";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { logger } from "../../../src/logger.ts";
-import { MembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
+import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -474,7 +475,7 @@ describe("MembershipManager", () => {
 
         it("does not provide focus if the selection method is unknown", () => {
             const manager = new MembershipManager({}, room, client, () => undefined, callSession);
-            manager.join([focus], Object.assign(focusActive, { type: "unknown_type" }));
+            manager.join([focus], { ...focusActive, type: "unknown_type" });
             expect(manager.getActiveFocus()).toBe(undefined);
         });
     });
@@ -936,6 +937,67 @@ describe("MembershipManager", () => {
             await manager.onRTCSessionMemberUpdate([membership]);
             await manager.updateCallIntent("video");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(0);
+        });
+    });
+
+    describe("StickyEventMembershipManager", () => {
+        beforeEach(() => {
+            // Provide a default mock that is like the default "non error" server behaviour.
+            (client._unstable_sendStickyDelayedEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
+            (client._unstable_sendStickyEvent as Mock<any>).mockResolvedValue(undefined);
+        });
+
+        describe("join()", () => {
+            describe("sends a membership event", () => {
+                it("sends a membership event and schedules delayed leave when joining a call", async () => {
+                    const updateDelayedEventHandle = createAsyncHandle<void>(
+                        client._unstable_updateDelayedEvent as Mock,
+                    );
+                    const memberManager = new StickyEventMembershipManager(
+                        undefined,
+                        room,
+                        client,
+                        () => undefined,
+                        callSession,
+                    );
+
+                    memberManager.join([focus], focusActive);
+
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                    // Test we sent the initial join
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
+                        room.roomId,
+                        MAX_STICKY_DURATION_MS,
+                        null,
+                        "org.matrix.msc3401.call.member",
+                        {
+                            application: "m.call",
+                            call_id: "",
+                            device_id: "AAAAAAA",
+                            expires: 14400000,
+                            foci_preferred: [focus],
+                            focus_active: focusActive,
+                            scope: "m.room",
+                            msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
+                        } satisfies SessionMembershipData,
+                    );
+                    updateDelayedEventHandle.resolve?.();
+
+                    // Ensure we have sent the delayed disconnect event.
+                    expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledWith(
+                        room.roomId,
+                        MAX_STICKY_DURATION_MS,
+                        { delay: 8000 },
+                        null,
+                        "org.matrix.msc3401.call.member",
+                        {
+                            msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
+                        },
+                    );
+                    // ..once
+                    expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
+                });
+            });
         });
     });
 });

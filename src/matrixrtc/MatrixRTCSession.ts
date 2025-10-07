@@ -811,14 +811,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Call this when the Matrix room members have changed.
      */
-    private onRoomMemberUpdate = (): void => {
+    private readonly onRoomMemberUpdate = (): void => {
         this.recalculateSessionMembers();
     };
 
     /**
      * Call this when a sticky event update has occured.
      */
-    private onStickyEventUpdate: RoomStickyEventsMap[RoomStickyEventsEvent.Update] = (
+    private readonly onStickyEventUpdate: RoomStickyEventsMap[RoomStickyEventsEvent.Update] = (
         added,
         updated,
         removed,

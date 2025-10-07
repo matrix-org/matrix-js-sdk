@@ -36,7 +36,8 @@ import {
     mockRTCEvent,
 } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
-import { type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
+import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
+import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 
 const mockFocus = { type: "mock" };
 
@@ -395,6 +396,31 @@ describe("MatrixRTCSession", () => {
 
             expect(sess?.sessionDescription.id).toEqual("");
         });
+        it("handles an incoming sticky event to an existing session", () => {
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            const stickyUserId = "@stickyev:user.example";
+
+            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            expect(sess.memberships.length).toEqual(1);
+            const stickyEv = mockRTCEvent(
+                {
+                    ...membershipTemplate,
+                    user_id: stickyUserId,
+                    msc4354_sticky_key: `_${stickyUserId}_${membershipTemplate.device_id}`,
+                },
+                mockRoom.roomId,
+                15000,
+                Date.now() - 1000, // Sticky event comes first.
+            ) as StickyMatrixEvent;
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                return [stickyEv];
+            });
+            mockRoom.emit(RoomStickyEventsEvent.Update, [stickyEv], [], []);
+            expect(sess.memberships.length).toEqual(2);
+        });
     });
 
     describe("getOldestMembership", () => {
@@ -519,6 +545,12 @@ describe("MatrixRTCSession", () => {
         it("shows joined once join is called", () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
+        });
+
+        it("uses the sticky events membership manager implementation", () => {
+            sess!.joinRoomSession([mockFocus], mockFocus, { unstableSendStickyEvents: true });
+            expect(sess!.isJoined()).toEqual(true);
+            expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
 
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
