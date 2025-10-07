@@ -118,7 +118,7 @@ describe("CallMembership", () => {
                 expect(membership.getTransport(oldestMembership)).toBe(membershipTemplate.foci_preferred[0]);
             });
 
-            it("does not provide focus if the selection method is unknown", () => {
+            it("gets the correct active transport with multi_sfu", () => {
                 const membership = new CallMembership(makeMockEvent(), {
                     ...membershipTemplate,
                     foci_preferred: [mockFocus],
@@ -130,6 +130,16 @@ describe("CallMembership", () => {
 
                 // If there is an older member we still use our own focus in multi sfu.
                 expect(membership.getTransport(oldestMembership)).toBe(mockFocus);
+            });
+            it("does not provide focus if the selection method is unknown", () => {
+                const membership = new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    foci_preferred: [mockFocus],
+                    focus_active: { type: "livekit", focus_selection: "unknown" },
+                });
+
+                // if we are the oldest member we use our focus.
+                expect(membership.getTransport(membership)).toBeUndefined();
             });
         });
         describe("correct values from computed fields", () => {
