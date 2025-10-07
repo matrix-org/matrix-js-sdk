@@ -146,7 +146,7 @@ export function mockRTCEvent({ user_id: sender, ...membershipData }: MembershipD
 }
 
 export function mockCallMembership(membershipData: MembershipData, roomId: string): CallMembership {
-    return new CallMembership(mockRTCEvent(membershipData, roomId), membershipData);
+    return new CallMembership(mockRTCEvent(membershipData, roomId));
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {
