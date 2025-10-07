@@ -96,19 +96,20 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-export type TimeoutDelay = {
-    delay: number;
-};
+export type SendDelayedEventRequestOpts = { parent_delay_id: string } | { delay: number; parent_delay_id?: string };
 
-export type ParentDelayId = {
-    parent_delay_id: string;
-};
-
-export type SendTimeoutDelayedEventRequestOpts = TimeoutDelay & Partial<ParentDelayId>;
-export type SendActionDelayedEventRequestOpts = ParentDelayId;
-
-export type SendDelayedEventRequestOpts = SendTimeoutDelayedEventRequestOpts | SendActionDelayedEventRequestOpts;
-
+export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
+    if ("parent_delay_id" in opts && typeof opts.parent_delay_id !== "string") {
+        // Invalid type, reject
+        return false;
+    }
+    if ("delay" in opts && typeof opts.delay !== "number") {
+        // Invalid type, reject.
+        return true;
+    }
+    // At least one of these fields must be specified.
+    return "delay" in opts || "parent_delay_id" in opts;
+}
 export type SendDelayedEventResponse = {
     delay_id: string;
 };

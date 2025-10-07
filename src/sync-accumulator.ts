@@ -20,7 +20,7 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
-import { type IContent, type IUnsigned } from "./models/event.ts";
+import { MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
 import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
@@ -76,11 +76,25 @@ export interface ITimeline {
     prev_batch: string | null;
 }
 
+type StickyEventFields = {
+    msc4354_sticky: { duration_ms: number };
+    content: { msc4354_sticky_key?: string };
+};
+
+export type IStickyEvent = IRoomEvent & StickyEventFields;
+
+export type IStickyStateEvent = IStateEvent & StickyEventFields;
+
+export interface ISticky {
+    events: Array<IStickyEvent | IStickyStateEvent>;
+}
+
 export interface IJoinedRoom {
     "summary": IRoomSummary;
     // One of `state` or `state_after` is required.
     "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
+    "msc4354_sticky"?: ISticky; // https://github.com/matrix-org/matrix-spec-proposals/pull/4354
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -201,6 +215,14 @@ interface IRoom {
     _unreadNotifications: Partial<UnreadNotificationCounts>;
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
     _receipts: ReceiptAccumulator;
+    _stickyEvents: {
+        readonly event: IStickyEvent | IStickyStateEvent;
+        /**
+         * This is the timestamp at which point it is safe to remove this event from the store.
+         * This value is immutable
+         */
+        readonly expiresTs: number;
+    }[];
 }
 
 export interface ISyncData {
@@ -411,6 +433,7 @@ export class SyncAccumulator {
 
     // Accumulate timeline and state events in a room.
     private accumulateJoinState(roomId: string, data: IJoinedRoom, fromDatabase = false): void {
+        const now = Date.now();
         // We expect this function to be called a lot (every /sync) so we want
         // this to be fast. /sync stores events in an array but we often want
         // to clobber based on type/state_key. Rather than convert arrays to
@@ -457,6 +480,7 @@ export class SyncAccumulator {
                 _unreadThreadNotifications: {},
                 _summary: {},
                 _receipts: new ReceiptAccumulator(),
+                _stickyEvents: [],
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -540,6 +564,27 @@ export class SyncAccumulator {
             });
         });
 
+        // Prune out any events in our stores that have since expired, do this before we
+        // insert new events.
+        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
+
+        // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
+        // process these events into the correct mapped order.
+        if (data.msc4354_sticky?.events) {
+            currentData._stickyEvents = currentData._stickyEvents.concat(
+                data.msc4354_sticky.events.map((event) => {
+                    // If `duration_ms` exceeds the spec limit of a hour, we cap it.
+                    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
+                    // If `origin_server_ts` claims to have been from the future, we still bound it to now.
+                    const createdTs = Math.min(event.origin_server_ts, now);
+                    return {
+                        event,
+                        expiresTs: cappedDuration + createdTs,
+                    };
+                }),
+            );
+        }
+
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
         if (currentData._timeline.length > this.opts.maxTimelineEntries!) {
@@ -611,6 +656,11 @@ export class SyncAccumulator {
                 "unread_notifications": roomData._unreadNotifications,
                 "unread_thread_notifications": roomData._unreadThreadNotifications,
                 "summary": roomData._summary as IRoomSummary,
+                "msc4354_sticky": roomData._stickyEvents?.length
+                    ? {
+                          events: roomData._stickyEvents.map((e) => e.event),
+                      }
+                    : undefined,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
