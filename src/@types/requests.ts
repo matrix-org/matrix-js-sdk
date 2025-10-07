@@ -34,6 +34,7 @@ export interface IJoinRoomOpts {
 
     /**
      * The server names to try and join through in addition to those that are automatically chosen.
+     * Only the first 3 are actually used in the request, to avoid HTTP 414 Request-URI Too Long responses.
      */
     viaServers?: string[];
 
@@ -71,6 +72,7 @@ export interface KnockRoomOpts {
 
     /**
      * The server names to try and knock through in addition to those that are automatically chosen.
+     * Only the first 3 are actually used in the request, to avoid HTTP 414 Request-URI Too Long responses.
      */
     viaServers?: string | string[];
 }

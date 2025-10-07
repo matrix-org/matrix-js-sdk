@@ -215,7 +215,14 @@ interface IRoom {
     _unreadNotifications: Partial<UnreadNotificationCounts>;
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
     _receipts: ReceiptAccumulator;
-    _stickyEvents: (IStickyEvent | IStickyStateEvent)[];
+    _stickyEvents: {
+        readonly event: IStickyEvent | IStickyStateEvent;
+        /**
+         * This is the timestamp at which point it is safe to remove this event from the store.
+         * This value is immutable
+         */
+        readonly expiresTs: number;
+    }[];
 }
 
 export interface ISyncData {
@@ -426,6 +433,7 @@ export class SyncAccumulator {
 
     // Accumulate timeline and state events in a room.
     private accumulateJoinState(roomId: string, data: IJoinedRoom, fromDatabase = false): void {
+        const now = Date.now();
         // We expect this function to be called a lot (every /sync) so we want
         // this to be fast. /sync stores events in an array but we often want
         // to clobber based on type/state_key. Rather than convert arrays to
@@ -558,20 +566,23 @@ export class SyncAccumulator {
 
         // Prune out any events in our stores that have since expired, do this before we
         // insert new events.
-        const now = Date.now();
-        currentData._stickyEvents = currentData._stickyEvents.filter((ev) => {
-            // If `duration_ms` exceeds the spec limit of a hour, we cap it.
-            const cappedDuration = Math.min(ev.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
-            // If `origin_server_ts` claims to have been from the future, we still bound it to now.
-            const sanitisedOriginTs = Math.min(now, ev.origin_server_ts);
-            const expiresAt = cappedDuration + sanitisedOriginTs;
-            return expiresAt > now;
-        });
+        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
 
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
         // process these events into the correct mapped order.
         if (data.msc4354_sticky?.events) {
-            currentData._stickyEvents = currentData._stickyEvents.concat(data.msc4354_sticky.events);
+            currentData._stickyEvents = currentData._stickyEvents.concat(
+                data.msc4354_sticky.events.map((event) => {
+                    // If `duration_ms` exceeds the spec limit of a hour, we cap it.
+                    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
+                    // If `origin_server_ts` claims to have been from the future, we still bound it to now.
+                    const createdTs = Math.min(event.origin_server_ts, now);
+                    return {
+                        event,
+                        expiresTs: cappedDuration + createdTs,
+                    };
+                }),
+            );
         }
 
         // attempt to prune the timeline by jumping between events which have
@@ -647,7 +658,7 @@ export class SyncAccumulator {
                 "summary": roomData._summary as IRoomSummary,
                 "msc4354_sticky": roomData._stickyEvents?.length
                     ? {
-                          events: roomData._stickyEvents,
+                          events: roomData._stickyEvents.map((e) => e.event),
                       }
                     : undefined,
             };
