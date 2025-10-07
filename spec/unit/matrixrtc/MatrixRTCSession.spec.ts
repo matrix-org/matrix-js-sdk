@@ -30,7 +30,6 @@ import { secureRandomString } from "../../../src/randomstring";
 import {
     makeMockEvent,
     makeMockRoom,
-    sessionMembershipTemplate as membershipTemplate,
     makeKey,
     type MembershipData,
     mockRoomState,
@@ -46,6 +45,7 @@ const textEncoder = new TextEncoder();
 const callSession = { id: "", application: "m.call" };
 
 describe("MatrixRTCSession", () => {
+    const membershipTemplate = sessionMembershipTemplate;
     let client: MatrixClient;
     let sess: MatrixRTCSession | undefined;
 
@@ -67,7 +67,6 @@ describe("MatrixRTCSession", () => {
     });
 
     describe("roomSessionForRoom", () => {
-        const membershipTemplate = sessionMembershipTemplate;
         it("creates a room-scoped session from room state", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);
 
@@ -412,6 +411,7 @@ describe("MatrixRTCSession", () => {
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": "ring",
+                "m.call.intent": "voice",
                 "m.relates_to": {
                     event_id: ownMembershipId,
                     rel_type: "m.reference",
@@ -431,6 +431,7 @@ describe("MatrixRTCSession", () => {
             expect(didSendEventFn).toHaveBeenCalledWith(
                 {
                     "event_id": "new-evt",
+                    "m.call.intent": "voice",
                     "lifetime": 30000,
                     "m.mentions": { room: true, user_ids: [] },
                     "m.relates_to": {
@@ -738,11 +739,17 @@ describe("MatrixRTCSession", () => {
             it("re-sends key if a new member joins even if a key rotation is in progress", async () => {
                 jest.useFakeTimers();
                 try {
+                    const ownMembership = {
+                        ...membershipTemplate,
+                        user_id: client.getUserId()!,
+                        device_id: client.getDeviceId()!,
+                    };
                     // session with two members
-                    const member2 = Object.assign({}, membershipTemplate, {
+                    const member2 = Object.assign({}, ownMembership, {
                         device_id: "BBBBBBB",
+                        user_id: "@bob:example.org",
                     });
-                    const mockRoom = makeMockRoom([membershipTemplate, member2]);
+                    const mockRoom = makeMockRoom([ownMembership, member2]);
                     sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
 
                     // joining will trigger an initial key send
@@ -758,14 +765,14 @@ describe("MatrixRTCSession", () => {
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
                     // member2 leaves triggering key rotation
-                    mockRoomState(mockRoom, [membershipTemplate]);
+                    mockRoomState(mockRoom, [ownMembership]);
                     await sess.onRTCSessionMemberUpdate();
 
                     // member2 re-joins which should trigger an immediate re-send
                     const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
-                    mockRoomState(mockRoom, [membershipTemplate, member2]);
+                    mockRoomState(mockRoom, [ownMembership, member2]);
                     await sess.onRTCSessionMemberUpdate();
                     // but, that immediate resend is throttled so we need to wait a bit
                     jest.advanceTimersByTime(1000);

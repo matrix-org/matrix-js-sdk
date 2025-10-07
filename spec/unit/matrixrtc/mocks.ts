@@ -145,7 +145,7 @@ export function makeMockEvent(
     timestamp?: number,
 ): MatrixEvent {
     return new MatrixEvent({
-        event_id: "mock_event_id",
+        event_id: secureRandomString(8),
         sender,
         type,
         content,
@@ -155,7 +155,7 @@ export function makeMockEvent(
 }
 
 export function mockRTCEvent({ user_id: sender, ...membershipData }: MembershipData, roomId: string): MatrixEvent {
-    return makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData);
+    return makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData, Date.now());
 }
 
 export function mockCallMembership(membershipData: MembershipData, roomId: string): CallMembership {
