@@ -2436,9 +2436,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const queryParams: QueryDict = {};
         if (opts.viaServers) {
-            // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
             // We only use the first 3 servers, to avoid URI length issues.
-            queryParams.server_name = queryParams.via = opts.viaServers.slice(0, 3);
+            const viaServers = Array.isArray(opts.viaServers) ? opts.viaServers.slice(0, 3) : [opts.viaServers];
+            // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
+            queryParams.server_name = viaServers;
+            queryParams.via = viaServers;
         }
 
         const body: Record<string, string> = {};
