@@ -215,7 +215,7 @@ export interface IMessageVisibilityHidden {
 }
 // A singleton implementing `IMessageVisibilityVisible`.
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
-const MAX_STICKY_DURATION_MS = 3600000;
+export const MAX_STICKY_DURATION_MS = 3600000;
 
 export enum MatrixEventEvent {
     /**
@@ -413,7 +413,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * The timestamp for when this event should expire, in milliseconds.
-     * Prefers using the serve-provided value, but will fall back to local calculation.
+     * Prefers using the server-provided value, but will fall back to local calculation.
+     *
+     * This value is **safe** to use, as malicious start time and duration are appropriately capped.
+     *
      * If the event is not a sticky event (or not supported by the server),
      * then this returns `undefined`.
      */
@@ -458,13 +461,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // The fallback in these cases will be to use the origin_server_ts.
         // For EDUs, the origin_server_ts also is not defined so we use Date.now().
         const age = this.getAge();
-        this.localTimestamp = age !== undefined ? Date.now() - age : (this.getTs() ?? Date.now());
+        const now = Date.now();
+        this.localTimestamp = age !== undefined ? now - age : (this.getTs() ?? now);
         this.reEmitter = new TypedReEmitter(this);
         if (this.unstableStickyInfo) {
             if (this.unstableStickyInfo.duration_ttl_ms) {
-                this.unstableStickyExpiresAt = Date.now() + this.unstableStickyInfo.duration_ttl_ms;
+                this.unstableStickyExpiresAt = now + this.unstableStickyInfo.duration_ttl_ms;
             } else {
-                this.unstableStickyExpiresAt = this.getTs() + this.unstableStickyInfo.duration_ms;
+                // Bound the timestamp so it doesn't come from the future.
+                this.unstableStickyExpiresAt = Math.min(now, this.getTs()) + this.unstableStickyInfo.duration_ms;
             }
         }
     }
@@ -1762,6 +1767,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Unstable getter to try and get the sticky information for the event.
      * If the event is not a sticky event (or not supported by the server),
      * then this returns `undefined`.
+     *
+     * `duration_ms` is safely bounded to a hour.
      */
     public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
         if (!this.event.msc4354_sticky?.duration_ms) {

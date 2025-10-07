@@ -20,7 +20,7 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
-import { type IContent, type IUnsigned } from "./models/event.ts";
+import { MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
 import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
@@ -560,14 +560,18 @@ export class SyncAccumulator {
         // insert new events.
         const now = Date.now();
         currentData._stickyEvents = currentData._stickyEvents.filter((ev) => {
+            // If `duration_ms` exceeds the spec limit of a hour, we cap it.
+            const cappedDuration = Math.min(ev.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
             // If `origin_server_ts` claims to have been from the future, we still bound it to now.
-            return now < ev.msc4354_sticky.duration_ms + Math.min(now, ev.origin_server_ts);
+            const sanitisedOriginTs = Math.min(now, ev.origin_server_ts);
+            const expiresAt = cappedDuration + sanitisedOriginTs;
+            return expiresAt > now;
         });
 
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
         // process these events into the correct mapped order.
         if (data.msc4354_sticky?.events) {
-            currentData._stickyEvents = currentData._stickyEvents.concat(data.msc4354_sticky?.events);
+            currentData._stickyEvents = currentData._stickyEvents.concat(data.msc4354_sticky.events);
         }
 
         // attempt to prune the timeline by jumping between events which have
