@@ -17,7 +17,7 @@ limitations under the License.
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
-import { RoomEvent, type Room } from "../models/room.ts";
+import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
 import { KnownMembership } from "../@types/membership.ts";

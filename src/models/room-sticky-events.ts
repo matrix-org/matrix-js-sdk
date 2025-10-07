@@ -8,7 +8,7 @@ export enum RoomStickyEventsEvent {
     Update = "RoomStickyEvents.Update",
 }
 
-type StickyMatrixEvent = MatrixEvent & { unstableStickyExpiresAt: number };
+export type StickyMatrixEvent = MatrixEvent & { unstableStickyExpiresAt: number };
 
 export type RoomStickyEventsMap = {
     /**

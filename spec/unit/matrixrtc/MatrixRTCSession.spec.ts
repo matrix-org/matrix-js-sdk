@@ -36,6 +36,7 @@ import {
     mockRTCEvent,
 } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
+import { type StickyMatrixEvent } from "src/models/room-sticky-events.ts";
 
 const mockFocus = { type: "mock" };
 
@@ -249,7 +250,7 @@ describe("MatrixRTCSession", () => {
                     },
                     mockRoom.roomId,
                 );
-                return [ev];
+                return [ev as StickyMatrixEvent];
             });
 
             // Expect for there to be one membership as the state has been merged down.
@@ -278,7 +279,7 @@ describe("MatrixRTCSession", () => {
                     },
                     mockRoom.roomId,
                 );
-                return [ev];
+                return [ev as StickyMatrixEvent];
             });
 
             // Expect two membership events, sticky events always coming first.
