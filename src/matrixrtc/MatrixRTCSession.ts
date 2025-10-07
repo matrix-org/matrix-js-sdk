@@ -51,7 +51,7 @@ import {
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type MatrixEvent } from "src/matrix.ts";
-import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "src/models/room-sticky-events.ts";
+import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
 
 /**
  * Events emitted by MatrixRTCSession

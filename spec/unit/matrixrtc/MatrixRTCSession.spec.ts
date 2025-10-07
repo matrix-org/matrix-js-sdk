@@ -36,7 +36,7 @@ import {
     mockRTCEvent,
 } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
-import { type StickyMatrixEvent } from "src/models/room-sticky-events.ts";
+import { type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
 
 const mockFocus = { type: "mock" };
 
