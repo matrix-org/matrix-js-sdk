@@ -17,7 +17,7 @@ limitations under the License.
 import { ClientEvent, EventTimeline, MatrixClient } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
-import { makeMockRoom, membershipTemplate, mockRoomState } from "./mocks";
+import { makeMockRoom, sessionMembershipTemplate, mockRoomState } from "./mocks";
 import { logger } from "../../../src/logger";
 
 describe("MatrixRTCSessionManager", () => {
@@ -42,7 +42,7 @@ describe("MatrixRTCSessionManager", () => {
         });
 
         try {
-            const room1 = makeMockRoom([membershipTemplate]);
+            const room1 = makeMockRoom([sessionMembershipTemplate]);
             jest.spyOn(client, "getRooms").mockReturnValue([room1]);
 
             client.emit(ClientEvent.Room, room1);
@@ -58,7 +58,7 @@ describe("MatrixRTCSessionManager", () => {
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
         try {
-            const room1 = makeMockRoom([{ ...membershipTemplate, application: "m.other" }]);
+            const room1 = makeMockRoom([{ ...sessionMembershipTemplate, application: "m.other" }]);
             jest.spyOn(client, "getRooms").mockReturnValue([room1]);
 
             client.emit(ClientEvent.Room, room1);
@@ -76,14 +76,14 @@ describe("MatrixRTCSessionManager", () => {
         client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionEnded, rEnd);
         client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, rStart);
 
-        const room1 = makeMockRoom([membershipTemplate]);
+        const room1 = makeMockRoom([sessionMembershipTemplate]);
         jest.spyOn(client, "getRooms").mockReturnValue([room1]);
         jest.spyOn(client, "getRoom").mockReturnValue(room1);
 
         client.emit(ClientEvent.Room, room1);
         await startPromise;
 
-        mockRoomState(room1, [{ user_id: membershipTemplate.user_id }]);
+        mockRoomState(room1, [{ user_id: sessionMembershipTemplate.user_id }]);
         const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
         const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
         client.emit(RoomStateEvent.Events, membEvent, roomState, null);
@@ -112,14 +112,14 @@ describe("MatrixRTCSessionManager", () => {
         });
 
         try {
-            const room1 = makeMockRoom([{ ...membershipTemplate, application: "m.other" }]);
+            const room1 = makeMockRoom([{ ...sessionMembershipTemplate, application: "m.other" }]);
             jest.spyOn(client, "getRooms").mockReturnValue([room1]);
 
             client.emit(ClientEvent.Room, room1);
             expect(onStarted).not.toHaveBeenCalled();
             onStarted.mockClear();
 
-            const room2 = makeMockRoom([{ ...membershipTemplate, application: "m.notCall", call_id: "test" }]);
+            const room2 = makeMockRoom([{ ...sessionMembershipTemplate, application: "m.notCall", call_id: "test" }]);
             jest.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
 
             client.emit(ClientEvent.Room, room2);
@@ -127,7 +127,7 @@ describe("MatrixRTCSessionManager", () => {
             expect(onStarted).toHaveBeenCalled();
             onStarted.mockClear();
 
-            mockRoomState(room2, [{ user_id: membershipTemplate.user_id }]);
+            mockRoomState(room2, [{ user_id: sessionMembershipTemplate.user_id }]);
             jest.spyOn(client, "getRoom").mockReturnValue(room2);
 
             const roomState = room2.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
@@ -137,7 +137,7 @@ describe("MatrixRTCSessionManager", () => {
             expect(onEnded).toHaveBeenCalled();
             onEnded.mockClear();
 
-            mockRoomState(room1, [{ user_id: membershipTemplate.user_id }]);
+            mockRoomState(room1, [{ user_id: sessionMembershipTemplate.user_id }]);
             jest.spyOn(client, "getRoom").mockReturnValue(room1);
 
             const roomStateOther = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
@@ -153,13 +153,13 @@ describe("MatrixRTCSessionManager", () => {
     it("Doesn't fire event if unrelated sessions ends", () => {
         const onEnded = jest.fn();
         client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
-        const room1 = makeMockRoom([{ ...membershipTemplate, application: "m.other_app" }]);
+        const room1 = makeMockRoom([{ ...sessionMembershipTemplate, application: "m.other_app" }]);
         jest.spyOn(client, "getRooms").mockReturnValue([room1]);
         jest.spyOn(client, "getRoom").mockReturnValue(room1);
 
         client.emit(ClientEvent.Room, room1);
 
-        mockRoomState(room1, [{ user_id: membershipTemplate.user_id }]);
+        mockRoomState(room1, [{ user_id: sessionMembershipTemplate.user_id }]);
 
         const roomState = room1.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
         const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];

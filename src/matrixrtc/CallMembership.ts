@@ -230,8 +230,8 @@ export class CallMembership {
      * @throws if the data does not match any known membership format.
      */
     public constructor(
-        private matrixEvent: MatrixEvent,
-        private relatedEvent?: MatrixEvent,
+        private readonly matrixEvent: MatrixEvent,
+        private readonly relatedEvent?: MatrixEvent,
     ) {
         const data = matrixEvent.getContent() as any;
         const sessionErrors: string[] = [];
@@ -252,8 +252,8 @@ export class CallMembership {
         const eventId = matrixEvent.getId();
         const sender = matrixEvent.getSender();
 
-        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
-        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+        if (eventId === undefined) throw new Error("CallMembership matrixEvent is missing eventId field");
+        if (sender === undefined) throw new Error("CallMembership matrixEvent is missing sender field");
         this.matrixEventData = { eventId, sender };
     }
 

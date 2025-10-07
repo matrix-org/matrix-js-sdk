@@ -16,13 +16,17 @@ limitations under the License.
 
 import { EventEmitter } from "stream";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { EventType, MatrixEvent, type Room, RoomEvent, type MatrixClient } from "../../../src";
+import {
+    CallMembership,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 
-export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
-export const membershipTemplate: SessionMembershipData & { user_id: string } = {
+export const sessionMembershipTemplate: SessionMembershipData & { user_id: string } = {
     "application": "m.call",
     "call_id": "",
     "user_id": "@mock:user.example",
@@ -42,6 +46,15 @@ export const membershipTemplate: SessionMembershipData & { user_id: string } = {
         },
     ],
     "m.call.intent": "voice",
+};
+
+export const rtcMembershipTemplate: RtcMembershipData = {
+    "slot_id": "m.call#",
+    "application": { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+    "member": { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+    "rtc_transports": [{ type: "livekit" }],
+    "m.call.intent": "voice",
+    "versions": [],
 };
 
 export type MockClient = Pick<
@@ -131,15 +144,14 @@ export function makeMockEvent(
     content: any,
     timestamp?: number,
 ): MatrixEvent {
-    return {
-        getType: jest.fn().mockReturnValue(type),
-        getContent: jest.fn().mockReturnValue(content),
-        getSender: jest.fn().mockReturnValue(sender),
-        getTs: jest.fn().mockReturnValue(timestamp ?? Date.now()),
-        getRoomId: jest.fn().mockReturnValue(roomId),
-        getId: jest.fn().mockReturnValue(secureRandomString(8)),
-        isDecryptionFailure: jest.fn().mockReturnValue(false),
-    } as unknown as MatrixEvent;
+    return new MatrixEvent({
+        event_id: "mock_event_id",
+        sender,
+        type,
+        content,
+        room_id: roomId,
+        origin_server_ts: timestamp ?? 0,
+    });
 }
 
 export function mockRTCEvent({ user_id: sender, ...membershipData }: MembershipData, roomId: string): MatrixEvent {

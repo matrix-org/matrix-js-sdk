@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { type MatrixEvent } from "../../../src";
-import { CallMembership, DEFAULT_EXPIRE_DURATION, type RtcMembershipData } from "../../../src/matrixrtc/CallMembership";
-import { membershipTemplate } from "./mocks";
+import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
+import { rtcMembershipTemplate, sessionMembershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0, content = {}): MatrixEvent {
     return {
@@ -29,6 +29,7 @@ function makeMockEvent(originTs = 0, content = {}): MatrixEvent {
 
 describe("CallMembership", () => {
     describe("SessionMembershipData", () => {
+        const membershipTemplate = sessionMembershipTemplate;
         beforeEach(() => {
             jest.useFakeTimers();
         });
@@ -185,15 +186,7 @@ describe("CallMembership", () => {
     });
 
     describe("RtcMembershipData", () => {
-        const membershipTemplate: RtcMembershipData = {
-            "slot_id": "m.call#",
-            "application": { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
-            "member": { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
-            "rtc_transports": [{ type: "livekit" }],
-            "m.call.intent": "voice",
-            "versions": [],
-        };
-
+        const membershipTemplate = rtcMembershipTemplate;
         it("rejects membership with no slot_id", () => {
             expect(() => {
                 new CallMembership(makeMockEvent(0, { ...membershipTemplate, slot_id: undefined }));

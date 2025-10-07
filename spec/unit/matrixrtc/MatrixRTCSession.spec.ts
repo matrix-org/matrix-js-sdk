@@ -14,12 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { encodeBase64, EventType, MatrixClient, type MatrixError, type MatrixEvent, type Room } from "../../../src";
+import {
+    encodeBase64,
+    EventType,
+    MatrixClient,
+    MatrixEvent,
+    RelationType,
+    type MatrixError,
+    type Room,
+} from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import { secureRandomString } from "../../../src/randomstring";
-import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey, type MembershipData, mockRoomState } from "./mocks";
+import {
+    makeMockEvent,
+    makeMockRoom,
+    sessionMembershipTemplate as membershipTemplate,
+    makeKey,
+    type MembershipData,
+    mockRoomState,
+    rtcMembershipTemplate,
+    sessionMembershipTemplate,
+} from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 
 const mockFocus = { type: "mock" };
@@ -50,6 +67,7 @@ describe("MatrixRTCSession", () => {
     });
 
     describe("roomSessionForRoom", () => {
+        const membershipTemplate = sessionMembershipTemplate;
         it("creates a room-scoped session from room state", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);
 
@@ -205,6 +223,41 @@ describe("MatrixRTCSession", () => {
             const mockRoom = makeMockRoom([testMembership]);
             sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
             expect(sess.memberships).toHaveLength(0);
+        });
+        it("fetches related events if needed from room", async () => {
+            const testMembership = {
+                ...rtcMembershipTemplate,
+                "m.relates_to": { event_id: "id", rel_type: RelationType.Reference as const },
+                // hack for simple makeMockRoom construction
+                "user_id": rtcMembershipTemplate.member.user_id,
+            };
+
+            const mockRoom = makeMockRoom([testMembership]);
+            mockRoom.findEventById = jest
+                .fn()
+                .mockImplementation((id) =>
+                    id === "id"
+                        ? new MatrixEvent({ content: { ...rtcMembershipTemplate }, origin_server_ts: 100 })
+                        : undefined,
+                );
+            sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            expect(sess.memberships[0].createdTs()).toBe(100);
+        });
+        it("fetches related events if needed from cs api", async () => {
+            const testMembership = {
+                ...rtcMembershipTemplate,
+                "m.relates_to": { event_id: "id", rel_type: RelationType.Reference as const },
+                // hack for simple makeMockRoom construction
+                "user_id": rtcMembershipTemplate.member.user_id,
+            };
+
+            const mockRoom = makeMockRoom([testMembership]);
+            mockRoom.findEventById = jest.fn().mockReturnValue(undefined);
+            client.fetchRoomEvent = jest
+                .fn()
+                .mockResolvedValue({ content: { ...rtcMembershipTemplate }, origin_server_ts: 100 });
+            sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            expect(sess.memberships[0].createdTs()).toBe(100);
         });
     });
 
