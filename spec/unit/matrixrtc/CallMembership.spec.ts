@@ -163,8 +163,8 @@ describe("CallMembership", () => {
                 expect(membership.membershipID).toBe("0");
             });
             it("returns correct unused fields", () => {
-                expect(membership.getAbsoluteExpiry()).toBe(14400000);
-                expect(membership.getMsUntilExpiry()).toBe(14400000 - Date.now());
+                expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
+                expect(membership.getMsUntilExpiry()).toBe(DEFAULT_EXPIRE_DURATION - Date.now());
                 expect(membership.isExpired()).toBe(true);
             });
         });
