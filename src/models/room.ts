@@ -500,7 +500,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Listen to our own receipt event as a more modular way of processing our own
         // receipts. No need to remove the listener: it's on ourself anyway.
         this.on(RoomEvent.Receipt, this.onReceipt);
-        this.reEmitter.reEmit(this.stickyEvents, [RoomStickyEventsEvent.Update])
+        this.reEmitter.reEmit(this.stickyEvents, [RoomStickyEventsEvent.Update]);
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.

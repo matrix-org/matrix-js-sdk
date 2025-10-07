@@ -203,16 +203,16 @@ describe("RoomStickyEvents", () => {
         });
 
         it("should emit when a sticky event expires", () => {
-            jest.setSystemTime(0);
+            jest.setSystemTime(1000);
             const ev = new MatrixEvent({
                 ...stickyEvent,
-                origin_server_ts: Date.now(),
+                origin_server_ts: 0,
             });
             const evLater = new MatrixEvent({
                 ...stickyEvent,
                 event_id: "$baz:bar",
                 sender: "@bob:example.org",
-                origin_server_ts: Date.now() + 1000,
+                origin_server_ts: 1000,
             });
             stickyEvents.addStickyEvents([ev, evLater]);
             const emitSpy = jest.fn();

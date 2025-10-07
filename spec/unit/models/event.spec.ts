@@ -616,12 +616,17 @@ describe("MatrixEvent", () => {
         };
         try {
             jest.useFakeTimers();
-            jest.setSystemTime(0);
+            jest.setSystemTime(50);
             // Prefer unsigned
-            expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5000);
+            expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
             // Fall back to `duration_ms`
             expect(
                 new MatrixEvent({ ...evData, unsigned: undefined } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(1050);
+            // Prefer current time if `origin_server_ts` is more recent.
+            expect(
+                new MatrixEvent({ ...evData, unsigned: undefined, origin_server_ts: 5000 } satisfies IStickyEvent)
+                    .unstableStickyExpiresAt,
             ).toEqual(1050);
         } finally {
             jest.useRealTimers();

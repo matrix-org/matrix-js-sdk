@@ -24,7 +24,6 @@ export type RoomStickyEventsMap = {
     ) => void;
 };
 
-
 /**
  * Tracks sticky events on behalf of one room, and fires an event
  * whenever a sticky event is updated or replaced.
@@ -208,6 +207,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                     );
                 }
             }
+            // Clean up map after use.
             if (this.stickyEventsMap.get(eventType)?.size === 0) {
                 this.stickyEventsMap.delete(eventType);
             }
