@@ -46,6 +46,7 @@ export interface RtcMembershipData {
     };
     "rtc_transports": Transport[];
     "versions": string[];
+    "msc4354_sticky_key"?: string;
     "sticky_key"?: string;
     /**
      * The intent of the call from the perspective of this user. This may be an audio call, video call or
@@ -93,7 +94,8 @@ const checkRtcMembershipData = (
     }
 
     // optional fields
-    if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
+    const stickyKey = data.sticky_key ?? data.msc4354_sticky_key;
+    if (stickyKey !== undefined && typeof stickyKey !== "string") {
         errors.push(prefix + "sticky_key must be a string");
     }
     if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
@@ -210,16 +212,20 @@ const checkSessionsMembershipData = (
 type MembershipData = { kind: "rtc"; data: RtcMembershipData } | { kind: "session"; data: SessionMembershipData };
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
 export class CallMembership {
-    public static equal(a: CallMembership, b: CallMembership): boolean {
+    public static equal(a?: CallMembership, b?: CallMembership): boolean {
         if (a === undefined || b === undefined) return a === b;
         return deepCompare(a.membershipData, b.membershipData);
     }
 
     private membershipData: MembershipData;
 
-    private parentEventData: { eventId: string; sender: string };
+    /** The parsed data from the Matrix event.
+     * To access checked eventId and sender from the matrixEvent.
+     * Class construction will fail if these values cannot get obtained. */
+    private matrixEventData: { eventId: string; sender: string };
     public constructor(
-        private parentEvent: MatrixEvent,
+        /** The Matrix event that this membership is based on */
+        private matrixEvent: MatrixEvent,
         data: any,
     ) {
         const sessionErrors: string[] = [];
@@ -237,12 +243,12 @@ export class CallMembership {
             );
         }
 
-        const eventId = parentEvent.getId();
-        const sender = parentEvent.getSender();
+        const eventId = matrixEvent.getId();
+        const sender = matrixEvent.getSender();
 
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
-        this.parentEventData = { eventId, sender };
+        this.matrixEventData = { eventId, sender };
     }
 
     public get sender(): string {
@@ -250,13 +256,14 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.member.user_id;
-            default: // "session":
-                return this.parentEventData.sender;
+            case "session":
+            default:
+                return this.matrixEventData.sender;
         }
     }
 
     public get eventId(): string {
-        return this.parentEventData.eventId;
+        return this.matrixEventData.eventId;
     }
 
     /**
@@ -268,7 +275,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.slot_id;
-            default: // "session":
+            case "session":
+            default:
                 return slotDescriptionToId({ application: this.application, id: data.call_id });
         }
     }
@@ -278,7 +286,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.member.device_id;
-            default: // "session":
+            case "session":
+            default:
                 return data.device_id;
         }
     }
@@ -299,7 +308,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.application.type;
-            default: // "session":
+            case "session":
+            default:
                 return data.application;
         }
     }
@@ -308,7 +318,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.application;
-            default: // "session":
+            case "session":
+            default:
                 return { "type": data.application, "m.call.intent": data["m.call.intent"] };
         }
     }
@@ -319,7 +330,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return undefined;
-            default: // "session":
+            case "session":
+            default:
                 return data.scope;
         }
     }
@@ -332,7 +344,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return data.member.id;
-            default: // "session":
+            case "session":
+            default:
                 return (this.createdTs() ?? "").toString();
         }
     }
@@ -342,9 +355,10 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 // TODO we need to read the referenced (relation) event if available to get the real created_ts
-                return this.parentEvent.getTs();
-            default: // "session":
-                return data.created_ts ?? this.parentEvent.getTs();
+                return this.matrixEvent.getTs();
+            case "session":
+            default:
+                return data.created_ts ?? this.matrixEvent.getTs();
         }
     }
 
@@ -357,7 +371,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return undefined;
-            default: // "session":
+            case "session":
+            default:
                 // TODO: calculate this from the MatrixRTCSession join configuration directly
                 return this.createdTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
         }
@@ -371,7 +386,8 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return undefined;
-            default: // "session":
+            case "session":
+            default:
                 // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
                 // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
                 // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
@@ -387,14 +403,15 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 return false;
-            default: // "session":
+            case "session":
+            default:
                 return this.getMsUntilExpiry()! <= 0;
         }
     }
 
     /**
      * ## RTC Membership
-     * Gets the transport to use for this RTC membership (m.rtc.member).
+     * Gets the primary transport to use for this RTC membership (m.rtc.member).
      * This will return the primary transport that is used by this call membership to publish their media.
      * Directly relates to the `rtc_transports` field.
      *
@@ -409,7 +426,6 @@ export class CallMembership {
      * Always required to make the consumer not care if it deals with RTC or session memberships.
      * @returns The transport this membership uses to publish media or undefined if no transport is available.
      */
-    // TODO: make this return all transports used to publish media once this is supported.
     public getTransport(oldestMembership: CallMembership): Transport | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
@@ -427,12 +443,17 @@ export class CallMembership {
         }
         return undefined;
     }
+    /**
+     * The value of the `rtc_transports` field for RTC memberships (m.rtc.member).
+     * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).
+     */
     public get transports(): Transport[] {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
                 return data.rtc_transports;
-            default: // "session":
+            case "session":
+            default:
                 return data.foci_preferred;
         }
     }

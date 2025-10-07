@@ -363,6 +363,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
             if (membershipContents.length === 0) continue;
 
             for (const membershipData of membershipContents) {
+                if (!("application" in membershipData)) {
+                    // This is a left membership event, ignore it here to not log warnings.
+                    continue;
+                }
                 try {
                     const membership = new CallMembership(memberEvent, membershipData);
 

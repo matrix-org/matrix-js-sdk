@@ -388,7 +388,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 }
 
-export const MXID_PATTERN = /@[^@:]+:[^@:]+/;
+export const MXID_PATTERN = /@.+:.+/;
 const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
 
 function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?: RoomState): boolean {

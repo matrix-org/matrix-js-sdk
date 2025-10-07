@@ -171,14 +171,6 @@ describe("CallMembership", () => {
     });
 
     describe("RtcMembershipData", () => {
-        beforeEach(() => {
-            jest.useFakeTimers();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
         const membershipTemplate: RtcMembershipData = {
             "slot_id": "m.call#",
             "application": { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
