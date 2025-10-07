@@ -51,7 +51,7 @@ import {
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type MatrixEvent } from "src/matrix.ts";
-import { type RoomStickyEventsEvent, type RoomStickyEventsMap } from "src/models/room-sticky-events.ts";
+import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "src/models/room-sticky-events.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -498,7 +498,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
-        this.roomSubset.on(RoomEvent.StickyEvents, this.onStickyEventUpdate);
+        this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
 
         this.setExpiryTimer();
     }
@@ -521,7 +521,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
-        this.roomSubset.off(RoomEvent.StickyEvents, this.onStickyEventUpdate);
+        this.roomSubset.off(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
     }
 
     private reEmitter = new TypedReEmitter<
