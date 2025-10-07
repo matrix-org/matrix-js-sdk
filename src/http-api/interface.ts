@@ -207,6 +207,11 @@ export interface UploadOpts {
      */
     progressHandler?(progress: UploadProgress): void;
     abortController?: AbortController;
+    /**
+     * Optional. Timeout in milliseconds before the upload is aborted.
+     *    Defaults to 30000 (30 seconds) if not specified.
+     */
+    timeoutMs?: number;
 }
 
 export interface Upload {
