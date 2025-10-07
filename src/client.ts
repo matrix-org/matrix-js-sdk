@@ -2391,8 +2391,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const queryParams: QueryDict = {};
         if (opts.viaServers) {
             // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
-            queryParams.server_name = opts.viaServers;
-            queryParams.via = opts.viaServers;
+            // We only use the first 3 servers, to avoid URI length issues.
+            queryParams.via = queryParams.server_name = opts.viaServers.slice(0, 3);
         }
 
         const data: IJoinRequestBody = {};
@@ -2437,8 +2437,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const queryParams: QueryDict = {};
         if (opts.viaServers) {
             // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
-            queryParams.server_name = opts.viaServers;
-            queryParams.via = opts.viaServers;
+            // We only use the first 3 servers, to avoid URI length issues.
+            queryParams.server_name = queryParams.via = opts.viaServers.slice(0, 3);
         }
 
         const body: Record<string, string> = {};
