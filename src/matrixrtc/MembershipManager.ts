@@ -156,6 +156,11 @@ function createReplaceActionUpdate(type: MembershipActionType, offset?: number):
     };
 }
 
+type MembershipManagerClient = Pick<
+    MatrixClient,
+    "getUserId" | "getDeviceId" | "sendStateEvent" | "_unstable_sendDelayedStateEvent" | "_unstable_updateDelayedEvent"
+>;
+
 /**
  * This class is responsible for sending all events relating to the own membership of a matrixRTC call.
  * It has the following tasks:
@@ -326,14 +331,7 @@ export class MembershipManager
     public constructor(
         private joinConfig: (SessionConfig & MembershipConfig) | undefined,
         protected room: Pick<Room, "roomId" | "getVersion">,
-        private client: Pick<
-            MatrixClient,
-            | "getUserId"
-            | "getDeviceId"
-            | "sendStateEvent"
-            | "_unstable_sendDelayedStateEvent"
-            | "_unstable_updateDelayedEvent"
-        >,
+        private client: MembershipManagerClient,
         private getOldestMembership: () => CallMembership | undefined,
         public readonly sessionDescription: SessionDescription,
         parentLogger?: Logger,
@@ -485,14 +483,12 @@ export class MembershipManager
     }
 
     // an abstraction to switch between sending state or a sticky event
-    protected clientSendDelayedEvent: (myMembership: EmptyObject) => Promise<SendDelayedEventResponse> = (
-        myMembership,
-    ) =>
+    protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
         this.client._unstable_sendDelayedStateEvent(
             this.room.roomId,
             { delay: this.delayedLeaveEventDelayMs },
             EventType.GroupCallMemberPrefix,
-            myMembership,
+            {},
             this.stateKey,
         );
 
@@ -502,7 +498,7 @@ export class MembershipManager
         // or during a call if the state event canceled our delayed event or caused by an unexpected error that removed our delayed event.
         // (Another client could have canceled it, the homeserver might have removed/lost it due to a restart, ...)
         // In the `then` and `catch` block we treat both cases differently. "if (this.state.hasMemberStateEvent) {} else {}"
-        return await this.clientSendDelayedEvent({})
+        return await this.clientSendDelayedDisconnectMembership()
             .then((response) => {
                 this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
                 this.setAndEmitProbablyLeft(false);
@@ -1025,16 +1021,8 @@ export class StickyEventMembershipManager extends MembershipManager {
     public constructor(
         joinConfig: (SessionConfig & MembershipConfig) | undefined,
         room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
-        private readonly clientWithSticky: Pick<
-            MatrixClient,
-            | "getUserId"
-            | "getDeviceId"
-            | "sendStateEvent"
-            | "_unstable_sendDelayedStateEvent"
-            | "_unstable_updateDelayedEvent"
-            | "_unstable_sendStickyEvent"
-            | "_unstable_sendStickyDelayedEvent"
-        >,
+        private readonly clientWithSticky: MembershipManagerClient &
+            Pick<MatrixClient, "_unstable_sendStickyEvent" | "_unstable_sendStickyDelayedEvent">,
         getOldestMembership: () => CallMembership | undefined,
         sessionDescription: SessionDescription,
         parentLogger?: Logger,
@@ -1042,9 +1030,7 @@ export class StickyEventMembershipManager extends MembershipManager {
         super(joinConfig, room, clientWithSticky, getOldestMembership, sessionDescription, parentLogger);
     }
 
-    protected clientSendDelayedEvent: (myMembership: EmptyObject) => Promise<SendDelayedEventResponse> = (
-        myMembership,
-    ) =>
+    protected clientSendDelayedEvent: () => Promise<SendDelayedEventResponse> = () =>
         this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
             STICK_DURATION_MS,
