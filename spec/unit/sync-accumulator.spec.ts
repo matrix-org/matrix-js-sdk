@@ -1116,6 +1116,18 @@ describe("SyncAccumulator", function () {
             sa.accumulate(syncSkeleton({}));
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
         });
+
+        it("clears stale sticky events that pretend to be from the distant future", () => {
+            jest.setSystemTime(0);
+            const eventFarInTheFuture = stickyEvent(999999999999);
+            sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [eventFarInTheFuture] } }));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
+                eventFarInTheFuture,
+            ]);
+            jest.setSystemTime(1000); // Expire the event
+            sa.accumulate(syncSkeleton({}));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+        });
     });
 });
 
