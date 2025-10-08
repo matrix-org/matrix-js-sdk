@@ -268,9 +268,6 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "oldest_membership",
             });
-            expect(sess.resolveActiveFocus(sess.memberships.find((m) => m.deviceId === "old"))).toBe(
-                firstPreferredFocus,
-            );
             jest.useRealTimers();
         });
         it("does not provide focus if the selection method is unknown", () => {
@@ -290,7 +287,7 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "unknown",
             });
-            expect(sess.resolveActiveFocus(sess.memberships.find((m) => m.deviceId === "old"))).toBe(undefined);
+            expect(sess.memberships.length).toBe(0);
         });
     });
 

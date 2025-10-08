@@ -642,22 +642,23 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         return await leavePromise;
     }
-
     /**
-     * Get the focus in use from a specific specified member.
-     * @param member The member for which to get the active focus. If undefined, the own membership is used.
-     * @returns The focus that is currently in use to connect to this session. This is undefined
-     * if the client is not connected to this session.
-     * @deprecated use `member.getTransport(session.getOldestMembership())` instead if you want to get the active transport for a specific member.
+     * This returns the focus in use by the oldest membership.
+     * Do not use since this might be just the focus for the oldest membership. others might use a different focus.
+     * @deprecated use `member.getTransport(session.getOldestMembership())` instead for the specific member you want to get the focus for.
      */
-    public resolveActiveFocus(member?: CallMembership): Transport | undefined {
+    public getFocusInUse(): Transport | undefined {
         const oldestMembership = this.getOldestMembership();
-        if (!oldestMembership) return undefined;
-        const m = member === undefined ? this.membershipManager?.ownMembership : member;
-        if (!m) return undefined;
-        return m.getTransport(oldestMembership);
+        return oldestMembership?.getTransport(oldestMembership);
     }
 
+    /**
+     * The used focusActive of the oldest membership (to find out the selection type multi-sfu or oldest membership active focus)
+     * @deprecated does not work with m.rtc.member. Do not rely on it.
+     */
+    public getActiveFocus(): Transport | undefined {
+        return this.getOldestMembership()?.getFocusActive();
+    }
     public getOldestMembership(): CallMembership | undefined {
         return this.memberships[0];
     }

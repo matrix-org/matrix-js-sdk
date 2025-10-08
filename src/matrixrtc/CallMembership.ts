@@ -21,6 +21,7 @@ import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "
 import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
+import { logger } from "src/logger.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -316,8 +317,14 @@ export class CallMembership {
     public get callIntent(): RTCCallIntent | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
-            case "rtc":
-                return data.application["m.call.intent"];
+            case "rtc": {
+                const intent = data.application["m.call.intent"];
+                if (intent !== undefined && typeof intent !== "string") {
+                    logger.warn("RTC membership has invalid m.call.intent");
+                    return undefined;
+                }
+                return intent;
+            }
             case "session":
             default:
                 return data["m.call.intent"];
@@ -469,6 +476,16 @@ export class CallMembership {
                         break;
                 }
         }
+        return undefined;
+    }
+
+    /**
+     * The focus_active filed of the session membership (m.call.member).
+     * @deprecated focus_active is not used and will be removed in future versions.
+     */
+    public getFocusActive(): LivekitFocusSelection | undefined {
+        const { kind, data } = this.membershipData;
+        if (kind === "session") return data.focus_active;
         return undefined;
     }
     /**
