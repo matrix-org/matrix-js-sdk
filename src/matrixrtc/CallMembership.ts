@@ -53,6 +53,7 @@ export interface RtcMembershipData {
 const checkRtcMembershipData = (
     data: Partial<Record<keyof RtcMembershipData, any>>,
     errors: string[],
+    referenceUserId: string,
 ): data is RtcMembershipData => {
     const prefix = " - ";
 
@@ -67,6 +68,10 @@ const checkRtcMembershipData = (
     } else {
         if (typeof data.member.user_id !== "string") errors.push(prefix + "member.user_id must be string");
         else if (!MXID_PATTERN.test(data.member.user_id)) errors.push(prefix + "member.user_id must be a valid mxid");
+        // This is not what the spec enforces but there currently are no rules what power levels are required to
+        // send a m.rtc.member event for a other user. So we add this check for simplicity and to avoid possible attacks until there
+        // is a proper definition when this is allowed.
+        else if (data.member.user_id !== referenceUserId) errors.push(prefix + "member.user_id must match the sender");
         if (typeof data.member.device_id !== "string") errors.push(prefix + "member.device_id must be string");
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
     }
@@ -266,7 +271,11 @@ export class CallMembership {
         this.matrixEventData = { eventId, sender };
     }
 
+    /** @deprecated use userId instead */
     public get sender(): string {
+        return this.userId;
+    }
+    public get userId(): string {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
