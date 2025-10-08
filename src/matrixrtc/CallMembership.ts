@@ -48,11 +48,6 @@ export interface RtcMembershipData {
     "versions": string[];
     "msc4354_sticky_key"?: string;
     "sticky_key"?: string;
-    /**
-     * The intent of the call from the perspective of this user. This may be an audio call, video call or
-     * something else.
-     */
-    "m.call.intent"?: RTCCallIntent;
 }
 
 const checkRtcMembershipData = (
@@ -97,9 +92,6 @@ const checkRtcMembershipData = (
     const stickyKey = data.sticky_key ?? data.msc4354_sticky_key;
     if (stickyKey !== undefined && typeof stickyKey !== "string") {
         errors.push(prefix + "sticky_key must be a string");
-    }
-    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
-        errors.push(prefix + "m.call.intent must be a string");
     }
     if (data["m.relates_to"] !== undefined) {
         const rel = data["m.relates_to"] as RtcMembershipData["m.relates_to"];
@@ -293,7 +285,14 @@ export class CallMembership {
     }
 
     public get callIntent(): RTCCallIntent | undefined {
-        return this.membershipData.data["m.call.intent"];
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc":
+                return data.application["m.call.intent"];
+            case "session":
+            default:
+                return data["m.call.intent"];
+        }
     }
 
     /**
@@ -313,7 +312,7 @@ export class CallMembership {
                 return data.application;
         }
     }
-    public get applicationData(): { type: string } & Record<string, any> {
+    public get applicationData(): { type: string; [key: string]: unknown } {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":

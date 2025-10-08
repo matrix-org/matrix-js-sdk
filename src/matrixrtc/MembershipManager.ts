@@ -760,7 +760,11 @@ export class MembershipManager
                 ? { "m.relation": { rel_type: RelationType.Reference, event_id: ownMembership?.eventId } }
                 : {};
             return {
-                application: { type: this.slotDescription.application, id: this.slotDescription.id },
+                application: {
+                    type: this.slotDescription.application,
+                    id: this.slotDescription.id,
+                    ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
+                },
                 slot_id: slotDescriptionToId(this.slotDescription),
                 rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
                 member: { device_id: this.deviceId, user_id: this.client.getUserId()!, id: this.memberId },
