@@ -248,8 +248,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
-    // The session Id of the call, this is the call_id of the call Member event.
-    private _slotId: string | undefined;
     private joinConfig?: SessionConfig;
     private logger: Logger;
 
@@ -299,7 +297,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * The slotId is the property that, per definition, groups memberships into one call.
      */
     public get slotId(): string | undefined {
-        return this._slotId;
+        return slotDescriptionToId(this.slotDescription);
     }
 
     /**
@@ -372,7 +370,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
                     if (!deepCompare(membership.slotDescription, slotDescription)) {
                         logger.info(
-                            `Ignoring membership of user ${membership.sender} for a different session:  ${JSON.stringify(membership.slotDescription)}`,
+                            `Ignoring membership of user ${membership.sender} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
                         );
                         continue;
                     }
@@ -486,7 +484,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
     ) {
         super();
         this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
-        this._slotId = memberships[0]?.slotId;
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
@@ -804,8 +801,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private recalculateSessionMembers = (): void => {
         const oldMemberships = this.memberships;
         this.memberships = MatrixRTCSession.sessionMembershipsForSlot(this.room, this.slotDescription);
-
-        this._slotId = this._slotId ?? this.memberships[0]?.slotId;
 
         const changed =
             oldMemberships.length != this.memberships.length ||

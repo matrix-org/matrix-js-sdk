@@ -19,7 +19,7 @@ import { deepCompare } from "../utils.ts";
 import { isLivekitFocusSelection, type LivekitFocusSelection } from "./LivekitTransport.ts";
 import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
 import type { RTCCallIntent, Transport } from "./types.ts";
-import { type MatrixEvent } from "../models/event.ts";
+import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 
 /**
@@ -51,7 +51,7 @@ export interface RtcMembershipData {
 }
 
 const checkRtcMembershipData = (
-    data: Partial<Record<keyof RtcMembershipData, any>>,
+    data: IContent,
     errors: string[],
     referenceUserId: string,
 ): data is RtcMembershipData => {
@@ -196,10 +196,7 @@ export type SessionMembershipData = {
     "m.call.intent"?: RTCCallIntent;
 };
 
-const checkSessionsMembershipData = (
-    data: Partial<Record<keyof SessionMembershipData, any>>,
-    errors: string[],
-): data is SessionMembershipData => {
+const checkSessionsMembershipData = (data: IContent, errors: string[]): data is SessionMembershipData => {
     const prefix = " - ";
     if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
@@ -242,17 +239,23 @@ export class CallMembership {
     /** The parsed data from the Matrix event.
      * To access checked eventId and sender from the matrixEvent.
      * Class construction will fail if these values cannot get obtained. */
-    private matrixEventData: { eventId: string; sender: string };
+    private readonly matrixEventData: { eventId: string; sender: string };
     public constructor(
         /** The Matrix event that this membership is based on */
-        private matrixEvent: MatrixEvent,
-        data: any,
+        private readonly matrixEvent: MatrixEvent,
+        data: IContent,
     ) {
+        const eventId = matrixEvent.getId();
+        const sender = matrixEvent.getSender();
+
+        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
+        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+
         const sessionErrors: string[] = [];
         const rtcErrors: string[] = [];
         if (checkSessionsMembershipData(data, sessionErrors)) {
             this.membershipData = { kind: "session", data };
-        } else if (checkRtcMembershipData(data, rtcErrors)) {
+        } else if (checkRtcMembershipData(data, rtcErrors, sender)) {
             this.membershipData = { kind: "rtc", data };
         } else {
             const details =
@@ -262,12 +265,6 @@ export class CallMembership {
             const json = "\nevent:\n" + JSON.stringify(data).replaceAll('"', "'");
             throw Error(`unknown CallMembership data.\n` + details + json);
         }
-
-        const eventId = matrixEvent.getId();
-        const sender = matrixEvent.getSender();
-
-        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
-        if (sender === undefined) throw new Error("parentEvent is missing sender field");
         this.matrixEventData = { eventId, sender };
     }
 
@@ -291,7 +288,7 @@ export class CallMembership {
     }
 
     /**
-     * The slot id to find all member building one session `slot_id` (format `{application}#{id}`).
+     * The ID of the MatrixRTC slot that this membership belongs to (format `{application}#{id}`).
      * This is computed in case SessionMembershipData is used.
      */
     public get slotId(): string {

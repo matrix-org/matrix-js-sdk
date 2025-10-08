@@ -312,6 +312,8 @@ export class MembershipManager
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
         this.deviceId = deviceId;
+        // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
+        // we keep it as a string for now for backwards compatibility.
         this.memberId = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
@@ -762,7 +764,6 @@ export class MembershipManager
             return {
                 application: {
                     type: this.slotDescription.application,
-                    id: this.slotDescription.id,
                     ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
                 },
                 slot_id: slotDescriptionToId(this.slotDescription),

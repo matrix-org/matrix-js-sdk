@@ -252,9 +252,9 @@ describe("CallMembership", () => {
             expect(() => {
                 new CallMembership(makeMockEvent(), {
                     ...membershipTemplate,
-                    member: { id: "test", device_id: "test", user_id: "@test:user.id" },
+                    member: { id: "test", device_id: "test", user_id: "@test-wrong-user:user.id" },
                 });
-            }).not.toThrow();
+            }).toThrow();
         });
         it("rejects membership with incorrect sticky_key", () => {
             expect(() => {
