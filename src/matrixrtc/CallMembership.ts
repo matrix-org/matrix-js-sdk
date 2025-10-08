@@ -21,7 +21,7 @@ import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "
 import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
-import { logger } from "src/logger.ts";
+import { logger } from "../logger.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
