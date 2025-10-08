@@ -176,9 +176,11 @@ export class MembershipManager
     /**
      * Puts the MembershipManager in a state where it tries to be joined.
      * It will send delayed events and membership events
-     * @param fociPreferred
+     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
      * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will use multi sfu. Use `undefined` to not use `oldest_membership` selection based sfu.
+     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
+     * transport selection will be used instead.
      * @param onError This will be called once the membership manager encounters an unrecoverable error.
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      */

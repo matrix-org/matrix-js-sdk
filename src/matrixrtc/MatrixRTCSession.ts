@@ -477,8 +477,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
         >,
         public memberships: CallMembership[],
         /**
-         * The session description is used to define the exact session this object is tracking.
-         * A session is distinct from another session if one of those properties differ: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
+         * The slot description is a virtual address where participants are allowed to meet.
+         * This session will only manage memberships that match this slot description.
+         * Sessions are distinct if any of those properties are distinct: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
          */
         public readonly slotDescription: SlotDescription,
     ) {
@@ -522,14 +523,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * This will not subscribe to updates: remember to call subscribe() separately if
      * desired.
      * This method will return immediately and the session will be joined in the background.
-     *
-     * @param fociActive - The object representing the active focus. (This depends on the focus type.)
-     * @param fociPreferred - The list of preferred foci this member proposes to use/knows/has access to.
-     *                        For the livekit case this is a list of foci generated from the homeserver well-known, the current rtc session,
-     *                        or optionally other room members homeserver well known.
+     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
+     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
+     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
+     * transport selection will be used instead.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRoomSession(fociPreferred: Transport[], fociActive?: Transport, joinConfig?: JoinSessionConfig): void {
+    public joinRoomSession(
+        fociPreferred: Transport[],
+        multiSfuFocus?: Transport,
+        joinConfig?: JoinSessionConfig,
+    ): void {
         if (this.isJoined()) {
             this.logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
             return;
@@ -602,7 +607,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager!.join(fociPreferred, fociActive, (e) => {
+        this.membershipManager!.join(fociPreferred, multiSfuFocus, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());

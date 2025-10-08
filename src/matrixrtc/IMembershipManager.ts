@@ -79,6 +79,7 @@ export interface IMembershipManager
     /**
      * Start sending all necessary events to make this user participate in the RTC session.
      * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
      * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
      * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
      * transport selection will be used instead.
