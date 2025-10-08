@@ -54,10 +54,14 @@ const checkRtcMembershipData = (
     data: Partial<Record<keyof RtcMembershipData, any>>,
     errors: string[],
 ): data is RtcMembershipData => {
-    const prefix = "Malformed rtc membership event: ";
+    const prefix = " - ";
 
     // required fields
-    if (typeof data.slot_id !== "string") errors.push(prefix + "slot_id must be string");
+    if (typeof data.slot_id !== "string") {
+        errors.push(prefix + "slot_id must be string");
+    } else {
+        if (data.slot_id.split("#").length !== 2) errors.push(prefix + 'slot_id must include exactly one "#"');
+    }
     if (typeof data.member !== "object" || data.member === null) {
         errors.push(prefix + "member must be an object");
     } else {
@@ -69,14 +73,18 @@ const checkRtcMembershipData = (
     if (typeof data.application !== "object" || data.application === null) {
         errors.push(prefix + "application must be an object");
     } else {
-        if (typeof data.application.type !== "string") errors.push(prefix + "application.type must be a string");
+        if (typeof data.application.type !== "string") {
+            errors.push(prefix + "application.type must be a string");
+        } else {
+            if (data.application.type.includes("#")) errors.push(prefix + 'application.type must not include "#"');
+        }
     }
     if (data.rtc_transports === undefined || !Array.isArray(data.rtc_transports)) {
         errors.push(prefix + "rtc_transports must be an array");
     } else {
         // validate that each transport has at least a string 'type'
         for (const t of data.rtc_transports) {
-            if (typeof t !== "object" || typeof (t as any).type !== "string") {
+            if (typeof t !== "object" || t === null || typeof (t as any).type !== "string") {
                 errors.push(prefix + "rtc_transports entries must be objects with a string type");
                 break;
             }
@@ -89,9 +97,21 @@ const checkRtcMembershipData = (
     }
 
     // optional fields
-    const stickyKey = data.sticky_key ?? data.msc4354_sticky_key;
-    if (stickyKey !== undefined && typeof stickyKey !== "string") {
+    if ((data.sticky_key ?? data.msc4354_sticky_key) === undefined) {
+        errors.push(prefix + "sticky_key or msc4354_sticky_key must be a defined");
+    }
+    if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
         errors.push(prefix + "sticky_key must be a string");
+    }
+    if (data.msc4354_sticky_key !== undefined && typeof data.msc4354_sticky_key !== "string") {
+        errors.push(prefix + "msc4354_sticky_key must be a string");
+    }
+    if (
+        data.sticky_key !== undefined &&
+        data.msc4354_sticky_key !== undefined &&
+        data.sticky_key !== data.msc4354_sticky_key
+    ) {
+        errors.push(prefix + "sticky_key and msc4354_sticky_key must be equal if both are defined");
     }
     if (data["m.relates_to"] !== undefined) {
         const rel = data["m.relates_to"] as RtcMembershipData["m.relates_to"];
@@ -175,7 +195,7 @@ const checkSessionsMembershipData = (
     data: Partial<Record<keyof SessionMembershipData, any>>,
     errors: string[],
 ): data is SessionMembershipData => {
-    const prefix = "Malformed session membership event: ";
+    const prefix = " - ";
     if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
@@ -183,8 +203,12 @@ const checkSessionsMembershipData = (
     if (data.focus_active !== undefined && !isLivekitFocusSelection(data.focus_active)) {
         errors.push(prefix + "focus_active has an invalid type");
     }
-    if (data.foci_preferred !== undefined && !Array.isArray(data.foci_preferred)) {
-        errors.push(prefix + "foci_preferred must be an array");
+    if (
+        data.foci_preferred !== undefined &&
+        !Array.isArray(data.foci_preferred) &&
+        !data.foci_preferred.every((f: Transport) => typeof f === "object" && f !== null && typeof f.type === "string")
+    ) {
+        errors.push(prefix + "foci_preferred must be an array of transport objects");
     }
     // optional parameters
     if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
@@ -205,8 +229,7 @@ type MembershipData = { kind: "rtc"; data: RtcMembershipData } | { kind: "sessio
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
 export class CallMembership {
     public static equal(a?: CallMembership, b?: CallMembership): boolean {
-        if (a === undefined || b === undefined) return a === b;
-        return deepCompare(a.membershipData, b.membershipData);
+        return deepCompare(a?.membershipData, b?.membershipData);
     }
 
     private membershipData: MembershipData;
@@ -227,12 +250,12 @@ export class CallMembership {
         } else if (checkRtcMembershipData(data, rtcErrors)) {
             this.membershipData = { kind: "rtc", data };
         } else {
-            throw Error(
-                `unknown CallMembership data.` +
-                    `Does not match MSC4143 call.member (${sessionErrors.join(" & ")})\n` +
-                    `Does not match MSC4143 rtc.member (${rtcErrors.join(" & ")})\n` +
-                    `events this could be a legacy membership event: (${data})`,
-            );
+            const details =
+                sessionErrors.length < rtcErrors.length
+                    ? `Does not match MSC4143 m.call.member:\n${sessionErrors.join("\n")}\n\n`
+                    : `Does not match MSC4143 m.rtc.member:\n${rtcErrors.join("\n")}\n\n`;
+            const json = "\nevent:\n" + JSON.stringify(data).replaceAll('"', "'");
+            throw Error(`unknown CallMembership data.\n` + details + json);
         }
 
         const eventId = matrixEvent.getId();

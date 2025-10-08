@@ -187,12 +187,23 @@ describe("CallMembership", () => {
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             rtc_transports: [{ type: "livekit" }],
             versions: [],
+            msc4354_sticky_key: "abc123",
         };
 
         it("rejects membership with no slot_id", () => {
             expect(() => {
                 new CallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: undefined });
             }).toThrow();
+        });
+        it("rejects membership with invalid slot_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "invalid_slot_id" });
+            }).toThrow();
+        });
+        it("accepts membership with valid slot_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#" });
+            }).not.toThrow();
         });
 
         it("rejects membership with no application", () => {
@@ -244,6 +255,49 @@ describe("CallMembership", () => {
                     member: { id: "test", device_id: "test", user_id: "@test:user.id" },
                 });
             }).not.toThrow();
+        });
+        it("rejects membership with incorrect sticky_key", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(), membershipTemplate);
+            }).not.toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    sticky_key: 1,
+                    msc4354_sticky_key: undefined,
+                });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    sticky_key: "1",
+                    msc4354_sticky_key: undefined,
+                });
+            }).not.toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), { ...membershipTemplate, msc4354_sticky_key: undefined });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    msc4354_sticky_key: 1,
+                    sticky_key: "valid",
+                });
+            }).toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    msc4354_sticky_key: "valid",
+                    sticky_key: "valid",
+                });
+            }).not.toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    msc4354_sticky_key: "valid_but_different",
+                    sticky_key: "valid",
+                });
+            }).toThrow();
         });
 
         it("considers memberships unexpired if local age low enough", () => {
