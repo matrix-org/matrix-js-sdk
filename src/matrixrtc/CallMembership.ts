@@ -208,8 +208,8 @@ const checkSessionsMembershipData = (data: IContent, errors: string[]): data is 
     }
     if (
         data.foci_preferred !== undefined &&
-        !Array.isArray(data.foci_preferred) &&
-        !data.foci_preferred.every((f: Transport) => typeof f === "object" && f !== null && typeof f.type === "string")
+        !(Array.isArray(data.foci_preferred) &&
+        data.foci_preferred.every((f: Transport) => typeof f === "object" && f !== null && typeof f.type === "string"))
     ) {
         errors.push(prefix + "foci_preferred must be an array of transport objects");
     }
