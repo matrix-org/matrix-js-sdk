@@ -42,7 +42,7 @@ export interface RtcMembershipData {
     "application": {
         type: string;
         // other application specific keys
-        [key: string]: any;
+        [key: string]: unknown;
     };
     "rtc_transports": Transport[];
     "versions": string[];
