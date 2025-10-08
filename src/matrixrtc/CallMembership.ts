@@ -203,7 +203,7 @@ const checkSessionsMembershipData = (data: IContent, errors: string[]): data is 
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
-    if (data.focus_active !== undefined) {
+    if (data.focus_active === undefined) {
         errors.push(prefix + "focus_active has an invalid type");
     }
     if (
