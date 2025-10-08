@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MXID_PATTERN } from "../models/room-member.ts";
 import { deepCompare } from "../utils.ts";
-import { isLivekitFocusSelection, type LivekitFocusSelection } from "./LivekitTransport.ts";
+import { type LivekitFocusSelection } from "./LivekitTransport.ts";
 import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
 import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
@@ -203,7 +203,7 @@ const checkSessionsMembershipData = (data: IContent, errors: string[]): data is 
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
-    if (data.focus_active !== undefined && !isLivekitFocusSelection(data.focus_active)) {
+    if (data.focus_active !== undefined) {
         errors.push(prefix + "focus_active has an invalid type");
     }
     if (
