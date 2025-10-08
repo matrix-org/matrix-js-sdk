@@ -323,11 +323,11 @@ export class CallMembership {
         switch (kind) {
             case "rtc": {
                 const intent = data.application["m.call.intent"];
-                if (intent !== undefined && typeof intent !== "string") {
-                    logger.warn("RTC membership has invalid m.call.intent");
-                    return undefined;
+                if (typeof intent === "string") {
+                    return intent;
                 }
-                return intent;
+                logger.warn("RTC membership has invalid m.call.intent");
+                return undefined;
             }
             case "session":
             default:
