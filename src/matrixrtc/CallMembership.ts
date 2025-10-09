@@ -394,7 +394,19 @@ export class CallMembership {
         }
     }
 
-    public createdTs(): number {
+    /**
+     * The last update to this membership.
+     * @returns The timestamp when this membership was last updated.
+     */
+    public updatedTs(): number {
+        return this.matrixEvent.getTs();
+    }
+
+    /**
+     * The ts of the initial connection of this membership.
+     * @returns The timestamp when this membership was initially connected.
+     */
+    public connectedTs(): number {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
@@ -405,19 +417,34 @@ export class CallMembership {
         }
     }
 
+    /** @deprecated use connectedTs instead */
+    public createdTs(): number {
+        return this.connectedTs();
+    }
+
     /**
      * Gets the absolute expiry timestamp of the membership.
+     *
+     * The absolute expiry based on DEFAULT_EXPIRE_DURATION and `sessionData.expires`.
+     *
+     * ### Note:
+     * This concept is not required for m.rtc.member sticky events anymore. the sticky timeout serves takes care of
+     * this logic automatically (removing member events that have were missed to get removed manually or via delayed events)
+     * So this is mostly relevant for legacy m.call.member events.
+     * It is planned to remove manual expiration logic entirely once m.rtc.member is widely adopted.
+     *
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
     public getAbsoluteExpiry(): number | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
-                return this.createdTs() + DEFAULT_EXPIRE_DURATION;
+                // Rtc events do not have an data.expires field that gets updated
+                // Instead the sticky event is resent.
+                return this.updatedTs() + DEFAULT_EXPIRE_DURATION;
             case "session":
             default:
-                // TODO: calculate this from the MatrixRTCSession join configuration directly
-                return this.createdTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
+                return this.connectedTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
         }
     }
 

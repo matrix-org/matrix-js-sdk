@@ -337,12 +337,18 @@ describe("CallMembership", () => {
             const now = Date.now();
             const startEv = makeMockEvent(now - DEFAULT_EXPIRE_DURATION - 100, membershipTemplate);
             const membershipWithRel = new CallMembership(
-                //update 1100 ms later (so the update is still after expiry)
-                makeMockEvent(now - DEFAULT_EXPIRE_DURATION + 1000, membershipTemplate),
+                //update 50 ms later (so the update is still expired)
+                makeMockEvent(now - DEFAULT_EXPIRE_DURATION - 50, membershipTemplate),
+                startEv,
+            );
+            const membershipWithRelUnexpired = new CallMembership(
+                //update 200 ms later (due to the update the member is NOT expired)
+                makeMockEvent(now - DEFAULT_EXPIRE_DURATION + 100, membershipTemplate),
                 startEv,
             );
             const membershipWithoutRel = new CallMembership(startEv);
             expect(membershipWithRel.isExpired()).toEqual(true);
+            expect(membershipWithRelUnexpired.isExpired()).toEqual(false);
             expect(membershipWithoutRel.isExpired()).toEqual(true);
             expect(membershipWithoutRel.createdTs()).toEqual(membershipWithRel.createdTs());
         });
