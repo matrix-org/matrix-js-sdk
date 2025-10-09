@@ -232,15 +232,16 @@ describe("MatrixRTCSession", () => {
             };
 
             const mockRoom = makeMockRoom([testMembership]);
+            const now = Date.now();
             mockRoom.findEventById = jest
                 .fn()
                 .mockImplementation((id) =>
                     id === "id"
-                        ? new MatrixEvent({ content: { ...rtcMembershipTemplate }, origin_server_ts: 100 })
+                        ? new MatrixEvent({ content: { ...rtcMembershipTemplate }, origin_server_ts: now + 100 })
                         : undefined,
                 );
             sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            expect(sess.memberships[0].createdTs()).toBe(100);
+            expect(sess.memberships[0].createdTs()).toBe(now + 100);
         });
         it("fetches related events if needed from cs api", async () => {
             const testMembership = {
@@ -251,12 +252,14 @@ describe("MatrixRTCSession", () => {
             };
 
             const mockRoom = makeMockRoom([testMembership]);
+            const now = Date.now();
+
             mockRoom.findEventById = jest.fn().mockReturnValue(undefined);
             client.fetchRoomEvent = jest
                 .fn()
-                .mockResolvedValue({ content: { ...rtcMembershipTemplate }, origin_server_ts: 100 });
+                .mockResolvedValue({ content: { ...rtcMembershipTemplate }, origin_server_ts: now + 100 });
             sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            expect(sess.memberships[0].createdTs()).toBe(100);
+            expect(sess.memberships[0].createdTs()).toBe(now + 100);
         });
     });
 
@@ -322,9 +325,8 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "oldest_membership",
             });
-            expect(sess.resolveActiveFocus(sess.memberships.find((m) => m.deviceId === "old"))).toBe(
-                firstPreferredFocus,
-            );
+            const oldest = sess.memberships.find((m) => m.deviceId === "old");
+            expect(oldest?.getTransport(sess.getOldestMembership()!)).toBe(firstPreferredFocus);
             jest.useRealTimers();
         });
         it("does not provide focus if the selection method is unknown", async () => {
@@ -344,7 +346,7 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "unknown",
             });
-            expect(sess.resolveActiveFocus(sess.memberships.find((m) => m.deviceId === "old"))).toBe(undefined);
+            expect(sess.memberships.length).toBe(0);
         });
     });
 

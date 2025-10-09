@@ -12,10 +12,6 @@ export default {
         "src/utils.ts", // not really an entrypoint but we have deprecated `defer` there
         "scripts/**",
         "spec/**",
-        // XXX: these look entirely unused
-        "src/crypto/aes.ts",
-        "src/crypto/crypto.ts",
-        "src/crypto/recoverykey.ts",
         // XXX: these should be re-exported by one of the supported exports
         "src/matrixrtc/index.ts",
         "src/sliding-sync.ts",

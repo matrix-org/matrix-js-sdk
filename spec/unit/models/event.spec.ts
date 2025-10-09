@@ -20,6 +20,7 @@ import { type IContent, MatrixEvent, MatrixEventEvent } from "../../../src/model
 import { emitPromise } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
+    type IStickyEvent,
     type MatrixClient,
     PushRuleActionName,
     Room,
@@ -597,6 +598,39 @@ describe("MatrixEvent", () => {
 
         expect(stateEvent.isState()).toBeTruthy();
         expect(stateEvent.threadRootId).toBeUndefined();
+    });
+
+    it("should calculate sticky duration correctly", async () => {
+        const evData: IStickyEvent = {
+            event_id: "$event_id",
+            type: "some_state_event",
+            content: {},
+            sender: "@alice:example.org",
+            origin_server_ts: 50,
+            msc4354_sticky: {
+                duration_ms: 1000,
+            },
+            unsigned: {
+                msc4354_sticky_duration_ttl_ms: 5000,
+            },
+        };
+        try {
+            jest.useFakeTimers();
+            jest.setSystemTime(50);
+            // Prefer unsigned
+            expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
+            // Fall back to `duration_ms`
+            expect(
+                new MatrixEvent({ ...evData, unsigned: undefined } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(1050);
+            // Prefer current time if `origin_server_ts` is more recent.
+            expect(
+                new MatrixEvent({ ...evData, unsigned: undefined, origin_server_ts: 5000 } satisfies IStickyEvent)
+                    .unstableStickyExpiresAt,
+            ).toEqual(1050);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });
 

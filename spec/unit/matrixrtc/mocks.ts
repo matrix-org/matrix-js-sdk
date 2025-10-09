@@ -49,12 +49,12 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
 };
 
 export const rtcMembershipTemplate: RtcMembershipData = {
-    "slot_id": "m.call#",
-    "application": { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
-    "member": { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
-    "rtc_transports": [{ type: "livekit" }],
-    "m.call.intent": "voice",
-    "versions": [],
+    slot_id: "m.call#",
+    application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+    member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+    rtc_transports: [{ type: "livekit" }],
+    msc4354_sticky_key: "my_sticky_key",
+    versions: [],
 };
 
 export type MockClient = Pick<

@@ -105,6 +105,7 @@ import {
 import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
 import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
+    isSendDelayedEventRequestOpts,
     type DelayedEventInfo,
     type IAddThreePidOnlyBody,
     type IBindThreePidBody,
@@ -246,7 +247,7 @@ import {
     validateAuthMetadataAndKeys,
 } from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
-import { UnsupportedDelayedEventsEndpointError } from "./errors.ts";
+import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 
 export type Store = IStore;
 
@@ -444,6 +445,12 @@ export interface ICreateClientOpts {
     isVoipWithNoMediaAllowed?: boolean;
 
     /**
+     * Disable VoIP support (prevents fetching TURN servers, etc.)
+     * Default: false (VoIP enabled)
+     */
+    disableVoip?: boolean;
+
+    /**
      * If true, group calls will not establish media connectivity and only create the signaling events,
      * so that livekit media can be used in the application layer (js-sdk contains no livekit code).
      */
@@ -545,6 +552,7 @@ export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms"
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
+export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
 
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
@@ -1220,6 +1228,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public idBaseUrl?: string;
     public baseUrl: string;
     public readonly isVoipWithNoMediaAllowed;
+    public disableVoip: boolean;
 
     public useLivekitForGroupCalls: boolean;
 
@@ -1346,7 +1355,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         }
 
-        if (supportsMatrixCall()) {
+        this.disableVoip = opts.disableVoip ?? false;
+
+        if (!this.disableVoip && supportsMatrixCall()) {
             this.callEventHandler = new CallEventHandler(this);
             this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
@@ -1433,7 +1444,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // periodically poll for turn servers if we support voip
-        if (this.canSupportVoip) {
+        if (this.supportsVoip()) {
             this.checkTurnServersIntervalID = setInterval(() => {
                 this.checkTurnServers();
             }, TURN_CHECK_INTERVAL);
@@ -1670,7 +1681,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns True if VoIP is supported.
      */
     public supportsVoip(): boolean {
-        return this.canSupportVoip;
+        return !this.disableVoip && this.canSupportVoip;
     }
 
     /**
@@ -2382,8 +2393,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const queryParams: QueryDict = {};
         if (opts.viaServers) {
             // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
-            queryParams.server_name = opts.viaServers;
-            queryParams.via = opts.viaServers;
+            // We only use the first 3 servers, to avoid URI length issues.
+            queryParams.via = queryParams.server_name = opts.viaServers.slice(0, 3);
         }
 
         const data: IJoinRequestBody = {};
@@ -2427,9 +2438,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const queryParams: QueryDict = {};
         if (opts.viaServers) {
+            // We only use the first 3 servers, to avoid URI length issues.
+            const viaServers = Array.isArray(opts.viaServers) ? opts.viaServers.slice(0, 3) : [opts.viaServers];
             // server_name has been deprecated in favour of via with Matrix >1.11 (MSC4156)
-            queryParams.server_name = opts.viaServers;
-            queryParams.via = opts.viaServers;
+            queryParams.server_name = viaServers;
+            queryParams.via = viaServers;
         }
 
         const body: Record<string, string> = {};
@@ -2672,7 +2685,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
-        return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, txnId);
+        return this.sendCompleteEvent({ roomId, threadId, eventObject: { type: eventType, content }, txnId });
     }
 
     /**
@@ -2709,12 +2722,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(
-        roomId: string,
-        threadId: string | null,
-        eventObject: Partial<IEvent>,
-        txnId?: string,
-    ): Promise<ISendEventResponse>;
+    private sendCompleteEvent(params: {
+        roomId: string;
+        threadId: string | null;
+        eventObject: Partial<IEvent>;
+        queryDict?: QueryDict;
+        txnId?: string;
+    }): Promise<ISendEventResponse>;
     /**
      * Sends a delayed event (MSC4140).
      * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
@@ -2723,29 +2737,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(
-        roomId: string,
-        threadId: string | null,
-        eventObject: Partial<IEvent>,
-        delayOpts: SendDelayedEventRequestOpts,
-        txnId?: string,
-    ): Promise<SendDelayedEventResponse>;
-    private sendCompleteEvent(
-        roomId: string,
-        threadId: string | null,
-        eventObject: Partial<IEvent>,
-        delayOptsOrTxnId?: SendDelayedEventRequestOpts | string,
-        txnIdOrVoid?: string,
-    ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        let delayOpts: SendDelayedEventRequestOpts | undefined;
-        let txnId: string | undefined;
-        if (typeof delayOptsOrTxnId === "string") {
-            txnId = delayOptsOrTxnId;
-        } else {
-            delayOpts = delayOptsOrTxnId;
-            txnId = txnIdOrVoid;
-        }
-
+    private sendCompleteEvent(params: {
+        roomId: string;
+        threadId: string | null;
+        eventObject: Partial<IEvent>;
+        delayOpts: SendDelayedEventRequestOpts;
+        queryDict?: QueryDict;
+        txnId?: string;
+    }): Promise<SendDelayedEventResponse>;
+    private sendCompleteEvent({
+        roomId,
+        threadId,
+        eventObject,
+        delayOpts,
+        queryDict,
+        txnId,
+    }: {
+        roomId: string;
+        threadId: string | null;
+        eventObject: Partial<IEvent>;
+        delayOpts?: SendDelayedEventRequestOpts;
+        queryDict?: QueryDict;
+        txnId?: string;
+    }): Promise<SendDelayedEventResponse | ISendEventResponse> {
         if (!txnId) {
             txnId = this.makeTxnId();
         }
@@ -2788,7 +2802,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const type = localEvent.getType();
         this.logger.debug(
-            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${delayOpts ? " (delayed event)" : ""}`,
+            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${delayOpts ? " (delayed event)" : ""}${queryDict ? " query params: " + JSON.stringify(queryDict) : ""}`,
         );
 
         localEvent.setTxnId(txnId);
@@ -2806,9 +2820,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return Promise.reject(new Error("Event blocked by other events not yet sent"));
             }
 
-            return this.encryptAndSendEvent(room, localEvent);
+            return this.encryptAndSendEvent(room, localEvent, queryDict);
         } else {
-            return this.encryptAndSendEvent(room, localEvent, delayOpts);
+            return this.encryptAndSendEvent(room, localEvent, delayOpts, queryDict);
         }
     }
 
@@ -2816,7 +2830,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * encrypts the event if necessary; adds the event to the queue, or sends it; marks the event as sent/unsent
      * @returns returns a promise which resolves with the result of the send request
      */
-    protected async encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room | null,
+        event: MatrixEvent,
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse>;
     /**
      * Simply sends a delayed event without encrypting it.
      * TODO: Allow encrypted delayed events, and encrypt them properly
@@ -2827,16 +2845,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         room: Room | null,
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
-    ): Promise<SendDelayedEventResponse>;
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room | null,
         event: MatrixEvent,
-        delayOpts?: SendDelayedEventRequestOpts,
+        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
+        queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        if (delayOpts) {
-            return this.sendEventHttpRequest(event, delayOpts);
+        let queryOpts = queryDict;
+        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
+            return this.sendEventHttpRequest(event, delayOptsOrQuery, queryOpts);
+        } else if (!queryOpts) {
+            queryOpts = delayOptsOrQuery;
         }
-
         try {
             let cancelled: boolean;
             this.eventsBeingEncrypted.add(event.getId()!);
@@ -2872,7 +2894,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             if (!promise) {
-                promise = this.sendEventHttpRequest(event);
+                promise = this.sendEventHttpRequest(event, queryOpts);
                 if (room) {
                     promise = promise.then((res) => {
                         room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
@@ -2987,14 +3009,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private sendEventHttpRequest(event: MatrixEvent): Promise<ISendEventResponse>;
+    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse>;
     private sendEventHttpRequest(
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
+        queryDict?: QueryDict,
     ): Promise<SendDelayedEventResponse>;
     private sendEventHttpRequest(
         event: MatrixEvent,
-        delayOpts?: SendDelayedEventRequestOpts,
+        queryOrDelayOpts?: SendDelayedEventRequestOpts | QueryDict,
+        queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let txnId = event.getTxnId();
         if (!txnId) {
@@ -3027,19 +3051,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
 
+        const delayOpts =
+            queryOrDelayOpts && isSendDelayedEventRequestOpts(queryOrDelayOpts) ? queryOrDelayOpts : undefined;
+        const queryOpts = !delayOpts ? queryOrDelayOpts : queryDict;
         const content = event.getWireContent();
-        if (!delayOpts) {
-            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, undefined, content).then((res) => {
-                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
-                return res;
-            });
-        } else {
+        if (delayOpts) {
             return this.http.authedRequest<SendDelayedEventResponse>(
                 Method.Put,
                 path,
-                getUnstableDelayQueryOpts(delayOpts),
+                { ...getUnstableDelayQueryOpts(delayOpts), ...queryOpts },
                 content,
             );
+        } else {
+            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content).then((res) => {
+                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+                return res;
+            });
         }
     }
 
@@ -3096,16 +3123,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             content[withRelTypesPropName] = opts.with_rel_types;
         }
 
-        return this.sendCompleteEvent(
+        return this.sendCompleteEvent({
             roomId,
             threadId,
-            {
+            eventObject: {
                 type: EventType.RoomRedaction,
                 content,
                 redacts: eventId,
             },
-            txnId as string,
-        );
+            txnId: txnId as string,
+        });
     }
 
     /**
@@ -3393,7 +3420,54 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
-        return this.sendCompleteEvent(roomId, threadId, { type: eventType, content }, delayOpts, txnId);
+        return this.sendCompleteEvent({
+            roomId,
+            threadId,
+            eventObject: { type: eventType, content },
+            delayOpts,
+            txnId,
+        });
+    }
+
+    /**
+     * Send a delayed sticky timeline event.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) and
+     *   [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354) for more details.
+     */
+    // eslint-disable-next-line
+    public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        stickDuration: number,
+        delayOpts: SendDelayedEventRequestOpts,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K] & { msc4354_sticky_key: string },
+        txnId?: string,
+    ): Promise<SendDelayedEventResponse> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "getDelayedEvents",
+            );
+        }
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
+            throw new UnsupportedStickyEventsEndpointError(
+                "Server does not support the sticky events",
+                "sendStickyEvent",
+            );
+        }
+
+        this.addThreadRelationIfNeeded(content, threadId, roomId);
+        return this.sendCompleteEvent({
+            roomId,
+            threadId,
+            eventObject: { type: eventType, content },
+            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            delayOpts,
+            txnId,
+        });
     }
 
     /**
@@ -3428,6 +3502,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
         return this.http.authedRequest(Method.Put, path, getUnstableDelayQueryOpts(delayOpts), content as Body, opts);
+    }
+
+    /**
+     * Send a sticky timeline event.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354) for more details.
+     */
+    // eslint-disable-next-line
+    public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        stickDuration: number,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K] & { msc4354_sticky_key: string },
+        txnId?: string,
+    ): Promise<ISendEventResponse> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
+            throw new UnsupportedStickyEventsEndpointError(
+                "Server does not support the sticky events",
+                "sendStickyEvent",
+            );
+        }
+
+        this.addThreadRelationIfNeeded(content, threadId, roomId);
+        return this.sendCompleteEvent({
+            roomId,
+            threadId,
+            eventObject: { type: eventType, content },
+            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            txnId,
+        });
     }
 
     /**
@@ -5622,7 +5728,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     // XXX: Intended private, used in code.
     public async checkTurnServers(): Promise<boolean | undefined> {
-        if (!this.canSupportVoip) {
+        if (!this.supportsVoip()) {
             return;
         }
 
@@ -6971,6 +7077,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async doesServerSupportExtendedProfiles(): Promise<boolean> {
         return (
+            (await this.isVersionSupported("v1.16")) ||
             (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4133_EXTENDED_PROFILES)) ||
             (await this.doesServerSupportUnstableFeature(STABLE_MSC4133_EXTENDED_PROFILES))
         );
@@ -6982,7 +7089,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The prefix for use with `authedRequest`
      */
     private async getExtendedProfileRequestPrefix(): Promise<string> {
-        if (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable")) {
+        if (
+            (await this.isVersionSupported("v1.16")) ||
+            (await this.doesServerSupportUnstableFeature("uk.tcpip.msc4133.stable"))
+        ) {
             return ClientPrefix.V3;
         }
         return "/_matrix/client/unstable/uk.tcpip.msc4133";

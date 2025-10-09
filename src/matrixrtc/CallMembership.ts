@@ -16,11 +16,12 @@ limitations under the License.
 
 import { MXID_PATTERN } from "../models/room-member.ts";
 import { deepCompare } from "../utils.ts";
-import { isLivekitFocusSelection, type LivekitFocusSelection } from "./LivekitTransport.ts";
+import { type LivekitFocusSelection } from "./LivekitTransport.ts";
 import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
 import type { RTCCallIntent, Transport } from "./types.ts";
-import { type MatrixEvent } from "../models/event.ts";
+import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
+import { logger } from "../logger.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -42,46 +43,54 @@ export interface RtcMembershipData {
     "application": {
         type: string;
         // other application specific keys
-        [key: string]: any;
+        [key: string]: unknown;
     };
     "rtc_transports": Transport[];
     "versions": string[];
     "msc4354_sticky_key"?: string;
     "sticky_key"?: string;
-    /**
-     * The intent of the call from the perspective of this user. This may be an audio call, video call or
-     * something else.
-     */
-    "m.call.intent"?: RTCCallIntent;
 }
 
 const checkRtcMembershipData = (
-    data: Partial<Record<keyof RtcMembershipData, any>>,
+    data: IContent,
     errors: string[],
+    referenceUserId: string,
 ): data is RtcMembershipData => {
-    const prefix = "Malformed rtc membership event: ";
+    const prefix = " - ";
 
     // required fields
-    if (typeof data.slot_id !== "string") errors.push(prefix + "slot_id must be string");
+    if (typeof data.slot_id !== "string") {
+        errors.push(prefix + "slot_id must be string");
+    } else {
+        if (data.slot_id.split("#").length !== 2) errors.push(prefix + 'slot_id must include exactly one "#"');
+    }
     if (typeof data.member !== "object" || data.member === null) {
         errors.push(prefix + "member must be an object");
     } else {
         if (typeof data.member.user_id !== "string") errors.push(prefix + "member.user_id must be string");
         else if (!MXID_PATTERN.test(data.member.user_id)) errors.push(prefix + "member.user_id must be a valid mxid");
+        // This is not what the spec enforces but there currently are no rules what power levels are required to
+        // send a m.rtc.member event for a other user. So we add this check for simplicity and to avoid possible attacks until there
+        // is a proper definition when this is allowed.
+        else if (data.member.user_id !== referenceUserId) errors.push(prefix + "member.user_id must match the sender");
         if (typeof data.member.device_id !== "string") errors.push(prefix + "member.device_id must be string");
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
     }
     if (typeof data.application !== "object" || data.application === null) {
         errors.push(prefix + "application must be an object");
     } else {
-        if (typeof data.application.type !== "string") errors.push(prefix + "application.type must be a string");
+        if (typeof data.application.type !== "string") {
+            errors.push(prefix + "application.type must be a string");
+        } else {
+            if (data.application.type.includes("#")) errors.push(prefix + 'application.type must not include "#"');
+        }
     }
     if (data.rtc_transports === undefined || !Array.isArray(data.rtc_transports)) {
         errors.push(prefix + "rtc_transports must be an array");
     } else {
         // validate that each transport has at least a string 'type'
         for (const t of data.rtc_transports) {
-            if (typeof t !== "object" || typeof (t as any).type !== "string") {
+            if (typeof t !== "object" || t === null || typeof (t as any).type !== "string") {
                 errors.push(prefix + "rtc_transports entries must be objects with a string type");
                 break;
             }
@@ -94,12 +103,21 @@ const checkRtcMembershipData = (
     }
 
     // optional fields
-    const stickyKey = data.sticky_key ?? data.msc4354_sticky_key;
-    if (stickyKey !== undefined && typeof stickyKey !== "string") {
+    if ((data.sticky_key ?? data.msc4354_sticky_key) === undefined) {
+        errors.push(prefix + "sticky_key or msc4354_sticky_key must be a defined");
+    }
+    if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
         errors.push(prefix + "sticky_key must be a string");
     }
-    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
-        errors.push(prefix + "m.call.intent must be a string");
+    if (data.msc4354_sticky_key !== undefined && typeof data.msc4354_sticky_key !== "string") {
+        errors.push(prefix + "msc4354_sticky_key must be a string");
+    }
+    if (
+        data.sticky_key !== undefined &&
+        data.msc4354_sticky_key !== undefined &&
+        data.sticky_key !== data.msc4354_sticky_key
+    ) {
+        errors.push(prefix + "sticky_key and msc4354_sticky_key must be equal if both are defined");
     }
     if (data["m.relates_to"] !== undefined) {
         const rel = data["m.relates_to"] as RtcMembershipData["m.relates_to"];
@@ -179,20 +197,25 @@ export type SessionMembershipData = {
     "m.call.intent"?: RTCCallIntent;
 };
 
-const checkSessionsMembershipData = (
-    data: Partial<Record<keyof SessionMembershipData, any>>,
-    errors: string[],
-): data is SessionMembershipData => {
-    const prefix = "Malformed session membership event: ";
+const checkSessionsMembershipData = (data: IContent, errors: string[]): data is SessionMembershipData => {
+    const prefix = " - ";
     if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
     if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
-    if (data.focus_active !== undefined && !isLivekitFocusSelection(data.focus_active)) {
+    if (data.focus_active === undefined) {
         errors.push(prefix + "focus_active has an invalid type");
     }
-    if (data.foci_preferred !== undefined && !Array.isArray(data.foci_preferred)) {
-        errors.push(prefix + "foci_preferred must be an array");
+    if (
+        data.foci_preferred !== undefined &&
+        !(
+            Array.isArray(data.foci_preferred) &&
+            data.foci_preferred.every(
+                (f: Transport) => typeof f === "object" && f !== null && typeof f.type === "string",
+            )
+        )
+    ) {
+        errors.push(prefix + "foci_preferred must be an array of transport objects");
     }
     // optional parameters
     if (data.created_ts !== undefined && typeof data.created_ts !== "number") {
@@ -213,8 +236,7 @@ type MembershipData = { kind: "rtc"; data: RtcMembershipData } | { kind: "sessio
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
 export class CallMembership {
     public static equal(a?: CallMembership, b?: CallMembership): boolean {
-        if (a === undefined || b === undefined) return a === b;
-        return deepCompare(a.membershipData, b.membershipData);
+        return deepCompare(a?.membershipData, b?.membershipData);
     }
 
     private membershipData: MembershipData;
@@ -234,30 +256,33 @@ export class CallMembership {
         private readonly relatedEvent?: MatrixEvent,
     ) {
         const data = matrixEvent.getContent() as any;
+
+        const eventId = matrixEvent.getId();
+        const sender = matrixEvent.getSender();
+        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
+        if (sender === undefined) throw new Error("parentEvent is missing sender field");
         const sessionErrors: string[] = [];
         const rtcErrors: string[] = [];
         if (checkSessionsMembershipData(data, sessionErrors)) {
             this.membershipData = { kind: "session", data };
-        } else if (checkRtcMembershipData(data, rtcErrors)) {
+        } else if (checkRtcMembershipData(data, rtcErrors, sender)) {
             this.membershipData = { kind: "rtc", data };
         } else {
-            throw Error(
-                `unknown CallMembership data.` +
-                    `Does not match MSC4143 call.member (${sessionErrors.join(" & ")})\n` +
-                    `Does not match MSC4143 rtc.member (${rtcErrors.join(" & ")})\n` +
-                    `events this could be a legacy membership event: (${data})`,
-            );
+            const details =
+                sessionErrors.length < rtcErrors.length
+                    ? `Does not match MSC4143 m.call.member:\n${sessionErrors.join("\n")}\n\n`
+                    : `Does not match MSC4143 m.rtc.member:\n${rtcErrors.join("\n")}\n\n`;
+            const json = "\nevent:\n" + JSON.stringify(data).replaceAll('"', "'");
+            throw Error(`unknown CallMembership data.\n` + details + json);
         }
-
-        const eventId = matrixEvent.getId();
-        const sender = matrixEvent.getSender();
-
-        if (eventId === undefined) throw new Error("CallMembership matrixEvent is missing eventId field");
-        if (sender === undefined) throw new Error("CallMembership matrixEvent is missing sender field");
         this.matrixEventData = { eventId, sender };
     }
 
+    /** @deprecated use userId instead */
     public get sender(): string {
+        return this.userId;
+    }
+    public get userId(): string {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
@@ -273,7 +298,7 @@ export class CallMembership {
     }
 
     /**
-     * The slot id to find all member building one session `slot_id` (format `{application}#{id}`).
+     * The ID of the MatrixRTC slot that this membership belongs to (format `{application}#{id}`).
      * This is computed in case SessionMembershipData is used.
      */
     public get slotId(): string {
@@ -299,7 +324,20 @@ export class CallMembership {
     }
 
     public get callIntent(): RTCCallIntent | undefined {
-        return this.membershipData.data["m.call.intent"];
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case "rtc": {
+                const intent = data.application["m.call.intent"];
+                if (typeof intent === "string") {
+                    return intent;
+                }
+                logger.warn("RTC membership has invalid m.call.intent");
+                return undefined;
+            }
+            case "session":
+            default:
+                return data["m.call.intent"];
+        }
     }
 
     /**
@@ -319,7 +357,7 @@ export class CallMembership {
                 return data.application;
         }
     }
-    public get applicationData(): { type: string } & Record<string, any> {
+    public get applicationData(): { type: string; [key: string]: unknown } {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
@@ -397,14 +435,7 @@ export class CallMembership {
      * @returns true if the membership has expired, otherwise false
      */
     public isExpired(): boolean {
-        const { kind } = this.membershipData;
-        switch (kind) {
-            case "rtc":
-                return false;
-            case "session":
-            default:
-                return this.getMsUntilExpiry()! <= 0;
-        }
+        return this.getMsUntilExpiry()! <= 0;
     }
 
     /**
@@ -441,6 +472,17 @@ export class CallMembership {
         }
         return undefined;
     }
+
+    /**
+     * The focus_active filed of the session membership (m.call.member).
+     * @deprecated focus_active is not used and will be removed in future versions.
+     */
+    public getFocusActive(): LivekitFocusSelection | undefined {
+        const { kind, data } = this.membershipData;
+        if (kind === "session") return data.focus_active;
+        return undefined;
+    }
+
     /**
      * The value of the `rtc_transports` field for RTC memberships (m.rtc.member).
      * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).

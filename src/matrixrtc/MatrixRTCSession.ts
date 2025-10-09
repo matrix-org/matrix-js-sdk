@@ -249,8 +249,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
-    // The session Id of the call, this is the call_id of the call Member event.
-    private _slotId: string | undefined;
     private joinConfig?: SessionConfig;
     private logger: Logger;
 
@@ -300,7 +298,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * The slotId is the property that, per definition, groups memberships into one call.
      */
     public get slotId(): string | undefined {
-        return this._slotId;
+        return slotDescriptionToId(this.slotDescription);
     }
 
     /**
@@ -335,7 +333,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * oldest first.
      */
     public static async sessionMembershipsForSlot(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "findEventById" | "client">,
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "findEventById">,
         client: Pick<MatrixClient, "fetchRoomEvent">,
         slotDescription: SlotDescription,
         existingMemberships?: CallMembership[],
@@ -476,6 +474,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public constructor(
         private readonly client: Pick<
             MatrixClient,
+            | "on"
+            | "off"
             | "getUserId"
             | "getDeviceId"
             | "sendStateEvent"
@@ -484,25 +484,23 @@ export class MatrixRTCSession extends TypedEventEmitter<
             | "sendEvent"
             | "cancelPendingEvent"
             | "encryptAndSendToDevice"
-            | "off"
-            | "on"
             | "decryptEventIfNeeded"
             | "fetchRoomEvent"
         >,
         private roomSubset: Pick<
             Room,
-            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+            "on" | "off" | "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "findEventById"
         >,
         public memberships: CallMembership[],
         /**
-         * The session description is used to define the exact session this object is tracking.
-         * A session is distinct from another session if one of those properties differ: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
+         * The slot description is a virtual address where participants are allowed to meet.
+         * This session will only manage memberships that match this slot description.
+         * Sessions are distinct if any of those properties are distinct: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
          */
         public readonly slotDescription: SlotDescription,
     ) {
         super();
         this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
-        this._slotId = memberships[0]?.slotId;
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
@@ -541,14 +539,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * This will not subscribe to updates: remember to call subscribe() separately if
      * desired.
      * This method will return immediately and the session will be joined in the background.
-     *
-     * @param fociActive - The object representing the active focus. (This depends on the focus type.)
-     * @param fociPreferred - The list of preferred foci this member proposes to use/knows/has access to.
-     *                        For the livekit case this is a list of foci generated from the homeserver well-known, the current rtc session,
-     *                        or optionally other room members homeserver well known.
+     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
+     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
+     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
+     * transport selection will be used instead.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRoomSession(fociPreferred: Transport[], fociActive?: Transport, joinConfig?: JoinSessionConfig): void {
+    public joinRoomSession(
+        fociPreferred: Transport[],
+        multiSfuFocus?: Transport,
+        joinConfig?: JoinSessionConfig,
+    ): void {
         if (this.isJoined()) {
             this.logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
             return;
@@ -621,7 +623,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager!.join(fociPreferred, fociActive, (e) => {
+        this.membershipManager!.join(fociPreferred, multiSfuFocus, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
@@ -656,22 +658,23 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         return await leavePromise;
     }
-
     /**
-     * Get the focus in use from a specific specified member.
-     * @param member The member for which to get the active focus. If undefined, the own membership is used.
-     * @returns The focus that is currently in use to connect to this session. This is undefined
-     * if the client is not connected to this session.
-     * @deprecated use `member.getTransport(session.getOldestMembership())` instead if you want to get the active transport for a specific member.
+     * This returns the focus in use by the oldest membership.
+     * Do not use since this might be just the focus for the oldest membership. others might use a different focus.
+     * @deprecated use `member.getTransport(session.getOldestMembership())` instead for the specific member you want to get the focus for.
      */
-    public resolveActiveFocus(member?: CallMembership): Transport | undefined {
+    public getFocusInUse(): Transport | undefined {
         const oldestMembership = this.getOldestMembership();
-        if (!oldestMembership) return undefined;
-        const m = member === undefined ? this.membershipManager?.ownMembership : member;
-        if (!m) return undefined;
-        return m.getTransport(oldestMembership);
+        return oldestMembership?.getTransport(oldestMembership);
     }
 
+    /**
+     * The used focusActive of the oldest membership (to find out the selection type multi-sfu or oldest membership active focus)
+     * @deprecated does not work with m.rtc.member. Do not rely on it.
+     */
+    public getActiveFocus(): Transport | undefined {
+        return this.getOldestMembership()?.getFocusActive();
+    }
     public getOldestMembership(): CallMembership | undefined {
         return this.memberships[0];
     }
@@ -819,14 +822,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     private async recalculateSessionMembers(): Promise<void> {
         const oldMemberships = this.memberships;
-        const newMemberships = await MatrixRTCSession.sessionMembershipsForSlot(
-            this.room,
+        this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
+            this.roomSubset,
             this.client,
             this.slotDescription,
             oldMemberships,
         );
-        this.memberships = newMemberships;
-        this._slotId = this._slotId ?? this.memberships[0]?.slotId;
 
         const changed =
             oldMemberships.length != this.memberships.length ||

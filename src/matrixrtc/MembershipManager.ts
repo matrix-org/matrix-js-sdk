@@ -176,9 +176,11 @@ export class MembershipManager
     /**
      * Puts the MembershipManager in a state where it tries to be joined.
      * It will send delayed events and membership events
-     * @param fociPreferred
+     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
+     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
      * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will use multi sfu. Use `undefined` to not use `oldest_membership` selection based sfu.
+     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
+     * transport selection will be used instead.
      * @param onError This will be called once the membership manager encounters an unrecoverable error.
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      */
@@ -312,6 +314,8 @@ export class MembershipManager
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
         this.deviceId = deviceId;
+        // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
+        // we keep it as a string for now for backwards compatibility.
         this.memberId = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
@@ -760,7 +764,10 @@ export class MembershipManager
                 ? { "m.relation": { rel_type: RelationType.Reference, event_id: ownMembership?.eventId } }
                 : {};
             return {
-                application: { type: this.slotDescription.application, id: this.slotDescription.id },
+                application: {
+                    type: this.slotDescription.application,
+                    ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
+                },
                 slot_id: slotDescriptionToId(this.slotDescription),
                 rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
                 member: { device_id: this.deviceId, user_id: this.client.getUserId()!, id: this.memberId },

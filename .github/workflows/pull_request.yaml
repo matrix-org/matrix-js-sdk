@@ -49,7 +49,7 @@ jobs:
             pull-requests: write
         steps:
             - name: Check membership
-              if: github.event.pull_request.user.login != 'renovate[bot]'
+              if: github.event.pull_request.user.login != 'renovate[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
               uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3
               id: teams
               with:

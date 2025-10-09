@@ -56,7 +56,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private readonly sessionDescription: SlotDescription = { application: "m.call", id: "" }, // Default to the Matrix Call application
+        private readonly slotDescription: SlotDescription = { application: "m.call", id: "" }, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
@@ -66,7 +66,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
         // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
-            const session = await MatrixRTCSession.sessionForRoom(this.client, room, this.sessionDescription);
+            const session = await MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription);
             if (session.memberships.length > 0) {
                 this.roomSessions.set(room.roomId, session);
             }
@@ -102,7 +102,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         if (!this.roomSessions.has(room.roomId)) {
             this.roomSessions.set(
                 room.roomId,
-                await MatrixRTCSession.sessionForRoom(this.client, room, this.sessionDescription),
+                await MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription),
             );
         }
 

@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { type MatrixEvent } from "../../../src";
-import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
 import { rtcMembershipTemplate, sessionMembershipTemplate } from "./mocks";
+import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
 
 function makeMockEvent(originTs = 0, content = {}): MatrixEvent {
     return {
@@ -187,10 +187,22 @@ describe("CallMembership", () => {
 
     describe("RtcMembershipData", () => {
         const membershipTemplate = rtcMembershipTemplate;
+
         it("rejects membership with no slot_id", () => {
             expect(() => {
                 new CallMembership(makeMockEvent(0, { ...membershipTemplate, slot_id: undefined }));
             }).toThrow();
+        });
+
+        it("rejects membership with invalid slot_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, slot_id: "invalid_slot_id" }));
+            }).toThrow();
+        });
+        it("accepts membership with valid slot_id", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, slot_id: "m.call#" }));
+            }).not.toThrow();
         });
 
         it("rejects membership with no application", () => {
@@ -248,18 +260,91 @@ describe("CallMembership", () => {
                 new CallMembership(
                     makeMockEvent(0, {
                         ...membershipTemplate,
-                        member: { id: "test", device_id: "test", user_id: "@test:user.id" },
+                        member: { id: "test", device_id: "test", user_id: "@test-wrong-user:user.id" },
+                    }),
+                );
+            }).toThrow();
+        });
+        it("rejects membership with incorrect sticky_key", () => {
+            expect(() => {
+                new CallMembership(makeMockEvent(0, membershipTemplate));
+            }).not.toThrow();
+            expect(() => {
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        sticky_key: 1,
+                        msc4354_sticky_key: undefined,
+                    }),
+                );
+            }).toThrow();
+            expect(() => {
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        sticky_key: "1",
+                        msc4354_sticky_key: undefined,
                     }),
                 );
             }).not.toThrow();
+            expect(() => {
+                new CallMembership(makeMockEvent(0, { ...membershipTemplate, msc4354_sticky_key: undefined }));
+            }).toThrow();
+            expect(() => {
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        msc4354_sticky_key: 1,
+                        sticky_key: "valid",
+                    }),
+                );
+            }).toThrow();
+            expect(() => {
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        msc4354_sticky_key: "valid",
+                        sticky_key: "valid",
+                    }),
+                );
+            }).not.toThrow();
+            expect(() => {
+                new CallMembership(
+                    makeMockEvent(0, {
+                        ...membershipTemplate,
+                        msc4354_sticky_key: "valid_but_different",
+                        sticky_key: "valid",
+                    }),
+                );
+            }).toThrow();
         });
 
         it("considers memberships unexpired if local age low enough", () => {
-            // TODO link prev event
+            const now = Date.now();
+            const startEv = makeMockEvent(now - DEFAULT_EXPIRE_DURATION + 100, membershipTemplate);
+            const membershipWithRel = new CallMembership(
+                //update 900 ms later
+                makeMockEvent(now - DEFAULT_EXPIRE_DURATION + 1000, membershipTemplate),
+                startEv,
+            );
+            const membershipWithoutRel = new CallMembership(startEv);
+            expect(membershipWithRel.isExpired()).toEqual(false);
+            expect(membershipWithoutRel.isExpired()).toEqual(false);
+            expect(membershipWithoutRel.createdTs()).toEqual(membershipWithRel.createdTs());
         });
 
         it("considers memberships expired if local age large enough", () => {
-            // TODO link prev event
+            const now = Date.now();
+            const startEv = makeMockEvent(now - DEFAULT_EXPIRE_DURATION - 100, membershipTemplate);
+            const membershipWithRel = new CallMembership(
+                //update 1100 ms later (so the update is still after expiry)
+                makeMockEvent(now - DEFAULT_EXPIRE_DURATION + 1000, membershipTemplate),
+                startEv,
+            );
+            const membershipWithoutRel = new CallMembership(startEv);
+            expect(membershipWithRel.isExpired()).toEqual(true);
+            expect(membershipWithoutRel.isExpired()).toEqual(true);
+            expect(membershipWithoutRel.createdTs()).toEqual(membershipWithRel.createdTs());
         });
 
         describe("getTransport", () => {
@@ -279,6 +364,7 @@ describe("CallMembership", () => {
                 expect(membership.getTransport(oldestMembership)).toStrictEqual({ type: "livekit" });
             });
         });
+
         describe("correct values from computed fields", () => {
             const membership = new CallMembership(makeMockEvent(0, membershipTemplate));
             it("returns correct sender", () => {

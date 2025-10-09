@@ -166,7 +166,7 @@ describe("MembershipManager", () => {
                     room.roomId,
                     "org.matrix.msc4143.rtc.member",
                     {
-                        application: { type: "m.call", id: "" },
+                        application: { type: "m.call" },
                         member: {
                             user_id: "@alice:example.org",
                             id: "_@alice:example.org_AAAAAAA_m.call",

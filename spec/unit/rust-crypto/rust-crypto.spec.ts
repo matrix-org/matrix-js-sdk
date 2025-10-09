@@ -2419,6 +2419,135 @@ describe("RustCrypto", () => {
             expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][1]).toEqual(new TextEncoder().encode("asdfghjkl"));
         });
     });
+
+    describe("Verification requests", () => {
+        it("fetches device details before room verification requests", async () => {
+            // Given a RustCrypto
+            const olmMachine = mockedOlmMachine();
+            const outgoingRequestProcessor = mockedOutgoingRequestProcessor();
+            const rustCrypto = makeRustCrypto(olmMachine, outgoingRequestProcessor);
+
+            // When we receive a room verification request
+            const event = mockedEvent("!r:s.co", "@u:s.co", "m.room.message", "m.key.verification.request");
+            await rustCrypto.onLiveEventFromSync(event);
+
+            // Then we first fetch device details
+            expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalled();
+
+            // And we handle the verification event as normal
+            expect(olmMachine.receiveVerificationEvent).toHaveBeenCalled();
+        });
+
+        it("does not fetch device details before other verification events", async () => {
+            // Given a RustCrypto
+            const olmMachine = mockedOlmMachine();
+            const outgoingRequestProcessor = mockedOutgoingRequestProcessor();
+            const rustCrypto = makeRustCrypto(olmMachine, outgoingRequestProcessor);
+
+            // When we receive some verification event that is not a room request
+            const event = mockedEvent("!r:s.co", "@u:s.co", "m.key.verification.start");
+            await rustCrypto.onLiveEventFromSync(event);
+
+            // Then we do not fetch device details
+            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
+
+            // And we handle the verification event as normal
+            expect(olmMachine.receiveVerificationEvent).toHaveBeenCalled();
+        });
+
+        it("throws an error if sender is missing", async () => {
+            // Given a RustCrypto
+            const olmMachine = mockedOlmMachine();
+            const outgoingRequestProcessor = mockedOutgoingRequestProcessor();
+            const rustCrypto = makeRustCrypto(olmMachine, outgoingRequestProcessor);
+
+            // When we receive a verification event without a sender
+            // Then we throw
+            const event = mockedEvent("!r:s.co", null, "m.key.verification.start");
+
+            await expect(async () => await rustCrypto.onLiveEventFromSync(event)).rejects.toThrow(
+                "missing sender in the event",
+            );
+
+            // And we do not fetch device details or handle the event
+            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
+            expect(olmMachine.receiveVerificationEvent).not.toHaveBeenCalled();
+        });
+
+        it("throws an error if room is missing", async () => {
+            // Given a RustCrypto
+            const olmMachine = mockedOlmMachine();
+            const outgoingRequestProcessor = mockedOutgoingRequestProcessor();
+            const rustCrypto = makeRustCrypto(olmMachine, outgoingRequestProcessor);
+
+            // When we receive a verification event without a sender
+            // Then we throw
+            const event = mockedEvent(null, "@u:s.co", "m.key.verification.start");
+
+            await expect(async () => await rustCrypto.onLiveEventFromSync(event)).rejects.toThrow(
+                "missing roomId in the event",
+            );
+
+            // And we do not fetch device details or handle the event
+            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
+            expect(olmMachine.receiveVerificationEvent).not.toHaveBeenCalled();
+        });
+
+        function mockedOlmMachine(): Mocked<OlmMachine> {
+            return {
+                queryKeysForUsers: jest.fn(),
+                getVerificationRequest: jest.fn(),
+                receiveVerificationEvent: jest.fn(),
+            } as unknown as Mocked<OlmMachine>;
+        }
+
+        function makeRustCrypto(
+            olmMachine: OlmMachine,
+            outgoingRequestProcessor: OutgoingRequestProcessor,
+        ): RustCrypto {
+            const rustCrypto = new RustCrypto(
+                new DebugLogger(debug("test Verification requests")),
+                olmMachine,
+                {} as unknown as MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {} as CryptoCallbacks,
+            );
+
+            // @ts-ignore mocking outgoingRequestProcessor
+            rustCrypto.outgoingRequestProcessor = outgoingRequestProcessor;
+
+            return rustCrypto;
+        }
+
+        function mockedOutgoingRequestProcessor(): OutgoingRequestProcessor {
+            return {
+                makeOutgoingRequest: jest.fn(),
+            } as unknown as Mocked<OutgoingRequestProcessor>;
+        }
+
+        function mockedEvent(
+            roomId: string | null,
+            senderId: string | null,
+            eventType: string,
+            msgtype?: string | undefined,
+        ): MatrixEvent {
+            return {
+                isState: jest.fn().mockReturnValue(false),
+                getUnsigned: jest.fn().mockReturnValue({}),
+                isDecryptionFailure: jest.fn(),
+                isEncrypted: jest.fn(),
+                getType: jest.fn().mockReturnValue(eventType),
+                getRoomId: jest.fn().mockReturnValue(roomId),
+                getSender: jest.fn().mockReturnValue(senderId),
+                getId: jest.fn(),
+                getStateKey: jest.fn(),
+                getContent: jest.fn().mockReturnValue({ msgtype: msgtype }),
+                getTs: jest.fn(),
+            } as unknown as MatrixEvent;
+        }
+    });
 });
 
 /** Build a MatrixHttpApi instance */
