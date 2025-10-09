@@ -1058,18 +1058,12 @@ export class StickyEventMembershipManager extends MembershipManager {
         );
     };
 
-    protected actionUpdateFromErrors(
-        error: unknown,
-        type: MembershipActionType,
-        method: string,
-    ): ActionUpdate | undefined {
-        // Override method name.
-        if (method === "sendStateEvent") {
-            method = "_unstable_sendStickyEvent";
-        } else if (method === "_unstable_sendDelayedStateEvent") {
-            method = "_unstable_sendStickyDelayedEvent";
-        }
-        return super.actionUpdateFromErrors(error, type, method);
+    protected actionUpdateFromErrors(e: unknown, t: MembershipActionType, m: string): ActionUpdate | undefined {
+        const mappedMethod = new Map([
+            ["sendStateEvent", "_unstable_sendStickyEvent"],
+            ["_unstable_sendDelayedStateEvent", "_unstable_sendStickyDelayedEvent"],
+        ]).get(m);
+        return super.actionUpdateFromErrors(e, t, mappedMethod ?? "unknown method");
     }
 
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
