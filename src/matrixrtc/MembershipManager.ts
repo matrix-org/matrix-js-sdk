@@ -1062,12 +1062,12 @@ export class StickyEventMembershipManager extends MembershipManager {
         );
     };
 
+    private static nameMap = new Map([
+        ["sendStateEvent", "_unstable_sendStickyEvent"],
+        ["sendDelayedStateEvent", "_unstable_sendStickyDelayedEvent"],
+    ]);
     protected actionUpdateFromErrors(e: unknown, t: MembershipActionType, m: string): ActionUpdate | undefined {
-        const mappedMethod = new Map([
-            ["sendStateEvent", "_unstable_sendStickyEvent"],
-            ["_unstable_sendDelayedStateEvent", "_unstable_sendStickyDelayedEvent"],
-        ]).get(m);
-        return super.actionUpdateFromErrors(e, t, mappedMethod ?? "unknown method");
+        return super.actionUpdateFromErrors(e, t, StickyEventMembershipManager.nameMap.get(m) ?? "unknown");
     }
 
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
