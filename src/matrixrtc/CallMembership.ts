@@ -22,6 +22,7 @@ import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { logger } from "../logger.ts";
+import { UNSTABLE_STICKY_KEY, type StickyKeyContent } from "src/models/room-sticky-events.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -33,7 +34,7 @@ export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 type CallScope = "m.room" | "m.user";
 type Member = { user_id: string; device_id: string; id: string };
 
-export interface RtcMembershipData {
+export type RtcMembershipData = {
     "slot_id": string;
     "member": Member;
     "m.relates_to"?: {
@@ -47,9 +48,7 @@ export interface RtcMembershipData {
     };
     "rtc_transports": Transport[];
     "versions": string[];
-    "msc4354_sticky_key"?: string;
-    "sticky_key"?: string;
-}
+} & StickyKeyContent;
 
 const checkRtcMembershipData = (
     data: IContent,
@@ -103,19 +102,19 @@ const checkRtcMembershipData = (
     }
 
     // optional fields
-    if ((data.sticky_key ?? data.msc4354_sticky_key) === undefined) {
+    if ((data[UNSTABLE_STICKY_KEY.name] ?? data[UNSTABLE_STICKY_KEY.altName]) === undefined) {
         errors.push(prefix + "sticky_key or msc4354_sticky_key must be a defined");
     }
-    if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
+    if (data[UNSTABLE_STICKY_KEY.name] !== undefined && typeof data[UNSTABLE_STICKY_KEY.name] !== "string") {
         errors.push(prefix + "sticky_key must be a string");
     }
-    if (data.msc4354_sticky_key !== undefined && typeof data.msc4354_sticky_key !== "string") {
+    if (data[UNSTABLE_STICKY_KEY.altName] !== undefined && typeof data[UNSTABLE_STICKY_KEY.altName] !== "string") {
         errors.push(prefix + "msc4354_sticky_key must be a string");
     }
     if (
-        data.sticky_key !== undefined &&
-        data.msc4354_sticky_key !== undefined &&
-        data.sticky_key !== data.msc4354_sticky_key
+        data[UNSTABLE_STICKY_KEY.name] !== undefined &&
+        data[UNSTABLE_STICKY_KEY.altName] !== undefined &&
+        data[UNSTABLE_STICKY_KEY.name] !== data[UNSTABLE_STICKY_KEY.altName]
     ) {
         errors.push(prefix + "sticky_key and msc4354_sticky_key must be equal if both are defined");
     }

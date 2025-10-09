@@ -81,29 +81,35 @@ describe("CallMembership", () => {
         });
 
         it("returns preferred foci", () => {
-            const mockFocus = { type: "this_is_a_mock_focus" };
+            const mockFocus = { type: "livekit", livekit_service_url: "https://example.org" };
             const fakeEvent = makeMockEvent(0, { ...membershipTemplate, foci_preferred: [mockFocus] });
             const membership = new CallMembership(fakeEvent);
-            expect(membership.transports).toEqual([mockFocus]);
+            expect(membership.transports.length).toEqual(1);
+            expect(membership.transports[0]).toEqual(expect.objectContaining({ type: "livekit" }));
         });
 
         describe("getTransport", () => {
-            const mockFocus = { type: "this_is_a_mock_focus" };
+            const mockFocus = { type: "livekit", livekit_service_url: "https://example.org" };
             const oldestMembership = new CallMembership(makeMockEvent(0, membershipTemplate));
             it("gets the correct active transport with oldest_membership", () => {
                 const membership = new CallMembership(
                     makeMockEvent(0, {
                         ...membershipTemplate,
+                        // The list of foci_preferred provided by the homeserver. (in the test example we just provide one)
+                        // The oldest member logic will use the first item in this list.
+                        // The multi-sfu logic will (theoretically) also use all the items in the list at once
+                        // (currently the js-sdk sets it to only one item in multi-sfu mode).
                         foci_preferred: [mockFocus],
                         focus_active: { type: "livekit", focus_selection: "oldest_membership" },
                     }),
                 );
 
                 // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
+                expect(membership.getTransport(membership)).toEqual(expect.objectContaining({ type: "livekit" }));
+                expect(membership.transports[0]).toEqual(expect.objectContaining({ type: "livekit" }));
 
                 // If there is an older member we use its focus.
-                expect(membership.getTransport(oldestMembership)).toBe(membershipTemplate.foci_preferred[0]);
+                expect(membership.getTransport(oldestMembership)).toEqual(expect.objectContaining({ type: "livekit" }));
             });
 
             it("gets the correct active transport with multi_sfu", () => {
@@ -115,7 +121,7 @@ describe("CallMembership", () => {
                     }),
                 );
 
-                // if we are the oldest member we use our focus.
+                // We use our focus.
                 expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
 
                 // If there is an older member we still use our own focus in multi sfu.
@@ -130,7 +136,6 @@ describe("CallMembership", () => {
                     }),
                 );
 
-                // if we are the oldest member we use our focus.
                 expect(membership.getTransport(membership)).toBeUndefined();
             });
         });

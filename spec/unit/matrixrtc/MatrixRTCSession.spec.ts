@@ -38,7 +38,7 @@ import {
 } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 
-const mockFocus = { type: "mock" };
+const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
 
 const textEncoder = new TextEncoder();
 
