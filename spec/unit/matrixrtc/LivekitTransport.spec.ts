@@ -14,47 +14,51 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { isLivekitFocus, isLivekitFocusActive, isLivekitFocusConfig } from "../../../src/matrixrtc/LivekitFocus";
+import {
+    isLivekitTransport,
+    isLivekitFocusSelection,
+    isLivekitTransportConfig,
+} from "../../../src/matrixrtc/LivekitTransport";
 
 describe("LivekitFocus", () => {
     it("isLivekitFocus", () => {
         expect(
-            isLivekitFocus({
+            isLivekitTransport({
                 type: "livekit",
                 livekit_service_url: "http://test.com",
                 livekit_alias: "test",
             }),
         ).toBeTruthy();
-        expect(isLivekitFocus({ type: "livekit" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit" })).toBeFalsy();
         expect(
-            isLivekitFocus({ type: "not-livekit", livekit_service_url: "http://test.com", livekit_alias: "test" }),
+            isLivekitTransport({ type: "not-livekit", livekit_service_url: "http://test.com", livekit_alias: "test" }),
         ).toBeFalsy();
         expect(
-            isLivekitFocus({ type: "livekit", other_service_url: "http://test.com", livekit_alias: "test" }),
+            isLivekitTransport({ type: "livekit", other_service_url: "http://test.com", livekit_alias: "test" }),
         ).toBeFalsy();
         expect(
-            isLivekitFocus({ type: "livekit", livekit_service_url: "http://test.com", other_alias: "test" }),
+            isLivekitTransport({ type: "livekit", livekit_service_url: "http://test.com", other_alias: "test" }),
         ).toBeFalsy();
     });
     it("isLivekitFocusActive", () => {
         expect(
-            isLivekitFocusActive({
+            isLivekitFocusSelection({
                 type: "livekit",
                 focus_selection: "oldest_membership",
             }),
         ).toBeTruthy();
-        expect(isLivekitFocusActive({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitFocusActive({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitFocusSelection({ type: "livekit" })).toBeFalsy();
+        expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
     });
     it("isLivekitFocusConfig", () => {
         expect(
-            isLivekitFocusConfig({
+            isLivekitTransportConfig({
                 type: "livekit",
                 livekit_service_url: "http://test.com",
             }),
         ).toBeTruthy();
-        expect(isLivekitFocusConfig({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitFocusConfig({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
-        expect(isLivekitFocusConfig({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitTransportConfig({ type: "livekit" })).toBeFalsy();
+        expect(isLivekitTransportConfig({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
+        expect(isLivekitTransportConfig({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
     });
 });

@@ -352,12 +352,12 @@ describe("MatrixRTCSession", () => {
                 listenForMemberStateEvents: true,
             });
             expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].sessionDescription.id).toEqual("");
+            expect(sess?.memberships[0].slotDescription.id).toEqual("");
             expect(sess?.memberships[0].scope).toEqual("m.room");
             expect(sess?.memberships[0].application).toEqual("m.call");
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
-            expect(sess?.sessionDescription.id).toEqual("");
+            expect(sess?.slotDescription.id).toEqual("");
         });
         it("combines sticky and membership events when both exist", () => {
             // Create a room with identical member state and sticky state for the same user.
@@ -485,7 +485,6 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "oldest_membership",
             });
-            expect(sess.getActiveFocus()).toBe(firstPreferredFocus);
             jest.useRealTimers();
         });
         it("does not provide focus if the selection method is unknown", () => {
@@ -505,7 +504,7 @@ describe("MatrixRTCSession", () => {
                 type: "livekit",
                 focus_selection: "unknown",
             });
-            expect(sess.getActiveFocus()).toBe(undefined);
+            expect(sess.memberships.length).toBe(0);
         });
     });
 
