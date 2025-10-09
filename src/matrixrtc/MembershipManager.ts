@@ -42,6 +42,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { UNSTABLE_STICKY_KEY } from "../models/room-sticky-events.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -773,6 +774,7 @@ export class MembershipManager
                 member: { device_id: this.deviceId, user_id: this.client.getUserId()!, id: this.memberId },
                 versions: [],
                 ...relationObject,
+                [UNSTABLE_STICKY_KEY.name]: this.memberId,
             };
         } else {
             const focusObjects =

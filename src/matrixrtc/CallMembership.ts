@@ -22,7 +22,7 @@ import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { logger } from "../logger.ts";
-import { UNSTABLE_STICKY_KEY, type StickyKeyContent } from "src/models/room-sticky-events.ts";
+import { UNSTABLE_STICKY_KEY, type StickyKeyContent } from "../models/room-sticky-events.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
