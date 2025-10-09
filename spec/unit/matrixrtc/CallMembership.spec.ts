@@ -377,7 +377,8 @@ describe("CallMembership", () => {
         });
 
         describe("correct values from computed fields", () => {
-            const membership = new CallMembership(makeMockEvent(0, membershipTemplate));
+            const now = Date.now();
+            const membership = new CallMembership(makeMockEvent(now, membershipTemplate));
             it("returns correct sender", () => {
                 expect(membership.sender).toBe("@alice:example.org");
             });
@@ -411,8 +412,8 @@ describe("CallMembership", () => {
                 expect(membership.membershipID).toBe("xyzHASHxyz");
             });
             it("returns correct expiration fields", () => {
-                expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
-                expect(membership.getMsUntilExpiry()).toBe(DEFAULT_EXPIRE_DURATION - Date.now());
+                expect(membership.getAbsoluteExpiry()).toBe(now + DEFAULT_EXPIRE_DURATION);
+                expect(membership.getMsUntilExpiry()).toBe(now + DEFAULT_EXPIRE_DURATION - Date.now());
                 expect(membership.isExpired()).toBe(false);
             });
         });
@@ -432,8 +433,8 @@ describe("CallMembership", () => {
                 const initialEvent = makeMockEvent(500, membershipTemplate);
                 const membership = new CallMembership(fakeEvent, initialEvent);
                 jest.setSystemTime(2000);
-                // should be using absolute expiry time
-                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1500);
+                // should be using absolute expiry time from the new event (ts = 1000)
+                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
             });
         });
     });

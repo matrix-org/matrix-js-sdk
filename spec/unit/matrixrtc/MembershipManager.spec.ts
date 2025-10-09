@@ -162,6 +162,7 @@ describe("MembershipManager", () => {
                 memberManager.join([], focus);
                 // expects
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                // This should check for send sticky once we merge with the sticky matrixRTC branch.
                 expect(client.sendStateEvent).toHaveBeenCalledWith(
                     room.roomId,
                     "org.matrix.msc4143.rtc.member",
@@ -175,6 +176,7 @@ describe("MembershipManager", () => {
                         slot_id: "m.call#",
                         rtc_transports: [focus],
                         versions: [],
+                        msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
                     },
                     "_@alice:example.org_AAAAAAA_m.call",
                 );
