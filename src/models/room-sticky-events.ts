@@ -273,7 +273,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     /**
      * Handles incoming event redactions. Checks the sticky map
      * for any active sticky events being redacted.
-     * @param redactEventId The MatrixEvent OR event ID of the event being redacted. MAY not be a sticky event.
+     * @param redactEvent The MatrixEvent OR event ID of the event being redacted. MAY not be a sticky event.
      */
     public handleRedaction(redactEvent: MatrixEvent | string): void {
         // Note, we do not adjust`nextStickyEventExpiryTs` here.
