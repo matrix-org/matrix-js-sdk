@@ -22,7 +22,10 @@ export interface LivekitTransportConfig extends Transport {
 }
 
 export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
-    object.type === "livekit" && "livekit_service_url" in object;
+    "type" in object &&
+    object.type === "livekit" &&
+    "livekit_service_url" in object &&
+    typeof object.livekit_service_url === "string";
 
 export interface LivekitTransport extends LivekitTransportConfig {
     livekit_alias: string;
@@ -43,4 +46,7 @@ export interface LivekitFocusSelection extends Transport {
  * @deprecated see LivekitFocusSelection
  */
 export const isLivekitFocusSelection = (object: any): object is LivekitFocusSelection =>
-    object.type === "livekit" && "focus_selection" in object;
+    "type" in object &&
+    object.type === "livekit" &&
+    "focus_selection" in object &&
+    typeof object.focus_selection === "string";
