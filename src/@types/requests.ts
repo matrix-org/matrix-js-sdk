@@ -140,8 +140,8 @@ type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEven
 export type DelayedEventInfoItem = DelayedPartialEvent &
     SendDelayedEventResponse &
     SendDelayedEventRequestOpts & {
-    running_since: number;
-};
+        running_since: number;
+    };
 
 export type DelayedEventInfo = {
     scheduled?: DelayedEventInfoItem[];

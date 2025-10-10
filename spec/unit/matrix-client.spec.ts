@@ -1076,7 +1076,6 @@ describe("MatrixClient", function () {
             }
         });
 
-
         it("can update delayed events", async () => {
             const delayId = "id";
             const action = UpdateDelayedEventAction.Restart;
