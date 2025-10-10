@@ -61,4 +61,15 @@ describe("LivekitFocus", () => {
         expect(isLivekitTransportConfig({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
         expect(isLivekitTransportConfig({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
     });
+    it("does not throw with missing fields", () => {
+        expect(() => isLivekitTransport({})).not.toThrow();
+        expect(() => isLivekitTransportConfig({})).not.toThrow();
+        expect(() => isLivekitFocusSelection({})).not.toThrow();
+        expect(() => isLivekitTransport({ wrong: "field" })).not.toThrow();
+        expect(() => isLivekitTransportConfig({ wrong: "field" })).not.toThrow();
+        expect(() => isLivekitFocusSelection({ wrong: "field" })).not.toThrow();
+        expect(() => isLivekitTransport(undefined)).not.toThrow();
+        expect(() => isLivekitTransportConfig(undefined)).not.toThrow();
+        expect(() => isLivekitFocusSelection(undefined)).not.toThrow();
+    });
 });
