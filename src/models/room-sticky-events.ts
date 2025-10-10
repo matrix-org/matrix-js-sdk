@@ -29,24 +29,40 @@ export type RoomStickyEventsMap = {
  * whenever a sticky event is updated or replaced.
  */
 export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEvent, RoomStickyEventsMap> {
-    private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent[]>>(); // (type -> stickyKey+userId) -> events (SORTED BY EXPIRY)
+    /**
+     * Sticky event map is a nested map of:
+     *  eventType -> `content.sticky_key sender` -> StickyMatrixEvent[]
+     *
+     * The events are ordered in latest to earliest expiry, so that the first event
+     * in the array will always be the "current" one.
+     */
+    private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent[]>>();
+    /**
+     * These are sticky events that have no sticky key and therefore exist outside the tuple
+     * system above. They are just held in this Set until they expire.
+     */
     private readonly unkeyedStickyEvents = new Set<StickyMatrixEvent>();
 
     private stickyEventTimer?: ReturnType<typeof setTimeout>;
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
 
     /**
-     * Sort two sticky events by order of expiry.
+     * Sort two sticky events by order of expiry. This assumes the sticky events have the same
+     * `type`, `sticky_key` and `sender`.
      * @returns A positive value if event A will expire sooner, or a negative value if event B will expire sooner.
      */
     private static sortStickyEvent(eventA: StickyMatrixEvent, eventB: StickyMatrixEvent): number {
         // sticky events are not allowed to expire sooner than their predecessor.
-        if (eventB.unstableStickyExpiresAt > eventA.unstableStickyExpiresAt) {
-            return 1;
-        } else if (eventA && eventA.getTs() === eventB.getTs() && (eventB.getId() ?? "") > (eventA.getId() ?? "")) {
+        if (eventB.getTs() !== eventA.getTs()) {
+            return eventB.getTs() - eventA.getTs();
+        }
+
+        if ((eventB.getId() ?? "") > (eventA.getId() ?? "")) {
             return 1;
         }
-        return -1;
+
+        // This should fail as we've got corruption in our sticky array.
+        throw Error("Comparing two sticky events with the same event ID is not allowed.");
     }
 
     /**
@@ -56,7 +72,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     public *getStickyEvents(): Iterable<StickyMatrixEvent> {
         yield* this.unkeyedStickyEvents;
         for (const innerMap of this.stickyEventsMap.values()) {
+            // Inner map contains a map of sender+stickykeys => all sticky events
             for (const events of innerMap.values()) {
+                // The first sticky event is the "current" one in the sticky map.
                 yield events[0];
             }
         }
@@ -92,7 +110,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @param event The MatrixEvent that contains sticky data.
      * @returns An object describing whether the event was added to the map,
      *          and the previous event it may have replaced.
-     *
      */
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: StickyMatrixEvent } | { added: false } {
         const stickyKey = event.getContent().msc4354_sticky_key;
@@ -142,7 +159,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         if (!this.stickyEventsMap.has(type)) {
             this.stickyEventsMap.set(type, new Map());
         }
-        this.stickyEventsMap.get(type)!.set(innerMapKey, currentEventSet);
+        this.stickyEventsMap.get(type)?.set(innerMapKey, currentEventSet);
 
         // Recalculate the next expiry time.
         this.nextStickyEventExpiryTs = Math.min(stickyEvent.unstableStickyExpiresAt, this.nextStickyEventExpiryTs);
@@ -256,14 +273,21 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     /**
      * Handles incoming event redactions. Checks the sticky map
      * for any active sticky events being redacted.
-     * @param redactEventId The event ID of the event being redacted. MAY not be a sticky event.
+     * @param redactEventId The MatrixEvent OR event ID of the event being redacted. MAY not be a sticky event.
      */
-    public handleRedaction(redactEventId: string): void {
+    public handleRedaction(redactEvent: MatrixEvent | string): void {
         // Note, we do not adjust`nextStickyEventExpiryTs` here.
         // If this event happens to be the most recent expiring event
         // then we may do one extra iteration of cleanExpiredStickyEvents
         // but this saves us having to iterate over all events here to calculate
         // the next expiry time.
+
+        // Note, as soon as we find a positive match on an event in this function
+        // we can return. There is no need to continue iterating on a positive match
+        // as an event can only appear in one map.
+
+        // Handle unkeyedStickyEvents first since it's *quick*.
+        const redactEventId = typeof redactEvent === "string" ? redactEvent : redactEvent.getId();
         for (const event of this.unkeyedStickyEvents) {
             if (event.getId() === redactEventId) {
                 this.unkeyedStickyEvents.delete(event);
@@ -271,6 +295,55 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                 return;
             }
         }
+
+        // Faster method of finding the event since we have the event cached.
+        if (typeof redactEvent !== "string" && !redactEvent.isRedacted()) {
+            const stickyKey = redactEvent.getContent().msc4354_sticky_key;
+            if (typeof stickyKey !== "string" && stickyKey !== undefined) {
+                return; // Not a sticky event.
+            }
+            const eventType = redactEvent.getType();
+            const innerMap = this.stickyEventsMap.get(eventType);
+            if (!innerMap) {
+                return;
+            }
+            const mapKey = `${stickyKey}${redactEvent.getSender()}`;
+            const [currentEvent, ...previousEvents] = innerMap.get(mapKey) ?? [];
+            if (!currentEvent) {
+                // No event current in the map so ignore.
+                return;
+            }
+            logger.debug(`Redaction for ${redactEventId} under sticky key ${stickyKey}`);
+            // Revert to previous state, taking care to skip any other redacted events.
+            const newEvents = previousEvents.filter((e) => !e.isRedacted()).sort(RoomStickyEventsStore.sortStickyEvent);
+            this.stickyEventsMap.get(eventType)?.set(mapKey, newEvents);
+            if (newEvents.length) {
+                this.emit(
+                    RoomStickyEventsEvent.Update,
+                    [],
+                    [
+                        {
+                            // This looks confusing. This emits that the newer event
+                            // has been redacted and the previous event has taken it's place.
+                            previous: currentEvent,
+                            current: newEvents[0],
+                        },
+                    ],
+                    [],
+                );
+            } else {
+                // We did not find a previous event, so just expire.
+                innerMap.delete(mapKey);
+                if (innerMap.size === 0) {
+                    this.stickyEventsMap.delete(eventType);
+                }
+                this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
+            }
+            return;
+        }
+
+        // We only know the event ID of the redacted event, so we need to
+        // traverse the map to find our event.
         for (const [eventType, innerMap] of this.stickyEventsMap) {
             for (const [key, [currentEvent, ...previousEvents]] of innerMap) {
                 if (currentEvent.getId() !== redactEventId) {
@@ -278,32 +351,33 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                 }
                 logger.debug(`Redaction for ${redactEventId} under sticky key ${key}`);
                 // We have found the event.
-                for (const event of previousEvents) {
-                    if (!event.isRedacted() && event.unstableStickyExpiresAt >= Date.now()) {
-                        // Revert to previous state.
-                        innerMap.set(key, previousEvents.sort(RoomStickyEventsStore.sortStickyEvent));
-                        this.emit(
-                            RoomStickyEventsEvent.Update,
-                            [],
-                            [
-                                {
-                                    // This looks confusing. This emits that the newer event
-                                    // has been redacted and the previous event has taken it's place.
-                                    previous: currentEvent,
-                                    current: event,
-                                },
-                            ],
-                            [],
-                        );
-                        break;
+                const newEvents = previousEvents
+                    .filter((e) => !e.isRedacted())
+                    .sort(RoomStickyEventsStore.sortStickyEvent);
+                this.stickyEventsMap.get(currentEvent.getType())?.set(key, newEvents);
+                if (newEvents.length) {
+                    this.emit(
+                        RoomStickyEventsEvent.Update,
+                        [],
+                        [
+                            {
+                                // This looks confusing. This emits that the newer event
+                                // has been redacted and the previous event has taken it's place.
+                                previous: currentEvent,
+                                current: newEvents[0],
+                            },
+                        ],
+                        [],
+                    );
+                } else {
+                    // We did not find a previous event, so just expire.
+                    innerMap.delete(key);
+                    if (innerMap.size === 0) {
+                        this.stickyEventsMap.delete(eventType);
                     }
+                    this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
                 }
-                // We did not find a previous event, so just expire.
-                innerMap.delete(key);
-                this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
-                if (innerMap.size === 0) {
-                    this.stickyEventsMap.delete(eventType);
-                }
+                break;
             }
         }
     }

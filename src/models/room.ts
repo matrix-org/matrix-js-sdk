@@ -2631,12 +2631,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (event.isRedaction()) {
             const redactId = event.event.redacts;
 
-            if (redactId) {
-                this.stickyEvents.handleRedaction(redactId);
-            }
-
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
+            if (redactId) {
+                this.stickyEvents.handleRedaction(redactedEvent || redactId);
+            }
             if (redactedEvent) {
                 this.applyEventAsRedaction(event, redactedEvent);
             }

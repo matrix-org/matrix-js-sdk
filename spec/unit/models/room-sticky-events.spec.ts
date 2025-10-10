@@ -400,5 +400,22 @@ describe("RoomStickyEvents", () => {
             stickyEvents.handleRedaction(newestEv.getId()!);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
         });
+        it("should handle redaction with a cached event", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            jest.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, newerEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(newerEv);
+            expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
+        });
     });
 });
