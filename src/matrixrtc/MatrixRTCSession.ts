@@ -70,6 +70,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.MembershipsChanged]: (
         oldMemberships: CallMembership[],
         newMemberships: CallMembership[],
+        session: MatrixRTCSession,
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
     [MatrixRTCSessionEvent.EncryptionKeyChanged]: (
@@ -488,10 +489,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * this class.
      * Outside of tests this most likely will be a full room, however.
      * @deprecated Relying on a full Room object being available here is an anti-pattern. You should be tracking
-     * the room object in your own code and passing it in when needed.
+     * the room object in your own code and passing it in when needed. use roomId instead.
      */
     public get room(): Room {
         return this.roomSubset as Room;
+    }
+    public get roomId(): string {
+        return this.roomSubset.roomId;
     }
 
     /**
@@ -537,8 +541,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         super();
         this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        roomState?.on(RoomStateEvent.Events, this.onRoomStateUpdate);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
 
         this.setExpiryTimer();
@@ -562,6 +566,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         roomState?.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        roomState?.off(RoomStateEvent.Events, this.onRoomStateUpdate);
         this.roomSubset.off(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
     }
 
@@ -855,6 +860,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.recalculateSessionMembers();
         }
     };
+    /**
+     * Call this when a sticky event update has occured.
+     */
+    private readonly onRoomStateUpdate = (event: MatrixEvent): void => {
+        if (event.getType() !== EventType.GroupCallMemberPrefix) return;
+        this.recalculateSessionMembers();
+    };
 
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
@@ -883,7 +895,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 `Memberships for call in room ${this.roomSubset.roomId} have changed: emitting (${this.memberships.length} members)`,
             );
             logDurationSync(this.logger, "emit MatrixRTCSessionEvent.MembershipsChanged", () => {
-                this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
+                this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships, this);
             });
 
             void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
