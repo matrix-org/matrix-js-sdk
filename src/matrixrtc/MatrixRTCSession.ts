@@ -775,7 +775,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
+            this.expiryTimeout = setTimeout(this.recalculateSessionMembers, soonestExpiry);
         }
     }
 
@@ -868,12 +868,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.recalculateSessionMembers();
     };
 
-    /**
-     * Call this when something changed that may impacts the current MatrixRTC members in this session.
-     */
-    public onRTCSessionMemberUpdate = (): void => {
-        this.recalculateSessionMembers();
-    };
+    // /**
+    //  * Call this when something changed that may impacts the current MatrixRTC members in this session.
+    //  */
+    // public onRTCSessionMemberUpdate = (): void => {
+    //     this.recalculateSessionMembers();
+    // };
 
     /**
      * Call this when anything that could impact rtc memberships has changed: Room Members or RTC members.
