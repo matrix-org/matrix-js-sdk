@@ -315,6 +315,28 @@ export const UNSIGNED_THREAD_ID_FIELD = new UnstableValue("thread_id", "org.matr
  */
 export const UNSIGNED_MEMBERSHIP_FIELD = new NamespacedValue("membership", "io.element.msc4115.membership");
 
+
+/**
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+ *
+ * @experimental
+ */
+export const STICKY_EVENT_FIELD = new NamespacedValue(null, "msc4354_sticky");
+
+/**
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+ *
+ * @experimental
+ */
+export const STICKY_EVENT_KEY_FIELD = new NamespacedValue(null, "msc4354_sticky_key");
+
+/**
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+ *
+ * @experimental
+ */
+export const STICKY_EVENT_DURATION_TTL_MS = new NamespacedValue(null, "msc4354_sticky_duration_ttl_ms")
+
 /**
  * Mapped type from event type to content type for all specified non-state room events.
  */
