@@ -240,7 +240,15 @@ export interface EncryptionConfig {
 export type JoinSessionConfig = SessionConfig & MembershipConfig & EncryptionConfig;
 
 interface SessionMembershipsForRoomOpts {
+    /**
+     * Listen for incoming sticky member events. If disabled, this session will
+     * ignore any incoming sticky events.
+     */
     listenForStickyEvents: boolean;
+    /**
+     * Listen for incoming  member state events (legacy). If disabled, this session will
+     * ignore any incoming state events.
+     */
     listenForMemberStateEvents: boolean;
 }
 
@@ -334,6 +342,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
+     * 
+     * By default, this will return *both* sticky and member state events.
      */
     public static sessionMembershipsForSlot(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
