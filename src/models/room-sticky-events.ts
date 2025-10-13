@@ -24,6 +24,13 @@ export type RoomStickyEventsMap = {
     ) => void;
 };
 
+type UserId = `@${string}`;
+
+function assertIsUserId(value: unknown): asserts value is UserId {
+    if (typeof value !== "string") throw new Error("Not a string");
+    if (!value.startsWith("@")) throw new Error("Not a userId");
+}
+
 /**
  * Tracks sticky events on behalf of one room, and fires an event
  * whenever a sticky event is updated or replaced.
@@ -71,7 +78,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @param stickyKey The sticky key of an event.
      * @param sender The sender of the event.
      */
-    private static stickyMapKey(stickyKey: string, sender: string): string {
+    private static stickyMapKey(stickyKey: string, sender: UserId): string {
         return `${stickyKey}${sender}`;
     }
 
@@ -98,7 +105,8 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @returns A matching active sticky event, or undefined.
      */
     public getKeyedStickyEvent(sender: string, type: string, stickyKey: string): StickyMatrixEvent | undefined {
-        return this.stickyEventsMap.get(type)?.get(RoomStickyEventsStore.stickyMapKey(sender, stickyKey))?.[0];
+        assertIsUserId(sender);
+        return this.stickyEventsMap.get(type)?.get(RoomStickyEventsStore.stickyMapKey(stickyKey, sender))?.[0];
     }
 
     /**
@@ -133,9 +141,8 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         }
         const sender = event.getSender();
         const type = event.getType();
-        if (!sender) {
-            throw new Error(`${event.getId()} is missing a sender`);
-        } else if (event.unstableStickyExpiresAt <= Date.now()) {
+        assertIsUserId(sender);
+        if (event.unstableStickyExpiresAt <= Date.now()) {
             logger.info("ignored sticky event with older expiration time than current time", stickyKey);
             return { added: false };
         }
@@ -162,7 +169,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         // constrained so that a key will always end with a @<user_id>
         // E.g. Where a malicious event type might be "rtc.member.event@foo:bar" the key becomes:
         // "rtc.member.event.@foo:bar@bar:baz"
-        const innerMapKey = RoomStickyEventsStore.stickyMapKey(sender, stickyKey);
+        const innerMapKey = RoomStickyEventsStore.stickyMapKey(stickyKey, sender);
         const currentEventSet = [stickyEvent, ...(this.stickyEventsMap.get(type)?.get(innerMapKey) ?? [])].sort(
             RoomStickyEventsStore.sortStickyEvent,
         );
@@ -311,11 +318,12 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             }
             const eventType = redactedEvent.getType();
             const sender = redactedEvent.getSender();
+            assertIsUserId(sender);
             const innerMap = this.stickyEventsMap.get(eventType);
-            if (!innerMap || !sender) {
+            if (!innerMap) {
                 return;
             }
-            const mapKey = RoomStickyEventsStore.stickyMapKey(sender, stickyKey);
+            const mapKey = RoomStickyEventsStore.stickyMapKey(stickyKey, sender);
             const [currentEvent, ...previousEvents] = innerMap.get(mapKey) ?? [];
             if (!currentEvent) {
                 // No event current in the map so ignore.
