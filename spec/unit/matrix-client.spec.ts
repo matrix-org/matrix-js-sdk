@@ -1055,11 +1055,11 @@ describe("MatrixClient", function () {
 
         describe("lookups", () => {
             const statuses = [undefined, "scheduled" as const, "finalised" as const];
-            const delayIds = [undefined, "d123"];
+            const delayIdLists = [[], ["d123"], ["d789", "d789"]];
             const inputs = statuses.flatMap((status) =>
-                delayIds.map((delayId) => [status, delayId] as [(typeof statuses)[0], (typeof delayIds)[0]]),
+                delayIdLists.map((delayIds) => [status, delayIds] as [(typeof statuses)[0], (typeof delayIdLists)[0]]),
             );
-            it.each(inputs)("can look up delayed events (status = %s, delayId = %s)", async (status, delayId) => {
+            it.each(inputs)("can look up delayed events (status = %s, delayId = %s)", async (status, delayIds) => {
                 httpLookups = [
                     {
                         method: "GET",
@@ -1067,13 +1067,13 @@ describe("MatrixClient", function () {
                         path: "/delayed_events",
                         expectQueryParams: {
                             status,
-                            delay_id: delayId,
+                            delay_id: delayIds,
                         },
                         data: [],
                     },
                 ];
 
-                await client._unstable_getDelayedEvents(status, delayId);
+                await client._unstable_getDelayedEvents(status, delayIds);
             });
         });
 

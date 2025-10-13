@@ -3545,7 +3545,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // eslint-disable-next-line
     public async _unstable_getDelayedEvents(
         status?: "scheduled" | "finalised",
-        delayId?: string,
+        delayIds?: string[],
         fromToken?: string,
     ): Promise<DelayedEventInfo> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
@@ -3558,8 +3558,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const queryDict = {
             from: fromToken,
             status,
-            // TODO: support multiple delayIds, but then query parameters must not be a dict
-            delay_id: delayId,
+            delay_id: delayIds,
         };
         return await this.http.authedRequest(Method.Get, "/delayed_events", queryDict, undefined, {
             prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
