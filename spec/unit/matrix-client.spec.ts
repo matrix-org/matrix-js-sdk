@@ -1054,26 +1054,27 @@ describe("MatrixClient", function () {
         });
 
         describe("lookups", () => {
-            for (const status of [undefined, "scheduled", "finalised"] as const) {
-                for (const delayId of [undefined, "d123"]) {
-                    it(`can look up ${delayId ? "a single " : ""}${status ? status + " " : ""}delayed event${delayId ? "" : "s"}`, async () => {
-                        httpLookups = [
-                            {
-                                method: "GET",
-                                prefix: unstableMSC4140Prefix,
-                                path: "/delayed_events",
-                                expectQueryParams: {
-                                    status,
-                                    delay_id: delayId,
-                                },
-                                data: [],
-                            },
-                        ];
+            const statuses = [undefined, "scheduled" as const, "finalised" as const];
+            const delayIds = [undefined, "d123"];
+            const inputs = statuses.flatMap((status) =>
+                delayIds.map((delayId) => [status, delayId] as [(typeof statuses)[0], (typeof delayIds)[0]]),
+            );
+            it.each(inputs)("can look up delayed events (status = %s, delayId = %s)", async (status, delayId) => {
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: "/delayed_events",
+                        expectQueryParams: {
+                            status,
+                            delay_id: delayId,
+                        },
+                        data: [],
+                    },
+                ];
 
-                        await client._unstable_getDelayedEvents(status, delayId);
-                    });
-                }
-            }
+                await client._unstable_getDelayedEvents(status, delayId);
+            });
         });
 
         it("can update delayed events", async () => {
