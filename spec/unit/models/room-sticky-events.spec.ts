@@ -367,6 +367,7 @@ describe("RoomStickyEvents", () => {
             });
             // Redact the newer event
             stickyEvents.handleRedaction(newestEv.getId()!);
+            // expect immediate transition from newestEv -> ev and skipping middleEv
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
         });
         it("should revert to the most recent valid event regardless of insertion order", () => {
@@ -400,7 +401,7 @@ describe("RoomStickyEvents", () => {
             stickyEvents.handleRedaction(newestEv.getId()!);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
         });
-        it("should handle redaction with a cached event", () => {
+        it("should handle redaction when using `handleRedaction` with a `MatrixEvent` parameter", () => {
             const emitSpy = jest.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
