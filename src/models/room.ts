@@ -2634,7 +2634,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactId) {
-                this.stickyEvents.handleRedaction(redactedEvent || redactId);
+                try {
+                    this.stickyEvents.handleRedaction(redactedEvent || redactId);
+                } catch (ex) {
+                    // Non-critical failure, but we should warn.
+                    logger.error("Failed to handle redaction for sticky event", ex);
+                }
             }
             if (redactedEvent) {
                 this.applyEventAsRedaction(event, redactedEvent);
