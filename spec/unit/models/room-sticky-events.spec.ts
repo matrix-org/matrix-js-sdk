@@ -259,4 +259,164 @@ describe("RoomStickyEvents", () => {
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
     });
+
+    describe("handleRedaction", () => {
+        beforeAll(() => {
+            jest.useFakeTimers();
+        });
+        afterAll(() => {
+            jest.useRealTimers();
+        });
+        it("should not emit if the event does not exist in the map", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                content: {},
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([ev]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction("$123456");
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
+        it("should emit a remove when the event exists in the map without a predecessor", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([ev]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(stickyEvent.event_id);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
+        });
+        it("should emit a remove when the event has no sticky key", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                content: {},
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([ev]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(stickyEvent.event_id);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
+        });
+        it("should emit an update when the event exists in the map with a predecessor", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            jest.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, newerEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(newerEv.getId()!);
+            expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
+        });
+        it("should emit a remove if the previous event has expired", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            jest.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, newerEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Expire the older event.
+            jest.advanceTimersByTime(stickyEvent.msc4354_sticky.duration_ms);
+            // Redact the newer event
+            stickyEvents.handleRedaction(newerEv.getId()!);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [newerEv]);
+        });
+        it("should recurse the chain of events if the previous event has been redacted", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            jest.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const middleEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            jest.advanceTimersByTime(1000);
+            const newestEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newest-ev",
+                origin_server_ts: Date.now() + 2000,
+            });
+            stickyEvents.addStickyEvents([ev, middleEv, newestEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Mark the middle event as redacted.
+            middleEv.setUnsigned({
+                redacted_because: {
+                    event_id: "$foo",
+                } as any,
+            });
+            // Redact the newer event
+            stickyEvents.handleRedaction(newestEv.getId()!);
+            // expect immediate transition from newestEv -> ev and skipping middleEv
+            expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
+        });
+        it("should revert to the most recent valid event regardless of insertion order", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            jest.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const middleEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            jest.advanceTimersByTime(1000);
+            const newestEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newest-ev",
+                origin_server_ts: Date.now() + 2000,
+            });
+            // Invert in reverse order, to make sure we retain the older events.
+            stickyEvents.addStickyEvents([newestEv, middleEv, ev]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Mark the middle event as redacted.
+            middleEv.setUnsigned({
+                redacted_because: {
+                    event_id: "$foo",
+                } as any,
+            });
+            // Redact the newer event
+            stickyEvents.handleRedaction(newestEv.getId()!);
+            expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
+        });
+        it("should handle redaction when using `handleRedaction` with a `MatrixEvent` parameter", () => {
+            const emitSpy = jest.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            jest.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, newerEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(newerEv);
+            expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
+        });
+    });
 });
