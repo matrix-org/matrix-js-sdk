@@ -3604,10 +3604,10 @@ eslint-plugin-jsdoc@^50.0.0:
     semver "^7.7.2"
     spdx-expression-parse "^4.0.0"
 
-eslint-plugin-matrix-org@2.2.1:
-  version "2.2.1"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-2.2.1.tgz#97304c0c1f74c200bf461f69bef76ac2c742cf96"
-  integrity sha512-TiNxZ/O/QZCfaeYG5OcL96dPV2A4qvt06+I4z/YjLBCtvb9aRSuUV8Kvrgb7FJha0TyB9V4p3LPDhfMni8N9LQ==
+eslint-plugin-matrix-org@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-3.0.0.tgz#0e5eaa556b6780dcd616b1381baec252df78b56d"
+  integrity sha512-xOPMeyLxOgoB2SsPhJmIc+drorZmXozSBo3X9whk/62DvbVpJcnththOCGx8ljYScADLb+baNOeN+wKZqwkldw==
 
 eslint-plugin-n@^14.0.0:
   version "14.0.0"

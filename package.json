@@ -99,7 +99,7 @@
         "eslint-plugin-import": "^2.26.0",
         "eslint-plugin-jest": "^28.0.0",
         "eslint-plugin-jsdoc": "^50.0.0",
-        "eslint-plugin-matrix-org": "2.2.1",
+        "eslint-plugin-matrix-org": "^3.0.0",
         "eslint-plugin-n": "^14.0.0",
         "eslint-plugin-tsdoc": "^0.4.0",
         "eslint-plugin-unicorn": "^56.0.0",
