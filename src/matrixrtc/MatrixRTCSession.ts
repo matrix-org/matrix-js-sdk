@@ -342,7 +342,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
-     * 
+     *
      * By default, this will return *both* sticky and member state events.
      */
     public static sessionMembershipsForSlot(
@@ -393,7 +393,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             const membershipContents: any[] = [];
 
             // We first decide if its a MSC4143 event (per device state key)
-            if (eventKeysCount > 1 && "focus_active" in content) {
+            if (eventKeysCount > 1 && "application" in content) {
                 // We have a MSC4143 event membership event
                 membershipContents.push(content);
             } else if (eventKeysCount === 1 && "memberships" in content) {
