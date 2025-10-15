@@ -360,7 +360,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         if (listenForStickyEvents) {
             // prefill with sticky events
             callMemberEvents = [...room._unstable_getStickyEvents()].filter(
-                (e) => e.getType() === EventType.GroupCallMemberPrefix,
+                (e) => e.getType() === EventType.RTCMembership,
             );
         }
         if (listenForMemberStateEvents) {
@@ -861,7 +861,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.logger.debug("Sticky event update", { added, updated, removed });
         if (
             [...added, ...removed, ...updated.flatMap((v) => [v.current, v.previous])].some(
-                (e) => e.getType() === EventType.GroupCallMemberPrefix,
+                (e) => e.getType() === EventType.RTCMembership,
             )
         ) {
             this.recalculateSessionMembers();

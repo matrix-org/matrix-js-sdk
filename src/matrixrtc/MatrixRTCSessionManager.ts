@@ -118,7 +118,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     private readonly onEvent = (event: MatrixEvent): void => {
         if (!event.unstableStickyExpiresAt) return; // Not sticky, not interested.
 
-        if (event.getType() !== EventType.GroupCallMemberPrefix) return;
+        if (event.getType() !== EventType.RTCMembership) return;
 
         const room = this.client.getRoom(event.getRoomId());
         if (!room) return;
