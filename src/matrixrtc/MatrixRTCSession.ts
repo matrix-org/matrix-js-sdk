@@ -50,6 +50,7 @@ import {
 } from "./RoomAndToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
+import { M_TEXT } from "matrix-events-sdk";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -98,6 +99,11 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
+
+    /**
+     * An optional URL to be provided to allow guests to join the call via fallbacks.
+     */
+    guestUrl?: () => string;
 }
 
 /**
@@ -754,6 +760,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             response: ISendEventResponse;
             content: IRTCNotificationContent;
         }> => {
+            const guestUrl = this.joinConfig?.guestUrl?.() ?? "";
             const content: IRTCNotificationContent = {
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": notificationType,
@@ -761,6 +768,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     event_id: parentEventId,
                     rel_type: RelationType.Reference,
                 },
+                [M_TEXT.name]: [{
+                    body: `Starting a new ${callIntent === "voice" ? "voice": "video"} call.` + (guestUrl && `Join via ${guestUrl}`),
+                }, {
+                    body: `Starting a new ${callIntent === "voice" ? "voice": "video"}</b> call.` + (guestUrl && `<a href="${guestUrl}">Click here to join</a>`),
+                    mimetype: "text/html"
+                }],
                 "sender_ts": Date.now(),
                 "lifetime": 30_000, // 30 seconds
             };
