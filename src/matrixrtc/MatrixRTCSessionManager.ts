@@ -20,8 +20,9 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession, type SlotDescription } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession, slotDescriptionToId, type SlotDescription } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import type { SlotMissingError } from "./types.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -49,9 +50,11 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     // is only ever one single room session object for any given room for the lifetime of the
     // client: that way there can never be any code holding onto a stale object that is no
     // longer the correct session object for the room.
-    private roomSessions = new Map<string, MatrixRTCSession>();
+    private roomSessions = new Map<string, {[slotId: string]: MatrixRTCSession}>();
 
     private readonly logger: Logger;
+
+    private readonly callSlotId: string;
 
     public constructor(
         rootLogger: Logger,
@@ -60,15 +63,17 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
+        this.callSlotId = slotDescriptionToId(this.slotDescription);
     }
 
     public start(): void {
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
         // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
-            const session = MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription);
-            if (session.memberships.length > 0) {
-                this.roomSessions.set(room.roomId, session);
+            const session = MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription);
+            if (session&& session.memberships.length > 0) {
+                const existing = this.roomSessions.get(room.roomId) ?? {};
+                this.roomSessions.set(room.roomId, {...existing, [session.slotId]: session});
             }
         }
 
@@ -78,7 +83,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     public stop(): void {
-        for (const sess of this.roomSessions.values()) {
+        for (const sess of [...this.roomSessions.values()].flatMap(s => Object.values(s))) {
             void sess.stop();
         }
         this.roomSessions.clear();
@@ -93,22 +98,24 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
      * no current session
      */
     public getActiveRoomSession(room: Room): MatrixRTCSession | undefined {
-        return this.roomSessions.get(room.roomId)!;
+        return this.roomSessions.get(room.roomId)?.[this.callSlotId];
     }
 
     /**
      * Gets the main MatrixRTC session for a room, returning an empty session
      * if no members are currently participating
+     * @throws May throw a SlotMissingError
+     * @see {@link SlotMissingError}
      */
     public getRoomSession(room: Room): MatrixRTCSession {
-        if (!this.roomSessions.has(room.roomId)) {
-            this.roomSessions.set(
-                room.roomId,
-                MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription),
-            );
+        const existingSession = this.getActiveRoomSession(room);
+        if (existingSession) {
+            return existingSession;
         }
-
-        return this.roomSessions.get(room.roomId)!;
+        const session = MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription);
+        const existing = this.roomSessions.get(room.roomId) ?? {};
+        this.roomSessions.set(room.roomId, {...existing, [session.slotId]: session});
+        return session;
     }
 
     private onRoom = (room: Room): void => {
@@ -127,6 +134,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private readonly onRoomState = (event: MatrixEvent): void => {
+        // TODO: Signal if the slot has been removed.
         if (event.getType() !== EventType.GroupCallMemberPrefix) {
             return;
         }

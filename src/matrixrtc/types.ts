@@ -13,9 +13,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { NamespacedValue } from "src/NamespacedValue.ts";
 import type { IMentions } from "../matrix.ts";
 import type { RelationEvent } from "../types.ts";
 import type { CallMembership } from "./CallMembership.ts";
+import { SlotDescription, slotDescriptionToId } from "./MatrixRTCSession.ts";
 
 export type ParticipantId = string;
 
@@ -163,4 +165,14 @@ export const isMyMembership = (m: CallMembership, userId: string, deviceId: stri
 export interface Transport {
     type: string;
     [key: string]: unknown;
+}
+
+
+
+export const SlotEventType = new NamespacedValue(null, "org.matrix.msc4143.rtc.slot"); // m.rtc.slot
+
+export class SlotMissingError extends Error {
+    public constructor (public readonly roomId: string, public readonly slotDescription: SlotDescription) {
+        super(`Room ${roomId} has no slot ${slotDescriptionToId(slotDescription)}, cannot start session.`);
+    }
 }

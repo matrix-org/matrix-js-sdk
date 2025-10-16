@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { EventTimeline } from "../models/event-timeline.ts";
+import { Direction, EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
@@ -27,14 +27,16 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
-import type {
-    Statistics,
-    RTCNotificationType,
-    Status,
-    IRTCNotificationContent,
-    ICallNotifyContent,
-    RTCCallIntent,
-    Transport,
+import {
+    type Statistics,
+    type RTCNotificationType,
+    type Status,
+    type IRTCNotificationContent,
+    type ICallNotifyContent,
+    type RTCCallIntent,
+    type Transport,
+    SlotEventType,
+    SlotMissingError,
 } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
@@ -307,10 +309,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * The slotId of the call.
      * `{application}#{appSpecificId}`
-     * It can be undefined since the slotId is only known once the first membership joins.
      * The slotId is the property that, per definition, groups memberships into one call.
      */
-    public get slotId(): string | undefined {
+    public get slotId(): string {
         return slotDescriptionToId(this.slotDescription);
     }
 
@@ -458,12 +459,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         room: Room,
         opts?: SessionMembershipsForRoomOpts,
     ): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(
-            room,
-            { id: "", application: "m.call" },
-            opts,
-        );
-        return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
+        return MatrixRTCSession.sessionForSlot(client, room, { id: "", application: "m.call"}, opts);
     }
 
     /**
@@ -485,6 +481,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         opts?: SessionMembershipsForRoomOpts,
     ): MatrixRTCSession {
         const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(room, slotDescription, opts);
+        // Find the slot first.
+        const slot = room.getLiveTimeline().getState(Direction.Forward)?.getStateEvents(SlotEventType.name, slotDescriptionToId(slotDescription));
+        if (Object.values(slot?.getContent() ?? {}).length === 0) {
+            // Slot is closed or missing.
+            throw new SlotMissingError(room.roomId, slotDescription);
+        }
         return new MatrixRTCSession(client, room, callMemberships, slotDescription);
     }
 
