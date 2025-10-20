@@ -20,6 +20,7 @@ import { type IEventWithRoomId, type SearchKey } from "./search.ts";
 import { type IRoomEventFilter } from "../filter.ts";
 import { type Direction } from "../models/event-timeline.ts";
 import { type PushRuleAction } from "./PushRules.ts";
+import { type MatrixError } from "../matrix.ts";
 import { type IRoomEvent } from "../sync-accumulator.ts";
 import { type EventType, type RelationType, type RoomType } from "./event.ts";
 
@@ -136,12 +137,22 @@ type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
 
 type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
 
+export type DelayedEventInfoItem = DelayedPartialEvent &
+    SendDelayedEventResponse &
+    SendDelayedEventRequestOpts & {
+        running_since: number;
+    };
+
 export type DelayedEventInfo = {
-    delayed_events: (DelayedPartialEvent &
-        SendDelayedEventResponse &
-        SendDelayedEventRequestOpts & {
-            running_since: number;
-        })[];
+    scheduled?: DelayedEventInfoItem[];
+    finalised?: {
+        delayed_event: DelayedEventInfoItem;
+        outcome: "send" | "cancel";
+        reason: "error" | "action" | "delay";
+        error?: MatrixError["data"];
+        event_id?: string;
+        origin_server_ts?: number;
+    }[];
     next_batch?: string;
 };
 

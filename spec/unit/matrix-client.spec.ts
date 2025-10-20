@@ -1053,17 +1053,28 @@ describe("MatrixClient", function () {
             );
         });
 
-        it("can look up delayed events", async () => {
-            httpLookups = [
-                {
-                    method: "GET",
-                    prefix: unstableMSC4140Prefix,
-                    path: "/delayed_events",
-                    data: [],
-                },
-            ];
+        describe("lookups", () => {
+            const statuses = [undefined, "scheduled" as const, "finalised" as const];
+            const delayIds = [undefined, "dxyz", ["d123"], ["d456", "d789"]];
+            const inputs = statuses.flatMap((status) =>
+                delayIds.map((delayId) => [status, delayId] as [(typeof statuses)[0], (typeof delayIds)[0]]),
+            );
+            it.each(inputs)("can look up delayed events (status = %s, delayId = %s)", async (status, delayId) => {
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: "/delayed_events",
+                        expectQueryParams: {
+                            status,
+                            delay_id: delayId,
+                        },
+                        data: [],
+                    },
+                ];
 
-            await client._unstable_getDelayedEvents();
+                await client._unstable_getDelayedEvents(status, delayId);
+            });
         });
 
         it("can update delayed events", async () => {
