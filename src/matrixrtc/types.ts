@@ -105,7 +105,7 @@ export type RTCCallIntent = "audio" | "video" | string;
 
 /**
  * This will check if the content has all the expected fields to be a valid IRTCNotificationContent.
- * It will also cap the lifetime to 120000ms if a higher value is provided.
+ * It will also cap the lifetime to 90000ms (1.5 min) if a higher value is provided.
  * @param content
  * @throws if the content is invalid
  * @returns a parsed IRTCNotificationContent
@@ -131,7 +131,7 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
         throw new Error("Invalid m.call.intent");
     }
 
-    const cappedLifetime = content["lifetime"] >= 120000 ? 120000 : content["lifetime"];
+    const cappedLifetime = content["lifetime"] >= 90000 ? 90000 : content["lifetime"];
     return { ...content, lifetime: cappedLifetime } as IRTCNotificationContent;
 }
 

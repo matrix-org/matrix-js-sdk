@@ -53,9 +53,9 @@ describe("IRTCNotificationContent", () => {
         expect(res).toMatchObject(validBase);
     });
 
-    it("caps lifetime to 120000ms", () => {
+    it("caps lifetime to 90000ms", () => {
         const res = parseCallNotificationContent({ ...validBase, lifetime: 130000 });
-        expect(res.lifetime).toBe(120000);
+        expect(res.lifetime).toBe(90000);
     });
 
     it("throws on malformed m.mentions", () => {
