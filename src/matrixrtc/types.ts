@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import type { IMentions } from "../matrix.ts";
+import type { IContent, IMentions } from "../matrix.ts";
 import type { RelationEvent } from "../types.ts";
 import type { CallMembership } from "./CallMembership.ts";
 
@@ -102,9 +102,45 @@ export type RTCNotificationType = "ring" | "notification";
  * May be any string, although `"audio"` and `"video"` are commonly accepted values.
  */
 export type RTCCallIntent = "audio" | "video" | string;
+
+/**
+ * This will check if the content has all the expected fields to be a valid IRTCNotificationContent.
+ * It will also cap the lifetime to 90000ms (1.5 min) if a higher value is provided.
+ * @param content
+ * @throws if the content is invalid
+ * @returns a parsed IRTCNotificationContent
+ */
+export function parseCallNotificationContent(content: IContent): IRTCNotificationContent {
+    if (content["m.mentions"] && typeof content["m.mentions"] !== "object") {
+        throw new Error("malformed m.mentions");
+    }
+    if (typeof content["notification_type"] !== "string") {
+        throw new Error("Missing or invalid notification_type");
+    }
+    if (typeof content["sender_ts"] !== "number") {
+        throw new Error("Missing or invalid sender_ts");
+    }
+    if (typeof content["lifetime"] !== "number") {
+        throw new Error("Missing or invalid lifetime");
+    }
+
+    if (content["relation"] && content["relation"]["rel_type"] !== "m.reference") {
+        throw new Error("Invalid relation");
+    }
+    if (content["m.call.intent"] && typeof content["m.call.intent"] !== "string") {
+        throw new Error("Invalid m.call.intent");
+    }
+
+    const cappedLifetime = content["lifetime"] >= 90000 ? 90000 : content["lifetime"];
+    return { ...content, lifetime: cappedLifetime } as IRTCNotificationContent;
+}
+
+/**
+ * Interface for `org.matrix.msc4075.rtc.notification` events.
+ * Don't cast event content to this directly. Use `parseCallNotificationContent` instead to validate the content first.
+ */
 export interface IRTCNotificationContent extends RelationEvent {
-    "m.mentions": IMentions;
-    "decline_reason"?: string;
+    "m.mentions"?: IMentions;
     "notification_type": RTCNotificationType;
     /**
      * The initial intent of the calling user.
