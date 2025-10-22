@@ -854,9 +854,27 @@ describe("RustCrypto", () => {
         });
     });
 
+    it("getSecretStorageStatus", async () => {
+        const mockSecretStorage = {
+            getDefaultKeyId: jest.fn().mockResolvedValue("blah"),
+            isStored: jest.fn().mockResolvedValue({ blah: {} }),
+        } as unknown as Mocked<ServerSideSecretStorage>;
+        const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, mockSecretStorage);
+        await expect(rustCrypto.getSecretStorageStatus()).resolves.toEqual({
+            defaultKeyId: "blah",
+            ready: true,
+            secretStorageKeyValidityMap: {
+                "m.cross_signing.master": true,
+                "m.cross_signing.self_signing": true,
+                "m.cross_signing.user_signing": true,
+            },
+        });
+    });
+
     it("isSecretStorageReady", async () => {
         const mockSecretStorage = {
             getDefaultKeyId: jest.fn().mockResolvedValue(null),
+            isStored: jest.fn().mockResolvedValue(null),
         } as unknown as Mocked<ServerSideSecretStorage>;
         const rustCrypto = await makeTestRustCrypto(undefined, undefined, undefined, mockSecretStorage);
         await expect(rustCrypto.isSecretStorageReady()).resolves.toBe(false);
