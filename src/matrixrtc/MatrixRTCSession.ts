@@ -917,9 +917,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             // (If we were the joiner we already did sent the notification in the block above.)
             if (this.memberships.length > 0) this.pendingNotificationToSend = undefined;
         } else {
-            this.logger.debug(
-                `No membership changes detected for room ${this.roomSubset.roomId}`,
-            );
+            this.logger.debug(`No membership changes detected for room ${this.roomSubset.roomId}`);
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
