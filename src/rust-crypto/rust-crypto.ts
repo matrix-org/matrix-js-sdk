@@ -858,7 +858,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         };
 
         for (const secretName of secretsToCheck) {
-            // check which keys this particular secret is encrypted with
+            // Check which keys this particular secret is encrypted with
             const record = (await this.secretStorage.isStored(secretName)) || {};
 
             // If it's encrypted with the right key, it is valid
