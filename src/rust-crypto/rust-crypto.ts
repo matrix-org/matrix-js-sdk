@@ -65,6 +65,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type OwnDeviceKeys,
+    type SecretStorageStatus,
     type StartDehydrationOpts,
     UserVerificationStatus,
     type VerificationRequest,
@@ -78,7 +79,7 @@ import {
     type ServerSideSecretStorage,
 } from "../secret-storage.ts";
 import { CrossSigningIdentity } from "./CrossSigningIdentity.ts";
-import { secretStorageCanAccessSecrets, secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
+import { secretStorageContainsCrossSigningKeys } from "./secret-storage.ts";
 import { isVerificationEvent, RustVerificationRequest, verificationMethodIdentifierToMethod } from "./verification.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
@@ -827,6 +828,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#isSecretStorageReady}
      */
     public async isSecretStorageReady(): Promise<boolean> {
+        return (await this.getSecretStorageStatus()).ready;
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getSecretStorageStatus}
+     */
+    public async getSecretStorageStatus(): Promise<SecretStorageStatus> {
         // make sure that the cross-signing keys are stored
         const secretsToCheck: SecretStorageKey[] = [
             "m.cross_signing.master",
@@ -834,13 +842,32 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             "m.cross_signing.self_signing",
         ];
 
-        // if key backup is active, we also need to check that the backup decryption key is stored
+        // If key backup is active, we also need to check that the backup decryption key is stored
         const keyBackupEnabled = (await this.backupManager.getActiveBackupVersion()) != null;
         if (keyBackupEnabled) {
             secretsToCheck.push("m.megolm_backup.v1");
         }
 
-        return secretStorageCanAccessSecrets(this.secretStorage, secretsToCheck);
+        const defaultKeyId = await this.secretStorage.getDefaultKeyId();
+
+        const result: SecretStorageStatus = {
+            // Assume we have all secrets until proven otherwise
+            ready: true,
+            defaultKeyId,
+            secretStorageKeyValidityMap: {},
+        };
+
+        for (const secretName of secretsToCheck) {
+            // Check which keys this particular secret is encrypted with
+            const record = (await this.secretStorage.isStored(secretName)) || {};
+
+            // If it's encrypted with the right key, it is valid
+            const secretStored = !!defaultKeyId && defaultKeyId in record;
+            result.secretStorageKeyValidityMap[secretName] = secretStored;
+            result.ready = result.ready && secretStored;
+        }
+
+        return result;
     }
 
     /**
