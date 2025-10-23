@@ -21,6 +21,7 @@ import {
     type SendDelayedEventResponse,
     UpdateDelayedEventAction,
 } from "../@types/requests.ts";
+import { type EmptyObject } from "../@types/common.ts";
 import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
@@ -46,7 +47,6 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
-import { type EmptyObject } from "src/matrix.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
