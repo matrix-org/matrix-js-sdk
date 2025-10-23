@@ -89,7 +89,11 @@ On Leave: ─────────  STOP ALL ABOVE
 (s) Successful restart/resend
 */
 
-const STICK_DURATION_MS = 60 * 60 * 1000; // 60 minutes
+/**
+ * Call membership should always remain sticky for this amount
+ * of time.
+ */
+const MEMBERSHIP_STICKY_DURATION_MS = 60 * 60 * 1000; // 60 minutes
 
 /**
  * The different types of actions the MembershipManager can take.
@@ -399,7 +403,7 @@ export class MembershipManager
     private computeNextExpiryActionTs(iteration: number): number {
         return (
             this.state.startTime +
-            Math.min(this.membershipEventExpiryMs, STICK_DURATION_MS) * iteration -
+            Math.min(this.membershipEventExpiryMs, MEMBERSHIP_STICKY_DURATION_MS) * iteration -
             this.membershipEventExpiryHeadroomMs
         );
     }
@@ -1039,7 +1043,7 @@ export class StickyEventMembershipManager extends MembershipManager {
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
         this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
-            STICK_DURATION_MS,
+            MEMBERSHIP_STICKY_DURATION_MS,
             { delay: this.delayedLeaveEventDelayMs },
             null,
             EventType.RTCMembership,
@@ -1051,7 +1055,7 @@ export class StickyEventMembershipManager extends MembershipManager {
     ) => Promise<ISendEventResponse> = (myMembership) => {
         return this.clientWithSticky._unstable_sendStickyEvent(
             this.room.roomId,
-            STICK_DURATION_MS,
+            MEMBERSHIP_STICKY_DURATION_MS,
             null,
             EventType.RTCMembership,
             { ...myMembership, msc4354_sticky_key: this.memberId },

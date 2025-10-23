@@ -858,7 +858,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         updated,
         removed,
     ): void => {
-        this.logger.debug("Sticky event update", { added, updated, removed });
         if (
             [...added, ...removed, ...updated.flatMap((v) => [v.current, v.previous])].some(
                 (e) => e.getType() === EventType.RTCMembership,
@@ -917,6 +916,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
             // If anyone else joins the session it is no longer our responsibility to send the notification.
             // (If we were the joiner we already did sent the notification in the block above.)
             if (this.memberships.length > 0) this.pendingNotificationToSend = undefined;
+        } else {
+            this.logger.debug(
+                `No membership changes detected for room ${this.roomSubset.roomId}`,
+            );
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
