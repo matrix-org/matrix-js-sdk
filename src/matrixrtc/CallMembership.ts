@@ -196,7 +196,7 @@ export type SessionMembershipData = {
      */
     "m.call.intent"?: RTCCallIntent;
     /**
-     * the sticky key for sticky events packed application + device_id making up the used slot + device.
+     * The sticky key in case of a sticky event. This string encodes the application + device_id indicating the used slot + device.
      */
     "msc4354_sticky_key"?: string;
 };
