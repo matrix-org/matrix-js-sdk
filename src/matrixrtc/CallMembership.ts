@@ -195,6 +195,10 @@ export type SessionMembershipData = {
      * something else.
      */
     "m.call.intent"?: RTCCallIntent;
+    /**
+     * The sticky key in case of a sticky event. This string encodes the application + device_id indicating the used slot + device.
+     */
+    "msc4354_sticky_key"?: string;
 };
 
 const checkSessionsMembershipData = (data: IContent, errors: string[]): data is SessionMembershipData => {
