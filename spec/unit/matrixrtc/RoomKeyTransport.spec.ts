@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey } from "./mocks";
+import { makeMockEvent, makeMockRoom, sessionMembershipTemplate, makeKey } from "./mocks";
 import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
@@ -31,7 +31,7 @@ describe("RoomKeyTransport", () => {
     let mockLogger: Mocked<Logger>;
 
     const onCallEncryptionMock = jest.fn();
-    beforeEach(() => {
+    beforeEach(async () => {
         onCallEncryptionMock.mockReset();
         mockLogger = {
             debug: jest.fn(),
@@ -48,9 +48,9 @@ describe("RoomKeyTransport", () => {
                 roomEventEncryptionKeysReceivedTotalAge: 0,
             },
         };
-        room = makeMockRoom([membershipTemplate]);
+        room = makeMockRoom([sessionMembershipTemplate]);
         client = new MatrixClient({ baseUrl: "base_url" });
-        client.matrixRTC.start();
+        await client.matrixRTC.start();
         transport = new RoomKeyTransport(room, client, statistics, {
             getChild: jest.fn().mockReturnValue(mockLogger),
         } as unknown as Mocked<Logger>);

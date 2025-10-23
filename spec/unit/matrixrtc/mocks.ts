@@ -16,20 +16,24 @@ limitations under the License.
 
 import { EventEmitter } from "stream";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { EventType, MatrixEvent, type Room, RoomEvent, type MatrixClient } from "../../../src";
+import {
+    CallMembership,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 
-export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
-export const membershipTemplate: SessionMembershipData & { user_id: string } = {
-    application: "m.call",
-    call_id: "",
-    user_id: "@mock:user.example",
-    device_id: "AAAAAAA",
-    scope: "m.room",
-    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-    foci_preferred: [
+export const sessionMembershipTemplate: SessionMembershipData & { user_id: string } = {
+    "application": "m.call",
+    "call_id": "",
+    "user_id": "@mock:user.example",
+    "device_id": "AAAAAAA",
+    "scope": "m.room",
+    "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+    "foci_preferred": [
         {
             livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
@@ -41,6 +45,16 @@ export const membershipTemplate: SessionMembershipData & { user_id: string } = {
             type: "livekit",
         },
     ],
+    "m.call.intent": "voice",
+};
+
+export const rtcMembershipTemplate: RtcMembershipData = {
+    slot_id: "m.call#",
+    application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+    member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+    rtc_transports: [{ type: "livekit" }],
+    msc4354_sticky_key: "my_sticky_key",
+    versions: [],
 };
 
 export type MockClient = Pick<
@@ -130,23 +144,22 @@ export function makeMockEvent(
     content: any,
     timestamp?: number,
 ): MatrixEvent {
-    return {
-        getType: jest.fn().mockReturnValue(type),
-        getContent: jest.fn().mockReturnValue(content),
-        getSender: jest.fn().mockReturnValue(sender),
-        getTs: jest.fn().mockReturnValue(timestamp ?? Date.now()),
-        getRoomId: jest.fn().mockReturnValue(roomId),
-        getId: jest.fn().mockReturnValue(secureRandomString(8)),
-        isDecryptionFailure: jest.fn().mockReturnValue(false),
-    } as unknown as MatrixEvent;
+    return new MatrixEvent({
+        event_id: secureRandomString(8),
+        sender,
+        type,
+        content,
+        room_id: roomId,
+        origin_server_ts: timestamp ?? 0,
+    });
 }
 
 export function mockRTCEvent({ user_id: sender, ...membershipData }: MembershipData, roomId: string): MatrixEvent {
-    return makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData);
+    return makeMockEvent(EventType.GroupCallMemberPrefix, sender, roomId, membershipData, Date.now());
 }
 
 export function mockCallMembership(membershipData: MembershipData, roomId: string): CallMembership {
-    return new CallMembership(mockRTCEvent(membershipData, roomId), membershipData);
+    return new CallMembership(mockRTCEvent(membershipData, roomId));
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {

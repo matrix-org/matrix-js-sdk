@@ -22,6 +22,7 @@ import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { logger } from "../logger.ts";
+import { UNSTABLE_STICKY_KEY, type StickyKeyContent } from "../models/room-sticky-events.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -33,7 +34,7 @@ export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 type CallScope = "m.room" | "m.user";
 type Member = { user_id: string; device_id: string; id: string };
 
-export interface RtcMembershipData {
+export type RtcMembershipData = {
     "slot_id": string;
     "member": Member;
     "m.relates_to"?: {
@@ -47,9 +48,7 @@ export interface RtcMembershipData {
     };
     "rtc_transports": Transport[];
     "versions": string[];
-    "msc4354_sticky_key"?: string;
-    "sticky_key"?: string;
-}
+} & StickyKeyContent;
 
 const checkRtcMembershipData = (
     data: IContent,
@@ -103,19 +102,19 @@ const checkRtcMembershipData = (
     }
 
     // optional fields
-    if ((data.sticky_key ?? data.msc4354_sticky_key) === undefined) {
+    if ((data[UNSTABLE_STICKY_KEY.name] ?? data[UNSTABLE_STICKY_KEY.altName]) === undefined) {
         errors.push(prefix + "sticky_key or msc4354_sticky_key must be a defined");
     }
-    if (data.sticky_key !== undefined && typeof data.sticky_key !== "string") {
+    if (data[UNSTABLE_STICKY_KEY.name] !== undefined && typeof data[UNSTABLE_STICKY_KEY.name] !== "string") {
         errors.push(prefix + "sticky_key must be a string");
     }
-    if (data.msc4354_sticky_key !== undefined && typeof data.msc4354_sticky_key !== "string") {
+    if (data[UNSTABLE_STICKY_KEY.altName] !== undefined && typeof data[UNSTABLE_STICKY_KEY.altName] !== "string") {
         errors.push(prefix + "msc4354_sticky_key must be a string");
     }
     if (
-        data.sticky_key !== undefined &&
-        data.msc4354_sticky_key !== undefined &&
-        data.sticky_key !== data.msc4354_sticky_key
+        data[UNSTABLE_STICKY_KEY.name] !== undefined &&
+        data[UNSTABLE_STICKY_KEY.altName] !== undefined &&
+        data[UNSTABLE_STICKY_KEY.name] !== data[UNSTABLE_STICKY_KEY.altName]
     ) {
         errors.push(prefix + "sticky_key and msc4354_sticky_key must be equal if both are defined");
     }
@@ -244,18 +243,23 @@ export class CallMembership {
     /** The parsed data from the Matrix event.
      * To access checked eventId and sender from the matrixEvent.
      * Class construction will fail if these values cannot get obtained. */
-    private readonly matrixEventData: { eventId: string; sender: string };
+    private matrixEventData: { eventId: string; sender: string };
+    /**
+     * Constructs a CallMembership from a Matrix event.
+     * @param matrixEvent The Matrix event that this membership is based on
+     * @param relatedEvent The fetched event linked via the `event_id` from the `m.relates_to` field if present.
+     * @throws if the data does not match any known membership format.
+     */
     public constructor(
-        /** The Matrix event that this membership is based on */
         private readonly matrixEvent: MatrixEvent,
-        data: IContent,
+        private readonly relatedEvent?: MatrixEvent,
     ) {
+        const data = matrixEvent.getContent() as any;
+
         const eventId = matrixEvent.getId();
         const sender = matrixEvent.getSender();
-
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
-
         const sessionErrors: string[] = [];
         const rtcErrors: string[] = [];
         if (checkSessionsMembershipData(data, sessionErrors)) {
@@ -389,31 +393,57 @@ export class CallMembership {
         }
     }
 
-    public createdTs(): number {
+    /**
+     * The last update to this membership.
+     * @returns The timestamp when this membership was last updated.
+     */
+    public updatedTs(): number {
+        return this.matrixEvent.getTs();
+    }
+
+    /**
+     * The ts of the initial connection of this membership.
+     * @returns The timestamp when this membership was initially connected.
+     */
+    public connectedTs(): number {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
-                // TODO we need to read the referenced (relation) event if available to get the real created_ts
-                return this.matrixEvent.getTs();
+                return this.relatedEvent?.getTs() ?? this.matrixEvent.getTs();
             case "session":
             default:
                 return data.created_ts ?? this.matrixEvent.getTs();
         }
     }
 
+    /** @deprecated use connectedTs instead */
+    public createdTs(): number {
+        return this.connectedTs();
+    }
+
     /**
      * Gets the absolute expiry timestamp of the membership.
+     *
+     * The absolute expiry based on DEFAULT_EXPIRE_DURATION and `sessionData.expires`.
+     *
+     * ### Note:
+     * This concept is not required for m.rtc.member sticky events anymore. the sticky timeout serves takes care of
+     * this logic automatically (removing member events that have were missed to get removed manually or via delayed events)
+     * So this is mostly relevant for legacy m.call.member events.
+     * It is planned to remove manual expiration logic entirely once m.rtc.member is widely adopted.
+     *
      * @returns The absolute expiry time of the membership as a unix timestamp in milliseconds or undefined if not applicable
      */
     public getAbsoluteExpiry(): number | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case "rtc":
-                return undefined;
+                // Rtc events do not have an data.expires field that gets updated
+                // Instead the sticky event is resent.
+                return this.updatedTs() + DEFAULT_EXPIRE_DURATION;
             case "session":
             default:
-                // TODO: calculate this from the MatrixRTCSession join configuration directly
-                return this.createdTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
+                return this.connectedTs() + (data.expires ?? DEFAULT_EXPIRE_DURATION);
         }
     }
 
@@ -421,31 +451,17 @@ export class CallMembership {
      * @returns The number of milliseconds until the membership expires or undefined if applicable
      */
     public getMsUntilExpiry(): number | undefined {
-        const { kind } = this.membershipData;
-        switch (kind) {
-            case "rtc":
-                return undefined;
-            case "session":
-            default:
-                // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
-                // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-                // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-                return this.getAbsoluteExpiry()! - Date.now();
-        }
+        // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
+        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
+        // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
+        return this.getAbsoluteExpiry()! - Date.now();
     }
 
     /**
      * @returns true if the membership has expired, otherwise false
      */
     public isExpired(): boolean {
-        const { kind } = this.membershipData;
-        switch (kind) {
-            case "rtc":
-                return false;
-            case "session":
-            default:
-                return this.getMsUntilExpiry()! <= 0;
-        }
+        return this.getMsUntilExpiry()! <= 0;
     }
 
     /**
@@ -492,6 +508,7 @@ export class CallMembership {
         if (kind === "session") return data.focus_active;
         return undefined;
     }
+
     /**
      * The value of the `rtc_transports` field for RTC memberships (m.rtc.member).
      * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).

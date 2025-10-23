@@ -17,6 +17,7 @@ limitations under the License.
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
+import { MatrixEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
@@ -306,10 +307,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * @deprecated Use `MatrixRTCSession.sessionMembershipsForSlot` instead.
      */
-    public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
-    ): CallMembership[] {
-        return MatrixRTCSession.sessionMembershipsForSlot(room, {
+    public static async callMembershipsForRoom(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "findEventById" | "client">,
+        client: Pick<MatrixClient, "fetchRoomEvent">,
+    ): Promise<CallMembership[]> {
+        return await MatrixRTCSession.sessionMembershipsForSlot(room, client, {
             id: "",
             application: "m.call",
         });
@@ -318,21 +320,24 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * @deprecated use `MatrixRTCSession.slotMembershipsForRoom` instead.
      */
-    public static sessionMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+    public static async sessionMembershipsForRoom(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "findEventById" | "client">,
+        client: Pick<MatrixClient, "fetchRoomEvent">,
         sessionDescription: SlotDescription,
-    ): CallMembership[] {
-        return this.sessionMembershipsForSlot(room, sessionDescription);
+    ): Promise<CallMembership[]> {
+        return await this.sessionMembershipsForSlot(room, client, sessionDescription);
     }
 
     /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
      */
-    public static sessionMembershipsForSlot(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState">,
+    public static async sessionMembershipsForSlot(
+        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "findEventById">,
+        client: Pick<MatrixClient, "fetchRoomEvent">,
         slotDescription: SlotDescription,
-    ): CallMembership[] {
+        existingMemberships?: CallMembership[],
+    ): Promise<CallMembership[]> {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!roomState) {
@@ -340,58 +345,57 @@ export class MatrixRTCSession extends TypedEventEmitter<
             throw new Error("Could't get state for room " + room.roomId);
         }
         const callMemberEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
-
         const callMemberships: CallMembership[] = [];
+
+        const createMembership = async (memberEvent: MatrixEvent): Promise<CallMembership | undefined> => {
+            const relatedEventId = memberEvent.relationEventId;
+            const fetchRelatedEvent = async (): Promise<MatrixEvent | undefined> => {
+                const eventData = await client
+                    .fetchRoomEvent(room.roomId, relatedEventId!)
+                    .catch((e) => logger.error(`Could not get related event ${relatedEventId} for call membership`, e));
+
+                return eventData ? new MatrixEvent(eventData) : undefined;
+            };
+            const relatedEvent = relatedEventId
+                ? (room.findEventById(relatedEventId) ?? (await fetchRelatedEvent()))
+                : undefined;
+
+            let membership = undefined;
+            try {
+                membership = new CallMembership(memberEvent, relatedEvent);
+            } catch (e) {
+                logger.warn("Couldn't construct call membership: ", e);
+                return undefined;
+            }
+            // static check for newly created memberships
+            if (!deepCompare(membership.slotDescription, slotDescription)) {
+                logger.info(
+                    `Ignoring membership of user ${membership.sender} for a different session:  ${JSON.stringify(membership.slotDescription)}`,
+                );
+                return undefined;
+            }
+            return membership;
+        };
+
         for (const memberEvent of callMemberEvents) {
-            const content = memberEvent.getContent();
-            const eventKeysCount = Object.keys(content).length;
-            // Dont even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-            if (eventKeysCount === 0) continue;
+            let membership = existingMemberships?.find((m) => m.eventId === memberEvent.getId());
+            if (!membership) membership = await createMembership(memberEvent);
+            if (!membership) continue;
 
-            const membershipContents: any[] = [];
-
-            // We first decide if its a MSC4143 event (per device state key)
-            if (eventKeysCount > 1 && "focus_active" in content) {
-                // We have a MSC4143 event membership event
-                membershipContents.push(content);
-            } else if (eventKeysCount === 1 && "memberships" in content) {
-                logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
+            // Dynamic checks for all (including existing) memberships
+            if (membership.isExpired()) {
+                logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
+                continue;
             }
-
-            if (membershipContents.length === 0) continue;
-
-            for (const membershipData of membershipContents) {
-                if (!("application" in membershipData)) {
-                    // This is a left membership event, ignore it here to not log warnings.
-                    continue;
-                }
-                try {
-                    const membership = new CallMembership(memberEvent, membershipData);
-
-                    if (!deepCompare(membership.slotDescription, slotDescription)) {
-                        logger.info(
-                            `Ignoring membership of user ${membership.sender} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
-                        );
-                        continue;
-                    }
-
-                    if (membership.isExpired()) {
-                        logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
-                        continue;
-                    }
-                    if (!room.hasMembershipState(membership.sender ?? "", KnownMembership.Join)) {
-                        logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
-                        continue;
-                    }
-                    callMemberships.push(membership);
-                } catch (e) {
-                    logger.warn("Couldn't construct call membership: ", e);
-                }
+            if (!room.hasMembershipState(membership.sender ?? "", KnownMembership.Join)) {
+                logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
+                continue;
             }
+            callMemberships.push(membership);
         }
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
-        if (callMemberships.length > 1) {
+        if (callMemberships.length >= 1) {
             logger.debug(
                 `Call memberships in room ${room.roomId}, in order: `,
                 callMemberships.map((m) => [m.createdTs(), m.sender]),
@@ -411,15 +415,22 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * @deprecated Use `MatrixRTCSession.sessionForSlot` with sessionDescription `{ id: "", application: "m.call" }` instead.
      */
-    public static roomSessionForRoom(client: MatrixClient, room: Room): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(room, { id: "", application: "m.call" });
+    public static async roomSessionForRoom(client: MatrixClient, room: Room): Promise<MatrixRTCSession> {
+        const callMemberships = await MatrixRTCSession.sessionMembershipsForSlot(room, client, {
+            id: "",
+            application: "m.call",
+        });
         return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
     }
 
     /**
      * @deprecated Use `MatrixRTCSession.sessionForSlot` instead.
      */
-    public static sessionForRoom(client: MatrixClient, room: Room, slotDescription: SlotDescription): MatrixRTCSession {
+    public static sessionForRoom(
+        client: MatrixClient,
+        room: Room,
+        slotDescription: SlotDescription,
+    ): Promise<MatrixRTCSession> {
         return this.sessionForSlot(client, room, slotDescription);
     }
 
@@ -428,8 +439,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * This returned session can be used to find out if there are active sessions
      * for the requested room and `slotDescription`.
      */
-    public static sessionForSlot(client: MatrixClient, room: Room, slotDescription: SlotDescription): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(room, slotDescription);
+    public static async sessionForSlot(
+        client: MatrixClient,
+        room: Room,
+        slotDescription: SlotDescription,
+    ): Promise<MatrixRTCSession> {
+        const callMemberships = await MatrixRTCSession.sessionMembershipsForSlot(room, client, slotDescription);
 
         return new MatrixRTCSession(client, room, callMemberships, slotDescription);
     }
@@ -459,6 +474,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public constructor(
         private readonly client: Pick<
             MatrixClient,
+            | "on"
+            | "off"
             | "getUserId"
             | "getDeviceId"
             | "sendStateEvent"
@@ -467,13 +484,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
             | "sendEvent"
             | "cancelPendingEvent"
             | "encryptAndSendToDevice"
-            | "off"
-            | "on"
             | "decryptEventIfNeeded"
+            | "fetchRoomEvent"
         >,
         private roomSubset: Pick<
             Room,
-            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+            "on" | "off" | "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "findEventById"
         >,
         public memberships: CallMembership[],
         /**
@@ -721,7 +737,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.onRTCSessionMemberUpdate, soonestExpiry);
+            this.expiryTimeout = setTimeout(() => void this.onRTCSessionMemberUpdate(), soonestExpiry);
         }
     }
 
@@ -787,14 +803,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Call this when the Matrix room members have changed.
      */
     public onRoomMemberUpdate = (): void => {
-        this.recalculateSessionMembers();
+        void this.recalculateSessionMembers();
     };
 
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
      */
-    public onRTCSessionMemberUpdate = (): void => {
-        this.recalculateSessionMembers();
+    public onRTCSessionMemberUpdate = (): Promise<void> => {
+        return this.recalculateSessionMembers();
     };
 
     /**
@@ -804,12 +820,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    private recalculateSessionMembers = (): void => {
+    private async recalculateSessionMembers(): Promise<void> {
         const oldMemberships = this.memberships;
-        this.memberships = MatrixRTCSession.sessionMembershipsForSlot(this.room, this.slotDescription);
+        this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
+            this.roomSubset,
+            this.client,
+            this.slotDescription,
+            oldMemberships,
+        );
 
         const changed =
             oldMemberships.length != this.memberships.length ||
+            // If they have the same length, this is enough to check "changed"
             oldMemberships.some((m, i) => !CallMembership.equal(m, this.memberships[i]));
 
         if (changed) {
@@ -820,7 +842,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.emit(MatrixRTCSessionEvent.MembershipsChanged, oldMemberships, this.memberships);
             });
 
-            void this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
+            await this.membershipManager?.onRTCSessionMemberUpdate(this.memberships);
             // The `ownMembership` will be set when calling `onRTCSessionMemberUpdate`.
             const ownMembership = this.membershipManager?.ownMembership;
             if (this.pendingNotificationToSend && ownMembership && oldMemberships.length === 0) {
@@ -845,5 +867,5 @@ export class MatrixRTCSession extends TypedEventEmitter<
         void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
-    };
+    }
 }
