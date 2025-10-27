@@ -465,14 +465,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         );
         return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
     }
-
-    /**
-     * @deprecated Use `MatrixRTCSession.sessionForSlot` instead.
-     */
-    public static sessionForRoom(client: MatrixClient, room: Room, slotDescription: SlotDescription): MatrixRTCSession {
-        return this.sessionForSlot(client, room, slotDescription);
-    }
-
     /**
      * Return the MatrixRTC session for the room.
      * This returned session can be used to find out if there are active sessions
