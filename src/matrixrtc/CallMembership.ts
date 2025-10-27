@@ -33,6 +33,8 @@ export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 type CallScope = "m.room" | "m.user";
 type Member = { user_id: string; device_id: string; id: string };
 
+
+
 export interface RtcMembershipData {
     "slot_id": string;
     "member": Member;

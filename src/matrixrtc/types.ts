@@ -200,3 +200,11 @@ export interface Transport {
     type: string;
     [key: string]: unknown;
 }
+
+export interface RtcSlotEventContent<T extends string = string> {
+    "application": {
+        type: T;
+        // other application specific keys
+        [key: string]: unknown;
+    };
+}

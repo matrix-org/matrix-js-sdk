@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { EventTimeline } from "../models/event-timeline.ts";
+import { Direction, EventTimeline } from "../models/event-timeline.ts";
 import { type Room } from "../models/room.ts";
 import { type MatrixClient } from "../client.ts";
 import { EventType, RelationType } from "../@types/event.ts";
@@ -35,6 +35,7 @@ import type {
     ICallNotifyContent,
     RTCCallIntent,
     Transport,
+    RtcSlotEventContent,
 } from "./types.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import {
@@ -52,6 +53,7 @@ import { TypedReEmitter } from "../ReEmitter.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
+import { DefaultCallApplicationSlot } from "./CallApplication.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -108,6 +110,7 @@ export interface SessionConfig {
 export interface SlotDescription {
     id: string;
     application: string;
+    parameters?: Record<string, unknown>;
 }
 export function slotIdToDescription(slotId: string): SlotDescription {
     const [application, id] = slotId.split("#");
@@ -299,6 +302,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * It can be undefined since the callId is only known once the first membership joins.
      * The callId is the property that, per definition, groups memberships into one call.
+     * 
+     * This may also be undefined if MSC4143 slots are in use, as calls do not always have an ID if they
+     * have a slot.
      * @deprecated use `slotId` instead.
      */
     public get callId(): string | undefined {
@@ -318,31 +324,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
      *
-     * @deprecated Use `MatrixRTCSession.sessionMembershipsForSlot` instead.
-     */
-    public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-    ): CallMembership[] {
-        return MatrixRTCSession.sessionMembershipsForSlot(room, {
-            id: "",
-            application: "m.call",
-        });
-    }
-
-    /**
-     * @deprecated use `MatrixRTCSession.slotMembershipsForRoom` instead.
-     */
-    public static sessionMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-        sessionDescription: SlotDescription,
-    ): CallMembership[] {
-        return this.sessionMembershipsForSlot(room, sessionDescription);
-    }
-
-    /**
-     * Returns all the call memberships for a room that match the provided `sessionDescription`,
-     * oldest first.
-     *
      * By default, this will return *both* sticky and member state events.
      */
     public static sessionMembershipsForSlot(
@@ -355,13 +336,24 @@ export class MatrixRTCSession extends TypedEventEmitter<
             listenForMemberStateEvents: true,
         },
     ): CallMembership[] {
-        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
+        const slotId = slotDescriptionToId(slotDescription);
+        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId} ${slotId}]`);
         let callMemberEvents = [] as MatrixEvent[];
         if (listenForStickyEvents) {
-            // prefill with sticky events
-            callMemberEvents = [...room._unstable_getStickyEvents()].filter(
-                (e) => e.getType() === EventType.RTCMembership,
-            );
+            // Also check that the room has the valid slot.
+            const slot = room.getLiveTimeline().getState(Direction.Forward)?.getStateEvents(EventType.RTCSlot, slotId);
+            const slotContent = slot?.getContent() as RtcSlotEventContent ?? {};
+            if (
+                // Check the slot exists and has the correct type.
+                slotContent?.application?.type === slotDescription.application &&
+                // Check the parameters of the slot match the expected parameters.
+                deepCompare({type: slotDescription.application, ...slotDescription.parameters}, slotContent.application)) {
+
+                // Has a slot and the application parameters match, fetch sticky members.
+                callMemberEvents = [...room._unstable_getStickyEvents()].filter(
+                    (e) => e.getType() === EventType.RTCMembership,
+                );
+            } // otherwise, the slot wasn't valid and we can skip these members
         }
         if (listenForMemberStateEvents) {
             const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
@@ -458,12 +450,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         room: Room,
         opts?: SessionMembershipsForRoomOpts,
     ): MatrixRTCSession {
+        const sessionDescription = {id: "", application: DefaultCallApplicationSlot.application.type};
         const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(
             room,
-            { id: "", application: "m.call" },
+            sessionDescription,
             opts,
         );
-        return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
+        return new MatrixRTCSession(client, room, callMemberships, sessionDescription);
     }
     /**
      * Return the MatrixRTC session for the room.
@@ -532,7 +525,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         public readonly slotDescription: SlotDescription,
     ) {
         super();
-        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
+        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId} ${slotDescriptionToId(slotDescription)}]`);
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager
         roomState?.on(RoomStateEvent.Members, this.onRoomMemberUpdate);

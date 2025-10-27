@@ -56,6 +56,7 @@ import {
     type IRTCDeclineContent,
     type EncryptionKeysEventContent,
     type ICallNotifyContent,
+    type RtcSlotEventContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
@@ -155,6 +156,7 @@ export enum EventType {
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
     RTCDecline = "org.matrix.msc4310.rtc.decline",
+    RTCSlot = "org.matrix.msc4143.rtc.slot"
 }
 
 export enum RelationType {
@@ -339,6 +341,7 @@ export interface TimelineEvents {
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
     [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string }; // An object containing just the sticky key is empty.
+    [EventType.RTCSlot]: RtcSlotEventContent;
 }
 
 /**
