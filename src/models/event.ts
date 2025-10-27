@@ -75,6 +75,7 @@ export interface IUnsigned {
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
+    "msc4354_sticky_duration_ttl_ms"?: number;
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
 }
 
@@ -96,6 +97,7 @@ export interface IEvent {
     membership?: Membership;
     unsigned: IUnsigned;
     redacts?: string;
+    msc4354_sticky?: { duration_ms: number };
 }
 
 export interface IAggregatedRelation {
@@ -158,6 +160,7 @@ export interface IMarkedUnreadEvent {
 export interface IClearEvent {
     room_id?: string;
     type: string;
+    state_key?: string;
     content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
     unsigned?: IUnsigned;
 }
@@ -212,6 +215,7 @@ export interface IMessageVisibilityHidden {
 }
 // A singleton implementing `IMessageVisibilityVisible`.
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
+export const MAX_STICKY_DURATION_MS = 3600000;
 
 export enum MatrixEventEvent {
     /**
@@ -408,6 +412,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
     /**
+     * The timestamp for when this event should expire, in milliseconds.
+     * Prefers using the server-provided value, but will fall back to local calculation.
+     *
+     * This value is **safe** to use, as malicious start time and duration are appropriately capped.
+     *
+     * If the event is not a sticky event (or not supported by the server),
+     * then this returns `undefined`.
+     */
+    public readonly unstableStickyExpiresAt: number | undefined;
+
+    /**
      * Construct a Matrix Event object
      *
      * @param event - The raw (possibly encrypted) event. <b>Do not access
@@ -446,8 +461,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // The fallback in these cases will be to use the origin_server_ts.
         // For EDUs, the origin_server_ts also is not defined so we use Date.now().
         const age = this.getAge();
-        this.localTimestamp = age !== undefined ? Date.now() - age : (this.getTs() ?? Date.now());
+        const now = Date.now();
+        this.localTimestamp = age !== undefined ? now - age : (this.getTs() ?? now);
         this.reEmitter = new TypedReEmitter(this);
+        if (this.unstableStickyInfo) {
+            if (this.unstableStickyInfo.duration_ttl_ms) {
+                this.unstableStickyExpiresAt = now + this.unstableStickyInfo.duration_ttl_ms;
+            } else {
+                // Bound the timestamp so it doesn't come from the future.
+                this.unstableStickyExpiresAt = Math.min(now, this.getTs()) + this.unstableStickyInfo.duration_ms;
+            }
+        }
     }
 
     /**
@@ -728,11 +752,25 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Get the event state_key if it has one. This will return <code>undefined
-     * </code> for message events.
+     * Get the event state_key if it has one. If necessary, this will perform
+     * string-unpacking on the state key, as per MSC3414. This will return
+     * <code>undefined</code> for message events.
      * @returns The event's `state_key`.
      */
     public getStateKey(): string | undefined {
+        if (this.clearEvent) {
+            return this.clearEvent.state_key;
+        }
+        return this.event.state_key;
+    }
+
+    /**
+     * Get the raw event state_key if it has one. This may be string-packed as per
+     * MSC3414 if the state event is encrypted. This will return <code>undefined
+     * </code> for message events.
+     * @returns The event's `state_key`.
+     */
+    public getWireStateKey(): string | undefined {
         return this.event.state_key;
     }
 
@@ -785,11 +823,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.clearEvent = {
             type: this.event.type!,
             content: this.event.content!,
+            state_key: this.event.state_key,
         };
         this.event.type = cryptoType;
         this.event.content = cryptoContent;
         this.senderCurve25519Key = senderCurve25519Key;
         this.claimedEd25519Key = claimedEd25519Key;
+
+        // if this is a state event, pack cleartext type and statekey
+        if (this.isState()) {
+            this.event.state_key = `${this.clearEvent!.type}:${this.clearEvent!.state_key}`;
+        }
     }
 
     /**
@@ -1025,7 +1069,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns True if this event is encrypted.
      */
     public isEncrypted(): boolean {
-        return !this.isState() && this.event.type === EventType.RoomMessageEncrypted;
+        return this.event.type === EventType.RoomMessageEncrypted;
     }
 
     /**
@@ -1717,6 +1761,24 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     public setThreadId(threadId?: string): void {
         this.threadId = threadId;
+    }
+
+    /**
+     * Unstable getter to try and get the sticky information for the event.
+     * If the event is not a sticky event (or not supported by the server),
+     * then this returns `undefined`.
+     *
+     * `duration_ms` is safely bounded to a hour.
+     */
+    public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
+        if (!this.event.msc4354_sticky?.duration_ms) {
+            return undefined;
+        }
+        return {
+            duration_ms: Math.min(MAX_STICKY_DURATION_MS, this.event.msc4354_sticky.duration_ms),
+            // This is assumed to be bounded server-side.
+            duration_ttl_ms: this.event.unsigned?.msc4354_sticky_duration_ttl_ms,
+        };
     }
 }
 

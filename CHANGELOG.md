@@ -1,3 +1,40 @@
+Changes in [39.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.0.0) (2025-10-21)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* [MatrixRTC] Multi SFU support + m.rtc.member event type support ([#5022](https://github.com/matrix-org/matrix-js-sdk/pull/5022)). Contributed by @toger5.
+
+## ✨ Features
+
+* [MatrixRTC] Multi SFU support + m.rtc.member event type support ([#5022](https://github.com/matrix-org/matrix-js-sdk/pull/5022)). Contributed by @toger5.
+* Implement Sticky Events MSC4354 ([#5028](https://github.com/matrix-org/matrix-js-sdk/pull/5028)). Contributed by @Half-Shot.
+* feat(client): allow disabling VoIP support ([#5021](https://github.com/matrix-org/matrix-js-sdk/pull/5021)). Contributed by @pkuzco.
+
+## 🐛 Bug Fixes
+
+* Only use the first 3 viaServers specified ([#5034](https://github.com/matrix-org/matrix-js-sdk/pull/5034)). Contributed by @t3chguy.
+* Fetch the user's device info before processing a verification request ([#5030](https://github.com/matrix-org/matrix-js-sdk/pull/5030)). Contributed by @andybalaam.
+
+
+Changes in [38.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.4.0) (2025-10-07)
+==================================================================================================
+## ✨ Features
+
+* Add call intent to RTC call notifications ([#5010](https://github.com/matrix-org/matrix-js-sdk/pull/5010)). Contributed by @Half-Shot.
+* Implement experimental encrypted state events. ([#4994](https://github.com/matrix-org/matrix-js-sdk/pull/4994)). Contributed by @kaylendog.
+
+## 🐛 Bug Fixes
+
+* Exclude cancelled requests from in-progress lists ([#5016](https://github.com/matrix-org/matrix-js-sdk/pull/5016)). Contributed by @andybalaam.
+
+
+Changes in [38.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.3.0) (2025-09-23)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Remove knocked room when membership changes to join ([#4977](https://github.com/matrix-org/matrix-js-sdk/pull/4977)). Contributed by @svajunas-budrys.
+
+
 Changes in [38.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v38.2.0) (2025-09-16)
 ==================================================================================================
 Fix [CVE-2025-59160](https://www.cve.org/CVERecord?id=CVE-2025-59160) / [GHSA-mp7c-m3rh-r56v](https://github.com/matrix-org/matrix-js-sdk/security/advisories/GHSA-mp7c-m3rh-r56v)

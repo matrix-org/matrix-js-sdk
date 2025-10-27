@@ -1053,17 +1053,28 @@ describe("MatrixClient", function () {
             );
         });
 
-        it("can look up delayed events", async () => {
-            httpLookups = [
-                {
-                    method: "GET",
-                    prefix: unstableMSC4140Prefix,
-                    path: "/delayed_events",
-                    data: [],
-                },
-            ];
+        describe("lookups", () => {
+            const statuses = [undefined, "scheduled" as const, "finalised" as const];
+            const delayIds = [undefined, "dxyz", ["d123"], ["d456", "d789"]];
+            const inputs = statuses.flatMap((status) =>
+                delayIds.map((delayId) => [status, delayId] as [(typeof statuses)[0], (typeof delayIds)[0]]),
+            );
+            it.each(inputs)("can look up delayed events (status = %s, delayId = %s)", async (status, delayId) => {
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: "/delayed_events",
+                        expectQueryParams: {
+                            status,
+                            delay_id: delayId,
+                        },
+                        data: [],
+                    },
+                ];
 
-            await client._unstable_getDelayedEvents();
+                await client._unstable_getDelayedEvents(status, delayId);
+            });
         });
 
         it("can update delayed events", async () => {
@@ -2363,6 +2374,61 @@ describe("MatrixClient", function () {
             expect(await client.checkTurnServers()).toBe(false);
             client.off(ClientEvent.TurnServersError, onTurnServersError);
             expect(events).toEqual([[error, true]]); // fatal
+        });
+    });
+
+    describe("disableVoip option", () => {
+        const baseUrl = "https://alice-server.com";
+        const userId = "@alice:bar";
+        const accessToken = "sometoken";
+
+        beforeEach(() => {
+            mocked(supportsMatrixCall).mockReturnValue(true);
+        });
+
+        afterAll(() => {
+            mocked(supportsMatrixCall).mockReset();
+        });
+
+        it("should not call /voip/turnServer when disableVoip = true", () => {
+            fetchMock.getOnce(`${baseUrl}/_matrix/client/unstable/voip/turnServer`, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                userId,
+                disableVoip: true,
+            });
+
+            // Only check createCall / supportsVoip, avoid startClient
+            expect(client.createCall("!roomId:example.com")).toBeNull();
+            expect(client.supportsVoip?.()).toBe(false);
+        });
+
+        it("should call /voip/turnServer when disableVoip is not set", () => {
+            fetchMock.getOnce(`${baseUrl}/_matrix/client/unstable/voip/turnServer`, {
+                uris: ["turn:turn.example.org"],
+            });
+
+            createClient({
+                baseUrl,
+                accessToken,
+                userId,
+            });
+
+            // The call will trigger the request if VoIP is supported
+            expect(fetchMock.called(`${baseUrl}/_matrix/client/unstable/voip/turnServer`)).toBe(false);
+        });
+
+        it("should return null from createCall when disableVoip = true", () => {
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                userId,
+                disableVoip: true,
+            });
+
+            expect(client.createCall("!roomId:example.com")).toBeNull();
         });
     });
 

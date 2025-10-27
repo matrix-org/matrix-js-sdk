@@ -46,8 +46,8 @@ import {
     type Verifier,
     VerifierEvent,
 } from "../../../src/crypto-api/verification";
-import { escapeRegExp } from "../../../src/utils";
-import { awaitDecryption, emitPromise, getSyncResponse, syncPromise } from "../../test-utils/test-utils";
+import { escapeRegExp, sleep } from "../../../src/utils";
+import { awaitDecryption, emitPromise, getSyncResponse, syncPromise, waitFor } from "../../test-utils/test-utils";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import {
     BACKUP_DECRYPTION_KEY_BASE64,
@@ -79,11 +79,6 @@ import {
 import { type KeyBackupInfo, CryptoEvent } from "../../../src/crypto-api";
 import { encodeBase64 } from "../../../src/base64";
 
-// The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
-// to ensure that we don't end up with dangling timeouts.
-// But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
 beforeAll(async () => {
     // we use the libolm primitives in the test, so init the Olm library
     await Olm.init();
@@ -95,6 +90,13 @@ beforeAll(async () => {
     const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
+
+beforeEach(() => {
+    // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
+    // to ensure that we don't end up with dangling timeouts.
+    // But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
+    jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+});
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -735,6 +737,35 @@ describe("verification", () => {
             expect(request.cancellingUserId).toEqual("@alice:localhost");
         });
 
+        it("does not include cancelled requests in the list of requests", async () => {
+            // Given Alice started a verification request
+            const [, request] = await Promise.all([
+                expectSendToDeviceMessage("m.key.verification.request"),
+                aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
+            ]);
+            const transactionId = request.transactionId!;
+
+            returnToDeviceMessageFromSync(buildReadyMessage(transactionId, ["m.sas.v1"]));
+            await waitForVerificationRequestChanged(request);
+
+            // Sanity: the request is listed
+            const requestsBeforeCancel = aliceClient
+                .getCrypto()!
+                .getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+
+            expect(requestsBeforeCancel).toHaveLength(1);
+
+            // When Alice cancels it
+            await Promise.all([expectSendToDeviceMessage("m.key.verification.cancel"), request.cancel()]);
+
+            // Then it is no longer listed as in progress
+            const requestsAfterCancel = aliceClient
+                .getCrypto()!
+                .getVerificationRequestsToDeviceInProgress(TEST_USER_ID);
+
+            expect(requestsAfterCancel).toHaveLength(0);
+        });
+
         it("can cancel during the SAS phase", async () => {
             // have alice initiate a verification. She should send a m.key.verification.request
             const [, request] = await Promise.all([
@@ -1051,6 +1082,13 @@ describe("verification", () => {
         });
 
         it("ignores old verification requests", async () => {
+            const debug = jest.fn();
+            const info = jest.fn();
+            const warn = jest.fn();
+
+            // @ts-ignore overriding RustCrypto's logger
+            aliceClient.getCrypto()!.logger = { debug, info, warn };
+
             const eventHandler = jest.fn();
             aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
 
@@ -1065,8 +1103,41 @@ describe("verification", () => {
             const matrixEvent = room.getLiveTimeline().getEvents()[0];
             expect(matrixEvent.getId()).toEqual(verificationRequestEvent.event_id);
 
+            // Wait until the request has been processed. We use a real sleep()
+            // here to make sure any background async tasks are completed.
+            jest.useRealTimers();
+            await waitFor(async () => {
+                expect(info).toHaveBeenCalledWith(
+                    expect.stringMatching(/^Ignoring just-received verification request/),
+                );
+                sleep(100);
+            });
+
             // check that an event has not been raised, and that the request is not found
             expect(eventHandler).not.toHaveBeenCalled();
+            expect(
+                aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
+            ).not.toBeDefined();
+        });
+
+        it("ignores cancelled verification requests", async () => {
+            // Given a verification request exists
+            const event = createVerificationRequestEvent();
+            returnRoomMessageFromSync(TEST_ROOM_ID, event);
+
+            // Wait for the request to be received
+            await emitPromise(aliceClient, CryptoEvent.VerificationRequestReceived);
+
+            const request = aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz");
+
+            // When I cancel it
+            fetchMock.put("express:/_matrix/client/v3/rooms/:roomId/send/m.key.verification.cancel/:id", {
+                event_id: event.event_id,
+            });
+            await request!.cancel();
+            expect(request!.phase).toEqual(VerificationPhase.Cancelled);
+
+            // Then it is no longer found
             expect(
                 aliceClient.getCrypto()!.findVerificationRequestDMInProgress(TEST_ROOM_ID, "@bob:xyz"),
             ).not.toBeDefined();

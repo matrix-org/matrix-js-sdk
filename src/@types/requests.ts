@@ -20,6 +20,7 @@ import { type IEventWithRoomId, type SearchKey } from "./search.ts";
 import { type IRoomEventFilter } from "../filter.ts";
 import { type Direction } from "../models/event-timeline.ts";
 import { type PushRuleAction } from "./PushRules.ts";
+import { type MatrixError } from "../matrix.ts";
 import { type IRoomEvent } from "../sync-accumulator.ts";
 import { type EventType, type RelationType, type RoomType } from "./event.ts";
 
@@ -34,6 +35,7 @@ export interface IJoinRoomOpts {
 
     /**
      * The server names to try and join through in addition to those that are automatically chosen.
+     * Only the first 3 are actually used in the request, to avoid HTTP 414 Request-URI Too Long responses.
      */
     viaServers?: string[];
 
@@ -71,6 +73,7 @@ export interface KnockRoomOpts {
 
     /**
      * The server names to try and knock through in addition to those that are automatically chosen.
+     * Only the first 3 are actually used in the request, to avoid HTTP 414 Request-URI Too Long responses.
      */
     viaServers?: string | string[];
 }
@@ -94,19 +97,20 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-export type TimeoutDelay = {
-    delay: number;
-};
+export type SendDelayedEventRequestOpts = { parent_delay_id: string } | { delay: number; parent_delay_id?: string };
 
-export type ParentDelayId = {
-    parent_delay_id: string;
-};
-
-export type SendTimeoutDelayedEventRequestOpts = TimeoutDelay & Partial<ParentDelayId>;
-export type SendActionDelayedEventRequestOpts = ParentDelayId;
-
-export type SendDelayedEventRequestOpts = SendTimeoutDelayedEventRequestOpts | SendActionDelayedEventRequestOpts;
-
+export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
+    if ("parent_delay_id" in opts && typeof opts.parent_delay_id !== "string") {
+        // Invalid type, reject
+        return false;
+    }
+    if ("delay" in opts && typeof opts.delay !== "number") {
+        // Invalid type, reject.
+        return true;
+    }
+    // At least one of these fields must be specified.
+    return "delay" in opts || "parent_delay_id" in opts;
+}
 export type SendDelayedEventResponse = {
     delay_id: string;
 };
@@ -133,12 +137,22 @@ type DelayedPartialStateEvent = DelayedPartialTimelineEvent & {
 
 type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEvent;
 
+export type DelayedEventInfoItem = DelayedPartialEvent &
+    SendDelayedEventResponse &
+    SendDelayedEventRequestOpts & {
+        running_since: number;
+    };
+
 export type DelayedEventInfo = {
-    delayed_events: (DelayedPartialEvent &
-        SendDelayedEventResponse &
-        SendDelayedEventRequestOpts & {
-            running_since: number;
-        })[];
+    scheduled?: DelayedEventInfoItem[];
+    finalised?: {
+        delayed_event: DelayedEventInfoItem;
+        outcome: "send" | "cancel";
+        reason: "error" | "action" | "delay";
+        error?: MatrixError["data"];
+        event_id?: string;
+        origin_server_ts?: number;
+    }[];
     next_batch?: string;
 };
 

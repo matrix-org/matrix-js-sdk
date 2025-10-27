@@ -26,6 +26,7 @@ import {
     type ILeftRoom,
     type IRoomEvent,
     type IStateEvent,
+    type IStickyEvent,
     type IStrippedState,
     type ISyncResponse,
     SyncAccumulator,
@@ -1065,6 +1066,67 @@ describe("SyncAccumulator", function () {
             expect(roomData.timeline?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
                 KnownMembership.Join,
             );
+        });
+    });
+
+    describe("MSC4354 sticky events", () => {
+        function stickyEvent(ts = 0): IStickyEvent {
+            const msgData = msg("test", "test text");
+            return {
+                ...msgData,
+                msc4354_sticky: {
+                    duration_ms: 1000,
+                },
+                origin_server_ts: ts,
+            };
+        }
+
+        beforeAll(() => {
+            jest.useFakeTimers();
+        });
+
+        afterAll(() => {
+            jest.useRealTimers();
+        });
+
+        it("should accumulate sticky events", () => {
+            jest.setSystemTime(0);
+            const ev = stickyEvent();
+            sa.accumulate(
+                syncSkeleton({
+                    msc4354_sticky: {
+                        events: [ev],
+                    },
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
+        });
+        it("should clear stale sticky events", () => {
+            jest.setSystemTime(1000);
+            const ev = stickyEvent(1000);
+            sa.accumulate(
+                syncSkeleton({
+                    msc4354_sticky: {
+                        events: [ev],
+                    },
+                }),
+            );
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
+            jest.setSystemTime(2000); // Expire the event
+            sa.accumulate(syncSkeleton({}));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+        });
+
+        it("clears stale sticky events that pretend to be from the distant future", () => {
+            jest.setSystemTime(0);
+            const eventFarInTheFuture = stickyEvent(999999999999);
+            sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [eventFarInTheFuture] } }));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
+                eventFarInTheFuture,
+            ]);
+            jest.setSystemTime(1000); // Expire the event
+            sa.accumulate(syncSkeleton({}));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
         });
     });
 });

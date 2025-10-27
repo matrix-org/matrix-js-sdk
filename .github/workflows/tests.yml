@@ -26,7 +26,7 @@ jobs:
 
             - name: Setup Node
               id: setupNode
-              uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+              uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
               with:
                   cache: "yarn"
                   node-version: ${{ matrix.node }}
@@ -116,7 +116,7 @@ jobs:
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'
-              uses: guibranco/github-status-action-v2@741ea90ba6c3ca76fe0d43ba11a90cda97d5e685
+              uses: guibranco/github-status-action-v2@5530c593759f489bba08272e96986ffc571c1ea1
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: success

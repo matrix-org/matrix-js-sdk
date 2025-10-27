@@ -20,7 +20,7 @@ import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.t
 import { type Room } from "../models/room.ts";
 import { type DeviceMap } from "../models/device.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
-import { type PassphraseInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
+import { type PassphraseInfo, type SecretStorageKey, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type VerificationRequest } from "./verification.ts";
 import {
     type BackupTrustInfo,
@@ -117,6 +117,11 @@ export interface CryptoApi {
      * us.
      */
     isEncryptionEnabledInRoom(roomId: string): Promise<boolean>;
+
+    /**
+     * Check if we believe the given room supports encrypted state events.
+     */
+    isStateEncryptionEnabledInRoom(roomId: string): Promise<boolean>;
 
     /**
      * Perform any background tasks that can be done before a message is ready to
@@ -363,6 +368,11 @@ export interface CryptoApi {
      * @returns True if secret storage is ready to be used on this device
      */
     isSecretStorageReady(): Promise<boolean>;
+
+    /**
+     * Inspect the status of secret storage, in more detail than {@link isSecretStorageReady}.
+     */
+    getSecretStorageStatus(): Promise<SecretStorageStatus>;
 
     /**
      * Bootstrap [secret storage](https://spec.matrix.org/v1.12/client-server-api/#storage).
@@ -1141,6 +1151,30 @@ export interface CryptoCallbacks {
      * @param key - private key to store
      */
     cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+}
+
+/**
+ * The result of a call to {@link CryptoApi.getSecretStorageStatus}.
+ */
+export interface SecretStorageStatus {
+    /** Whether secret storage is fully populated. The same as {@link CryptoApi.isSecretStorageReady}. */
+    ready: boolean;
+
+    /** The ID of the current default secret storage key. */
+    defaultKeyId: string | null;
+
+    /**
+     * For each secret that we checked whether it is correctly stored in secret storage with the default secret storage key.
+     *
+     * Note that we will only check that the key backup key is stored if key backup is currently enabled (i.e. that
+     * {@link CryptoApi.getActiveSessionBackupVersion} returns non-null). `m.megolm_backup.v1` will only be present in that case.
+     *
+     * (This is an object rather than a `Map` so that it JSON.stringify()s nicely, since its main purpose is to end up
+     * in logs.)
+     */
+    secretStorageKeyValidityMap: {
+        [P in SecretStorageKey]?: boolean;
+    };
 }
 
 /**

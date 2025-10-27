@@ -77,6 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 import { type MSC4186Hero } from "../sliding-sync.ts";
+import { RoomStickyEventsStore, RoomStickyEventsEvent, type RoomStickyEventsMap } from "./room-sticky-events.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -167,6 +168,7 @@ export type RoomEmittedEvents =
     | RoomStateEvent.NewMember
     | RoomStateEvent.Update
     | RoomStateEvent.Marker
+    | RoomStickyEventsEvent.Update
     | ThreadEvent.New
     | ThreadEvent.Update
     | ThreadEvent.NewReply
@@ -320,6 +322,7 @@ export type RoomEventHandlerMap = {
 } & Pick<ThreadHandlerMap, ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete> &
     EventTimelineSetHandlerMap &
     Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction> &
+    Pick<RoomStickyEventsMap, RoomStickyEventsEvent.Update> &
     Pick<
         RoomStateEventHandlerMap,
         | RoomStateEvent.Events
@@ -447,6 +450,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private roomReceipts = new RoomReceipts(this);
 
     /**
+     * Stores and tracks sticky events
+     */
+    private stickyEvents = new RoomStickyEventsStore();
+
+    /**
      * Construct a new Room.
      *
      * <p>For a room, we store an ordered sequence of timelines, which may or may not
@@ -492,6 +500,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Listen to our own receipt event as a more modular way of processing our own
         // receipts. No need to remove the listener: it's on ourself anyway.
         this.on(RoomEvent.Receipt, this.onReceipt);
+        this.reEmitter.reEmit(this.stickyEvents, [RoomStickyEventsEvent.Update]);
 
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
@@ -2624,6 +2633,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             // if we know about this event, redact its contents now.
             const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
+            if (redactId) {
+                try {
+                    this.stickyEvents.handleRedaction(redactedEvent || redactId);
+                } catch (ex) {
+                    // Non-critical failure, but we should warn.
+                    logger.error("Failed to handle redaction for sticky event", ex);
+                }
+            }
             if (redactedEvent) {
                 this.applyEventAsRedaction(event, redactedEvent);
             }
@@ -3412,6 +3429,55 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getAccountData(type: EventType | string): MatrixEvent | undefined {
         return this.accountData.get(type);
+    }
+
+    /**
+     * Get an iterator of currently active sticky events.
+     */
+    // eslint-disable-next-line
+    public _unstable_getStickyEvents(): ReturnType<RoomStickyEventsStore["getStickyEvents"]> {
+        return this.stickyEvents.getStickyEvents();
+    }
+
+    /**
+     * Get a sticky event that match the given `type`, `sender`, and `stickyKey`
+     * @param type The event `type`.
+     * @param sender The sender of the sticky event.
+     * @param stickyKey The sticky key used by the event.
+     * @returns A matching active sticky event, or undefined.
+     */
+    // eslint-disable-next-line
+    public _unstable_getKeyedStickyEvent(
+        sender: string,
+        type: string,
+        stickyKey: string,
+    ): ReturnType<RoomStickyEventsStore["getKeyedStickyEvent"]> {
+        return this.stickyEvents.getKeyedStickyEvent(sender, type, stickyKey);
+    }
+
+    /**
+     * Get active sticky events without a sticky key that match the given `type` and `sender`.
+     * @param type The event `type`.
+     * @param sender The sender of the sticky event.
+     * @returns An array of matching sticky events.
+     */
+    // eslint-disable-next-line
+    public _unstable_getUnkeyedStickyEvent(
+        sender: string,
+        type: string,
+    ): ReturnType<RoomStickyEventsStore["getUnkeyedStickyEvent"]> {
+        return this.stickyEvents.getUnkeyedStickyEvent(sender, type);
+    }
+
+    /**
+     * Add a series of sticky events, emitting `RoomEvent.StickyEvents` if any
+     * changes were made.
+     * @param events A set of new sticky events.
+     * @internal
+     */
+    // eslint-disable-next-line
+    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEventsStore["addStickyEvents"]> {
+        return this.stickyEvents.addStickyEvents(events);
     }
 
     /**
