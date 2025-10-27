@@ -43,10 +43,10 @@ import {
 } from "./IMembershipManager.ts";
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
-import { RoomKeyTransport } from "./
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
+import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 
 /**
  * Events emitted by MatrixRTCSession
