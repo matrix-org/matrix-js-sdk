@@ -32,13 +32,8 @@ import {
     type RtcMembershipData,
     type SessionMembershipData,
 } from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status } from "./types.ts";
-import {
-    type SlotDescription,
-    type MembershipConfig,
-    type SessionConfig,
-    slotDescriptionToId,
-} from "./MatrixRTCSession.ts";
+import { type Transport, isMyMembership, type RTCCallIntent, Status, SlotDescription } from "./types.ts";
+import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
@@ -47,6 +42,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { slotDescriptionToId } from "./utils.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐

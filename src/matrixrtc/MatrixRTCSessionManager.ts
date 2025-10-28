@@ -20,8 +20,10 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession, SlotDescription } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import { DefaultCallApplicationDescription } from "./CallApplication.ts";
+import type { SlotDescription } from "./types.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -56,7 +58,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private readonly slotDescription: SlotDescription = { application: "m.call", id: "", parameters: {} }, // Default to the Matrix Call application
+        private readonly slotDescription: SlotDescription = DefaultCallApplicationDescription, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");

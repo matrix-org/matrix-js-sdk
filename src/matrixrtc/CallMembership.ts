@@ -17,11 +17,11 @@ limitations under the License.
 import { MXID_PATTERN } from "../models/room-member.ts";
 import { deepCompare } from "../utils.ts";
 import { type LivekitFocusSelection } from "./LivekitTransport.ts";
-import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
-import type { RTCCallIntent, Transport } from "./types.ts";
+import { type RTCCallIntent, type Transport, type SlotDescription, RtcSlotEventContent } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { logger } from "../logger.ts";
+import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -33,8 +33,6 @@ export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 type CallScope = "m.room" | "m.user";
 type Member = { user_id: string; device_id: string; id: string };
 
-
-
 export interface RtcMembershipData {
     "slot_id": string;
     "member": Member;
@@ -42,11 +40,7 @@ export interface RtcMembershipData {
         event_id: string;
         rel_type: RelationType.Reference;
     };
-    "application": {
-        type: string;
-        // other application specific keys
-        [key: string]: unknown;
-    };
+    "application": RtcSlotEventContent["application"];
     "rtc_transports": Transport[];
     "versions": string[];
     "msc4354_sticky_key"?: string;
