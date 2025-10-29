@@ -1,9 +1,6 @@
 name: Publish to npm
 on:
     workflow_call:
-        secrets:
-            NPM_TOKEN:
-                required: true
         outputs:
             id:
                 description: "The npm package@version string we published"
@@ -30,6 +27,10 @@ jobs:
                   cache: "yarn"
                   registry-url: "https://registry.npmjs.org"
                   node-version-file: package.json
+
+            # Ensure npm 11.5.1 or later is installed
+            - name: Update npm
+              run: npm install -g npm@latest
 
             - name: 🔨 Install dependencies
               run: "yarn install --frozen-lockfile"
