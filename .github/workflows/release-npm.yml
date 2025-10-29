@@ -1,9 +1,6 @@
 name: Publish to npm
 on:
     workflow_call:
-        secrets:
-            NPM_TOKEN:
-                required: true
         outputs:
             id:
                 description: "The npm package@version string we published"
