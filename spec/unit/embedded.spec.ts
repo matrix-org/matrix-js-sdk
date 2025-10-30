@@ -603,6 +603,13 @@ describe("RoomWidgetClient", () => {
                         "Server does not support",
                     );
                 }
+                for (const updateDelayedEvent of [
+                    client._unstable_cancelScheduledDelayedEvent,
+                    client._unstable_restartScheduledDelayedEvent,
+                    client._unstable_sendScheduledDelayedEvent,
+                ]) {
+                    await expect(updateDelayedEvent.call(client, "id")).rejects.toThrow("Server does not support");
+                }
             });
         });
     });
