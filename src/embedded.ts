@@ -478,17 +478,7 @@ export class RoomWidgetClient extends MatrixClient {
      */
     // eslint-disable-next-line
     public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "cancelScheduledDelayedEvent",
-            );
-        }
-
-        await this.widgetApi
-            .updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel)
-            .catch(timeoutToConnectionError);
-        return {};
+        return this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel);
     }
 
     /**
@@ -496,17 +486,7 @@ export class RoomWidgetClient extends MatrixClient {
      */
     // eslint-disable-next-line
     public async _unstable_restartScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "restartScheduledDelayedEvent",
-            );
-        }
-
-        await this.widgetApi
-            .updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart)
-            .catch(timeoutToConnectionError);
-        return {};
+        return this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart);
     }
 
     /**
@@ -514,15 +494,7 @@ export class RoomWidgetClient extends MatrixClient {
      */
     // eslint-disable-next-line
     public async _unstable_sendScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "sendScheduledDelayedEvent",
-            );
-        }
-
-        await this.widgetApi.updateDelayedEvent(delayId, UpdateDelayedEventAction.Send).catch(timeoutToConnectionError);
-        return {};
+        return this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send);
     }
 
     /**
