@@ -3597,7 +3597,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Cancel the scheduled delivery of the delayed event matching the provided {@link delayId}.
+     * Cancel the scheduled delivery of the delayed event matching the provided delayId.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
@@ -3638,7 +3638,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Restart the scheduled delivery of the delayed event matching the given {@link delayId}.
+     * Restart the scheduled delivery of the delayed event matching the given delayId.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
@@ -3679,7 +3679,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Immediately send the delayed event matching the given {@link delayId},
+     * Immediately send the delayed event matching the given delayId,
      * instead of waiting for its scheduled delivery.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
