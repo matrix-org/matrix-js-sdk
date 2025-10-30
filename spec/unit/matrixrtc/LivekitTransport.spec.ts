@@ -16,7 +16,6 @@ limitations under the License.
 
 import {
     isLivekitTransport,
-    isLivekitFocusSelection,
     isLivekitTransportConfig,
 } from "../../../src/matrixrtc/LivekitTransport";
 
@@ -39,16 +38,6 @@ describe("LivekitFocus", () => {
         expect(
             isLivekitTransport({ type: "livekit", livekit_service_url: "http://test.com", other_alias: "test" }),
         ).toBeFalsy();
-    });
-    it("isLivekitFocusActive", () => {
-        expect(
-            isLivekitFocusSelection({
-                type: "livekit",
-                focus_selection: "oldest_membership",
-            }),
-        ).toBeTruthy();
-        expect(isLivekitFocusSelection({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
     });
     it("isLivekitFocusConfig", () => {
         expect(

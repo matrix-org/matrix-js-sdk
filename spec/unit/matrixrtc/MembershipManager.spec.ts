@@ -29,11 +29,10 @@ import {
     MembershipManagerEvent,
     Status,
     type Transport,
-    type SessionMembershipData,
-    type LivekitFocusSelection,
 } from "../../../src/matrixrtc";
-import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
+import { makeMockClient, makeMockRoom, sessionMembershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
+import { SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -76,21 +75,21 @@ const callSession = { id: "", application: "m.call" };
 describe("MembershipManager", () => {
     let client: MockClient;
     let room: Room;
-    const focusActive: LivekitFocusSelection = {
+    const focusActive = Object.freeze({
         focus_selection: "oldest_membership",
         type: "livekit",
-    };
-    const focus: Transport = {
+    });
+    const focus: Transport = Object.freeze({
         type: "livekit",
         livekit_service_url: "https://active.url",
         livekit_alias: "!active:active.url",
-    };
+    });
 
     beforeEach(() => {
         // Default to fake timers.
         jest.useFakeTimers();
         client = makeMockClient("@alice:example.org", "AAAAAAA");
-        room = makeMockRoom([membershipTemplate]);
+        room = makeMockRoom([sessionMembershipTemplate]);
         // Provide a default mock that is like the default "non error" server behaviour.
         (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
         (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
@@ -350,7 +349,7 @@ describe("MembershipManager", () => {
             const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
             await jest.advanceTimersByTimeAsync(RESTART_DELAY);
             // first simulate the sync, then resolve sending the delayed event.
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             resolve({ delay_id: "id" });
             // Let the scheduler run one iteration so that the new join gets sent
             await jest.runOnlyPendingTimersAsync();
@@ -433,7 +432,7 @@ describe("MembershipManager", () => {
     describe("onRTCSessionMemberUpdate()", () => {
         it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             await jest.advanceTimersToNextTimerAsync();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
@@ -450,7 +449,7 @@ describe("MembershipManager", () => {
             (client._unstable_sendDelayedStateEvent as Mock).mockClear();
 
             await manager.onRTCSessionMemberUpdate([
-                mockCallMembership(membershipTemplate, room.roomId),
+                mockCallMembership(sessionMembershipTemplate, room.roomId),
                 mockCallMembership(
                     { ...(myMembership as SessionMembershipData), user_id: client.getUserId()! },
                     room.roomId,
@@ -473,7 +472,7 @@ describe("MembershipManager", () => {
             (client._unstable_sendDelayedStateEvent as Mock).mockClear();
 
             // Our own membership is removed:
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             await jest.advanceTimersByTimeAsync(1);
             expect(client.sendStateEvent).toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
@@ -496,7 +495,7 @@ describe("MembershipManager", () => {
 
             const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
             await jest.advanceTimersByTimeAsync(10_000);
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             resolve({ delay_id: "id" });
             await jest.advanceTimersByTimeAsync(10_000);
 
@@ -865,7 +864,7 @@ describe("MembershipManager", () => {
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
-            const membership = mockCallMembership({ ...membershipTemplate, user_id: client.getUserId()! }, room.roomId);
+            const membership = mockCallMembership({ ...sessionMembershipTemplate, user_id: client.getUserId()! }, room.roomId);
             await manager.onRTCSessionMemberUpdate([membership]);
             await manager.updateCallIntent("video");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
@@ -879,7 +878,7 @@ describe("MembershipManager", () => {
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
             const membership = mockCallMembership(
-                { ...membershipTemplate, "user_id": client.getUserId()!, "m.call.intent": "video" },
+                { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "m.call.intent": "video" },
                 room.roomId,
             );
             await manager.onRTCSessionMemberUpdate([membership]);
@@ -948,7 +947,7 @@ describe("MembershipManager", () => {
 
 it("Should prefix log with MembershipManager used", () => {
     const client = makeMockClient("@alice:example.org", "AAAAAAA");
-    const room = makeMockRoom([membershipTemplate]);
+    const room = makeMockRoom([sessionMembershipTemplate]);
 
     const membershipManager = new MembershipManager(undefined, room, client, callSession);
 

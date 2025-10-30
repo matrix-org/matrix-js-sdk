@@ -2,14 +2,17 @@ import { EventType, IContent, MXID_PATTERN, RelationType } from "../../matrix";
 import { RtcSlotEventContent, Transport } from "../types";
 import { MatrixRTCMembershipParseError } from "./common";
 
-type Member = { user_id: string; device_id: string; id: string };
 
 /**
  * Represents the current form of MSC4143.
  */
 export interface RtcMembershipData {
     "slot_id": string;
-    "member": Member;
+    "member": {
+        claimed_user_id: string;
+        claimed_device_id: string;
+        id: string
+    };
     "m.relates_to"?: {
         event_id: string;
         rel_type: RelationType.Reference;
@@ -37,13 +40,13 @@ export const checkRtcMembershipData = (
     if (typeof data.member !== "object" || data.member === null) {
         errors.push(prefix + "member must be an object");
     } else {
-        if (typeof data.member.user_id !== "string") errors.push(prefix + "member.user_id must be string");
-        else if (!MXID_PATTERN.test(data.member.user_id)) errors.push(prefix + "member.user_id must be a valid mxid");
+        if (typeof data.member.claimed_user_id !== "string") errors.push(prefix + "member.claimed_user_id must be string");
+        else if (!MXID_PATTERN.test(data.member.claimed_user_id)) errors.push(prefix + "member.claimed_user_id must be a valid mxid");
         // This is not what the spec enforces but there currently are no rules what power levels are required to
         // send a m.rtc.member event for a other user. So we add this check for simplicity and to avoid possible attacks until there
         // is a proper definition when this is allowed.
-        else if (data.member.user_id !== referenceUserId) errors.push(prefix + "member.user_id must match the sender");
-        if (typeof data.member.device_id !== "string") errors.push(prefix + "member.device_id must be string");
+        else if (data.member.claimed_user_id !== referenceUserId) errors.push(prefix + "member.claimed_user_id must match the sender");
+        if (typeof data.member.claimed_device_id !== "string") errors.push(prefix + "member.claimed_device_id must be string");
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
     }
     if (typeof data.application !== "object" || data.application === null) {

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { deepCompare } from "../utils.ts";
-import { type LivekitFocusSelection } from "./LivekitTransport.ts";
 import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { logger } from "../logger.ts";
@@ -90,7 +89,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return data.member.user_id;
+                return data.member.claimed_user_id;
             case MembershipKind.Session:
             default:
                 return this.matrixEventData.sender;
@@ -120,7 +119,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return data.member.device_id;
+                return data.member.claimed_device_id;
             case MembershipKind.Session:
             default:
                 return data.device_id;
@@ -280,27 +279,16 @@ export class CallMembership {
             case MembershipKind.RTC:
                 return data.rtc_transports[0];
             case MembershipKind.Session:
-                switch (data.focus_active.focus_selection) {
-                    case "multi_sfu":
-                        return data.foci_preferred[0];
-                    case "oldest_membership":
-                        if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
-                        if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
-                        break;
+                if (data.focus_active.focus_selection === "oldest_membership") {
+                    // For legacy events we only support "oldest_membership"
+                    if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
+                    if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
                 }
+                break;
         }
         return undefined;
     }
 
-    /**
-     * The focus_active filed of the session membership (m.call.member).
-     * @deprecated focus_active is not used and will be removed in future versions.
-     */
-    public getFocusActive(): LivekitFocusSelection | undefined {
-        const { kind, data } = this.membershipData;
-        if (kind === MembershipKind.Session) return data.focus_active;
-        return undefined;
-    }
     /**
      * The value of the `rtc_transports` field for RTC memberships (m.rtc.member).
      * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).

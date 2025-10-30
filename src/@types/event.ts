@@ -59,11 +59,12 @@ import {
     type RtcSlotEventContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import { RtcMembershipData } from "src/matrixrtc/membership/rtc.ts";
+import { SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
 
 export enum EventType {
     // Room state events
@@ -149,6 +150,10 @@ export enum EventType {
 
     // Group call events
     GroupCallPrefix = "org.matrix.msc3401.call",
+    /**
+     * Legacy call membership.
+     * @see RTCMembership
+     */
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events

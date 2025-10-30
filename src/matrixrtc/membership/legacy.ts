@@ -1,5 +1,4 @@
 import { EventType, IContent } from "../../matrix";
-import { LivekitFocusSelection } from "../LivekitTransport";
 import { RTCCallIntent, Transport } from "../types";
 import { MatrixRTCMembershipParseError } from "./common";
 
@@ -29,8 +28,12 @@ export type SessionMembershipData = {
 
     /**
      * The focus selection system this user/membership is using.
+     * NOTE: This is still included for legacy reasons, but not consumed by the SDK.
      */
-    "focus_active": LivekitFocusSelection;
+    "focus_active": {
+        type: string,
+        focus_selection: "oldest_membership"|string,
+    };
 
     /**
      * A list of possible foci this user knows about. One of them might be used based on the focus_active
@@ -67,10 +70,6 @@ export type SessionMembershipData = {
      * something else.
      */
     "m.call.intent"?: RTCCallIntent;
-    /**
-     * The sticky key in case of a sticky event. This string encodes the application + device_id indicating the used slot + device.
-     */
-    "msc4354_sticky_key"?: string;
 };
 
 export const checkSessionsMembershipData = (data: IContent): data is SessionMembershipData => {
@@ -79,9 +78,11 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
     if (typeof data.device_id !== "string") errors.push(prefix + "device_id must be string");
     if (typeof data.call_id !== "string") errors.push(prefix + "call_id must be string");
     if (typeof data.application !== "string") errors.push(prefix + "application must be a string");
-    if (typeof data.focus_active?.type !== "string") errors.push(prefix + "focus_active.type must be a string");
     if (data.focus_active === undefined) {
         errors.push(prefix + "focus_active has an invalid type");
+    }
+    if (typeof data.focus_active?.type !== "string") {
+        errors.push(prefix + "focus_active.type must be a string");
     }
     if (
         data.foci_preferred !== undefined &&

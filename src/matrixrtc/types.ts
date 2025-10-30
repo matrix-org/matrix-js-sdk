@@ -207,13 +207,13 @@ export interface RtcSlotEventContent<T extends string = string> {
         // other application specific keys
         [key: string]: unknown;
     };
+    slot_id: string,
 }
 
 /**
  * The session description is used to identify a session. Used in the state event.
  */
 export interface SlotDescription {
-    id: string;
+    id?: string;
     application: string;
-    parameters?: Record<string, unknown>;
 }
