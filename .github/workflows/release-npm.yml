@@ -36,17 +36,7 @@ jobs:
               run: "yarn install --frozen-lockfile"
 
             - name: 🚀 Publish to npm
-              id: npm-publish
-              run: |
-                  npm publish --provenance --access public --tag next
-                  release=$(jq -r '"\(.name)@\(.version)"' package.json)
-                  echo "id=$release" >> $GITHUB_OUTPUT
+              run: npm publish --provenance --access public --tag "$TAG"
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-            - name: 🎖️ Add `latest` dist-tag to final releases
-              if: steps.npm-publish.outputs.id && !contains(steps.npm-publish.outputs.id, '-rc.')
-              run: npm dist-tag add "$release" latest
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-                  release: ${{ steps.npm-publish.outputs.id }}
+                  TAG: contains(steps.npm-publish.outputs.id, '-rc.') && 'next' || 'latest'
