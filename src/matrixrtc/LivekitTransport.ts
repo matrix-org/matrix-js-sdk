@@ -21,8 +21,9 @@ export interface LivekitTransportConfig extends Transport {
     livekit_service_url: string;
 }
 
-export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
-    object &&
+export const isLivekitTransportConfig = (object: unknown): object is LivekitTransportConfig =>
+    object !== null &&
+    typeof object === "object" &&
     "type" in object &&
     object.type === "livekit" &&
     "livekit_service_url" in object &&
@@ -32,7 +33,7 @@ export interface LivekitTransport extends LivekitTransportConfig {
     livekit_alias: string;
 }
 
-export const isLivekitTransport = (object: any): object is LivekitTransport =>
+export const isLivekitTransport = (object: unknown): object is LivekitTransport =>
     isLivekitTransportConfig(object) && "livekit_alias" in object;
 
 /**
