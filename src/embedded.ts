@@ -37,7 +37,6 @@ import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
-    UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -461,15 +460,15 @@ export class RoomWidgetClient extends MatrixClient {
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
     // eslint-disable-next-line
-    public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
+    public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
                 "Server does not support the delayed events API",
-                "updateDelayedEvent",
+                "cancelScheduledDelayedEvent",
             );
         }
 
-        await this.widgetApi.updateDelayedEvent(delayId, action).catch(timeoutToConnectionError);
+        await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
         return {};
     }
 
@@ -477,16 +476,16 @@ export class RoomWidgetClient extends MatrixClient {
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
     // eslint-disable-next-line
-    public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        return this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel);
-    }
-
-    /**
-     * @experimental This currently relies on an unstable MSC (MSC4140).
-     */
-    // eslint-disable-next-line
     public async _unstable_restartScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        return this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart);
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "restartScheduledDelayedEvent",
+            );
+        }
+
+        await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        return {};
     }
 
     /**
@@ -494,7 +493,15 @@ export class RoomWidgetClient extends MatrixClient {
      */
     // eslint-disable-next-line
     public async _unstable_sendScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        return this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send);
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "sendScheduledDelayedEvent",
+            );
+        }
+
+        await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        return {};
     }
 
     /**

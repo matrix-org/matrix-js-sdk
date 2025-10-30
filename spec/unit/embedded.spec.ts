@@ -86,7 +86,9 @@ class MockWidgetApi extends EventEmitter {
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public updateDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public cancelScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public restartScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public sendScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
     public sendToDevice = jest.fn().mockResolvedValue(undefined);
     public requestOpenIDConnectToken = jest.fn(async () => {
         return testOIDCToken;
@@ -531,37 +533,46 @@ describe("RoomWidgetClient", () => {
                 ).rejects.toThrow();
             });
 
-            it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
-                "can %s scheduled delayed events (action in request body)",
-                async (action: UpdateDelayedEventAction) => {
-                    await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
-                    expect(widgetApi.requestCapability).toHaveBeenCalledWith(
-                        MatrixCapabilities.MSC4157UpdateDelayedEvent,
-                    );
-                    await client._unstable_updateDelayedEvent("id", action);
-                    expect(widgetApi.updateDelayedEvent).toHaveBeenCalledWith("id", action);
-                },
-            );
+            it("can cancel scheduled delayed events (action in request body)", async () => {
+                await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                await client._unstable_cancelScheduledDelayedEvent("id");
+                expect(widgetApi.cancelScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            });
+
+            it("can restart scheduled delayed events (action in request body)", async () => {
+                await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                await client._unstable_restartScheduledDelayedEvent("id");
+                expect(widgetApi.restartScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            });
+
+            it("can send scheduled delayed events (action in request body)", async () => {
+                await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                await client._unstable_sendScheduledDelayedEvent("id");
+                expect(widgetApi.sendScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            });
 
             it("can cancel scheduled delayed events (action in request path)", async () => {
                 await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
                 await client._unstable_cancelScheduledDelayedEvent("id");
-                expect(widgetApi.updateDelayedEvent).toHaveBeenCalledWith("id", UpdateDelayedEventAction.Cancel);
+                expect(widgetApi.cancelScheduledDelayedEvent).toHaveBeenCalledWith("id");
             });
 
             it("can restart scheduled delayed events (action in request path)", async () => {
                 await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
                 await client._unstable_restartScheduledDelayedEvent("id");
-                expect(widgetApi.updateDelayedEvent).toHaveBeenCalledWith("id", UpdateDelayedEventAction.Restart);
+                expect(widgetApi.restartScheduledDelayedEvent).toHaveBeenCalledWith("id");
             });
 
             it("can send scheduled delayed events (action in request path)", async () => {
                 await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
                 await client._unstable_sendScheduledDelayedEvent("id");
-                expect(widgetApi.updateDelayedEvent).toHaveBeenCalledWith("id", UpdateDelayedEventAction.Send);
+                expect(widgetApi.sendScheduledDelayedEvent).toHaveBeenCalledWith("id");
             });
         });
 
