@@ -106,6 +106,7 @@ import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-m
 import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
     isSendDelayedEventRequestOpts,
+    UpdateDelayedEventAction,
     type DelayedEventInfo,
     type IAddThreePidOnlyBody,
     type IBindThreePidBody,
@@ -130,7 +131,6 @@ import {
     type KnockRoomOpts,
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
-    type UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
     type AccountDataEvents,
@@ -3590,10 +3590,130 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const data = {
             action,
         };
-        return await this.http.authedRequest(Method.Post, path, undefined, data, {
+        return await this.http.request(Method.Post, path, undefined, data, {
             ...requestOptions,
             prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
         });
+    }
+
+    /**
+     * Cancel the scheduled delivery of the delayed event matching the provided {@link delayId}.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     */
+    // eslint-disable-next-line
+    public async _unstable_cancelScheduledDelayedEvent(
+        delayId: string,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "cancelScheduledDelayedEvent",
+            );
+        }
+
+        try {
+            const path = utils.encodeUri("/delayed_events/$delayId/cancel", {
+                $delayId: delayId,
+            });
+            return await this.http.request(Method.Post, path, undefined, undefined, {
+                ...requestOptions,
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                return await this._unstable_updateDelayedEvent(
+                    delayId,
+                    UpdateDelayedEventAction.Cancel,
+                    requestOptions,
+                );
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Restart the scheduled delivery of the delayed event matching the given {@link delayId}.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     */
+    // eslint-disable-next-line
+    public async _unstable_restartScheduledDelayedEvent(
+        delayId: string,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "restartScheduledDelayedEvent",
+            );
+        }
+
+        try {
+            const path = utils.encodeUri("/delayed_events/$delayId/restart", {
+                $delayId: delayId,
+            });
+            return await this.http.request(Method.Post, path, undefined, undefined, {
+                ...requestOptions,
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                return await this._unstable_updateDelayedEvent(
+                    delayId,
+                    UpdateDelayedEventAction.Restart,
+                    requestOptions,
+                );
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Immediately send the delayed event matching the given {@link delayId},
+     * instead of waiting for its scheduled delivery.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     */
+    // eslint-disable-next-line
+    public async _unstable_sendScheduledDelayedEvent(
+        delayId: string,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "sendScheduledDelayedEvent",
+            );
+        }
+
+        try {
+            const path = utils.encodeUri("/delayed_events/$delayId/send", {
+                $delayId: delayId,
+            });
+            return await this.http.request(Method.Post, path, undefined, undefined, {
+                ...requestOptions,
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                return await this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send, requestOptions);
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**

@@ -59,7 +59,14 @@ export class ClientStoppedError extends Error {
 export class UnsupportedDelayedEventsEndpointError extends Error {
     public constructor(
         message: string,
-        public clientEndpoint: "sendDelayedEvent" | "updateDelayedEvent" | "sendDelayedStateEvent" | "getDelayedEvents",
+        public clientEndpoint:
+            | "sendDelayedEvent"
+            | "updateDelayedEvent"
+            | "cancelScheduledDelayedEvent"
+            | "restartScheduledDelayedEvent"
+            | "sendScheduledDelayedEvent"
+            | "sendDelayedStateEvent"
+            | "getDelayedEvents",
     ) {
         super(message);
         this.name = "UnsupportedDelayedEventsEndpointError";
