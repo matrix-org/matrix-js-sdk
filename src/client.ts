@@ -3583,17 +3583,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "updateDelayedEvent",
             );
         }
-
-        const path = utils.encodeUri("/delayed_events/$delayId", {
-            $delayId: delayId,
-        });
-        const data = {
-            action,
-        };
-        return await this.http.request(Method.Post, path, undefined, data, {
-            ...requestOptions,
-            prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-        });
+        return await this.updateScheduledDelayedEventWithActionInBody(delayId, action, requestOptions);
     }
 
     /**
@@ -3609,32 +3599,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayId: string,
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "cancelScheduledDelayedEvent",
-            );
-        }
-
-        try {
-            const path = utils.encodeUri("/delayed_events/$delayId/cancel", {
-                $delayId: delayId,
-            });
-            return await this.http.request(Method.Post, path, undefined, undefined, {
-                ...requestOptions,
-                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-            });
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                return await this._unstable_updateDelayedEvent(
-                    delayId,
-                    UpdateDelayedEventAction.Cancel,
-                    requestOptions,
-                );
-            } else {
-                throw e;
-            }
-        }
+        return this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Cancel, requestOptions);
     }
 
     /**
@@ -3650,32 +3615,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayId: string,
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "restartScheduledDelayedEvent",
-            );
-        }
-
-        try {
-            const path = utils.encodeUri("/delayed_events/$delayId/restart", {
-                $delayId: delayId,
-            });
-            return await this.http.request(Method.Post, path, undefined, undefined, {
-                ...requestOptions,
-                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-            });
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                return await this._unstable_updateDelayedEvent(
-                    delayId,
-                    UpdateDelayedEventAction.Restart,
-                    requestOptions,
-                );
-            } else {
-                throw e;
-            }
-        }
+        return this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Restart, requestOptions);
     }
 
     /**
@@ -3692,16 +3632,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayId: string,
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
+        return this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Send, requestOptions);
+    }
+
+    private async updateScheduledDelayedEvent(
+        delayId: string,
+        action: UpdateDelayedEventAction,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
                 "Server does not support the delayed events API",
-                "sendScheduledDelayedEvent",
+                `${action}ScheduledDelayedEvent`,
             );
         }
 
         try {
-            const path = utils.encodeUri("/delayed_events/$delayId/send", {
+            const path = utils.encodeUri("/delayed_events/$delayId/$action", {
                 $delayId: delayId,
+                $action: action,
             });
             return await this.http.request(Method.Post, path, undefined, undefined, {
                 ...requestOptions,
@@ -3709,11 +3658,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                return await this._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send, requestOptions);
+                return await this.updateScheduledDelayedEventWithActionInBody(delayId, action, requestOptions);
             } else {
                 throw e;
             }
         }
+    }
+
+    private async updateScheduledDelayedEventWithActionInBody(
+        delayId: string,
+        action: UpdateDelayedEventAction,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        const path = utils.encodeUri("/delayed_events/$delayId", {
+            $delayId: delayId,
+        });
+        const data = {
+            action,
+        };
+        return await this.http.request(Method.Post, path, undefined, data, {
+            ...requestOptions,
+            prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+        });
     }
 
     /**
