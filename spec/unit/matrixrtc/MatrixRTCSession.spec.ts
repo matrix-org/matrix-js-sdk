@@ -16,27 +16,30 @@ limitations under the License.
 
 import {
     encodeBase64,
+    type EventTimeline,
     EventType,
     MatrixClient,
+    type MatrixError,
     MatrixEvent,
     RelationType,
-    type MatrixError,
     type Room,
 } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
 import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
-import { secureRandomString } from "../../../src/randomstring";
 import {
     makeMockEvent,
     makeMockRoom,
     makeKey,
     type MembershipData,
     mockRoomState,
-    rtcMembershipTemplate,
+    mockRTCEvent,
     sessionMembershipTemplate,
+    rtcMembershipTemplate,
 } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
+import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
+import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 
 const mockFocus = { type: "livekit", livekit_service_url: "https://test.org" };
 
@@ -66,11 +69,293 @@ describe("MatrixRTCSession", () => {
         sess = undefined;
     });
 
-    describe("roomSessionForRoom", () => {
-        it("creates a room-scoped session from room state", async () => {
-            const mockRoom = makeMockRoom([membershipTemplate]);
+    describe.each([
+        {
+            listenForStickyEvents: true,
+            listenForMemberStateEvents: true,
+            testCreateSticky: false,
+            createWithDefaults: true, // Create MatrixRTCSession with defaults
+        },
+        {
+            listenForStickyEvents: true,
+            listenForMemberStateEvents: true,
+            testCreateSticky: false,
+        },
+        {
+            listenForStickyEvents: false,
+            listenForMemberStateEvents: true,
+            testCreateSticky: false,
+        },
+        {
+            listenForStickyEvents: true,
+            listenForMemberStateEvents: true,
+            testCreateSticky: true,
+        },
+        {
+            listenForStickyEvents: true,
+            listenForMemberStateEvents: false,
+            testCreateSticky: true,
+        },
+    ])(
+        "roomSessionForRoom listenForSticky=$listenForStickyEvents listenForMemberStateEvents=$listenForMemberStateEvents testCreateSticky=$testCreateSticky",
+        (testConfig) => {
+            it(`will ${testConfig.listenForMemberStateEvents ? "" : "NOT"} throw if the room does not have any state stored`, () => {
+                const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
+                mockRoom.getLiveTimeline.mockReturnValue({
+                    getState: jest.fn().mockReturnValue(undefined),
+                } as unknown as EventTimeline);
+                if (testConfig.listenForMemberStateEvents) {
+                    // eslint-disable-next-line jest/no-conditional-expect
+                    expect(async () => {
+                        await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, testConfig);
+                    }).toThrow();
+                } else {
+                    // eslint-disable-next-line jest/no-conditional-expect
+                    expect(async () => {
+                        await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, testConfig);
+                    }).not.toThrow();
+                }
+            });
 
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            it("creates a room-scoped session from room state", async () => {
+                const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
+
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships.length).toEqual(1);
+                expect(sess?.memberships[0].slotDescription.id).toEqual("");
+                expect(sess?.memberships[0].scope).toEqual("m.room");
+                expect(sess?.memberships[0].application).toEqual("m.call");
+                expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+                expect(sess?.memberships[0].isExpired()).toEqual(false);
+                expect(sess?.slotDescription.id).toEqual("");
+            });
+
+            it("ignores memberships where application is not m.call", async () => {
+                const testMembership = Object.assign({}, membershipTemplate, {
+                    application: "not-m.call",
+                });
+                const mockRoom = makeMockRoom([testMembership], testConfig.testCreateSticky);
+                const sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships).toHaveLength(0);
+            });
+
+            it("ignores memberships where callId is not empty", async () => {
+                const testMembership = Object.assign({}, membershipTemplate, {
+                    call_id: "not-empty",
+                    scope: "m.room",
+                });
+                const mockRoom = makeMockRoom([testMembership], testConfig.testCreateSticky);
+                const sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships).toHaveLength(0);
+            });
+
+            it("ignores expired memberships events", async () => {
+                jest.useFakeTimers();
+                const expiredMembership = Object.assign({}, membershipTemplate);
+                expiredMembership.expires = 1000;
+                expiredMembership.device_id = "EXPIRED";
+                const mockRoom = makeMockRoom([membershipTemplate, expiredMembership], testConfig.testCreateSticky);
+
+                jest.advanceTimersByTime(2000);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships.length).toEqual(1);
+                expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
+                jest.useRealTimers();
+            });
+
+            it("ignores memberships events of members not in the room", async () => {
+                const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
+                mockRoom.hasMembershipState.mockImplementation((state) => state === KnownMembership.Join);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships.length).toEqual(0);
+            });
+
+            it("ignores memberships events with no sender", async () => {
+                // Force the sender to be undefined.
+                const mockRoom = makeMockRoom([{ ...membershipTemplate, user_id: "" }], testConfig.testCreateSticky);
+                mockRoom.hasMembershipState.mockImplementation((state) => state === KnownMembership.Join);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships.length).toEqual(0);
+            });
+
+            it("honours created_ts", async () => {
+                jest.useFakeTimers();
+                jest.setSystemTime(500);
+                const expiredMembership = Object.assign({}, membershipTemplate);
+                expiredMembership.created_ts = 500;
+                expiredMembership.expires = 1000;
+                const mockRoom = makeMockRoom([expiredMembership], testConfig.testCreateSticky);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
+                jest.useRealTimers();
+            });
+
+            it("returns empty session if no membership events are present", async () => {
+                const mockRoom = makeMockRoom([], testConfig.testCreateSticky);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess?.memberships).toHaveLength(0);
+            });
+
+            it("safely ignores events with no memberships section", async () => {
+                const event = {
+                    getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+                    getContent: jest.fn().mockReturnValue({}),
+                    getSender: jest.fn().mockReturnValue("@mock:user.example"),
+                    getTs: jest.fn().mockReturnValue(1000),
+                    getLocalAge: jest.fn().mockReturnValue(0),
+                };
+                const mockRoom = makeMockRoom([]);
+                mockRoom.getLiveTimeline.mockReturnValue({
+                    getState: jest.fn().mockReturnValue({
+                        on: jest.fn(),
+                        off: jest.fn(),
+                        getStateEvents: (_type: string, _stateKey: string) => [event],
+                        events: new Map([
+                            [
+                                EventType.GroupCallMemberPrefix,
+                                {
+                                    size: () => true,
+                                    has: (_stateKey: string) => true,
+                                    get: (_stateKey: string) => event,
+                                    values: () => [event],
+                                },
+                            ],
+                        ]),
+                    }),
+                } as unknown as EventTimeline);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess.memberships).toHaveLength(0);
+            });
+
+            it("safely ignores events with junk memberships section", async () => {
+                const event = {
+                    getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+                    getContent: jest.fn().mockReturnValue({ memberships: ["i am a fish"] }),
+                    getSender: jest.fn().mockReturnValue("@mock:user.example"),
+                    getTs: jest.fn().mockReturnValue(1000),
+                    getLocalAge: jest.fn().mockReturnValue(0),
+                };
+                const mockRoom = makeMockRoom([]);
+                mockRoom.getLiveTimeline.mockReturnValue({
+                    getState: jest.fn().mockReturnValue({
+                        on: jest.fn(),
+                        off: jest.fn(),
+                        getStateEvents: (_type: string, _stateKey: string) => [event],
+                        events: new Map([
+                            [
+                                EventType.GroupCallMemberPrefix,
+                                {
+                                    size: () => true,
+                                    has: (_stateKey: string) => true,
+                                    get: (_stateKey: string) => event,
+                                    values: () => [event],
+                                },
+                            ],
+                        ]),
+                    }),
+                } as unknown as EventTimeline);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess.memberships).toHaveLength(0);
+            });
+
+            it("ignores memberships with no device_id", async () => {
+                const testMembership = Object.assign({}, membershipTemplate);
+                (testMembership.device_id as string | undefined) = undefined;
+                const mockRoom = makeMockRoom([testMembership]);
+                const sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess.memberships).toHaveLength(0);
+            });
+
+            it("ignores memberships with no call_id", async () => {
+                const testMembership = Object.assign({}, membershipTemplate);
+                (testMembership.call_id as string | undefined) = undefined;
+                const mockRoom = makeMockRoom([testMembership]);
+                sess = await MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess.memberships).toHaveLength(0);
+            });
+        },
+    );
+
+    describe("roomSessionForRoom combined state", () => {
+        it("perfers sticky events when both membership and sticky events appear for the same user", async () => {
+            // Create a room with identical member state and sticky state for the same user.
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent(
+                    {
+                        ...membershipTemplate,
+                        msc4354_sticky_key: `_${membershipTemplate.user_id}_${membershipTemplate.device_id}`,
+                    },
+                    mockRoom.roomId,
+                );
+                return [ev as StickyMatrixEvent];
+            });
+
+            // Expect for there to be one membership as the state has been merged down.
+            sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
             expect(sess?.memberships.length).toEqual(1);
             expect(sess?.memberships[0].slotDescription.id).toEqual("");
             expect(sess?.memberships[0].scope).toEqual("m.room");
@@ -79,149 +364,67 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships[0].isExpired()).toEqual(false);
             expect(sess?.slotDescription.id).toEqual("");
         });
-
-        it("ignores memberships where application is not m.call", async () => {
-            const testMembership = Object.assign({}, membershipTemplate, {
-                application: "not-m.call",
-            });
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess?.memberships).toHaveLength(0);
-        });
-
-        it("ignores memberships where callId is not empty", async () => {
-            const testMembership = Object.assign({}, membershipTemplate, {
-                call_id: "not-empty",
-                scope: "m.room",
-            });
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess?.memberships).toHaveLength(0);
-        });
-
-        it("ignores expired memberships events", async () => {
-            jest.useFakeTimers();
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.expires = 1000;
-            expiredMembership.device_id = "EXPIRED";
-            const mockRoom = makeMockRoom([membershipTemplate, expiredMembership]);
-
-            jest.advanceTimersByTime(2000);
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
-            jest.useRealTimers();
-        });
-
-        it("ignores memberships events of members not in the room", async () => {
+        it("combines sticky and membership events when both exist", async () => {
+            // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([membershipTemplate]);
-            mockRoom.hasMembershipState = (state) => state === KnownMembership.Join;
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess?.memberships.length).toEqual(0);
-        });
+            const stickyUserId = "@stickyev:user.example";
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent(
+                    {
+                        ...membershipTemplate,
+                        user_id: stickyUserId,
+                        msc4354_sticky_key: `_${stickyUserId}_${membershipTemplate.device_id}`,
+                    },
+                    mockRoom.roomId,
+                    15000,
+                    Date.now() - 1000, // Sticky event comes first.
+                );
+                return [ev as StickyMatrixEvent];
+            });
 
-        it("honours created_ts", async () => {
-            jest.useFakeTimers();
-            jest.setSystemTime(500);
-            const expiredMembership = Object.assign({}, membershipTemplate);
-            expiredMembership.created_ts = 500;
-            expiredMembership.expires = 1000;
-            const mockRoom = makeMockRoom([expiredMembership]);
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
-            jest.useRealTimers();
-        });
+            sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
 
-        it("returns empty session if no membership events are present", async () => {
-            const mockRoom = makeMockRoom([]);
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess?.memberships).toHaveLength(0);
-        });
+            const memberships = sess.memberships;
+            expect(memberships.length).toEqual(2);
+            expect(memberships[0].sender).toEqual(stickyUserId);
+            expect(memberships[0].slotDescription.id).toEqual("");
+            expect(memberships[0].scope).toEqual("m.room");
+            expect(memberships[0].application).toEqual("m.call");
+            expect(memberships[0].deviceId).toEqual("AAAAAAA");
+            expect(memberships[0].isExpired()).toEqual(false);
 
-        it("safely ignores events with no memberships section", async () => {
-            const roomId = secureRandomString(8);
-            const event = {
-                getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-                getContent: jest.fn().mockReturnValue({}),
-                getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                getTs: jest.fn().mockReturnValue(1000),
-                getLocalAge: jest.fn().mockReturnValue(0),
-            };
-            const mockRoom = {
-                ...makeMockRoom([]),
-                roomId,
-                getLiveTimeline: jest.fn().mockReturnValue({
-                    getState: jest.fn().mockReturnValue({
-                        on: jest.fn(),
-                        off: jest.fn(),
-                        getStateEvents: (_type: string, _stateKey: string) => [event],
-                        events: new Map([
-                            [
-                                EventType.GroupCallMemberPrefix,
-                                {
-                                    size: () => true,
-                                    has: (_stateKey: string) => true,
-                                    get: (_stateKey: string) => event,
-                                    values: () => [event],
-                                },
-                            ],
-                        ]),
-                    }),
-                }),
-            };
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom as unknown as Room, callSession);
-            expect(sess.memberships).toHaveLength(0);
-        });
+            // Then state
+            expect(memberships[1].sender).toEqual(membershipTemplate.user_id);
 
-        it("safely ignores events with junk memberships section", async () => {
-            const roomId = secureRandomString(8);
-            const event = {
-                getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-                getContent: jest.fn().mockReturnValue({ memberships: ["i am a fish"] }),
-                getSender: jest.fn().mockReturnValue("@mock:user.example"),
-                getTs: jest.fn().mockReturnValue(1000),
-                getLocalAge: jest.fn().mockReturnValue(0),
-            };
-            const mockRoom = {
-                ...makeMockRoom([]),
-                roomId,
-                getLiveTimeline: jest.fn().mockReturnValue({
-                    getState: jest.fn().mockReturnValue({
-                        on: jest.fn(),
-                        off: jest.fn(),
-                        getStateEvents: (_type: string, _stateKey: string) => [event],
-                        events: new Map([
-                            [
-                                EventType.GroupCallMemberPrefix,
-                                {
-                                    size: () => true,
-                                    has: (_stateKey: string) => true,
-                                    get: (_stateKey: string) => event,
-                                    values: () => [event],
-                                },
-                            ],
-                        ]),
-                    }),
-                }),
-            };
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom as unknown as Room, callSession);
-            expect(sess.memberships).toHaveLength(0);
+            expect(sess?.slotDescription.id).toEqual("");
         });
+        it("handles an incoming sticky event to an existing session", async () => {
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            const stickyUserId = "@stickyev:user.example";
 
-        it("ignores memberships with no device_id", async () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            (testMembership.device_id as string | undefined) = undefined;
-            const mockRoom = makeMockRoom([testMembership]);
-            const sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess.memberships).toHaveLength(0);
-        });
-
-        it("ignores memberships with no call_id", async () => {
-            const testMembership = Object.assign({}, membershipTemplate);
-            (testMembership.call_id as string | undefined) = undefined;
-            const mockRoom = makeMockRoom([testMembership]);
-            sess = await MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-            expect(sess.memberships).toHaveLength(0);
+            sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            expect(sess.memberships.length).toEqual(1);
+            const stickyEv = mockRTCEvent(
+                {
+                    ...membershipTemplate,
+                    user_id: stickyUserId,
+                    msc4354_sticky_key: `_${stickyUserId}_${membershipTemplate.device_id}`,
+                },
+                mockRoom.roomId,
+                15000,
+                Date.now() - 1000, // Sticky event comes first.
+            ) as StickyMatrixEvent;
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                return [stickyEv];
+            });
+            mockRoom.emit(RoomStickyEventsEvent.Update, [stickyEv], [], []);
+            expect(sess.memberships.length).toEqual(2);
         });
         it("fetches related events if needed from room", async () => {
             const testMembership = {
@@ -233,13 +436,11 @@ describe("MatrixRTCSession", () => {
 
             const mockRoom = makeMockRoom([testMembership]);
             const now = Date.now();
-            mockRoom.findEventById = jest
-                .fn()
-                .mockImplementation((id) =>
-                    id === "id"
-                        ? new MatrixEvent({ content: { ...rtcMembershipTemplate }, origin_server_ts: now + 100 })
-                        : undefined,
-                );
+            mockRoom.findEventById.mockImplementation((id) =>
+                id === "id"
+                    ? new MatrixEvent({ content: { ...rtcMembershipTemplate }, origin_server_ts: now + 100 })
+                    : undefined,
+            );
             sess = await MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             expect(sess.memberships[0].createdTs()).toBe(now + 100);
         });
@@ -254,7 +455,7 @@ describe("MatrixRTCSession", () => {
             const mockRoom = makeMockRoom([testMembership]);
             const now = Date.now();
 
-            mockRoom.findEventById = jest.fn().mockReturnValue(undefined);
+            mockRoom.findEventById.mockReturnValue(undefined);
             client.fetchRoomEvent = jest
                 .fn()
                 .mockResolvedValue({ content: { ...rtcMembershipTemplate }, origin_server_ts: now + 100 });
@@ -389,6 +590,12 @@ describe("MatrixRTCSession", () => {
         it("shows joined once join is called", () => {
             sess!.joinRoomSession([mockFocus], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
+        });
+
+        it("uses the sticky events membership manager implementation", () => {
+            sess!.joinRoomSession([mockFocus], mockFocus, { unstableSendStickyEvents: true });
+            expect(sess!.isJoined()).toEqual(true);
+            expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
 
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {

@@ -23,6 +23,7 @@ import {
     MatrixError,
     UnsupportedDelayedEventsEndpointError,
     type Room,
+    MAX_STICKY_DURATION_MS,
 } from "../../../src";
 import {
     MembershipManagerEvent,
@@ -94,7 +95,9 @@ describe("MembershipManager", () => {
         // Provide a default mock that is like the default "non error" server behaviour.
         (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
         (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
-        (client.sendStateEvent as Mock<any>).mockResolvedValue(undefined);
+        (client._unstable_sendStickyEvent as Mock<any>).mockResolvedValue({ event_id: "id" });
+        (client._unstable_sendStickyDelayedEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
+        (client.sendStateEvent as Mock<any>).mockResolvedValue({ event_id: "id" });
     });
 
     afterEach(() => {
@@ -146,45 +149,6 @@ describe("MembershipManager", () => {
                     room.roomId,
                     { delay: 8000 },
                     "org.matrix.msc3401.call.member",
-                    {},
-                    "_@alice:example.org_AAAAAAA_m.call",
-                );
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
-            });
-
-            it("sends a rtc membership event when using `useRtcMemberFormat`", async () => {
-                // Spys/Mocks
-
-                const updateDelayedEventHandle = createAsyncHandle<void>(client._unstable_updateDelayedEvent as Mock);
-
-                // Test
-                const memberManager = new MembershipManager({ useRtcMemberFormat: true }, room, client, callSession);
-                memberManager.join([], focus);
-                // expects
-                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
-                // This should check for send sticky once we merge with the sticky matrixRTC branch.
-                expect(client.sendStateEvent).toHaveBeenCalledWith(
-                    room.roomId,
-                    "org.matrix.msc4143.rtc.member",
-                    {
-                        application: { type: "m.call" },
-                        member: {
-                            user_id: "@alice:example.org",
-                            id: "_@alice:example.org_AAAAAAA_m.call",
-                            device_id: "AAAAAAA",
-                        },
-                        slot_id: "m.call#",
-                        rtc_transports: [focus],
-                        versions: [],
-                        msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
-                    },
-                    "_@alice:example.org_AAAAAAA_m.call",
-                );
-                updateDelayedEventHandle.resolve?.();
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
-                    room.roomId,
-                    { delay: 8000 },
-                    "org.matrix.msc4143.rtc.member",
                     {},
                     "_@alice:example.org_AAAAAAA_m.call",
                 );
@@ -925,6 +889,63 @@ describe("MembershipManager", () => {
             await manager.onRTCSessionMemberUpdate([membership]);
             await manager.updateCallIntent("video");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(0);
+        });
+    });
+
+    describe("StickyEventMembershipManager", () => {
+        beforeEach(() => {
+            // Provide a default mock that is like the default "non error" server behaviour.
+            (client._unstable_sendStickyDelayedEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
+            (client._unstable_sendStickyEvent as Mock<any>).mockResolvedValue(undefined);
+        });
+
+        describe("join()", () => {
+            describe("sends an rtc membership event", () => {
+                it("sends a membership event and schedules delayed leave when joining a call", async () => {
+                    const updateDelayedEventHandle = createAsyncHandle<void>(
+                        client._unstable_updateDelayedEvent as Mock,
+                    );
+                    const memberManager = new StickyEventMembershipManager(undefined, room, client, callSession);
+
+                    memberManager.join([], focus);
+
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                    // Test we sent the initial join
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
+                        room.roomId,
+                        3600000,
+                        null,
+                        "org.matrix.msc4143.rtc.member",
+                        {
+                            application: { type: "m.call" },
+                            member: {
+                                user_id: "@alice:example.org",
+                                id: "_@alice:example.org_AAAAAAA_m.call",
+                                device_id: "AAAAAAA",
+                            },
+                            slot_id: "m.call#",
+                            rtc_transports: [focus],
+                            versions: [],
+                            msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
+                        },
+                    );
+                    updateDelayedEventHandle.resolve?.();
+
+                    // Ensure we have sent the delayed disconnect event.
+                    expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledWith(
+                        room.roomId,
+                        MAX_STICKY_DURATION_MS,
+                        { delay: 8000 },
+                        null,
+                        "org.matrix.msc4143.rtc.member",
+                        {
+                            msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
+                        },
+                    );
+                    // ..once
+                    expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
+                });
+            });
         });
     });
 });

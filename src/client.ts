@@ -3537,13 +3537,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Get all pending delayed events for the calling user.
+     * Get information about delayed events owned by the requesting user.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
      */
     // eslint-disable-next-line
-    public async _unstable_getDelayedEvents(fromToken?: string): Promise<DelayedEventInfo> {
+    public async _unstable_getDelayedEvents(
+        status?: "scheduled" | "finalised",
+        delayId?: string | string[],
+        fromToken?: string,
+    ): Promise<DelayedEventInfo> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
                 "Server does not support the delayed events API",
@@ -3551,7 +3555,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         }
 
-        const queryDict = fromToken ? { from: fromToken } : undefined;
+        const queryDict = {
+            from: fromToken,
+            status,
+            delay_id: delayId,
+        };
         return await this.http.authedRequest(Method.Get, "/delayed_events", queryDict, undefined, {
             prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
         });
