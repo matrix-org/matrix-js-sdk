@@ -24,7 +24,7 @@ import { KnownMembership } from "../@types/membership.ts";
 import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
-import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
+import { LegacyMembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
 import {
@@ -618,7 +618,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                       this.slotDescription,
                       this.logger,
                   )
-                : new MembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
+                : new LegacyMembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
 
             this.reEmitter.reEmit(this.membershipManager!, [
                 MembershipManagerEvent.ProbablyLeft,
