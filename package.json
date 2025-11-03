@@ -59,7 +59,7 @@
         "matrix-widget-api": "^1.10.0",
         "oidc-client-ts": "^3.0.1",
         "p-retry": "7",
-        "sdp-transform": "^2.14.1",
+        "sdp-transform": "^3.0.0",
         "unhomoglyph": "^1.0.6",
         "uuid": "13"
     },
