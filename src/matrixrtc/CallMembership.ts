@@ -22,6 +22,7 @@ import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
 import { checkSessionsMembershipData, SessionMembershipData } from "./membership/legacy.ts";
 import { checkRtcMembershipData, RtcMembershipData } from "./membership/rtc.ts";
 import { EventType } from "../matrix.ts";
+import { MatrixRTCMembershipParseError } from "./membership/common.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -70,13 +71,21 @@ export class CallMembership {
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
 
-        if (evType === EventType.RTCMembership && checkRtcMembershipData(data, sender)) {
-            this.membershipData = { kind: MembershipKind.RTC, data };
-        } else if (evType === EventType.GroupCallMemberPrefix && checkSessionsMembershipData(data)) {
-            this.membershipData = { kind: MembershipKind.Session, data };
-        } else {
-            throw Error(`'${evType} is not a known call membership type`);
+        try {
+            if (evType === EventType.RTCMembership && checkRtcMembershipData(data, sender)) {
+                this.membershipData = { kind: MembershipKind.RTC, data };
+            } else if (evType === EventType.GroupCallMemberPrefix && checkSessionsMembershipData(data)) {
+                this.membershipData = { kind: MembershipKind.Session, data };
+            } else {
+                throw Error(`'${evType} is not a known call membership type`);
+            }
+        } catch (ex) {
+            if (ex instanceof MatrixRTCMembershipParseError) {
+                logger.debug("CallMembership.MatrixRTCMembershipParseError provided data", data);
+            }
+            throw ex;
         }
+
         this.matrixEventData = { eventId, sender };
     }
 

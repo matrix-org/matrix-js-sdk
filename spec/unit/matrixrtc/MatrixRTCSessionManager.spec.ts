@@ -21,7 +21,7 @@ import { makeMockRoom, type MembershipData, sessionMembershipTemplate, mockRoomS
 import { logger } from "../../../src/logger";
 import { slotDescriptionToId } from "../../../src/matrixrtc";
 
-describe.each([{ eventKind: "sticky" }, /*{ eventKind: "memberState" }*/])(
+describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
     ({ eventKind }) => {
         let client: MatrixClient;
@@ -42,7 +42,7 @@ describe.each([{ eventKind: "sticky" }, /*{ eventKind: "memberState" }*/])(
         beforeEach(() => {
             client = new MatrixClient({ baseUrl: "base_url" });
             client.matrixRTC.start();
-            membershipTemplate = eventKind ? rtcMembershipTemplate : sessionMembershipTemplate;
+            membershipTemplate = eventKind === "sticky" ? rtcMembershipTemplate : sessionMembershipTemplate;
         });
 
         afterEach(() => {
