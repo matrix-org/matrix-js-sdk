@@ -1,3 +1,13 @@
+Changes in [39.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.1.0) (2025-11-04)
+==================================================================================================
+## ✨ Features
+
+* [MatrixRTC] Sticky Events support (MSC4354) ([#5017](https://github.com/matrix-org/matrix-js-sdk/pull/5017)). Contributed by @toger5.
+* Add `CryptoApi.getSecretStorageStatus` ([#5054](https://github.com/matrix-org/matrix-js-sdk/pull/5054)). Contributed by @richvdh.
+* Add parseCallNotificationContent ([#5015](https://github.com/matrix-org/matrix-js-sdk/pull/5015)). Contributed by @toger5.
+* MSC4140: support filters on delayed event lookup  ([#5038](https://github.com/matrix-org/matrix-js-sdk/pull/5038)). Contributed by @AndrewFerr.
+
+
 Changes in [39.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.0.0) (2025-10-21)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
