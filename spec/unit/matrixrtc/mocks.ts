@@ -22,8 +22,8 @@ import { CallMembership } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 import { DefaultCallApplicationDescription, RtcSlotEventContent, SlotDescription, slotDescriptionToId } from "../../../src/matrixrtc";
 import { mkMatrixEvent } from "../../../src/testing";
-import type { SessionMembershipData } from "src/matrixrtc/membership/legacy";
-import type { RtcMembershipData } from "src/matrixrtc/membership/rtc";
+import type { SessionMembershipData } from "../../../src/matrixrtc/membership/legacy";
+import type { RtcMembershipData } from "../../../src/matrixrtc/membership/rtc";
 
 export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 

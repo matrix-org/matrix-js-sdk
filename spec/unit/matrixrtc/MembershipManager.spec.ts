@@ -32,8 +32,8 @@ import {
 } from "../../../src/matrixrtc";
 import { makeMockClient, makeMockRoom, sessionMembershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { LegacyMembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
-import { SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
-import { RtcMembershipData } from "src/matrixrtc/membership/rtc.ts";
+import { SessionMembershipData } from "../../../src/matrixrtc/membership/legacy.ts";
+import { RtcMembershipData } from "../../../src/matrixrtc/membership/rtc.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.

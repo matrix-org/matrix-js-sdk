@@ -63,8 +63,8 @@ import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
-import { RtcMembershipData } from "src/matrixrtc/membership/rtc.ts";
-import { SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
+import { RtcMembershipData } from "../matrixrtc/membership/rtc.ts";
+import { SessionMembershipData } from "../matrixrtc/membership/legacy.ts";
 
 export enum EventType {
     // Room state events

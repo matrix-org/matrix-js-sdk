@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SessionMembershipData } from "src/matrixrtc/membership/legacy";
+import { SessionMembershipData } from "../../../src/matrixrtc/membership/legacy";
 import { EventType, type MatrixEvent } from "../../../src";
 import {
     CallMembership,
     DEFAULT_EXPIRE_DURATION,
 } from "../../../src/matrixrtc/CallMembership";
 import { sessionMembershipTemplate } from "./mocks";
-import { RtcMembershipData } from "src/matrixrtc/membership/rtc";
+import { RtcMembershipData } from "../../../src/matrixrtc/membership/rtc";
 
 function makeMockEvent(eventType: EventType.RTCMembership|EventType.GroupCallMemberPrefix, originTs = 0): MatrixEvent {
     return {
