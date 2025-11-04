@@ -1,3 +1,7 @@
+Changes in [39.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.1.1) (2025-11-04)
+==================================================================================================
+Re-release of v39.1.0 to fix npm publishing workflow
+
 Changes in [39.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.1.0) (2025-11-04)
 ==================================================================================================
 ## ✨ Features
