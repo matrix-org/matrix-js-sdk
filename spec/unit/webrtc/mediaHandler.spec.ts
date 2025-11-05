@@ -61,10 +61,10 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 audio: expect.objectContaining({
-                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    deviceId: { exact: FAKE_AUDIO_INPUT_ID },
                 }),
                 video: expect.objectContaining({
-                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    deviceId: { exact: FAKE_VIDEO_INPUT_ID },
                 }),
             }),
         );
@@ -77,7 +77,7 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 audio: expect.objectContaining({
-                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    deviceId: { exact: FAKE_AUDIO_INPUT_ID },
                 }),
             }),
         );
@@ -109,7 +109,7 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 video: expect.objectContaining({
-                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    deviceId: { exact: FAKE_VIDEO_INPUT_ID },
                 }),
             }),
         );
@@ -122,10 +122,10 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 audio: expect.objectContaining({
-                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    deviceId: { exact: FAKE_AUDIO_INPUT_ID },
                 }),
                 video: expect.objectContaining({
-                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    deviceId: { exact: FAKE_VIDEO_INPUT_ID },
                 }),
             }),
         );
