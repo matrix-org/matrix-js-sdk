@@ -441,7 +441,8 @@ export class MediaHandler extends TypedEventEmitter<
         return {
             audio: audio
                 ? {
-                      deviceId: this.audioInput ? { ideal: this.audioInput } : undefined,
+                      /* Not specifying exact for deviceId means switching devices does not always work */
+                      deviceId: this.audioInput ? { exact: this.audioInput } : undefined,
                       autoGainControl: this.audioSettings ? { ideal: this.audioSettings.autoGainControl } : undefined,
                       echoCancellation: this.audioSettings ? { ideal: this.audioSettings.echoCancellation } : undefined,
                       noiseSuppression: this.audioSettings ? { ideal: this.audioSettings.noiseSuppression } : undefined,
@@ -449,7 +450,8 @@ export class MediaHandler extends TypedEventEmitter<
                 : false,
             video: video
                 ? {
-                      deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
+                      /* Not specifying exact for deviceId means switching devices does not always work */
+                      deviceId: this.videoInput ? { exact: this.videoInput } : undefined,
                       /* We want 640x360.  Chrome will give it only if we ask exactly,
                    FF refuses entirely if we ask exactly, so have to ask for ideal
                    instead
