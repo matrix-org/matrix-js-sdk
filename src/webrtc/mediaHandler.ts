@@ -264,8 +264,19 @@ export class MediaHandler extends TypedEventEmitter<
         }
 
         if (!canReuseStream) {
-            const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            let constraints: MediaStreamConstraints;
+            try {
+                // Not specifying exact for deviceId means switching devices does not always work,
+                // try with exact and fallback to ideal if it fails
+                constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo, true);
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (e) {
+                logger.warn(
+                    `MediaHandler getUserMediaStreamInternal() error (e=${e}), retrying without exact deviceId`,
+                );
+                constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo, false);
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            }
             logger.log(
                 `MediaHandler getUserMediaStreamInternal() calling getUserMediaStream (streamId=${
                     stream.id
@@ -435,14 +446,13 @@ export class MediaHandler extends TypedEventEmitter<
         this.emit(MediaHandlerEvent.LocalStreamsChanged);
     }
 
-    private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {
+    private getUserMediaContraints(audio: boolean, video: boolean, exactDeviceId?: boolean): MediaStreamConstraints {
         const isWebkit = !!navigator.webkitGetUserMedia;
 
         return {
             audio: audio
                 ? {
-                      /* Not specifying exact for deviceId means switching devices does not always work */
-                      deviceId: this.audioInput ? { exact: this.audioInput } : undefined,
+                      deviceId: this.audioInput ? { [exactDeviceId ? "exact" : "ideal"]: this.audioInput } : undefined,
                       autoGainControl: this.audioSettings ? { ideal: this.audioSettings.autoGainControl } : undefined,
                       echoCancellation: this.audioSettings ? { ideal: this.audioSettings.echoCancellation } : undefined,
                       noiseSuppression: this.audioSettings ? { ideal: this.audioSettings.noiseSuppression } : undefined,
@@ -450,8 +460,7 @@ export class MediaHandler extends TypedEventEmitter<
                 : false,
             video: video
                 ? {
-                      /* Not specifying exact for deviceId means switching devices does not always work */
-                      deviceId: this.videoInput ? { exact: this.videoInput } : undefined,
+                      deviceId: this.videoInput ? { [exactDeviceId ? "exact" : "ideal"]: this.videoInput } : undefined,
                       /* We want 640x360.  Chrome will give it only if we ask exactly,
                    FF refuses entirely if we ask exactly, so have to ask for ideal
                    instead
