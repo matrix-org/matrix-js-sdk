@@ -448,28 +448,34 @@ export class MediaHandler extends TypedEventEmitter<
 
     private getUserMediaContraints(audio: boolean, video: boolean, exactDeviceId?: boolean): MediaStreamConstraints {
         const isWebkit = !!navigator.webkitGetUserMedia;
+        const deviceIdKey = exactDeviceId ? "exact" : "ideal";
+
+        const audioConstraints: MediaTrackConstraints = {};
+        if (this.audioInput) {
+            audioConstraints.deviceId = { [deviceIdKey]: this.audioInput };
+        }
+        if (this.audioSettings) {
+            audioConstraints.autoGainControl = { ideal: this.audioSettings.autoGainControl };
+            audioConstraints.echoCancellation = { ideal: this.audioSettings.echoCancellation };
+            audioConstraints.noiseSuppression = { ideal: this.audioSettings.noiseSuppression };
+        }
+
+        const videoConstraints: MediaTrackConstraints = {
+            /* We want 640x360.  Chrome will give it only if we ask exactly,
+               FF refuses entirely if we ask exactly, so have to ask for ideal
+               instead
+               XXX: Is this still true?
+             */
+            width: isWebkit ? { exact: 640 } : { ideal: 640 },
+            height: isWebkit ? { exact: 360 } : { ideal: 360 },
+        };
+        if (this.videoInput) {
+            videoConstraints.deviceId = { [deviceIdKey]: this.videoInput };
+        }
 
         return {
-            audio: audio
-                ? {
-                      deviceId: this.audioInput ? { [exactDeviceId ? "exact" : "ideal"]: this.audioInput } : undefined,
-                      autoGainControl: this.audioSettings ? { ideal: this.audioSettings.autoGainControl } : undefined,
-                      echoCancellation: this.audioSettings ? { ideal: this.audioSettings.echoCancellation } : undefined,
-                      noiseSuppression: this.audioSettings ? { ideal: this.audioSettings.noiseSuppression } : undefined,
-                  }
-                : false,
-            video: video
-                ? {
-                      deviceId: this.videoInput ? { [exactDeviceId ? "exact" : "ideal"]: this.videoInput } : undefined,
-                      /* We want 640x360.  Chrome will give it only if we ask exactly,
-                   FF refuses entirely if we ask exactly, so have to ask for ideal
-                   instead
-                   XXX: Is this still true?
-                 */
-                      width: isWebkit ? { exact: 640 } : { ideal: 640 },
-                      height: isWebkit ? { exact: 360 } : { ideal: 360 },
-                  }
-                : false,
+            audio: audio ? audioConstraints : false,
+            video: video ? videoConstraints : false,
         };
     }
 
