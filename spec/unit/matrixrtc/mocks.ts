@@ -27,6 +27,8 @@ import type { RtcMembershipData } from "../../../src/matrixrtc/membership/rtc";
 
 export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
+export const testStickyDurationMs = 10000;
+
 export const sessionMembershipTemplate: SessionMembershipData & { user_id: string } = {
     application: "m.call",
     call_id: "",
@@ -48,7 +50,7 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     ],
 };
 
-export const rtcMembershipTemplate: RtcMembershipData&{user_id: string} = {
+export const rtcMembershipTemplate: RtcMembershipData&{user_id: string, __test_sticky_expiry?: number} = {
     slot_id: "m.call#",
     application: {
         type: "m.call",
@@ -110,10 +112,11 @@ export function makeMockRoom(
     membershipData: MembershipData[],
     useStickyEvents = false,
     slotDescription = DefaultCallApplicationDescription,
+    addRTCSlot = useStickyEvents,
 ): Mocked<Room & { emitTimelineEvent: (event: MatrixEvent) => void }> {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
-    const roomState = makeMockRoomState(useStickyEvents ? [] : membershipData, roomId, useStickyEvents ? slotDescription : undefined);
+    const roomState = makeMockRoomState(useStickyEvents ? [] : membershipData, roomId, addRTCSlot ? slotDescription : undefined);
     const ts = Date.now();
     const room = Object.assign(new EventEmitter(), {
         roomId: roomId,
@@ -125,7 +128,7 @@ export function makeMockRoom(
         _unstable_getStickyEvents: jest
             .fn()
             .mockImplementation(() =>
-                useStickyEvents ? membershipData.map((m) => mockRTCEvent(m, roomId, 10000, ts)) : [],
+                useStickyEvents ? membershipData.map((m) => mockRTCEvent(m, roomId, (m as typeof rtcMembershipTemplate).__test_sticky_expiry ?? testStickyDurationMs, ts)) : [],
             ) as any,
     });
     return Object.assign(room, {
@@ -227,7 +230,7 @@ export function mockRTCEvent(
             timestamp,
             !stickyDuration && "device_id" in membershipData ? `_${sender}_${membershipData.device_id}` : "",
         ),
-        unstableStickyExpiresAt: stickyDuration,
+        unstableStickyExpiresAt: stickyDuration ? Date.now() + stickyDuration : undefined,
     } as unknown as MatrixEvent;
 }
 

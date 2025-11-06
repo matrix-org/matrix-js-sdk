@@ -306,7 +306,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const slotId = slotDescriptionToId(slotDescription);
         const slot = room.getLiveTimeline().getState(Direction.Forward)?.getStateEvents(EventType.RTCSlot, slotId);
         if (!slot) {
-            console.log(room.getLiveTimeline().getState(Direction.Forward)?.events);
             logger.debug(`No slot found for ${room.roomId}`);
             return null;
         }
@@ -818,6 +817,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 "lifetime": 30_000, // 30 seconds
             };
             if (callIntent) {
+                // TODO: Should be in a different field?1
                 content["m.call.intent"] = callIntent;
             }
             const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);

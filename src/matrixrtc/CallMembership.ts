@@ -136,39 +136,34 @@ export class CallMembership {
     }
 
     public get callIntent(): RTCCallIntent | undefined {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC: {
-                const intent = data.application["m.call.intent"];
-                if (typeof intent === "string") {
-                    return intent;
-                }
-                logger.warn("RTC membership has invalid m.call.intent");
-                return undefined;
-            }
-            case MembershipKind.Session:
-            default:
-                return data["m.call.intent"];
+        const intent = this.applicationData["m.call.intent"];
+        if (typeof intent === "string") {
+            return intent;
         }
+        logger.warn("RTC membership has invalid m.call.intent");
+        return undefined;
     }
 
     /**
      * Parsed `slot_id` (format `{application}#{id}`) into its components (application and id).
      */
     public get slotDescription(): SlotDescription {
+        // TODO: Should this use content.application?
         return slotIdToDescription(this.slotId);
     }
 
+    /**
+     * The application `type`.
+     * @deprecated Use @see applicationData
+     */
     public get application(): string {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.application.type;
-            case MembershipKind.Session:
-            default:
-                return data.application;
-        }
+        return this.applicationData.type;
     }
+
+    /**
+     * Information about the application being used for the RTC session.
+     * May contain extra keys specific to the application.
+     */
     public get applicationData(): { type: string; [key: string]: unknown } {
         const { kind, data } = this.membershipData;
         switch (kind) {
@@ -176,6 +171,7 @@ export class CallMembership {
                 return data.application;
             case MembershipKind.Session:
             default:
+                // XXX: This is a hack around 
                 return { "type": data.application, "m.call.intent": data["m.call.intent"] };
         }
     }
@@ -226,7 +222,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return undefined;
+                return this.matrixEvent.unstableStickyExpiresAt;
             case MembershipKind.Session:
             default:
                 // TODO: calculate this from the MatrixRTCSession join configuration directly
@@ -236,19 +232,14 @@ export class CallMembership {
 
     /**
      * @returns The number of milliseconds until the membership expires or undefined if applicable
+     * @deprecated Not used by RTC events.
      */
     public getMsUntilExpiry(): number | undefined {
-        const { kind } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return undefined;
-            case MembershipKind.Session:
-            default:
-                // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
-                // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-                // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-                return this.getAbsoluteExpiry()! - Date.now();
-        }
+        const absExpiry = this.getAbsoluteExpiry();
+        // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
+        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
+        // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
+        return absExpiry ? absExpiry - Date.now() : undefined;
     }
 
     /**
@@ -258,7 +249,8 @@ export class CallMembership {
         const { kind } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return false;
+                console.log("isExpired", this.matrixEvent.unstableStickyExpiresAt, Date.now());
+                return this.matrixEvent.unstableStickyExpiresAt ? Date.now() > this.matrixEvent.unstableStickyExpiresAt: false;
             case MembershipKind.Session:
             default:
                 return this.getMsUntilExpiry()! <= 0;
