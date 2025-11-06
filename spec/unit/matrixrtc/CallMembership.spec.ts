@@ -16,14 +16,14 @@ limitations under the License.
 
 import { SessionMembershipData } from "../../../src/matrixrtc/membership/legacy";
 import { EventType, type MatrixEvent } from "../../../src";
-import {
-    CallMembership,
-    DEFAULT_EXPIRE_DURATION,
-} from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
 import { sessionMembershipTemplate } from "./mocks";
 import { RtcMembershipData } from "../../../src/matrixrtc/membership/rtc";
 
-function makeMockEvent(eventType: EventType.RTCMembership|EventType.GroupCallMemberPrefix, originTs = 0): MatrixEvent {
+function makeMockEvent(
+    eventType: EventType.RTCMembership | EventType.GroupCallMemberPrefix,
+    originTs = 0,
+): MatrixEvent {
     return {
         getTs: jest.fn().mockReturnValue(originTs),
         getSender: jest.fn().mockReturnValue("@alice:example.org"),
@@ -54,24 +54,36 @@ describe("CallMembership", () => {
 
         it("rejects membership with no device_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.GroupCallMemberPrefix), Object.assign({}, membershipTemplate, { device_id: undefined }));
+                new CallMembership(
+                    makeMockEvent(EventType.GroupCallMemberPrefix),
+                    Object.assign({}, membershipTemplate, { device_id: undefined }),
+                );
             }).toThrow();
         });
 
         it("rejects membership with no call_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.GroupCallMemberPrefix), Object.assign({}, membershipTemplate, { call_id: undefined }));
+                new CallMembership(
+                    makeMockEvent(EventType.GroupCallMemberPrefix),
+                    Object.assign({}, membershipTemplate, { call_id: undefined }),
+                );
             }).toThrow();
         });
 
         it("allow membership with no scope", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.GroupCallMemberPrefix), Object.assign({}, membershipTemplate, { scope: undefined }));
+                new CallMembership(
+                    makeMockEvent(EventType.GroupCallMemberPrefix),
+                    Object.assign({}, membershipTemplate, { scope: undefined }),
+                );
             }).not.toThrow();
         });
 
         it("uses event timestamp if no created_ts", () => {
-            const membership = new CallMembership(makeMockEvent(EventType.GroupCallMemberPrefix, 12345), membershipTemplate);
+            const membership = new CallMembership(
+                makeMockEvent(EventType.GroupCallMemberPrefix, 12345),
+                membershipTemplate,
+            );
             expect(membership.createdTs()).toEqual(12345);
         });
 
@@ -104,7 +116,10 @@ describe("CallMembership", () => {
 
         describe("getTransport", () => {
             const mockFocus = { type: "this_is_a_mock_focus" };
-            const oldestMembership = new CallMembership(makeMockEvent(EventType.GroupCallMemberPrefix), membershipTemplate);
+            const oldestMembership = new CallMembership(
+                makeMockEvent(EventType.GroupCallMemberPrefix),
+                membershipTemplate,
+            );
             it("gets the correct active transport with oldest_membership", () => {
                 const membership = new CallMembership(makeMockEvent(EventType.GroupCallMemberPrefix), {
                     ...membershipTemplate,
@@ -193,23 +208,35 @@ describe("CallMembership", () => {
 
         it("rejects membership with no slot_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, slot_id: undefined });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    slot_id: undefined,
+                });
             }).toThrow();
         });
         it("rejects membership with invalid slot_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, slot_id: "invalid_slot_id" });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    slot_id: "invalid_slot_id",
+                });
             }).toThrow();
         });
         it("accepts membership with valid slot_id", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, slot_id: "m.call#" });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    slot_id: "m.call#",
+                });
             }).not.toThrow();
         });
 
         it("rejects membership with no application", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, application: undefined });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    application: undefined,
+                });
             }).toThrow();
         });
 
@@ -224,13 +251,19 @@ describe("CallMembership", () => {
 
         it("rejects membership with no member", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, member: undefined });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    member: undefined,
+                });
             }).toThrow();
         });
 
         it("rejects membership with incorrect  member", () => {
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, member: { i: "test" } });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    member: { i: "test" },
+                });
             }).toThrow();
             expect(() => {
                 new CallMembership(makeMockEvent(EventType.RTCMembership), {
@@ -276,7 +309,10 @@ describe("CallMembership", () => {
                 });
             }).not.toThrow();
             expect(() => {
-                new CallMembership(makeMockEvent(EventType.RTCMembership), { ...membershipTemplate, msc4354_sticky_key: undefined });
+                new CallMembership(makeMockEvent(EventType.RTCMembership), {
+                    ...membershipTemplate,
+                    msc4354_sticky_key: undefined,
+                });
             }).toThrow();
             expect(() => {
                 new CallMembership(makeMockEvent(EventType.RTCMembership), {

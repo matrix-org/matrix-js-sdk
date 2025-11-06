@@ -25,11 +25,7 @@ import {
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
-import {
-    MembershipManagerEvent,
-    Status,
-    type Transport,
-} from "../../../src/matrixrtc";
+import { MembershipManagerEvent, Status, type Transport } from "../../../src/matrixrtc";
 import { makeMockClient, makeMockRoom, sessionMembershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { LegacyMembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 import { SessionMembershipData } from "../../../src/matrixrtc/membership/legacy.ts";
@@ -98,13 +94,12 @@ describe("MembershipManager", () => {
         // There is no need to clean up mocks since we will recreate the client.
     });
     describe("LegacyMembershipManager", () => {
-
         beforeEach(() => {
             // Provide a default mock that is like the default "non error" server behaviour.
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockResolvedValue({ delay_id: "id" });
             (client._unstable_updateDelayedEvent as Mock<any>).mockResolvedValue(undefined);
             (client.sendStateEvent as Mock<any>).mockResolvedValue({ event_id: "id" });
-        })
+        });
 
         describe("isActivated()", () => {
             it("defaults to false", () => {
@@ -124,7 +119,9 @@ describe("MembershipManager", () => {
                 it("sends a membership event and schedules delayed leave when joining a call", async () => {
                     // Spys/Mocks
 
-                    const updateDelayedEventHandle = createAsyncHandle<void>(client._unstable_updateDelayedEvent as Mock);
+                    const updateDelayedEventHandle = createAsyncHandle<void>(
+                        client._unstable_updateDelayedEvent as Mock,
+                    );
 
                     // Test
                     const memberManager = new LegacyMembershipManager(undefined, room, client, callSession);
@@ -308,7 +305,12 @@ describe("MembershipManager", () => {
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
                 });
                 it("uses delayedLeaveEventDelayMs from config", () => {
-                    const manager = new LegacyMembershipManager({ delayedLeaveEventDelayMs: 123456 }, room, client, callSession);
+                    const manager = new LegacyMembershipManager(
+                        { delayedLeaveEventDelayMs: 123456 },
+                        room,
+                        client,
+                        callSession,
+                    );
                     manager.join([focus]);
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                         room.roomId,
@@ -867,7 +869,10 @@ describe("MembershipManager", () => {
                 const manager = new LegacyMembershipManager({}, room, client, callSession);
                 manager.join([]);
                 expect(manager.isActivated()).toEqual(true);
-                const membership = mockCallMembership({ ...sessionMembershipTemplate, user_id: client.getUserId()! }, room.roomId);
+                const membership = mockCallMembership(
+                    { ...sessionMembershipTemplate, user_id: client.getUserId()! },
+                    room.roomId,
+                );
                 await manager.onRTCSessionMemberUpdate([membership]);
                 await manager.updateCallIntent("video");
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(2);

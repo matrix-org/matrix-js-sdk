@@ -20,7 +20,12 @@ import { type Mocked } from "jest-mock";
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
-import { DefaultCallApplicationDescription, RtcSlotEventContent, SlotDescription, slotDescriptionToId } from "../../../src/matrixrtc";
+import {
+    DefaultCallApplicationDescription,
+    RtcSlotEventContent,
+    SlotDescription,
+    slotDescriptionToId,
+} from "../../../src/matrixrtc";
 import { mkMatrixEvent } from "../../../src/testing";
 import type { SessionMembershipData } from "../../../src/matrixrtc/membership/legacy";
 import type { RtcMembershipData } from "../../../src/matrixrtc/membership/rtc";
@@ -50,17 +55,17 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     ],
 };
 
-export const rtcMembershipTemplate: RtcMembershipData&{user_id: string, __test_sticky_expiry?: number} = {
+export const rtcMembershipTemplate: RtcMembershipData & { user_id: string; __test_sticky_expiry?: number } = {
     slot_id: "m.call#",
     application: {
-        type: "m.call",
-        "m.call.id": ""
+        "type": "m.call",
+        "m.call.id": "",
     },
     user_id: "@mock:user.example",
     member: {
         claimed_user_id: "@mock:user.example",
         claimed_device_id: "AAAAAAA",
-        id: "ea2MaingeeMo"
+        id: "ea2MaingeeMo",
     },
     sticky_key: "ea2MaingeeMo",
     rtc_transports: [
@@ -77,7 +82,6 @@ export const rtcMembershipTemplate: RtcMembershipData&{user_id: string, __test_s
     ],
     versions: [],
 };
-
 
 export type MockClient = Pick<
     MatrixClient,
@@ -116,7 +120,11 @@ export function makeMockRoom(
 ): Mocked<Room & { emitTimelineEvent: (event: MatrixEvent) => void }> {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
-    const roomState = makeMockRoomState(useStickyEvents ? [] : membershipData, roomId, addRTCSlot ? slotDescription : undefined);
+    const roomState = makeMockRoomState(
+        useStickyEvents ? [] : membershipData,
+        roomId,
+        addRTCSlot ? slotDescription : undefined,
+    );
     const ts = Date.now();
     const room = Object.assign(new EventEmitter(), {
         roomId: roomId,
@@ -128,7 +136,16 @@ export function makeMockRoom(
         _unstable_getStickyEvents: jest
             .fn()
             .mockImplementation(() =>
-                useStickyEvents ? membershipData.map((m) => mockRTCEvent(m, roomId, (m as typeof rtcMembershipTemplate).__test_sticky_expiry ?? testStickyDurationMs, ts)) : [],
+                useStickyEvents
+                    ? membershipData.map((m) =>
+                          mockRTCEvent(
+                              m,
+                              roomId,
+                              (m as typeof rtcMembershipTemplate).__test_sticky_expiry ?? testStickyDurationMs,
+                              ts,
+                          ),
+                      )
+                    : [],
             ) as any,
     });
     return Object.assign(room, {
@@ -143,7 +160,7 @@ function makeMockRoomState(membershipData: MembershipData[], roomId: string, slo
         const data = e.getContent() as SessionMembershipData;
         return [`_${e.sender?.userId}_${data.device_id}`];
     });
-    let slotEvent: MatrixEvent|undefined;
+    let slotEvent: MatrixEvent | undefined;
 
     if (slotDescription) {
         // Add a slot
@@ -181,18 +198,27 @@ function makeMockRoomState(membershipData: MembershipData[], roomId: string, slo
                     values: () => events,
                 },
             ],
-            ...(slotEvent ? [[EventType.RTCSlot, {
-                size: () => true,
-                has: (stateKey: string) => slotEvent.getStateKey() === stateKey,
-                get: (stateKey: string) => slotEvent.getStateKey() === stateKey ? slotEvent : undefined,
-                values: () => [slotEvent],
-            }]] : []),
+            ...(slotEvent
+                ? [
+                      [
+                          EventType.RTCSlot,
+                          {
+                              size: () => true,
+                              has: (stateKey: string) => slotEvent.getStateKey() === stateKey,
+                              get: (stateKey: string) => (slotEvent.getStateKey() === stateKey ? slotEvent : undefined),
+                              values: () => [slotEvent],
+                          },
+                      ],
+                  ]
+                : []),
         ] as any),
     };
 }
 
 export function mockRoomState(room: Room, membershipData: MembershipData[], slotDescription?: SlotDescription): void {
-    room.getLiveTimeline().getState = jest.fn().mockReturnValue(makeMockRoomState(membershipData, room.roomId, slotDescription));
+    room.getLiveTimeline().getState = jest
+        .fn()
+        .mockReturnValue(makeMockRoomState(membershipData, room.roomId, slotDescription));
 }
 
 export function makeMockEvent(
