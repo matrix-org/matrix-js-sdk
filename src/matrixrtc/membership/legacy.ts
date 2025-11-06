@@ -1,4 +1,4 @@
-import { EventType, type IContent } from "../../matrix.ts";
+import { type IContent } from "../../matrix.ts";
 import { type RTCCallIntent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 
@@ -114,7 +114,7 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
     }
 
     if (errors.length) {
-        throw new MatrixRTCMembershipParseError(EventType.GroupCallMemberPrefix, errors);
+        throw new MatrixRTCMembershipParseError("bar", errors);
     }
 
     return true;

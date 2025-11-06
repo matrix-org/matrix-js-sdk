@@ -21,8 +21,8 @@ import { logger } from "../logger.ts";
 import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
 import { checkSessionsMembershipData, type SessionMembershipData } from "./membership/legacy.ts";
 import { checkRtcMembershipData, type RtcMembershipData } from "./membership/rtc.ts";
-import { EventType } from "../matrix.ts";
 import { MatrixRTCMembershipParseError } from "./membership/common.ts";
+import { EventType } from "../@types/event.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.

@@ -1,4 +1,6 @@
-import { EventType, type IContent, MXID_PATTERN, type RelationType } from "../../matrix.ts";
+import { MXID_PATTERN } from "../../models/room-member.ts";
+import { IContent } from "../../models/event.ts";
+import { RelationType } from "../../types.ts";
 import { type RtcSlotEventContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 
@@ -113,7 +115,7 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     }
 
     if (errors.length) {
-        throw new MatrixRTCMembershipParseError(EventType.RTCMembership, errors);
+        throw new MatrixRTCMembershipParseError("foo", errors);
     }
 
     return true;
