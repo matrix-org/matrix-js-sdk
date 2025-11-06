@@ -1,6 +1,6 @@
 import { MXID_PATTERN } from "../../models/room-member.ts";
-import { IContent } from "../../models/event.ts";
-import { RelationType } from "../../types.ts";
+import type { IContent } from "../../models/event.ts";
+import type { RelationType } from "../../types.ts";
 import { type RtcSlotEventContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 
