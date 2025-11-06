@@ -1,7 +1,6 @@
-import { EventType, IContent, MXID_PATTERN, RelationType } from "../../matrix";
-import { RtcSlotEventContent, Transport } from "../types";
-import { MatrixRTCMembershipParseError } from "./common";
-
+import { EventType, type IContent, MXID_PATTERN, type RelationType } from "../../matrix.ts";
+import { type RtcSlotEventContent, type Transport } from "../types.ts";
+import { MatrixRTCMembershipParseError } from "./common.ts";
 
 /**
  * Represents the current form of MSC4143.
@@ -11,7 +10,7 @@ export interface RtcMembershipData {
     "member": {
         claimed_user_id: string;
         claimed_device_id: string;
-        id: string
+        id: string;
     };
     "m.relates_to"?: {
         event_id: string;
@@ -24,10 +23,14 @@ export interface RtcMembershipData {
     "sticky_key"?: string;
 }
 
-export const checkRtcMembershipData = (
-    data: IContent,
-    referenceUserId: string,
-): data is RtcMembershipData => {
+/**
+ * Validates that `data` matches the format expected by MSC4143.
+ * @param data The event content.
+ * @param sender The sender of the event.
+ * @returns true if `data` is valid RtcMembershipData
+ * @throws {MatrixRTCMembershipParseError} if the content is not valid
+ */
+export const checkRtcMembershipData = (data: IContent, sender: string): data is RtcMembershipData => {
     const errors: string[] = [];
     const prefix = " - ";
 
@@ -40,13 +43,20 @@ export const checkRtcMembershipData = (
     if (typeof data.member !== "object" || data.member === null) {
         errors.push(prefix + "member must be an object");
     } else {
-        if (typeof data.member.claimed_user_id !== "string") errors.push(prefix + "member.claimed_user_id must be string");
-        else if (!MXID_PATTERN.test(data.member.claimed_user_id)) errors.push(prefix + "member.claimed_user_id must be a valid mxid");
+        if (typeof data.member.claimed_user_id !== "string") {
+            errors.push(prefix + "member.claimed_user_id must be string");
+        } else if (!MXID_PATTERN.test(data.member.claimed_user_id)) {
+            errors.push(prefix + "member.claimed_user_id must be a valid mxid");
+        }
         // This is not what the spec enforces but there currently are no rules what power levels are required to
         // send a m.rtc.member event for a other user. So we add this check for simplicity and to avoid possible attacks until there
         // is a proper definition when this is allowed.
-        else if (data.member.claimed_user_id !== referenceUserId) errors.push(prefix + "member.claimed_user_id must match the sender");
-        if (typeof data.member.claimed_device_id !== "string") errors.push(prefix + "member.claimed_device_id must be string");
+        else if (data.member.claimed_user_id !== sender) {
+            errors.push(prefix + "member.claimed_user_id must match the sender");
+        }
+        if (typeof data.member.claimed_device_id !== "string") {
+            errors.push(prefix + "member.claimed_device_id must be string");
+        }
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
     }
     if (typeof data.application !== "object" || data.application === null) {
@@ -103,7 +113,7 @@ export const checkRtcMembershipData = (
     }
 
     if (errors.length) {
-        throw new MatrixRTCMembershipParseError(EventType.RTCMembership, errors)
+        throw new MatrixRTCMembershipParseError(EventType.RTCMembership, errors);
     }
 
     return true;

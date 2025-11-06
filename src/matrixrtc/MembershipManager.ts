@@ -26,17 +26,10 @@ import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import {
-    type CallMembership,
-    DEFAULT_EXPIRE_DURATION,
-} from "./CallMembership.ts";
-import type {
-    RtcMembershipData,
-} from "./membership/rtc.ts"
-import type {
-    SessionMembershipData,
-} from "./membership/legacy.ts"
-import { type Transport, isMyMembership, type RTCCallIntent, Status, SlotDescription } from "./types.ts";
+import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
+import type { RtcMembershipData } from "./membership/rtc.ts";
+import type { SessionMembershipData } from "./membership/legacy.ts";
+import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
 import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
@@ -185,7 +178,7 @@ type MembershipManagerClient = Pick<
  *   - Stop the timer for the delay refresh
  *   - Stop the timer for updating the state event
  */
-export abstract class MembershipManager<MembershipData extends SessionMembershipData|RtcMembershipData>
+export abstract class MembershipManager<MembershipData extends SessionMembershipData | RtcMembershipData>
     extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap>
     implements IMembershipManager
 {
@@ -1024,25 +1017,22 @@ export class LegacyMembershipManager extends MembershipManager<SessionMembership
         };
     }
 
-
-    protected clientSendMembership: (
-        myMembership: SessionMembershipData | EmptyObject,
-    ) => Promise<ISendEventResponse> = (myMembership) => {
-        return this.client.sendStateEvent(
-            this.room.roomId,
-            EventType.GroupCallMemberPrefix,
-            myMembership,
-            this.memberId,
-        );
-    };
-
+    protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
+        (myMembership) => {
+            return this.client.sendStateEvent(
+                this.room.roomId,
+                EventType.GroupCallMemberPrefix,
+                myMembership,
+                this.memberId,
+            );
+        };
 }
 
 /**
  * Implementation of the Membership manager that uses sticky events
  * rather than state events.
- * 
- * This exclusively sends RTCMembershipData 
+ *
+ * This exclusively sends RTCMembershipData
  */
 export class StickyEventMembershipManager extends MembershipManager<RtcMembershipData> {
     public constructor(
@@ -1068,9 +1058,9 @@ export class StickyEventMembershipManager extends MembershipManager<RtcMembershi
             { msc4354_sticky_key: this.memberId },
         );
 
-    protected clientSendMembership: (
-        myMembership: RtcMembershipData | EmptyObject,
-    ) => Promise<ISendEventResponse> = (myMembership) => {
+    protected clientSendMembership: (myMembership: RtcMembershipData | EmptyObject) => Promise<ISendEventResponse> = (
+        myMembership,
+    ) => {
         return this.clientWithSticky._unstable_sendStickyEvent(
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,

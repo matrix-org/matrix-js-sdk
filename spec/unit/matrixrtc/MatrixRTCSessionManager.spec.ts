@@ -160,7 +160,6 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                               },
                           ];
                 const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky", slotDescription);
-                console.log({ room2: room2.roomId });
                 jest.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
                 client.emit(ClientEvent.Room, room2);
                 expect(onStarted).toHaveBeenCalled();

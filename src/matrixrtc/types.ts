@@ -207,7 +207,7 @@ export interface RtcSlotEventContent<T extends string = string> {
         // other application specific keys
         [key: string]: unknown;
     };
-    slot_id: string,
+    slot_id: string;
 }
 
 /**

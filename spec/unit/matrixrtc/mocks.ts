@@ -22,8 +22,8 @@ import { CallMembership } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 import {
     DefaultCallApplicationDescription,
-    RtcSlotEventContent,
-    SlotDescription,
+    type RtcSlotEventContent,
+    type SlotDescription,
     slotDescriptionToId,
 } from "../../../src/matrixrtc";
 import { mkMatrixEvent } from "../../../src/testing";

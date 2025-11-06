@@ -19,8 +19,8 @@ import { type RTCCallIntent, type Transport, type SlotDescription } from "./type
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { logger } from "../logger.ts";
 import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
-import { checkSessionsMembershipData, SessionMembershipData } from "./membership/legacy.ts";
-import { checkRtcMembershipData, RtcMembershipData } from "./membership/rtc.ts";
+import { checkSessionsMembershipData, type SessionMembershipData } from "./membership/legacy.ts";
+import { checkRtcMembershipData, type RtcMembershipData } from "./membership/rtc.ts";
 import { EventType } from "../matrix.ts";
 import { MatrixRTCMembershipParseError } from "./membership/common.ts";
 
@@ -45,8 +45,9 @@ enum MembershipKind {
     Session = "session",
 }
 
-
-type MembershipData = { kind: MembershipKind.RTC; data: RtcMembershipData } | { kind: MembershipKind.Session; data: SessionMembershipData };
+type MembershipData =
+    | { kind: MembershipKind.RTC; data: RtcMembershipData }
+    | { kind: MembershipKind.Session; data: SessionMembershipData };
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
 export class CallMembership {
     public static equal(a?: CallMembership, b?: CallMembership): boolean {
@@ -72,6 +73,7 @@ export class CallMembership {
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
 
         try {
+            // Event types are strictly checked here.
             if (evType === EventType.RTCMembership && checkRtcMembershipData(data, sender)) {
                 this.membershipData = { kind: MembershipKind.RTC, data };
             } else if (evType === EventType.GroupCallMemberPrefix && checkSessionsMembershipData(data)) {
@@ -171,7 +173,7 @@ export class CallMembership {
                 return data.application;
             case MembershipKind.Session:
             default:
-                // XXX: This is a hack around 
+                // XXX: This is a hack around
                 return { "type": data.application, "m.call.intent": data["m.call.intent"] };
         }
     }
@@ -249,8 +251,9 @@ export class CallMembership {
         const { kind } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                console.log("isExpired", this.matrixEvent.unstableStickyExpiresAt, Date.now());
-                return this.matrixEvent.unstableStickyExpiresAt ? Date.now() > this.matrixEvent.unstableStickyExpiresAt: false;
+                return this.matrixEvent.unstableStickyExpiresAt
+                    ? Date.now() > this.matrixEvent.unstableStickyExpiresAt
+                    : false;
             case MembershipKind.Session:
             default:
                 return this.getMsUntilExpiry()! <= 0;

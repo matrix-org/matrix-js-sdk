@@ -1,8 +1,8 @@
-import { RtcSlotEventContent, SlotDescription } from "./types";
+import { type RtcSlotEventContent, type SlotDescription } from "./types.ts";
 
 export const DefaultCallApplicationDescription: SlotDescription = {
     id: "",
-    application: "m.call"
+    application: "m.call",
 };
 
 /**
@@ -13,14 +13,14 @@ export interface CallSlotEventContent extends RtcSlotEventContent<"m.call"> {
         "type": "m.call";
         "m.call.id"?: string;
     };
-    slot_id: `${string}#${string}`,
+    slot_id: `${string}#${string}`;
 }
 /**
  * Default slot for a room using "m.call".
  */
 export const DefaultCallApplicationSlot: CallSlotEventContent = {
     application: {
-        "type": "m.call",
+        type: "m.call",
     },
     slot_id: "m.call#",
 };

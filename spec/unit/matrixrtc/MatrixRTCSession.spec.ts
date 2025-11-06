@@ -26,7 +26,7 @@ import {
 } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
-import { SlotDescription, Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
+import { type SlotDescription, Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import {
     makeMockEvent,
     makeMockRoom,

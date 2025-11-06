@@ -1,6 +1,6 @@
-import { EventType, IContent } from "../../matrix";
-import { RTCCallIntent, Transport } from "../types";
-import { MatrixRTCMembershipParseError } from "./common";
+import { EventType, type IContent } from "../../matrix.ts";
+import { type RTCCallIntent, type Transport } from "../types.ts";
+import { MatrixRTCMembershipParseError } from "./common.ts";
 
 /**
  * **Legacy** (MatrixRTC) session membership data.
@@ -31,8 +31,8 @@ export type SessionMembershipData = {
      * NOTE: This is still included for legacy reasons, but not consumed by the SDK.
      */
     "focus_active": {
-        type: string,
-        focus_selection: "oldest_membership"|string,
+        type: string;
+        focus_selection: "oldest_membership" | string;
     };
 
     /**
@@ -72,6 +72,12 @@ export type SessionMembershipData = {
     "m.call.intent"?: RTCCallIntent;
 };
 
+/**
+ * Validates that `data` matches the format expected by the legacy form of MSC4143.
+ * @param data The event content.
+ * @returns true if `data` is valid SessionMembershipData
+ * @throws {MatrixRTCMembershipParseError} if the content is not valid
+ */
 export const checkSessionsMembershipData = (data: IContent): data is SessionMembershipData => {
     const prefix = " - ";
     const errors: string[] = [];
@@ -108,7 +114,7 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
     }
 
     if (errors.length) {
-        throw new MatrixRTCMembershipParseError(EventType.GroupCallMemberPrefix, errors)
+        throw new MatrixRTCMembershipParseError(EventType.GroupCallMemberPrefix, errors);
     }
 
     return true;

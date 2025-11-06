@@ -50,7 +50,7 @@ import { type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
 import { DefaultCallApplicationSlot } from "./CallApplication.ts";
 import { slotDescriptionToId } from "./utils.ts";
-import { RtcMembershipData } from "./membership/rtc.ts";
+import { type RtcMembershipData } from "./membership/rtc.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 
 /**
@@ -300,7 +300,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @returns The contents of the slot event, or null if no matching slot found.
      */
     public static getRtcSlot(
-        room: Pick<Room, "getLiveTimeline"|"roomId">,
+        room: Pick<Room, "getLiveTimeline" | "roomId">,
         slotDescription: SlotDescription,
     ): RtcSlotEventContent | null {
         const slotId = slotDescriptionToId(slotDescription);
@@ -325,8 +325,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         if (
-            "slot_id" in slotContent === false || 
-            typeof slotContent.slot_id !== "string" || 
+            "slot_id" in slotContent === false ||
+            typeof slotContent.slot_id !== "string" ||
             !slotContent.slot_id.startsWith(slotContent.application.type + "#")
         ) {
             logger.debug(`Mismatched app for ${room.roomId}`, slotContent);
@@ -361,17 +361,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
             // Has a slot and the application parameters match, fetch sticky members.
             callMemberEvents = [...room._unstable_getStickyEvents()].filter((e) => {
                 if (e.getType() !== EventType.RTCMembership) {
-                    console.log("Invalid type");
                     return false;
                 }
                 const content = e.getContent<RtcMembershipData>();
                 // Ensure the slot ID of the membership matches the state
                 if (content.slot_id !== slotId) {
-                    console.log("Invalid slot ID", content.slot_id, slotId);
                     return false;
                 }
                 if (content.application.type !== slotDescription.application) {
-                    console.log("Invalid application.type", content.application.type, slotDescription.application);
                     return false;
                 }
                 return true;
@@ -452,7 +449,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 callMemberships.map((m) => [m.createdTs(), m.sender]),
             );
         }
-
 
         return callMemberships;
     }
@@ -612,7 +608,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
                       this.slotDescription,
                       this.logger,
                   )
-                : new LegacyMembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
+                : new LegacyMembershipManager(
+                      joinConfig,
+                      this.roomSubset,
+                      this.client,
+                      this.slotDescription,
+                      this.logger,
+                  );
 
             this.reEmitter.reEmit(this.membershipManager!, [
                 MembershipManagerEvent.ProbablyLeft,
