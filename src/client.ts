@@ -3570,8 +3570,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @deprecated Instead use one of:
+     * - {@link _unstable_cancelScheduledDelayedEvent}
+     * - {@link _unstable_restartScheduledDelayedEvent}
+     * - {@link _unstable_sendScheduledDelayedEvent}
      */
-    // eslint-disable-next-line
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_updateDelayedEvent(
         delayId: string,
         action: UpdateDelayedEventAction,
