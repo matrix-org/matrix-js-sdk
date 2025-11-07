@@ -3594,7 +3594,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws A M_NOT_FOUND error if no matching delayed event could be found.
      */
-    // eslint-disable-next-line
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_cancelScheduledDelayedEvent(
         delayId: string,
         requestOptions: IRequestOpts = {},
@@ -3610,7 +3610,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws A M_NOT_FOUND error if no matching delayed event could be found.
      */
-    // eslint-disable-next-line
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_restartScheduledDelayedEvent(
         delayId: string,
         requestOptions: IRequestOpts = {},
@@ -3627,7 +3627,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws A M_NOT_FOUND error if no matching delayed event could be found.
      */
-    // eslint-disable-next-line
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_sendScheduledDelayedEvent(
         delayId: string,
         requestOptions: IRequestOpts = {},
