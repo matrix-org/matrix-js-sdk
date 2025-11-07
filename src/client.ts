@@ -3672,6 +3672,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
+    /**
+     * @deprecated Present for backwards compatibility with an older version of MSC4140
+     * which had a single, authenticated endpoint for updating a delayed event, instead
+     * of one unauthenticated endpoint per update action.
+     */
     private async updateScheduledDelayedEventWithActionInBody(
         delayId: string,
         action: UpdateDelayedEventAction,
