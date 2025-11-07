@@ -3683,10 +3683,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const data = {
             action,
         };
-        return await this.http.request(Method.Post, path, undefined, data, {
-            ...requestOptions,
-            prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-        });
+        try {
+            return await this.http.request(Method.Post, path, undefined, data, {
+                ...requestOptions,
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_MISSING_TOKEN") {
+                // For backwards compatibility with an older version of this endpoint
+                // which required authentication
+                return await this.http.authedRequest(Method.Post, path, undefined, data, {
+                    ...requestOptions,
+                    prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+                });
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**

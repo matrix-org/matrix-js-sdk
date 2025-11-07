@@ -1100,6 +1100,35 @@ describe("MatrixClient", function () {
             },
         );
 
+        it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
+            "can %s scheduled delayed events (action in request body fallback when auth required)",
+            async (action: UpdateDelayedEventAction) => {
+                const delayId = "id";
+                const baseLookup = {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                };
+                httpLookups = [
+                    {
+                        ...baseLookup,
+                        error: {
+                            httpStatus: 401,
+                            errcode: "M_MISSING_TOKEN",
+                        },
+                    },
+                    {
+                        ...baseLookup,
+                        data: {
+                            action,
+                        },
+                    },
+                ];
+
+                await client._unstable_updateDelayedEvent(delayId, action);
+            },
+        );
+
         it("can cancel scheduled delayed events (action in request path)", async () => {
             const delayId = "id";
             httpLookups = [
