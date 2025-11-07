@@ -3663,6 +3663,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                // For backwards compatibility with an older version of this endpoint
+                // which put the update action in the request body instead of the path
                 return await this.updateScheduledDelayedEventWithActionInBody(delayId, action, requestOptions);
             } else {
                 throw e;
