@@ -3443,7 +3443,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayOpts: SendDelayedEventRequestOpts,
         threadId: string | null,
         eventType: K,
-        content: TimelineEvents[K] & { msc4354_sticky_key: string },
+        content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
@@ -3516,7 +3516,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         stickDuration: number,
         threadId: string | null,
         eventType: K,
-        content: TimelineEvents[K] & { msc4354_sticky_key: string },
+        content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
