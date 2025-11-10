@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { InboundEncryptionSession, ParticipantId } from "./types.ts";
+import type { InboundEncryptionSession, ParticipantId, SlotDescription } from "./types.ts";
 
 /**
  * Detects when a key for a given index is outdated.
@@ -48,4 +48,13 @@ export class OutdatedKeyFilter {
 
 export function getParticipantId(userId: string, deviceId: string): ParticipantId {
     return `${userId}:${deviceId}`;
+}
+
+export function slotIdToDescription(slotId: string): SlotDescription {
+    const [application, id] = slotId.split("#");
+    return { application, id };
+}
+
+export function slotDescriptionToId(slotDescription: SlotDescription): string {
+    return `${slotDescription.application}#${slotDescription.id}`;
 }

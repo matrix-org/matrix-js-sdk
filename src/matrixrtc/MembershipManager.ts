@@ -26,19 +26,11 @@ import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import {
-    type CallMembership,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-    type SessionMembershipData,
-} from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status } from "./types.ts";
-import {
-    type SlotDescription,
-    type MembershipConfig,
-    type SessionConfig,
-    slotDescriptionToId,
-} from "./MatrixRTCSession.ts";
+import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
+import type { RtcMembershipData } from "./membership/rtc.ts";
+import type { SessionMembershipData } from "./membership/legacy.ts";
+import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
+import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
@@ -47,6 +39,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { slotDescriptionToId } from "./utils.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -185,7 +178,7 @@ type MembershipManagerClient = Pick<
  *   - Stop the timer for the delay refresh
  *   - Stop the timer for updating the state event
  */
-export class MembershipManager
+export abstract class MembershipManager<MembershipData extends SessionMembershipData | RtcMembershipData>
     extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap>
     implements IMembershipManager
 {
@@ -386,7 +379,7 @@ export class MembershipManager
     protected memberId: string;
     protected rtcTransport?: Transport;
     /** @deprecated This will be removed in favor or rtcTransport becoming a list of actively used transports */
-    private fociPreferred?: Transport[];
+    protected fociPreferred?: Transport[];
 
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
@@ -477,15 +470,7 @@ export class MembershipManager
         }
     }
 
-    // an abstraction to switch between sending state or a sticky event
-    protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
-        this.client._unstable_sendDelayedStateEvent(
-            this.room.roomId,
-            { delay: this.delayedLeaveEventDelayMs },
-            EventType.GroupCallMemberPrefix,
-            {},
-            this.memberId,
-        );
+    protected abstract clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse>;
 
     // HANDLERS (used in the membershipLoopHandler)
     private async sendOrResendDelayedLeaveEvent(): Promise<ActionUpdate> {
@@ -673,16 +658,9 @@ export class MembershipManager
             });
     }
 
-    protected clientSendMembership: (
-        myMembership: RtcMembershipData | SessionMembershipData | EmptyObject,
-    ) => Promise<ISendEventResponse> = (myMembership) => {
-        return this.client.sendStateEvent(
-            this.room.roomId,
-            EventType.GroupCallMemberPrefix,
-            myMembership as EmptyObject | SessionMembershipData,
-            this.memberId,
-        );
-    };
+    protected abstract clientSendMembership: (
+        myMembership: MembershipData | EmptyObject,
+    ) => Promise<ISendEventResponse>;
 
     private async sendJoinEvent(): Promise<ActionUpdate> {
         return await this.clientSendMembership(this.makeMyMembership(this.membershipEventExpiryMs))
@@ -775,30 +753,7 @@ export class MembershipManager
     /**
      * Constructs our own membership
      */
-    protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
-        const ownMembership = this.ownMembership;
-
-        const focusObjects =
-            this.rtcTransport === undefined
-                ? {
-                      focus_active: { type: "livekit", focus_selection: "oldest_membership" } as const,
-                      foci_preferred: this.fociPreferred ?? [],
-                  }
-                : {
-                      focus_active: { type: "livekit", focus_selection: "multi_sfu" } as const,
-                      foci_preferred: [this.rtcTransport, ...(this.fociPreferred ?? [])],
-                  };
-        return {
-            "application": this.slotDescription.application,
-            "call_id": this.slotDescription.id,
-            "scope": "m.room",
-            "device_id": this.deviceId,
-            expires,
-            "m.call.intent": this.callIntent,
-            ...focusObjects,
-            ...(ownMembership !== undefined ? { created_ts: ownMembership.createdTs() } : undefined),
-        };
-    }
+    protected abstract makeMyMembership(expires: number): MembershipData;
 
     // Error checks and handlers
 
@@ -1025,10 +980,61 @@ export class MembershipManager
 }
 
 /**
+ * Handles sending membership for MSC3401 RTC events.
+ */
+export class LegacyMembershipManager extends MembershipManager<SessionMembershipData> {
+    protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
+        this.client._unstable_sendDelayedStateEvent(
+            this.room.roomId,
+            { delay: this.delayedLeaveEventDelayMs },
+            EventType.GroupCallMemberPrefix,
+            {},
+            this.memberId,
+        );
+
+    protected makeMyMembership(expires: number): SessionMembershipData {
+        const ownMembership = this.ownMembership;
+
+        const focusObjects =
+            this.rtcTransport === undefined
+                ? {
+                      focus_active: { type: "livekit", focus_selection: "oldest_membership" } as const,
+                      foci_preferred: this.fociPreferred ?? [],
+                  }
+                : {
+                      focus_active: { type: "livekit", focus_selection: "multi_sfu" } as const,
+                      foci_preferred: [this.rtcTransport, ...(this.fociPreferred ?? [])],
+                  };
+        return {
+            "application": this.slotDescription.application,
+            "call_id": this.slotDescription.id ?? "",
+            "scope": "m.room",
+            "device_id": this.deviceId,
+            expires,
+            "m.call.intent": this.callIntent,
+            ...focusObjects,
+            ...(ownMembership !== undefined ? { created_ts: ownMembership.createdTs() } : undefined),
+        };
+    }
+
+    protected clientSendMembership: (myMembership: SessionMembershipData | EmptyObject) => Promise<ISendEventResponse> =
+        (myMembership) => {
+            return this.client.sendStateEvent(
+                this.room.roomId,
+                EventType.GroupCallMemberPrefix,
+                myMembership,
+                this.memberId,
+            );
+        };
+}
+
+/**
  * Implementation of the Membership manager that uses sticky events
  * rather than state events.
+ *
+ * This exclusively sends RTCMembershipData
  */
-export class StickyEventMembershipManager extends MembershipManager {
+export class StickyEventMembershipManager extends MembershipManager<RtcMembershipData> {
     public constructor(
         joinConfig: (SessionConfig & MembershipConfig) | undefined,
         room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
@@ -1040,6 +1046,8 @@ export class StickyEventMembershipManager extends MembershipManager {
         super(joinConfig, room, clientWithSticky, sessionDescription, parentLogger);
     }
 
+    protected readonly eventType = EventType.RTCMembership;
+
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
         this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
@@ -1050,9 +1058,9 @@ export class StickyEventMembershipManager extends MembershipManager {
             { msc4354_sticky_key: this.memberId },
         );
 
-    protected clientSendMembership: (
-        myMembership: RtcMembershipData | SessionMembershipData | EmptyObject,
-    ) => Promise<ISendEventResponse> = (myMembership) => {
+    protected clientSendMembership: (myMembership: RtcMembershipData | EmptyObject) => Promise<ISendEventResponse> = (
+        myMembership,
+    ) => {
         return this.clientWithSticky._unstable_sendStickyEvent(
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
@@ -1070,7 +1078,7 @@ export class StickyEventMembershipManager extends MembershipManager {
         return super.actionUpdateFromErrors(e, t, StickyEventMembershipManager.nameMap.get(m) ?? "unknown");
     }
 
-    protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
+    protected makeMyMembership(_expires: number): RtcMembershipData {
         const ownMembership = this.ownMembership;
 
         const relationObject = ownMembership?.eventId
@@ -1083,7 +1091,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             slot_id: slotDescriptionToId(this.slotDescription),
             rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
-            member: { device_id: this.deviceId, user_id: this.client.getUserId()!, id: this.memberId },
+            member: { claimed_device_id: this.deviceId, claimed_user_id: this.client.getUserId()!, id: this.memberId },
             versions: [],
             ...relationObject,
         };

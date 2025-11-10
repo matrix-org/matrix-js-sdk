@@ -56,13 +56,15 @@ import {
     type IRTCDeclineContent,
     type EncryptionKeysEventContent,
     type ICallNotifyContent,
+    type RtcSlotEventContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import { type RtcMembershipData } from "../matrixrtc/membership/rtc.ts";
+import { type SessionMembershipData } from "../matrixrtc/membership/legacy.ts";
 
 export enum EventType {
     // Room state events
@@ -148,6 +150,10 @@ export enum EventType {
 
     // Group call events
     GroupCallPrefix = "org.matrix.msc3401.call",
+    /**
+     * Legacy call membership.
+     * @see RTCMembership
+     */
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events
@@ -155,6 +161,7 @@ export enum EventType {
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
     RTCDecline = "org.matrix.msc4310.rtc.decline",
+    RTCSlot = "org.matrix.msc4143.rtc.slot",
 }
 
 export enum RelationType {
@@ -339,6 +346,7 @@ export interface TimelineEvents {
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
     [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string }; // An object containing just the sticky key is empty.
+    [EventType.RTCSlot]: RtcSlotEventContent;
 }
 
 /**

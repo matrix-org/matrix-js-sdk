@@ -17,13 +17,22 @@ limitations under the License.
 import { ClientEvent, EventTimeline, MatrixClient, type Room } from "../../../src";
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
-import { makeMockRoom, type MembershipData, membershipTemplate, mockRoomState, mockRTCEvent } from "./mocks";
+import {
+    makeMockRoom,
+    type MembershipData,
+    sessionMembershipTemplate,
+    mockRoomState,
+    mockRTCEvent,
+    rtcMembershipTemplate,
+} from "./mocks";
 import { logger } from "../../../src/logger";
+import { slotDescriptionToId } from "../../../src/matrixrtc";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
     ({ eventKind }) => {
         let client: MatrixClient;
+        let membershipTemplate: MembershipData;
 
         function sendLeaveMembership(room: Room, membershipData: MembershipData[]): void {
             if (eventKind === "memberState") {
@@ -40,6 +49,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         beforeEach(() => {
             client = new MatrixClient({ baseUrl: "base_url" });
             client.matrixRTC.start();
+            membershipTemplate = eventKind === "sticky" ? rtcMembershipTemplate : sessionMembershipTemplate;
         });
 
         afterEach(() => {
@@ -91,14 +101,15 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
         });
 
-        it("Fires correctly with custom sessionDescription", () => {
+        it("Fires correctly with custom slotDescription", () => {
             const onStarted = jest.fn();
             const onEnded = jest.fn();
-            // create a session manager with a custom session description
-            const sessionManager = new MatrixRTCSessionManager(logger, client, {
+            const slotDescription = {
                 id: "test",
                 application: "m.notCall",
-            });
+            };
+            // create a session manager with a custom session description
+            const sessionManager = new MatrixRTCSessionManager(logger, client, slotDescription);
 
             // manually start the session manager (its not the default one started by the client)
             sessionManager.start();
@@ -106,19 +117,49 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             sessionManager.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
             try {
-                // Create a session for applicaation m.other, we ignore this session ecause it lacks a call_id
-                const room1MembershipData: MembershipData[] = [{ ...membershipTemplate, application: "m.other" }];
-                const room1 = makeMockRoom(room1MembershipData, eventKind === "sticky");
+                // Create a session for applicaation m.other, we ignore this session because it has the wrong application type.
+                const room1MembershipData: MembershipData[] =
+                    eventKind === "sticky"
+                        ? [
+                              {
+                                  ...membershipTemplate,
+                                  application: {
+                                      ...rtcMembershipTemplate.application,
+                                      type: "m.call",
+                                  },
+                              },
+                          ]
+                        : [{ ...membershipTemplate, application: "m.call" }];
+                const room1 = makeMockRoom(room1MembershipData, eventKind === "sticky", {
+                    application: "m.call",
+                    id: "",
+                });
                 jest.spyOn(client, "getRooms").mockReturnValue([room1]);
                 client.emit(ClientEvent.Room, room1);
                 expect(onStarted).not.toHaveBeenCalled();
                 onStarted.mockClear();
 
                 // Create a session for applicaation m.notCall. We expect this call to be tracked because it has a call_id
-                const room2MembershipData: MembershipData[] = [
-                    { ...membershipTemplate, application: "m.notCall", call_id: "test" },
-                ];
-                const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky");
+                const room2MembershipData: MembershipData[] =
+                    eventKind === "sticky"
+                        ? [
+                              {
+                                  ...membershipTemplate,
+                                  application: {
+                                      ...rtcMembershipTemplate.application,
+                                      type: slotDescription.application,
+                                  },
+                                  slot_id: slotDescriptionToId(slotDescription),
+                              },
+                          ]
+                        : [
+                              {
+                                  ...membershipTemplate,
+                                  application: slotDescription.application,
+                                  call_id: slotDescription.id,
+                              },
+                          ];
+                const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky", slotDescription);
                 jest.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
                 client.emit(ClientEvent.Room, room2);
                 expect(onStarted).toHaveBeenCalled();
@@ -143,7 +184,18 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         it("Doesn't fire event if unrelated sessions ends", () => {
             const onEnded = jest.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
-            const membership: MembershipData[] = [{ ...membershipTemplate, application: "m.other_app" }];
+            const membership: MembershipData[] =
+                eventKind === "sticky"
+                    ? [
+                          {
+                              ...membershipTemplate,
+                              application: {
+                                  ...rtcMembershipTemplate.application,
+                                  type: "m.other_app",
+                              },
+                          },
+                      ]
+                    : [{ ...membershipTemplate, application: "m.other_app" }];
             const room1 = makeMockRoom(membership, eventKind === "sticky");
             jest.spyOn(client, "getRooms").mockReturnValue([room1]);
             jest.spyOn(client, "getRoom").mockReturnValue(room1);

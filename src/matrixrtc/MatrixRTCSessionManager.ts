@@ -20,8 +20,10 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession, type SlotDescription } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import { DefaultCallApplicationDescription } from "./CallApplication.ts";
+import type { SlotDescription } from "./types.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -56,7 +58,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private readonly slotDescription: SlotDescription = { application: "m.call", id: "" }, // Default to the Matrix Call application
+        private readonly slotDescription: SlotDescription = DefaultCallApplicationDescription, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
@@ -66,7 +68,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
         // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
-            const session = MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription);
+            const session = MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription);
             if (session.memberships.length > 0) {
                 this.roomSessions.set(room.roomId, session);
             }
@@ -104,7 +106,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         if (!this.roomSessions.has(room.roomId)) {
             this.roomSessions.set(
                 room.roomId,
-                MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription),
+                MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription),
             );
         }
 
