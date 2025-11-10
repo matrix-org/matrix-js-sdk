@@ -3604,7 +3604,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayId: string,
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
-        return this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Cancel, requestOptions);
+        return await this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Cancel, requestOptions);
     }
 
     /**
@@ -3620,7 +3620,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayId: string,
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
-        return this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Restart, requestOptions);
+        return await this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Restart, requestOptions);
     }
 
     /**
@@ -3637,7 +3637,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayId: string,
         requestOptions: IRequestOpts = {},
     ): Promise<EmptyObject> {
-        return this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Send, requestOptions);
+        return await this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Send, requestOptions);
     }
 
     private async updateScheduledDelayedEvent(
