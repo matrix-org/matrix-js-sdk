@@ -22,7 +22,7 @@ import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
 import { MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
-import { type EventType } from "./@types/event.ts";
+import { STICKY_EVENT_FIELD, STICKY_EVENT_KEY_FIELD, type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
@@ -77,8 +77,8 @@ export interface ITimeline {
 }
 
 type StickyEventFields = {
-    msc4354_sticky: { duration_ms: number };
-    content: { msc4354_sticky_key?: string };
+    [STICKY_EVENT_FIELD.name]: { duration_ms: number };
+    content: { [STICKY_EVENT_KEY_FIELD.name]?: string };
 };
 
 export type IStickyEvent = IRoomEvent & StickyEventFields;
@@ -94,7 +94,7 @@ export interface IJoinedRoom {
     // One of `state` or `state_after` is required.
     "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
-    "msc4354_sticky"?: ISticky; // https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+    [STICKY_EVENT_FIELD.name]: ISticky; // https://github.com/matrix-org/matrix-spec-proposals/pull/4354
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
     "account_data": IAccountData;
@@ -570,18 +570,23 @@ export class SyncAccumulator {
 
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
         // process these events into the correct mapped order.
-        if (data.msc4354_sticky?.events) {
+        const stickyEventData = (data.sticky ?? data['msc4354_sticky']) as ISticky;
+        if (stickyEventData?.events.length) {
             currentData._stickyEvents = currentData._stickyEvents.concat(
-                data.msc4354_sticky.events.map((event) => {
+                stickyEventData.events.map((event) => {
                     // If `duration_ms` exceeds the spec limit of a hour, we cap it.
-                    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
+                    const duration = event['sticky_event']?.duration_ms ?? event['msc4354_sticky']?.duration_ms;
+                    if (typeof duration !== "number") {
+                        return null;
+                    }
+                    const cappedDuration = Math.min(duration, MAX_STICKY_DURATION_MS);
                     // If `origin_server_ts` claims to have been from the future, we still bound it to now.
                     const createdTs = Math.min(event.origin_server_ts, now);
                     return {
                         event,
                         expiresTs: cappedDuration + createdTs,
                     };
-                }),
+                }).filter(e => e !== null),
             );
         }
 
@@ -659,7 +664,7 @@ export class SyncAccumulator {
                 "msc4354_sticky": roomData._stickyEvents?.length
                     ? {
                           events: roomData._stickyEvents.map((e) => e.event),
-                      }
+                      } satisfies ISticky
                     : undefined,
             };
             // Add account data

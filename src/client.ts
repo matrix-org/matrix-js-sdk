@@ -143,6 +143,7 @@ import {
     RoomCreateTypeField,
     RoomType,
     type StateEvents,
+    STICKY_EVENT_KEY_FIELD,
     type TimelineEvents,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
@@ -3443,7 +3444,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayOpts: SendDelayedEventRequestOpts,
         threadId: string | null,
         eventType: K,
-        content: TimelineEvents[K] & { msc4354_sticky_key: string },
+        content: TimelineEvents[K] & { [STICKY_EVENT_KEY_FIELD.name]: string },
         txnId?: string,
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {

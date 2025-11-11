@@ -31,6 +31,8 @@ import {
     ToDeviceMessageId,
     UNSIGNED_THREAD_ID_FIELD,
     UNSIGNED_MEMBERSHIP_FIELD,
+    STICKY_EVENT_DURATION_TTL_MS,
+    STICKY_EVENT_FIELD,
 } from "../@types/event.ts";
 import { deepSortedObjectEntries, internaliseString } from "../utils.ts";
 import { type RoomMember } from "./room-member.ts";
@@ -75,7 +77,7 @@ export interface IUnsigned {
     "transaction_id"?: string;
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
-    "msc4354_sticky_duration_ttl_ms"?: number;
+    [STICKY_EVENT_DURATION_TTL_MS.name]?: number;
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
 }
 
@@ -97,7 +99,7 @@ export interface IEvent {
     membership?: Membership;
     unsigned: IUnsigned;
     redacts?: string;
-    msc4354_sticky?: { duration_ms: number };
+    [STICKY_EVENT_FIELD.name]?: { duration_ms: number };
 }
 
 export interface IAggregatedRelation {
@@ -1771,13 +1773,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * `duration_ms` is safely bounded to a hour.
      */
     public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
-        if (!this.event.msc4354_sticky?.duration_ms) {
+        const stickyInfo = (this.event[STICKY_EVENT_FIELD.name] ?? this.event[STICKY_EVENT_FIELD.unstable!]) as { duration_ms: number }|undefined;
+        if (!stickyInfo?.duration_ms) {
             return undefined;
         }
         return {
-            duration_ms: Math.min(MAX_STICKY_DURATION_MS, this.event.msc4354_sticky.duration_ms),
+            duration_ms: Math.min(MAX_STICKY_DURATION_MS, stickyInfo.duration_ms),
             // This is assumed to be bounded server-side.
-            duration_ttl_ms: this.event.unsigned?.msc4354_sticky_duration_ttl_ms,
+            duration_ttl_ms: this.event.unsigned?.[STICKY_EVENT_DURATION_TTL_MS.name] ?? this.event.unsigned?.[STICKY_EVENT_DURATION_TTL_MS.unstable!],
         };
     }
 }

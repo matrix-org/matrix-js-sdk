@@ -1,3 +1,4 @@
+import { STICKY_EVENT_KEY_FIELD } from "src/matrix.ts";
 import { logger as loggerInstance } from "../logger.ts";
 import { type MatrixEvent } from "./event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
@@ -130,14 +131,14 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      *          and the previous event it may have replaced.
      */
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: StickyMatrixEvent } | { added: false } {
-        const stickyKey = event.getContent().msc4354_sticky_key;
+        const stickyKey = event.getContent()[STICKY_EVENT_KEY_FIELD.name] ?? event.getContent()[STICKY_EVENT_KEY_FIELD.unstable!];
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
-            throw new Error(`${event.getId()} is missing msc4354_sticky_key`);
+            throw new Error(`${event.getId()} is missing ${STICKY_EVENT_KEY_FIELD.name}`);
         }
 
         // With this we have the guarantee, that all events in stickyEventsMap are correctly formatted
         if (event.unstableStickyExpiresAt === undefined) {
-            throw new Error(`${event.getId()} is missing msc4354_sticky.duration_ms`);
+            throw new Error(`${event.getId()} is missing ${STICKY_EVENT_KEY_FIELD.name}.duration_ms`);
         }
         const sender = event.getSender();
         const type = event.getType();
