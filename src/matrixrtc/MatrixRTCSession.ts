@@ -178,7 +178,8 @@ export interface MembershipConfig {
      * In the presence of network packet loss (hurting TCP connections), the custom delayedEventRestartLocalTimeoutMs
      * helps by keeping more delayed event reset candidates in flight,
      * improving the chances of a successful reset. (its is equivalent to the js-sdk `localTimeout` configuration,
-     * but only applies to calls to the `_unstable_updateDelayedEvent` endpoint with a body of `{action:"restart"}`.)
+     * but only applies to calls to the `_unstable_restartScheduledDelayedEvent` endpoint
+     * or the `_unstable_updateDelayedEvent` endpoint with a body of `{action:"restart"}`.)
      */
     delayedLeaveEventRestartLocalTimeoutMs?: number;
 
@@ -514,6 +515,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
             | "sendStateEvent"
             | "_unstable_sendDelayedStateEvent"
             | "_unstable_updateDelayedEvent"
+            | "_unstable_cancelScheduledDelayedEvent"
+            | "_unstable_restartScheduledDelayedEvent"
+            | "_unstable_sendScheduledDelayedEvent"
             | "_unstable_sendStickyEvent"
             | "_unstable_sendStickyDelayedEvent"
             | "cancelPendingEvent"

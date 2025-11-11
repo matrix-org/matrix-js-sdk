@@ -801,6 +801,10 @@ describe("MatrixClient", function () {
             await expect(
                 client._unstable_updateDelayedEvent("anyDelayId", UpdateDelayedEventAction.Send),
             ).rejects.toThrow(errorMessage);
+
+            await expect(client._unstable_cancelScheduledDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
+            await expect(client._unstable_restartScheduledDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
+            await expect(client._unstable_sendScheduledDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
         });
 
         it("works with null threadId", async () => {
@@ -1077,21 +1081,169 @@ describe("MatrixClient", function () {
             });
         });
 
-        it("can update delayed events", async () => {
+        it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
+            "can %s scheduled delayed events (action in request body)",
+            async (action: UpdateDelayedEventAction) => {
+                const delayId = "id";
+                httpLookups = [
+                    {
+                        method: "POST",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                        data: {
+                            action,
+                        },
+                    },
+                ];
+
+                await client._unstable_updateDelayedEvent(delayId, action);
+            },
+        );
+
+        it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
+            "can %s scheduled delayed events (action in request body fallback when auth required)",
+            async (action: UpdateDelayedEventAction) => {
+                const delayId = "id";
+                const baseLookup = {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                };
+                httpLookups = [
+                    {
+                        ...baseLookup,
+                        error: {
+                            httpStatus: 401,
+                            errcode: "M_MISSING_TOKEN",
+                        },
+                    },
+                    {
+                        ...baseLookup,
+                        data: {
+                            action,
+                        },
+                    },
+                ];
+
+                await client._unstable_updateDelayedEvent(delayId, action);
+            },
+        );
+
+        it("can cancel scheduled delayed events (action in request path)", async () => {
             const delayId = "id";
-            const action = UpdateDelayedEventAction.Restart;
             httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}/cancel`,
+                },
+            ];
+
+            await client._unstable_cancelScheduledDelayedEvent(delayId);
+        });
+
+        it("can restart scheduled delayed events (action in request path)", async () => {
+            const delayId = "id";
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}/restart`,
+                },
+            ];
+
+            await client._unstable_restartScheduledDelayedEvent(delayId);
+        });
+
+        it("can send scheduled delayed events (action in request path)", async () => {
+            const delayId = "id";
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}/send`,
+                },
+            ];
+
+            await client._unstable_sendScheduledDelayedEvent(delayId);
+        });
+
+        it("can cancel scheduled delayed events (action in request path fallback when unsupported)", async () => {
+            const delayId = "id";
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}/cancel`,
+                    error: {
+                        httpStatus: 400,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
                 {
                     method: "POST",
                     prefix: unstableMSC4140Prefix,
                     path: `/delayed_events/${encodeURIComponent(delayId)}`,
                     data: {
-                        action,
+                        action: UpdateDelayedEventAction.Cancel,
                     },
                 },
             ];
 
-            await client._unstable_updateDelayedEvent(delayId, action);
+            await client._unstable_cancelScheduledDelayedEvent(delayId);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can restart scheduled delayed events (action in request path fallback when unsupported)", async () => {
+            const delayId = "id";
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}/restart`,
+                    error: {
+                        httpStatus: 400,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    data: {
+                        action: UpdateDelayedEventAction.Restart,
+                    },
+                },
+            ];
+
+            await client._unstable_restartScheduledDelayedEvent(delayId);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can send scheduled delayed events (action in request path fallback when unsupported)", async () => {
+            const delayId = "id";
+            httpLookups = [
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}/send`,
+                    error: {
+                        httpStatus: 400,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    method: "POST",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    data: {
+                        action: UpdateDelayedEventAction.Send,
+                    },
+                },
+            ];
+
+            await client._unstable_sendScheduledDelayedEvent(delayId);
+            expect(httpLookups).toHaveLength(0);
         });
     });
 

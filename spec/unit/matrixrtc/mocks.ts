@@ -52,6 +52,9 @@ export type MockClient = Pick<
     | "sendStateEvent"
     | "_unstable_sendDelayedStateEvent"
     | "_unstable_updateDelayedEvent"
+    | "_unstable_cancelScheduledDelayedEvent"
+    | "_unstable_restartScheduledDelayedEvent"
+    | "_unstable_sendScheduledDelayedEvent"
     | "_unstable_sendStickyEvent"
     | "_unstable_sendStickyDelayedEvent"
     | "cancelPendingEvent"
@@ -67,6 +70,9 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
         sendStateEvent: jest.fn(),
         cancelPendingEvent: jest.fn(),
         _unstable_updateDelayedEvent: jest.fn(),
+        _unstable_cancelScheduledDelayedEvent: jest.fn(),
+        _unstable_restartScheduledDelayedEvent: jest.fn(),
+        _unstable_sendScheduledDelayedEvent: jest.fn(),
         _unstable_sendDelayedStateEvent: jest.fn(),
         _unstable_sendStickyEvent: jest.fn(),
         _unstable_sendStickyDelayedEvent: jest.fn(),

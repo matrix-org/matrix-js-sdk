@@ -523,6 +523,9 @@ describe("MatrixRTCSession", () => {
             client.sendEvent = sendEventMock;
 
             client._unstable_updateDelayedEvent = jest.fn();
+            client._unstable_cancelScheduledDelayedEvent = jest.fn();
+            client._unstable_restartScheduledDelayedEvent = jest.fn();
+            client._unstable_sendScheduledDelayedEvent = jest.fn();
 
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);

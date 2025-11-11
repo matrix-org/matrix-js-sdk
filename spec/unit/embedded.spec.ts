@@ -86,7 +86,9 @@ class MockWidgetApi extends EventEmitter {
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public updateDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public cancelScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public restartScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
+    public sendScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
     public sendToDevice = jest.fn().mockResolvedValue(undefined);
     public requestOpenIDConnectToken = jest.fn(async () => {
         return testOIDCToken;
@@ -531,17 +533,49 @@ describe("RoomWidgetClient", () => {
                 ).rejects.toThrow();
             });
 
-            it("updates delayed events", async () => {
+            it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
+                "can %s scheduled delayed events (action in parameter)",
+                async (action: UpdateDelayedEventAction) => {
+                    await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                    expect(widgetApi.requestCapability).toHaveBeenCalledWith(
+                        MatrixCapabilities.MSC4157UpdateDelayedEvent,
+                    );
+                    await client._unstable_updateDelayedEvent("id", action);
+                    let updateDelayedEvent: (delayId: string) => Promise<unknown>;
+                    switch (action) {
+                        case UpdateDelayedEventAction.Cancel:
+                            updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
+                            break;
+                        case UpdateDelayedEventAction.Restart:
+                            updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
+                            break;
+                        case UpdateDelayedEventAction.Send:
+                            updateDelayedEvent = widgetApi.sendScheduledDelayedEvent;
+                            break;
+                    }
+                    expect(updateDelayedEvent).toHaveBeenCalledWith("id");
+                },
+            );
+
+            it("can cancel scheduled delayed events (action in method)", async () => {
                 await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
-                for (const action of [
-                    UpdateDelayedEventAction.Cancel,
-                    UpdateDelayedEventAction.Restart,
-                    UpdateDelayedEventAction.Send,
-                ]) {
-                    await client._unstable_updateDelayedEvent("id", action);
-                    expect(widgetApi.updateDelayedEvent).toHaveBeenCalledWith("id", action);
-                }
+                await client._unstable_cancelScheduledDelayedEvent("id");
+                expect(widgetApi.cancelScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            });
+
+            it("can restart scheduled delayed events (action in method)", async () => {
+                await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                await client._unstable_restartScheduledDelayedEvent("id");
+                expect(widgetApi.restartScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            });
+
+            it("can send scheduled delayed events (action in method)", async () => {
+                await makeClient({ updateDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                await client._unstable_sendScheduledDelayedEvent("id");
+                expect(widgetApi.sendScheduledDelayedEvent).toHaveBeenCalledWith("id");
             });
         });
 
@@ -582,6 +616,13 @@ describe("RoomWidgetClient", () => {
                     await expect(client._unstable_updateDelayedEvent("id", action)).rejects.toThrow(
                         "Server does not support",
                     );
+                }
+                for (const updateDelayedEvent of [
+                    client._unstable_cancelScheduledDelayedEvent,
+                    client._unstable_restartScheduledDelayedEvent,
+                    client._unstable_sendScheduledDelayedEvent,
+                ]) {
+                    await expect(updateDelayedEvent.call(client, "id")).rejects.toThrow("Server does not support");
                 }
             });
         });

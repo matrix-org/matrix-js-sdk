@@ -106,6 +106,7 @@ import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-m
 import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
     isSendDelayedEventRequestOpts,
+    UpdateDelayedEventAction,
     type DelayedEventInfo,
     type IAddThreePidOnlyBody,
     type IBindThreePidBody,
@@ -130,7 +131,6 @@ import {
     type KnockRoomOpts,
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
-    type UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import {
     type AccountDataEvents,
@@ -3570,8 +3570,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @deprecated Instead use one of:
+     * - {@link _unstable_cancelScheduledDelayedEvent}
+     * - {@link _unstable_restartScheduledDelayedEvent}
+     * - {@link _unstable_sendScheduledDelayedEvent}
      */
-    // eslint-disable-next-line
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_updateDelayedEvent(
         delayId: string,
         action: UpdateDelayedEventAction,
@@ -3583,17 +3588,123 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "updateDelayedEvent",
             );
         }
+        return await this.updateScheduledDelayedEventWithActionInBody(delayId, action, requestOptions);
+    }
 
+    /**
+     * Cancel the scheduled delivery of the delayed event matching the provided delayId.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_cancelScheduledDelayedEvent(
+        delayId: string,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        return await this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Cancel, requestOptions);
+    }
+
+    /**
+     * Restart the scheduled delivery of the delayed event matching the given delayId.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_restartScheduledDelayedEvent(
+        delayId: string,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        return await this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Restart, requestOptions);
+    }
+
+    /**
+     * Immediately send the delayed event matching the given delayId,
+     * instead of waiting for its scheduled delivery.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     *
+     * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_sendScheduledDelayedEvent(
+        delayId: string,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        return await this.updateScheduledDelayedEvent(delayId, UpdateDelayedEventAction.Send, requestOptions);
+    }
+
+    private async updateScheduledDelayedEvent(
+        delayId: string,
+        action: UpdateDelayedEventAction,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                `${action}ScheduledDelayedEvent`,
+            );
+        }
+
+        try {
+            const path = utils.encodeUri("/delayed_events/$delayId/$action", {
+                $delayId: delayId,
+                $action: action,
+            });
+            return await this.http.request(Method.Post, path, undefined, undefined, {
+                ...requestOptions,
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
+                // For backwards compatibility with an older version of this endpoint
+                // which put the update action in the request body instead of the path
+                return await this.updateScheduledDelayedEventWithActionInBody(delayId, action, requestOptions);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * @deprecated Present for backwards compatibility with an older version of MSC4140
+     * which had a single, authenticated endpoint for updating a delayed event, instead
+     * of one unauthenticated endpoint per update action.
+     */
+    private async updateScheduledDelayedEventWithActionInBody(
+        delayId: string,
+        action: UpdateDelayedEventAction,
+        requestOptions: IRequestOpts = {},
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/delayed_events/$delayId", {
             $delayId: delayId,
         });
         const data = {
             action,
         };
-        return await this.http.authedRequest(Method.Post, path, undefined, data, {
-            ...requestOptions,
-            prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-        });
+        try {
+            return await this.http.request(Method.Post, path, undefined, data, {
+                ...requestOptions,
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            });
+        } catch (e) {
+            if (e instanceof MatrixError && e.errcode === "M_MISSING_TOKEN") {
+                // For backwards compatibility with an older version of this endpoint
+                // which required authentication
+                return await this.http.authedRequest(Method.Post, path, undefined, data, {
+                    ...requestOptions,
+                    prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+                });
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**
