@@ -218,7 +218,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
             await jest.runAllTimersAsync();
             expect(spy).toHaveBeenCalledTimes(1);
-            expect(spy).toHaveLastReturnedWith(Promise.resolve({ ok: false, error: "MISSING_DECRYPTION_KEY" }));
+            await expect(spy.mock.results[0].value).rejects.toThrow("MISSING_DECRYPTION_KEY");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");
             await jest.runAllTimersAsync();
@@ -318,7 +318,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
-            expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+            await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
 
             // isKeyBackupDownloadConfigured remains false
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
@@ -336,7 +336,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
-            expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+            await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
 
             // isKeyBackupDownloadConfigured remains false
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
@@ -355,7 +355,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
-            expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+            await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
 
             // isKeyBackupDownloadConfigured remains false
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
@@ -377,7 +377,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
-            expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+            await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
 
             // isKeyBackupDownloadConfigured remains false
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
@@ -399,7 +399,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             await jest.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
-            expect(getConfigSpy).toHaveReturnedWith(Promise.resolve(null));
+            await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
 
             // isKeyBackupDownloadConfigured remains false
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
