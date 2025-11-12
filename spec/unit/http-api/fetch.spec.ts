@@ -375,7 +375,7 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toEqual(
                             unknownTokenErr,
                         );
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
@@ -397,7 +397,7 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toEqual(
                             unknownTokenErr,
                         );
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
