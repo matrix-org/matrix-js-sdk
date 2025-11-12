@@ -187,12 +187,14 @@ describe("Group Call", function () {
         });
 
         it("does not start initializing local call feed twice", () => {
-            const promise1 = groupCall.initLocalCallFeed();
+            // @ts-expect-error TS2769
+            const spy = jest.spyOn(groupCall, "initLocalCallFeedInternal");
+            groupCall.initLocalCallFeed();
             // @ts-ignore Mock
             groupCall.state = GroupCallState.LocalCallFeedUninitialized;
-            const promise2 = groupCall.initLocalCallFeed();
+            groupCall.initLocalCallFeed();
 
-            expect(promise1).toEqual(promise2);
+            expect(spy).toHaveBeenCalledTimes(1);
         });
 
         it("sets state to local call feed uninitialized when getUserMedia() fails", async () => {
