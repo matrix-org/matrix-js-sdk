@@ -1783,12 +1783,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         allowDefault = true,
         useAuthentication: boolean = false,
     ): string | null {
-        const roomAvatarEvent = this.currentState.getStateEvents(EventType.RoomAvatar, "");
-        if (!roomAvatarEvent && !allowDefault) {
+        const mainUrl = this.getMxcAvatarUrl();
+        if (!mainUrl && !allowDefault) {
             return null;
         }
 
-        const mainUrl = roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
         if (mainUrl) {
             return getHttpUriForMxc(
                 baseUrl,
@@ -1810,7 +1809,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns the mxc avatar url or falsy
      */
     public getMxcAvatarUrl(): string | null {
-        return this.currentState.getStateEvents(EventType.RoomAvatar, "")?.getContent()?.url || null;
+        const url = this.currentState.getStateEvents(EventType.RoomAvatar, "")?.getContent().url;
+        return typeof url === "string" ? url : null;
     }
 
     /**
@@ -1820,11 +1820,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns The room's canonical alias, or null if there is none
      */
     public getCanonicalAlias(): string | null {
-        const canonicalAlias = this.currentState.getStateEvents(EventType.RoomCanonicalAlias, "");
-        if (canonicalAlias) {
-            return canonicalAlias.getContent().alias || null;
-        }
-        return null;
+        const canonicalAlias = this.currentState.getStateEvents(EventType.RoomCanonicalAlias, "")?.getContent().alias;
+        return typeof canonicalAlias === "string" ? canonicalAlias : null;
     }
 
     /**
@@ -1832,9 +1829,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns The room's alternative aliases, or an empty array
      */
     public getAltAliases(): string[] {
-        const canonicalAlias = this.currentState.getStateEvents(EventType.RoomCanonicalAlias, "");
-        if (canonicalAlias) {
-            return canonicalAlias.getContent().alt_aliases || [];
+        const altAliases = this.currentState.getStateEvents(EventType.RoomCanonicalAlias, "")?.getContent().alt_aliases;
+        if (Array.isArray(altAliases)) {
+            return altAliases.filter((alias) => typeof alias === "string");
         }
         return [];
     }
@@ -3643,7 +3640,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // check for an alias, if any. for now, assume first alias is the
             // official one.
             const mRoomName = this.currentState.getStateEvents(EventType.RoomName, "");
-            if (mRoomName?.getContent().name) {
+            if (typeof mRoomName?.getContent().name === "string") {
                 return this.roomNameGenerator({
                     type: RoomNameType.Actual,
                     name: mRoomName.getContent().name,
