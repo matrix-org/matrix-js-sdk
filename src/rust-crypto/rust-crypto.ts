@@ -164,7 +164,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
 
-        /** Enable support for encrypted state events under MSC3414. */
+        /** Enable support for encrypted state events under MSC4362. */
         private readonly enableEncryptedStateEvents: boolean = false,
     ) {
         super();
@@ -1774,7 +1774,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             return;
         }
 
-        if (config["io.element.msc3414.encrypt_state_events"] && this.enableEncryptedStateEvents) {
+        if (config["io.element.msc4362.encrypt_state_events"] && this.enableEncryptedStateEvents) {
             this.logger.info("crypto Enabling state event encryption...");
             settings.encryptStateEvents = true;
         }

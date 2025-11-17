@@ -753,7 +753,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the event state_key if it has one. If necessary, this will perform
-     * string-unpacking on the state key, as per MSC3414. This will return
+     * string-unpacking on the state key, as per MSC4362. This will return
      * <code>undefined</code> for message events.
      * @returns The event's `state_key`.
      */
@@ -766,7 +766,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the raw event state_key if it has one. This may be string-packed as per
-     * MSC3414 if the state event is encrypted. This will return <code>undefined
+     * MSC4362 if the state event is encrypted. This will return <code>undefined
      * </code> for message events.
      * @returns The event's `state_key`.
      */
