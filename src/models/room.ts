@@ -3637,13 +3637,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private calculateRoomName(userId: string, ignoreRoomNameEvent = false): string {
         if (!ignoreRoomNameEvent) {
-            // check for an alias, if any. for now, assume first alias is the
-            // official one.
-            const mRoomName = this.currentState.getStateEvents(EventType.RoomName, "");
-            if (typeof mRoomName?.getContent().name === "string") {
+            const name = this.currentState.getStateEvents(EventType.RoomName, "")?.getContent().name;
+            if (typeof name === "string") {
                 return this.roomNameGenerator({
                     type: RoomNameType.Actual,
-                    name: mRoomName.getContent().name,
+                    name,
                 });
             }
         }
