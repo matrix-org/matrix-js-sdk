@@ -206,4 +206,27 @@ describe("Room", () => {
 
         expect(room.name).toEqual("Empty room");
     });
+
+    describe("getAltAliases()", () => {
+        it("should ignore invalid events", async () => {
+            const mockClient = createMockClient();
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+            const invalidAliasEvent = new MatrixEvent({
+                type: EventType.RoomCanonicalAlias,
+                content: {
+                    alt_aliases: [123, "#foo:bar"],
+                },
+                state_key: "",
+                event_id: "$123",
+                room_id: room.roomId,
+                sender: CREATOR_USER_ID,
+            });
+
+            // Set up the room
+            room.currentState.setStateEvents([invalidAliasEvent]);
+            room.recalculate();
+
+            expect(room.getAltAliases()).toEqual(["#foo:bar"]);
+        });
+    });
 });
