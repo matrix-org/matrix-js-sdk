@@ -1,3 +1,15 @@
+Changes in [39.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.2.0) (2025-11-18)
+==================================================================================================
+## ✨ Features
+
+* Delayed event management: split endpoints, no auth ([#5066](https://github.com/matrix-org/matrix-js-sdk/pull/5066)). Contributed by @AndrewFerr.
+* do not set cache in authenticated fetch ([#5020](https://github.com/matrix-org/matrix-js-sdk/pull/5020)). Contributed by @pkuzco.
+
+## 🐛 Bug Fixes
+
+* Fix media switching during legacy calls ([#5069](https://github.com/matrix-org/matrix-js-sdk/pull/5069)). Contributed by @langleyd.
+
+
 Changes in [39.1.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.1.2) (2025-11-04)
 ==================================================================================================
 Re-release of v39.1.0 to fix npm publishing workflow
