@@ -305,7 +305,9 @@ export function encryptMegolmEventRawPlainText(opts: {
         },
         type: "m.room.encrypted",
         unsigned: {},
-        state_key: opts.plaintext.state_key ? `${opts.plaintext.type}:${opts.plaintext.state_key}` : undefined,
+        state_key: opts.plaintext.hasOwnProperty("state_key")
+            ? `${opts.plaintext.type}:${opts.plaintext.state_key}`
+            : undefined,
     };
 }
 
