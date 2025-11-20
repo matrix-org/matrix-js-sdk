@@ -30,7 +30,7 @@ import {
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver.ts";
 import { SyncResponder } from "../../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests, mockSetupCrossSigningRequests } from "../../test-utils/mockEndpoints.ts";
-import { getSyncResponse, mkEventCustom, syncPromise } from "../../test-utils/test-utils.ts";
+import { getSyncResponse, mkEventCustom, syncPromise, waitFor } from "../../test-utils/test-utils.ts";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
 import { E2EOTKClaimResponder } from "../../test-utils/E2EOTKClaimResponder.ts";
@@ -80,6 +80,9 @@ describe("History Sharing", () => {
     let bobSyncResponder: SyncResponder;
 
     beforeEach(async () => {
+        // Reset mocks.
+        fetchMock.reset();
+
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
         fetchMock.config.warnOnFallback = false;
@@ -199,6 +202,104 @@ describe("History Sharing", () => {
         await event.getDecryptionPromise();
         expect(event.getType()).toEqual("m.room.message");
         expect(event.getContent().body).toEqual("Hi!");
+    });
+
+    test("Room keys are imported correctly if invite is accepted before the bundle arrives", async () => {
+        // Alice is in an encrypted room
+        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], ROOM_ID);
+        aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        // ... and she sends an event
+        const msgProm = expectSendRoomEvent(ALICE_HOMESERVER_URL, "m.room.encrypted");
+        await aliceClient.sendEvent(ROOM_ID, EventType.RoomMessage, { msgtype: MsgType.Text, body: "Hello!" });
+        const sentMessage = await msgProm;
+        debug(`Alice sent encrypted room event: ${JSON.stringify(sentMessage)}`);
+
+        // Now, Alice invites Bob
+        const uploadProm = new Promise<Uint8Array>((resolve) => {
+            fetchMock.postOnce(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString(), (url, request) => {
+                const body = request.body as Uint8Array;
+                debug(`Alice uploaded blob of length ${body.length}`);
+                resolve(body);
+                return { content_uri: "mxc://alice-server/here" };
+            });
+        });
+        const toDeviceMessageProm = expectSendToDeviceMessage(ALICE_HOMESERVER_URL, "m.room.encrypted");
+        // POST https://alice-server.com/_matrix/client/v3/rooms/!room%3Aexample.com/invite
+        fetchMock.postOnce(`${ALICE_HOMESERVER_URL}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+        const uploadedBlob = await uploadProm;
+        const sentToDeviceRequest = await toDeviceMessageProm;
+        debug(`Alice sent encrypted to-device events: ${JSON.stringify(sentToDeviceRequest)}`);
+        const bobToDeviceMessage = sentToDeviceRequest[bobClient.getSafeUserId()][bobClient.deviceId!];
+        expect(bobToDeviceMessage).toBeDefined();
+
+        // Bob receives the room invite, but not the room key bundle
+        const inviteEvent = mkEventCustom({
+            type: "m.room.member",
+            sender: aliceClient.getSafeUserId(),
+            state_key: bobClient.getSafeUserId(),
+            content: { membership: KnownMembership.Invite },
+        });
+        bobSyncResponder.sendOrQueueSyncResponse({
+            rooms: { invite: { [ROOM_ID]: { invite_state: { events: [inviteEvent] } } } },
+        });
+        await syncPromise(bobClient);
+
+        const room = bobClient.getRoom(ROOM_ID);
+        expect(room).toBeTruthy();
+        expect(room?.getMyMembership()).toEqual(KnownMembership.Invite);
+
+        fetchMock.postOnce(`${BOB_HOMESERVER_URL}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
+            room_id: ROOM_ID,
+        });
+        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+
+        // Bob receives and attempts decrypts the megolm message, but should not be able to.
+        const bobSyncResponse = getSyncResponse([aliceClient.getSafeUserId(), bobClient.getSafeUserId()], ROOM_ID);
+        bobSyncResponse.rooms.join[ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                type: "m.room.encrypted",
+                sender: aliceClient.getSafeUserId(),
+                content: sentMessage,
+                event_id: "$event_id",
+            }) as any,
+        );
+        bobSyncResponder.sendOrQueueSyncResponse(bobSyncResponse);
+        await syncPromise(bobClient);
+        const bobRoom = bobClient.getRoom(ROOM_ID);
+        const event = bobRoom!.getLastLiveEvent()!;
+        expect(event.getId()).toEqual("$event_id");
+        await event.getDecryptionPromise();
+        expect(event.isDecryptionFailure()).toBeTruthy();
+
+        // Now the room key bundle arrives
+        fetchMock.getOnce(
+            `begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`,
+            { body: uploadedBlob },
+            { sendAsJson: false },
+        );
+        bobSyncResponder.sendOrQueueSyncResponse({
+            to_device: {
+                events: [
+                    {
+                        type: "m.room.encrypted",
+                        sender: aliceClient.getSafeUserId(),
+                        content: bobToDeviceMessage,
+                    },
+                ],
+            },
+        });
+        await syncPromise(bobClient);
+
+        // Once the room key bundle finishes downloading, we should be able to decrypt the message.
+        await waitFor(async () => {
+            await event.getDecryptionPromise();
+            expect(event.isDecryptionFailure()).toBeFalsy();
+            expect(event.getType()).toEqual("m.room.message");
+            expect(event.getContent().body).toEqual("Hello!");
+        });
     });
 
     afterEach(async () => {

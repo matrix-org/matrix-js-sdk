@@ -2167,7 +2167,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const claimedSender = encryptionInfo?.sender ?? message.sender;
 
         // Validate room ID
-        const roomId = message.content.roomId;
+        const roomId = message.content.room_id;
         if (typeof roomId !== "string") {
             return;
         }
