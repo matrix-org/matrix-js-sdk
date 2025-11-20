@@ -90,8 +90,20 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      *
      * @param inviter - The user who invited us to the room and is expected to have
      *   sent the room key bundle.
+     *
+     * @returns `true` if the key bundle was successfuly downloaded and imported.
      */
-    maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void>;
+    maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<boolean>;
+
+    /**
+     * Mark a room as pending a key bundle under MSC4268. The backend will listen for room key bundle messages, and if
+     * it sees one matching the room and inviter specified, it will automatically import it.
+     *
+     * @param roomId - The room we were invited to, for which we did not receive a key bundle before accepting the invite.
+     *
+     * @param inviter - The user who invited us to the room and is expected to send us the room key bundle.
+     */
+    markRoomAsPendingKeyBundle(roomId: string, inviter: string): void;
 }
 
 /** The methods which crypto implementations should expose to the Sync api

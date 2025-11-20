@@ -129,6 +129,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
+    /** mapping of room ID -> inviter ID for rooms pending MSC4268 key bundles */
+    private roomsPendingKeyBundles: Record<string, string> = {};
+
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
@@ -329,7 +332,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend.maybeAcceptKeyBundle}.
      */
-    public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void> {
+    public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<boolean> {
         // TODO: retry this if it gets interrupted or it fails. (https://github.com/matrix-org/matrix-rust-sdk/issues/5112)
         // TODO: do this in the background.
         // TODO: handle the bundle message arriving after the invite (https://github.com/element-hq/element-web/issues/30740)
@@ -352,7 +355,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
         if (!bundleData) {
             logger.info("No key bundle found for user");
-            return;
+            return false;
         }
 
         logger.info(`Fetching key bundle ${bundleData.url}`);
@@ -391,7 +394,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             logger.warn(`Error receiving encrypted bundle:`, err);
             throw err;
         }
+
+        return true;
     }
+
+    /**
+     * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
+     */
+    public async markRoomAsPendingKeyBundle(roomId: string, inviterId: string): Promise<void> {
+        this.roomsPendingKeyBundles[roomId] = inviterId;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
@@ -2137,6 +2150,34 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
         return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
+    }
+    /**
+     * Handles the receipt of a to-device message, specifically for processing
+     * "io.element.msc4268.room_key_bundle" message types.
+     *
+     * @param payload - The received to-device message payload, which includes
+     * the message content and optional encryption information.
+     */
+    public async onReceiveToDeviceMessage(payload: ReceivedToDeviceMessage): Promise<void> {
+        if (payload.message.type != "io.element.msc4268.room_key_bundle") {
+            return;
+        }
+
+        const { message, encryptionInfo } = payload;
+        const claimedSender = encryptionInfo?.sender ?? message.sender;
+
+        // Validate room ID
+        const roomId = message.content.roomId;
+        if (typeof roomId !== "string") {
+            return;
+        }
+
+        // Check if the room is in the map of rooms we expect to receive bundles from, otherwise discard.
+        if (this.roomsPendingKeyBundles[roomId] !== claimedSender) {
+            return;
+        }
+
+        await this.maybeAcceptKeyBundle(roomId, claimedSender);
     }
 }
 
