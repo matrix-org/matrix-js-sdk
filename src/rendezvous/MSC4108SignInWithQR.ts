@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
     ClientRendezvousFailureReason,
@@ -27,7 +27,16 @@ import { logger } from "../logger.ts";
 import { type MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";
 import { MatrixError } from "../http-api/index.ts";
 import { sleep } from "../utils.ts";
-import { DEVICE_CODE_SCOPE, type OidcClientConfig } from "../oidc/index.ts";
+import {
+    DEVICE_AUTHORIZATION_GRANT_TYPE,
+    generateScope,
+    startDeviceAuthorization,
+    type ValidatedAuthMetadata,
+    type OidcClientConfig,
+    waitForDeviceAuthorization,
+    type DeviceAuthorizationResponse,
+    type DeviceAccessTokenResponse,
+} from "../oidc/index.ts";
 import { type CryptoApi } from "../crypto-api/index.ts";
 
 /**
@@ -57,7 +66,7 @@ export interface MSC4108Payload {
 interface ProtocolsPayload extends MSC4108Payload {
     type: PayloadType.Protocols;
     protocols: string[];
-    homeserver: string;
+    base_url: string;
 }
 
 interface ProtocolPayload extends MSC4108Payload {
@@ -108,9 +117,10 @@ interface SecretsPayload extends MSC4108Payload, Awaited<ReturnType<NonNullable<
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
 export class MSC4108SignInWithQR {
-    private readonly ourIntent: QrCodeMode;
     private _code?: Uint8Array;
     private expectingNewDeviceId?: string;
+    private grantInProgress?: DeviceAuthorizationResponse;
+    private metadata?: ValidatedAuthMetadata;
 
     /**
      * Returns the check code for the secure channel or undefined if not generated yet.
@@ -130,9 +140,7 @@ export class MSC4108SignInWithQR {
         private readonly didScanCode: boolean,
         private readonly client?: MatrixClient,
         public onFailure?: RendezvousFailureListener,
-    ) {
-        this.ourIntent = client ? QrCodeMode.Reciprocate : QrCodeMode.Login;
-    }
+    ) {}
 
     /**
      * Returns the code representing the rendezvous suitable for rendering in a QR code or undefined if not generated yet.
@@ -149,18 +157,14 @@ export class MSC4108SignInWithQR {
             return;
         }
 
-        if (this.ourIntent === QrCodeMode.Reciprocate && this.client) {
-            this._code = await this.channel.generateCode(this.ourIntent, this.client.getDomain()!);
-        } else if (this.ourIntent === QrCodeMode.Login) {
-            this._code = await this.channel.generateCode(this.ourIntent);
-        }
+        this._code = await this.channel.generateCode();
     }
 
     /**
      * Returns true if the device is the already logged in device reciprocating a new login on the other side of the channel.
      */
     public get isExistingDevice(): boolean {
-        return this.ourIntent === QrCodeMode.Reciprocate;
+        return this.channel.intent === QrCodeIntent.Reciprocate;
     }
 
     /**
@@ -176,7 +180,7 @@ export class MSC4108SignInWithQR {
      * The scanning device has to discover the homeserver details, if they scanned the code then they already have it.
      * If the new device is the one rendering the QR code then it has to wait be sent the homeserver details via the rendezvous channel.
      */
-    public async negotiateProtocols(): Promise<{ serverName?: string }> {
+    public async negotiateProtocols(): Promise<{ baseUrl?: string }> {
         logger.info(`negotiateProtocols(isNewDevice=${this.isNewDevice} didScanCode=${this.didScanCode})`);
         await this.channel.connect();
 
@@ -194,11 +198,11 @@ export class MSC4108SignInWithQR {
                     logger.error("Failed to discover OIDC metadata", e);
                 }
 
-                if (oidcClientConfig?.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
+                if (oidcClientConfig?.grant_types_supported.includes(DEVICE_AUTHORIZATION_GRANT_TYPE)) {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],
-                        homeserver: this.client!.getDomain()!,
+                        base_url: this.client!.baseUrl,
                     });
                 } else {
                     await this.send<FailurePayload>({
@@ -231,7 +235,7 @@ export class MSC4108SignInWithQR {
                 );
             }
 
-            return { serverName: payload.homeserver };
+            return { baseUrl: payload.base_url };
         } else {
             // MSC4108-Flow: NewScanned - nothing to do
         }
@@ -241,14 +245,51 @@ export class MSC4108SignInWithQR {
     /**
      * The second & third step in the OIDC QR login process.
      * To be called after `negotiateProtocols` for the existing device.
-     * To be called after OIDC negotiation for the new device. (Currently unsupported)
+     * To be called after OIDC negotiation for the new device.
      */
-    public async deviceAuthorizationGrant(): Promise<{
+    public async deviceAuthorizationGrant(input?: {
+        metadata: ValidatedAuthMetadata;
+        clientId: string;
+        deviceId: string;
+    }): Promise<{
         verificationUri?: string;
         userCode?: string;
     }> {
         if (this.isNewDevice) {
-            throw new Error("New device flows around OIDC are not yet implemented");
+            if (!input) {
+                throw new Error("Input must be provided for new device");
+            }
+
+            const { metadata, clientId, deviceId } = input;
+
+            const scope = generateScope(deviceId);
+
+            // MSC4108-Flow: NewDevice - start device authorization grant
+            const dagResponse = await startDeviceAuthorization({
+                clientId,
+                scope,
+                metadata,
+            });
+
+            const protocol: DeviceAuthorizationGrantProtocolPayload = {
+                type: PayloadType.Protocol,
+                protocol: "device_authorization_grant",
+                device_id: deviceId,
+                device_authorization_grant: {
+                    verification_uri: dagResponse.verification_uri,
+                    verification_uri_complete: dagResponse.verification_uri_complete,
+                },
+            };
+
+            await this.send(protocol);
+
+            this.grantInProgress = dagResponse;
+            this.metadata = metadata;
+
+            return {
+                verificationUri: dagResponse.verification_uri_complete ?? dagResponse.verification_uri,
+                userCode: dagResponse.user_code,
+            };
         } else {
             // The user needs to do step 7 for the out-of-band confirmation
             // but, first we receive the protocol chosen by the other device so that
@@ -311,6 +352,64 @@ export class MSC4108SignInWithQR {
         }
     }
 
+    public async completeLoginOnNewDevice({
+        clientId,
+    }: {
+        clientId: string;
+    }): Promise<DeviceAccessTokenResponse | undefined> {
+        if (!this.isNewDevice || !this.grantInProgress || !this.metadata) {
+            throw new Error("Can only complete login on new device");
+        }
+
+        logger.info("Waiting for protocol accepted message");
+        // wait for accepted message
+        const payload = await this.receive<AcceptedPayload | FailurePayload>();
+
+        if (!payload) {
+            throw new RendezvousError(
+                "No response from existing device",
+                MSC4108FailureReason.UnexpectedMessageReceived,
+            );
+        }
+        if (payload.type === PayloadType.Failure) {
+            throw new RendezvousError("Failed", (payload as FailurePayload).reason);
+        }
+        if (payload.type !== PayloadType.ProtocolAccepted) {
+            throw new RendezvousError("Unexpected message received", MSC4108FailureReason.UnexpectedMessageReceived);
+        }
+
+        // poll for DAG
+        const res = await waitForDeviceAuthorization({
+            session: this.grantInProgress,
+            metadata: this.metadata,
+            clientId,
+        });
+
+        if (!res) {
+            throw new RendezvousError(
+                "No response from device authorization endpoint",
+                ClientRendezvousFailureReason.Unknown,
+            );
+        }
+
+        if ("error" in res) {
+            let reason: MSC4108FailureReason = MSC4108FailureReason.UnexpectedMessageReceived;
+            if (res.error === "expired_token") {
+                reason = MSC4108FailureReason.AuthorizationExpired;
+            } else if (res.error === "access_denied") {
+                reason = MSC4108FailureReason.UserCancelled;
+            }
+            const payload: FailurePayload = {
+                type: PayloadType.Failure,
+                reason,
+            };
+            await this.send(payload);
+            return undefined;
+        }
+
+        return res;
+    }
+
     /**
      * The fifth (and final) step in the OIDC QR login process.
      * To be called after the new device has completed authentication.
@@ -337,7 +436,12 @@ export class MSC4108SignInWithQR {
                     MSC4108FailureReason.UnexpectedMessageReceived,
                 );
             }
-            return { secrets: payload };
+            return {
+                secrets: {
+                    cross_signing: payload.cross_signing,
+                    backup: payload.backup,
+                },
+            };
             // then done?
         } else {
             if (!this.expectingNewDeviceId) {

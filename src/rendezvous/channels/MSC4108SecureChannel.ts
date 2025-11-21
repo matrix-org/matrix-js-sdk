@@ -19,7 +19,7 @@ import {
     Ecies,
     type EstablishedEcies,
     QrCodeData,
-    QrCodeMode,
+    type QrCodeIntent,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
@@ -45,6 +45,7 @@ export class MSC4108SecureChannel {
 
     public constructor(
         private rendezvousSession: MSC4108RendezvousSession,
+        public intent: QrCodeIntent,
         private theirPublicKey?: Curve25519PublicKey,
         public onFailure?: RendezvousFailureListener,
     ) {
@@ -54,22 +55,19 @@ export class MSC4108SecureChannel {
     /**
      * Generate a QR code for the current session.
      * @param mode the mode to generate the QR code in, either `Login` or `Reciprocate`.
-     * @param serverName the name of the homeserver to connect to, as defined by server discovery in the spec, required for `Reciprocate` mode.
      */
-    public async generateCode(mode: QrCodeMode.Login): Promise<Uint8Array>;
-    public async generateCode(mode: QrCodeMode.Reciprocate, serverName: string): Promise<Uint8Array>;
-    public async generateCode(mode: QrCodeMode, serverName?: string): Promise<Uint8Array> {
-        const { url } = this.rendezvousSession;
+    public async generateCode(): Promise<Uint8Array> {
+        const { id, baseUrl } = this.rendezvousSession;
 
-        if (!url) {
-            throw new Error("No rendezvous session URL");
+        if (!id) {
+            throw new Error("No rendezvous session ID");
         }
 
-        return new QrCodeData(
-            this.secureChannel.public_key(),
-            url,
-            mode === QrCodeMode.Reciprocate ? serverName : undefined,
-        ).toBytes();
+        if (!baseUrl) {
+            throw new Error("No rendezvous session base URL");
+        }
+
+        return new QrCodeData(this.secureChannel.public_key(), id, baseUrl, this.intent).toBytes();
     }
 
     /**
@@ -95,39 +93,21 @@ export class MSC4108SecureChannel {
         }
 
         if (this.theirPublicKey) {
-            // We are the scanning device
-            const result = this.secureChannel.establish_outbound_channel(
-                this.theirPublicKey,
-                "MATRIX_QR_CODE_LOGIN_INITIATE",
-            );
-            this.establishedChannel = result.channel;
+            // We are device S: the scanning device
 
-            /*
-             Secure Channel step 4. Device S sends the initial message
-
-             Nonce := 0
-             SH := ECDH(Ss, Gp)
-             EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
-             TaggedCiphertext := ChaCha20Poly1305_Encrypt(EncKey, Nonce, "MATRIX_QR_CODE_LOGIN_INITIATE")
-             Nonce := Nonce + 2
-             LoginInitiateMessage := UnpaddedBase64(TaggedCiphertext) || "|" || UnpaddedBase64(Sp)
-             */
+            // Secure Channel step 4. Device S sends the initial message
             {
+                const result = this.secureChannel.establish_outbound_channel(
+                    this.theirPublicKey,
+                    "MATRIX_QR_CODE_LOGIN_INITIATE",
+                );
+                this.establishedChannel = result.channel;
                 logger.info("Sending LoginInitiateMessage");
+                // send LoginInitiateMessage
                 await this.rendezvousSession.send(result.initial_message);
             }
 
-            /*
-            Secure Channel step 6. Verification by Device S
-
-            Nonce_G := 1
-            (TaggedCiphertext, Sp) := Unpack(Message)
-            Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_G, TaggedCiphertext)
-            Nonce_G := Nonce_G + 2
-
-            unless Plaintext == "MATRIX_QR_CODE_LOGIN_OK":
-                FAIL
-             */
+            // Secure Channel step 6. Verification by Device S
             {
                 logger.info("Waiting for LoginOkMessage");
                 const ciphertext = await this.rendezvousSession.receive();
@@ -140,6 +120,7 @@ export class MSC4108SecureChannel {
                 }
                 const candidateLoginOkMessage = await this.decrypt(ciphertext);
 
+                // Verify LoginOkMessage
                 if (candidateLoginOkMessage !== "MATRIX_QR_CODE_LOGIN_OK") {
                     throw new RendezvousError(
                         "Invalid response from other device",
@@ -147,19 +128,11 @@ export class MSC4108SecureChannel {
                     );
                 }
 
-                // Step 6 is now complete. We trust the channel
+                // Step 6 is now complete. We, device S, trusts the channel
             }
         } else {
-            /*
-            Secure Channel step 5. Device G confirms
+            // We are device G: the generating device
 
-            Nonce_S := 0
-            (TaggedCiphertext, Sp) := Unpack(LoginInitiateMessage)
-            SH := ECDH(Gs, Sp)
-            EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
-            Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_S, TaggedCiphertext)
-            Nonce_S := Nonce_S + 2
-             */
             // wait for the other side to send us their public key
             logger.info("Waiting for LoginInitiateMessage");
             const loginInitiateMessage = await this.rendezvousSession.receive();
@@ -171,6 +144,7 @@ export class MSC4108SecureChannel {
                 this.secureChannel.establish_inbound_channel(loginInitiateMessage);
             this.establishedChannel = channel;
 
+            // Verify LoginInitiateMessage
             if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
                 throw new RendezvousError(
                     "Invalid response from other device",
@@ -183,7 +157,7 @@ export class MSC4108SecureChannel {
             const loginOkMessage = await this.encrypt("MATRIX_QR_CODE_LOGIN_OK");
             await this.rendezvousSession.send(loginOkMessage);
 
-            // Step 5 is complete. We don't yet trust the channel
+            // Step 5 is complete. We, device G, don't yet trust the channel
 
             // next step will be for the user to confirm the check code on the other device
         }

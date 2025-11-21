@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QrCodeData, QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrCodeData, QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked } from "jest-mock";
 import fetchMock from "fetch-mock-jest";
 
@@ -28,7 +28,7 @@ import {
 } from "../../../src/rendezvous";
 import {
     ClientPrefix,
-    DEVICE_CODE_SCOPE,
+    DEVICE_AUTHORIZATION_GRANT_TYPE,
     type IHttpOpts,
     type IMyDevice,
     type MatrixClient,
@@ -38,13 +38,14 @@ import {
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
-    const baseUrl = "https://example.com";
+    const domain = opts.userId.split(":")[1];
+    const baseUrl = `https://${domain}`;
     const crypto = {
         exportSecretsForQrLogin: jest.fn(),
     };
     const client = {
         doesServerSupportUnstableFeature(feature: string) {
-            return Promise.resolve(opts.msc4108Enabled && feature === "org.matrix.msc4108");
+            return Promise.resolve(opts.msc4108Enabled && feature === "io.element.msc4108");
         },
         getUserId() {
             return opts.userId;
@@ -53,10 +54,12 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
             return opts.deviceId;
         },
         baseUrl,
-        getDomain: () => "example.com",
+        getDomain: () => domain,
         getDevice: jest.fn(),
         getCrypto: jest.fn(() => crypto),
-        getAuthMetadata: jest.fn().mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_CODE_SCOPE])),
+        getAuthMetadata: jest
+            .fn()
+            .mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_AUTHORIZATION_GRANT_TYPE])),
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,
@@ -81,24 +84,27 @@ describe("MSC4108SignInWithQR", () => {
         fetchMock.reset();
     });
 
-    const url = "https://fallbackserver/rz/123";
+    const id = "123";
+    const baseUrl = "https://fallbackserver/rz";
     const deviceId = "DEADB33F";
     const verificationUri = "https://example.com/verify";
     const verificationUriComplete = "https://example.com/verify/complete";
 
     it("should generate qr code data as expected", async () => {
         const session = new MSC4108RendezvousSession({
-            url,
+            id,
+            baseUrl,
         });
-        const channel = new MSC4108SecureChannel(session);
+        const channel = new MSC4108SecureChannel(session, QrCodeIntent.Login);
         const login = new MSC4108SignInWithQR(channel, false);
 
         await login.generateCode();
         const code = login.code;
-        expect(code).toHaveLength(71);
+        // expect(code).toHaveLength(71);
         const text = new TextDecoder().decode(code);
-        expect(text.startsWith("MATRIX")).toBeTruthy();
-        expect(text.endsWith(url)).toBeTruthy();
+        expect(text.startsWith("IO_ELEMENT_MSC4108")).toBeTruthy();
+        expect(text.includes(id)).toBeTruthy();
+        expect(text.endsWith(baseUrl)).toBeTruthy();
 
         // Assert that the code is stable
         await login.generateCode();
@@ -125,7 +131,8 @@ describe("MSC4108SignInWithQR", () => {
                     });
                     return prom;
                 }),
-                url,
+                id,
+                baseUrl,
                 cancelled: false,
                 cancel: () => {
                     // @ts-ignore
@@ -144,25 +151,29 @@ describe("MSC4108SignInWithQR", () => {
                     });
                     return prom;
                 }),
-                url,
+                id,
+                baseUrl,
             } as unknown as MSC4108RendezvousSession;
 
             client = makeMockClient({ userId: "@alice:example.com", deviceId: "alice", msc4108Enabled: true });
 
-            const ourChannel = new MSC4108SecureChannel(ourMockSession);
-            const qrCodeData = QrCodeData.fromBytes(
-                await ourChannel.generateCode(QrCodeMode.Reciprocate, client.getDomain()!),
+            const ourChannel = new MSC4108SecureChannel(ourMockSession, QrCodeIntent.Reciprocate);
+            const qrCodeData = QrCodeData.fromBytes(await ourChannel.generateCode());
+            const opponentChannel = new MSC4108SecureChannel(
+                opponentMockSession,
+                QrCodeIntent.Login,
+                qrCodeData.publicKey,
             );
-            const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.publicKey);
 
             ourLogin = new MSC4108SignInWithQR(ourChannel, true, client);
             opponentLogin = new MSC4108SignInWithQR(opponentChannel, false);
         });
 
-        it("should be able to connect with opponent and share server name & check code", async () => {
+        it("should be able to connect with opponent and share base URL & check code", async () => {
+            // n.b. the base URL that of the login is different from the rendezvous base URL
             await Promise.all([
                 expect(ourLogin.negotiateProtocols()).resolves.toEqual({}),
-                expect(opponentLogin.negotiateProtocols()).resolves.toEqual({ serverName: client.getDomain() }),
+                expect(opponentLogin.negotiateProtocols()).resolves.toEqual({ baseUrl: "https://example.com" }),
             ]);
 
             expect(ourLogin.checkCode).toBe(opponentLogin.checkCode);

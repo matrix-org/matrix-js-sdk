@@ -44,6 +44,4 @@ export enum ClientRendezvousFailureReason {
     Unknown = "unknown",
     /** The user declined the sign in request */
     UserDeclined = "user_declined",
-    /** The rendezvous request is missing an ETag header */
-    ETagMissing = "etag_missing",
 }

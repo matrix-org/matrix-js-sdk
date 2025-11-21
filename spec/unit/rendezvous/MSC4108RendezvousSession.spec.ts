@@ -20,9 +20,10 @@ import { ClientPrefix, type IHttpOpts, type MatrixClient, MatrixHttpApi } from "
 import { ClientRendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
+    const domain = opts.userId.split(":")[1];
     const client = {
         doesServerSupportUnstableFeature(feature: string) {
-            return Promise.resolve(opts.msc4108Enabled && feature === "org.matrix.msc4108");
+            return Promise.resolve(opts.msc4108Enabled && feature === "io.element.msc4108");
         },
         getUserId() {
             return opts.userId;
@@ -30,7 +31,7 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
         getDeviceId() {
             return opts.deviceId;
         },
-        baseUrl: "https://example.com",
+        baseUrl: `https://${domain}`,
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,
@@ -47,285 +48,265 @@ describe("MSC4108RendezvousSession", () => {
         fetchMock.reset();
     });
 
-    async function postAndCheckLocation(msc4108Enabled: boolean, fallbackRzServer: string, locationResponse: string) {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled });
-        const transport = new MSC4108RendezvousSession({ client, fallbackRzServer });
-        {
-            // initial POST
-            const expectedPostLocation = msc4108Enabled
-                ? `${client.baseUrl}/_matrix/client/unstable/org.matrix.msc4108/rendezvous`
-                : fallbackRzServer;
-
-            fetchMock.postOnce(expectedPostLocation, {
-                status: 201,
-                body: { url: locationResponse },
-            });
-            await transport.send("data");
-        }
-
-        {
-            fetchMock.get(locationResponse, {
-                status: 200,
-                body: "data",
-                headers: {
-                    "content-type": "text/plain",
-                    "etag": "aaa",
-                },
-            });
-            await expect(transport.receive()).resolves.toEqual("data");
-        }
-    }
-
-    it("should use custom fetchFn if provided", async () => {
-        const sandbox = fetchMock.sandbox();
-        const fetchFn = jest.fn().mockImplementation(sandbox);
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const transport = new MSC4108RendezvousSession({
-            client,
-            fetchFn,
-            fallbackRzServer: "https://fallbackserver/rz",
-        });
-        sandbox.postOnce("https://fallbackserver/rz", {
-            status: 201,
-            body: {
-                url: "https://fallbackserver/rz/123",
-            },
-        });
-        await transport.send("data");
-        await sandbox.flush(true);
-        expect(fetchFn).toHaveBeenCalledWith("https://fallbackserver/rz", expect.anything());
-    });
-
     it("should throw an error when no server available", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
         const transport = new MSC4108RendezvousSession({ client });
         await expect(transport.send("data")).rejects.toThrow("Invalid rendezvous URI");
     });
 
-    it("POST to fallback server", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+    it("POST to create rendezvous", async function () {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
         });
-        fetchMock.postOnce("https://fallbackserver/rz", {
-            status: 201,
-            body: { url: "https://fallbackserver/rz/123" },
+        fetchMock.postOnce(`${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
+            status: 200,
+            body: { id: "123", expires_ts: 0, sequence_token: "1" },
         });
         await fetchMock.flush(true);
         await expect(transport.send("data")).resolves.toStrictEqual(undefined);
     });
 
-    it("POST with no location", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+    it("POST with no id in response errors", async function () {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
         });
-        fetchMock.postOnce("https://fallbackserver/rz", {
-            status: 201,
+        fetchMock.postOnce("https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous", {
+            status: 200,
         });
         await Promise.all([expect(transport.send("data")).rejects.toThrow(), fetchMock.flush(true)]);
     });
 
-    it("POST with absolute path response", async function () {
-        await postAndCheckLocation(false, "https://fallbackserver/rz", "https://fallbackserver/123");
-    });
-
-    it("POST to built-in MSC3886 implementation", async function () {
-        await postAndCheckLocation(
-            true,
-            "https://fallbackserver/rz",
-            "https://example.com/_matrix/client/unstable/org.matrix.msc4108/rendezvous/123",
-        );
-    });
-
-    it("POST with relative path response including parent", async function () {
-        await postAndCheckLocation(false, "https://fallbackserver/rz/abc", "https://fallbackserver/rz/xyz/123");
-    });
-
-    // fetch-mock doesn't handle redirects properly, so we can't test this
-    it.skip("POST to follow 307 to other server", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const transport = new MSC4108RendezvousSession({
-            client,
-            fallbackRzServer: "https://fallbackserver/rz",
-        });
-        fetchMock.postOnce("https://fallbackserver/rz", {
-            status: 307,
-            redirectUrl: "https://redirected.fallbackserver/rz",
-            redirected: true,
-        });
-        fetchMock.postOnce("https://redirected.fallbackserver/rz", {
-            status: 201,
-            body: { url: "https://redirected.fallbackserver/rz/123" },
-            headers: { etag: "aaa" },
-        });
-        await fetchMock.flush(true);
-        await expect(transport.send("data")).resolves.toStrictEqual(undefined);
-    });
-
     it("POST and GET", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const transport = new MSC4108RendezvousSession({
-            client,
-            fallbackRzServer: "https://fallbackserver/rz",
+        const alice = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
+        const sender = new MSC4108RendezvousSession({
+            client: alice,
         });
+
+        const mockId = "123";
         {
             // initial POST
-            fetchMock.postOnce("https://fallbackserver/rz", {
-                status: 201,
-                body: { url: "https://fallbackserver/rz/123" },
+            fetchMock.postOnce(`${alice.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
+                status: 200,
+                body: { id: mockId, expires_ts: 0, sequence_token: "1" },
             });
-            await expect(transport.send("foo=baa")).resolves.toStrictEqual(undefined);
+            await expect(sender.send("foo=baa")).resolves.toStrictEqual(undefined);
             await fetchMock.flush(true);
-            expect(fetchMock).toHaveFetched("https://fallbackserver/rz", {
+            expect(fetchMock).toHaveFetched(`${alice.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
                 method: "POST",
-                headers: { "content-type": "text/plain" },
+                headers: { "content-type": "application/json" },
                 functionMatcher: (_, opts): boolean => {
-                    return opts.body === "foo=baa";
+                    const body = JSON.parse(opts.body as string);
+                    return body.data === "foo=baa" && body.sequence_token === undefined;
                 },
             });
+            expect(sender.id).toBe(mockId);
         }
+
+        const receiver = new MSC4108RendezvousSession({ id: mockId, baseUrl: alice.baseUrl });
+
         {
-            // first GET without etag
-            fetchMock.getOnce("https://fallbackserver/rz/123", {
+            // GET should have sequence_token from previous request
+            fetchMock.getOnce(`${alice.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous/${mockId}`, {
                 status: 200,
-                body: "foo=baa",
-                headers: { "content-type": "text/plain", "etag": "aaa" },
+                body: { data: "foo=baa", sequence_token: "1" },
             });
-            await expect(transport.receive()).resolves.toEqual("foo=baa");
+            await expect(receiver.receive()).resolves.toEqual("foo=baa");
             await fetchMock.flush(true);
-        }
-        {
-            // subsequent GET which should have etag from previous request
-            fetchMock.getOnce("https://fallbackserver/rz/123", {
-                status: 200,
-                body: "foo=baa",
-                headers: { "content-type": "text/plain", "etag": "bbb" },
-            });
-            await expect(transport.receive()).resolves.toEqual("foo=baa");
-            await fetchMock.flush(true);
-            expect(fetchMock).toHaveFetched("https://fallbackserver/rz/123", {
-                method: "GET",
-                headers: { "if-none-match": "aaa" },
-            });
+            expect(fetchMock).toHaveFetched(
+                `${alice.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous/${mockId}`,
+                {
+                    method: "GET",
+                },
+            );
         }
     });
 
-    it("POST and PUTs", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+    it("PUT should call GET on first use", async function () {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
         });
+        const mockId = "123";
+
         {
-            // initial POST
-            fetchMock.postOnce("https://fallbackserver/rz", {
-                status: 201,
-                body: { url: "https://fallbackserver/rz/123" },
-                headers: { etag: "aaa" },
+            // initial POST should not have a sequence_token
+            fetchMock.postOnce(`${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
+                status: 200,
+                body: { id: mockId, expires_ts: 0, sequence_token: "aaa" },
             });
             await transport.send("foo=baa");
             await fetchMock.flush(true);
-            expect(fetchMock).toHaveFetched("https://fallbackserver/rz", {
+            expect(fetchMock).toHaveFetched(`${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
                 method: "POST",
-                headers: { "content-type": "text/plain" },
+                headers: { "content-type": "application/json" },
                 functionMatcher: (_, opts): boolean => {
-                    return opts.body === "foo=baa";
+                    const body = JSON.parse(opts.body as string);
+                    return body.data === "foo=baa" && body.sequence_token === undefined;
                 },
             });
+            expect(transport.id).toBe(mockId);
         }
         {
-            // subsequent PUT which should have etag from previous request
-            fetchMock.putOnce("https://fallbackserver/rz/123", { status: 202, headers: { etag: "bbb" } });
+            // subsequent PUT which should have sequence_token from previous request
+            fetchMock.putOnce(`${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous/${mockId}`, {
+                status: 200,
+                body: { sequence_token: "bbb" },
+            });
             await transport.send("c=d");
             await fetchMock.flush(true);
-            expect(fetchMock).toHaveFetched("https://fallbackserver/rz/123", {
-                method: "PUT",
-                headers: { "if-match": "aaa" },
+            expect(fetchMock).toHaveFetched(
+                `${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous/${mockId}`,
+                {
+                    method: "PUT",
+                    headers: { "content-type": "application/json" },
+                    functionMatcher: (_, opts): boolean => {
+                        const body = JSON.parse(opts.body as string);
+                        return body.data === "c=d" && body.sequence_token === "aaa";
+                    },
+                },
+            );
+        }
+    });
+
+    it("POST and PUT clash", async function () {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
+        const alice = new MSC4108RendezvousSession({
+            client,
+        });
+
+        const mockId = "123";
+
+        {
+            // initial POST should not have a sequence_token
+            fetchMock.postOnce(`${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
+                status: 200,
+                body: { id: mockId, expires_ts: 0, sequence_token: "aaa" },
             });
+            await alice.send("foo=baa");
+            await fetchMock.flush(true);
+            expect(fetchMock).toHaveFetched(`${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                functionMatcher: (_, opts): boolean => {
+                    const body = JSON.parse(opts.body as string);
+                    return body.data === "foo=baa" && body.sequence_token === undefined;
+                },
+            });
+            expect(alice.id).toBe(mockId);
+        }
+
+        const rendezvousUrl = `${client.baseUrl}/_matrix/client/unstable/io.element.msc4108/rendezvous/${mockId}`;
+
+        const onFailure = jest.fn();
+        const bob = new MSC4108RendezvousSession({
+            id: mockId,
+            baseUrl: client.baseUrl,
+            onFailure,
+        });
+
+        {
+            // subsequent PUT which should have sequence_token from previous request
+            fetchMock.getOnce(rendezvousUrl, {
+                status: 200,
+                body: { data: "foo=baa", sequence_token: "aaa" },
+            });
+            fetchMock.putOnce(rendezvousUrl, { status: 409, body: { errcode: "IO_ELEMENT_MSC4108_CONCURRENT_WRITE" } });
+            await bob.send("c=d");
+            await fetchMock.flush(true);
+            expect(fetchMock).toHaveFetched(rendezvousUrl, {
+                method: "PUT",
+                headers: { "content-type": "application/json" },
+                functionMatcher: (_, opts): boolean => {
+                    const body = JSON.parse(opts.body as string);
+                    return body.data === "c=d" && body.sequence_token === "aaa";
+                },
+            });
+            expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Unknown);
         }
     });
 
     it("POST and DELETE", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
         });
         {
             // Create
-            fetchMock.postOnce("https://fallbackserver/rz", {
-                status: 201,
-                body: { url: "https://fallbackserver/rz/123" },
+            fetchMock.postOnce("https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous", {
+                status: 200,
+                body: { id: "123", expires_ts: 0, sequence_token: "1" },
             });
             await expect(transport.send("foo=baa")).resolves.toStrictEqual(undefined);
             await fetchMock.flush(true);
-            expect(fetchMock).toHaveFetched("https://fallbackserver/rz", {
-                method: "POST",
-                headers: { "content-type": "text/plain" },
-                functionMatcher: (_, opts): boolean => {
-                    return opts.body === "foo=baa";
+            expect(fetchMock).toHaveFetched(
+                "https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous",
+                {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    functionMatcher: (_, opts): boolean => {
+                        const body = JSON.parse(opts.body as string);
+                        return body.data === "foo=baa" && body.sequence_token === undefined;
+                    },
                 },
-            });
+            );
         }
         {
             // Cancel
-            fetchMock.deleteOnce("https://fallbackserver/rz/123", { status: 204 });
+            fetchMock.deleteOnce("https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous/123", {
+                status: 200,
+            });
             await transport.cancel(ClientRendezvousFailureReason.UserDeclined);
             await fetchMock.flush(true);
         }
     });
 
     it("send after cancelled", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
         });
         await transport.cancel(ClientRendezvousFailureReason.UserDeclined);
         await expect(transport.send("data")).resolves.toBeUndefined();
     });
 
     it("receive before ready", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
         });
         await expect(transport.receive()).rejects.toThrow();
     });
 
     it("404 failure callback", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const onFailure = jest.fn();
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
             onFailure,
         });
 
-        fetchMock.postOnce("https://fallbackserver/rz", { status: 404 });
+        fetchMock.postOnce("https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous", {
+            status: 404,
+        });
         await Promise.all([expect(transport.send("foo=baa")).resolves.toBeUndefined(), fetchMock.flush(true)]);
         expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Unknown);
     });
 
     it("404 failure callback mapped to expired", async function () {
-        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: true });
         const onFailure = jest.fn();
         const transport = new MSC4108RendezvousSession({
             client,
-            fallbackRzServer: "https://fallbackserver/rz",
             onFailure,
         });
 
         {
             // initial POST
-            fetchMock.postOnce("https://fallbackserver/rz", {
-                status: 201,
-                body: { url: "https://fallbackserver/rz/123" },
-                headers: { expires: "Thu, 01 Jan 1970 00:00:00 GMT" },
+            fetchMock.postOnce("https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous", {
+                status: 200,
+                body: { id: "123", expires_ts: 0, sequence_token: "1" },
             });
 
             await transport.send("foo=baa");
@@ -333,7 +314,10 @@ describe("MSC4108RendezvousSession", () => {
         }
         {
             // GET with 404 to simulate expiry
-            fetchMock.getOnce("https://fallbackserver/rz/123", { status: 404, body: "foo=baa" });
+            fetchMock.getOnce("https://example.com/_matrix/client/unstable/io.element.msc4108/rendezvous/123", {
+                status: 404,
+                body: "foo=baa",
+            });
             await Promise.all([expect(transport.receive()).resolves.toBeUndefined(), fetchMock.flush(true)]);
             expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Expired);
         }

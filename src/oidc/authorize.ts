@@ -29,6 +29,7 @@ import {
 } from "./validate.ts";
 import { sha256 } from "../digest.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
+import { DEVICE_AUTHORIZATION_GRANT_TYPE } from ".";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
@@ -276,4 +277,99 @@ export const completeAuthorizationCodeGrant = async (
         }
         throw new Error(OidcError.CodeExchangeFailed);
     }
+};
+
+export interface DeviceAccessTokenResponse {
+    id_token?: string;
+    access_token: string;
+    token_type: string;
+    refresh_token?: string;
+    scope?: string;
+    expires_in?: number;
+    session_state?: string;
+}
+
+export interface DeviceAccessTokenError {
+    error: string;
+    error_description?: string;
+    error_uri?: string;
+    session_state?: string;
+}
+
+export interface DeviceAuthorizationResponse {
+    device_code: string;
+    user_code: string;
+    verification_uri: string;
+    verification_uri_complete?: string;
+    expires_in: number;
+    interval?: number;
+}
+export const startDeviceAuthorization = async ({
+    clientId,
+    scope,
+    metadata,
+}: {
+    clientId: string;
+    scope: string;
+    metadata: ValidatedAuthMetadata;
+}): Promise<DeviceAuthorizationResponse> => {
+    const params = new URLSearchParams({ client_id: clientId, scope: scope });
+
+    const url = metadata.device_authorization_endpoint;
+    if (!url) {
+        throw new Error("No device_authorization_endpoint given");
+    }
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+    });
+
+    return (await response.json()) as DeviceAuthorizationResponse;
+};
+
+export const waitForDeviceAuthorization = async ({
+    session,
+    metadata,
+    clientId,
+}: {
+    session: DeviceAuthorizationResponse;
+    metadata: ValidatedAuthMetadata;
+    clientId: string;
+}): Promise<DeviceAccessTokenResponse | DeviceAccessTokenError> => {
+    let interval = (session.interval ?? 5) * 1000; // poll interval
+    const expiration = Date.now() + session.expires_in * 1000;
+    do {
+        const body = new URLSearchParams({
+            device_code: session.device_code,
+            grant_type: DEVICE_AUTHORIZATION_GRANT_TYPE,
+            // TODO: is auth required here? it is optional in RFC8628
+            client_id: clientId,
+        });
+        const response = await fetch(metadata.token_endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body,
+        });
+
+        if (response.ok) {
+            return (await response.json()) as DeviceAccessTokenResponse;
+        }
+        const errorResponse = (await response.json()) as DeviceAccessTokenError;
+        switch (errorResponse.error) {
+            case "authorization_pending":
+                break;
+            case "slow_down":
+                interval += 5000;
+                break;
+            case "access_denied":
+            case "expired_token":
+                return errorResponse;
+        }
+        await new Promise((resolve) => setTimeout(resolve, interval));
+    } while (Date.now() < expiration);
+    return { error: "expired" };
 };

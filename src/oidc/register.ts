@@ -52,7 +52,10 @@ interface OidcRegistrationRequestBody {
     application_type: "web" | "native";
 }
 
-export const DEVICE_CODE_SCOPE = "urn:ietf:params:oauth:grant-type:device_code";
+/**
+ * Experimental constant for device authorization grant type from MSC4341
+ */
+export const DEVICE_AUTHORIZATION_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code";
 
 // Check that URIs have a common base, as per the MSC2966 definition
 const urlHasCommonBase = (base: URL, urlStr?: string): boolean => {
@@ -82,6 +85,11 @@ export const registerOidcClient = async (
     const grantTypes: NonEmptyArray<string> = ["authorization_code", "refresh_token"];
     if (grantTypes.some((scope) => !delegatedAuthConfig.grant_types_supported.includes(scope))) {
         throw new Error(OidcError.DynamicRegistrationNotSupported);
+    }
+
+    // ask for device authorization grant if supported
+    if (delegatedAuthConfig.grant_types_supported.includes(DEVICE_AUTHORIZATION_GRANT_TYPE)) {
+        grantTypes.push(DEVICE_AUTHORIZATION_GRANT_TYPE);
     }
 
     const commonBase = new URL(clientMetadata.clientUri);
