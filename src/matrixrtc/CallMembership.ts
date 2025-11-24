@@ -20,7 +20,7 @@ import { type LivekitFocusSelection } from "./LivekitTransport.ts";
 import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
 import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
-import { type RelationType } from "../@types/event.ts";
+import { STICKY_EVENT_KEY_FIELD, type RelationType } from "../@types/event.ts";
 import { logger } from "../logger.ts";
 
 /**
@@ -47,7 +47,7 @@ export interface RtcMembershipData {
     };
     "rtc_transports": Transport[];
     "versions": string[];
-    "msc4354_sticky_key"?: string;
+    [STICKY_EVENT_KEY_FIELD.name]?: string;
     "sticky_key"?: string;
 }
 

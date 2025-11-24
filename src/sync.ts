@@ -40,6 +40,7 @@ import {
     type ResetTimelineCallback,
 } from "./client.ts";
 import {
+    ISticky,
     type IEphemeral,
     type IInvitedRoom,
     type IInviteState,
@@ -58,7 +59,7 @@ import {
 import { MatrixEvent } from "./models/event.ts";
 import { type MatrixError, Method } from "./http-api/index.ts";
 import { type ISavedSync } from "./store/index.ts";
-import { EventType } from "./@types/event.ts";
+import { EventType, STICKY_EVENT_FIELD } from "./@types/event.ts";
 import { type IPushRules } from "./@types/PushRules.ts";
 import { type IMarkerFoundOptions, RoomStateEvent } from "./models/room-state.ts";
 import { RoomMemberEvent } from "./models/room-member.ts";
@@ -1221,7 +1222,7 @@ export class SyncApi {
             const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
             const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
-            const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky);
+            const stickyEvents = this.mapSyncEventsFormat((joinObj[STICKY_EVENT_FIELD.name] ?? joinObj[STICKY_EVENT_FIELD.unstable!]) as ISticky);
 
             // If state_after is present, this is the events that form the state at the end of the timeline block and
             // regular timeline events do *not* count towards state. If it's not present, then the state is formed by
