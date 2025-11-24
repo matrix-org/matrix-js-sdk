@@ -127,15 +127,17 @@ describe("Poll", () => {
 
         it("waits for existing relations request to finish when getting responses", async () => {
             const poll = new Poll(basePollStartEvent, mockClient, room);
+            // @ts-expect-error TS2769
+            const spy = jest.spyOn(poll, "fetchResponses");
             const firstResponsePromise = poll.getResponses();
             const secondResponsePromise = poll.getResponses();
             await firstResponsePromise;
-            expect(firstResponsePromise).toEqual(secondResponsePromise);
             await secondResponsePromise;
+            expect(spy).toHaveBeenCalledTimes(1);
             expect(mockClient.relations).toHaveBeenCalledTimes(1);
         });
 
-        it("filters relations for relevent response events", async () => {
+        it("filters relations for relevant response events", async () => {
             const replyEvent = makeRelatedEvent({ type: "m.room.message" });
             const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
             const unstableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
