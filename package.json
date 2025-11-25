@@ -101,7 +101,7 @@
         "eslint-plugin-jsdoc": "^61.0.0",
         "eslint-plugin-matrix-org": "^3.0.0",
         "eslint-plugin-n": "^14.0.0",
-        "eslint-plugin-tsdoc": "^0.4.0",
+        "eslint-plugin-tsdoc": "^0.5.0",
         "eslint-plugin-unicorn": "^56.0.0",
         "fake-indexeddb": "^5.0.2",
         "fetch-mock": "11.1.5",
