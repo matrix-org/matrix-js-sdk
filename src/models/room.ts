@@ -1810,7 +1810,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getMxcAvatarUrl(): string | null {
         const url = this.currentState.getStateEvents(EventType.RoomAvatar, "")?.getContent().url;
-        return typeof url === "string" ? url : null;
+        return url && typeof url === "string" ? url : null;
     }
 
     /**
@@ -1821,7 +1821,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getCanonicalAlias(): string | null {
         const canonicalAlias = this.currentState.getStateEvents(EventType.RoomCanonicalAlias, "")?.getContent().alias;
-        return typeof canonicalAlias === "string" ? canonicalAlias : null;
+        return canonicalAlias && typeof canonicalAlias === "string" ? canonicalAlias : null;
     }
 
     /**
@@ -3638,7 +3638,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private calculateRoomName(userId: string, ignoreRoomNameEvent = false): string {
         if (!ignoreRoomNameEvent) {
             const name = this.currentState.getStateEvents(EventType.RoomName, "")?.getContent().name;
-            if (typeof name === "string") {
+            if (name && typeof name === "string") {
                 return this.roomNameGenerator({
                     type: RoomNameType.Actual,
                     name,

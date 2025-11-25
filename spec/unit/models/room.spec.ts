@@ -229,4 +229,27 @@ describe("Room", () => {
             expect(room.getAltAliases()).toEqual(["#foo:bar"]);
         });
     });
+
+    describe("calculateRoomName()", () => {
+        it("should ignore empty m.room.name 'name' field", async () => {
+            const mockClient = createMockClient();
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+            const event = new MatrixEvent({
+                type: EventType.RoomName,
+                content: {
+                    name: "",
+                },
+                state_key: "",
+                event_id: "$123",
+                room_id: room.roomId,
+                sender: CREATOR_USER_ID,
+            });
+
+            // Set up the room
+            room.currentState.setStateEvents([event]);
+            room.recalculate();
+
+            expect(room.name).not.toEqual("");
+        });
+    });
 });
