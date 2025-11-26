@@ -401,7 +401,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
      */
-    public async markRoomAsPendingKeyBundle(roomId: string, inviterId: string): Promise<void> {
+    public markRoomAsPendingKeyBundle(roomId: string, inviterId: string): void {
         this.roomsPendingKeyBundles[roomId] = inviterId;
     }
 
