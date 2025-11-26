@@ -73,6 +73,8 @@ jobs:
     close-if-fork-develop:
         name: Forbid develop branch fork contributions
         runs-on: ubuntu-24.04
+        permissions:
+            pull-requests: write
         if: >
             github.event.action == 'opened' &&
             github.event.pull_request.head.ref == 'develop' &&
