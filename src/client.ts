@@ -4448,6 +4448,46 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Calls the `/context` API for the given room ID & event ID.
+     * Returns the response, with `event` asserted and all optional arrays defaulted to an empty array.
+     * @param roomId - the room ID to request a context for
+     * @param eventId - the event ID to request a context for
+     * @throws if `event` in the response is missing
+     * @private
+     */
+    private async getEventContext(
+        roomId: string,
+        eventId: string,
+    ): Promise<IContextResponse & Omit<Required<IContextResponse>, "start" | "end">> {
+        const path = utils.encodeUri("/rooms/$roomId/context/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        });
+
+        const params: Record<string, string | string[]> = {
+            limit: "0",
+        };
+        if (this.clientOpts?.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
+        if (res.event) {
+            return {
+                start: res.start,
+                end: res.end,
+                event: res.event,
+                events_after: res.events_after ?? [],
+                events_before: res.events_before ?? [],
+                state: res.state ?? [],
+            };
+        }
+
+        throw new Error("'event' not in '/context' result - homeserver too old?");
+    }
+
+    /**
      * Get an EventTimeline for the given event
      *
      * <p>If the EventTimelineSet object already has the given event in its store, the
@@ -4482,21 +4522,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.getThreadTimeline(timelineSet, eventId);
         }
 
-        const path = utils.encodeUri("/rooms/$roomId/context/$eventId", {
-            $roomId: timelineSet.room.roomId,
-            $eventId: eventId,
-        });
-
-        let params: Record<string, string | string[]> | undefined = undefined;
-        if (this.clientOpts?.lazyLoadMembers) {
-            params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
-        }
-
-        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
-        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
-        if (!res.event) {
-            throw new Error("'event' not in '/context' result - homeserver too old?");
-        }
+        const res = await this.getEventContext(timelineSet.room.roomId, eventId);
 
         // by the time the request completes, the event might have ended up in the timeline.
         if (timelineSet.getTimelineForEvent(eventId)) {
@@ -4525,7 +4551,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } else {
             timeline = timelineSet.addTimeline();
             timeline.initialiseState(res.state.map(mapper));
-            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
+            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end ?? null;
         }
 
         const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
@@ -4558,20 +4584,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("could not get thread timeline: not a thread timeline");
         }
 
-        const path = utils.encodeUri("/rooms/$roomId/context/$eventId", {
-            $roomId: timelineSet.room.roomId,
-            $eventId: eventId,
-        });
+        const res = await this.getEventContext(timelineSet.room.roomId, eventId);
 
-        const params: Record<string, string | string[]> = {
-            limit: "0",
-        };
-        if (this.clientOpts?.lazyLoadMembers) {
-            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
-        }
-
-        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
-        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
 
