@@ -298,12 +298,12 @@ export interface IRelationsResponse {
 }
 
 export interface IContextResponse {
-    end: string;
-    start: string;
-    state: IEventWithRoomId[];
-    events_before: IEventWithRoomId[];
-    events_after: IEventWithRoomId[];
-    event: IEventWithRoomId;
+    end?: string;
+    start?: string;
+    state?: IEventWithRoomId[];
+    events_before?: IEventWithRoomId[];
+    events_after?: IEventWithRoomId[];
+    event?: IEventWithRoomId;
 }
 
 export interface IEventsResponse {

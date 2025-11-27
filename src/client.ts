@@ -4448,6 +4448,43 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Calls the `/context` API for the given room ID & event ID.
+     * Returns the response, with the `event` field asserted to be present.
+     * @param roomId - the room ID to request a context for
+     * @param eventId - the event ID to request a context for
+     * @throws if `event` in the response is missing
+     * @private
+     */
+    private async getEventContext(
+        roomId: string,
+        eventId: string,
+    ): Promise<IContextResponse & { event: IEventWithRoomId }> {
+        const path = utils.encodeUri("/rooms/$roomId/context/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        });
+
+        const params: Record<string, string | string[]> = {
+            limit: "0",
+        };
+        if (this.clientOpts?.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
+        if (res.event) {
+            // XXX: required to make typescript happy
+            return {
+                ...res,
+                event: res.event,
+            };
+        }
+
+        throw new Error("'event' not in '/context' result - homeserver too old?");
+    }
+
+    /**
      * Get an EventTimeline for the given event
      *
      * <p>If the EventTimelineSet object already has the given event in its store, the
@@ -4482,21 +4519,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.getThreadTimeline(timelineSet, eventId);
         }
 
-        const path = utils.encodeUri("/rooms/$roomId/context/$eventId", {
-            $roomId: timelineSet.room.roomId,
-            $eventId: eventId,
-        });
-
-        let params: Record<string, string | string[]> | undefined = undefined;
-        if (this.clientOpts?.lazyLoadMembers) {
-            params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
-        }
-
-        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
-        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
-        if (!res.event) {
-            throw new Error("'event' not in '/context' result - homeserver too old?");
-        }
+        const res = await this.getEventContext(timelineSet.room.roomId, eventId);
 
         // by the time the request completes, the event might have ended up in the timeline.
         if (timelineSet.getTimelineForEvent(eventId)) {
@@ -4513,19 +4536,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Order events from most recent to oldest (reverse-chronological).
             // We start with the last event, since that's the point at which we have known state.
             // events_after is already backwards; events_before is forwards.
-            ...res.events_after.reverse().map(mapper),
+            ...(res.events_after?.reverse().map(mapper) ?? []),
             event,
-            ...res.events_before.map(mapper),
+            ...(res.events_before?.map(mapper) ?? []),
         ];
 
+        const stateEvents = res.state?.map(mapper) ?? [];
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
         let timeline = timelineSet.getTimelineForEvent(events[0].getId());
         if (timeline) {
-            timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
+            timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(stateEvents);
         } else {
             timeline = timelineSet.addTimeline();
-            timeline.initialiseState(res.state.map(mapper));
-            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
+            timeline.initialiseState(stateEvents);
+            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end ?? null;
         }
 
         const [timelineEvents, threadedEvents, unknownRelations] = timelineSet.room.partitionThreadedEvents(events);
@@ -4558,20 +4582,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("could not get thread timeline: not a thread timeline");
         }
 
-        const path = utils.encodeUri("/rooms/$roomId/context/$eventId", {
-            $roomId: timelineSet.room.roomId,
-            $eventId: eventId,
-        });
+        const res = await this.getEventContext(timelineSet.room.roomId, eventId);
 
-        const params: Record<string, string | string[]> = {
-            limit: "0",
-        };
-        if (this.clientOpts?.lazyLoadMembers) {
-            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
-        }
-
-        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
-        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
 
@@ -4579,6 +4591,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return undefined;
         }
 
+        const stateEvents = res.state?.map(mapper) ?? [];
         const recurse = this.canSupport.get(Feature.RelationsRecursion) !== ServerSupport.Unsupported;
         if (Thread.hasServerSideSupport) {
             if (Thread.hasServerSideFwdPaginationSupport) {
@@ -4617,10 +4630,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
                 let timeline = timelineSet.getTimelineForEvent(event.getId());
                 if (timeline) {
-                    timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
+                    timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(stateEvents);
                 } else {
                     timeline = timelineSet.addTimeline();
-                    timeline.initialiseState(res.state.map(mapper));
+                    timeline.initialiseState(stateEvents);
                 }
 
                 timelineSet.addEventsToTimeline(events, true, false, timeline, resNewer.next_batch);
@@ -4678,7 +4691,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread
                 // summaries.
                 const timeline = timelineSet.getLiveTimeline();
-                timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
+                timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(stateEvents);
 
                 timelineSet.addEventsToTimeline(events, true, false, timeline, null);
                 if (!resOlder.next_batch) {
