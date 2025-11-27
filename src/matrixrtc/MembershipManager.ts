@@ -16,11 +16,7 @@ limitations under the License.
 import { AbortError } from "p-retry";
 
 import { EventType, RelationType } from "../@types/event.ts";
-import {
-    type ISendEventResponse,
-    type SendDelayedEventResponse,
-    UpdateDelayedEventAction,
-} from "../@types/requests.ts";
+import { type ISendEventResponse, type SendDelayedEventResponse } from "../@types/requests.ts";
 import { type EmptyObject } from "../@types/common.ts";
 import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
@@ -169,7 +165,14 @@ function createReplaceActionUpdate(type: MembershipActionType, offset?: number):
 
 type MembershipManagerClient = Pick<
     MatrixClient,
-    "getUserId" | "getDeviceId" | "sendStateEvent" | "_unstable_sendDelayedStateEvent" | "_unstable_updateDelayedEvent"
+    | "getUserId"
+    | "getDeviceId"
+    | "sendStateEvent"
+    | "_unstable_sendDelayedStateEvent"
+    | "_unstable_updateDelayedEvent"
+    | "_unstable_cancelScheduledDelayedEvent"
+    | "_unstable_restartScheduledDelayedEvent"
+    | "_unstable_sendScheduledDelayedEvent"
 >;
 
 /**
@@ -544,7 +547,7 @@ export class MembershipManager
     private async cancelKnownDelayIdBeforeSendDelayedEvent(delayId: string): Promise<ActionUpdate> {
         // Remove all running updates and restarts
         return await this.client
-            ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Cancel)
+            ._unstable_cancelScheduledDelayedEvent(delayId)
             .then(() => {
                 this.state.delayId = undefined;
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
@@ -552,7 +555,7 @@ export class MembershipManager
             })
             .catch((e) => {
                 const repeatActionType = MembershipActionType.SendDelayedEvent;
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "cancelScheduledDelayedEvent");
                 if (update) return update;
 
                 if (this.isNotFoundError(e)) {
@@ -606,10 +609,7 @@ export class MembershipManager
 
         // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
         // to the widget driver this information would get lost. That is why we mimic the AbortError using the race.
-        return await Promise.race([
-            this.client._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Restart),
-            abortPromise,
-        ])
+        return await Promise.race([this.client._unstable_restartScheduledDelayedEvent(delayId), abortPromise])
             .then(() => {
                 // Whenever we successfully restart the delayed event we update the `state.expectedServerDelayLeaveTs`
                 // which stores the predicted timestamp at which the server will send the delayed leave event if there wont be any further
@@ -637,7 +637,7 @@ export class MembershipManager
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
 
                 // TODO this also needs a test: get rate limit while checking id delayed event is scheduled
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "restartScheduledDelayedEvent");
                 if (update) return update;
 
                 // In other error cases we have no idea what is happening
@@ -647,7 +647,7 @@ export class MembershipManager
 
     private async sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(delayId: string): Promise<ActionUpdate> {
         return await this.client
-            ._unstable_updateDelayedEvent(delayId, UpdateDelayedEventAction.Send)
+            ._unstable_sendScheduledDelayedEvent(delayId)
             .then(() => {
                 this.state.hasMemberStateEvent = false;
                 this.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
@@ -661,7 +661,7 @@ export class MembershipManager
                     this.state.delayId = undefined;
                     return createInsertActionUpdate(repeatActionType);
                 }
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "updateDelayedEvent");
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "sendScheduledDelayedEvent");
                 if (update) return update;
 
                 // On any other error we fall back to SendLeaveEvent (this includes hard errors from rate limiting)

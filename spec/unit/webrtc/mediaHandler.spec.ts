@@ -61,10 +61,10 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 audio: expect.objectContaining({
-                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    deviceId: { exact: FAKE_AUDIO_INPUT_ID },
                 }),
                 video: expect.objectContaining({
-                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    deviceId: { exact: FAKE_VIDEO_INPUT_ID },
                 }),
             }),
         );
@@ -77,7 +77,7 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 audio: expect.objectContaining({
-                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    deviceId: { exact: FAKE_AUDIO_INPUT_ID },
                 }),
             }),
         );
@@ -109,7 +109,7 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 video: expect.objectContaining({
-                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    deviceId: { exact: FAKE_VIDEO_INPUT_ID },
                 }),
             }),
         );
@@ -122,10 +122,10 @@ describe("Media Handler", function () {
         expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
             expect.objectContaining({
                 audio: expect.objectContaining({
-                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    deviceId: { exact: FAKE_AUDIO_INPUT_ID },
                 }),
                 video: expect.objectContaining({
-                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    deviceId: { exact: FAKE_VIDEO_INPUT_ID },
                 }),
             }),
         );
@@ -330,6 +330,80 @@ describe("Media Handler", function () {
             const stream = await mediaHandler.getUserMediaStream(true, false);
 
             expect(stream.getVideoTracks().length).toEqual(0);
+        });
+
+        it("falls back to ideal deviceId when exact deviceId fails", async () => {
+            // First call with exact should fail
+            mockMediaDevices.getUserMedia
+                .mockRejectedValueOnce(new Error("OverconstrainedError"))
+                .mockImplementation((constraints: MediaStreamConstraints) => {
+                    const stream = new MockMediaStream("local_stream");
+                    if (constraints.audio) {
+                        const track = new MockMediaStreamTrack("audio_track", "audio");
+                        track.settings = { deviceId: FAKE_AUDIO_INPUT_ID };
+                        stream.addTrack(track);
+                    }
+                    return Promise.resolve(stream.typed());
+                });
+
+            const stream = await mediaHandler.getUserMediaStream(true, false);
+
+            // Should have been called twice: once with exact, once with ideal
+            expect(mockMediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+            expect(mockMediaDevices.getUserMedia).toHaveBeenNthCalledWith(
+                1,
+                expect.objectContaining({
+                    audio: expect.objectContaining({
+                        deviceId: { exact: FAKE_AUDIO_INPUT_ID },
+                    }),
+                }),
+            );
+            expect(mockMediaDevices.getUserMedia).toHaveBeenNthCalledWith(
+                2,
+                expect.objectContaining({
+                    audio: expect.objectContaining({
+                        deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                    }),
+                }),
+            );
+            expect(stream).toBeTruthy();
+        });
+
+        it("falls back to ideal deviceId for video when exact fails", async () => {
+            // First call with exact should fail
+            mockMediaDevices.getUserMedia
+                .mockRejectedValueOnce(new Error("OverconstrainedError"))
+                .mockImplementation((constraints: MediaStreamConstraints) => {
+                    const stream = new MockMediaStream("local_stream");
+                    if (constraints.video) {
+                        const track = new MockMediaStreamTrack("video_track", "video");
+                        track.settings = { deviceId: FAKE_VIDEO_INPUT_ID };
+                        stream.addTrack(track);
+                    }
+                    return Promise.resolve(stream.typed());
+                });
+
+            const stream = await mediaHandler.getUserMediaStream(false, true);
+
+            // Should have been called twice: once with exact, once with ideal
+            expect(mockMediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+            expect(mockMediaDevices.getUserMedia).toHaveBeenNthCalledWith(
+                1,
+                expect.objectContaining({
+                    video: expect.objectContaining({
+                        deviceId: { exact: FAKE_VIDEO_INPUT_ID },
+                    }),
+                }),
+            );
+            expect(mockMediaDevices.getUserMedia).toHaveBeenNthCalledWith(
+                2,
+                expect.objectContaining({
+                    video: expect.objectContaining({
+                        deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                    }),
+                }),
+            );
+            expect(stream).toBeTruthy();
         });
     });
 

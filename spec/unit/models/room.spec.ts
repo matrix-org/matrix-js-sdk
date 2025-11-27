@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Direction, type MatrixClient, MatrixEvent, Room } from "../../../src";
+import { Direction, EventType, type MatrixClient, MatrixEvent, Room } from "../../../src";
 import type { MockedObject } from "jest-mock";
 
 const CREATOR_USER_ID = "@creator:example.org";
@@ -183,6 +183,73 @@ describe("Room", () => {
             await room.addLiveEvents([leaveEvent], { addToState: true });
 
             expectRedacted(messageEvents, room, false);
+        });
+    });
+
+    it("should ignore invalid m.room.name events", async () => {
+        const mockClient = createMockClient();
+        const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+        const invalidNameEvent = new MatrixEvent({
+            type: EventType.RoomName,
+            content: {
+                name: { invalid: 123 },
+            },
+            state_key: "",
+            event_id: "$123",
+            room_id: room.roomId,
+            sender: CREATOR_USER_ID,
+        });
+
+        // Set up the room
+        room.currentState.setStateEvents([invalidNameEvent]);
+        room.recalculate();
+
+        expect(room.name).toEqual("Empty room");
+    });
+
+    describe("getAltAliases()", () => {
+        it("should ignore invalid events", async () => {
+            const mockClient = createMockClient();
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+            const invalidAliasEvent = new MatrixEvent({
+                type: EventType.RoomCanonicalAlias,
+                content: {
+                    alt_aliases: [123, "#foo:bar"],
+                },
+                state_key: "",
+                event_id: "$123",
+                room_id: room.roomId,
+                sender: CREATOR_USER_ID,
+            });
+
+            // Set up the room
+            room.currentState.setStateEvents([invalidAliasEvent]);
+            room.recalculate();
+
+            expect(room.getAltAliases()).toEqual(["#foo:bar"]);
+        });
+    });
+
+    describe("calculateRoomName()", () => {
+        it("should ignore empty m.room.name 'name' field", async () => {
+            const mockClient = createMockClient();
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+            const event = new MatrixEvent({
+                type: EventType.RoomName,
+                content: {
+                    name: "",
+                },
+                state_key: "",
+                event_id: "$123",
+                room_id: room.roomId,
+                sender: CREATOR_USER_ID,
+            });
+
+            // Set up the room
+            room.currentState.setStateEvents([event]);
+            room.recalculate();
+
+            expect(room.name).not.toEqual("");
         });
     });
 });

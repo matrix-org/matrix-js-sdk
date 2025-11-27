@@ -34,6 +34,8 @@ export default {
         "ts-node",
         // Used by `@babel/plugin-transform-runtime`
         "@babel/runtime",
+        // Transitive dep of jest
+        "jsdom",
     ],
     ignoreBinaries: [
         // Used when available by reusable workflow `.github/workflows/release-make.yml`

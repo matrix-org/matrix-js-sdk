@@ -37,7 +37,7 @@ import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
-    type UpdateDelayedEventAction,
+    UpdateDelayedEventAction,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -459,8 +459,12 @@ export class RoomWidgetClient extends MatrixClient {
 
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
+     * @deprecated Instead use one of:
+     * - {@link _unstable_cancelScheduledDelayedEvent}
+     * - {@link _unstable_restartScheduledDelayedEvent}
+     * - {@link _unstable_sendScheduledDelayedEvent}
      */
-    // eslint-disable-next-line
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -469,7 +473,67 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        await this.widgetApi.updateDelayedEvent(delayId, action).catch(timeoutToConnectionError);
+        let updateDelayedEvent: (delayId: string) => Promise<unknown>;
+        switch (action) {
+            case UpdateDelayedEventAction.Cancel:
+                updateDelayedEvent = this.widgetApi.cancelScheduledDelayedEvent;
+                break;
+            case UpdateDelayedEventAction.Restart:
+                updateDelayedEvent = this.widgetApi.cancelScheduledDelayedEvent;
+                break;
+            case UpdateDelayedEventAction.Send:
+                updateDelayedEvent = this.widgetApi.sendScheduledDelayedEvent;
+                break;
+        }
+        await updateDelayedEvent.call(this.widgetApi, delayId).catch(timeoutToConnectionError);
+        return {};
+    }
+
+    /**
+     * @experimental This currently relies on an unstable MSC (MSC4140).
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "cancelScheduledDelayedEvent",
+            );
+        }
+
+        await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        return {};
+    }
+
+    /**
+     * @experimental This currently relies on an unstable MSC (MSC4140).
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_restartScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "restartScheduledDelayedEvent",
+            );
+        }
+
+        await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        return {};
+    }
+
+    /**
+     * @experimental This currently relies on an unstable MSC (MSC4140).
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_sendScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "sendScheduledDelayedEvent",
+            );
+        }
+
+        await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
         return {};
     }
 
