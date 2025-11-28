@@ -2151,6 +2151,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
         return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
     }
+
     /**
      * Handles the receipt of a to-device message, specifically for processing
      * "io.element.msc4268.room_key_bundle" message types.
@@ -2166,7 +2167,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const { message, encryptionInfo } = payload;
         const claimedSender = encryptionInfo?.sender ?? message.sender;
 
-        // Validate room ID
         const roomId = message.content.room_id;
         if (typeof roomId !== "string") {
             return;

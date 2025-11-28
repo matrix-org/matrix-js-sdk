@@ -256,7 +256,7 @@ describe("History Sharing", () => {
         });
         await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
 
-        // Bob receives and attempts decrypts the megolm message, but should not be able to.
+        // Bob receives and attempts to decrypt the megolm message, but should not be able to (yet).
         const bobSyncResponse = getSyncResponse([aliceClient.getSafeUserId(), bobClient.getSafeUserId()], ROOM_ID);
         bobSyncResponse.rooms.join[ROOM_ID].timeline.events.push(
             mkEventCustom({
@@ -274,7 +274,7 @@ describe("History Sharing", () => {
         await event.getDecryptionPromise();
         expect(event.isDecryptionFailure()).toBeTruthy();
 
-        // Now the room key bundle arrives
+        // Now the room key bundle message arrives
         fetchMock.getOnce(
             `begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`,
             { body: uploadedBlob },
