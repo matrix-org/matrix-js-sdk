@@ -1,3 +1,11 @@
+Changes in [39.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.3.0) (2025-12-02)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Re-add truthy check on room name/avatar/alias events ([#5081](https://github.com/matrix-org/matrix-js-sdk/pull/5081)). Contributed by @t3chguy.
+* Fix invalid state events corrupting room objects ([#5078](https://github.com/matrix-org/matrix-js-sdk/pull/5078)). Contributed by @t3chguy.
+
+
 Changes in [39.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.2.0) (2025-11-18)
 ==================================================================================================
 ## ✨ Features
