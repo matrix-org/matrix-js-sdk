@@ -40,10 +40,8 @@ export type MembershipManagerEventHandlerMap = {
  *
  * @internal
  */
-export interface IMembershipManager extends TypedEventEmitter<
-    MembershipManagerEvent,
-    MembershipManagerEventHandlerMap
-> {
+export interface IMembershipManager
+    extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap> {
     /**
      * If we are trying to join, or have successfully joined the session.
      * It does not reflect if the room state is already configured to represent us being joined.

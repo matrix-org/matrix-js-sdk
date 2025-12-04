@@ -20,10 +20,8 @@ import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
  */
-export interface VerificationRequest extends TypedEventEmitter<
-    VerificationRequestEvent,
-    VerificationRequestEventHandlerMap
-> {
+export interface VerificationRequest
+    extends TypedEventEmitter<VerificationRequestEvent, VerificationRequestEventHandlerMap> {
     /**
      * Unique ID for this verification request.
      *
