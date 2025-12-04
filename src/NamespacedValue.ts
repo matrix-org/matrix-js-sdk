@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Optional } from "matrix-events-sdk";
-
 /**
  * Represents a simple Matrix namespaced value. This will assume that if a stable prefix
  * is provided that the stable prefix should be used when representing the identifier.
@@ -62,7 +60,7 @@ export class NamespacedValue<S extends string, U extends string> {
 
     // this desperately wants https://github.com/microsoft/TypeScript/pull/26349 at the top level of the class
     // so we can instantiate `NamespacedValue<string, _, _>` as a default type for that namespace.
-    public findIn<T>(obj: any): Optional<T> {
+    public findIn<T>(obj: any): T | undefined {
         let val: T | undefined = undefined;
         if (this.name) {
             val = obj?.[this.name];

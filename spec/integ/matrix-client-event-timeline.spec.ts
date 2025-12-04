@@ -672,7 +672,7 @@ describe("MatrixClient event timelines", function () {
             expect(timeline!.getEvents().find((e) => e.getId() === THREAD_ROOT.event_id!)).toBeTruthy();
         });
 
-        it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
+        it("should return null when event is not in the thread that the given timelineSet is representing", () => {
             // @ts-ignore
             client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
@@ -696,12 +696,12 @@ describe("MatrixClient event timelines", function () {
                 });
 
             return Promise.all([
-                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id!)).resolves.toBeUndefined(),
+                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id!)).resolves.toBeNull(),
                 httpBackend.flushAllExpected(),
             ]);
         });
 
-        it("should return undefined when event is within a thread but timelineSet is not", () => {
+        it("should return null when event is within a thread but timelineSet is not", () => {
             // @ts-ignore
             client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
@@ -723,7 +723,7 @@ describe("MatrixClient event timelines", function () {
                 });
 
             return Promise.all([
-                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!)).resolves.toBeUndefined(),
+                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!)).resolves.toBeNull(),
                 httpBackend.flushAllExpected(),
             ]);
         });

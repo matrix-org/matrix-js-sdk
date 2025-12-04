@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Optional } from "matrix-events-sdk";
-
 import { ExtensibleEvent } from "./ExtensibleEvent.ts";
 import {
     type ExtensibleEventType,
@@ -46,7 +44,7 @@ export class MessageEvent extends ExtensibleEvent<ExtensibleAnyMessageEventConte
     /**
      * The default HTML for the event, if provided.
      */
-    public readonly html: Optional<string>;
+    public readonly html?: string;
 
     /**
      * All the different renderings of the message. Note that this is the same
@@ -82,7 +80,7 @@ export class MessageEvent extends ExtensibleEvent<ExtensibleAnyMessageEventConte
             this.renderings = mmessage;
         } else if (isOptionalAString(mtext)) {
             this.text = mtext;
-            this.html = mhtml;
+            this.html = mhtml ?? undefined;
             this.renderings = [{ body: mtext, mimetype: "text/plain" }];
             if (this.html) {
                 this.renderings.push({ body: this.html, mimetype: "text/html" });

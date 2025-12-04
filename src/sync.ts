@@ -23,8 +23,6 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
-import { type Optional } from "matrix-events-sdk";
-
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
 import { User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
@@ -208,7 +206,7 @@ export class SyncApi {
     private readonly opts: IStoredClientOpts;
     private readonly syncOpts: SyncApiOptions;
 
-    private _peekRoom: Optional<Room> = null;
+    private _peekRoom: Room | null = null;
     private currentSyncRequest?: Promise<ISyncResponse>;
     private abortController?: AbortController;
     private syncState: SyncState | null = null;

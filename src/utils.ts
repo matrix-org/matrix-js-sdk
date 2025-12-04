@@ -20,7 +20,6 @@ limitations under the License.
 
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
-import { type Optional } from "matrix-events-sdk";
 
 import { type IEvent, type MatrixEvent } from "./models/event.ts";
 import { M_TIMESTAMP } from "./@types/location.ts";
@@ -115,7 +114,7 @@ export function decodeParams(query: string): Record<string, string | string[]> {
  * variables with. E.g. `{ "$bar": "baz" }`.
  * @returns The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string, variables: Record<string, Optional<string>>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, string | null | undefined>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
