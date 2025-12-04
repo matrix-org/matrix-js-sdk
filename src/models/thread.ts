@@ -474,7 +474,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    public async processEvent(event: MatrixEvent | undefined): Promise<void> {
+    public async processEvent(event: MatrixEvent | null | undefined): Promise<void> {
         if (event) {
             this.setEventMetadata(event);
             await this.fetchEditsWhereNeeded(event);
@@ -684,14 +684,14 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    public setEventMetadata(event: MatrixEvent | undefined): void {
+    public setEventMetadata(event: MatrixEvent | null | undefined): void {
         if (event) {
             EventTimeline.setEventMetadata(event, this.roomState, false);
             event.setThread(this);
         }
     }
 
-    public clearEventMetadata(event: MatrixEvent): void {
+    public clearEventMetadata(event: MatrixEvent | null | undefined): void {
         if (event) {
             event.setThread(undefined);
             delete event.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
