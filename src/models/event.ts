@@ -19,7 +19,7 @@ limitations under the License.
  * the public classes.
  */
 
-import { type ExtensibleEvent, ExtensibleEvents, type Optional } from "matrix-events-sdk";
+import { type ExtensibleEvent, ExtensibleEvents } from "matrix-events-sdk";
 
 import type { IEventDecryptionResult } from "../@types/crypto.ts";
 import { logger } from "../logger.ts";
@@ -270,7 +270,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     // addition to a falsy cached event value. We check the flag later on in
     // a public getter to decide if the cache is valid.
     private _hasCachedExtEv = false;
-    private _cachedExtEv: Optional<ExtensibleEvent> = undefined;
+    private _cachedExtEv?: ExtensibleEvent = undefined;
 
     /** If we failed to decrypt this event, the reason for the failure. Otherwise, `null`. */
     private _decryptionFailureReason: DecryptionFailureCode | null = null;
@@ -481,9 +481,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @deprecated Use stable functions where possible.
      */
-    public get unstableExtensibleEvent(): Optional<ExtensibleEvent> {
+    public get unstableExtensibleEvent(): ExtensibleEvent | undefined {
         if (!this._hasCachedExtEv) {
-            this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent());
+            this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent()) ?? undefined;
         }
         return this._cachedExtEv;
     }
@@ -789,7 +789,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns The user's room membership, or `undefined` if the server does
      *   not report it.
      */
-    public getMembershipAtEvent(): Optional<Membership | string> {
+    public getMembershipAtEvent(): Membership | string | undefined {
         const unsigned = this.getUnsigned();
         return UNSIGNED_MEMBERSHIP_FIELD.findIn<Membership | string>(unsigned);
     }

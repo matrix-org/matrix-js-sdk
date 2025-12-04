@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, type Optional, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, M_POLL_START, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise, type IMessageOpts } from "../test-utils/test-utils";
@@ -197,8 +197,8 @@ describe("Room", function () {
 
     const addRoomThreads = (
         room: Room,
-        thread1EventTs: Optional<number>,
-        thread2EventTs: Optional<number>,
+        thread1EventTs?: number,
+        thread2EventTs?: number,
     ): { thread1?: Thread; thread2?: Thread } => {
         const result: { thread1?: Thread; thread2?: Thread } = {};
 
@@ -4159,7 +4159,7 @@ describe("Room", function () {
         });
 
         it("when there is only one thread, it should return this one", () => {
-            const { thread1 } = addRoomThreads(room, 23, null);
+            const { thread1 } = addRoomThreads(room, 23);
             expect(room.getLastThread()).toBe(thread1);
         });
 

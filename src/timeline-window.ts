@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Optional } from "matrix-events-sdk";
-
 import { type Direction, EventTimeline } from "./models/event-timeline.ts";
 import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
@@ -105,7 +103,7 @@ export class TimelineWindow {
     public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
-        const initFields = (timeline: Optional<EventTimeline>): void => {
+        const initFields = (timeline: EventTimeline | null): void => {
             if (!timeline) {
                 throw new Error("No timeline given to initFields");
             }

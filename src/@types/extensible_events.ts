@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type EitherAnd, NamespacedValue, type Optional, UnstableValue } from "matrix-events-sdk";
+import { type EitherAnd, NamespacedValue, UnstableValue } from "matrix-events-sdk";
 
 import { isProvided } from "../extensible_events_v1/utilities.ts";
 
@@ -125,10 +125,7 @@ export type ExtensibleEventType = NamespacedValue<string, string> | string;
  * @param expected - The expected event type.
  * @returns True if the given type matches the expected type.
  */
-export function isEventTypeSame(
-    given: Optional<ExtensibleEventType>,
-    expected: Optional<ExtensibleEventType>,
-): boolean {
+export function isEventTypeSame(given: ExtensibleEventType | null, expected: ExtensibleEventType | null): boolean {
     if (typeof given === "string") {
         if (typeof expected === "string") {
             return expected === given;

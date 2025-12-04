@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_START, type Optional } from "matrix-events-sdk";
+import { M_POLL_START } from "matrix-events-sdk";
 
 import {
     DuplicateStrategy,
@@ -1196,7 +1196,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Get the main TimelineSet
         const timelineSet = this.getUnfilteredTimelineSet();
 
-        let newTimeline: Optional<EventTimeline>;
+        let newTimeline: EventTimeline | null = null;
         // If there isn't any event in the timeline, let's go fetch the latest
         // event and construct a timeline from it.
         //
@@ -2490,7 +2490,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     };
 
     private updateThreadRootEvent = (
-        timelineSet: Optional<EventTimelineSet>,
+        timelineSet: EventTimelineSet | undefined,
         thread: Thread,
         toStartOfTimeline: boolean,
         recreateEvent: boolean,

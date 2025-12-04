@@ -71,7 +71,7 @@ Unless otherwise specified, the following applies to all code:
 11. If a variable is not receiving a value on declaration, its type must be defined.
 
     ```typescript
-    let errorMessage: Optional<string>;
+    let errorMessage: string;
     ```
 
 12. Objects can use shorthand declarations, including mixing of types.
@@ -150,8 +150,7 @@ Unless otherwise specified, the following applies to all code:
     1. When using `any`, a comment explaining why must be present.
 27. `import` should be used instead of `require`, as `require` does not have types.
 28. Export only what can be reused.
-29. Prefer a type like `Optional<X>` (`type Optional<T> = T | null | undefined`) instead
-    of truly optional parameters.
+29. Prefer a type like `X | null` instead of truly optional parameters.
     1. A notable exception is when the likelihood of a bug is minimal, such as when a function
        takes an argument that is more often not required than required. An example where the
        `?` operator is inappropriate is when taking a room ID: typically the caller should
@@ -161,7 +160,7 @@ Unless otherwise specified, the following applies to all code:
         ```typescript
         function doThingWithRoom(
             thing: string,
-            room: Optional<string>, // require the caller to specify
+            room: string | null, // require the caller to specify
         ) {
             // ...
         }

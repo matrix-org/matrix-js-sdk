@@ -18,8 +18,6 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { type Optional } from "matrix-events-sdk";
-
 import type { IDeviceKeys, IOneTimeKey } from "./@types/crypto.ts";
 import { type ISyncStateData, type SetPresence, SyncApi, type SyncApiOptions, SyncState } from "./sync.ts";
 import {
@@ -4501,7 +4499,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves:
      *    {@link EventTimeline} including the given event
      */
-    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<Optional<EventTimeline>> {
+    public async getEventTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | null> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error(
@@ -4519,7 +4517,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (timelineSet.thread && this.supportsThreads()) {
-            return this.getThreadTimeline(timelineSet, eventId);
+            return (await this.getThreadTimeline(timelineSet, eventId)) ?? null;
         }
 
         const res = await this.getEventContext(timelineSet.room.roomId, eventId);
@@ -4533,7 +4531,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const event = mapper(res.event);
         if (event.isRelation(THREAD_RELATION_TYPE.name)) {
             this.logger.warn("Tried loading a regular timeline at the position of a thread event");
-            return undefined;
+            return null;
         }
         const events = [
             // Order events from most recent to oldest (reverse-chronological).
@@ -4665,7 +4663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     { dir: Direction.Backward, from: res.start, recurse: recurse || undefined },
                 );
                 const eventsNewer: IEvent[] = [];
-                let nextBatch: Optional<string> = res.end;
+                let nextBatch = res.end;
                 while (nextBatch) {
                     const resNewer: IRelationsResponse = await this.fetchRelations(
                         timelineSet.room.roomId,
@@ -4674,7 +4672,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         null,
                         { dir: Direction.Forward, from: nextBatch, recurse: recurse || undefined },
                     );
-                    nextBatch = resNewer.next_batch ?? null;
+                    nextBatch = resNewer.next_batch;
                     eventsNewer.push(...resNewer.chunk);
                 }
                 const events = [
@@ -4718,7 +4716,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves:
      *    {@link EventTimeline} timeline with the latest events in the room
      */
-    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<Optional<EventTimeline>> {
+    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline | null> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error(
