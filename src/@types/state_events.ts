@@ -106,7 +106,7 @@ export interface RoomPinnedEventsEventContent {
 
 export interface RoomEncryptionEventContent {
     "algorithm": "m.megolm.v1.aes-sha2";
-    "io.element.msc3414.encrypt_state_events"?: boolean;
+    "io.element.msc4362.encrypt_state_events"?: boolean;
     "rotation_period_ms"?: number;
     "rotation_period_msgs"?: number;
 }
