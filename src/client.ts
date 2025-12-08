@@ -2406,7 +2406,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const roomId = res.room_id;
         if (opts.acceptSharedHistory && inviter && this.cryptoBackend) {
-            await this.cryptoBackend.maybeAcceptKeyBundle(roomId, inviter);
+            // Try to accept the room key bundle specified in a `m.room_key_bundle` to-device message we (might have) already received.
+            const bundleDownloaded = await this.cryptoBackend.maybeAcceptKeyBundle(roomId, inviter);
+            // If this fails, i.e. we haven't received this message yet, we need to wait until the to-device message arrives.
+            if (!bundleDownloaded) {
+                this.cryptoBackend.markRoomAsPendingKeyBundle(roomId, inviter);
+            }
         }
 
         // In case we were originally given an alias, check the room cache again
