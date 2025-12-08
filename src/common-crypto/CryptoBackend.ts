@@ -101,7 +101,7 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      * the inviter's ID.
      *
      * @param roomId - The room we were invited to, for which we did not receive a key bundle before accepting the invite.
-     * @param inviterId - The user who invited us to the room and is expected to have sent the room key bundle.
+     * @param inviterId - The user who invited us to the room and is expected to send the room key bundle.
      */
     markRoomAsPendingKeyBundle(roomId: string, inviterId: string): void;
 }

@@ -130,7 +130,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
     /** mapping of room ID -> inviter ID for rooms pending MSC4268 key bundles */
-    private readonly roomsPendingKeyBundles: Record<string, string> = {};
+    private readonly roomsPendingKeyBundles: Map<string, string> = new Map();
 
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
@@ -401,7 +401,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
      */
     public markRoomAsPendingKeyBundle(roomId: string, inviter: string): void {
-        this.roomsPendingKeyBundles[roomId] = inviter;
+        this.roomsPendingKeyBundles.set(roomId, inviter);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1725,19 +1725,22 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                     // received a new room key bundle that we might be able to download.
                     if (
                         isRoomKeyBundleMessage(parsedMessage) &&
-                        !!this.roomsPendingKeyBundles[parsedMessage.content.room_id]
+                        this.roomsPendingKeyBundles.has(parsedMessage.content.room_id)
                     ) {
                         // No `await`-ing here, as this is called from inside the `/sync` loop.
                         this.maybeAcceptKeyBundle(
                             parsedMessage.content.room_id,
-                            this.roomsPendingKeyBundles[parsedMessage.content.room_id],
+                            this.roomsPendingKeyBundles.get(parsedMessage.content.room_id)!,
                         ).then(
                             (success) => {
                                 if (success) {
-                                    delete this.roomsPendingKeyBundles[parsedMessage.content.room_id];
+                                    this.roomsPendingKeyBundles.delete(parsedMessage.content.room_id);
                                 }
                             },
                             (err) => {
+                                this.logger.error(
+                                    `Error attempting to download key bundle for room ${parsedMessage.content.room_id}`,
+                                );
                                 this.logger.error(err);
                             },
                         );
