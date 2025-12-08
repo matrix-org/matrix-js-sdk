@@ -98,7 +98,7 @@ function createLinkedTimelines(): [EventTimeline, EventTimeline] {
 describe("TimelineIndex", function () {
     beforeEach(() => {
         jest.clearAllMocks();
-        mockClient.getEventTimeline.mockResolvedValue(undefined);
+        mockClient.getEventTimeline.mockResolvedValue(null);
     });
 
     describe("minIndex", function () {
@@ -193,7 +193,7 @@ describe("TimelineWindow", function () {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockClient.getEventTimeline.mockResolvedValue(undefined);
+        mockClient.getEventTimeline.mockResolvedValue(null);
         mockClient.paginateEventTimeline.mockResolvedValue(false);
     });
 

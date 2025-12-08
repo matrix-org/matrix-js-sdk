@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Optional } from "matrix-events-sdk";
-
 import { type MatrixClient, PendingEventOrdering } from "../client.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { RelationType } from "../@types/event.ts";
@@ -476,7 +474,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    public async processEvent(event: Optional<MatrixEvent>): Promise<void> {
+    public async processEvent(event: MatrixEvent | null | undefined): Promise<void> {
         if (event) {
             this.setEventMetadata(event);
             await this.fetchEditsWhereNeeded(event);
@@ -686,14 +684,14 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         }
     }
 
-    public setEventMetadata(event: Optional<MatrixEvent>): void {
+    public setEventMetadata(event: MatrixEvent | null | undefined): void {
         if (event) {
             EventTimeline.setEventMetadata(event, this.roomState, false);
             event.setThread(this);
         }
     }
 
-    public clearEventMetadata(event: Optional<MatrixEvent>): void {
+    public clearEventMetadata(event: MatrixEvent | null | undefined): void {
         if (event) {
             event.setThread(undefined);
             delete event.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
@@ -739,7 +737,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * A getter for the last event of the thread.
      * This might be a synthesized event, if so, it will not emit any events to listeners.
      */
-    public get replyToEvent(): Optional<MatrixEvent> {
+    public get replyToEvent(): MatrixEvent | null {
         return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
     }
 

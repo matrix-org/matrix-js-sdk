@@ -75,13 +75,14 @@ jobs:
 
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
-              uses: matrix-org/sonarcloud-workflow-action@820f7c2e9e94ba9e35add0f739691e5c7e23fa25 # v4.0
+              uses: matrix-org/sonarcloud-workflow-action@035ca8a2a741dd940f2e6c16d7d078312d625ac6 # v4.0
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
                   skip_checkout: true
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
+                  skip_coverage_label: Z-Skip-Coverage
                   version_cmd: "cat package.json | jq -r .version"
                   branch: ${{ github.event.workflow_run.head_branch }}
                   revision: ${{ github.event.workflow_run.head_sha }}
