@@ -130,7 +130,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
     /** mapping of room ID -> inviter ID for rooms pending MSC4268 key bundles */
-    private roomsPendingKeyBundles: Set<string> = new Set();
+    private readonly roomsPendingKeyBundles: Record<string, string> = {};
 
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
@@ -335,7 +335,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<boolean> {
         // TODO: retry this if it gets interrupted or it fails. (https://github.com/matrix-org/matrix-rust-sdk/issues/5112)
         // TODO: do this in the background.
-        // TODO: handle the bundle message arriving after the invite (https://github.com/element-hq/element-web/issues/30740)
 
         const logger = new LogSpan(this.logger, `maybeAcceptKeyBundle(${roomId}, ${inviter})`);
 
@@ -401,8 +400,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
      */
-    public markRoomAsPendingKeyBundle(roomId: string): void {
-        this.roomsPendingKeyBundles.add(roomId);
+    public markRoomAsPendingKeyBundle(roomId: string, inviter: string): void {
+        this.roomsPendingKeyBundles[roomId] = inviter;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1716,6 +1715,34 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                             senderVerified: encryptionInfo.isSenderVerified(),
                         },
                     });
+
+                    // If we have received a room key bundle message, and have previously marked the room
+                    // IDs it references as pending key bundles, tell the Rust SDK to try and accept it,
+                    // just in case it was received after invite.
+                    //
+                    // We don't actually need to validate the contents of the bundle message, or do
+                    // anything with its contents at all. We simply want to inform the Rust SDK we have
+                    // received a new room key bundle that we might be able to download.
+                    if (
+                        isRoomKeyBundleMessage(parsedMessage) &&
+                        !!this.roomsPendingKeyBundles[parsedMessage.content.room_id]
+                    ) {
+                        // No `await`-ing here, as this is called from inside the `/sync` loop.
+                        this.maybeAcceptKeyBundle(
+                            parsedMessage.content.room_id,
+                            this.roomsPendingKeyBundles[parsedMessage.content.room_id],
+                        ).then(
+                            (success) => {
+                                if (success) {
+                                    delete this.roomsPendingKeyBundles[parsedMessage.content.room_id];
+                                }
+                            },
+                            (err) => {
+                                this.logger.error(err);
+                            },
+                        );
+                    }
+
                     break;
                 }
                 case RustSdkCryptoJs.ProcessedToDeviceEventType.PlainText: {
@@ -1731,21 +1758,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 case RustSdkCryptoJs.ProcessedToDeviceEventType.Invalid:
                     // ignore invalid messages
                     break;
-            }
-        }
-
-        // If any of the received events are room key bundle messages, and we have previously
-        // marked the room IDs they referenced as pending key bundles, tell the Rust SDK to
-        // try and accept them, just in case they were received after invite.
-        //
-        // We don't actually need to validate the contents of the bundle message, since the
-        // Rust SDK does that for us when it process it during the above `receiveSyncChanges`.
-        for (const payload of received
-            .filter(isRoomKeyBundleMessage)
-            .filter((payload) => this.roomsPendingKeyBundles.has(payload.message.content.room_id))) {
-            const success = await this.maybeAcceptKeyBundle(payload.message.content.room_id, payload.message.sender);
-            if (success) {
-                this.roomsPendingKeyBundles.delete(payload.message.content.room_id);
             }
         }
 
@@ -2496,15 +2508,10 @@ function rustEncryptionInfoToJsEncryptionInfo(
     return { shieldColour, shieldReason };
 }
 
-type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
-type RustCryptoEvents = Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>;
-
 interface RoomKeyBundleMessage {
-    message: {
-        type: "io.element.msc4268.room_key_bundle";
-        content: {
-            room_id: string;
-        };
+    type: "io.element.msc4268.room_key_bundle";
+    content: {
+        room_id: string;
     };
 }
 
@@ -2514,14 +2521,12 @@ interface RoomKeyBundleMessage {
  * A RoomKeyBundleMessage is identified by having a specific message type
  * ("io.element.msc4268.room_key_bundle") and a valid room_id in its content.
  *
- * @param payload - The received to-device message to check.
+ * @param message - The received to-device message to check.
  * @returns True if the payload matches the RoomKeyBundleMessage structure, false otherwise.
  */
-function isRoomKeyBundleMessage(
-    payload: ReceivedToDeviceMessage,
-): payload is ReceivedToDeviceMessage & RoomKeyBundleMessage {
-    return (
-        payload.message.type === "io.element.msc4268.room_key_bundle" &&
-        typeof payload.message.content.room_id === "string"
-    );
+function isRoomKeyBundleMessage(message: IToDeviceEvent): message is IToDeviceEvent & RoomKeyBundleMessage {
+    return message.type === "io.element.msc4268.room_key_bundle" && typeof message.content.room_id === "string";
 }
+
+type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
+type RustCryptoEvents = Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>;

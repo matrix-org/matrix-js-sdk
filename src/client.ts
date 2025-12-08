@@ -2412,7 +2412,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const bundleDownloaded = await this.cryptoBackend.maybeAcceptKeyBundle(roomId, inviter);
             // If this fails, i.e. we haven't received this message yet, we need to wait until the to-device message arrives.
             if (!bundleDownloaded) {
-                this.cryptoBackend.markRoomAsPendingKeyBundle(roomId);
+                this.cryptoBackend.markRoomAsPendingKeyBundle(roomId, inviter);
             }
         }
 
