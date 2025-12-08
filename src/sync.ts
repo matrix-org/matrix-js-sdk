@@ -26,7 +26,7 @@ limitations under the License.
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
 import { User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
-import { deepCopy, noUnsafeEventProps, promiseMapSeries, unsafeProp } from "./utils.ts";
+import { deepCopy, noUnsafeEventProps, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
 import { type Logger } from "./logger.ts";
