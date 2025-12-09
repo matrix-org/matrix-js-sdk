@@ -3002,9 +3002,9 @@ export function supportsMatrixCall(): boolean {
     try {
         const supported = Boolean(
             window.RTCPeerConnection ??
-                window.RTCSessionDescription ??
-                window.RTCIceCandidate ??
-                navigator.mediaDevices,
+            window.RTCSessionDescription ??
+            window.RTCIceCandidate ??
+            navigator.mediaDevices,
         );
         if (!supported) {
             /* istanbul ignore if */ // Adds a lot of noise to test runs, so disable logging there.
