@@ -6933,7 +6933,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        // Check if the event is excluded under MSC3414
+        // Check if the event is excluded under MSC4362
         if (
             [
                 "m.room.create",

@@ -82,7 +82,7 @@ export function getSyncResponse(
                     state_key: "",
                     content: {
                         "algorithm": "m.megolm.v1.aes-sha2",
-                        "io.element.msc3414.encrypt_state_events": encryptStateEvents,
+                        "io.element.msc4362.encrypt_state_events": encryptStateEvents,
                     },
                 }),
             ],
