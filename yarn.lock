@@ -1253,10 +1253,10 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
-"@casualbot/jest-sonar-reporter@2.2.7":
-  version "2.2.7"
-  resolved "https://registry.yarnpkg.com/@casualbot/jest-sonar-reporter/-/jest-sonar-reporter-2.2.7.tgz#3cc14c64f5d8ab5e9163b03b9cd2e07456432ed0"
-  integrity sha512-iswhPNodtcOQzfXR3TkD0A/8yHr5fnC86Ryt5UAqrJWfMI8mPZ9mpjykHnibbf91SjNtELv7ApZtha0bdWOmoQ==
+"@casualbot/jest-sonar-reporter@2.5.0":
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/@casualbot/jest-sonar-reporter/-/jest-sonar-reporter-2.5.0.tgz#1c5efc189d57422300034b3551287321ac4d093f"
+  integrity sha512-2/kaSndRYHPqxrnWLszHCzKD5kkmoDq9X54x68ghSxLWzLDEwKzTRiJcRsjRHtqOeMJmwf0EgS/nuv/1BDGI8g==
   dependencies:
     mkdirp "1.0.4"
     uuid "8.3.2"
