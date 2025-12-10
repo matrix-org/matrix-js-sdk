@@ -159,11 +159,8 @@ export interface IRTCDeclineContent extends RelationEvent {}
 export enum Status {
     Disconnected = "Disconnected",
     Connecting = "Connecting",
-    ConnectingFailed = "ConnectingFailed",
     Connected = "Connected",
-    Reconnecting = "Reconnecting",
     Disconnecting = "Disconnecting",
-    Stuck = "Stuck",
     Unknown = "Unknown",
 }
 
