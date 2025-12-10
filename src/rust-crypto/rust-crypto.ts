@@ -17,7 +17,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
+import type { IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type IDeviceLists, type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
 import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
@@ -28,6 +28,7 @@ import {
     type BackupDecryptor,
     type CryptoBackend,
     DecryptionError,
+    type EventDecryptionResult,
     type OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
 import { type Logger, LogSpan } from "../logger.ts";
@@ -285,7 +286,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
     }
 
-    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
+    public async decryptEvent(event: MatrixEvent): Promise<EventDecryptionResult> {
         const roomId = event.getRoomId();
         if (!roomId) {
             // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
@@ -2202,7 +2203,7 @@ class EventDecryptor {
     public async attemptEventDecryption(
         event: MatrixEvent,
         isolationMode: DeviceIsolationMode,
-    ): Promise<IEventDecryptionResult> {
+    ): Promise<EventDecryptionResult> {
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
