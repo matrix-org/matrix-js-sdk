@@ -142,11 +142,11 @@ describe("OidcTokenRefresher", () => {
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // spy on our stub
-            jest.spyOn(refresher, "persistTokens");
+            jest.spyOn(refresher as any, "persistTokens");
 
             await refresher.doRefreshAccessToken("refresh-token");
 
-            expect(refresher.persistTokens).toHaveBeenCalledWith(
+            expect((refresher as any).persistTokens).toHaveBeenCalledWith(
                 expect.objectContaining({
                     accessToken: "new-access-token",
                     refreshToken: "new-refresh-token",
