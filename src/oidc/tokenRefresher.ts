@@ -58,7 +58,7 @@ export class OidcTokenRefresher {
         /**
          * Device ID of current session
          */
-        private deviceId: string,
+        protected deviceId: string,
         /**
          * idTokenClaims as returned from authorization grant
          * used to validate tokens
