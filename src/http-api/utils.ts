@@ -19,7 +19,7 @@ import { parse as parseContentType, type ParsedMediaType } from "content-type";
 import { logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
 import { ConnectionError, HTTPError, IErrorJson, MatrixError, safeGetRetryAfterMs } from "./errors.ts";
-import { MatrixSafetyError, MatrixSafetyErrorCode } from "src/errors.ts";
+import { MatrixSafetyError, MatrixSafetyErrorCode } from "../errors.ts";
 
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
