@@ -454,12 +454,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         room: Room,
         opts?: SessionMembershipsForRoomOpts,
     ): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(
-            room,
-            { id: "", application: "m.call" },
-            opts,
-        );
-        return new MatrixRTCSession(client, room, callMemberships, { id: "", application: "m.call" });
+        return new MatrixRTCSession(client, room, { id: "", application: "m.call" });
     }
 
     /**
@@ -480,8 +475,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         slotDescription: SlotDescription,
         opts?: SessionMembershipsForRoomOpts,
     ): MatrixRTCSession {
-        const callMemberships = MatrixRTCSession.sessionMembershipsForSlot(room, slotDescription, opts);
-        return new MatrixRTCSession(client, room, callMemberships, slotDescription);
+        return new MatrixRTCSession(client, room, slotDescription);
     }
 
     /**
@@ -494,6 +488,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public get room(): Room {
         return this.roomSubset as Room;
     }
+
+    public memberships: CallMembership[];
 
     /**
      * This constructs a room session. When using MatrixRTC inside the js-sdk this is expected
@@ -530,7 +526,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             Room,
             "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
         >,
-        public memberships: CallMembership[],
+
         /**
          * The slot description is a virtual address where participants are allowed to meet.
          * This session will only manage memberships that match this slot description.
@@ -539,6 +535,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         public readonly slotDescription: SlotDescription,
     ) {
         super();
+        this.memberships = [];
+        this.recalculateSessionMembers();
         this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
         const roomState = this.roomSubset.getLiveTimeline().getState(EventTimeline.FORWARDS);
         // TODO: double check if this is actually needed. Should be covered by refreshRoom in MatrixRTCSessionManager

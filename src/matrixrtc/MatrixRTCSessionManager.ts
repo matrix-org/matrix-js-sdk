@@ -104,7 +104,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         if (!this.roomSessions.has(room.roomId)) {
             this.roomSessions.set(
                 room.roomId,
-                MatrixRTCSession.sessionForRoom(this.client, room, this.slotDescription),
+                MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription),
             );
         }
 
