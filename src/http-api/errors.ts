@@ -19,7 +19,7 @@ import { type IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
 import { type IUsageLimit } from "../@types/partials.ts";
 import { type MatrixEvent } from "../models/event.ts";
 
-interface IErrorJson extends Partial<IUsageLimit> {
+export interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
     errcode?: string;
     error?: string;
