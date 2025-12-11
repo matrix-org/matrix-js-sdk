@@ -170,7 +170,7 @@ describe("CallMembership", () => {
                 expect(membership.scope).toBe("m.room");
             });
             it("returns correct membershipID", () => {
-                expect(membership.membershipID).toBe("0");
+                expect(membership.membershipID).toBe("@alice:example.org:AAAAAAA");
             });
             it("returns correct unused fields", () => {
                 expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
