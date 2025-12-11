@@ -143,6 +143,7 @@ describe("MembershipManager", () => {
                         device_id: "AAAAAAA",
                         expires: 14400000,
                         foci_preferred: [focus],
+                        membershipID: "@alice:example.org:AAAAAAA",
                         focus_active: focusActive,
                         scope: "m.room",
                     },
@@ -263,6 +264,7 @@ describe("MembershipManager", () => {
                             expires: 14400000,
                             device_id: "AAAAAAA",
                             foci_preferred: [focus],
+                            membershipID: "@alice:example.org:AAAAAAA",
                             focus_active: focusActive,
                         } satisfies SessionMembershipData,
                         userStateKey,
@@ -383,6 +385,7 @@ describe("MembershipManager", () => {
                     device_id: "AAAAAAA",
                     expires: 1234567,
                     foci_preferred: [focus],
+                    membershipID: "@alice:example.org:AAAAAAA",
                     focus_active: {
                         focus_selection: "oldest_membership",
                         type: "livekit",
