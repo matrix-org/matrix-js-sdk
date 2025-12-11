@@ -88,28 +88,3 @@ export class UnsupportedStickyEventsEndpointError extends Error {
         this.name = "UnsupportedStickyEventsEndpointError";
     }
 }
-
-export const MatrixSafetyErrorCode = new NamespacedValue("M_SAFETY", "ORG.MATRIX.MSC4387_SAFETY");
-
-/***
- * This error is thrown when the homeserver cannot handle an action due to a
- * safety concern.
- * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4387
- */
-export class MatrixSafetyError extends MatrixError {
-    private readonly _harms: Set<string>;
-    public readonly expiry?: Date;
-    public readonly errcode = MatrixSafetyErrorCode.name;
-    public constructor(...props: ConstructorParameters<typeof MatrixError>) {
-        super(...props);
-        const body = props[0];
-        this._harms = new Set(body && "harms" in body && Array.isArray(body.harms) ? body.harms : []);
-        if (body && "expiry" in body && typeof body.expiry === "number") {
-            this.expiry = new Date(body.expiry);
-        }
-    }
-
-    public get harms() {
-        return new Set(this._harms);
-    }
-}
