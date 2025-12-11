@@ -49,6 +49,8 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      * @param opts - options object
      *
      * @returns Promise which resolves to response object, or rejects with an error (usually a MatrixError).
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public uploadContent(file: FileType, opts: UploadOpts = {}): Promise<UploadResponse> {
         const includeFilename = opts.includeFilename ?? true;
