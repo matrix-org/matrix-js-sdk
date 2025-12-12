@@ -276,13 +276,8 @@ export class MembershipManager
         if (!this.isActivated()) {
             return Promise.resolve();
         }
-        const userId = this.client.getUserId();
-        const deviceId = this.client.getDeviceId();
-        if (!userId || !deviceId) {
-            this.logger.error("MembershipManager.onRTCSessionMemberUpdate called without user or device id");
-            return Promise.resolve();
-        }
-        this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
+
+        this._ownMembership = memberships.find((m) => isMyMembership(m, this.userId, this.deviceId));
 
         if (!this._ownMembership) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
@@ -338,6 +333,7 @@ export class MembershipManager
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
         this.deviceId = deviceId;
+        this.userId = userId;
         // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
         // we keep it as a string for now for backwards compatibility.
         this.memberId = this.makeMembershipStateKey(userId, deviceId);
@@ -386,6 +382,7 @@ export class MembershipManager
     }
     // Membership Event static parameters:
     protected deviceId: string;
+    protected userId: string;
     protected memberId: string;
     protected rtcTransport?: Transport;
     /** @deprecated This will be removed in favor or rtcTransport becoming a list of actively used transports */
@@ -763,6 +760,10 @@ export class MembershipManager
     }
 
     // HELPERS
+    /**
+     * this creates `${localUserId}_${localDeviceId}_${this.slotDescription.application}${this.slotDescription.id}`
+     * which is not compatible with membershipID of session type member events. They have to be `${localUserId}:${localDeviceId}`
+     */
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
         const stateKey = `${localUserId}_${localDeviceId}_${this.slotDescription.application}${this.slotDescription.id}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
@@ -793,6 +794,10 @@ export class MembershipManager
             "call_id": this.slotDescription.id,
             "scope": "m.room",
             "device_id": this.deviceId,
+            // DO NOT use this.memberId here since that is the state key (using application...)
+            // But for session events we use the colon seperated userId and deviceId. The SFU will automatically
+            // assign those values to the media participant for those versions.
+            "membershipID": `${this.userId}:${this.deviceId}`,
             expires,
             "m.call.intent": this.callIntent,
             ...focusObjects,
@@ -1083,7 +1088,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             slot_id: slotDescriptionToId(this.slotDescription),
             rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
-            member: { device_id: this.deviceId, user_id: this.client.getUserId()!, id: this.memberId },
+            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],
             ...relationObject,
         };

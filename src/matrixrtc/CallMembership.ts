@@ -31,7 +31,16 @@ import { logger } from "../logger.ts";
 export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 
 type CallScope = "m.room" | "m.user";
-type Member = { user_id: string; device_id: string; id: string };
+type Member = {
+    user_id: string;
+    device_id: string;
+    /**
+     * The id used on the media backend.
+     * (With livekit this is the participant identity on the LK SFU)
+     * This can be a UUID but right now it is `${this.matrixEventData.sender}:${data.device_id}`.
+     */
+    id: string;
+};
 
 export interface RtcMembershipData {
     "slot_id": string;
@@ -199,6 +208,15 @@ export type SessionMembershipData = {
      * The sticky key in case of a sticky event. This string encodes the application + device_id indicating the used slot + device.
      */
     "msc4354_sticky_key"?: string;
+
+    /**
+     * The id used on the media backend.
+     * (With livekit this is the participant identity on the LK SFU)
+     * This can be a UUID but right now it is `${this.matrixEventData.sender}:${data.device_id}`.
+     *
+     * It is compleatly valid to not set this field. Other clients will treat `undefined` as `${this.matrixEventData.sender}:${data.device_id}`
+     */
+    "membershipID"?: string;
 };
 
 const checkSessionsMembershipData = (data: IContent, errors: string[]): data is SessionMembershipData => {
@@ -378,7 +396,18 @@ export class CallMembership {
                 return data.scope;
         }
     }
-
+    /**
+     * This computes the membership ID for the membership.
+     * for the sticky event based rtcSessionData this is trivial it is `member.id`.
+     *
+     * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
+     * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
+     *
+     * So if there is no membershipID we use the hard coded jwt id default (`${this.matrixEventData.sender}:${data.device_id}`)
+     * value (used until version 0.16.0)
+     *
+     * It is also possible for a session event to set a custom membershipID. in that case this will be used.
+     */
     public get membershipID(): string {
         // the createdTs behaves equivalent to the membershipID.
         // we only need the field for the legacy member events where we needed to update them
@@ -389,7 +418,12 @@ export class CallMembership {
                 return data.member.id;
             case "session":
             default:
-                return (this.createdTs() ?? "").toString();
+                return (
+                    // best case we have a client already publishing the right custom membershipId
+                    data.membershipID ??
+                    // alternativly we use the hard coded jwt id defuatl value (used until version 0.16.0)
+                    `${this.matrixEventData.sender}:${data.device_id}`
+                );
         }
     }
 
