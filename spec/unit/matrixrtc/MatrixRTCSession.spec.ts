@@ -571,7 +571,7 @@ describe("MatrixRTCSession", () => {
             sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
-            sess!.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
             const ownMembershipId = sess?.memberships[0].eventId;
 
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
@@ -641,7 +641,7 @@ describe("MatrixRTCSession", () => {
                 },
             ]);
 
-            sess!.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
             const ownMembershipId = sess?.memberships[0].eventId;
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
@@ -692,13 +692,13 @@ describe("MatrixRTCSession", () => {
         it("doesn't send a notification when joining an existing call", async () => {
             // Add another member to the call so that it is considered an existing call
             mockRoomState(mockRoom, [membershipTemplate]);
-            sess!.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
 
             // Simulate a join, including the update to the room state
             sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
-            sess!.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
 
             expect(client.sendEvent).not.toHaveBeenCalled();
         });
@@ -710,9 +710,9 @@ describe("MatrixRTCSession", () => {
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent
             mockRoomState(mockRoom, [membershipTemplate]);
-            sess!.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
-            sess!.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
 
             // We assume that the responsibility to send a notification, if any, lies with the other
             // participant that won the race
@@ -727,7 +727,7 @@ describe("MatrixRTCSession", () => {
 
             const onMembershipsChanged = jest.fn();
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
-            sess.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
 
             expect(onMembershipsChanged).not.toHaveBeenCalled();
         });
@@ -740,7 +740,7 @@ describe("MatrixRTCSession", () => {
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
             mockRoomState(mockRoom, []);
-            sess.onRTCSessionMemberUpdate();
+            (sess as any).recalculateSessionMembers();
 
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
@@ -924,14 +924,14 @@ describe("MatrixRTCSession", () => {
 
                     // member2 leaves triggering key rotation
                     mockRoomState(mockRoom, [membershipTemplate]);
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
 
                     // member2 re-joins which should trigger an immediate re-send
                     const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
                     mockRoomState(mockRoom, [membershipTemplate, member2]);
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
                     // but, that immediate resend is throttled so we need to wait a bit
                     jest.advanceTimersByTime(1000);
                     const { keys } = await keysSentPromise2;
@@ -982,7 +982,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     mockRoomState(mockRoom, [membershipTemplate, member2]);
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
 
                     await keysSentPromise2;
 
@@ -1029,7 +1029,7 @@ describe("MatrixRTCSession", () => {
                     sendEventMock.mockClear();
 
                     // these should be a no-op:
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
                     expect(sendEventMock).toHaveBeenCalledTimes(0);
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
                 } finally {
@@ -1074,7 +1074,7 @@ describe("MatrixRTCSession", () => {
                     sendEventMock.mockClear();
 
                     // this should be a no-op:
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
                     expect(sendEventMock).toHaveBeenCalledTimes(0);
 
                     // advance time to avoid key throttling
@@ -1089,7 +1089,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     // this should re-send the key
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
 
                     await keysSentPromise2;
 
@@ -1147,7 +1147,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     mockRoomState(mockRoom, [membershipTemplate]);
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
 
                     jest.advanceTimersByTime(KEY_DELAY);
                     expect(sendKeySpy).toHaveBeenCalledTimes(1);
@@ -1214,7 +1214,7 @@ describe("MatrixRTCSession", () => {
                             mockRoomState(mockRoom, members.slice(0, membersToTest - i));
                         }
 
-                        sess!.onRTCSessionMemberUpdate();
+                        (sess as any).recalculateSessionMembers();
 
                         // advance time to avoid key throttling
                         jest.advanceTimersByTime(10000);
@@ -1253,7 +1253,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     mockRoomState(mockRoom, [membershipTemplate, member2]);
-                    sess.onRTCSessionMemberUpdate();
+                    (sess as any).recalculateSessionMembers();
 
                     await new Promise((resolve) => {
                         realSetTimeout(resolve);
@@ -1280,7 +1280,8 @@ describe("MatrixRTCSession", () => {
                         manageMediaKeys: true,
                         useExperimentalToDeviceTransport: true,
                     });
-                    sess.onRTCSessionMemberUpdate();
+
+                    (sess as any).recalculateSessionMembers();
 
                     await keySentPromise;
 

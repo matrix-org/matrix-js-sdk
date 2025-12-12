@@ -19,6 +19,7 @@ import { RoomStateEvent } from "../../../src/models/room-state";
 import { MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc/MatrixRTCSessionManager";
 import { makeMockRoom, type MembershipData, membershipTemplate, mockRoomState, mockRTCEvent } from "./mocks";
 import { logger } from "../../../src/logger";
+import { RoomStickyEventsEvent } from "../../../src/models/room-sticky-events";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
@@ -30,10 +31,15 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                 mockRoomState(room, [{ user_id: membershipTemplate.user_id }]);
                 const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
                 const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
-                client.emit(RoomStateEvent.Events, membEvent, roomState, null);
+                roomState.emit(RoomStateEvent.Events, membEvent, roomState, null);
             } else {
-                membershipData.splice(0, 1, { user_id: membershipTemplate.user_id });
-                client.emit(ClientEvent.Event, mockRTCEvent(membershipData[0], room.roomId, 10000));
+                const previousData = membershipData.splice(0, 1, {
+                    user_id: membershipTemplate.user_id,
+                    msc4354_sticky_key: membershipTemplate.msc4354_sticky_key,
+                })[0];
+                const current = mockRTCEvent(membershipData[0], room.roomId, 10000);
+                const previous = mockRTCEvent(previousData, room.roomId, 10000);
+                room.emit(RoomStickyEventsEvent.Update, [], [{ current, previous }], []);
             }
         }
 
