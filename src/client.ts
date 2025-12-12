@@ -1355,8 +1355,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.disableVoip = opts.disableVoip ?? false;
+        this.isVoipWithNoMediaAllowed = opts.isVoipWithNoMediaAllowed || false;
 
-        if (!this.disableVoip && supportsMatrixCall()) {
+        if ((!this.disableVoip && supportsMatrixCall()) || this.isVoipWithNoMediaAllowed) {
             this.callEventHandler = new CallEventHandler(this);
             this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
@@ -1385,7 +1386,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
         this.supportsCallTransfer = opts.supportsCallTransfer || false;
         this.fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
-        this.isVoipWithNoMediaAllowed = opts.isVoipWithNoMediaAllowed || false;
 
         if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
 
@@ -5792,7 +5792,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
-            if (supportsMatrixCall()) {
+            if (supportsMatrixCall() || this.isVoipWithNoMediaAllowed) {
                 this.callEventHandler!.start();
                 this.groupCallEventHandler!.start();
             }
