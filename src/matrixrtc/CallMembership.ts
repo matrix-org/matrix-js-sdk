@@ -562,4 +562,7 @@ export class CallMembership {
                 return data.foci_preferred;
         }
     }
+    public get kind(): MembershipData["kind"] {
+        return this.membershipData.kind;
+    }
 }
