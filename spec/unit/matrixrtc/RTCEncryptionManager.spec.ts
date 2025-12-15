@@ -23,7 +23,7 @@ import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../
 import { membershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { logger } from "../../../src/logger.ts";
-import { getParticipantId } from "../../../src/matrixrtc/utils.ts";
+import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
 
 describe("RTCEncryptionManager", () => {
     // The manager being tested
@@ -54,8 +54,7 @@ describe("RTCEncryptionManager", () => {
         } as unknown as Mocked<ToDeviceKeyTransport>;
 
         encryptionManager = new RTCEncryptionManager(
-            "@alice:example.org",
-            "DEVICE01",
+            { userId: "@alice:example.org", deviceId: "DEVICE01", memberId: "@alice:example.org:DEVICE01" },
             getMembershipMock,
             mockTransport,
             statistics,
@@ -109,11 +108,11 @@ describe("RTCEncryptionManager", () => {
             await jest.runOnlyPendingTimersAsync();
             // The key should have been rolled out immediately
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                expect.any(Uint8Array<ArrayBufferLike>),
-                0,
-                "@alice:example.org:DEVICE01",
-            );
+            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(expect.any(Uint8Array<ArrayBufferLike>), 0, {
+                deviceId: "DEVICE01",
+                memberId: "@alice:example.org:DEVICE01",
+                userId: "@alice:example.org",
+            });
         });
 
         it("Should re-distribute keys to members whom callMemberhsip ts has changed", async () => {
@@ -438,11 +437,11 @@ describe("RTCEncryptionManager", () => {
             await jest.advanceTimersByTimeAsync(1000);
 
             // now should be rolled out
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                expect.any(Uint8Array<ArrayBufferLike>),
-                1,
-                "@alice:example.org:DEVICE01",
-            );
+            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(expect.any(Uint8Array<ArrayBufferLike>), 1, {
+                userId: "@alice:example.org",
+                deviceId: "DEVICE01",
+                memberId: "@alice:example.org:DEVICE01",
+            });
 
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
@@ -477,8 +476,7 @@ describe("RTCEncryptionManager", () => {
                 emit: emitter.emit.bind(emitter),
             } as unknown as Mocked<ToDeviceKeyTransport>;
             encryptionManager = new RTCEncryptionManager(
-                "@alice:example.org",
-                "DEVICE01",
+                { userId: "@alice:example.org", deviceId: "DEVICE01", memberId: "@alice:example.org:DEVICE01" },
                 getMembershipMock,
                 mockTransport,
                 statistics,
@@ -498,8 +496,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@bob:example.org",
-                "BOBDEVICE",
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE", memberId: "@bob:example.org:BOBDEVICE" },
                 "AAAAAAAAAAA",
                 0 /* KeyId */,
                 0 /* Timestamp */,
@@ -525,47 +522,44 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@bob:example.org",
-                "BOBDEVICE",
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE", memberId: "@bob:example.org:BOBDEVICE" },
                 "AAAAAAAAAAA",
                 0 /* KeyId */,
                 0 /* Timestamp */,
             );
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@bob:example.org",
-                "BOBDEVICE2",
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE2", memberId: "@bob:example.org:BOBDEVICE2" },
                 "BBBBBBBBBBB",
                 4 /* KeyId */,
                 0 /* Timestamp */,
             );
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@carl:example.org",
-                "CARLDEVICE",
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE", memberId: "@carl:example.org:CARLDEVICE" },
                 "CCCCCCCCCC",
                 8 /* KeyId */,
                 0 /* Timestamp */,
             );
 
             expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(4);
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                decodeBase64("AAAAAAAAAAA"),
-                0,
-                "@bob:example.org:BOBDEVICE",
-            );
+            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(decodeBase64("AAAAAAAAAAA"), 0, {
+                userId: "@bob:example.org",
+                deviceId: "BOBDEVICE",
+                memberId: "@bob:example.org:BOBDEVICE",
+            });
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                decodeBase64("BBBBBBBBBBB"),
-                4,
-                "@bob:example.org:BOBDEVICE2",
-            );
+            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(decodeBase64("BBBBBBBBBBB"), 4, {
+                userId: "@bob:example.org",
+                deviceId: "BOBDEVICE2",
+                memberId: "@bob:example.org:BOBDEVICE2",
+            });
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                decodeBase64("CCCCCCCCCC"),
-                8,
-                "@carl:example.org:CARLDEVICE",
-            );
+            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(decodeBase64("CCCCCCCCCC"), 8, {
+                userId: "@carl:example.org",
+                deviceId: "CARLDEVICE",
+                memberId: "@carl:example.org:CARLDEVICE",
+            });
 
             expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(3);
         });
@@ -586,8 +580,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@carol:example.org",
-                "CAROLDEVICE",
+                { userId: "@carol:example.org", deviceId: "CAROLDEVICE", memberId: "@carol:example.org:CAROLDEVICE" },
                 "BBBBBBBBBBB",
                 0 /* KeyId */,
                 newKey0TimeStamp,
@@ -597,8 +590,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@carol:example.org",
-                "CAROLDEVICE",
+                { userId: "@carol:example.org", deviceId: "CAROLDEVICE", memberId: "@carol:example.org:CAROLDEVICE" },
                 "AAAAAAAAAAA",
                 0 /* KeyId */,
                 initialKey0TimeStamp,
@@ -608,11 +600,11 @@ describe("RTCEncryptionManager", () => {
 
             // The latest key used for carol should be the one with the latest timestamp
 
-            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
-                decodeBase64("BBBBBBBBBBB"),
-                0,
-                "@carol:example.org:CAROLDEVICE",
-            );
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(decodeBase64("BBBBBBBBBBB"), 0, {
+                userId: "@carol:example.org",
+                deviceId: "CAROLDEVICE",
+                memberId: "@carol:example.org:CAROLDEVICE",
+            });
         });
 
         it("Should store keys for later retrieval", async () => {
@@ -633,8 +625,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@carl:example.org",
-                "CARLDEVICE",
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE", memberId: "@carl:example.org:CARLDEVICE" },
                 "BBBBBBBBBBB",
                 0 /* KeyId */,
                 1000,
@@ -642,8 +633,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@carl:example.org",
-                "CARLDEVICE",
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE", memberId: "@carl:example.org:CARLDEVICE" },
                 "CCCCCCCCCCC",
                 5 /* KeyId */,
                 1000,
@@ -651,8 +641,7 @@ describe("RTCEncryptionManager", () => {
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
-                "@bob:example.org",
-                "BOBDEVICE2",
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE2", memberId: "@bob:example.org:BOBDEVICE2" },
                 "DDDDDDDDDDD",
                 0 /* KeyId */,
                 1000,
@@ -661,7 +650,13 @@ describe("RTCEncryptionManager", () => {
             const knownKeys = encryptionManager.getEncryptionKeys();
 
             // My own key should be there
-            const myRing = knownKeys.get(getParticipantId("@alice:example.org", "DEVICE01"));
+            const myRing = knownKeys.get(
+                getEncryptionKeyMapKey({
+                    userId: "@alice:example.org",
+                    deviceId: "DEVICE01",
+                    memberId: "@alice:example.org:DEVICE01",
+                }),
+            );
             expect(myRing).toBeDefined();
             expect(myRing).toHaveLength(1);
             expect(myRing![0]).toMatchObject(
@@ -671,7 +666,13 @@ describe("RTCEncryptionManager", () => {
                 }),
             );
 
-            const carlRing = knownKeys.get(getParticipantId("@carl:example.org", "CARLDEVICE"));
+            const carlRing = knownKeys.get(
+                getEncryptionKeyMapKey({
+                    userId: "@carl:example.org",
+                    deviceId: "CARLDEVICE",
+                    memberId: "@carl:example.org:CARLDEVICE",
+                }),
+            );
             expect(carlRing).toBeDefined();
             expect(carlRing).toHaveLength(2);
             expect(carlRing![0]).toMatchObject(
@@ -687,7 +688,13 @@ describe("RTCEncryptionManager", () => {
                 }),
             );
 
-            const bobRing = knownKeys.get(getParticipantId("@bob:example.org", "BOBDEVICE2"));
+            const bobRing = knownKeys.get(
+                getEncryptionKeyMapKey({
+                    userId: "@bob:example.org",
+                    deviceId: "BOBDEVICE2",
+                    memberId: "@bob:example.org:BOBDEVICE2",
+                }),
+            );
             expect(bobRing).toBeDefined();
             expect(bobRing).toHaveLength(1);
             expect(bobRing![0]).toMatchObject(
@@ -697,7 +704,13 @@ describe("RTCEncryptionManager", () => {
                 }),
             );
 
-            const bob1Ring = knownKeys.get(getParticipantId("@bob:example.org", "BOBDEVICE"));
+            const bob1Ring = knownKeys.get(
+                getEncryptionKeyMapKey({
+                    userId: "@bob:example.org",
+                    deviceId: "BOBDEVICE",
+                    memberId: "@bob:example.org:BOBDEVICE",
+                }),
+            );
             expect(bob1Ring).not.toBeDefined();
         });
     });
@@ -718,11 +731,11 @@ describe("RTCEncryptionManager", () => {
         await jest.advanceTimersByTimeAsync(10);
 
         // The initial rollout
-        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-            expect.any(Uint8Array<ArrayBufferLike>),
-            0,
-            "@alice:example.org:DEVICE01",
-        );
+        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(expect.any(Uint8Array<ArrayBufferLike>), 0, {
+            deviceId: "DEVICE01",
+            memberId: "@alice:example.org:DEVICE01",
+            userId: "@alice:example.org",
+        });
         onEncryptionKeysChanged.mockClear();
 
         // Trigger a key rotation with a leaver
@@ -754,16 +767,16 @@ describe("RTCEncryptionManager", () => {
         // There should 2 rollout. The `1` rollout, then just one additional one
         // that has "buffered" the 2 membership changes with leavers
         expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
-        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-            expect.any(Uint8Array<ArrayBufferLike>),
-            1,
-            "@alice:example.org:DEVICE01",
-        );
-        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-            expect.any(Uint8Array<ArrayBufferLike>),
-            2,
-            "@alice:example.org:DEVICE01",
-        );
+        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(expect.any(Uint8Array<ArrayBufferLike>), 1, {
+            deviceId: "DEVICE01",
+            userId: "@alice:example.org",
+            memberId: "@alice:example.org:DEVICE01",
+        });
+        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(expect.any(Uint8Array<ArrayBufferLike>), 2, {
+            deviceId: "DEVICE01",
+            memberId: "@alice:example.org:DEVICE01",
+            userId: "@alice:example.org",
+        });
 
         // Key `2` should only be distributed to the last membership
         expect(mockTransport.sendKey).toHaveBeenLastCalledWith(

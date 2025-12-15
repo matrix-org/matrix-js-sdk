@@ -918,7 +918,13 @@ describe("MembershipManager", () => {
                     const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
                         client._unstable_restartScheduledDelayedEvent as Mock,
                     );
-                    const memberManager = new StickyEventMembershipManager(undefined, room, client, callSession);
+                    const memberManager = new StickyEventMembershipManager(
+                        undefined,
+                        room,
+                        client,
+                        callSession,
+                        "@alice:example.org:AAAAAAA_m.call",
+                    );
 
                     memberManager.join([], focus);
 
@@ -933,13 +939,13 @@ describe("MembershipManager", () => {
                             application: { type: "m.call" },
                             member: {
                                 user_id: "@alice:example.org",
-                                id: "_@alice:example.org_AAAAAAA_m.call",
+                                id: "@alice:example.org:AAAAAAA_m.call",
                                 device_id: "AAAAAAA",
                             },
                             slot_id: "m.call#",
                             rtc_transports: [focus],
                             versions: [],
-                            msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
+                            msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
                     restartScheduledDelayedEventHandle.resolve?.();
@@ -952,7 +958,7 @@ describe("MembershipManager", () => {
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
-                            msc4354_sticky_key: "_@alice:example.org_AAAAAAA_m.call",
+                            msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
                     // ..once
