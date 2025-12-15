@@ -25,7 +25,7 @@ import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
-import { EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
+import { type CallMembershipIdentityParts, EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
 import { deepCompare, logDurationSync } from "../utils.ts";
 import type {
     Statistics,
@@ -75,7 +75,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.EncryptionKeyChanged]: (
         key: Uint8Array,
         encryptionKeyIndex: number,
-        participantId: string,
+        membership: CallMembershipIdentityParts,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
@@ -621,40 +621,33 @@ export class MatrixRTCSession extends TypedEventEmitter<
             if (joinConfig?.useExperimentalToDeviceTransport) {
                 this.logger.info("Using experimental to-device transport for encryption keys");
                 this.logger.info("Using to-device with room fallback transport for encryption keys");
-                const [uId, dId] = [this.client.getUserId()!, this.client.getDeviceId()!];
                 const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
-                const transport = new ToDeviceKeyTransport(uId, dId, room.roomId, client, statistics);
+                const transport = new ToDeviceKeyTransport(
+                    { userId, deviceId, memberId },
+                    room.roomId,
+                    client,
+                    statistics,
+                );
                 this.encryptionManager = new RTCEncryptionManager(
-                    this.client.getUserId()!,
-                    this.client.getDeviceId()!,
+                    { userId, deviceId, memberId },
                     () => this.memberships,
                     transport,
                     this.statistics,
-                    (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
-                        this.emit(
-                            MatrixRTCSessionEvent.EncryptionKeyChanged,
-                            keyBin,
-                            encryptionKeyIndex,
-                            participantId,
-                        );
+                    (keyBin: Uint8Array, encryptionKeyIndex: number, membership: CallMembershipIdentityParts) => {
+                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, membership);
                     },
                     this.logger,
                 );
             } else {
+                // TODO REMOVE ME!
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
                 this.encryptionManager = new EncryptionManager(
-                    this.client.getUserId()!,
-                    this.client.getDeviceId()!,
+                    { userId, deviceId, memberId },
                     () => this.memberships,
                     transport,
                     this.statistics,
-                    (keyBin: Uint8Array, encryptionKeyIndex: number, participantId: string) => {
-                        this.emit(
-                            MatrixRTCSessionEvent.EncryptionKeyChanged,
-                            keyBin,
-                            encryptionKeyIndex,
-                            participantId,
-                        );
+                    (keyBin: Uint8Array, encryptionKeyIndex: number, membership: CallMembershipIdentityParts) => {
+                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, membership);
                     },
                 );
             }
@@ -753,7 +746,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public reemitEncryptionKeys(): void {
         this.encryptionManager?.getEncryptionKeys().forEach((keyRing, participantId) => {
             keyRing.forEach((keyInfo) => {
-                this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyInfo.key, keyInfo.keyIndex, participantId);
+                this.emit(
+                    MatrixRTCSessionEvent.EncryptionKeyChanged,
+                    keyInfo.key,
+                    keyInfo.keyIndex,
+                    keyInfo.membership,
+                );
             });
         });
     }

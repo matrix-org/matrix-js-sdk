@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { InboundEncryptionSession, ParticipantId } from "./types.ts";
+import { getEncryptionKeyMapKey, type CallMembershipIdentityParts } from "./EncryptionManager.ts";
+import { type InboundEncryptionSession, type EncryptionKeyMapKey } from "./types.ts";
 
 /**
  * Detects when a key for a given index is outdated.
  */
 export class OutdatedKeyFilter {
     // Map of participantId -> keyIndex -> timestamp
-    private tsBuffer: Map<ParticipantId, Map<number, number>> = new Map();
+    private tsBuffer: Map<EncryptionKeyMapKey, Map<number, number>> = new Map();
 
     public constructor() {}
 
@@ -31,21 +32,18 @@ export class OutdatedKeyFilter {
      * @param participantId
      * @param item
      */
-    public isOutdated(participantId: ParticipantId, item: InboundEncryptionSession): boolean {
-        if (!this.tsBuffer.has(participantId)) {
-            this.tsBuffer.set(participantId, new Map<number, number>());
+    public isOutdated(membership: CallMembershipIdentityParts, item: InboundEncryptionSession): boolean {
+        const id = getEncryptionKeyMapKey(membership);
+        if (!this.tsBuffer.has(id)) {
+            this.tsBuffer.set(id, new Map<number, number>());
         }
 
-        const latestTimestamp = this.tsBuffer.get(participantId)?.get(item.keyIndex);
+        const latestTimestamp = this.tsBuffer.get(id)?.get(item.keyIndex);
         if (latestTimestamp && latestTimestamp > item.creationTS) {
             // The existing key is more recent, ignore this one
             return true;
         }
-        this.tsBuffer.get(participantId)!.set(item.keyIndex, item.creationTS);
+        this.tsBuffer.get(id)!.set(item.keyIndex, item.creationTS);
         return false;
     }
-}
-
-export function getParticipantId(userId: string, deviceId: string): ParticipantId {
-    return `${userId}:${deviceId}`;
 }
