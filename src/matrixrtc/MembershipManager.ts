@@ -336,7 +336,7 @@ export class MembershipManager
         this.userId = userId;
         // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
         // we keep it as a string for now for backwards compatibility.
-        this.memberId = this.makeMembershipStateKey(userId, deviceId);
+        this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
@@ -383,7 +383,7 @@ export class MembershipManager
     // Membership Event static parameters:
     protected deviceId: string;
     protected userId: string;
-    protected memberId: string;
+    protected stateKey: string;
     protected rtcTransport?: Transport;
     /** @deprecated This will be removed in favor or rtcTransport becoming a list of actively used transports */
     private fociPreferred?: Transport[];
@@ -484,7 +484,7 @@ export class MembershipManager
             { delay: this.delayedLeaveEventDelayMs },
             EventType.GroupCallMemberPrefix,
             {},
-            this.memberId,
+            this.stateKey,
         );
 
     // HANDLERS (used in the membershipLoopHandler)
@@ -677,7 +677,7 @@ export class MembershipManager
             this.room.roomId,
             EventType.GroupCallMemberPrefix,
             myMembership as EmptyObject | SessionMembershipData,
-            this.memberId,
+            this.stateKey,
         );
     };
 
@@ -1040,6 +1040,9 @@ export class StickyEventMembershipManager extends MembershipManager {
         private readonly clientWithSticky: MembershipManagerClient &
             Pick<MatrixClient, "_unstable_sendStickyEvent" | "_unstable_sendStickyDelayedEvent">,
         sessionDescription: SlotDescription,
+        // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
+        // we keep it as a string for now for backwards compatibility.
+        private readonly memberId: string,
         parentLogger?: Logger,
     ) {
         super(joinConfig, room, clientWithSticky, sessionDescription, parentLogger);

@@ -407,8 +407,26 @@ export class CallMembership {
      * value (used until version 0.16.0)
      *
      * It is also possible for a session event to set a custom membershipID. in that case this will be used.
+     *
+     * @deprecated renamed to `memberId`
      */
     public get membershipID(): string {
+        return this.memberId;
+    }
+
+    /**
+     * This computes the membership ID for the membership.
+     * for the sticky event based rtcSessionData this is trivial it is `member.id`.
+     *
+     * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
+     * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
+     *
+     * So if there is no membershipID we use the hard coded jwt id default (`${this.matrixEventData.sender}:${data.device_id}`)
+     * value (used until version 0.16.0)
+     *
+     * It is also possible for a session event to set a custom membershipID. in that case this will be used.
+     */
+    public get memberId(): string {
         // the createdTs behaves equivalent to the membershipID.
         // we only need the field for the legacy member events where we needed to update them
         // synapse ignores sending state events if they have the same content.

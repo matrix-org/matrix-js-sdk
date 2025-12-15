@@ -593,6 +593,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
         multiSfuFocus?: Transport,
         joinConfig?: JoinSessionConfig,
     ): void {
+        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
+        // TODO this wants to become a UUID
+        const memberId = `${userId}:${deviceId}`;
         if (this.isJoined()) {
             this.logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
             return;
@@ -604,6 +607,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                       this.roomSubset,
                       this.client,
                       this.slotDescription,
+                      memberId,
                       this.logger,
                   )
                 : new MembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
