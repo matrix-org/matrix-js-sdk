@@ -139,5 +139,29 @@ export class OutgoingRequestsManager {
                 this.logger.error(`Failed to process outgoing request ${request.type}: ${e}`);
             }
         }
+
+        // If we handled any requests this time, more may have been queued as
+        // part of that handling, so do an extra check to make sure we handle
+        // them immediately. See
+        // If we handled any requests this time, more may have been queued as
+        // part of that handling.
+        //
+        // For example, we may have processed a `/keys/claim` request, which
+        // meant the rust side could establish an Olm session and is now ready to
+        // send out an `m.secret.send` message.
+        // (See https://github.com/element-hq/element-web/issues/30988.)
+        //
+        // So, if we have processed any requests, flag that we need make another
+        // pass around the outgoing-requests loop, to make sure we handle any
+        // pending requests immediately.
+        if (outgoingRequests.length > 0) {
+            // We call doProcessOutgoingRequests but since we expect that we are
+            // already processing outgoing requests, this call will not kick off
+            // the processing loop, but just set `nextLoopDeferred` and return,
+            // which will mean we loop one more time.
+            this.doProcessOutgoingRequests().catch((e) => {
+                this.logger.warn("processOutgoingRequests: Error re-checking outgoing requests", e);
+            });
+        }
     }
 }

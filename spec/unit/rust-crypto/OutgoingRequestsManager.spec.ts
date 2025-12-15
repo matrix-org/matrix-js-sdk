@@ -92,9 +92,11 @@ describe("OutgoingRequestsManager", () => {
             await secondRequest;
             await thirdRequest;
 
-            // outgoingRequests should be called twice in total, as the second and third requests are
-            // processed in the same loop.
-            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(2);
+            // outgoingRequests should be called three times in total:
+            // 1. the first time,
+            // 2. the second and third requests processed in the same loop, and
+            // 3. checking that all requests are finished
+            expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(3);
 
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(3);
             expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request1);
