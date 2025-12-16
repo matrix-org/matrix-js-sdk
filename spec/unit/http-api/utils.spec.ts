@@ -21,6 +21,8 @@ import {
     ConnectionError,
     HTTPError,
     MatrixError,
+    MatrixSafetyError,
+    MatrixSafetyErrorCode,
     parseErrorResponse,
     retryNetworkOperation,
     timeoutSignal,
@@ -182,6 +184,27 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
+            ),
+        );
+    });
+    it("should resolve MatrixSafetyErrors from fetch", () => {
+        headers.set("Content-Type", "application/json");
+        const value = parseErrorResponse(
+            {
+                headers,
+                status: 400,
+            } as Response,
+            `{"errcode": "${MatrixSafetyErrorCode.name}", "error": "Spammy", "harms": ["m.spam", "org.example.additional-harm"], "expiry": 5000}`,
+        );
+        expect(value).toStrictEqual(
+            new MatrixSafetyError(
+                {
+                    errcode: MatrixSafetyErrorCode.name,
+                    error: "Spammy",
+                    harms: ["m.spam", "org.example.additional-harm"],
+                    expiry: 5000,
+                },
+                400,
             ),
         );
     });

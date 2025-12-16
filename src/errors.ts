@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError } from "./http-api";
-import { NamespacedValue } from "./NamespacedValue";
-
 export enum InvalidCryptoStoreState {
     TooNew = "TOO_NEW",
 }
