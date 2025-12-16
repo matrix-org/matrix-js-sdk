@@ -2236,7 +2236,6 @@ class EventDecryptor {
                 clearEvent: JSON.parse(res.event),
                 claimedEd25519Key: res.senderClaimedEd25519Key,
                 senderCurve25519Key: res.senderCurve25519Key,
-                forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
             };
         } catch (err) {
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
