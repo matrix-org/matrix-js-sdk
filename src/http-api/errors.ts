@@ -234,7 +234,7 @@ export class TokenRefreshLogoutError extends Error {
 export const MatrixSafetyErrorCode = new NamespacedValue(null, "ORG.MATRIX.MSC4387_SAFETY");
 
 /***
- * This error is thrown when the homeserver cannot handle an action due to a
+ * This error is thrown when the homeserver refuses to handle an action due to a
  * safety concern.
  * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4387
  */
