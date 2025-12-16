@@ -21,7 +21,6 @@ limitations under the License.
 
 import { type ExtensibleEvent, ExtensibleEvents } from "matrix-events-sdk";
 
-import type { IEventDecryptionResult } from "../@types/crypto.ts";
 import { logger } from "../logger.ts";
 import {
     EVENT_VISIBILITY_CHANGE_TYPE,
@@ -40,7 +39,7 @@ import { TypedReEmitter } from "../ReEmitter.ts";
 import { type MatrixError } from "../http-api/index.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { type EventStatus } from "./event-status.ts";
-import { type CryptoBackend, DecryptionError } from "../common-crypto/CryptoBackend.ts";
+import { type CryptoBackend, DecryptionError, type EventDecryptionResult } from "../common-crypto/CryptoBackend.ts";
 import { type IAnnotatedPushRule } from "../@types/PushRules.ts";
 import { type Room } from "./room.ts";
 import { EventTimeline } from "./event-timeline.ts";
@@ -1025,7 +1024,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @param decryptionResult - the decryption result, including the plaintext and some key info
      */
-    private setClearData(decryptionResult: IEventDecryptionResult): void {
+    private setClearData(decryptionResult: EventDecryptionResult): void {
         this.clearEvent = decryptionResult.clearEvent;
         this.senderCurve25519Key = decryptionResult.senderCurve25519Key ?? null;
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
