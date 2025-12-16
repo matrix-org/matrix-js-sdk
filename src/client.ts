@@ -245,10 +245,8 @@ import {
     validateAuthMetadataAndKeys,
 } from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
-import {
-    UnsupportedDelayedEventsEndpointError,
-    UnsupportedStickyEventsEndpointError,
-} from "./errors.ts";
+import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
+import { type Transport } from "./matrixrtc/index.ts";
 
 export type Store = IStore;
 
@@ -6144,6 +6142,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } while (token != null);
 
         return rooms;
+    }
+
+    /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     * Requires homeserver support for MSC4143.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver.
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_getRTCTransports(): Promise<Transport[]> {
+        // There is no /versions endpoint to check for support, so we just have to attempt a request.
+        return (
+            await this.http.authedRequest<{
+                rtc_transports: Transport[];
+            }>(Method.Get, "/rtc/transports", undefined, undefined, {
+                prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
+            })
+        ).rtc_transports;
     }
 
     /**

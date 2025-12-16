@@ -84,6 +84,7 @@ import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
+import { type Transport } from "src/matrixrtc/index.ts";
 
 jest.useFakeTimers();
 
@@ -3933,6 +3934,25 @@ describe("MatrixClient", function () {
 
             expect(lookupResult).toHaveLength(1);
             expect(lookupResult[0]).toEqual({ address: "bob@email.dummy", mxid: "@bob:homeserver.dummy" });
+        });
+    });
+
+    describe("_unstable_getRTCTransports", () => {
+        it("makes a well-formed request", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rtc/transports`,
+                    data: { rtc_transports: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
+                    prefix: "/_matrix/client/unstable/org.matrix.msc4143",
+                },
+            ];
+            expect(await client._unstable_getRTCTransports()).toEqual([
+                {
+                    type: "livekit",
+                    extra_field: "foobar",
+                },
+            ]);
         });
     });
 });
