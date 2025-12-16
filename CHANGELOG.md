@@ -1,3 +1,15 @@
+Changes in [39.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.4.0) (2025-12-16)
+==================================================================================================
+## ✨ Features
+
+* Import room key bundles received after invite. ([#5080](https://github.com/matrix-org/matrix-js-sdk/pull/5080)). Contributed by @kaylendog.
+
+## 🐛 Bug Fixes
+
+* Allow msc4354\_sticky\_key to be optional on sticky events. ([#5073](https://github.com/matrix-org/matrix-js-sdk/pull/5073)). Contributed by @Half-Shot.
+* Handle all response fields from /context API being optional ([#5089](https://github.com/matrix-org/matrix-js-sdk/pull/5089)). Contributed by @t3chguy.
+
+
 Changes in [39.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.3.0) (2025-12-02)
 ==================================================================================================
 ## 🐛 Bug Fixes
