@@ -285,9 +285,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public get membershipStatus(): Status | undefined {
         return this.membershipManager?.status;
     }
-
     public get probablyLeft(): boolean | undefined {
         return this.membershipManager?.probablyLeft;
+    }
+    public get delayId(): string | undefined {
+        return this.membershipManager?.delayId;
     }
 
     /**
@@ -588,14 +590,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * transport selection will be used instead.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRoomSession(
+    public joinRTCSession(
+        ownMembershipIdentity: CallMembershipIdentityParts,
         fociPreferred: Transport[],
         multiSfuFocus?: Transport,
         joinConfig?: JoinSessionConfig,
     ): void {
-        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
-        // TODO this wants to become a UUID
-        const memberId = `${userId}:${deviceId}`;
         if (this.isJoined()) {
             this.logger.info(`Already joined to session in room ${this.roomSubset.roomId}: ignoring join call`);
             return;
@@ -607,7 +607,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                       this.roomSubset,
                       this.client,
                       this.slotDescription,
-                      memberId,
+                      ownMembershipIdentity.memberId,
                       this.logger,
                   )
                 : new MembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
@@ -622,14 +622,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 this.logger.info("Using experimental to-device transport for encryption keys");
                 this.logger.info("Using to-device with room fallback transport for encryption keys");
                 const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
-                const transport = new ToDeviceKeyTransport(
-                    { userId, deviceId, memberId },
-                    room.roomId,
-                    client,
-                    statistics,
-                );
+                const transport = new ToDeviceKeyTransport(ownMembershipIdentity, room.roomId, client, statistics);
                 this.encryptionManager = new RTCEncryptionManager(
-                    { userId, deviceId, memberId },
+                    ownMembershipIdentity,
                     () => this.memberships,
                     transport,
                     this.statistics,
@@ -642,7 +637,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 // TODO REMOVE ME!
                 transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
                 this.encryptionManager = new EncryptionManager(
-                    { userId, deviceId, memberId },
+                    ownMembershipIdentity,
                     () => this.memberships,
                     transport,
                     this.statistics,
@@ -665,6 +660,24 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.encryptionManager!.join(joinConfig);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
+    }
+
+    /**
+     *
+     * @param fociPreferred
+     * @param multiSfuFocus
+     * @param joinConfig
+     * @deprecated use the joinRTCSession method instead
+     */
+    public joinRoomSession(
+        fociPreferred: Transport[],
+        multiSfuFocus?: Transport,
+        joinConfig?: JoinSessionConfig,
+    ): void {
+        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
+        // TODO this wants to become a UUID
+        const memberId = `${userId}:${deviceId}`;
+        this.joinRTCSession({ userId, deviceId, memberId }, fociPreferred, multiSfuFocus, joinConfig);
     }
 
     /**
