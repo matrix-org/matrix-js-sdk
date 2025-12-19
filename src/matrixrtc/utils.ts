@@ -33,17 +33,17 @@ export class OutdatedKeyFilter {
      * @param item
      */
     public isOutdated(membership: CallMembershipIdentityParts, item: InboundEncryptionSession): boolean {
-        const id = getEncryptionKeyMapKey(membership);
-        if (!this.tsBuffer.has(id)) {
-            this.tsBuffer.set(id, new Map<number, number>());
+        const mapKey = getEncryptionKeyMapKey(membership);
+        if (!this.tsBuffer.has(mapKey)) {
+            this.tsBuffer.set(mapKey, new Map<number, number>());
         }
 
-        const latestTimestamp = this.tsBuffer.get(id)?.get(item.keyIndex);
+        const latestTimestamp = this.tsBuffer.get(mapKey)?.get(item.keyIndex);
         if (latestTimestamp && latestTimestamp > item.creationTS) {
             // The existing key is more recent, ignore this one
             return true;
         }
-        this.tsBuffer.get(id)!.set(item.keyIndex, item.creationTS);
+        this.tsBuffer.get(mapKey)!.set(item.keyIndex, item.creationTS);
         return false;
     }
 }

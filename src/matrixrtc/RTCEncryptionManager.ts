@@ -127,11 +127,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private addKeyToParticipant(key: Uint8Array, keyIndex: number, membership: CallMembershipIdentityParts): void {
-        const id = getEncryptionKeyMapKey(membership);
-        if (!this.participantKeyRings.has(id)) {
-            this.participantKeyRings.set(id, []);
+        const mapKey = getEncryptionKeyMapKey(membership);
+        if (!this.participantKeyRings.has(mapKey)) {
+            this.participantKeyRings.set(mapKey, []);
         }
-        this.participantKeyRings.get(id)!.push({ key, keyIndex, membership });
+        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership });
         this.onEncryptionKeysChanged(key, keyIndex, membership);
     }
 
