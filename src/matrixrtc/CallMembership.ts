@@ -21,7 +21,11 @@ import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "
 import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
-import { logger } from "../logger.ts";
+import { logger as rootLogger } from "../logger.ts";
+import { sha256 } from "../digest.ts";
+import { encodeUnpaddedBase64Url } from "../base64.ts";
+
+const logger = rootLogger.getChild("[CallMembership]");
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -270,29 +274,75 @@ export class CallMembership {
     public constructor(
         /** The Matrix event that this membership is based on */
         private readonly matrixEvent: MatrixEvent,
-        data: IContent,
+        data: MembershipData,
+        /**
+         *
+         * Anonymised identity to use with the RTC backend.
+         *
+         * The rtcBackendIdentity is a hashed version of all the identity parts:
+         * `${this.userId}|${this.deviceId}|${this.memberId}`
+         *
+         * It is used to anonymize the identity of the user in the RTC backend.
+         *
+         * The computation of this value is async and should be done right after constructing the CallMembership instance.
+         * When using a CallMembership from matrixRtcSession.memberships this will already be computed.
+         */
+
+        public readonly rtcBackendIdentity: string,
     ) {
+        this.membershipData = data;
         const eventId = matrixEvent.getId();
         const sender = matrixEvent.getSender();
 
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
 
+        this.matrixEventData = { eventId, sender };
+    }
+
+    /**
+     * sha256(`${this.userId}|${this.deviceId}|${this.memberId}`) for sticky events (kind = rtc)
+     * `${this.userId}:${this.deviceId}` for state events (kind = session)
+     */
+    public static async computeRtcBackendIdentity(
+        matrixEvent: MatrixEvent,
+        membershipData: MembershipData,
+    ): Promise<string> {
+        const { kind, data } = membershipData;
+        switch (kind) {
+            case "rtc": {
+                const hashInput = `${data.member.user_id}|${data.member.device_id}|${data.member.id}`;
+                const hashBuffer = await sha256(hashInput);
+                const hashedString = encodeUnpaddedBase64Url(hashBuffer);
+                return hashedString;
+            }
+            case "session":
+                return `${matrixEvent.getSender()}:${data.device_id}`;
+        }
+    }
+
+    public static membershipDataFromMatrixEvent(matrixEvent: MatrixEvent): MembershipData {
+        const eventId = matrixEvent.getId();
+        const sender = matrixEvent.getSender();
+        const content = matrixEvent.getContent();
+
+        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
+        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+
         const sessionErrors: string[] = [];
         const rtcErrors: string[] = [];
-        if (checkSessionsMembershipData(data, sessionErrors)) {
-            this.membershipData = { kind: "session", data };
-        } else if (checkRtcMembershipData(data, rtcErrors, sender)) {
-            this.membershipData = { kind: "rtc", data };
+        if (checkSessionsMembershipData(content, sessionErrors)) {
+            return { kind: "session", data: content };
+        } else if (checkRtcMembershipData(content, rtcErrors, sender)) {
+            return { kind: "rtc", data: content };
         } else {
             const details =
                 sessionErrors.length < rtcErrors.length
                     ? `Does not match MSC4143 m.call.member:\n${sessionErrors.join("\n")}\n\n`
                     : `Does not match MSC4143 m.rtc.member:\n${rtcErrors.join("\n")}\n\n`;
-            const json = "\nevent:\n" + JSON.stringify(data).replaceAll('"', "'");
+            const json = "\nevent:\n" + JSON.stringify(content).replaceAll('"', "'");
             throw Error(`unknown CallMembership data.\n` + details + json);
         }
-        this.matrixEventData = { eventId, sender };
     }
 
     /** @deprecated use userId instead */
@@ -397,17 +447,6 @@ export class CallMembership {
         }
     }
     /**
-     * This computes the membership ID for the membership.
-     * for the sticky event based rtcSessionData this is trivial it is `member.id`.
-     *
-     * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
-     * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
-     *
-     * So if there is no membershipID we use the hard coded jwt id default (`${this.matrixEventData.sender}:${data.device_id}`)
-     * value (used until version 0.16.0)
-     *
-     * It is also possible for a session event to set a custom membershipID. in that case this will be used.
-     *
      * @deprecated renamed to `memberId`
      */
     public get membershipID(): string {
@@ -416,7 +455,9 @@ export class CallMembership {
 
     /**
      * This computes the membership ID for the membership.
-     * for the sticky event based rtcSessionData this is trivial it is `member.id`.
+     * For the sticky event based rtcSessionData this is trivial it is `member.id`.
+     * This is not supposed to be used to identity on an rtc backend. This is just a nouance for
+     * a generated (sha256) anonymised identity. Only send `rtcBackendIdentity` to any rtc backend service.
      *
      * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
      * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
