@@ -21,11 +21,9 @@ import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "
 import type { RTCCallIntent, Transport } from "./types.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
-import { logger as rootLogger } from "../logger.ts";
 import { sha256 } from "../digest.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
-
-const logger = rootLogger.getChild("[CallMembership]");
+import { type Logger } from "src/logger.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -280,15 +278,13 @@ export class CallMembership {
          * Anonymised identity to use with the RTC backend.
          *
          * The rtcBackendIdentity is a hashed version of all the identity parts:
-         * `${this.userId}|${this.deviceId}|${this.memberId}`
+         * `sha256(${this.userId}|${this.deviceId}|${this.memberId})`
          *
          * It is used to anonymize the identity of the user in the RTC backend.
-         *
-         * The computation of this value is async and should be done right after constructing the CallMembership instance.
-         * When using a CallMembership from matrixRtcSession.memberships this will already be computed.
          */
 
         public readonly rtcBackendIdentity: string,
+        private logger?: Logger,
     ) {
         this.membershipData = data;
         const eventId = matrixEvent.getId();
@@ -398,7 +394,7 @@ export class CallMembership {
                 if (typeof intent === "string") {
                     return intent;
                 }
-                logger.warn("RTC membership has invalid m.call.intent");
+                this.logger?.warn("RTC membership has invalid m.call.intent");
                 return undefined;
             }
             case "session":

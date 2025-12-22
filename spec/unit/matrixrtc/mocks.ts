@@ -21,6 +21,7 @@ import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } 
 import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
 import { secureRandomString } from "../../../src/randomstring";
 import { type CallMembershipIdentityParts } from "src/matrixrtc/EncryptionManager";
+import { logger } from "src/logger";
 
 export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
 
@@ -191,7 +192,7 @@ export function mockCallMembership(membershipData: MembershipData, roomId: strin
     const ev = mockRTCEvent(membershipData, roomId);
     (ev.getContent as jest.Mock).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, "xx");
+    return new CallMembership(ev, data, "xx", logger);
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {
