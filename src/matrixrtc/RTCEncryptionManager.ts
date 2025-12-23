@@ -113,6 +113,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             keyBin: Uint8Array,
             encryptionKeyIndex: number,
             membership: CallMembershipIdentityParts,
+            rtcBackendIdentity: string,
         ) => void,
         parentLogger?: Logger,
     ) {
@@ -126,13 +127,34 @@ export class RTCEncryptionManager implements IEncryptionManager {
         return new Map(this.participantKeyRings);
     }
 
+    private keysWithoutMatchingRTCMembership: Array<{
+        key: Uint8Array;
+        keyIndex: number;
+        membership: CallMembershipIdentityParts;
+    }> = [];
+
+    private checkKeysWithoutMatchingRTCMembership(): void {
+        const keyInfoTemp = this.keysWithoutMatchingRTCMembership;
+        this.keysWithoutMatchingRTCMembership = [];
+        keyInfoTemp.forEach((keyInfo) => {
+            this.addKeyToParticipant(keyInfo.key, keyInfo.keyIndex, keyInfo.membership);
+        });
+    }
+
     private addKeyToParticipant(key: Uint8Array, keyIndex: number, membership: CallMembershipIdentityParts): void {
+        const fullMembership = this.getMemberships().find(
+            (member) => member.userId === membership.userId && member.deviceId === membership.deviceId,
+        );
+        if (!fullMembership) {
+            this.keysWithoutMatchingRTCMembership.push({ key, keyIndex, membership });
+            return;
+        }
         const mapKey = getEncryptionKeyMapKey(membership);
         if (!this.participantKeyRings.has(mapKey)) {
             this.participantKeyRings.set(mapKey, []);
         }
         this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership });
-        this.onEncryptionKeysChanged(key, keyIndex, membership);
+        this.onEncryptionKeysChanged(key, keyIndex, membership, fullMembership.rtcBackendIdentity);
     }
 
     public join(joinConfig: EncryptionConfig | undefined): void {
@@ -231,6 +253,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
         this.ensureKeyDistribution();
+        // ensure key emission to the rtc backend
+        this.checkKeysWithoutMatchingRTCMembership();
     }
 
     private async rolloutOutboundKey(): Promise<void> {

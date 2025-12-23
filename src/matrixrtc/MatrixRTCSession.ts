@@ -76,6 +76,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         key: Uint8Array,
         encryptionKeyIndex: number,
         membership: CallMembershipIdentityParts,
+        rtcBackendIdentity: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
@@ -587,8 +588,19 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     () => this.memberships,
                     transport,
                     this.statistics,
-                    (keyBin: Uint8Array, encryptionKeyIndex: number, membership: CallMembershipIdentityParts) => {
-                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, membership);
+                    (
+                        keyBin: Uint8Array,
+                        encryptionKeyIndex: number,
+                        membership: CallMembershipIdentityParts,
+                        rtcBackendIdentity?: string,
+                    ) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            membership,
+                            rtcBackendIdentity,
+                        );
                     },
                     this.logger,
                 );
