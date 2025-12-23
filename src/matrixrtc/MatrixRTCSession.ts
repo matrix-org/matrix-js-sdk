@@ -592,7 +592,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                         keyBin: Uint8Array,
                         encryptionKeyIndex: number,
                         membership: CallMembershipIdentityParts,
-                        rtcBackendIdentity?: string,
+                        rtcBackendIdentity: string,
                     ) => {
                         this.emit(
                             MatrixRTCSessionEvent.EncryptionKeyChanged,
@@ -612,8 +612,19 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     () => this.memberships,
                     transport,
                     this.statistics,
-                    (keyBin: Uint8Array, encryptionKeyIndex: number, membership: CallMembershipIdentityParts) => {
-                        this.emit(MatrixRTCSessionEvent.EncryptionKeyChanged, keyBin, encryptionKeyIndex, membership);
+                    (
+                        keyBin: Uint8Array,
+                        encryptionKeyIndex: number,
+                        membership: CallMembershipIdentityParts,
+                        rtcBackendIdentity: string,
+                    ) => {
+                        this.emit(
+                            MatrixRTCSessionEvent.EncryptionKeyChanged,
+                            keyBin,
+                            encryptionKeyIndex,
+                            membership,
+                            rtcBackendIdentity,
+                        );
                     },
                 );
             }
@@ -728,13 +739,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * the keys.
      */
     public reemitEncryptionKeys(): void {
-        this.encryptionManager?.getEncryptionKeys().forEach((keyRing, participantId) => {
+        this.encryptionManager?.getEncryptionKeys().forEach((keyRing, key) => {
             keyRing.forEach((keyInfo) => {
                 this.emit(
                     MatrixRTCSessionEvent.EncryptionKeyChanged,
                     keyInfo.key,
                     keyInfo.keyIndex,
                     keyInfo.membership,
+                    keyInfo.rtcBackendIdentity,
                 );
             });
         });

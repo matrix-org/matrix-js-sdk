@@ -57,7 +57,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
      */
     private participantKeyRings = new Map<
         EncryptionKeyMapKey,
-        Array<{ key: Uint8Array; keyIndex: number; membership: CallMembershipIdentityParts }>
+        Array<{
+            key: Uint8Array;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
     >();
 
     // The current per-sender media key for this device
@@ -122,7 +127,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     public getEncryptionKeys(): ReadonlyMap<
         EncryptionKeyMapKey,
-        ReadonlyArray<{ key: Uint8Array; keyIndex: number; membership: CallMembershipIdentityParts }>
+        ReadonlyArray<{
+            key: Uint8Array;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
     > {
         return new Map(this.participantKeyRings);
     }
@@ -153,8 +163,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
         if (!this.participantKeyRings.has(mapKey)) {
             this.participantKeyRings.set(mapKey, []);
         }
-        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership });
-        this.onEncryptionKeysChanged(key, keyIndex, membership, fullMembership.rtcBackendIdentity);
+        const rtcBackendIdentity = fullMembership.rtcBackendIdentity;
+        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, rtcBackendIdentity });
+        this.onEncryptionKeysChanged(key, keyIndex, membership, rtcBackendIdentity);
     }
 
     public join(joinConfig: EncryptionConfig | undefined): void {

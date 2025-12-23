@@ -47,7 +47,12 @@ export interface IEncryptionManager {
      */
     getEncryptionKeys(): ReadonlyMap<
         EncryptionKeyMapKey,
-        ReadonlyArray<{ key: Uint8Array; keyIndex: number; membership: CallMembershipIdentityParts }>
+        ReadonlyArray<{
+            key: Uint8Array;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
     >;
 }
 
@@ -102,25 +107,42 @@ export class EncryptionManager implements IEncryptionManager {
             keyBin: Uint8Array,
             encryptionKeyIndex: number,
             membership: CallMembershipIdentityParts,
+            rtcBackendIdentity: string,
         ) => void,
         parentLogger?: Logger,
     ) {
         this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
     }
 
+    private rtcBackendIdentityFromMembershipParts(membership: CallMembershipIdentityParts): string {
+        // Implement logic to construct rtcBackendIdentity from membership parts
+        return `${membership.userId}:${membership.deviceId}`;
+    }
+
     public getEncryptionKeys(): ReadonlyMap<
         EncryptionKeyMapKey,
-        ReadonlyArray<{ key: Uint8Array; keyIndex: number; membership: CallMembershipIdentityParts }>
+        ReadonlyArray<{
+            key: Uint8Array;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
     > {
         const keysMap = new Map<
             EncryptionKeyMapKey,
-            ReadonlyArray<{ key: Uint8Array; keyIndex: number; membership: CallMembershipIdentityParts }>
+            ReadonlyArray<{
+                key: Uint8Array;
+                keyIndex: number;
+                membership: CallMembershipIdentityParts;
+                rtcBackendIdentity: string;
+            }>
         >();
         for (const [userId, userKeyEntry] of this.encryptionKeys) {
             const keys = userKeyEntry.map((entry, index) => ({
                 key: entry.key,
                 membership: entry.membership,
                 keyIndex: index,
+                rtcBackendIdentity: this.rtcBackendIdentityFromMembershipParts(entry.membership),
             }));
             keysMap.set(userId as EncryptionKeyMapKey, keys);
         }
@@ -414,11 +436,21 @@ export class EncryptionManager implements IEncryptionManager {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
                 this.logger.info(`Delayed-emitting key changed event for ${mapKey} index ${encryptionKeyIndex}`);
 
-                this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, membership);
+                this.onEncryptionKeysChanged(
+                    keyBin,
+                    encryptionKeyIndex,
+                    membership,
+                    this.rtcBackendIdentityFromMembershipParts(membership),
+                );
             }, this.useKeyDelay);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
-            this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, membership);
+            this.onEncryptionKeysChanged(
+                keyBin,
+                encryptionKeyIndex,
+                membership,
+                this.rtcBackendIdentityFromMembershipParts(membership),
+            );
         }
     }
 
