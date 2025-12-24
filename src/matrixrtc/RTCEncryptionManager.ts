@@ -151,7 +151,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                     this.ownMembership.memberId,
                 );
             } else {
-                this._ownRtcBackendIdentity = `${this.ownMembership.userId}|${this.ownMembership.deviceId}`;
+                this._ownRtcBackendIdentity = `${this.ownMembership.userId}:${this.ownMembership.deviceId}`;
             }
         }
         return this._ownRtcBackendIdentity!;

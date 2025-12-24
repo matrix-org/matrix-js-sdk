@@ -126,7 +126,7 @@ describe("RTCEncryptionManager", () => {
                     memberId: "@alice:example.org:DEVICE01",
                     userId: "@alice:example.org",
                 },
-                "@alice:example.org|DEVICE01",
+                "@alice:example.org:DEVICE01",
             );
         });
 
@@ -461,7 +461,7 @@ describe("RTCEncryptionManager", () => {
                     deviceId: "DEVICE01",
                     memberId: "@alice:example.org:DEVICE01",
                 },
-                "@alice:example.org|DEVICE01",
+                "@alice:example.org:DEVICE01",
             );
 
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
@@ -781,7 +781,7 @@ describe("RTCEncryptionManager", () => {
                 memberId: "@alice:example.org:DEVICE01",
                 userId: "@alice:example.org",
             },
-            "@alice:example.org|DEVICE01",
+            "@alice:example.org:DEVICE01",
         );
         onEncryptionKeysChanged.mockClear();
 
@@ -825,7 +825,7 @@ describe("RTCEncryptionManager", () => {
                 userId: "@alice:example.org",
                 memberId: "@alice:example.org:DEVICE01",
             },
-            "@alice:example.org|DEVICE01",
+            "@alice:example.org:DEVICE01",
         );
         expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
             expect.any(Uint8Array<ArrayBufferLike>),
@@ -835,7 +835,7 @@ describe("RTCEncryptionManager", () => {
                 memberId: "@alice:example.org:DEVICE01",
                 userId: "@alice:example.org",
             },
-            "@alice:example.org|DEVICE01",
+            "@alice:example.org:DEVICE01",
         );
 
         // Key `2` should only be distributed to the last membership
@@ -894,7 +894,7 @@ describe("RTCEncryptionManager", () => {
                     userId: "@alice:example.org",
                     memberId: "@alice:example.org:DEVICE01",
                 },
-                "@alice:example.org|DEVICE01",
+                "@alice:example.org:DEVICE01",
             );
         });
 

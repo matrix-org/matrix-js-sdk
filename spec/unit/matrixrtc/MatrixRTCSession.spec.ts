@@ -825,11 +825,16 @@ describe("MatrixRTCSession", () => {
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess?.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(expect.any(Uint8Array), 0, {
-                    deviceId: "AAAAAAA",
-                    memberId: "@alice:example.org:AAAAAAA",
-                    userId: "@alice:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    expect.any(Uint8Array),
+                    0,
+                    {
+                        deviceId: "AAAAAAA",
+                        memberId: "@alice:example.org:AAAAAAA",
+                        userId: "@alice:example.org",
+                    },
+                    "@alice:example.org:AAAAAAA",
+                );
             });
 
             it("sends keys when joining", async () => {
@@ -1344,11 +1349,16 @@ describe("MatrixRTCSession", () => {
                 sess!.reemitEncryptionKeys();
 
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("this is the key"), 0, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("this is the key"),
+                    0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
             });
 
@@ -1370,11 +1380,16 @@ describe("MatrixRTCSession", () => {
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("this is the key"), 4, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("this is the key"),
+                    4,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
 
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
             });
@@ -1396,11 +1411,16 @@ describe("MatrixRTCSession", () => {
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("this is the key"), 0, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("this is the key"),
+                    0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
 
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
 
@@ -1416,16 +1436,26 @@ describe("MatrixRTCSession", () => {
                 encryptionKeyChangedListener.mockClear();
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(3);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("this is the key"), 0, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("this is the key"), 4, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("this is the key"),
+                    0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("this is the key"),
+                    4,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
 
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
             });
@@ -1480,11 +1510,16 @@ describe("MatrixRTCSession", () => {
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("newer key"), 0, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("newer key"),
+                    0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
 
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(3);
             });
@@ -1526,11 +1561,16 @@ describe("MatrixRTCSession", () => {
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess!.reemitEncryptionKeys();
                 expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(textEncoder.encode("second key"), 0, {
-                    deviceId: "bobsphone",
-                    memberId: "@bob:example.org:bobsphone",
-                    userId: "@bob:example.org",
-                });
+                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
+                    textEncoder.encode("second key"),
+                    0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
+                    "@bob:example.org:bobsphone",
+                );
             });
 
             it("ignores keys event for the local participant", () => {
