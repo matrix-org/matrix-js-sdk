@@ -18,10 +18,10 @@ import { EventEmitter } from "stream";
 import { type Mocked } from "jest-mock";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
 import { type CallMembershipIdentityParts } from "src/matrixrtc/EncryptionManager";
-import { logger } from "src/logger";
+import { logger } from "../../../src/logger.ts";
 
 export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
 
