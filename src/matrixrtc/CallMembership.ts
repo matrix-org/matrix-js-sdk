@@ -307,14 +307,18 @@ export class CallMembership {
         const { kind, data } = membershipData;
         switch (kind) {
             case "rtc": {
-                const hashInput = `${data.member.user_id}|${data.member.device_id}|${data.member.id}`;
-                const hashBuffer = await sha256(hashInput);
-                const hashedString = encodeUnpaddedBase64Url(hashBuffer);
-                return hashedString;
+                return CallMembership.computeRtcIdentityRaw(data.member.user_id, data.member.device_id, data.member.id);
             }
             case "session":
                 return `${matrixEvent.getSender()}:${data.device_id}`;
         }
+    }
+
+    public static async computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
+        const hashInput = `${userId}|${deviceId}|${memberId}`;
+        const hashBuffer = await sha256(hashInput);
+        const hashedString = encodeUnpaddedBase64Url(hashBuffer);
+        return hashedString;
     }
 
     public static membershipDataFromMatrixEvent(matrixEvent: MatrixEvent): MembershipData {

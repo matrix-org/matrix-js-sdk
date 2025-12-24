@@ -15,21 +15,21 @@ limitations under the License.
 */
 
 import {
-    getEncryptionKeyMapKey,
     type CallMembershipIdentityParts,
+    getEncryptionKeyMapKey,
     type IEncryptionManager,
 } from "./EncryptionManager.ts";
-import { type EncryptionConfig } from "./MatrixRTCSession.ts";
-import { type CallMembership } from "./CallMembership.ts";
+import { type EncryptionConfig, type MembershipConfig } from "./MatrixRTCSession.ts";
+import { CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { type Logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
 import {
+    type EncryptionKeyMapKey,
     type InboundEncryptionSession,
     type OutboundEncryptionSession,
     type ParticipantDeviceInfo,
-    type EncryptionKeyMapKey,
     type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
@@ -49,6 +49,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
     // to create a NoOpEncryptionManager that does nothing and use it for the session.
     // This will be done when removing the legacy EncryptionManager.
     private manageMediaKeys = false;
+
+    private usePseudoRtcBackendIdentity = false;
+    private _ownRtcBackendIdentity: string | undefined = undefined;
 
     /**
      * Store the key rings for each participant.
@@ -108,8 +111,20 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger | undefined = undefined;
 
+    private rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
+
+    /**
+     *
+     * @param ownMembership - our own membership info
+     * @param getMemberships - function to get current memberships
+     * @param transport - key transport (room or to-device)
+     * @param statistics - statistics collector
+     * @param onEncryptionKeysChanged - callback to notify the media layer of new keys
+     * @param parentLogger - optional parent logger
+     * @param rtcBackendIdProvider - A function to compute the rtc backend identity, exposed for testing purposes
+     */
     public constructor(
-        private membership: CallMembershipIdentityParts,
+        private ownMembership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
         private statistics: Statistics,
@@ -121,8 +136,25 @@ export class RTCEncryptionManager implements IEncryptionManager {
             rtcBackendIdentity: string,
         ) => void,
         parentLogger?: Logger,
+        rtcBackendIdProvider?: (userId: string, deviceId: string, memberId: string) => Promise<string>,
     ) {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
+        this.rtcIdentityProvider = rtcBackendIdProvider ?? CallMembership.computeRtcIdentityRaw;
+    }
+
+    private async getOwnRtcBackendIdentity(): Promise<string> {
+        if (!this._ownRtcBackendIdentity) {
+            if (this.usePseudoRtcBackendIdentity) {
+                this._ownRtcBackendIdentity = await this.rtcIdentityProvider(
+                    this.ownMembership.userId,
+                    this.ownMembership.deviceId,
+                    this.ownMembership.memberId,
+                );
+            } else {
+                this._ownRtcBackendIdentity = `${this.ownMembership.userId}|${this.ownMembership.deviceId}`;
+            }
+        }
+        return this._ownRtcBackendIdentity!;
     }
 
     public getEncryptionKeys(): ReadonlyMap<
@@ -152,25 +184,41 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private addKeyToParticipant(key: Uint8Array, keyIndex: number, membership: CallMembershipIdentityParts): void {
-        const fullMembership = this.getMemberships().find(
+        const knownRtcMembership = this.getMemberships();
+        const fullMembership = knownRtcMembership.find(
             (member) => member.userId === membership.userId && member.deviceId === membership.deviceId,
         );
         if (!fullMembership) {
+            this.logger?.info(
+                `No matching RTC membership for key from ${membership.userId}:${membership.deviceId}, delaying key addition`,
+            );
             this.keysWithoutMatchingRTCMembership.push({ key, keyIndex, membership });
             return;
         }
+        this.addKeyToParticipantWithBackendIdentity(key, keyIndex, membership, fullMembership.rtcBackendIdentity);
+    }
+
+    private addKeyToParticipantWithBackendIdentity(
+        key: Uint8Array,
+        keyIndex: number,
+        membership: CallMembershipIdentityParts,
+        rtcBackendIdentity: string,
+    ): void {
         const mapKey = getEncryptionKeyMapKey(membership);
         if (!this.participantKeyRings.has(mapKey)) {
             this.participantKeyRings.set(mapKey, []);
         }
-        const rtcBackendIdentity = fullMembership.rtcBackendIdentity;
         this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, rtcBackendIdentity });
         this.onEncryptionKeysChanged(key, keyIndex, membership, rtcBackendIdentity);
     }
 
-    public join(joinConfig: EncryptionConfig | undefined): void {
+    public join(joinConfig: (EncryptionConfig & MembershipConfig) | undefined): void {
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
 
+        this.usePseudoRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
+        void this.getOwnRtcBackendIdentity(); // precompute own identity
+
+        this.usePseudoRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
         this.logger?.info(`Joining room`);
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
@@ -210,7 +258,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 }
             });
         } else {
-            // There is a rollout in progress, but a key rotation is requested (could be caused by a membership change)
+            // There is a rollout in progress, but a key rotation is requested (could be caused by a ownMembership change)
             // Remember that a new rotation is needed after the current one.
             this.logger?.debug(`Rollout in progress, a new rollout will be started after the current one`);
             this.needToEnsureKeyAgain = true;
@@ -254,7 +302,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     };
 
     /**
-     * Called when the membership of the call changes.
+     * Called when the ownMembership of the call changes.
      * This encryption manager is very basic, it will rotate the key everytime this is called.
      * @param oldMemberships - This parameter is not used here, but it is kept for compatibility with the interface.
      */
@@ -272,13 +320,19 @@ export class RTCEncryptionManager implements IEncryptionManager {
         const isFirstKey = this.outboundSession == null;
         if (isFirstKey) {
             // create the first key
-            this.outboundSession = {
+            const firstKey = {
                 key: this.generateRandomKey(),
                 creationTS: Date.now(),
                 sharedWith: [],
                 keyId: 0,
             };
-            this.addKeyToParticipant(this.outboundSession.key, this.outboundSession.keyId, this.membership);
+            this.outboundSession = firstKey;
+            this.addKeyToParticipantWithBackendIdentity(
+                firstKey.key,
+                firstKey.keyId,
+                this.ownMembership,
+                await this.getOwnRtcBackendIdentity(),
+            );
         }
         // get current memberships
         const toShareWith: ParticipantDeviceInfo[] = this.getMemberships()
@@ -295,7 +349,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         let alreadySharedWith = this.outboundSession?.sharedWith ?? [];
 
-        // Some users might have rotate their membership event (formally called fingerprint) meaning they might have
+        // Some users might have rotate their ownMembership event (formally called fingerprint) meaning they might have
         // clear their key. Reset the `alreadySharedWith` flag for them.
         alreadySharedWith = alreadySharedWith.filter(
             (x) =>
@@ -364,7 +418,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
                 await sleep(this.useKeyDelay);
                 this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
-                this.addKeyToParticipant(outboundKey.key, outboundKey.keyId, this.membership);
+                this.addKeyToParticipantWithBackendIdentity(
+                    outboundKey.key,
+                    outboundKey.keyId,
+                    this.ownMembership,
+                    await this.getOwnRtcBackendIdentity(),
+                );
             }
         } catch (err) {
             this.logger?.error(`Failed to rollout key`, err);

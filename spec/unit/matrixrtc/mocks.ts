@@ -188,11 +188,15 @@ export function mockRTCEvent(
     } as unknown as MatrixEvent;
 }
 
-export function mockCallMembership(membershipData: MembershipData, roomId: string): CallMembership {
+export function mockCallMembership(
+    membershipData: MembershipData,
+    roomId: string,
+    rtcBackendIdentity?: string,
+): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
     (ev.getContent as jest.Mock).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, "xx", logger);
+    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx", logger);
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {
