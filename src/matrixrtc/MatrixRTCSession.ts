@@ -462,7 +462,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * @param client A subset of the {@link MatrixClient} that lets the session interact with the Matrix room.
      * @param roomSubset The room this session is attached to. A subset of a js-sdk Room that the session needs.
-     * @param The slot description is a virtual address where participants are allowed to meet.
+     * @param slotDescription The slot description is a virtual address where participants are allowed to meet.
      * This session will only manage memberships that match this slot description.Sessions are distinct if any of
      * those properties are distinct: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
      */
