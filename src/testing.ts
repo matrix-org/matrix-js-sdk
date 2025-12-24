@@ -179,7 +179,6 @@ export async function decryptExistingEvent(
             type: opts.plainType,
             content: opts.plainContent,
         },
-        forwardingCurve25519KeyChain: [],
         senderCurve25519Key: "",
         untrusted: false,
     };

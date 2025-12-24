@@ -15,9 +15,12 @@ limitations under the License.
 */
 
 import type { ISignatures } from "./signed.ts";
+import type { EventDecryptionResult } from "../common-crypto/CryptoBackend.ts";
 
 // Backwards compatible re-export
-export type { EventDecryptionResult as IEventDecryptionResult } from "../common-crypto/CryptoBackend.ts";
+/** @deprecated This is an internal type and should not be used. */
+type IEventDecryptionResult = EventDecryptionResult;
+export type { IEventDecryptionResult };
 
 interface Extensible {
     [key: string]: any;

@@ -200,8 +200,9 @@ export interface EventDecryptionResult {
      */
     clearEvent: IClearEvent;
     /**
-     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     * No longer used.
      * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
+     * @deprecated
      */
     forwardingCurve25519KeyChain?: string[];
     /**
