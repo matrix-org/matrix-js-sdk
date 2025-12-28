@@ -50,8 +50,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
     // This will be done when removing the legacy EncryptionManager.
     private manageMediaKeys = false;
 
-    private usePseudoRtcBackendIdentity = false;
-    private _ownRtcBackendIdentity: string | undefined = undefined;
+    private useHashedRtcBackendIdentity = false;
+    private ownRtcBackendIdentityCache: string | undefined;
 
     /**
      * Store the key rings for each participant.
@@ -143,18 +143,19 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private async getOwnRtcBackendIdentity(): Promise<string> {
-        if (!this._ownRtcBackendIdentity) {
-            if (this.usePseudoRtcBackendIdentity) {
-                this._ownRtcBackendIdentity = await this.rtcIdentityProvider(
-                    this.ownMembership.userId,
-                    this.ownMembership.deviceId,
-                    this.ownMembership.memberId,
-                );
-            } else {
-                this._ownRtcBackendIdentity = `${this.ownMembership.userId}:${this.ownMembership.deviceId}`;
-            }
+        if (this.ownRtcBackendIdentityCache) return this.ownRtcBackendIdentityCache;
+
+        if (this.useHashedRtcBackendIdentity) {
+            const { userId, deviceId, memberId } = this.ownMembership;
+            this.logger?.info(
+                // If we see this log multiple times, we need to reconsider the precompute call of getOwnRtcBackendIdentity
+                `Computing RTC backend identity for ${userId}:${deviceId}:${memberId} (SHOULD ONLY BE CALLED ONCE)`,
+            );
+            this.ownRtcBackendIdentityCache = await this.rtcIdentityProvider(userId, deviceId, memberId);
+        } else {
+            this.ownRtcBackendIdentityCache = `${this.ownMembership.userId}:${this.ownMembership.deviceId}`;
         }
-        return this._ownRtcBackendIdentity!;
+        return this.ownRtcBackendIdentityCache;
     }
 
     public getEncryptionKeys(): ReadonlyMap<
@@ -214,16 +215,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     public join(joinConfig: (EncryptionConfig & MembershipConfig) | undefined): void {
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
-
-        this.usePseudoRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
-        void this.getOwnRtcBackendIdentity(); // precompute own identity
-
-        this.usePseudoRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
-        this.logger?.info(`Joining room`);
+        this.useHashedRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
-        this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
 
+        this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
+        void this.getOwnRtcBackendIdentity(); // precompute own identity
+
+        this.logger?.info(`Joining room`);
         this.transport.start();
     }
 
