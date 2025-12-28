@@ -263,16 +263,19 @@ export class CallMembership {
         return deepCompare(a?.membershipData, b?.membershipData);
     }
 
-    private membershipData: MembershipData;
-
+    private logger?: Logger;
     /** The parsed data from the Matrix event.
      * To access checked eventId and sender from the matrixEvent.
      * Class construction will fail if these values cannot get obtained. */
-    private readonly matrixEventData: { eventId: string; sender: string };
+    private readonly matrixEventData: { eventId: string; sender: string; ts: number };
+
     public constructor(
-        /** The Matrix event that this membership is based on */
-        private readonly matrixEvent: MatrixEvent,
-        data: MembershipData,
+        /** The required parts of the Matrix event that this membership is based on */
+        matrixEvent: Pick<MatrixEvent, "getId" | "getSender" | "getTs">,
+
+        /** The type checked membership data {data: (content of the matrix event), kind: (type hint)} */
+        private readonly membershipData: MembershipData,
+
         /**
          *
          * Anonymised identity to use with the RTC backend.
@@ -282,18 +285,20 @@ export class CallMembership {
          *
          * It is used to anonymize the identity of the user in the RTC backend.
          */
-
         public readonly rtcBackendIdentity: string,
-        private logger?: Logger,
-    ) {
-        this.membershipData = data;
-        const eventId = matrixEvent.getId();
-        const sender = matrixEvent.getSender();
 
+        /**
+         * The constructor will automatically create a properly tagged child logger instance.
+         */
+        logger?: Logger,
+    ) {
+        const [eventId, sender, ts] = [matrixEvent.getId(), matrixEvent.getSender(), matrixEvent.getTs()];
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
 
-        this.matrixEventData = { eventId, sender };
+        this.matrixEventData = { eventId, sender, ts };
+
+        this.logger = logger?.getChild(`[CallMembership ${sender}:${this.deviceId}]`);
     }
 
     /**
@@ -301,7 +306,7 @@ export class CallMembership {
      * `${this.userId}:${this.deviceId}` for state events (kind = session)
      */
     public static async computeRtcBackendIdentity(
-        matrixEvent: MatrixEvent,
+        matrixEvent: Pick<MatrixEvent, "getSender">,
         membershipData: MembershipData,
     ): Promise<string> {
         const { kind, data } = membershipData;
@@ -322,9 +327,7 @@ export class CallMembership {
     }
 
     public static membershipDataFromMatrixEvent(matrixEvent: MatrixEvent): MembershipData {
-        const eventId = matrixEvent.getId();
-        const sender = matrixEvent.getSender();
-        const content = matrixEvent.getContent();
+        const [eventId, sender, content] = [matrixEvent.getId(), matrixEvent.getSender(), matrixEvent.getContent()];
 
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
@@ -491,10 +494,10 @@ export class CallMembership {
         switch (kind) {
             case "rtc":
                 // TODO we need to read the referenced (relation) event if available to get the real created_ts
-                return this.matrixEvent.getTs();
+                return this.matrixEventData.ts;
             case "session":
             default:
-                return data.created_ts ?? this.matrixEvent.getTs();
+                return data.created_ts ?? this.matrixEventData.ts;
         }
     }
 

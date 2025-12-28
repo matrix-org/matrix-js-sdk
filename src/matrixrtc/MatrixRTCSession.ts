@@ -384,16 +384,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
             }
             try {
                 const membershipData = CallMembership.membershipDataFromMatrixEvent(memberEvent);
-                // For the logger we need to get the device ID here already.
-                const deviceId =
-                    membershipData.kind === "rtc"
-                        ? membershipData.data.member.device_id
-                        : membershipData.data.device_id;
+
                 const membership = new CallMembership(
                     memberEvent,
                     membershipData,
                     await CallMembership.computeRtcBackendIdentity(memberEvent, membershipData),
-                    rootLogger.getChild(`[CallMembership ${memberEvent.sender?.userId}:${deviceId}]`),
+                    rootLogger,
                 );
 
                 if (!deepCompare(membership.slotDescription, slotDescription)) {
