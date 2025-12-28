@@ -23,7 +23,7 @@ import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { sha256 } from "../digest.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
-import { type Logger } from "src/logger.ts";
+import { type Logger } from "../logger.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
