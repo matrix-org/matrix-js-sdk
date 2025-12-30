@@ -1217,7 +1217,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
 
     private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
-    private readonly enableEncryptedStateEvents: boolean;
+
+    /**
+     * Support MSC4362: Simplified Encrypted State Events.
+     *
+     * The client must be recreated for changes to this setting to take effect
+     * reliably.
+     *
+     * When this setting is true, if we find a state event that is encrypted
+     * (within a room that supports encrypted state), we will attempt to decrypt
+     * it as specified in MSC4362. If the user was in the room at the time an
+     * encrypted state event was received (meaning we have the key), even if
+     * this setting was set to false at the time it was received, recreating the
+     * client with this setting set to true will allow decrypting that event.
+     *
+     * When this setting is false, any state event that is encrypted will not be
+     * decrypted, meaning it will have no effect. This matched the behaviour of
+     * a client that does not support MSC4362.
+     */
+    public enableEncryptedStateEvents: boolean;
+
     public cryptoCallbacks: CryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;

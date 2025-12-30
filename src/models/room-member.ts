@@ -94,16 +94,23 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * True if the room member is currently typing.
      */
     public typing = false;
+
     /**
-     * The human-readable name for this room member. This will be
+     * The human-readable name for this room member. Similar to {@link rawDisplayName}, but
      * disambiguated with a suffix of " (\@user_id:matrix.org)" if another member shares the
      * same displayname.
      */
     public name: string;
+
     /**
-     * The ambiguous displayname of this room member.
+     * The ambiguous displayname of this room member, with some preprocessing:
+     *
+     *  * Direction override characters (RTO and LRO) are removed.
+     *  * If the displayname is empty, or contains only blank, non-printing, or diacritcic characters, it is
+     *    replaced with the user ID.
      */
     public rawDisplayName: string;
+
     /**
      * The power level for this room member.
      */
