@@ -195,7 +195,7 @@ describe("parseErrorResponse", () => {
         {
             errcode: MatrixSafetyErrorCode.name,
             error: "Spammy",
-            expiry: Date.now() + 5000,
+            expiry: 5000,
         },
         {
             errcode: MatrixSafetyErrorCode.name,
