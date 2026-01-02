@@ -187,26 +187,34 @@ describe("parseErrorResponse", () => {
             ),
         );
     });
-    it("should resolve MatrixSafetyErrors from fetch", () => {
+    it.each([
+        {
+            errcode: MatrixSafetyErrorCode.name,
+            error: "Spammy",
+        },
+        {
+            errcode: MatrixSafetyErrorCode.name,
+            error: "Spammy",
+            expiry: Date.now() + 5000,
+        },
+        {
+            errcode: MatrixSafetyErrorCode.name,
+            error: "Spammy",
+            harms: ["m.spam", "org.example.additional-harm"],
+            expiry: 5000,
+        },
+    ])("should resolve MatrixSafetyErrors from fetch", (errContent) => {
         headers.set("Content-Type", "application/json");
         const value = parseErrorResponse(
             {
                 headers,
                 status: 400,
             } as Response,
-            `{"errcode": "${MatrixSafetyErrorCode.name}", "error": "Spammy", "harms": ["m.spam", "org.example.additional-harm"], "expiry": 5000}`,
-        );
-        expect(value).toStrictEqual(
-            new MatrixSafetyError(
-                {
-                    errcode: MatrixSafetyErrorCode.name,
-                    error: "Spammy",
-                    harms: ["m.spam", "org.example.additional-harm"],
-                    expiry: 5000,
-                },
-                400,
-            ),
-        );
+            JSON.stringify(errContent),
+        ) as MatrixSafetyError;
+        expect(value).toBeInstanceOf(MatrixSafetyError);
+        expect(value.harms.size).toEqual(errContent.harms?.length ?? 0);
+        expect(value.expiry?.getTime()).toEqual(errContent.expiry);
     });
 
     describe("with HTTP headers", () => {

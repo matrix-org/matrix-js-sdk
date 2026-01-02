@@ -239,29 +239,23 @@ export const MatrixSafetyErrorCode = new NamespacedValue(null, "ORG.MATRIX.MSC43
  * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4387
  */
 export class MatrixSafetyError extends MatrixError {
-    private readonly _harms: Set<string>;
-    public readonly expiryMs?: number;
+    /**
+     * The kinds of harms detected by the server.
+     * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4387 for a list of spec defined harms.
+     */
+    public readonly harms: Set<string>;
+    /**
+     * The date at which a request can be reattempted.
+     */
+    public readonly expiry?: Date;
     public constructor(...props: ConstructorParameters<typeof MatrixError>) {
         super(...props);
         const body = props[0];
-        this._harms = new Set(body && "harms" in body && Array.isArray(body.harms) ? body.harms : []);
-        this.message = `${super.message} (${[...this._harms].join(", ")})`;
+
+        this.harms = new Set(body && "harms" in body && Array.isArray(body.harms) ? body.harms : []);
+        this.message = `${super.message} (${[...this.harms].join(", ")})`;
         if (body && "expiry" in body && typeof body.expiry === "number") {
-            this.expiryMs = body.expiry;
+            this.expiry = new Date(body.expiry);
         }
-    }
-
-    /**
-     * Get the list of harms
-     */
-    public get harms(): Set<string> {
-        return new Set(this._harms);
-    }
-
-    /**
-     * Get the time at which a request can be reattempted.
-     */
-    public get expiry(): Date | undefined {
-        return this.expiryMs !== undefined ? new Date(this.expiryMs) : undefined;
     }
 }
