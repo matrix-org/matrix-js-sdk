@@ -34,10 +34,13 @@ import {
     type MembershipData,
     mockRoomState,
     mockRTCEvent,
+    owmMemberIdentity,
 } from "./mocks";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
+import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager.ts";
+import { flushPromises } from "../../test-utils/flushPromises.ts";
 
 const mockFocus = { type: "mock" };
 
@@ -92,27 +95,32 @@ describe("MatrixRTCSession", () => {
             testCreateSticky: true,
         },
     ])(
-        "roomSessionForRoom listenForSticky=$listenForStickyEvents listenForMemberStateEvents=$listenForMemberStateEvents testCreateSticky=$testCreateSticky",
+        "roomsessionForSlot listenForSticky=$listenForStickyEvents listenForMemberStateEvents=$listenForMemberStateEvents testCreateSticky=$testCreateSticky",
         (testConfig) => {
-            it(`will ${testConfig.listenForMemberStateEvents ? "" : "NOT"} throw if the room does not have any state stored`, () => {
+            it(`will ${testConfig.listenForMemberStateEvents ? "" : "NOT"} throw if the room does not have any state stored`, async () => {
                 const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
                 mockRoom.getLiveTimeline.mockReturnValue({
                     getState: jest.fn().mockReturnValue(undefined),
                 } as unknown as EventTimeline);
+
+                const warnLogSpy = jest.spyOn(console, "warn");
+                warnLogSpy.mockClear();
+                const stateWarningWasLogged = () =>
+                    warnLogSpy.mock.calls.find((call) => (call[1] as string).includes("Couldn't get state for room"));
+
+                MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, testConfig);
+                await flushPromises();
+
                 if (testConfig.listenForMemberStateEvents) {
                     // eslint-disable-next-line jest/no-conditional-expect
-                    expect(() => {
-                        MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, testConfig);
-                    }).toThrow();
+                    expect(stateWarningWasLogged()).toBeTruthy();
                 } else {
                     // eslint-disable-next-line jest/no-conditional-expect
-                    expect(() => {
-                        MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, testConfig);
-                    }).not.toThrow();
+                    expect(stateWarningWasLogged()).toBeFalsy();
                 }
             });
 
-            it("creates a room-scoped session from room state", () => {
+            it("creates a room-scoped session from room state", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
 
                 sess = MatrixRTCSession.sessionForSlot(
@@ -121,6 +129,7 @@ describe("MatrixRTCSession", () => {
                     callSession,
                     testConfig.createWithDefaults ? undefined : testConfig,
                 );
+                await flushPromises();
                 expect(sess?.memberships.length).toEqual(1);
                 expect(sess?.memberships[0].slotDescription.id).toEqual("");
                 expect(sess?.memberships[0].scope).toEqual("m.room");
@@ -159,7 +168,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess?.memberships).toHaveLength(0);
             });
 
-            it("ignores expired memberships events", () => {
+            it("ignores expired memberships events", async () => {
                 jest.useFakeTimers();
                 const expiredMembership = Object.assign({}, membershipTemplate);
                 expiredMembership.expires = 1000;
@@ -173,6 +182,7 @@ describe("MatrixRTCSession", () => {
                     callSession,
                     testConfig.createWithDefaults ? undefined : testConfig,
                 );
+                await flushPromises();
                 expect(sess?.memberships.length).toEqual(1);
                 expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
                 jest.useRealTimers();
@@ -203,7 +213,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess?.memberships.length).toEqual(0);
             });
 
-            it("honours created_ts", () => {
+            it("honours created_ts", async () => {
                 jest.useFakeTimers();
                 jest.setSystemTime(500);
                 const expiredMembership = Object.assign({}, membershipTemplate);
@@ -216,6 +226,7 @@ describe("MatrixRTCSession", () => {
                     callSession,
                     testConfig.createWithDefaults ? undefined : testConfig,
                 );
+                await flushPromises();
                 expect(sess?.memberships[0].getAbsoluteExpiry()).toEqual(1500);
                 jest.useRealTimers();
             });
@@ -331,8 +342,8 @@ describe("MatrixRTCSession", () => {
         },
     );
 
-    describe("roomSessionForRoom combined state", () => {
-        it("perfers sticky events when both membership and sticky events appear for the same user", () => {
+    describe("roomsessionForSlot combined state", () => {
+        it("perfers sticky events when both membership and sticky events appear for the same user", async () => {
             // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([membershipTemplate]);
             mockRoom._unstable_getStickyEvents.mockImplementation(() => {
@@ -351,6 +362,7 @@ describe("MatrixRTCSession", () => {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
+            await flushPromises();
             expect(sess?.memberships.length).toEqual(1);
             expect(sess?.memberships[0].slotDescription.id).toEqual("");
             expect(sess?.memberships[0].scope).toEqual("m.room");
@@ -359,7 +371,7 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships[0].isExpired()).toEqual(false);
             expect(sess?.slotDescription.id).toEqual("");
         });
-        it("combines sticky and membership events when both exist", () => {
+        it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([membershipTemplate]);
             const stickyUserId = "@stickyev:user.example";
@@ -381,6 +393,7 @@ describe("MatrixRTCSession", () => {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
+            await flushPromises();
 
             const memberships = sess.memberships;
             expect(memberships.length).toEqual(2);
@@ -396,7 +409,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess?.slotDescription.id).toEqual("");
         });
-        it("handles an incoming sticky event to an existing session", () => {
+        it("handles an incoming sticky event to an existing session", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);
             const stickyUserId = "@stickyev:user.example";
 
@@ -404,6 +417,7 @@ describe("MatrixRTCSession", () => {
                 listenForStickyEvents: true,
                 listenForMemberStateEvents: true,
             });
+            await flushPromises();
             expect(sess.memberships.length).toEqual(1);
             const stickyEv = mockRTCEvent(
                 {
@@ -419,12 +433,13 @@ describe("MatrixRTCSession", () => {
                 return [stickyEv];
             });
             mockRoom.emit(RoomStickyEventsEvent.Update, [stickyEv], [], []);
+            await flushPromises();
             expect(sess.memberships.length).toEqual(2);
         });
     });
 
     describe("getOldestMembership", () => {
-        it("returns the oldest membership event", () => {
+        it("returns the oldest membership event", async () => {
             jest.useFakeTimers();
             jest.setSystemTime(4000);
             const mockRoom = makeMockRoom([
@@ -433,7 +448,8 @@ describe("MatrixRTCSession", () => {
                 Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
             ]);
 
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await flushPromises();
             expect(sess.getOldestMembership()!.deviceId).toEqual("old");
             jest.useRealTimers();
         });
@@ -446,7 +462,7 @@ describe("MatrixRTCSession", () => {
             [undefined, "audio", "audio"],
             ["audio", "audio", "audio"],
             ["audio", "video", undefined],
-        ])("gets correct consensus for %s + %s = %s", (intentA, intentB, result) => {
+        ])("gets correct consensus for %s + %s = %s", async (intentA, intentB, result) => {
             jest.useFakeTimers();
             jest.setSystemTime(4000);
             const mockRoom = makeMockRoom([
@@ -454,7 +470,8 @@ describe("MatrixRTCSession", () => {
                 Object.assign({}, membershipTemplate, { "m.call.intent": intentB }),
             ]);
 
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await flushPromises();
             expect(sess.getConsensusCallIntent()).toEqual(result);
             jest.useRealTimers();
         });
@@ -479,9 +496,9 @@ describe("MatrixRTCSession", () => {
                 Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
             ]);
 
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
-            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }], {
+            sess.joinRTCSession(owmMemberIdentity, [{ type: "livekit", livekit_service_url: "htts://test.org" }], {
                 type: "livekit",
                 focus_selection: "oldest_membership",
             });
@@ -498,9 +515,9 @@ describe("MatrixRTCSession", () => {
                 Object.assign({}, membershipTemplate, { device_id: "bar", created_ts: 2000 }),
             ]);
 
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
-            sess.joinRoomSession([{ type: "livekit", livekit_service_url: "htts://test.org" }], {
+            sess.joinRTCSession(owmMemberIdentity, [{ type: "livekit", livekit_service_url: "htts://test.org" }], {
                 type: "livekit",
                 focus_selection: "unknown",
             });
@@ -514,7 +531,7 @@ describe("MatrixRTCSession", () => {
         let sendStateEventMock: jest.Mock;
 
         let sentStateEvent: Promise<void>;
-        beforeEach(() => {
+        beforeEach(async () => {
             sentStateEvent = new Promise((resolve) => {
                 sendStateEventMock = jest.fn(resolve);
             });
@@ -528,7 +545,8 @@ describe("MatrixRTCSession", () => {
             client._unstable_sendScheduledDelayedEvent = jest.fn();
 
             mockRoom = makeMockRoom([]);
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await flushPromises();
         });
 
         afterEach(async () => {
@@ -545,12 +563,12 @@ describe("MatrixRTCSession", () => {
         });
 
         it("shows joined once join is called", () => {
-            sess!.joinRoomSession([mockFocus], mockFocus);
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
         });
 
         it("uses the sticky events membership manager implementation", () => {
-            sess!.joinRoomSession([mockFocus], mockFocus, { unstableSendStickyEvents: true });
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { unstableSendStickyEvents: true });
             expect(sess!.isJoined()).toEqual(true);
             expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
@@ -568,10 +586,10 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...membershipTemplate, user_id: client.getUserId()! }]);
-            sess!.onRTCSessionMemberUpdate();
+            await sess!._onRTCSessionMemberUpdate();
             const ownMembershipId = sess?.memberships[0].eventId;
 
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
@@ -629,7 +647,10 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring", callIntent: "audio" });
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                notificationType: "ring",
+                callIntent: "audio",
+            });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
 
             mockRoomState(mockRoom, [
@@ -641,7 +662,7 @@ describe("MatrixRTCSession", () => {
                 },
             ]);
 
-            sess!.onRTCSessionMemberUpdate();
+            await sess!._onRTCSessionMemberUpdate();
             const ownMembershipId = sess?.memberships[0].eventId;
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
@@ -692,27 +713,27 @@ describe("MatrixRTCSession", () => {
         it("doesn't send a notification when joining an existing call", async () => {
             // Add another member to the call so that it is considered an existing call
             mockRoomState(mockRoom, [membershipTemplate]);
-            sess!.onRTCSessionMemberUpdate();
+            await sess!._onRTCSessionMemberUpdate();
 
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
-            sess!.onRTCSessionMemberUpdate();
+            await sess!._onRTCSessionMemberUpdate();
 
             expect(client.sendEvent).not.toHaveBeenCalled();
         });
 
         it("doesn't send a notification when someone else starts the call faster than us", async () => {
             // Simulate a join, including the update to the room state
-            sess!.joinRoomSession([mockFocus], mockFocus, { notificationType: "ring" });
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent
             mockRoomState(mockRoom, [membershipTemplate]);
-            sess!.onRTCSessionMemberUpdate();
+            await sess!._onRTCSessionMemberUpdate();
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
-            sess!.onRTCSessionMemberUpdate();
+            await sess!._onRTCSessionMemberUpdate();
 
             // We assume that the responsibility to send a notification, if any, lies with the other
             // participant that won the race
@@ -721,26 +742,26 @@ describe("MatrixRTCSession", () => {
     });
 
     describe("onMembershipsChanged", () => {
-        it("does not emit if no membership changes", () => {
+        it("does not emit if no membership changes", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await flushPromises();
             const onMembershipsChanged = jest.fn();
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
-            sess.onRTCSessionMemberUpdate();
+            await sess._onRTCSessionMemberUpdate();
 
             expect(onMembershipsChanged).not.toHaveBeenCalled();
         });
 
-        it("emits on membership changes", () => {
+        it("emits on membership changes", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);
-            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
             const onMembershipsChanged = jest.fn();
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
             mockRoomState(mockRoom, []);
-            sess.onRTCSessionMemberUpdate();
+            await sess._onRTCSessionMemberUpdate();
 
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
@@ -753,7 +774,7 @@ describe("MatrixRTCSession", () => {
         //         const membership = Object.assign({}, membershipTemplate);
         //         const mockRoom = makeMockRoom([membership]);
 
-        //         sess = MatrixRTCSession.roomSessionForRoom(client, mockRoom);
+        //         sess = MatrixRTCSession.roomsessionForSlot(client, mockRoom);
         //         const membershipObject = sess.memberships[0];
 
         //         const onMembershipsChanged = jest.fn();
@@ -789,7 +810,8 @@ describe("MatrixRTCSession", () => {
                 client.encryptAndSendToDevice = sendToDeviceMock;
 
                 mockRoom = makeMockRoom([]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                // await new Promise((resolve) => sess!.once(MatrixRTCSessionEvent.MembershipsChanged, resolve));
             });
 
             afterEach(async () => {
@@ -798,7 +820,7 @@ describe("MatrixRTCSession", () => {
             });
 
             it("creates a key when joining", () => {
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 const encryptionKeyChangedListener = jest.fn();
                 sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
                 sess?.reemitEncryptionKeys();
@@ -806,6 +828,11 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     expect.any(Uint8Array),
                     0,
+                    {
+                        deviceId: "AAAAAAA",
+                        memberId: "@alice:example.org:AAAAAAA",
+                        userId: "@alice:example.org",
+                    },
                     "@alice:example.org:AAAAAAA",
                 );
             });
@@ -817,7 +844,7 @@ describe("MatrixRTCSession", () => {
                         sendEventMock.mockImplementation(resolve);
                     });
 
-                    sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
 
                     await eventSentPromise;
 
@@ -842,13 +869,13 @@ describe("MatrixRTCSession", () => {
                     sendStateEventMock = jest.fn(resolve);
                 });
                 client.sendStateEvent = sendStateEventMock;
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 await sentStateEvent;
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 expect(client.sendEvent).toHaveBeenCalledTimes(1);
                 expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 expect(client.sendEvent).toHaveBeenCalledTimes(1);
                 expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
@@ -872,7 +899,7 @@ describe("MatrixRTCSession", () => {
                         });
                     });
 
-                    sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                     // wait for the encryption event to get sent
                     await jest.advanceTimersByTimeAsync(5000);
                     await eventSentPromise;
@@ -895,7 +922,7 @@ describe("MatrixRTCSession", () => {
                     throw e;
                 });
 
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
 
                 expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
             });
@@ -908,13 +935,13 @@ describe("MatrixRTCSession", () => {
                         device_id: "BBBBBBB",
                     });
                     const mockRoom = makeMockRoom([membershipTemplate, member2]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                    await flushPromises();
                     // joining will trigger an initial key send
                     const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
-                    sess.joinRoomSession([mockFocus], mockFocus, {
+                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
                         manageMediaKeys: true,
                         updateEncryptionKeyThrottle: 1000,
                         makeKeyDelay: 3000,
@@ -924,14 +951,14 @@ describe("MatrixRTCSession", () => {
 
                     // member2 leaves triggering key rotation
                     mockRoomState(mockRoom, [membershipTemplate]);
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
 
                     // member2 re-joins which should trigger an immediate re-send
                     const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
                     mockRoomState(mockRoom, [membershipTemplate, member2]);
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
                     // but, that immediate resend is throttled so we need to wait a bit
                     jest.advanceTimersByTime(1000);
                     const { keys } = await keysSentPromise2;
@@ -957,13 +984,13 @@ describe("MatrixRTCSession", () => {
                 jest.useFakeTimers();
                 try {
                     const mockRoom = makeMockRoom([membershipTemplate]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
                     const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
 
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                     await keysSentPromise1;
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
@@ -982,7 +1009,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     mockRoomState(mockRoom, [membershipTemplate, member2]);
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
 
                     await keysSentPromise2;
 
@@ -1008,8 +1035,8 @@ describe("MatrixRTCSession", () => {
                     const mockRoom = makeMockRoom([member1, member2]);
                     mockRoomState(mockRoom, [member1, member2]);
 
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
 
                     await keysSentPromise1;
 
@@ -1029,7 +1056,7 @@ describe("MatrixRTCSession", () => {
                     sendEventMock.mockClear();
 
                     // these should be a no-op:
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
                     expect(sendEventMock).toHaveBeenCalledTimes(0);
                     expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
                 } finally {
@@ -1053,8 +1080,9 @@ describe("MatrixRTCSession", () => {
                     };
 
                     const mockRoom = makeMockRoom([member1, member2]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                    await flushPromises();
+                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
 
                     await keysSentPromise1;
 
@@ -1074,7 +1102,7 @@ describe("MatrixRTCSession", () => {
                     sendEventMock.mockClear();
 
                     // this should be a no-op:
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
                     expect(sendEventMock).toHaveBeenCalledTimes(0);
 
                     // advance time to avoid key throttling
@@ -1089,7 +1117,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     // this should re-send the key
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
 
                     await keysSentPromise2;
 
@@ -1117,13 +1145,16 @@ describe("MatrixRTCSession", () => {
                         device_id: "BBBBBBB",
                     });
                     const mockRoom = makeMockRoom([membershipTemplate, member2]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                    await flushPromises();
                     const onMyEncryptionKeyChanged = jest.fn();
                     sess.on(
                         MatrixRTCSessionEvent.EncryptionKeyChanged,
-                        (_key: Uint8Array, _idx: number, participantId: string) => {
-                            if (participantId === `${client.getUserId()}:${client.getDeviceId()}`) {
+                        (_key: Uint8Array, _idx: number, membership: CallMembershipIdentityParts) => {
+                            if (
+                                membership.userId === client.getUserId() &&
+                                membership.deviceId === client.getDeviceId()
+                            ) {
                                 onMyEncryptionKeyChanged();
                             }
                         },
@@ -1133,7 +1164,10 @@ describe("MatrixRTCSession", () => {
                         sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
                     });
 
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true, makeKeyDelay: KEY_DELAY });
+                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                        manageMediaKeys: true,
+                        makeKeyDelay: KEY_DELAY,
+                    });
                     const sendKeySpy = jest.spyOn((sess as unknown as any).encryptionManager.transport, "sendKey");
                     const firstKeysPayload = await keysSentPromise1;
                     expect(firstKeysPayload.keys).toHaveLength(1);
@@ -1147,7 +1181,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     mockRoomState(mockRoom, [membershipTemplate]);
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
 
                     jest.advanceTimersByTime(KEY_DELAY);
                     expect(sendKeySpy).toHaveBeenCalledTimes(1);
@@ -1207,14 +1241,15 @@ describe("MatrixRTCSession", () => {
 
                         if (i === 0) {
                             // if first time around then set up the session
-                            sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                            sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                            await flushPromises();
+                            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                         } else {
                             // otherwise update the state reducing the membership each time in order to trigger key rotation
                             mockRoomState(mockRoom, members.slice(0, membersToTest - i));
                         }
 
-                        sess!.onRTCSessionMemberUpdate();
+                        await sess!._onRTCSessionMemberUpdate();
 
                         // advance time to avoid key throttling
                         jest.advanceTimersByTime(10000);
@@ -1233,13 +1268,14 @@ describe("MatrixRTCSession", () => {
                 jest.useFakeTimers();
                 try {
                     const mockRoom = makeMockRoom([membershipTemplate]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                    await flushPromises();
 
                     const keysSentPromise1 = new Promise((resolve) => {
                         sendEventMock.mockImplementation(resolve);
                     });
 
-                    sess.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                     await keysSentPromise1;
 
                     sendEventMock.mockClear();
@@ -1253,7 +1289,7 @@ describe("MatrixRTCSession", () => {
                     });
 
                     mockRoomState(mockRoom, [membershipTemplate, member2]);
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
 
                     await new Promise((resolve) => {
                         realSetTimeout(resolve);
@@ -1274,13 +1310,13 @@ describe("MatrixRTCSession", () => {
                     });
 
                     const mockRoom = makeMockRoom([membershipTemplate]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-
-                    sess!.joinRoomSession([mockFocus], mockFocus, {
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                    await flushPromises();
+                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
                         manageMediaKeys: true,
                         useExperimentalToDeviceTransport: true,
                     });
-                    sess.onRTCSessionMemberUpdate();
+                    await sess._onRTCSessionMemberUpdate();
 
                     await keySentPromise;
 
@@ -1297,8 +1333,9 @@ describe("MatrixRTCSession", () => {
         describe("receiving", () => {
             it("collects keys from encryption events", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                await flushPromises();
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
@@ -1315,6 +1352,11 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("this is the key"),
                     0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
                 expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
@@ -1322,8 +1364,9 @@ describe("MatrixRTCSession", () => {
 
             it("collects keys at non-zero indices", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                await flushPromises();
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
@@ -1340,6 +1383,11 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("this is the key"),
                     4,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
 
@@ -1348,8 +1396,8 @@ describe("MatrixRTCSession", () => {
 
             it("collects keys by merging", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
                         device_id: "bobsphone",
@@ -1366,6 +1414,11 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("this is the key"),
                     0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
 
@@ -1386,11 +1439,21 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("this is the key"),
                     0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("this is the key"),
                     4,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
 
@@ -1399,8 +1462,8 @@ describe("MatrixRTCSession", () => {
 
             it("ignores older keys at same index", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
@@ -1450,6 +1513,11 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("newer key"),
                     0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
 
@@ -1458,8 +1526,8 @@ describe("MatrixRTCSession", () => {
 
             it("key timestamps are treated as monotonic", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 mockRoom.emitTimelineEvent(
                     makeMockEvent(
                         "io.element.call.encryption_keys",
@@ -1496,15 +1564,20 @@ describe("MatrixRTCSession", () => {
                 expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
                     textEncoder.encode("second key"),
                     0,
+                    {
+                        deviceId: "bobsphone",
+                        memberId: "@bob:example.org:bobsphone",
+                        userId: "@bob:example.org",
+                    },
                     "@bob:example.org:bobsphone",
                 );
             });
 
             it("ignores keys event for the local participant", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 mockRoom.emitTimelineEvent(
                     makeMockEvent("io.element.call.encryption_keys", client.getUserId()!, "1234roomId", {
                         device_id: client.getDeviceId(),
@@ -1525,11 +1598,11 @@ describe("MatrixRTCSession", () => {
                 jest.useFakeTimers();
                 try {
                     const mockRoom = makeMockRoom([membershipTemplate]);
-                    sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
                     // defaults to getTs()
                     jest.setSystemTime(1000);
-                    sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                     mockRoom.emitTimelineEvent(
                         makeMockEvent(
                             "io.element.call.encryption_keys",
@@ -1581,10 +1654,10 @@ describe("MatrixRTCSession", () => {
         describe("read status", () => {
             it("returns the correct probablyLeft status", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
                 expect(sess!.probablyLeft).toBe(undefined);
 
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 expect(sess!.probablyLeft).toBe(false);
 
                 // Simulate the membership manager believing the user has left
@@ -1595,12 +1668,12 @@ describe("MatrixRTCSession", () => {
                 expect(sess!.probablyLeft).toBe(true);
             });
 
-            it("returns membershipStatus once joinRoomSession got called", () => {
+            it("returns membershipStatus once joinRTCSession got called", () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
-                sess = MatrixRTCSession.sessionForRoom(client, mockRoom, callSession);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
                 expect(sess!.membershipStatus).toBe(undefined);
 
-                sess!.joinRoomSession([mockFocus], mockFocus, { manageMediaKeys: true });
+                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 expect(sess!.membershipStatus).toBe(Status.Connecting);
             });
         });

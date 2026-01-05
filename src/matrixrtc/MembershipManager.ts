@@ -336,7 +336,7 @@ export class MembershipManager
         this.userId = userId;
         // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
         // we keep it as a string for now for backwards compatibility.
-        this.memberId = this.makeMembershipStateKey(userId, deviceId);
+        this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
@@ -383,7 +383,7 @@ export class MembershipManager
     // Membership Event static parameters:
     protected deviceId: string;
     protected userId: string;
-    protected memberId: string;
+    protected stateKey: string;
     protected rtcTransport?: Transport;
     /** @deprecated This will be removed in favor or rtcTransport becoming a list of actively used transports */
     private fociPreferred?: Transport[];
@@ -484,7 +484,7 @@ export class MembershipManager
             { delay: this.delayedLeaveEventDelayMs },
             EventType.GroupCallMemberPrefix,
             {},
-            this.memberId,
+            this.stateKey,
         );
 
     // HANDLERS (used in the membershipLoopHandler)
@@ -499,7 +499,7 @@ export class MembershipManager
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
-                this.state.delayId = response.delay_id;
+                this.setAndEmitDelayId(response.delay_id);
                 if (this.state.hasMemberStateEvent) {
                     // This action was scheduled because the previous delayed event was cancelled
                     // due to lack of https://github.com/element-hq/synapse/pull/17810
@@ -546,7 +546,7 @@ export class MembershipManager
         return await this.client
             ._unstable_cancelScheduledDelayedEvent(delayId)
             .then(() => {
-                this.state.delayId = undefined;
+                this.setAndEmitDelayId(undefined);
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
                 return createReplaceActionUpdate(MembershipActionType.SendDelayedEvent);
             })
@@ -558,7 +558,7 @@ export class MembershipManager
                 if (this.isNotFoundError(e)) {
                     // If we get a M_NOT_FOUND we know that the delayed event got already removed.
                     // This means we are good and can set it to undefined and run this again.
-                    this.state.delayId = undefined;
+                    this.setAndEmitDelayId(undefined);
                     return createReplaceActionUpdate(repeatActionType);
                 }
                 if (this.isUnsupportedDelayedEndpoint(e)) {
@@ -582,6 +582,13 @@ export class MembershipManager
         }
         this.state.probablyLeft = probablyLeft;
         this.emit(MembershipManagerEvent.ProbablyLeft, this.state.probablyLeft);
+    }
+
+    private setAndEmitDelayId(delayId?: string): void {
+        if (this.state.delayId === delayId) return;
+
+        this.state.delayId = delayId;
+        this.emit(MembershipManagerEvent.DelayIdChanged, this.state.delayId);
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
@@ -627,7 +634,7 @@ export class MembershipManager
                 }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
-                    this.state.delayId = undefined;
+                    this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(MembershipActionType.SendDelayedEvent);
                 }
                 // If the HS does not support delayed events we wont reschedule.
@@ -655,7 +662,7 @@ export class MembershipManager
                 const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
                 if (this.isNotFoundError(e)) {
-                    this.state.delayId = undefined;
+                    this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(repeatActionType);
                 }
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "sendScheduledDelayedEvent");
@@ -677,7 +684,7 @@ export class MembershipManager
             this.room.roomId,
             EventType.GroupCallMemberPrefix,
             myMembership as EmptyObject | SessionMembershipData,
-            this.memberId,
+            this.stateKey,
         );
     };
 
@@ -1027,6 +1034,9 @@ export class MembershipManager
     public get probablyLeft(): boolean {
         return this.state.probablyLeft;
     }
+    public get delayId(): string | undefined {
+        return this.state.delayId;
+    }
 }
 
 /**
@@ -1040,6 +1050,9 @@ export class StickyEventMembershipManager extends MembershipManager {
         private readonly clientWithSticky: MembershipManagerClient &
             Pick<MatrixClient, "_unstable_sendStickyEvent" | "_unstable_sendStickyDelayedEvent">,
         sessionDescription: SlotDescription,
+        // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
+        // we keep it as a string for now for backwards compatibility.
+        private readonly memberId: string,
         parentLogger?: Logger,
     ) {
         super(joinConfig, room, clientWithSticky, sessionDescription, parentLogger);

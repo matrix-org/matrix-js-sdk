@@ -16,8 +16,9 @@ limitations under the License.
 import type { IContent, IMentions } from "../matrix.ts";
 import type { RelationEvent } from "../types.ts";
 import type { CallMembership } from "./CallMembership.ts";
+import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 
-export type ParticipantId = string;
+export type EncryptionKeyMapKey = string;
 
 export interface EncryptionKeyEntry {
     index: number;
@@ -38,7 +39,7 @@ export type ParticipantDeviceInfo = {
  */
 export type InboundEncryptionSession = {
     key: Uint8Array<ArrayBuffer>;
-    participantId: ParticipantId;
+    membership: CallMembershipIdentityParts;
     keyIndex: number;
     creationTS: number;
 };
@@ -68,6 +69,7 @@ export interface EncryptionKeysEventContent {
 export interface EncryptionKeysToDeviceEventContent {
     keys: { index: number; key: string };
     member: {
+        id: string;
         // TODO Remove that it is claimed, need to get the sealed sender from decryption info
         // Or add some validation on it based on the encryption info
         claimed_device_id: string;

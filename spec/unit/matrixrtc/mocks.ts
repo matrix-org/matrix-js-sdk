@@ -18,10 +18,18 @@ import { EventEmitter } from "stream";
 import { type Mocked } from "jest-mock";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
+import { type CallMembershipIdentityParts } from "src/matrixrtc/EncryptionManager";
+import { logger } from "../../../src/logger.ts";
 
 export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
+
+export const owmMemberIdentity: CallMembershipIdentityParts = {
+    deviceId: "AAAAAAA",
+    memberId: "@alice:example.org:AAAAAAA",
+    userId: "@alice:example.org",
+};
 
 export const membershipTemplate: SessionMembershipData & { user_id: string } = {
     application: "m.call",
@@ -180,8 +188,15 @@ export function mockRTCEvent(
     } as unknown as MatrixEvent;
 }
 
-export function mockCallMembership(membershipData: MembershipData, roomId: string): CallMembership {
-    return new CallMembership(mockRTCEvent(membershipData, roomId), membershipData);
+export function mockCallMembership(
+    membershipData: MembershipData,
+    roomId: string,
+    rtcBackendIdentity?: string,
+): CallMembership {
+    const ev = mockRTCEvent(membershipData, roomId);
+    (ev.getContent as jest.Mock).mockReturnValue(membershipData);
+    const data = CallMembership.membershipDataFromMatrixEvent(ev);
+    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx", logger);
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {
