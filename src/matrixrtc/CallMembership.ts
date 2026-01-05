@@ -269,6 +269,9 @@ export class CallMembership {
      * Class construction will fail if these values cannot get obtained. */
     private readonly matrixEventData: { eventId: string; sender: string; ts: number };
 
+    /** Anonymized identity to use with the RTC backend. */
+    public readonly rtcBackendIdentity: string;
+
     public constructor(
         /** The required parts of the Matrix event that this membership is based on */
         matrixEvent: Pick<MatrixEvent, "getId" | "getSender" | "getTs">,
@@ -278,20 +281,24 @@ export class CallMembership {
 
         /**
          *
-         * Anonymised identity to use with the RTC backend.
+         * Anonymized identity to use with the RTC backend.
          *
+         * The rtcBackendIdentity is optional only for backwards compatibility. If omitted, the constructor will
+         *  fall back to the legacy `${sender}:${deviceId}` value.
          * The rtcBackendIdentity is a hashed version of all the identity parts:
          * `sha256(${this.userId}|${this.deviceId}|${this.memberId})`
          *
          * It is used to anonymize the identity of the user in the RTC backend.
          */
-        public readonly rtcBackendIdentity: string,
+        rtcBackendIdentity?: string,
 
         /**
          * The constructor will automatically create a properly tagged child logger instance.
          */
         logger?: Logger,
     ) {
+        this.rtcBackendIdentity = rtcBackendIdentity ?? `${matrixEvent.getSender()}:${this.deviceId}`;
+
         const [eventId, sender, ts] = [matrixEvent.getId(), matrixEvent.getSender(), matrixEvent.getTs()];
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
