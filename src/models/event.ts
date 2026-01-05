@@ -185,8 +185,7 @@ export interface IDecryptOptions {
     isRetry?: boolean;
 
     /**
-     * Whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key.
-     * Defaults to `false`.
+     * @deprecated does nothing
      */
     forceRedecryptIfUntrusted?: boolean;
 }
@@ -883,8 +882,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         }
 
         const alreadyDecrypted = this.clearEvent && !this.isDecryptionFailure();
-        const forceRedecrypt = options.forceRedecryptIfUntrusted && this.isKeySourceUntrusted();
-        if (alreadyDecrypted && !forceRedecrypt) {
+        if (alreadyDecrypted) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error("Attempt to decrypt event which has already been decrypted");
         }
