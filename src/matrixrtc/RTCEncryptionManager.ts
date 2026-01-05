@@ -51,7 +51,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
      * The keys are stored and can be retrieved later when the application layer is ready {@link RTCEncryptionManager#getEncryptionKeys}.
      */
-    private participantKeyRings = new Map<ParticipantId, Array<{ key: Uint8Array; keyIndex: number }>>();
+    private participantKeyRings = new Map<ParticipantId, Array<{ key: Uint8Array<ArrayBuffer>; keyIndex: number }>>();
 
     // The current per-sender media key for this device
     private outboundSession: OutboundEncryptionSession | null = null;
@@ -104,7 +104,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         private statistics: Statistics,
         // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array,
+            keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
             participantId: ParticipantId,
         ) => void,
@@ -113,11 +113,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
     }
 
-    public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
+    public getEncryptionKeys(): ReadonlyMap<
+        ParticipantId,
+        ReadonlyArray<{ key: Uint8Array<ArrayBuffer>; keyIndex: number }>
+    > {
         return new Map(this.participantKeyRings);
     }
 
-    private addKeyToParticipant(key: Uint8Array, keyIndex: number, participantId: ParticipantId): void {
+    private addKeyToParticipant(key: Uint8Array<ArrayBuffer>, keyIndex: number, participantId: ParticipantId): void {
         if (!this.participantKeyRings.has(participantId)) {
             this.participantKeyRings.set(participantId, []);
         }
@@ -354,7 +357,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         return 0;
     }
 
-    private generateRandomKey(): Uint8Array {
+    private generateRandomKey(): Uint8Array<ArrayBuffer> {
         const key = new Uint8Array(16);
         globalThis.crypto.getRandomValues(key);
         return key;

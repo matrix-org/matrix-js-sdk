@@ -38,7 +38,7 @@ export interface IEncryptionManager {
      *
      * @returns A map of participant IDs to their encryption keys.
      */
-    getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>;
+    getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array<ArrayBuffer>; keyIndex: number }>>;
 }
 
 /**
@@ -67,7 +67,7 @@ export class EncryptionManager implements IEncryptionManager {
         return this.joinConfig?.useKeyDelay ?? 5_000;
     }
 
-    private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
+    private encryptionKeys = new Map<string, Array<{ key: Uint8Array<ArrayBuffer>; timestamp: number }>>();
     private lastEncryptionKeyUpdateRequest?: number;
 
     // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
@@ -85,7 +85,7 @@ export class EncryptionManager implements IEncryptionManager {
         private transport: IKeyTransport,
         private statistics: Statistics,
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array,
+            keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
             participantId: string,
         ) => void,
@@ -94,8 +94,11 @@ export class EncryptionManager implements IEncryptionManager {
         this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
     }
 
-    public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
-        const keysMap = new Map<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>();
+    public getEncryptionKeys(): ReadonlyMap<
+        ParticipantId,
+        ReadonlyArray<{ key: Uint8Array<ArrayBuffer>; keyIndex: number }>
+    > {
+        const keysMap = new Map<ParticipantId, ReadonlyArray<{ key: Uint8Array<ArrayBuffer>; keyIndex: number }>>();
         for (const [userId, userKeys] of this.encryptionKeys) {
             const keys = userKeys.map((entry, index) => ({
                 key: entry.key,
@@ -244,7 +247,7 @@ export class EncryptionManager implements IEncryptionManager {
      * @param deviceId the device ID of the participant
      * @returns The encryption keys for the given participant, or undefined if they are not known.
      */
-    private getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
+    private getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array<ArrayBuffer>> | undefined {
         return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
     }
 

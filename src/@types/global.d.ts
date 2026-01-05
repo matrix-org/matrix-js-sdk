@@ -62,6 +62,6 @@ declare global {
 
     interface Uint8ArrayConstructor {
         // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.frombase64
-        fromBase64?(base64: string, options?: Uint8ArrayFromBase64Options): Uint8Array;
+        fromBase64?(base64: string, options?: Uint8ArrayFromBase64Options): Uint8Array<ArrayBuffer>;
     }
 }
