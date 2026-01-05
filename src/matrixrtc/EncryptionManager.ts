@@ -48,7 +48,7 @@ export interface IEncryptionManager {
     getEncryptionKeys(): ReadonlyMap<
         EncryptionKeyMapKey,
         ReadonlyArray<{
-            key: Uint8Array;
+            key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
             rtcBackendIdentity: string;
@@ -86,7 +86,7 @@ export class EncryptionManager implements IEncryptionManager {
 
     private encryptionKeys = new Map<
         string,
-        Array<{ key: Uint8Array; timestamp: number; membership: CallMembershipIdentityParts }>
+        Array<{ key: Uint8Array<ArrayBuffer>; timestamp: number; membership: CallMembershipIdentityParts }>
     >();
     private lastEncryptionKeyUpdateRequest?: number;
 
@@ -104,7 +104,7 @@ export class EncryptionManager implements IEncryptionManager {
         private transport: IKeyTransport,
         private statistics: Statistics,
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array,
+            keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
             membership: CallMembershipIdentityParts,
             rtcBackendIdentity: string,
@@ -122,7 +122,7 @@ export class EncryptionManager implements IEncryptionManager {
     public getEncryptionKeys(): ReadonlyMap<
         EncryptionKeyMapKey,
         ReadonlyArray<{
-            key: Uint8Array;
+            key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
             rtcBackendIdentity: string;
@@ -131,7 +131,7 @@ export class EncryptionManager implements IEncryptionManager {
         const keysMap = new Map<
             EncryptionKeyMapKey,
             ReadonlyArray<{
-                key: Uint8Array;
+                key: Uint8Array<ArrayBuffer>;
                 keyIndex: number;
                 membership: CallMembershipIdentityParts;
                 rtcBackendIdentity: string;
@@ -276,12 +276,10 @@ export class EncryptionManager implements IEncryptionManager {
     /**
      * Get the known encryption keys for a given participant device.
      *
-     * @param userId the user ID of the participant
-     * @param deviceId the device ID of the participant
-     * @param memberId the member ID of the participant
+     * @param membership - The membership identity parts of the participant
      * @returns The encryption keys for the given participant, or undefined if they are not known.
      */
-    private getKeysForParticipant(membership: CallMembershipIdentityParts): Array<Uint8Array> | undefined {
+    private getKeysForParticipant(membership: CallMembershipIdentityParts): Array<Uint8Array<ArrayBuffer>> | undefined {
         return this.encryptionKeys.get(getEncryptionKeyMapKey(membership))?.map((entry) => entry.key);
     }
 

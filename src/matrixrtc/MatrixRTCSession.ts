@@ -73,7 +73,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     ) => void;
     [MatrixRTCSessionEvent.JoinStateChanged]: (isJoined: boolean) => void;
     [MatrixRTCSessionEvent.EncryptionKeyChanged]: (
-        key: Uint8Array,
+        key: Uint8Array<ArrayBuffer>,
         encryptionKeyIndex: number,
         membership: CallMembershipIdentityParts,
         rtcBackendIdentity: string,
@@ -597,7 +597,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     transport,
                     this.statistics,
                     (
-                        keyBin: Uint8Array,
+                        keyBin: Uint8Array<ArrayBuffer>,
                         encryptionKeyIndex: number,
                         membership: CallMembershipIdentityParts,
                         rtcBackendIdentity: string,
@@ -621,7 +621,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     transport,
                     this.statistics,
                     (
-                        keyBin: Uint8Array,
+                        keyBin: Uint8Array<ArrayBuffer>,
                         encryptionKeyIndex: number,
                         membership: CallMembershipIdentityParts,
                         rtcBackendIdentity: string,

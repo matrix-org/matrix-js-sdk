@@ -61,7 +61,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private participantKeyRings = new Map<
         EncryptionKeyMapKey,
         Array<{
-            key: Uint8Array;
+            key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
             rtcBackendIdentity: string;
@@ -130,7 +130,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         private statistics: Statistics,
         // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array,
+            keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
             membership: CallMembershipIdentityParts,
             rtcBackendIdentity: string,
@@ -161,7 +161,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     public getEncryptionKeys(): ReadonlyMap<
         EncryptionKeyMapKey,
         ReadonlyArray<{
-            key: Uint8Array;
+            key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
             rtcBackendIdentity: string;
@@ -171,7 +171,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private keysWithoutMatchingRTCMembership: Array<{
-        key: Uint8Array;
+        key: Uint8Array<ArrayBuffer>;
         keyIndex: number;
         membership: CallMembershipIdentityParts;
     }> = [];
@@ -184,7 +184,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
         });
     }
 
-    private addKeyToParticipant(key: Uint8Array, keyIndex: number, membership: CallMembershipIdentityParts): void {
+    private addKeyToParticipant(
+        key: Uint8Array<ArrayBuffer>,
+        keyIndex: number,
+        membership: CallMembershipIdentityParts,
+    ): void {
         const knownRtcMembership = this.getMemberships();
         const fullMembership = knownRtcMembership.find(
             (member) => member.userId === membership.userId && member.deviceId === membership.deviceId,
@@ -200,7 +204,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private addKeyToParticipantWithBackendIdentity(
-        key: Uint8Array,
+        key: Uint8Array<ArrayBuffer>,
         keyIndex: number,
         membership: CallMembershipIdentityParts,
         rtcBackendIdentity: string,
@@ -450,7 +454,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         return 0;
     }
 
-    private generateRandomKey(): Uint8Array {
+    private generateRandomKey(): Uint8Array<ArrayBuffer> {
         const key = new Uint8Array(16);
         globalThis.crypto.getRandomValues(key);
         return key;
