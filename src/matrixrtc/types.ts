@@ -37,7 +37,7 @@ export type ParticipantDeviceInfo = {
  * A type representing the information needed to decrypt video streams.
  */
 export type InboundEncryptionSession = {
-    key: Uint8Array;
+    key: Uint8Array<ArrayBuffer>;
     participantId: ParticipantId;
     keyIndex: number;
     creationTS: number;
@@ -47,7 +47,7 @@ export type InboundEncryptionSession = {
  * The information about the key used to encrypt video streams.
  */
 export type OutboundEncryptionSession = {
-    key: Uint8Array;
+    key: Uint8Array<ArrayBuffer>;
     creationTS: number;
     // The devices that this key is shared with.
     sharedWith: Array<ParticipantDeviceInfo>;
