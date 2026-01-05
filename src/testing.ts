@@ -180,7 +180,6 @@ export async function decryptExistingEvent(
             content: opts.plainContent,
         },
         senderCurve25519Key: "",
-        untrusted: false,
     };
 
     const mockCrypto = {
