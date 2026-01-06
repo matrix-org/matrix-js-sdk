@@ -811,7 +811,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    private recalculateSessionMembers = async (): Promise<void> => {
+    private readonly recalculateSessionMembers = async (): Promise<void> => {
         const oldMemberships = this.memberships;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
