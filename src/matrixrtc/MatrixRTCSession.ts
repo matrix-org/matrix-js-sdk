@@ -315,19 +315,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         return slotDescriptionToId(this.slotDescription);
     }
 
-    /**
-     *
-     * @deprecated Use `MatrixRTCSession.sessionMembershipsForSlot` instead.
-     * @returns an empty array.
-     */
-    public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-    ): CallMembership[] {
-        rootLogger.error(
-            `[MatrixRTCSession ${room.roomId}] callMembershipsForRoom is deprecated. Use sessionMembershipsForSlot instead.`,
-        );
-        return [];
-    }
 
     /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
