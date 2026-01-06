@@ -269,7 +269,6 @@ export class CallMembership {
      * Class construction will fail if these values cannot get obtained. */
     private readonly matrixEventData: { eventId: string; sender: string; ts: number };
 
-
     public constructor(
         /** The required parts of the Matrix event that this membership is based on */
         matrixEvent: Pick<MatrixEvent, "getId" | "getSender" | "getTs">,

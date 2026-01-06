@@ -320,7 +320,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         return slotDescriptionToId(this.slotDescription);
     }
 
-
     /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
@@ -337,7 +336,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const callMemberEvents = collectMembersEvents(room, options, logger);
 
-        const callMemberships = await processMemberEvents(callMemberEvents, slotDescription, logger);
+        const callMemberships = await processMemberEvents(room, callMemberEvents, slotDescription, logger);
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
         if (callMemberships.length > 1) {
@@ -866,6 +865,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
 /// Private helpers
 async function processMemberEvents(
+    room: Pick<Room, "hasMembershipState">,
     callMemberEvents: MatrixEvent[],
     slotDescription: SlotDescription,
     logger: Logger,
