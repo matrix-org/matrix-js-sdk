@@ -1016,7 +1016,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.clearEvent = decryptionResult.clearEvent;
         this.senderCurve25519Key = decryptionResult.senderCurve25519Key ?? null;
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
-        this.untrusted = false;
         this.invalidateExtensibleEvent();
     }
 
@@ -1035,7 +1034,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         };
         this.senderCurve25519Key = null;
         this.claimedEd25519Key = null;
-        this.untrusted = false;
         this.invalidateExtensibleEvent();
     }
 
