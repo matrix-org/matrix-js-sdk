@@ -14,21 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type IEncryptionManager } from "./EncryptionManager.ts";
-import { type EncryptionConfig } from "./MatrixRTCSession.ts";
-import { type CallMembership } from "./CallMembership.ts";
+import {
+    type CallMembershipIdentityParts,
+    getEncryptionKeyMapKey,
+    type IEncryptionManager,
+} from "./EncryptionManager.ts";
+import { type EncryptionConfig, type MembershipConfig } from "./MatrixRTCSession.ts";
+import { CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { type Logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
-import type {
-    InboundEncryptionSession,
-    OutboundEncryptionSession,
-    ParticipantDeviceInfo,
-    ParticipantId,
-    Statistics,
+import {
+    type EncryptionKeyMapKey,
+    type InboundEncryptionSession,
+    type OutboundEncryptionSession,
+    type ParticipantDeviceInfo,
+    type Statistics,
 } from "./types.ts";
-import { getParticipantId, OutdatedKeyFilter } from "./utils.ts";
+import { OutdatedKeyFilter } from "./utils.ts";
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -46,12 +50,23 @@ export class RTCEncryptionManager implements IEncryptionManager {
     // This will be done when removing the legacy EncryptionManager.
     private manageMediaKeys = false;
 
+    private useHashedRtcBackendIdentity = false;
+    private ownRtcBackendIdentityCache: string | undefined;
+
     /**
      * Store the key rings for each participant.
      * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
      * The keys are stored and can be retrieved later when the application layer is ready {@link RTCEncryptionManager#getEncryptionKeys}.
      */
-    private participantKeyRings = new Map<ParticipantId, Array<{ key: Uint8Array; keyIndex: number }>>();
+    private participantKeyRings = new Map<
+        EncryptionKeyMapKey,
+        Array<{
+            key: Uint8Array<ArrayBuffer>;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
+    >();
 
     // The current per-sender media key for this device
     private outboundSession: OutboundEncryptionSession | null = null;
@@ -96,43 +111,122 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger | undefined = undefined;
 
+    private rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
+
+    /**
+     *
+     * @param ownMembership - our own membership info
+     * @param getMemberships - function to get current memberships
+     * @param transport - key transport (room or to-device)
+     * @param statistics - statistics collector
+     * @param onEncryptionKeysChanged - callback to notify the media layer of new keys
+     * @param parentLogger - optional parent logger
+     * @param rtcBackendIdProvider - A function to compute the rtc backend identity, exposed for testing purposes
+     */
     public constructor(
-        private userId: string,
-        private deviceId: string,
+        private ownMembership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
         private statistics: Statistics,
         // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array,
+            keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
-            participantId: ParticipantId,
+            membership: CallMembershipIdentityParts,
+            rtcBackendIdentity: string,
         ) => void,
         parentLogger?: Logger,
+        rtcBackendIdProvider?: (userId: string, deviceId: string, memberId: string) => Promise<string>,
     ) {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
+        this.rtcIdentityProvider = rtcBackendIdProvider ?? CallMembership.computeRtcIdentityRaw;
     }
 
-    public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
+    private async getOwnRtcBackendIdentity(): Promise<string> {
+        if (this.ownRtcBackendIdentityCache) return this.ownRtcBackendIdentityCache;
+
+        if (this.useHashedRtcBackendIdentity) {
+            const { userId, deviceId, memberId } = this.ownMembership;
+            this.logger?.info(
+                // If we see this log multiple times, we need to reconsider the precompute call of getOwnRtcBackendIdentity
+                `Computing RTC backend identity for ${userId}:${deviceId}:${memberId} (SHOULD ONLY BE CALLED ONCE)`,
+            );
+            this.ownRtcBackendIdentityCache = await this.rtcIdentityProvider(userId, deviceId, memberId);
+        } else {
+            this.ownRtcBackendIdentityCache = `${this.ownMembership.userId}:${this.ownMembership.deviceId}`;
+        }
+        return this.ownRtcBackendIdentityCache;
+    }
+
+    public getEncryptionKeys(): ReadonlyMap<
+        EncryptionKeyMapKey,
+        ReadonlyArray<{
+            key: Uint8Array<ArrayBuffer>;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
+    > {
         return new Map(this.participantKeyRings);
     }
 
-    private addKeyToParticipant(key: Uint8Array, keyIndex: number, participantId: ParticipantId): void {
-        if (!this.participantKeyRings.has(participantId)) {
-            this.participantKeyRings.set(participantId, []);
-        }
-        this.participantKeyRings.get(participantId)!.push({ key, keyIndex });
-        this.onEncryptionKeysChanged(key, keyIndex, participantId);
+    private keysWithoutMatchingRTCMembership: Array<{
+        key: Uint8Array<ArrayBuffer>;
+        keyIndex: number;
+        membership: CallMembershipIdentityParts;
+    }> = [];
+
+    private checkKeysWithoutMatchingRTCMembership(): void {
+        const keyInfoTemp = this.keysWithoutMatchingRTCMembership;
+        this.keysWithoutMatchingRTCMembership = [];
+        keyInfoTemp.forEach((keyInfo) => {
+            this.addKeyToParticipant(keyInfo.key, keyInfo.keyIndex, keyInfo.membership);
+        });
     }
 
-    public join(joinConfig: EncryptionConfig | undefined): void {
-        this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
+    private addKeyToParticipant(
+        key: Uint8Array<ArrayBuffer>,
+        keyIndex: number,
+        membership: CallMembershipIdentityParts,
+    ): void {
+        const knownRtcMembership = this.getMemberships();
+        const fullMembership = knownRtcMembership.find(
+            (member) => member.userId === membership.userId && member.deviceId === membership.deviceId,
+        );
+        if (!fullMembership) {
+            this.logger?.info(
+                `No matching RTC membership for key from ${membership.userId}:${membership.deviceId}, delaying key addition`,
+            );
+            this.keysWithoutMatchingRTCMembership.push({ key, keyIndex, membership });
+            return;
+        }
+        this.addKeyToParticipantWithBackendIdentity(key, keyIndex, membership, fullMembership.rtcBackendIdentity);
+    }
 
-        this.logger?.info(`Joining room`);
+    private addKeyToParticipantWithBackendIdentity(
+        key: Uint8Array<ArrayBuffer>,
+        keyIndex: number,
+        membership: CallMembershipIdentityParts,
+        rtcBackendIdentity: string,
+    ): void {
+        const mapKey = getEncryptionKeyMapKey(membership);
+        if (!this.participantKeyRings.has(mapKey)) {
+            this.participantKeyRings.set(mapKey, []);
+        }
+        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, rtcBackendIdentity });
+        this.onEncryptionKeysChanged(key, keyIndex, membership, rtcBackendIdentity);
+    }
+
+    public join(joinConfig: (EncryptionConfig & MembershipConfig) | undefined): void {
+        this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
+        this.useHashedRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
-        this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
 
+        this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
+        void this.getOwnRtcBackendIdentity(); // precompute own identity
+
+        this.logger?.info(`Joining room`);
         this.transport.start();
     }
 
@@ -167,50 +261,51 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 }
             });
         } else {
-            // There is a rollout in progress, but a key rotation is requested (could be caused by a membership change)
+            // There is a rollout in progress, but a key rotation is requested (could be caused by a ownMembership change)
             // Remember that a new rotation is needed after the current one.
             this.logger?.debug(`Rollout in progress, a new rollout will be started after the current one`);
             this.needToEnsureKeyAgain = true;
         }
     }
 
-    public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
+    public onNewKeyReceived: KeyTransportEventListener = (membership, keyBase64Encoded, index, timestamp) => {
         // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
         // to create a NoOpEncryptionManager that does nothing and use it for the session.
         // This will be done when removing the legacy EncryptionManager.
         if (!this.manageMediaKeys) {
             this.logger?.warn(
-                `Received key over transport ${userId}:${deviceId} at index ${index} but media keys are disabled`,
+                `Received key over transport ${membership.userId}:${membership.deviceId} at index ${index} but media keys are disabled`,
             );
             return;
         }
-        this.logger?.debug(`Received key over transport ${userId}:${deviceId} at index ${index}`);
+        this.logger?.debug(`Received key over transport ${membership.userId}:${membership.deviceId} at index ${index}`);
 
         // We received a new key, notify the video layer of this new key so that it can decrypt the frames properly.
-        const participantId = getParticipantId(userId, deviceId);
         const keyBin = decodeBase64(keyBase64Encoded);
         const candidateInboundSession: InboundEncryptionSession = {
             key: keyBin,
-            participantId,
+            membership,
             keyIndex: index,
             creationTS: timestamp,
         };
 
-        const outdated = this.keyBuffer.isOutdated(participantId, candidateInboundSession);
+        const outdated = this.keyBuffer.isOutdated(membership, candidateInboundSession);
         if (!outdated) {
             this.addKeyToParticipant(
                 candidateInboundSession.key,
                 candidateInboundSession.keyIndex,
-                candidateInboundSession.participantId,
+                candidateInboundSession.membership,
             );
             this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
-            this.logger?.info(`Received an out of order key for ${userId}:${deviceId}, dropping it`);
+            this.logger?.info(
+                `Received an out of order key for ${membership.userId}:${membership.deviceId}, dropping it`,
+            );
         }
     };
 
     /**
-     * Called when the membership of the call changes.
+     * Called when the ownMembership of the call changes.
      * This encryption manager is very basic, it will rotate the key everytime this is called.
      * @param oldMemberships - This parameter is not used here, but it is kept for compatibility with the interface.
      */
@@ -220,22 +315,26 @@ export class RTCEncryptionManager implements IEncryptionManager {
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
         this.ensureKeyDistribution();
+        // ensure key emission to the rtc backend
+        this.checkKeysWithoutMatchingRTCMembership();
     }
 
     private async rolloutOutboundKey(): Promise<void> {
         const isFirstKey = this.outboundSession == null;
         if (isFirstKey) {
             // create the first key
-            this.outboundSession = {
+            const firstKey = {
                 key: this.generateRandomKey(),
                 creationTS: Date.now(),
                 sharedWith: [],
                 keyId: 0,
             };
-            this.addKeyToParticipant(
-                this.outboundSession.key,
-                this.outboundSession.keyId,
-                getParticipantId(this.userId, this.deviceId),
+            this.outboundSession = firstKey;
+            this.addKeyToParticipantWithBackendIdentity(
+                firstKey.key,
+                firstKey.keyId,
+                this.ownMembership,
+                await this.getOwnRtcBackendIdentity(),
             );
         }
         // get current memberships
@@ -253,7 +352,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         let alreadySharedWith = this.outboundSession?.sharedWith ?? [];
 
-        // Some users might have rotate their membership event (formally called fingerprint) meaning they might have
+        // Some users might have rotate their ownMembership event (formally called fingerprint) meaning they might have
         // clear their key. Reset the `alreadySharedWith` flag for them.
         alreadySharedWith = alreadySharedWith.filter(
             (x) =>
@@ -322,10 +421,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
                 await sleep(this.useKeyDelay);
                 this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
-                this.addKeyToParticipant(
+                this.addKeyToParticipantWithBackendIdentity(
                     outboundKey.key,
                     outboundKey.keyId,
-                    getParticipantId(this.userId, this.deviceId),
+                    this.ownMembership,
+                    await this.getOwnRtcBackendIdentity(),
                 );
             }
         } catch (err) {
@@ -354,7 +454,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         return 0;
     }
 
-    private generateRandomKey(): Uint8Array {
+    private generateRandomKey(): Uint8Array<ArrayBuffer> {
         const key = new Uint8Array(16);
         globalThis.crypto.getRandomValues(key);
         return key;

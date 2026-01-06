@@ -25,9 +25,9 @@ describe("OutdatedKeyFilter Test", () => {
         const olderKey = fakeInboundSessionWithTimestamp(300);
         // Simulate receiving out of order keys
 
-        expect(filter.isOutdated(aKey.participantId, aKey)).toBe(false);
+        expect(filter.isOutdated(aKey.membership, aKey)).toBe(false);
         // Then we receive the most recent key out of order
-        const isOutdated = filter.isOutdated(aKey.participantId, olderKey);
+        const isOutdated = filter.isOutdated(aKey.membership, olderKey);
         // this key is older and should be ignored even if received after
         expect(isOutdated).toBe(true);
     });
@@ -36,7 +36,7 @@ describe("OutdatedKeyFilter Test", () => {
         return {
             keyIndex: 0,
             creationTS: ts,
-            participantId: "@alice:localhost|ABCDE",
+            membership: { userId: "@alice:localhost", deviceId: "ABDE", memberId: "@alice:localhost:ABCDE" },
             key: new Uint8Array(16),
         };
     }

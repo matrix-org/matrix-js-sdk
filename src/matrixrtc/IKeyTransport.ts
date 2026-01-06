@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 import { type ParticipantDeviceInfo } from "./types.ts";
 
 export enum KeyTransportEvents {
@@ -27,8 +28,7 @@ export type KeyTransportEventsHandlerMap = {
 };
 
 export type KeyTransportEventListener = (
-    userId: string,
-    deviceId: string,
+    membership: CallMembershipIdentityParts,
     keyBase64Encoded: string,
     index: number,
     timestamp: number,
