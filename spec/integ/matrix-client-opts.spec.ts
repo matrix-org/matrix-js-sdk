@@ -159,7 +159,7 @@ describe("MatrixClient opts", function () {
 
             await expect(
                 Promise.all([client.sendTextMessage("!foo:bar", "a body", "txn1"), httpBackend.flush("/txn1", 1)]),
-            ).rejects.toThrow("MatrixError: [500] Unknown message");
+            ).rejects.toThrow("MatrixError: [500] Ruh roh");
         });
 
         it("shouldn't queue events", async () => {

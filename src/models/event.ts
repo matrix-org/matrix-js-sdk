@@ -185,8 +185,7 @@ export interface IDecryptOptions {
     isRetry?: boolean;
 
     /**
-     * Whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key.
-     * Defaults to `false`.
+     * @deprecated does nothing
      */
     forceRedecryptIfUntrusted?: boolean;
 }
@@ -283,10 +282,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * the megolm session (for megolm) claims to own. See getClaimedEd25519Key()
      */
     private claimedEd25519Key: string | null = null;
-
-    /* where the decryption key is untrusted
-     */
-    private untrusted: boolean | null = null;
 
     /* if we have a process decrypting this event, a Promise which resolves
      * when it is finished. Normally null.
@@ -887,8 +882,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         }
 
         const alreadyDecrypted = this.clearEvent && !this.isDecryptionFailure();
-        const forceRedecrypt = options.forceRedecryptIfUntrusted && this.isKeySourceUntrusted();
-        if (alreadyDecrypted && !forceRedecrypt) {
+        if (alreadyDecrypted) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error("Attempt to decrypt event which has already been decrypted");
         }
@@ -1022,7 +1016,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.clearEvent = decryptionResult.clearEvent;
         this.senderCurve25519Key = decryptionResult.senderCurve25519Key ?? null;
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
-        this.untrusted = decryptionResult.untrusted || false;
         this.invalidateExtensibleEvent();
     }
 
@@ -1041,7 +1034,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         };
         this.senderCurve25519Key = null;
         this.claimedEd25519Key = null;
-        this.untrusted = false;
         this.invalidateExtensibleEvent();
     }
 
@@ -1126,11 +1118,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Whether the decryption key was obtained from an untrusted source. If so,
-     * we cannot verify the authenticity of the message.
+     * @deprecated always returns false
      */
-    public isKeySourceUntrusted(): boolean | undefined {
-        return !!this.untrusted;
+    public isKeySourceUntrusted(): false {
+        return false;
     }
 
     public getUnsigned(): IUnsigned {

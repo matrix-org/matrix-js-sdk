@@ -18,6 +18,7 @@ import { type IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
 
 import { type IUsageLimit } from "../@types/partials.ts";
 import { type MatrixEvent } from "../models/event.ts";
+import { NamespacedValue } from "../NamespacedValue.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
@@ -82,6 +83,8 @@ export class HTTPError extends Error {
 export class MatrixError extends HTTPError {
     // The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
     public readonly errcode?: string;
+    // The Matrix 'error' value.
+    public readonly error?: string;
     // The raw Matrix error JSON used to construct this object.
     public data: IErrorJson;
 
@@ -108,6 +111,7 @@ export class MatrixError extends HTTPError {
         }
         super(`MatrixError: ${message}`, httpStatus, httpHeaders);
         this.errcode = errorJson.errcode;
+        this.error = errorJson.error;
         this.name = errorJson.errcode || "Unknown error code";
         this.data = errorJson;
     }
@@ -224,5 +228,34 @@ export class TokenRefreshLogoutError extends Error {
 
     public get name(): string {
         return "TokenRefreshLogoutError";
+    }
+}
+
+export const MatrixSafetyErrorCode = new NamespacedValue(null, "ORG.MATRIX.MSC4387_SAFETY");
+
+/***
+ * This error is thrown when the homeserver refuses to handle an action due to a
+ * safety concern.
+ * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4387
+ */
+export class MatrixSafetyError extends MatrixError {
+    /**
+     * The kinds of harms detected by the server.
+     * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4387 for a list of spec defined harms.
+     */
+    public readonly harms: Set<string>;
+    /**
+     * The date at which a request can be reattempted.
+     */
+    public readonly expiry?: Date;
+    public constructor(...props: ConstructorParameters<typeof MatrixError>) {
+        super(...props);
+        const body = props[0];
+
+        this.harms = new Set(body && "harms" in body && Array.isArray(body.harms) ? body.harms : []);
+        this.message = `${super.message} (${[...this.harms].join(", ")})`;
+        if (body && "expiry" in body && typeof body.expiry === "number") {
+            this.expiry = new Date(body.expiry);
+        }
     }
 }
