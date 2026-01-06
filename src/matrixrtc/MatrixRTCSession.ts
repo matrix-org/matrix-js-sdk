@@ -44,7 +44,7 @@ import {
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
-import { type MatrixEvent } from "../models/event.ts";
+import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 
@@ -874,27 +874,13 @@ async function processMemberEvents(
 
     for (const memberEvent of callMemberEvents) {
         const content = memberEvent.getContent();
-        // Ignore sticky keys for the count
-        const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
-        // Dont even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-        if (eventKeysCount === 0) continue;
 
-        let membershipContent = undefined;
-
-        // We first decide if its a MSC4143 event (per device state key)
-        if (eventKeysCount > 1 && "application" in content) {
-            // We have a MSC4143 event membership event
-            membershipContent = content;
-        } else if (eventKeysCount === 1 && "memberships" in content) {
-            logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
-        }
-
-        if (membershipContent === undefined) continue;
-
-        if (!("application" in membershipContent)) {
-            // This is a left membership event, ignore it here to not log warnings.
+        // Quick filter to avoid unneeded processing of invalid events or left events.
+        // A more thorough validation will be done later with CallMembership.membershipDataFromMatrixEvent.
+        if (!quickFilterNonRelevantContents(content, logger)) {
             continue;
         }
+
         try {
             const membershipData = CallMembership.membershipDataFromMatrixEvent(memberEvent);
 
@@ -905,28 +891,60 @@ async function processMemberEvents(
                 logger,
             );
 
-            if (!deepCompare(membership.slotDescription, slotDescription)) {
-                logger.info(
-                    `Ignoring membership of user ${membership.sender} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
-                );
-                continue;
+            if (isValidMembership(membership, room, slotDescription, logger)) {
+                callMemberships.push(membership);
             }
-
-            if (membership.isExpired()) {
-                logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
-                continue;
-            }
-            if (!room.hasMembershipState(membership.sender ?? "", KnownMembership.Join)) {
-                logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
-                continue;
-            }
-            callMemberships.push(membership);
         } catch (e) {
             logger.warn("Couldn't construct call membership: ", e);
         }
     }
 
     return callMemberships;
+}
+
+function quickFilterNonRelevantContents(content: IContent, logger: Logger): boolean {
+    // Ignore sticky keys for the count
+    const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
+    // Don't even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
+    if (eventKeysCount === 0) return false;
+
+    // We first decide if it's a MSC4143 event (per device state key)
+    if (eventKeysCount > 1 && "application" in content) {
+        // We have a MSC4143 event membership event with a proper joined content
+        return true;
+    } else if (eventKeysCount === 1 && "memberships" in content) {
+        logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
+        return false;
+    } else {
+        // Invalid or left content
+        return false;
+    }
+}
+
+function isValidMembership(
+    membership: CallMembership,
+    room: Pick<Room, "hasMembershipState">,
+    slotDescription: SlotDescription,
+    logger: Logger,
+): boolean {
+    if (!deepCompare(membership.slotDescription, slotDescription)) {
+        logger.info(
+            `Ignoring membership of user ${membership.userId} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
+        );
+        return false;
+    }
+
+    if (membership.isExpired()) {
+        logger.info(`Ignoring expired device membership ${membership.userId}/${membership.deviceId}`);
+        return false;
+    }
+
+    if (!room.hasMembershipState(membership.userId ?? "", KnownMembership.Join)) {
+        logger.info(`Ignoring membership of user ${membership.userId} who is not in the room.`);
+        return false;
+    }
+
+    return true;
 }
 
 function collectMembersEvents(
