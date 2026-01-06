@@ -410,7 +410,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         try {
             this.logger?.trace(`Sending key...`);
             await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
-            this.statistics.counters.roomEventEncryptionKeysSent += 1;
             outboundKey.sharedWith.push(...toDistributeTo);
             this.logger?.trace(
                 `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
