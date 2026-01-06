@@ -938,9 +938,7 @@ function collectMembersEvents(
     let callMemberEvents: MatrixEvent[] = [];
     if (listenForStickyEvents) {
         // prefill with sticky events
-        callMemberEvents = [...room._unstable_getStickyEvents()].filter(
-            (e) => e.getType() === EventType.RTCMembership,
-        );
+        callMemberEvents = [...room._unstable_getStickyEvents()].filter((e) => e.getType() === EventType.RTCMembership);
     }
     if (listenForMemberStateEvents) {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
