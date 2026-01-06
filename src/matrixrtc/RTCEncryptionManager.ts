@@ -30,7 +30,6 @@ import {
     type InboundEncryptionSession,
     type OutboundEncryptionSession,
     type ParticipantDeviceInfo,
-    type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
 
@@ -127,7 +126,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         private ownMembership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
-        private statistics: Statistics,
         // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array<ArrayBuffer>,
@@ -296,7 +294,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 candidateInboundSession.keyIndex,
                 candidateInboundSession.membership,
             );
-            this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
             this.logger?.info(
                 `Received an out of order key for ${membership.userId}:${membership.deviceId}, dropping it`,

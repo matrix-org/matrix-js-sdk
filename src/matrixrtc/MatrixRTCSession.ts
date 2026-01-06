@@ -585,7 +585,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 ownMembershipIdentity,
                 () => this.memberships,
                 transport,
-                this.statistics,
                 (
                     keyBin: Uint8Array<ArrayBuffer>,
                     encryptionKeyIndex: number,

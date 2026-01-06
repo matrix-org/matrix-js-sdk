@@ -17,7 +17,7 @@ limitations under the License.
 import { type Mocked } from "jest-mock";
 
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
-import { type CallMembership, type Statistics } from "../../../src/matrixrtc";
+import { type CallMembership } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { membershipTemplate, mockCallMembership } from "./mocks.ts";
@@ -31,20 +31,10 @@ describe("RTCEncryptionManager", () => {
     let encryptionManager: RTCEncryptionManager;
     let getMembershipMock: jest.Mock;
     let mockTransport: Mocked<ToDeviceKeyTransport>;
-    let statistics: Statistics;
     let onEncryptionKeysChanged: jest.Mock;
     let rtcIdentifierProvider: jest.Mock;
 
     beforeEach(() => {
-        statistics = {
-            counters: {
-                roomEventEncryptionKeysSent: 0,
-                roomEventEncryptionKeysReceived: 0,
-            },
-            totals: {
-                roomEventEncryptionKeysReceivedTotalAge: 0,
-            },
-        };
         getMembershipMock = jest.fn().mockReturnValue([]);
         onEncryptionKeysChanged = jest.fn();
         mockTransport = {
@@ -63,7 +53,6 @@ describe("RTCEncryptionManager", () => {
             { userId: "@alice:example.org", deviceId: "DEVICE01", memberId: "@alice:example.org:DEVICE01" },
             getMembershipMock,
             mockTransport,
-            statistics,
             onEncryptionKeysChanged,
             logger,
             rtcIdentifierProvider,
@@ -223,8 +212,6 @@ describe("RTCEncryptionManager", () => {
 
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
             await jest.advanceTimersByTimeAsync(1000);
-
-            expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
         // Test an edge case where the use key delay is higher than the grace period.
@@ -322,7 +309,6 @@ describe("RTCEncryptionManager", () => {
 
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
             await jest.advanceTimersByTimeAsync(1000);
-            expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
         it("Should not rotate key when several users join within the rotation grace period", async () => {
@@ -463,8 +449,6 @@ describe("RTCEncryptionManager", () => {
                 },
                 "@alice:example.org:DEVICE01",
             );
-
-            expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
         it("Should not distribute keys if encryption is disabled", async () => {
@@ -500,7 +484,6 @@ describe("RTCEncryptionManager", () => {
                 { userId: "@alice:example.org", deviceId: "DEVICE01", memberId: "@alice:example.org:DEVICE01" },
                 getMembershipMock,
                 mockTransport,
-                statistics,
                 onEncryptionKeysChanged,
             );
         });
@@ -524,7 +507,6 @@ describe("RTCEncryptionManager", () => {
             );
 
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
-            expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(0);
         });
 
         it("should accept keys from transport", async () => {
@@ -596,8 +578,6 @@ describe("RTCEncryptionManager", () => {
                 },
                 "rtcIDCARL1",
             );
-
-            expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(3);
         });
 
         it("Should support quick re-joiner if keys received out of order", async () => {
@@ -913,7 +893,6 @@ describe("RTCEncryptionManager", () => {
                 { userId: "@alice:example.org", deviceId: "DEVICE01", memberId: "@alice:example.org:DEVICE01" },
                 getMembershipMock,
                 mockTransport,
-                statistics,
                 onEncryptionKeysChanged,
                 logger,
                 rtcIdentifierProvider,
