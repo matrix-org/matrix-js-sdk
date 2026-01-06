@@ -249,6 +249,11 @@ interface SessionMembershipsForSlotOpts {
     listenForMemberStateEvents: boolean;
 }
 
+const DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS: SessionMembershipsForSlotOpts = {
+    listenForStickyEvents: true,
+    listenForMemberStateEvents: true,
+};
+
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
@@ -327,10 +332,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         slotDescription: SlotDescription,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
-        options: SessionMembershipsForSlotOpts = {
-            listenForStickyEvents: true,
-            listenForMemberStateEvents: true,
-        },
+        options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
     ): Promise<CallMembership[]> {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const callMemberEvents = collectMembersEvents(room, options, logger);
