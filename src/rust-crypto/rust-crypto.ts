@@ -2494,9 +2494,6 @@ function rustEncryptionInfoToJsEncryptionInfo(
         case RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity:
             shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
             break;
-        case RustSdkCryptoJs.ShieldStateCode.SentInClear:
-            shieldReason = EventShieldReason.SENT_IN_CLEAR;
-            break;
         case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
             break;
