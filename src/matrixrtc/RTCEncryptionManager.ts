@@ -57,7 +57,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
      * The keys are stored and can be retrieved later when the application layer is ready {@link RTCEncryptionManager#getEncryptionKeys}.
      */
-    private participantKeyRings = new Map<
+    private readonly participantKeyRings = new Map<
         EncryptionKeyMapKey,
         Array<{
             key: Uint8Array<ArrayBuffer>;
@@ -110,7 +110,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger | undefined = undefined;
 
-    private rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
+    private readonly rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
 
     /**
      *
@@ -123,7 +123,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * @param rtcBackendIdProvider - A function to compute the rtc backend identity, exposed for testing purposes
      */
     public constructor(
-        private ownMembership: CallMembershipIdentityParts,
+        private readonly ownMembership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
         // Callback to notify the media layer of new keys
