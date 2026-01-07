@@ -385,6 +385,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @param slotDescription The slot description is a virtual address where participants are allowed to meet.
      * This session will only manage memberships that match this slot description.Sessions are distinct if any of
      * those properties are distinct: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
+     * @param calculateMembershipsOpts - Options to configure how memberships are calculated for this session.
      */
     public constructor(
         private readonly client: Pick<
