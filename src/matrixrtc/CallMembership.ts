@@ -19,7 +19,7 @@ import { deepCompare } from "../utils.ts";
 import { type LivekitFocusSelection } from "./LivekitTransport.ts";
 import { slotDescriptionToId, slotIdToDescription, type SlotDescription } from "./MatrixRTCSession.ts";
 import type { RTCCallIntent, Transport } from "./types.ts";
-import { MatrixEvent, type IContent } from "../models/event.ts";
+import { type MatrixEvent, type IContent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { sha256 } from "../digest.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
@@ -269,57 +269,31 @@ export class CallMembership {
      * Class construction will fail if these values cannot get obtained. */
     private readonly matrixEventData: { eventId: string; sender: string; ts: number };
 
-    /** Anonymized identity to use with the RTC backend. */
-    public readonly rtcBackendIdentity: string;
-
-    /**
-     * The type checked membership data {data: (content of the matrix event), kind: (type hint)}
-     * @private
-     */
-    private readonly membershipData: MembershipData;
-
     public constructor(
         /** The required parts of the Matrix event that this membership is based on */
         matrixEvent: Pick<MatrixEvent, "getId" | "getSender" | "getTs">,
+
         /**
          * The type checked membership data {data: (content of the matrix event), kind: (type hint)}
-         * It can be a IContent just for backwards compatibility.
-         * */
-        membershipData: MembershipData | IContent,
+         *
+         */
+        private readonly membershipData: MembershipData,
+
         /**
          *
          * Anonymized identity to use with the RTC backend.
          *
-         * The rtcBackendIdentity is optional only for backwards compatibility. If omitted, the constructor will
-         *  fall back to the legacy `${sender}:${deviceId}` value.
          * The rtcBackendIdentity is a hashed version of all the identity parts:
          * `sha256(${this.userId}|${this.deviceId}|${this.memberId})`
          *
          * It is used to anonymize the identity of the user in the RTC backend.
          */
-        rtcBackendIdentity?: string,
+        public readonly rtcBackendIdentity: string,
         /**
          * The constructor will automatically create a properly tagged child logger instance.
          */
         logger?: Logger,
     ) {
-        if (membershipData.kind === "rtc" || membershipData.kind === "session") {
-            this.membershipData = membershipData as MembershipData;
-            if (rtcBackendIdentity == undefined) {
-                throw new Error("rtcBackendIdentity must be defined when passing MembershipData");
-            }
-            this.rtcBackendIdentity = rtcBackendIdentity!;
-        } else {
-            // Backwards compatibility path for legacy code that passes raw content
-            this.membershipData = CallMembership.membershipDataFromMatrixEvent(
-                new MatrixEvent({
-                    event_id: matrixEvent.getId(),
-                    sender: matrixEvent.getSender(),
-                    content: membershipData,
-                }),
-            );
-            this.rtcBackendIdentity = `${matrixEvent.getSender()}:${this.deviceId}`;
-        }
         const [eventId, sender, ts] = [matrixEvent.getId(), matrixEvent.getSender(), matrixEvent.getTs()];
         if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
         if (sender === undefined) throw new Error("parentEvent is missing sender field");
