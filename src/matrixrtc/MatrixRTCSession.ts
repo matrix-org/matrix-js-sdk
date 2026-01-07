@@ -408,7 +408,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         >,
         private roomSubset: Pick<
             Room,
-            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+            | "getLiveTimeline"
+            | "roomId"
+            | "getVersion"
+            | "hasMembershipState"
+            | "on"
+            | "off"
+            | "_unstable_getStickyEvents"
         >,
 
         public readonly slotDescription: SlotDescription,
@@ -786,7 +792,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const oldMemberships = this.memberships;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
-            this.room,
+            this.roomSubset,
             this.slotDescription,
             this.calculateMembershipsOpts,
         );
