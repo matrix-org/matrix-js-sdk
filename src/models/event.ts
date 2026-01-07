@@ -283,6 +283,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     private claimedEd25519Key: string | null = null;
 
+    /**
+     * If another user forwarded the key to this message
+     * (eg via [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)),
+     * the ID of that user.
+     */
+    private keyForwardedBy?: string;
+
     /* if we have a process decrypting this event, a Promise which resolves
      * when it is finished. Normally null.
      */
@@ -1016,6 +1023,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.clearEvent = decryptionResult.clearEvent;
         this.senderCurve25519Key = decryptionResult.senderCurve25519Key ?? null;
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
+        this.keyForwardedBy = decryptionResult.keyForwardedBy;
         this.invalidateExtensibleEvent();
     }
 
@@ -1122,6 +1130,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public isKeySourceUntrusted(): false {
         return false;
+    }
+
+    /**
+     * If another user forwarded the key to this message
+     * (eg via [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)),
+     * get the ID of that user.
+     */
+    public getKeyForwardingUser(): string | undefined {
+        return this.keyForwardedBy;
     }
 
     public getUnsigned(): IUnsigned {

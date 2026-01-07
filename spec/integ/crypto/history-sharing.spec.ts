@@ -35,6 +35,7 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
 import { E2EOTKClaimResponder } from "../../test-utils/E2EOTKClaimResponder.ts";
 import { escapeRegExp } from "../../../src/utils.ts";
+import { EventShieldColour, EventShieldReason } from "../../../src/crypto-api";
 
 const debug = mkDebug("matrix-js-sdk:history-sharing");
 
@@ -202,6 +203,10 @@ describe("History Sharing", () => {
         await event.getDecryptionPromise();
         expect(event.getType()).toEqual("m.room.message");
         expect(event.getContent().body).toEqual("Hi!");
+        expect(event.getKeyForwardingUser()).toEqual(aliceClient.getUserId());
+        const encryptionInfo = await bobClient.getCrypto()!.getEncryptionInfoForEvent(event);
+        expect(encryptionInfo?.shieldColour).toEqual(EventShieldColour.GREY);
+        expect(encryptionInfo?.shieldReason).toEqual(EventShieldReason.AUTHENTICITY_NOT_GUARANTEED);
     });
 
     test("Room keys are imported correctly if invite is accepted before the bundle arrives", async () => {
@@ -297,9 +302,13 @@ describe("History Sharing", () => {
         await waitFor(async () => {
             await event.getDecryptionPromise();
             expect(event.isDecryptionFailure()).toBeFalsy();
-            expect(event.getType()).toEqual("m.room.message");
-            expect(event.getContent().body).toEqual("Hello!");
         });
+        expect(event.getType()).toEqual("m.room.message");
+        expect(event.getContent().body).toEqual("Hello!");
+        expect(event.getKeyForwardingUser()).toEqual(aliceClient.getUserId());
+        const encryptionInfo = await bobClient.getCrypto()!.getEncryptionInfoForEvent(event);
+        expect(encryptionInfo?.shieldColour).toEqual(EventShieldColour.GREY);
+        expect(encryptionInfo?.shieldReason).toEqual(EventShieldReason.AUTHENTICITY_NOT_GUARANTEED);
     });
 
     afterEach(async () => {
