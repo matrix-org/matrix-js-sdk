@@ -26,11 +26,17 @@ export enum MembershipManagerEvent {
      * This means that the user is probably not joined anymore and the leave event was distributed to other session members.
      */
     ProbablyLeft = "ProbablyLeft",
+    /**
+     * Once the membershipManger has aquired the a delay id (after sending the state event)
+     * It will emit and share the delay id.
+     */
+    DelayIdChanged = "DelayIdChanged",
 }
 
 export type MembershipManagerEventHandlerMap = {
     [MembershipManagerEvent.StatusChanged]: (prefStatus: Status, newStatus: Status) => void;
     [MembershipManagerEvent.ProbablyLeft]: (probablyLeft: boolean) => void;
+    [MembershipManagerEvent.DelayIdChanged]: (delayId: string | undefined) => void;
 };
 
 /**
@@ -77,6 +83,12 @@ export interface IMembershipManager extends TypedEventEmitter<
      * and as a consequence the current user is perceived as left for other session participants.
      */
     get probablyLeft(): boolean;
+
+    /**
+     * If the membership manager has reason to believe that the hs sent a leave event
+     * and as a consequence the current user is perceived as left for other session participants.
+     */
+    get delayId(): string | undefined;
 
     /**
      * Start sending all necessary events to make this user participate in the RTC session.

@@ -23,6 +23,7 @@ import { type EncryptionKeysToDeviceEventContent, type ParticipantDeviceInfo, ty
 import { ClientEvent, type MatrixClient } from "../client.ts";
 import type { MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
+import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 
 export class NotSupportedError extends Error {
     public constructor(message?: string) {
@@ -47,8 +48,7 @@ export class ToDeviceKeyTransport
     }
 
     public constructor(
-        private userId: string,
-        private deviceId: string,
+        private membership: CallMembershipIdentityParts,
         private roomId: string,
         private client: Pick<MatrixClient, "encryptAndSendToDevice" | "on" | "off">,
         private statistics: Statistics,
@@ -74,7 +74,8 @@ export class ToDeviceKeyTransport
             },
             room_id: this.roomId,
             member: {
-                claimed_device_id: this.deviceId,
+                claimed_device_id: this.membership.deviceId,
+                id: this.membership.memberId,
             },
             session: {
                 call_id: "",
@@ -92,7 +93,9 @@ export class ToDeviceKeyTransport
                 };
             })
             // filter out me
-            .filter((member) => !(member.userId == this.userId && member.deviceId == this.deviceId));
+            .filter(
+                (member) => !(member.userId == this.membership.userId && member.deviceId == this.membership.deviceId),
+            );
 
         if (targets.length > 0) {
             await this.client
@@ -127,12 +130,16 @@ export class ToDeviceKeyTransport
         const age = now - (typeof content.sent_ts === "number" ? content.sent_ts : now);
         this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
 
+        const hardcodedMemberIdAlternative = `${fromUser}:${content.member.claimed_device_id}`;
+
         this.emit(
             KeyTransportEvents.ReceivedKeys,
-            // TODO this is claimed information
-            fromUser,
-            // TODO: This is claimed information
-            content.member.claimed_device_id!,
+            // TODO userId this is claimed information, deviceId is claimed information
+            {
+                userId: fromUser,
+                deviceId: content.member.claimed_device_id!,
+                memberId: content.member.id ?? hardcodedMemberIdAlternative,
+            },
             content.keys.key,
             content.keys.index,
             now,

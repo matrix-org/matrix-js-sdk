@@ -24,6 +24,9 @@ import { type MatrixEvent } from "../models/event.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room, RoomEvent } from "../models/room.ts";
 
+/**
+ * @deprecated This is depreacted and not used anymore. use the ToDeviceTransport
+ */
 export class RoomKeyTransport
     extends TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>
     implements IKeyTransport
@@ -174,8 +177,8 @@ export class RoomKeyTransport
                 );
                 this.emit(
                     KeyTransportEvents.ReceivedKeys,
-                    userId,
-                    deviceId,
+                    // Using `${userId}:${deviceId}` makes no sense (but works). It does not matter since the RoomKeyTransport is deprecated
+                    { userId, deviceId, memberId: `${userId}:${deviceId}` },
                     encryptionKey,
                     encryptionKeyIndex,
                     event.getTs(),
