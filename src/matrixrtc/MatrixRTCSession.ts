@@ -336,7 +336,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
         const callMemberEvents = collectMembersEvents(room, options, logger);
 
-        const callMemberships = await processMemberEvents(room, callMemberEvents, slotDescription, logger);
+        const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
+            room,
+            callMemberEvents,
+            slotDescription,
+            logger,
+        );
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
         if (callMemberships.length > 1) {
@@ -864,7 +869,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 }
 
 /// Private helpers
-async function processMemberEvents(
+async function computeBackendIdentityAndVerifyMemberEvents(
     room: Pick<Room, "hasMembershipState">,
     callMemberEvents: MatrixEvent[],
     slotDescription: SlotDescription,
@@ -947,6 +952,9 @@ function isValidMembership(
     return true;
 }
 
+/**
+ * Collects the raw member events from room state and sticky store.
+ */
 function collectMembersEvents(
     room: Pick<Room, "getLiveTimeline" | "roomId" | "_unstable_getStickyEvents">,
     options: SessionMembershipsForSlotOpts,
