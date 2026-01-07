@@ -44,7 +44,7 @@ import {
 import { RTCEncryptionManager } from "./RTCEncryptionManager.ts";
 import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
-import { type MatrixEvent } from "../models/event.ts";
+import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
 
 /**
@@ -243,6 +243,11 @@ interface SessionMembershipsForSlotOpts {
     listenForMemberStateEvents: boolean;
 }
 
+const DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS: SessionMembershipsForSlotOpts = {
+    listenForStickyEvents: true,
+    listenForMemberStateEvents: true,
+};
+
 /**
  * A MatrixRTCSession manages the membership & properties of a MatrixRTC session.
  * This class doesn't deal with media at all, just membership & properties of a session.
@@ -310,20 +315,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     *
-     * @deprecated Use `MatrixRTCSession.sessionMembershipsForSlot` instead.
-     * @returns an empty array.
-     */
-    public static callMembershipsForRoom(
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-    ): CallMembership[] {
-        rootLogger.error(
-            `[MatrixRTCSession ${room.roomId}] callMembershipsForRoom is deprecated. Use sessionMembershipsForSlot instead.`,
-        );
-        return [];
-    }
-
-    /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
      *
@@ -334,92 +325,17 @@ export class MatrixRTCSession extends TypedEventEmitter<
         slotDescription: SlotDescription,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
-        { listenForStickyEvents, listenForMemberStateEvents }: SessionMembershipsForSlotOpts = {
-            listenForStickyEvents: true,
-            listenForMemberStateEvents: true,
-        },
+        options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
     ): Promise<CallMembership[]> {
         const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
-        let callMemberEvents = [] as MatrixEvent[];
-        if (listenForStickyEvents) {
-            // prefill with sticky events
-            callMemberEvents = [...room._unstable_getStickyEvents()].filter(
-                (e) => e.getType() === EventType.RTCMembership,
-            );
-        }
-        if (listenForMemberStateEvents) {
-            const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
-            if (!roomState) {
-                logger.warn("Couldn't get state for room " + room.roomId + "using empty membership array");
-                return [];
-            }
-            const callMemberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
-            callMemberEvents = callMemberEvents.concat(
-                callMemberStateEvents.filter(
-                    (callMemberStateEvent) =>
-                        !callMemberEvents.some(
-                            // only care about state events which have keys which we have not yet seen in the sticky events.
-                            (stickyEvent) =>
-                                stickyEvent.getContent().msc4354_sticky_key === callMemberStateEvent.getStateKey(),
-                        ),
-                ),
-            );
-        }
+        const callMemberEvents = collectMembersEvents(room, options, logger);
 
-        const callMemberships: CallMembership[] = [];
-        for (const memberEvent of callMemberEvents) {
-            const content = memberEvent.getContent();
-            // Ignore sticky keys for the count
-            const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
-            // Dont even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-            if (eventKeysCount === 0) continue;
-
-            let membershipContent = undefined;
-
-            // We first decide if its a MSC4143 event (per device state key)
-            if (eventKeysCount > 1 && "application" in content) {
-                // We have a MSC4143 event membership event
-                membershipContent = content;
-            } else if (eventKeysCount === 1 && "memberships" in content) {
-                logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
-            }
-
-            if (membershipContent === undefined) continue;
-
-            if (!("application" in membershipContent)) {
-                // This is a left membership event, ignore it here to not log warnings.
-                continue;
-            }
-            try {
-                const membershipData = CallMembership.membershipDataFromMatrixEvent(memberEvent);
-
-                const membership = new CallMembership(
-                    memberEvent,
-                    membershipData,
-                    await CallMembership.computeRtcBackendIdentity(memberEvent, membershipData),
-                    rootLogger,
-                );
-
-                if (!deepCompare(membership.slotDescription, slotDescription)) {
-                    logger.info(
-                        `Ignoring membership of user ${membership.sender} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
-                    );
-                    continue;
-                }
-
-                if (membership.isExpired()) {
-                    logger.info(`Ignoring expired device membership ${membership.sender}/${membership.deviceId}`);
-                    continue;
-                }
-                if (!room.hasMembershipState(membership.sender ?? "", KnownMembership.Join)) {
-                    logger.info(`Ignoring membership of user ${membership.sender} who is not in the room.`);
-                    continue;
-                }
-                callMemberships.push(membership);
-            } catch (e) {
-                logger.warn("Couldn't construct call membership: ", e);
-            }
-        }
+        const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
+            room,
+            callMemberEvents,
+            slotDescription,
+            logger,
+        );
 
         callMemberships.sort((a, b) => a.createdTs() - b.createdTs());
         if (callMemberships.length > 1) {
@@ -866,7 +782,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    private recalculateSessionMembers = async (): Promise<void> => {
+    private readonly recalculateSessionMembers = async (): Promise<void> => {
         const oldMemberships = this.memberships;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
@@ -915,4 +831,124 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         this.setExpiryTimer();
     };
+}
+
+/// Private helpers
+async function computeBackendIdentityAndVerifyMemberEvents(
+    room: Pick<Room, "hasMembershipState">,
+    callMemberEvents: MatrixEvent[],
+    slotDescription: SlotDescription,
+    logger: Logger,
+): Promise<CallMembership[]> {
+    const callMemberships: CallMembership[] = [];
+
+    for (const memberEvent of callMemberEvents) {
+        const content = memberEvent.getContent();
+
+        // Quick filter to avoid unneeded processing of invalid events or left events.
+        // A more thorough validation will be done later with CallMembership.membershipDataFromMatrixEvent.
+        if (!quickFilterNonRelevantContents(content, logger)) {
+            continue;
+        }
+
+        try {
+            const membershipData = CallMembership.membershipDataFromMatrixEvent(memberEvent);
+
+            const membership = new CallMembership(
+                memberEvent,
+                membershipData,
+                await CallMembership.computeRtcBackendIdentity(memberEvent, membershipData),
+                logger,
+            );
+
+            if (isValidMembership(membership, room, slotDescription, logger)) {
+                callMemberships.push(membership);
+            }
+        } catch (e) {
+            logger.warn("Couldn't construct call membership: ", e);
+        }
+    }
+
+    return callMemberships;
+}
+
+function quickFilterNonRelevantContents(content: IContent, logger: Logger): boolean {
+    // Ignore sticky keys for the count
+    const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
+    // Don't even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
+    if (eventKeysCount === 0) return false;
+
+    // We first decide if it's a MSC4143 event (per device state key)
+    if (eventKeysCount > 1 && "application" in content) {
+        // We have a MSC4143 event membership event with a proper joined content
+        return true;
+    } else if (eventKeysCount === 1 && "memberships" in content) {
+        logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
+        return false;
+    } else {
+        // Invalid or left content
+        return false;
+    }
+}
+
+function isValidMembership(
+    membership: CallMembership,
+    room: Pick<Room, "hasMembershipState">,
+    slotDescription: SlotDescription,
+    logger: Logger,
+): boolean {
+    if (!deepCompare(membership.slotDescription, slotDescription)) {
+        logger.info(
+            `Ignoring membership of user ${membership.userId} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
+        );
+        return false;
+    }
+
+    if (membership.isExpired()) {
+        logger.info(`Ignoring expired device membership ${membership.userId}/${membership.deviceId}`);
+        return false;
+    }
+
+    if (!room.hasMembershipState(membership.userId ?? "", KnownMembership.Join)) {
+        logger.info(`Ignoring membership of user ${membership.userId} who is not in the room.`);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Collects the raw member events from room state and sticky store.
+ */
+function collectMembersEvents(
+    room: Pick<Room, "getLiveTimeline" | "roomId" | "_unstable_getStickyEvents">,
+    options: SessionMembershipsForSlotOpts,
+    logger: Logger,
+): MatrixEvent[] {
+    const { listenForStickyEvents, listenForMemberStateEvents } = options;
+    let callMemberEvents: MatrixEvent[] = [];
+    if (listenForStickyEvents) {
+        // prefill with sticky events
+        callMemberEvents = [...room._unstable_getStickyEvents()].filter((e) => e.getType() === EventType.RTCMembership);
+    }
+    if (listenForMemberStateEvents) {
+        const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!roomState) {
+            logger.warn("Couldn't get state for room " + room.roomId + "using empty membership array");
+            return [];
+        }
+        const callMemberStateEvents = roomState.getStateEvents(EventType.GroupCallMemberPrefix);
+        callMemberEvents = callMemberEvents.concat(
+            callMemberStateEvents.filter(
+                (callMemberStateEvent) =>
+                    !callMemberEvents.some(
+                        // only care about state events which have keys which we have not yet seen in the sticky events.
+                        // TODO: I believe this can discard a joined state event if there is a matching left sticky event.
+                        (stickyEvent) =>
+                            stickyEvent.getContent().msc4354_sticky_key === callMemberStateEvent.getStateKey(),
+                    ),
+            ),
+        );
+    }
+    return callMemberEvents;
 }
