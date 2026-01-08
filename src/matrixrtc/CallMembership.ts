@@ -22,7 +22,7 @@ import type { RTCCallIntent, Transport } from "./types.ts";
 import { type MatrixEvent, type IContent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { sha256 } from "../digest.ts";
-import { encodeUnpaddedBase64Url } from "../base64.ts";
+import { encodeUnpaddedBase64 } from "../base64.ts";
 import { type Logger } from "../logger.ts";
 
 /**
@@ -324,7 +324,7 @@ export class CallMembership {
     public static async computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
         const hashInput = `${userId}|${deviceId}|${memberId}`;
         const hashBuffer = await sha256(hashInput);
-        const hashedString = encodeUnpaddedBase64Url(hashBuffer);
+        const hashedString = encodeUnpaddedBase64(hashBuffer);
         return hashedString;
     }
 
