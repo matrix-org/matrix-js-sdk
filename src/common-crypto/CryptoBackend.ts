@@ -213,6 +213,13 @@ export interface EventDecryptionResult {
      * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
      */
     claimedEd25519Key?: string;
+
+    /**
+     * If another user forwarded the key to this message
+     * (eg via [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)),
+     * the ID of that user.
+     */
+    keyForwardedBy?: string;
 }
 
 /**
