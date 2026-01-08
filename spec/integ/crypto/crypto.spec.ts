@@ -223,15 +223,20 @@ describe("crypto", () => {
      */
     function createCryptoCallbacks(): CryptoCallbacks {
         // Store the cached secret storage key and return it when `getSecretStorageKey` is called
-        let cachedKey: { keyId: string; key: Uint8Array };
-        const cacheSecretStorageKey = (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => {
+        let cachedKey: { keyId: string; key: Uint8Array<ArrayBuffer> };
+        const cacheSecretStorageKey = (
+            keyId: string,
+            keyInfo: SecretStorageKeyDescription,
+            key: Uint8Array<ArrayBuffer>,
+        ) => {
             cachedKey = {
                 keyId,
                 key,
             };
         };
 
-        const getSecretStorageKey = () => Promise.resolve<[string, Uint8Array]>([cachedKey.keyId, cachedKey.key]);
+        const getSecretStorageKey = () =>
+            Promise.resolve<[string, Uint8Array<ArrayBuffer>]>([cachedKey.keyId, cachedKey.key]);
 
         return {
             cacheSecretStorageKey,
