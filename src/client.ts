@@ -3071,7 +3071,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const pathParams = {
             $roomId: event.getRoomId()!,
             $eventType: event.getWireType(),
-            $stateKey: event.getStateKey()!,
             $txnId: txnId,
         };
 
@@ -3113,7 +3112,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (event.getStateKey() && event.getStateKey()!.length > 0) {
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
-            path = utils.encodeUri(pathTemplate, pathParams);
+            path = utils.encodeUri(pathTemplate, {
+                $stateKey: event.getStateKey()!,
+                ...pathParams,
+            });
         } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
             path = utils.encodeUri(pathTemplate, {
@@ -3584,7 +3586,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,
-            $stateKey: stateKey,
         };
         try {
             return await this.http.authedRequest(
@@ -3607,11 +3608,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
                 throw e;
             }
-            let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
-            if (stateKey !== undefined) {
-                path = utils.encodeUri(path + "/$stateKey", pathParams);
-            }
-            return this.http.authedRequest(Method.Put, path, getUnstableDelayQueryOpts(delayOpts), content as Body, opts);
+            return this.http.authedRequest(
+                Method.Put,
+                utils.encodeUri("/rooms/$roomId/state/$eventType/$stateKey", {
+                    $stateKey: stateKey,
+                    ...pathParams,
+                }),
+                getUnstableDelayQueryOpts(delayOpts),
+                content,
+                opts,
+            );
         }
     }
 
