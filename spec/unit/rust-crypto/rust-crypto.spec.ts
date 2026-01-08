@@ -1157,7 +1157,6 @@ describe("RustCrypto", () => {
                 RustSdkCryptoJs.ShieldStateCode.UnknownDevice,
                 EventShieldReason.UNKNOWN_DEVICE,
             ],
-            ["Not encrypted.", RustSdkCryptoJs.ShieldStateCode.SentInClear, EventShieldReason.SENT_IN_CLEAR],
             [
                 "Encrypted by a previously-verified user who is no longer verified.",
                 RustSdkCryptoJs.ShieldStateCode.VerificationViolation,

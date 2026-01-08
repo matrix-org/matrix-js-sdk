@@ -146,3 +146,8 @@ export interface PolicyRuleEventContent {
     reason: string;
     recommendation: PolicyRecommendation;
 }
+
+export interface RoomPolicyContent {
+    via: string;
+    public_key: string;
+}
