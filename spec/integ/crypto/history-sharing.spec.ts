@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import mkDebug from "debug";
 
 import {

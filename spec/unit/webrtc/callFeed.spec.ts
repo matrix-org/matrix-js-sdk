@@ -93,7 +93,7 @@ describe("CallFeed", () => {
         it.each([true, false])("should always be connected, if isLocal()", (val: boolean) => {
             // @ts-ignore
             feed._connected = val;
-            jest.spyOn(feed, "isLocal").mockReturnValue(true);
+            vi.spyOn(feed, "isLocal").mockReturnValue(true);
 
             expect(feed.connected).toBeTruthy();
         });

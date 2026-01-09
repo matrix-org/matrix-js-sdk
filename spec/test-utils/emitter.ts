@@ -14,15 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type MockInstance } from "vitest";
+
 /**
  * Filter emitter.emit mock calls to find relevant events
  * eg:
  * ```
- * const emitSpy = jest.spyOn(state, 'emit');
+ * const emitSpy = vi.spyOn(state, 'emit');
  * << actions >>
  * const beaconLivenessEmits = emitCallsByEventType(BeaconEvent.New, emitSpy);
  * expect(beaconLivenessEmits.length).toBe(1);
  * ```
  */
-export const filterEmitCallsByEventType = (eventType: string, spy: jest.SpyInstance<any, any[]>) =>
+export const filterEmitCallsByEventType = (eventType: string, spy: MockInstance<(...args: any[]) => any>) =>
     spy.mock.calls.filter((args) => args[0] === eventType);

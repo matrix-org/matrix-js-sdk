@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import Olm from "@matrix-org/olm";
 
@@ -185,6 +185,7 @@ describe("Encrypted State Events", () => {
         expect(decryptedEvent.getContent().topic).toEqual("Secret!");
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("Should send an encrypted state event", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);

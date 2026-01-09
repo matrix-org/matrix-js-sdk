@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked, type MockedFunction } from "jest-mock";
+import { type Mocked, type MockedFunction } from "vitest";
 
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
@@ -40,7 +40,7 @@ describe("FetchHttpApi", () => {
     const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
 
     beforeEach(() => {
-        jest.useRealTimers();
+        vi.useRealTimers();
     });
 
     it("should support aborting multiple times", () => {
@@ -67,7 +67,7 @@ describe("FetchHttpApi", () => {
     });
 
     it("should fall back to global fetch if fetchFn not provided", () => {
-        const spy = (globalThis.fetch = jest.fn());
+        const spy = (globalThis.fetch = vi.fn());
         expect(spy).not.toHaveBeenCalled();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         api.fetch("test");
@@ -144,7 +144,7 @@ describe("FetchHttpApi", () => {
 
     it("should set an Accept header, and parse the response as JSON, by default", async () => {
         const result = { a: 1 };
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue(result) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(result) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(api.requestOtherUrl(Method.Get, "http://url")).resolves.toBe(result);
         expect(fetchFn.mock.calls[0][1].headers.Accept).toBe("application/json");
@@ -152,7 +152,7 @@ describe("FetchHttpApi", () => {
 
     it("should not set an Accept header, and should return text if json=false", async () => {
         const text = "418 I'm a teapot";
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, text: jest.fn().mockResolvedValue(text) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue(text) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(
             api.requestOtherUrl(Method.Get, "http://url", undefined, {
@@ -164,7 +164,7 @@ describe("FetchHttpApi", () => {
 
     it("should not set an Accept header, and should return a blob, if rawResponseBody is true", async () => {
         const blob = new Blob(["blobby"]);
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, blob: jest.fn().mockResolvedValue(blob) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, blob: vi.fn().mockResolvedValue(blob) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(
             api.requestOtherUrl(Method.Get, "http://url", undefined, {
@@ -178,7 +178,7 @@ describe("FetchHttpApi", () => {
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
-            fetchFn: jest.fn(),
+            fetchFn: vi.fn(),
             onlyData: true,
         });
         await expect(
@@ -282,14 +282,14 @@ describe("FetchHttpApi", () => {
     });
 
     it("should emit NoConsent when given errcode=M_CONTENT_NOT_GIVEN", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({
+        const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             headers: {
                 get(name: string): string | null {
                     return name === "Content-Type" ? "application/json" : null;
                 },
             },
-            text: jest.fn().mockResolvedValue(
+            text: vi.fn().mockResolvedValue(
                 JSON.stringify({
                     errcode: "M_CONSENT_NOT_GIVEN",
                     error: "Ye shall ask for consent",
@@ -339,19 +339,19 @@ describe("FetchHttpApi", () => {
                             return name === "Content-Type" ? "application/json" : null;
                         },
                     },
-                    text: jest.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
+                    text: vi.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
                 };
                 const okayResponse = {
                     ok: true,
                     status: 200,
-                    json: jest.fn().mockResolvedValue({ x: 1 }),
+                    json: vi.fn().mockResolvedValue({ x: 1 }),
                 };
 
                 describe("without a tokenRefreshFunction", () => {
                     it("should emit logout and throw", async () => {
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -370,10 +370,10 @@ describe("FetchHttpApi", () => {
                 describe("with a tokenRefreshFunction", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
                         const error = new MatrixError();
-                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const tokenRefreshFunction = vi.fn().mockRejectedValue(error);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -392,10 +392,10 @@ describe("FetchHttpApi", () => {
 
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
                         const error = new ConnectionError("transitive fault");
-                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const tokenRefreshFunction = vi.fn().mockRejectedValue(error);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -415,16 +415,16 @@ describe("FetchHttpApi", () => {
                     it("should refresh token and retry request", async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
+                        const tokenRefreshFunction = vi.fn().mockResolvedValue({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
                         });
-                        const fetchFn = jest
+                        const fetchFn = vi
                             .fn()
                             .mockResolvedValueOnce(unknownTokenResponse)
                             .mockResolvedValueOnce(okayResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -456,7 +456,7 @@ describe("FetchHttpApi", () => {
                         // count because it's only to get a token with an expiry)
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockReturnValue({
+                        const tokenRefreshFunction = vi.fn().mockReturnValue({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
                             // This needs to be sufficiently high that it's over the threshold for
@@ -465,10 +465,10 @@ describe("FetchHttpApi", () => {
                         });
 
                         // fetch doesn't like our new or old tokens
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -478,7 +478,7 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
 
@@ -500,7 +500,7 @@ describe("FetchHttpApi", () => {
 
                         // first refresh is to get a token with an expiry at all, because we
                         // can't specify an expiry on the token we inject
-                        const tokenRefreshFunction = jest.fn().mockResolvedValueOnce({
+                        const tokenRefreshFunction = vi.fn().mockResolvedValueOnce({
                             accessToken: newAccessToken,
                             refreshToken: newRefreshToken,
                             expiry: new Date(Date.now() + 1000),
@@ -521,10 +521,10 @@ describe("FetchHttpApi", () => {
                             expiry: new Date(Date.now() + 5 * 60 * 1000),
                         });
 
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -534,7 +534,7 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
 
@@ -551,7 +551,7 @@ describe("FetchHttpApi", () => {
         const localBaseUrl = "http://baseurl";
         const baseUrlWithTrailingSlash = "http://baseurl/";
         const makeApi = (thisBaseUrl = baseUrl): FetchHttpApi<any> => {
-            const fetchFn = jest.fn();
+            const fetchFn = vi.fn();
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             return new FetchHttpApi(emitter, { baseUrl: thisBaseUrl, prefix, fetchFn, onlyData: true });
         };
@@ -604,7 +604,7 @@ describe("FetchHttpApi", () => {
 
         describe("extraParams handling", () => {
             const makeApiWithExtraParams = (extraParams: QueryDict): FetchHttpApi<any> => {
-                const fetchFn = jest.fn();
+                const fetchFn = vi.fn();
                 const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                 return new FetchHttpApi(emitter, {
                     baseUrl: localBaseUrl,
@@ -663,7 +663,7 @@ describe("FetchHttpApi", () => {
             });
 
             it("should work when extraParams is undefined", () => {
-                const fetchFn = jest.fn();
+                const fetchFn = vi.fn();
                 const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                 const api = new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn, onlyData: true });
 
@@ -687,11 +687,11 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not log query parameters", async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         const responseResolvers = Promise.withResolvers<Response>();
-        const fetchFn = jest.fn().mockReturnValue(responseResolvers.promise);
+        const fetchFn = vi.fn().mockReturnValue(responseResolvers.promise);
         const mockLogger = {
-            debug: jest.fn(),
+            debug: vi.fn(),
         } as unknown as Mocked<Logger>;
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -701,7 +701,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
-        jest.advanceTimersByTime(1234);
+        vi.advanceTimersByTime(1234);
         responseResolvers.resolve({ ok: true, status: 200, json: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");
@@ -722,7 +722,7 @@ describe("FetchHttpApi", () => {
 
     it("should not make multiple concurrent refresh token requests", async () => {
         const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
-        const fetchFn = jest.fn().mockResolvedValue({
+        const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,
             async text() {
@@ -732,10 +732,10 @@ describe("FetchHttpApi", () => {
                 return tokenInactiveError.data;
             },
             headers: {
-                get: jest.fn().mockReturnValue("application/json"),
+                get: vi.fn().mockReturnValue("application/json"),
             },
         });
-        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
+        const tokenRefreshFunction = vi.fn().mockReturnValue(deferredTokenRefresh.promise);
 
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -763,7 +763,7 @@ describe("FetchHttpApi", () => {
                 return {};
             },
             headers: {
-                get: jest.fn().mockReturnValue("application/json"),
+                get: vi.fn().mockReturnValue("application/json"),
             },
         });
         deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
@@ -778,7 +778,7 @@ describe("FetchHttpApi", () => {
 
     it("should use newly refreshed token if request starts mid-refresh", async () => {
         const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
-        const fetchFn = jest.fn().mockResolvedValue({
+        const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,
             async text() {
@@ -788,10 +788,10 @@ describe("FetchHttpApi", () => {
                 return tokenInactiveError.data;
             },
             headers: {
-                get: jest.fn().mockReturnValue("application/json"),
+                get: vi.fn().mockReturnValue("application/json"),
             },
         });
-        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
+        const tokenRefreshFunction = vi.fn().mockReturnValue(deferredTokenRefresh.promise);
 
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -821,7 +821,7 @@ describe("FetchHttpApi", () => {
                 return {};
             },
             headers: {
-                get: jest.fn().mockReturnValue("application/json"),
+                get: vi.fn().mockReturnValue("application/json"),
             },
         });
 
@@ -840,6 +840,6 @@ describe("FetchHttpApi", () => {
     });
 });
 
-function makeMockFetchFn(): MockedFunction<any> {
-    return jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
+function makeMockFetchFn(): MockedFunction<Window["fetch"]> {
+    return vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({}) });
 }

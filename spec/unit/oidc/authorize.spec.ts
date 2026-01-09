@@ -1,5 +1,5 @@
 /**
- * @jest-environment jest-fixed-jsdom
+ * @vitest-environment happy-dom
  */
 
 /*
@@ -18,7 +18,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import { jwtDecode } from "jwt-decode";
 import { Crypto } from "@peculiar/webcrypto";
 import { getRandomValues } from "node:crypto";
@@ -33,7 +33,7 @@ import {
 import { OidcError } from "../../../src/oidc/error";
 import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
 
-jest.mock("jwt-decode");
+vi.mock("jwt-decode");
 
 describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
@@ -45,19 +45,17 @@ describe("oidc authorization", () => {
     const now = 1647270879403;
 
     beforeEach(() => {
-        jest.spyOn(logger, "warn");
-        jest.useFakeTimers();
-        jest.setSystemTime(now);
+        vi.spyOn(logger, "warn");
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
 
         fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
-    });
 
-    beforeEach(() => {
         const webCrypto = new Crypto();
         Object.defineProperty(window, "crypto", {
             value: {
                 getRandomValues,
-                randomUUID: jest.fn().mockReturnValue("not-random-uuid"),
+                randomUUID: vi.fn().mockReturnValue("not-random-uuid"),
                 subtle: webCrypto.subtle,
             },
         });
@@ -251,7 +249,7 @@ describe("oidc authorization", () => {
             return state;
         };
 
-        beforeEach(() => {
+        beforeEach(async () => {
             sessionStorage.clear();
 
             fetchMock.get(`${metadata.issuer}.well-known/openid-configuration`, metadata);
@@ -263,7 +261,7 @@ describe("oidc authorization", () => {
                 keys: [],
             });
 
-            jest.mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
+            vi.mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
         });
 
         it("should make correct request to the token endpoint", async () => {
@@ -356,6 +354,7 @@ describe("oidc authorization", () => {
 
         it("should throw when state is not found in storage", async () => {
             // don't setup sessionStorage with expected state
+            sessionStorage.clear();
             const state = "abc123";
             fetchMock.post(metadata.token_endpoint, {
                 status: 500,
@@ -391,7 +390,7 @@ describe("oidc authorization", () => {
 
         it("should throw invalid id token error when id_token is invalid", async () => {
             const state = await setupState();
-            jest.mocked(jwtDecode).mockReturnValue({
+            vi.mocked(jwtDecode).mockReturnValue({
                 ...validDecodedIdToken,
                 // invalid audience
                 aud: "something-else",

@@ -226,15 +226,14 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // everything else is either an unequal primitive, or an object
-    if (typeof x !== "object") {
+    if (!(x instanceof Object)) {
         return false;
     }
 
-    // XXX: this fails under jest
-    // // check they are the same type of object
-    // if (x.constructor !== y.constructor || x.prototype !== y.prototype) {
-    //     return false;
-    // }
+    // check they are the same type of object
+    if (x.constructor !== y.constructor || x.prototype !== y.prototype) {
+        return false;
+    }
 
     // special-casing for some special types of object
     if (x instanceof RegExp || x instanceof Date) {

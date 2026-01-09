@@ -1,5 +1,5 @@
 /**
- * @jest-environment jest-fixed-jsdom
+ * @vitest-environment happy-dom
  */
 
 /*
@@ -18,7 +18,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { OidcTokenRefresher, TokenRefreshLogoutError } from "../../../src";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
@@ -77,7 +77,7 @@ describe("OidcTokenRefresher", () => {
     });
 
     afterEach(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     describe("doRefreshAccessToken()", () => {
@@ -139,7 +139,7 @@ describe("OidcTokenRefresher", () => {
         it("should persist the new tokens", async () => {
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             // spy on our stub
-            jest.spyOn(refresher as any, "persistTokens");
+            vi.spyOn(refresher as any, "persistTokens");
 
             await refresher.doRefreshAccessToken("refresh-token");
 

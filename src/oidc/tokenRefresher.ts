@@ -110,7 +110,7 @@ export class OidcTokenRefresher {
             });
         } catch (error) {
             logger.error("Failed to initialise OIDC client.", error);
-            throw new Error("Failed to initialise OIDC client.");
+            throw new Error("Failed to initialise OIDC client.", { cause: error });
         }
     }
 

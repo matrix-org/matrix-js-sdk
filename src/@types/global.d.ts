@@ -64,4 +64,7 @@ declare global {
         // https://tc39.es/proposal-arraybuffer-base64/spec/#sec-uint8array.frombase64
         fromBase64?(base64: string, options?: Uint8ArrayFromBase64Options): Uint8Array<ArrayBuffer>;
     }
+
+    // https://github.com/microsoft/TypeScript/issues/58995
+    // interface RTCStatsReport extends Omit<Map<string, any>, "delete" | "clear" | "set"> {}
 }

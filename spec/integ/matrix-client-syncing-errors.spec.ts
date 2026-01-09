@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { type MatrixClient, ClientEvent, createClient, SyncState } from "../../src";
 
@@ -83,7 +83,7 @@ describe("MatrixClient syncing errors", () => {
     });
 
     it("should retry, until errors are solved.", async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         fetchMock
             .getOnce("end:versions", {}) // first version check without credentials needs to succeed
             .getOnce("end:versions", 429) // second version check fails with 429 triggering another retry
@@ -104,18 +104,18 @@ describe("MatrixClient syncing errors", () => {
 
         await client!.startClient();
         expect(await syncEvents[0].promise).toBe(SyncState.Error);
-        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
+        vi.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[1].promise).toBe(SyncState.Error);
-        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
+        vi.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[2].promise).toBe(SyncState.Prepared);
-        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
+        vi.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[3].promise).toBe(SyncState.Syncing);
-        jest.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
+        vi.advanceTimersByTime(60 * 1000); // this will skip forward to trigger the keepAlive/sync
         expect(await syncEvents[4].promise).toBe(SyncState.Syncing);
     });
 
     it("should stop sync keep alive when client is stopped.", async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         fetchMock
             .get("end:capabilities", {})
             .getOnce("end:versions", {}) // first version check without credentials needs to succeed
@@ -144,9 +144,9 @@ describe("MatrixClient syncing errors", () => {
 
         const syntState = await firstSyncEvent.promise;
         expect(syntState).toBe(SyncState.Error);
-        jest.runAllTimers(); // this will skip forward to trigger the keepAlive
+        vi.runAllTimers(); // this will skip forward to trigger the keepAlive
 
-        jest.useRealTimers(); // we need real timer for the setTimout below to work
+        vi.useRealTimers(); // we need real timer for the setTimout below to work
 
         const timeoutPromise = makeQueryablePromise(new Promise<void>((res) => setTimeout(res, 1)));
 

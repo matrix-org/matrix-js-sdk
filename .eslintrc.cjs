@@ -1,6 +1,6 @@
 module.exports = {
-    plugins: ["matrix-org", "import", "jsdoc", "n"],
-    extends: ["plugin:matrix-org/babel", "plugin:matrix-org/jest", "plugin:import/typescript"],
+    plugins: ["matrix-org", "import", "jsdoc", "n", "@vitest"],
+    extends: ["plugin:matrix-org/babel", "plugin:import/typescript"],
     parserOptions: {
         project: ["./tsconfig.json"],
     },
@@ -83,16 +83,6 @@ module.exports = {
                 ],
             },
         ],
-        // Disabled tests are a reality for now but as soon as all of the xits are
-        // eliminated, we should enforce this.
-        "jest/no-disabled-tests": "off",
-        // Used in some crypto tests.
-        "jest/no-standalone-expect": [
-            "error",
-            {
-                additionalTestBlockFunctions: ["beforeAll", "beforeEach"],
-            },
-        ],
     },
     overrides: [
         {
@@ -147,11 +137,37 @@ module.exports = {
         },
         {
             files: ["spec/**/*.ts"],
+            extends: ["plugin:@vitest/legacy-recommended"],
             rules: {
                 // We don't need super strict typing in test utilities
                 "@typescript-eslint/explicit-function-return-type": "off",
                 "@typescript-eslint/explicit-member-accessibility": "off",
                 "@typescript-eslint/no-empty-object-type": "off",
+
+                // Disabled tests are a reality for now but as soon as all of the xits are
+                // eliminated, we should enforce this.
+                "@vitest/no-disabled-tests": "off",
+                // Used in some crypto tests.
+                "@vitest/no-standalone-expect": [
+                    "error",
+                    {
+                        additionalTestBlockFunctions: ["beforeAll", "beforeEach"],
+                    },
+                ],
+                "@vitest/expect-expect": [
+                    "error",
+                    {
+                        assertFunctionNames: [
+                            "expect",
+                            "expectDevices",
+                            "assert.isTrue",
+                            "assert.isFalse",
+                            "passwordTest",
+                            "compareHeaders",
+                            "doTest",
+                        ],
+                    },
+                ],
             },
         },
         {

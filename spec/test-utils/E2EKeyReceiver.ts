@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import debugFunc, { type Debugger } from "debug";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
 import type { CrossSigningKeys, ISignedKey, KeySignatures } from "../../src";

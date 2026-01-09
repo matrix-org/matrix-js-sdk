@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";
@@ -104,7 +104,7 @@ afterEach(() => {
     // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 
-    jest.useRealTimers();
+    vi.useRealTimers();
 });
 
 describe("crypto", () => {
@@ -265,7 +265,7 @@ describe("crypto", () => {
             const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
             testSenderKey = testE2eKeys.curve25519;
 
-            jest.useRealTimers();
+            vi.useRealTimers();
         },
         /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
         10000,
@@ -275,7 +275,9 @@ describe("crypto", () => {
         aliceClient.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
-        await jest.runAllTimersAsync();
+        if (vi.isFakeTimers()) {
+            await vi.runAllTimersAsync();
+        }
     });
 
     it("MatrixClient.getCrypto returns a CryptoApi", () => {
@@ -342,7 +344,7 @@ describe("crypto", () => {
 
     describe("Unable to decrypt error codes", function () {
         beforeEach(() => {
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers();
         });
 
         it("Decryption fails with UISI error", async () => {
@@ -869,6 +871,7 @@ describe("crypto", () => {
         await expectSendRoomKey("@bob:xyz", testOlmAccount);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("Alice sends a megolm message", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);
@@ -896,6 +899,7 @@ describe("crypto", () => {
         ]);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("We should start a new megolm session after forceDiscardSession", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);
@@ -996,9 +1000,7 @@ describe("crypto", () => {
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            // We need to fake the timers to advance the time, but the wasm bindings of matrix-sdk-crypto rely on a
-            // working `queueMicrotask`
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers();
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -1030,7 +1032,7 @@ describe("crypto", () => {
             expect(sessionId).toBeDefined();
 
             // Advance the time by 1h
-            jest.advanceTimersByTime(oneHourInMs);
+            vi.advanceTimersByTime(oneHourInMs);
 
             // Send a second message to bob and get the encrypted message
             const [secondEncryptedMessage] = await Promise.all([
@@ -1263,6 +1265,7 @@ describe("crypto", () => {
             });
         }
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("Sending an event initiates a member list sync", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
             const keyResponder = new E2EKeyResponder(homeserverUrl);
@@ -1286,6 +1289,7 @@ describe("crypto", () => {
             await Promise.all([sendPromise, megolmMessagePromise, memberListPromise]);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("loading the membership list inhibits a later load", async () => {
             const homeserverUrl = aliceClient.getHomeserverUrl();
             const keyResponder = new E2EKeyResponder(homeserverUrl);
@@ -1395,8 +1399,7 @@ describe("crypto", () => {
 
     describe("key upload request", () => {
         beforeEach(() => {
-            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers();
         });
 
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
@@ -1442,7 +1445,7 @@ describe("crypto", () => {
 
             // Advance local date to 2 minutes
             // The old crypto only runs the upload every 60 seconds
-            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+            vi.setSystemTime(Date.now() + 2 * 60 * 1000);
 
             await syncPromise(aliceClient);
 
@@ -1581,8 +1584,7 @@ describe("crypto", () => {
         });
 
         it("Get devices from tracked users", async () => {
-            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers();
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -1594,12 +1596,12 @@ describe("crypto", () => {
 
             // Advance local date to 2 minutes
             // The old crypto only runs the upload every 60 seconds
-            jest.setSystemTime(Date.now() + 2 * 60 * 1000);
+            vi.setSystemTime(Date.now() + 2 * 60 * 1000);
 
             await syncPromise(aliceClient);
 
             // Old crypto: for alice: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
-            jest.runAllTimers();
+            vi.runAllTimers();
             // Old crypto: for alice: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
             await flushPromises();
 
@@ -1607,7 +1609,7 @@ describe("crypto", () => {
             await queryPromise;
 
             // Old crypto: for `user`: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
-            jest.runAllTimers();
+            vi.runAllTimers();
             // Old crypto: for `user`: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
             // It will add `@testing_florian1:matrix.org` devices to the DeviceList
             await flushPromises();
@@ -1631,7 +1633,7 @@ describe("crypto", () => {
          * Create a fake secret storage key
          * Async because `bootstrapSecretStorage` expect an async method
          */
-        const createSecretStorageKey = jest.fn().mockResolvedValue({
+        const createSecretStorageKey = vi.fn().mockResolvedValue({
             keyInfo: {}, // Returning undefined here used to cause a crash
             privateKey: Uint8Array.of(32, 33),
         });
@@ -1920,8 +1922,7 @@ describe("crypto", () => {
 
         describe("Manage Key Backup", () => {
             beforeEach(async () => {
-                // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-                jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+                vi.useFakeTimers();
             });
 
             it("Should be able to restore from 4S after bootstrap", async () => {
@@ -1954,7 +1955,7 @@ describe("crypto", () => {
                 await aliceClient.getCrypto()!.importRoomKeys([newKey]);
 
                 // The backup loop waits a random amount of time to avoid different clients firing at the same time.
-                jest.runAllTimers();
+                vi.runAllTimers();
 
                 const keyBackupData = await awaitKeyUploaded;
 
@@ -2070,8 +2071,7 @@ describe("crypto", () => {
         });
 
         it("Cross signing keys are available for a tracked user", async () => {
-            // Process Alice keys, old crypto has a sleep(5ms) during the process
-            await jest.advanceTimersByTimeAsync(5);
+            // Process Alice keys
             await flushPromises();
 
             // Alice is the local user and should be tracked !
@@ -2159,6 +2159,7 @@ describe("crypto", () => {
             client2?.stopClient();
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         test("Sending a message in a room where the server is hiding the state event does not send a plaintext event", async () => {
             // Alice is in an encrypted room
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2" });
@@ -2216,6 +2217,7 @@ describe("crypto", () => {
             expect(msg3Content.session_id).not.toEqual(msg1Content.session_id);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         test("Changes to the rotation period should be ignored after a client restart", async () => {
             // Alice is in an encrypted room, where the rotation period is set to 2 messages
             const encryptionState = mkEncryptionEvent({ algorithm: "m.megolm.v1.aes-sha2", rotation_period_msgs: 2 });

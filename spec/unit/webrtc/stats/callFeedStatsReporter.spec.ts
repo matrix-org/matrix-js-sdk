@@ -23,7 +23,7 @@ describe("CallFeedStatsReporter", () => {
     let rtcSpy: RTCPeerConnection;
     beforeEach(() => {
         rtcSpy = {} as RTCPeerConnection;
-        rtcSpy.getTransceivers = jest.fn().mockReturnValue(buildTransceiverMocks());
+        rtcSpy.getTransceivers = vi.fn().mockReturnValue(buildTransceiverMocks());
     });
 
     describe("should", () => {

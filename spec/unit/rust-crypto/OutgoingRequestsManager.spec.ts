@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type Mocked } from "vitest";
 
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -34,11 +34,11 @@ describe("OutgoingRequestsManager", () => {
 
     beforeEach(async () => {
         olmMachine = {
-            outgoingRequests: jest.fn(),
+            outgoingRequests: vi.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
         processor = {
-            makeOutgoingRequest: jest.fn(),
+            makeOutgoingRequest: vi.fn(),
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
         manager = new OutgoingRequestsManager(logger, olmMachine, processor);

@@ -32,11 +32,11 @@ import { Room } from "../../../src/models/room";
  */
 describe("RoomReceipts", () => {
     beforeAll(() => {
-        jest.replaceProperty(Thread, "hasServerSideSupport", FeatureSupport.Stable);
+        vi.spyOn(Thread, "hasServerSideSupport", "get").mockReturnValue(FeatureSupport.Stable);
     });
 
     afterAll(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     it("reports events unread if there are no receipts", () => {
@@ -436,13 +436,13 @@ describe("RoomReceipts", () => {
 
 function createFakeClient(): MatrixClient {
     return {
-        getUserId: jest.fn(),
-        getEventMapper: jest.fn().mockReturnValue(jest.fn()),
-        isInitialSyncComplete: jest.fn().mockReturnValue(true),
-        supportsThreads: jest.fn().mockReturnValue(true),
-        fetchRoomEvent: jest.fn().mockResolvedValue({}),
-        paginateEventTimeline: jest.fn(),
-        canSupport: { get: jest.fn() },
+        getUserId: vi.fn(),
+        getEventMapper: vi.fn().mockReturnValue(vi.fn()),
+        isInitialSyncComplete: vi.fn().mockReturnValue(true),
+        supportsThreads: vi.fn().mockReturnValue(true),
+        fetchRoomEvent: vi.fn().mockResolvedValue({}),
+        paginateEventTimeline: vi.fn(),
+        canSupport: { get: vi.fn() },
     } as unknown as MatrixClient;
 }
 

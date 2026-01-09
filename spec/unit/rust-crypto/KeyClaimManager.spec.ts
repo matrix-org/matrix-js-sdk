@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { type Mocked } from "jest-mock";
+import { type Mocked } from "vitest";
 
 import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -45,8 +45,8 @@ describe("KeyClaimManager", () => {
         });
 
         olmMachine = {
-            getMissingSessions: jest.fn(),
-            markRequestAsSent: jest.fn(),
+            getMissingSessions: vi.fn(),
+            markRequestAsSent: vi.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
         const outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, httpApi);

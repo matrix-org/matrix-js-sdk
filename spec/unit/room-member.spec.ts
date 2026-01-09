@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
@@ -110,7 +110,7 @@ describe("RoomMember", function () {
         });
 
         it("should emit when power level set", function () {
-            const onEmit = jest.fn();
+            const onEmit = vi.fn();
             member.on(RoomMemberEvent.PowerLevel, onEmit);
 
             const aMatrixEvent = new MatrixEvent();
@@ -120,7 +120,7 @@ describe("RoomMember", function () {
         });
 
         it("should not emit if new power level is the same", function () {
-            const onEmit = jest.fn();
+            const onEmit = vi.fn();
             member.on(RoomMemberEvent.PowerLevel, onEmit);
 
             const aMatrixEvent = new MatrixEvent();

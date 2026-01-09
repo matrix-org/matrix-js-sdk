@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientPrefix, type IHttpOpts, type MatrixClient, MatrixHttpApi } from "../../../src";
 import { ClientRendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
@@ -72,7 +72,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("should use custom fetchFn if provided", async () => {
         const sandbox = fetchMock.createInstance();
-        const fetchFn = jest.fn().mockImplementation(sandbox.fetchHandler);
+        const fetchFn = vi.fn().mockImplementation(sandbox.fetchHandler);
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
         const transport = new MSC4108RendezvousSession({
             client,
@@ -122,10 +122,12 @@ describe("MSC4108RendezvousSession", () => {
         await Promise.all([expect(transport.send("data")).rejects.toThrow(), fetchMock.callHistory.flush(true)]);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("POST with absolute path response", async function () {
         await postAndCheckLocation(false, "https://fallbackserver/rz", "https://fallbackserver/123");
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("POST to built-in MSC3886 implementation", async function () {
         await postAndCheckLocation(
             true,
@@ -134,6 +136,7 @@ describe("MSC4108RendezvousSession", () => {
         );
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("POST with relative path response including parent", async function () {
         await postAndCheckLocation(false, "https://fallbackserver/rz/abc", "https://fallbackserver/rz/xyz/123");
     });
@@ -293,7 +296,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("404 failure callback", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const onFailure = jest.fn();
+        const onFailure = vi.fn();
         const transport = new MSC4108RendezvousSession({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
@@ -310,7 +313,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("404 failure callback mapped to expired", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const onFailure = jest.fn();
+        const onFailure = vi.fn();
         const transport = new MSC4108RendezvousSession({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
