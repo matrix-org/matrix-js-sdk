@@ -3127,17 +3127,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (delayOpts) {
-            return this.http.authedRequest<SendDelayedEventResponse>(
+            return await this.http.authedRequest<SendDelayedEventResponse>(
                 Method.Put,
                 path,
                 { ...getUnstableDelayQueryOpts(delayOpts), ...queryOpts },
                 content,
             );
         } else {
-            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content).then((res) => {
-                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
-                return res;
-            });
+            const res = await this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content);
+            this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+            return res;
         }
     }
 
@@ -3608,7 +3607,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
                 throw e;
             }
-            return this.http.authedRequest(
+            return await this.http.authedRequest(
                 Method.Put,
                 utils.encodeUri("/rooms/$roomId/state/$eventType/$stateKey", {
                     $stateKey: stateKey,
