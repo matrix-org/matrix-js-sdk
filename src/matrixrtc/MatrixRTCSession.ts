@@ -1,5 +1,5 @@
 /*
-Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import type {
     ICallNotifyContent,
     RTCCallIntent,
     Transport,
+    SlotDescription,
 } from "./types.ts";
 import {
     MembershipManagerEvent,
@@ -98,13 +99,6 @@ export interface SessionConfig {
     callIntent?: RTCCallIntent;
 }
 
-/**
- * The session description is used to identify a session. Used in the state event.
- */
-export interface SlotDescription {
-    id: string;
-    application: string;
-}
 export function slotIdToDescription(slotId: string): SlotDescription {
     const [application, id] = slotId.split("#");
     return { application, id };

@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -198,4 +198,24 @@ export const isMyMembership = (m: CallMembership, userId: string, deviceId: stri
 export interface Transport {
     type: string;
     [key: string]: unknown;
+}
+
+/**
+ * Event content for a `m.rtc.slot` state event.
+ */
+export interface RtcSlotEventContent<T extends string = string> {
+    application: {
+        type: T;
+        // other application specific keys
+        [key: string]: unknown;
+    };
+    slot_id: string;
+}
+
+/**
+ * The session description is used to identify a session. Used in the state event.
+ */
+export interface SlotDescription {
+    id?: string;
+    application: string;
 }
