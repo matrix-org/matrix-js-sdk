@@ -339,6 +339,20 @@ describe("MatrixRTCSession", () => {
                 );
                 expect(sess.memberships).toHaveLength(0);
             });
+
+            it("assigns RTC backend identities to memberships", async () => {
+                const mockRoom = makeMockRoom([membershipTemplate], testConfig.testCreateSticky);
+                sess = MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                await flushPromises();
+                expect(sess?.memberships.length).toEqual(1);
+                // Backend identity is expected to not be hashed with a legacy (session) membership
+                expect(sess?.memberships[0].rtcBackendIdentity).toEqual("@mock:user.example:AAAAAAA");
+            });
         },
     );
 
