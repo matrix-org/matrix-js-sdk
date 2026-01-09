@@ -16,7 +16,7 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { createClient, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
@@ -134,10 +134,6 @@ describe("MatrixClient.initRustCrypto", () => {
     });
 
     describe("Libolm Migration", () => {
-        beforeEach(() => {
-            fetchMock.reset();
-        });
-
         it("should migrate from libolm", async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.backupResponse);
 

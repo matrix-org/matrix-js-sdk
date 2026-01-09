@@ -420,7 +420,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent()).toEqual({
+            expect(encryptedEvent.getContent<IContent>()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
             });
@@ -446,7 +446,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent()).toEqual({
+            expect(encryptedEvent.getContent<IContent>()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: uisi **",
             });
@@ -472,7 +472,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent()).toEqual({
+            expect(encryptedEvent.getContent<IContent>()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
             });

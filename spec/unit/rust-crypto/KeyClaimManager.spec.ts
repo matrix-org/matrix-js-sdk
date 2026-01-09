@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
-import { type Mocked } from "jest-mock";
+import fetchMock from "@fetch-mock/jest";
 import { KeysClaimRequest, UserId } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type Mocked } from "jest-mock";
 
 import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
@@ -24,10 +24,6 @@ import { KeyClaimManager } from "../../../src/rust-crypto/KeyClaimManager";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi } from "../../../src";
 import { logger, LogSpan } from "../../../src/logger";
-
-afterEach(() => {
-    fetchMock.mockReset();
-});
 
 describe("KeyClaimManager", () => {
     /* for these tests, we connect a KeyClaimManager to a mock OlmMachine, and a real OutgoingRequestProcessor
@@ -144,7 +140,7 @@ describe("KeyClaimManager", () => {
         const calledWith = olmMachine.getMissingSessions.mock.calls[0][0].map((u) => u.toString());
         expect(calledWith).toEqual([u1.toString()]);
         expect(olmMachine.getMissingSessions).toHaveBeenCalledTimes(1);
-        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveFetchedTimes(1, "https://example.com/_matrix/client/v3/keys/claim");
         expect(req1Resolved).toBe(false);
         expect(req2Resolved).toBe(false);
 
@@ -158,7 +154,7 @@ describe("KeyClaimManager", () => {
         const calledWith2 = olmMachine.getMissingSessions.mock.calls[1][0].map((u) => u.toString());
         expect(calledWith2).toEqual([u2.toString()]);
         expect(olmMachine.getMissingSessions).toHaveBeenCalledTimes(2);
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveFetchedTimes(2, "https://example.com/_matrix/client/v3/keys/claim");
         expect(req1Resolved).toBe(true);
         expect(req2Resolved).toBe(false);
 

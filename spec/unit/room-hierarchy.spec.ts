@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { EventType, MatrixClient, Room } from "../../src";
 import { RoomHierarchy } from "../../src/room-hierarchy";
@@ -24,52 +24,46 @@ describe("RoomHierarchy", () => {
     const client = new MatrixClient({ baseUrl: "https://server", userId: "@user:server" });
 
     it("should load data from /hierarchy API", async () => {
-        const spy = fetchMock.getOnce(
-            `https://server/_matrix/client/v1/rooms/${encodeURIComponent(roomId)}/hierarchy?suggested_only=false`,
-            {
-                rooms: [],
-            },
-            { overwriteRoutes: true },
-        );
+        const url = `https://server/_matrix/client/v1/rooms/${encodeURIComponent(roomId)}/hierarchy?suggested_only=false`;
+        fetchMock.getOnce(url, {
+            rooms: [],
+        });
 
         const room = new Room(roomId, client, client.getSafeUserId());
         const hierarchy = new RoomHierarchy(room);
         const res = await hierarchy.load();
 
-        expect(spy).toHaveBeenCalled();
+        expect(fetchMock).toHaveFetched(url);
         expect(res).toHaveLength(0);
     });
 
     describe("itSuggested", () => {
         it("should return true if a room is suggested", async () => {
-            const spy = fetchMock.getOnce(
-                `https://server/_matrix/client/v1/rooms/${encodeURIComponent(roomId)}/hierarchy?suggested_only=false`,
-                {
-                    rooms: [
-                        {
-                            children_state: [
-                                {
-                                    origin_server_ts: 111,
-                                    content: {
-                                        suggested: true,
-                                        via: ["matrix.org"],
-                                    },
-                                    type: EventType.SpaceChild,
-                                    state_key: "!child_room:server",
+            const url = `https://server/_matrix/client/v1/rooms/${encodeURIComponent(roomId)}/hierarchy?suggested_only=false`;
+            fetchMock.getOnce(url, {
+                rooms: [
+                    {
+                        children_state: [
+                            {
+                                origin_server_ts: 111,
+                                content: {
+                                    suggested: true,
+                                    via: ["matrix.org"],
                                 },
-                            ],
-                            room_id: roomId,
-                        },
-                    ],
-                },
-                { overwriteRoutes: true },
-            );
+                                type: EventType.SpaceChild,
+                                state_key: "!child_room:server",
+                            },
+                        ],
+                        room_id: roomId,
+                    },
+                ],
+            });
 
             const room = new Room(roomId, client, client.getSafeUserId());
             const hierarchy = new RoomHierarchy(room);
             await hierarchy.load();
 
-            expect(spy).toHaveBeenCalled();
+            expect(fetchMock).toHaveFetched(url);
             expect(hierarchy.isSuggested(hierarchy.root.roomId, "!child_room:server")).toBeTruthy();
         });
     });

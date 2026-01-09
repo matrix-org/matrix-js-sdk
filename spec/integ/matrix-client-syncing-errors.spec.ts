@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { type MatrixClient, ClientEvent, createClient, SyncState } from "../../src";
 
@@ -84,7 +84,6 @@ describe("MatrixClient syncing errors", () => {
 
     it("should retry, until errors are solved.", async () => {
         jest.useFakeTimers();
-        fetchMock.config.overwriteRoutes = false;
         fetchMock
             .getOnce("end:versions", {}) // first version check without credentials needs to succeed
             .getOnce("end:versions", 429) // second version check fails with 429 triggering another retry
@@ -117,7 +116,6 @@ describe("MatrixClient syncing errors", () => {
 
     it("should stop sync keep alive when client is stopped.", async () => {
         jest.useFakeTimers();
-        fetchMock.config.overwriteRoutes = false;
         fetchMock
             .get("end:capabilities", {})
             .getOnce("end:versions", {}) // first version check without credentials needs to succeed

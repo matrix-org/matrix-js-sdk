@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { type Mocked, mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { logger } from "../../src/logger";
 import {
@@ -37,7 +37,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
-import { EventStatus, MatrixEvent } from "../../src/models/event";
+import { EventStatus, type IContent, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
@@ -130,15 +130,20 @@ type WrappedRoom = Room & {
 };
 
 /** A list of methods to run after the current test */
-const afterTestHooks: (() => Promise<void> | void)[] = [];
+const afterTestHooks = new Set<() => Promise<void> | void>();
+
+beforeEach(() => {
+    // anything that we don't have a specific matcher for silently returns a 404
+    fetchMock.catch(404);
+});
 
 afterEach(async () => {
-    fetchMock.reset();
-    jest.restoreAllMocks();
     for (const hook of afterTestHooks) {
         await hook();
     }
-    afterTestHooks.length = 0;
+    afterTestHooks.clear();
+
+    jest.restoreAllMocks();
 });
 
 describe("convertQueryDictToMap", () => {
@@ -232,7 +237,7 @@ describe("MatrixClient", function () {
         method: Method,
         path: string,
         queryParams?: QueryDict,
-        body?: BodyInit,
+        body?: Body,
         requestOpts: IRequestOpts = {},
     ) {
         const { prefix } = requestOpts;
@@ -341,8 +346,8 @@ describe("MatrixClient", function () {
             r[k] = jest.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
-        mocked(client.http.authedRequest).mockImplementation(httpReq);
-        mocked(client.http.request).mockImplementation(httpReq);
+        mocked(client.http.authedRequest).mockImplementation(httpReq as any);
+        mocked(client.http.request).mockImplementation(httpReq as any);
     }
 
     beforeEach(function () {
@@ -2570,7 +2575,7 @@ describe("MatrixClient", function () {
             });
 
             // The call will trigger the request if VoIP is supported
-            expect(fetchMock.called(`${baseUrl}/_matrix/client/unstable/voip/turnServer`)).toBe(false);
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/unstable/voip/turnServer`)).toBe(false);
         });
 
         it("should return null from createCall when disableVoip = true", () => {
@@ -2702,7 +2707,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2731,7 +2736,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch!.getContent()).toMatchObject({
+            expect(ruleSenderMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2741,7 +2746,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:example.org",
             });
             expect(ruleRoomMatch).toBeTruthy();
-            expect(ruleRoomMatch!.getContent()).toMatchObject({
+            expect(ruleRoomMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2766,7 +2771,7 @@ describe("MatrixClient", function () {
                 roomId: BAD_ROOM_ID,
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch!.getContent()).toMatchObject({
+            expect(ruleSenderMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2800,7 +2805,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2828,7 +2833,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2923,17 +2928,13 @@ describe("MatrixClient", function () {
 
         /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
         async function setUpClient(): Promise<MatrixClient> {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
-
             mockInitialApiRequests(TEST_HOMESERVER_URL, userId);
 
             const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
             await client.startClient();
 
             // Remember to stop the client again, to stop it spamming logs and HTTP requests
-            afterTestHooks.push(() => client.stopClient());
+            afterTestHooks.add(() => client.stopClient());
             return client;
         }
 
@@ -2950,10 +2951,10 @@ describe("MatrixClient", function () {
                 `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+            fetchMock.put(url, testresponse);
 
             // suppress the expected warning on the console
-            jest.spyOn(console, "warn").mockImplementation();
+            jest.spyOn(console, "warn").mockImplementation(() => {});
 
             // WHEN we call `setAccountData` ...
             const result = await client.setAccountData(eventType, content);
@@ -2962,9 +2963,9 @@ describe("MatrixClient", function () {
             expect(result).toEqual(testresponse);
 
             // and the REST call should have happened, and had the correct content
-            const lastCall = fetchMock.lastCall("put-account-data");
+            const lastCall = fetchMock.callHistory.lastCall(url);
             expect(lastCall).toBeDefined();
-            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+            expect(lastCall?.options?.body).toEqual(JSON.stringify(content));
 
             // and a warning should have been logged
             // eslint-disable-next-line no-console
@@ -2987,16 +2988,16 @@ describe("MatrixClient", function () {
                 `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+            fetchMock.put(url, testresponse);
 
             // WHEN we call `setAccountData` ...
             const setProm = client.setAccountData(eventType, content);
 
             await jest.advanceTimersByTimeAsync(10);
             // THEN, the REST call should have happened, and had the correct content
-            const lastCall = fetchMock.lastCall("put-account-data");
+            const lastCall = fetchMock.callHistory.lastCall(url);
             expect(lastCall).toBeDefined();
-            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+            expect(lastCall?.options?.body).toEqual(JSON.stringify(content));
 
             // Even after waiting a bit more, the method should not yet have returned
             await jest.advanceTimersByTimeAsync(10);
@@ -3042,7 +3043,7 @@ describe("MatrixClient", function () {
             await client.setAccountData(eventType, content);
 
             // THEN there should be no REST call
-            expect(fetchMock.calls(/account_data/).length).toEqual(0);
+            expect(fetchMock.callHistory.calls(/account_data/).length).toEqual(0);
         });
     });
 
@@ -3051,29 +3052,26 @@ describe("MatrixClient", function () {
 
         /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
         async function setUpClient(versionsResponse: object = { versions: ["1"] }): Promise<MatrixClient> {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
-
-            fetchMock.getOnce(new URL("/_matrix/client/versions", TEST_HOMESERVER_URL).toString(), versionsResponse, {
-                overwriteRoutes: true,
-            });
-            fetchMock.getOnce(
-                new URL("/_matrix/client/v3/pushrules/", TEST_HOMESERVER_URL).toString(),
-                {},
-                { overwriteRoutes: true },
-            );
+            fetchMock.getOnce(new URL("/_matrix/client/versions", TEST_HOMESERVER_URL).toString(), versionsResponse);
+            fetchMock.getOnce(new URL("/_matrix/client/v3/capabilities", TEST_HOMESERVER_URL).toString(), {});
+            fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", TEST_HOMESERVER_URL).toString(), {});
             fetchMock.postOnce(
                 new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, TEST_HOMESERVER_URL).toString(),
                 { filter_id: "fid" },
-                { overwriteRoutes: true },
+            );
+            fetchMock.getOnce(
+                new URL(
+                    `/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter/fid`,
+                    TEST_HOMESERVER_URL,
+                ).toString(),
+                {},
             );
 
             const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
             await client.startClient();
 
             // Remember to stop the client again, to stop it spamming logs and HTTP requests
-            afterTestHooks.push(() => client.stopClient());
+            afterTestHooks.add(() => client.stopClient());
             return client;
         }
 
@@ -3091,11 +3089,11 @@ describe("MatrixClient", function () {
                 `/_matrix/client/unstable/org.matrix.msc3391/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.delete({ url, name: "delete-data" }, {});
+            fetchMock.delete(url, {});
 
             await client.deleteAccountData(eventType);
 
-            expect(fetchMock.calls("delete-data").length).toEqual(1);
+            expect(fetchMock.callHistory.calls(url).length).toEqual(1);
         });
 
         it("makes correct request when deletion is supported by server based on matrix version", async () => {
@@ -3112,11 +3110,11 @@ describe("MatrixClient", function () {
                 `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.delete({ url, name: "delete-data" }, {});
+            fetchMock.delete(url, {});
 
             await client.deleteAccountData(eventType);
 
-            expect(fetchMock.calls("delete-data").length).toEqual(1);
+            expect(fetchMock.callHistory.calls(url).length).toEqual(1);
         });
 
         it("makes correct request when deletion is not supported by server", async () => {
@@ -3129,7 +3127,7 @@ describe("MatrixClient", function () {
                 `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.put({ url, name: "put-account-data" }, {});
+            fetchMock.put(url, {});
 
             const setProm = client.deleteAccountData(eventType);
             syncResponder.sendOrQueueSyncResponse({
@@ -3138,9 +3136,9 @@ describe("MatrixClient", function () {
             await setProm;
 
             // account data updated with empty content
-            const lastCall = fetchMock.lastCall("put-account-data");
+            const lastCall = fetchMock.callHistory.lastCall(url);
             expect(lastCall).toBeDefined();
-            expect(lastCall?.[1]?.body).toEqual("{}");
+            expect(lastCall?.options?.body).toEqual("{}");
         });
     });
 
@@ -3742,11 +3740,11 @@ describe("MatrixClient", function () {
                 client.setPushRules(pushRules);
             });
 
-            it("should throw when trying to paginate forwards", async () => {
+            it("should throw when trying to paginate forwards", () => {
                 const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
-                await expect(
-                    async () => await client.paginateEventTimeline(timeline, { backwards: false }),
-                ).rejects.toThrow("paginateNotifTimeline can only paginate backwards");
+                expect(() => client.paginateEventTimeline(timeline, { backwards: false })).toThrow(
+                    "paginateNotifTimeline can only paginate backwards",
+                );
             });
 
             it("defaults limit to 30 events", async () => {
@@ -3841,7 +3839,6 @@ describe("MatrixClient", function () {
 
     describe("getAuthMetadata", () => {
         beforeEach(() => {
-            fetchMock.mockReset();
             // This request is made by oidc-client-ts so is not intercepted by httpLookups
             fetchMock.get("https://auth.org/jwks", {
                 status: 200,
@@ -3850,6 +3847,7 @@ describe("MatrixClient", function () {
                 },
                 keys: [],
             });
+            makeClient();
         });
 
         it("should use unstable prefix", async () => {

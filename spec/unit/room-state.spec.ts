@@ -23,7 +23,7 @@ import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { RoomMemberEvent } from "../../src/models/room-member";
 import { type Beacon, BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
 import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
-import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import { IContent, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
 import { type MatrixClient } from "../../src/client";
 import { Room } from "../../src/models/room";
@@ -185,7 +185,7 @@ describe("RoomState", function () {
 
         it("should return a single MatrixEvent if a state_key was specified", function () {
             const event = state.getStateEvents("m.room.member", userA);
-            expect(event?.getContent()).toMatchObject({
+            expect(event?.getContent<IContent>()).toMatchObject({
                 membership: KnownMembership.Join,
             });
         });

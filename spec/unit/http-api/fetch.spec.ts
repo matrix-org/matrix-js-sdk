@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { Mocked, MockedFunction } from "jest-mock";
+import { Mocked, MockedFunction } from "jest-mock";
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
@@ -26,6 +26,7 @@ import {
     type IHttpOpts,
     MatrixError,
     Method,
+    TokenRefreshError,
 } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { type QueryDict, sleep } from "../../../src/utils";
@@ -47,29 +48,29 @@ describe("FetchHttpApi", () => {
 
         api.request(Method.Get, "/foo");
         api.request(Method.Get, "/baz");
-        expect(fetchFn.mock.calls[0][0].href.endsWith("/foo")).toBeTruthy();
-        expect(fetchFn.mock.calls[0][1].signal.aborted).toBeFalsy();
-        expect(fetchFn.mock.calls[1][0].href.endsWith("/baz")).toBeTruthy();
-        expect(fetchFn.mock.calls[1][1].signal.aborted).toBeFalsy();
+        expect((fetchFn.mock.calls[0][0] as URL).href.endsWith("/foo")).toBeTruthy();
+        expect(fetchFn.mock.calls[0][1]?.signal?.aborted).toBeFalsy();
+        expect((fetchFn.mock.calls[1][0] as URL).href.endsWith("/baz")).toBeTruthy();
+        expect(fetchFn.mock.calls[1][1]?.signal?.aborted).toBeFalsy();
 
         api.abort();
-        expect(fetchFn.mock.calls[0][1].signal.aborted).toBeTruthy();
-        expect(fetchFn.mock.calls[1][1].signal.aborted).toBeTruthy();
+        expect(fetchFn.mock.calls[0][1]?.signal?.aborted).toBeTruthy();
+        expect(fetchFn.mock.calls[1][1]?.signal?.aborted).toBeTruthy();
 
         api.request(Method.Get, "/bar");
-        expect(fetchFn.mock.calls[2][0].href.endsWith("/bar")).toBeTruthy();
-        expect(fetchFn.mock.calls[2][1].signal.aborted).toBeFalsy();
+        expect((fetchFn.mock.calls[2][0] as URL).href.endsWith("/bar")).toBeTruthy();
+        expect(fetchFn.mock.calls[2][1]?.signal?.aborted).toBeFalsy();
 
         api.abort();
-        expect(fetchFn.mock.calls[2][1].signal.aborted).toBeTruthy();
+        expect(fetchFn.mock.calls[2][1]?.signal?.aborted).toBeTruthy();
     });
 
     it("should fall back to global fetch if fetchFn not provided", () => {
-        globalThis.fetch = jest.fn();
-        expect(globalThis.fetch).not.toHaveBeenCalled();
+        const spy = (globalThis.fetch = jest.fn());
+        expect(spy).not.toHaveBeenCalled();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         api.fetch("test");
-        expect(globalThis.fetch).toHaveBeenCalled();
+        expect(spy).toHaveBeenCalled();
     });
 
     it("should update identity server base url", () => {
@@ -97,8 +98,8 @@ describe("FetchHttpApi", () => {
                 onlyData: true,
             });
             api.idServerRequest(Method.Get, "/test", { foo: "bar", via: ["a", "b"] }, IdentityPrefix.V2);
-            expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).toBe("bar");
-            expect(fetchFn.mock.calls[0][0].searchParams.getAll("via")).toEqual(["a", "b"]);
+            expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("foo")).toBe("bar");
+            expect((fetchFn.mock.calls[0][0] as URL).searchParams.getAll("via")).toEqual(["a", "b"]);
         });
 
         it("should send params as body for non-GET requests", () => {
@@ -112,8 +113,8 @@ describe("FetchHttpApi", () => {
             });
             const params = { foo: "bar", via: ["a", "b"] };
             api.idServerRequest(Method.Post, "/test", params, IdentityPrefix.V2);
-            expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).not.toBe("bar");
-            expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toStrictEqual(params);
+            expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("foo")).not.toBe("bar");
+            expect(JSON.parse(fetchFn.mock.calls[0][1]!.body as string)).toStrictEqual(params);
         });
 
         it("should add Authorization header if token provided", () => {
@@ -126,7 +127,7 @@ describe("FetchHttpApi", () => {
                 onlyData: true,
             });
             api.idServerRequest(Method.Post, "/test", {}, IdentityPrefix.V2, "token");
-            expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
+            expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>).Authorization).toBe("Bearer token");
         });
     });
 
@@ -195,7 +196,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path");
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("token");
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBe("token");
     });
 
     it("should send token via headers by default", async () => {
@@ -208,7 +209,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path");
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBe("Bearer token");
     });
 
     it("should not send a token if not calling `authedRequest`", () => {
@@ -221,8 +222,8 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         api.request(Method.Get, "/path");
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBeFalsy();
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBeFalsy();
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBeFalsy();
     });
 
     it("should ensure no token is leaked out via query params if sending via headers", async () => {
@@ -236,8 +237,8 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", { access_token: "123" });
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBeFalsy();
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBe("Bearer token");
     });
 
     it("should not override manually specified access token via query params", async () => {
@@ -251,7 +252,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("RealToken");
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBe("RealToken");
     });
 
     it("should not override manually specified access token via header", async () => {
@@ -267,7 +268,7 @@ describe("FetchHttpApi", () => {
         await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Authorization: "Bearer RealToken" },
         });
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer RealToken");
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBe("Bearer RealToken");
     });
 
     it("should not override Accept header", async () => {
@@ -276,7 +277,7 @@ describe("FetchHttpApi", () => {
         await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Accept: "text/html" },
         });
-        expect(fetchFn.mock.calls[0][1].headers["Accept"]).toBe("text/html");
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Accept"]).toBe("text/html");
     });
 
     it("should emit NoConsent when given errcode=M_CONTENT_NOT_GIVEN", async () => {
@@ -309,7 +310,7 @@ describe("FetchHttpApi", () => {
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, onlyData: true });
             await api.authedRequest(Method.Post, "/account/password");
-            expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
+            expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>).Authorization).toBeUndefined();
         });
 
         describe("with refresh token", () => {
@@ -322,7 +323,13 @@ describe("FetchHttpApi", () => {
                     error: "Token is not active",
                     soft_logout: false,
                 };
-                const unknownTokenErr = new MatrixError(unknownTokenErrBody, 401);
+                const unknownTokenErr = new MatrixError(
+                    unknownTokenErrBody,
+                    401,
+                    undefined,
+                    undefined,
+                    expect.anything(),
+                );
                 const unknownTokenResponse = {
                     ok: false,
                     status: 401,
@@ -375,7 +382,7 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toEqual(
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
@@ -397,8 +404,8 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toEqual(
-                            unknownTokenErr,
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            new TokenRefreshError(unknownTokenErr),
                         );
                         expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
                         expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);

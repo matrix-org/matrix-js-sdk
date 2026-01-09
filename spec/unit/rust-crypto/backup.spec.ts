@@ -1,5 +1,5 @@
 import { type Mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
@@ -70,7 +70,6 @@ describe("Upload keys to backup", () => {
     });
 
     afterEach(() => {
-        fetchMock.reset();
         jest.useRealTimers();
         jest.resetAllMocks();
     });

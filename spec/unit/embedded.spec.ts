@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @jest-environment jest-fixed-jsdom
  */
 
 /*
@@ -35,6 +35,7 @@ import {
     type ApiVersion,
     type IRoomEvent,
 } from "matrix-widget-api";
+import { mocked } from "jest-mock";
 
 import { createRoomWidgetClient, MatrixError, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
 import { MatrixClient, ClientEvent, type ITurnServer as IClientTurnServer } from "../../src/client";
@@ -357,10 +358,10 @@ describe("RoomWidgetClient", () => {
 
         it("handles widget errors with generic error data", async () => {
             const error = new Error("failed to send");
-            widgetApi.transport.send.mockRejectedValue(error);
+            mocked(widgetApi.transport.send).mockRejectedValue(error);
 
             await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
-            widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send);
+            widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
 
             await expect(
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
@@ -383,16 +384,16 @@ describe("RoomWidgetClient", () => {
                     response: errorData,
                 },
             });
-            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl);
+            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl, undefined, expect.any(Headers));
 
-            widgetApi.transport.send.mockRejectedValue(widgetError);
+            mocked(widgetApi.transport.send).mockRejectedValue(widgetError);
 
             await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
-            widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send);
+            widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
 
             await expect(
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
-            ).rejects.toThrow(matrixError);
+            ).rejects.toStrictEqual(matrixError);
         });
     });
 
@@ -970,7 +971,7 @@ describe("RoomWidgetClient", () => {
 
         it("handles widget errors with generic error data", async () => {
             const error = new Error("failed to get token");
-            widgetApi.transport.sendComplete.mockRejectedValue(error);
+            mocked(widgetApi.transport.sendComplete).mockRejectedValue(error);
 
             await makeClient({});
             widgetApi.requestOpenIDConnectToken.mockImplementation(widgetApi.transport.sendComplete as any);
@@ -994,9 +995,9 @@ describe("RoomWidgetClient", () => {
                     response: errorData,
                 },
             });
-            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl);
+            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl, undefined, expect.any(Headers));
 
-            widgetApi.transport.sendComplete.mockRejectedValue(widgetError);
+            mocked(widgetApi.transport.sendComplete).mockRejectedValue(widgetError);
 
             await makeClient({});
             widgetApi.requestOpenIDConnectToken.mockImplementation(widgetApi.transport.sendComplete as any);

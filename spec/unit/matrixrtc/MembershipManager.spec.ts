@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MockedFunction, type Mock } from "jest-mock";
+import { mocked, type Mock, type MockedFunction } from "jest-mock";
 
 import {
     type EmptyObject,
@@ -200,7 +200,7 @@ describe("MembershipManager", () => {
                             "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
                             "org.matrix.msc4140.max_delay": 7500,
                         });
-                        (client._unstable_sendDelayedStateEvent as Mock).mockImplementationOnce(() => {
+                        mocked(client._unstable_sendDelayedStateEvent).mockImplementationOnce(() => {
                             resolve();
                             return Promise.reject(error);
                         });
@@ -210,7 +210,7 @@ describe("MembershipManager", () => {
                     // preparing the delayed disconnect should handle ratelimiting
                     const sendDelayedStateAttempt = new Promise<void>((resolve) => {
                         const error = new MatrixError({ errcode: "M_LIMIT_EXCEEDED" });
-                        (client._unstable_sendDelayedStateEvent as Mock).mockImplementationOnce(() => {
+                        mocked(client._unstable_sendDelayedStateEvent).mockImplementationOnce(() => {
                             resolve();
                             return Promise.reject(error);
                         });
@@ -225,7 +225,7 @@ describe("MembershipManager", () => {
                             undefined,
                             new Headers({ "Retry-After": "1" }),
                         );
-                        (client.sendStateEvent as Mock).mockImplementationOnce(() => {
+                        mocked(client.sendStateEvent).mockImplementationOnce(() => {
                             resolve();
                             return Promise.reject(error);
                         });
@@ -430,9 +430,9 @@ describe("MembershipManager", () => {
                 "_@alice:example.org_AAAAAAA_m.call",
             );
         });
-        it("does nothing if not joined", () => {
+        it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
-            expect(async () => await manager.leave()).not.toThrow();
+            await expect(manager.leave()).resolves.toBeTruthy();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
@@ -454,14 +454,14 @@ describe("MembershipManager", () => {
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
-            const myMembership = (client.sendStateEvent as Mock).mock.calls[0][2];
+            const myMembership = mocked(client.sendStateEvent).mock.calls[0][2];
             // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
-            (client.sendStateEvent as Mock).mockClear();
-            (client._unstable_updateDelayedEvent as Mock).mockClear();
-            (client._unstable_cancelScheduledDelayedEvent as Mock).mockClear();
-            (client._unstable_restartScheduledDelayedEvent as Mock).mockClear();
-            (client._unstable_sendScheduledDelayedEvent as Mock).mockClear();
-            (client._unstable_sendDelayedStateEvent as Mock).mockClear();
+            mocked(client.sendStateEvent).mockClear();
+            mocked(client._unstable_updateDelayedEvent).mockClear();
+            mocked(client._unstable_cancelScheduledDelayedEvent).mockClear();
+            mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
+            mocked(client._unstable_sendScheduledDelayedEvent).mockClear();
+            mocked(client._unstable_sendDelayedStateEvent).mockClear();
 
             await manager.onRTCSessionMemberUpdate([
                 mockCallMembership(membershipTemplate, room.roomId),
@@ -485,9 +485,9 @@ describe("MembershipManager", () => {
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
-            (client.sendStateEvent as Mock).mockClear();
-            (client._unstable_restartScheduledDelayedEvent as Mock).mockClear();
-            (client._unstable_sendDelayedStateEvent as Mock).mockClear();
+            mocked(client.sendStateEvent).mockClear();
+            mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
+            mocked(client._unstable_sendDelayedStateEvent).mockClear();
 
             // Our own membership is removed:
             await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
@@ -503,9 +503,9 @@ describe("MembershipManager", () => {
             manager.join([focus], focusActive);
             await jest.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
-            (client.sendStateEvent as Mock).mockClear();
-            (client._unstable_restartScheduledDelayedEvent as Mock).mockClear();
-            (client._unstable_sendDelayedStateEvent as Mock).mockClear();
+            mocked(client.sendStateEvent).mockClear();
+            mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
+            mocked(client._unstable_sendDelayedStateEvent).mockClear();
 
             (client._unstable_restartScheduledDelayedEvent as Mock<any>).mockRejectedValueOnce(
                 new MatrixError({ errcode: "M_NOT_FOUND" }),
@@ -569,12 +569,12 @@ describe("MembershipManager", () => {
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-            const sentMembership = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
+            const sentMembership = mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
             expect(sentMembership.expires).toBe(expire);
             for (let i = 2; i <= 12; i++) {
                 await jest.advanceTimersByTimeAsync(expire);
                 expect(client.sendStateEvent).toHaveBeenCalledTimes(i);
-                const sentMembership = (client.sendStateEvent as Mock).mock.lastCall![2] as SessionMembershipData;
+                const sentMembership = mocked(client.sendStateEvent).mock.lastCall![2] as SessionMembershipData;
                 expect(sentMembership.expires).toBe(expire * i);
             }
         }
@@ -886,7 +886,7 @@ describe("MembershipManager", () => {
             await manager.onRTCSessionMemberUpdate([membership]);
             await manager.updateCallIntent("video");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
-            const eventContent = (client.sendStateEvent as Mock).mock.calls[0][2] as SessionMembershipData;
+            const eventContent = mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
             expect(eventContent["created_ts"]).toEqual(membership.createdTs());
             expect(eventContent["m.call.intent"]).toEqual("video");
         });

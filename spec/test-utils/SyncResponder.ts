@@ -16,9 +16,8 @@ limitations under the License.
 
 import debugFunc from "debug";
 import { type Debugger } from "debug";
-import fetchMock from "fetch-mock-jest";
-
-import type FetchMock from "fetch-mock";
+import fetchMock from "@fetch-mock/jest";
+import { type RouteResponse } from "fetch-mock";
 
 /** Interface implemented by classes that intercept `/sync` requests from test clients
  *
@@ -76,12 +75,12 @@ export class SyncResponder implements ISyncResponder {
      */
     public constructor(homeserverUrl: string) {
         this.debug = debugFunc(`sync-responder:[${homeserverUrl}]`);
-        fetchMock.get("begin:" + new URL("/_matrix/client/v3/sync?", homeserverUrl).toString(), (_url, _options) =>
+        fetchMock.get("begin:" + new URL("/_matrix/client/v3/sync?", homeserverUrl).toString(), (callLog) =>
             this.onSyncRequest(),
         );
     }
 
-    private async onSyncRequest(): Promise<FetchMock.MockResponse> {
+    private async onSyncRequest(): Promise<RouteResponse> {
         switch (this.state) {
             case SyncResponderState.IDLE: {
                 this.debug("Got /sync request: waiting for response to be ready");

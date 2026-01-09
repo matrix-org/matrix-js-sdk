@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { MapWithDefault } from "../../src/utils";
 import { type IDownloadKeyResult, type SigningKeys } from "../../src";
@@ -42,8 +42,9 @@ export class E2EKeyResponder {
      */
     public constructor(homeserverUrl: string) {
         // set up a listener for /keys/query.
-        const listener = (url: string, options: RequestInit) => this.onKeyQueryRequest(options);
-        fetchMock.post(new URL("/_matrix/client/v3/keys/query", homeserverUrl).toString(), listener);
+        fetchMock.post(new URL("/_matrix/client/v3/keys/query", homeserverUrl).toString(), (callLog) =>
+            this.onKeyQueryRequest(callLog.options),
+        );
     }
 
     private onKeyQueryRequest(options: RequestInit) {
