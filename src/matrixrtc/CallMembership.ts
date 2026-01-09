@@ -322,10 +322,7 @@ export class CallMembership {
     }
 
     public static async computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
-        const hashInput = `${userId}|${deviceId}|${memberId}`;
-        const hashBuffer = await sha256(hashInput);
-        const hashedString = encodeUnpaddedBase64(hashBuffer);
-        return hashedString;
+        return encodeUnpaddedBase64(await sha256(`${userId}|${deviceId}|${memberId}`));
     }
 
     public static membershipDataFromMatrixEvent(matrixEvent: MatrixEvent): MembershipData {

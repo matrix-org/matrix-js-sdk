@@ -394,4 +394,20 @@ describe("CallMembership", () => {
             expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
         });
     });
+
+    it("uses unpadded base64 for RTC backend identities", async () => {
+        expect(
+            await CallMembership.computeRtcBackendIdentity(makeMockEvent(), {
+                kind: "rtc",
+                data: {
+                    slot_id: "m.call#",
+                    application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+                    member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzRANDOMxyz" },
+                    rtc_transports: [{ type: "livekit" }],
+                    versions: [],
+                    msc4354_sticky_key: "abc123",
+                },
+            }),
+        ).toBe("2+h2ELE1XY/NsuveToZOekORCoyQMO6V0W7XZUWk5Q4");
+    });
 });
