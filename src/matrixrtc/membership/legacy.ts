@@ -86,6 +86,15 @@ export type SessionMembershipData = {
      * something else.
      */
     "m.call.intent"?: RTCCallIntent;
+
+    /**
+     * The id used on the media backend.
+     * (With livekit this is the participant identity on the LK SFU)
+     * This can be a UUID but right now it is `${this.matrixEventData.sender}:${data.device_id}`.
+     *
+     * It is compleatly valid to not set this field. Other clients will treat `undefined` as `${this.matrixEventData.sender}:${data.device_id}`
+     */
+    "membershipID"?: string;
 };
 
 /**

@@ -19,6 +19,8 @@ import type { IContent } from "../../models/event.ts";
 import type { RelationType } from "../../types.ts";
 import { type RtcSlotEventContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
+import { sha256 } from "src/digest.ts";
+import { encodeUnpaddedBase64Url } from "src/base64.ts";
 
 /**
  * Represents the current form of MSC4143.
@@ -136,3 +138,10 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
 
     return true;
 };
+
+export async function computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
+    const hashInput = `${userId}|${deviceId}|${memberId}`;
+    const hashBuffer = await sha256(hashInput);
+    const hashedString = encodeUnpaddedBase64Url(hashBuffer);
+    return hashedString;
+}

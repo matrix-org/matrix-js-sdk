@@ -14,14 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { RtcMembershipData } from "src/matrixrtc/membership/rtc";
 import { type MatrixEvent } from "../../../src";
-import {
-    CallMembership,
-    type SessionMembershipData,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-} from "../../../src/matrixrtc/CallMembership";
+import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
 import { membershipTemplate } from "./mocks";
+import { SessionMembershipData } from "src/matrixrtc/membership/legacy";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
@@ -191,7 +188,7 @@ describe("CallMembership", () => {
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
-            member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+            member: { claimed_user_id: "@alice:example.org", claimed_device_id: "AAAAAAA", id: "xyzHASHxyz" },
             rtc_transports: [{ type: "livekit" }],
             versions: [],
             msc4354_sticky_key: "abc123",

@@ -33,6 +33,7 @@ import {
     type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
+import { computeRtcIdentityRaw } from "./membership/rtc.ts";
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -139,7 +140,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         rtcBackendIdProvider?: (userId: string, deviceId: string, memberId: string) => Promise<string>,
     ) {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
-        this.rtcIdentityProvider = rtcBackendIdProvider ?? CallMembership.computeRtcIdentityRaw;
+        this.rtcIdentityProvider = rtcBackendIdProvider ?? computeRtcIdentityRaw;
     }
 
     private async getOwnRtcBackendIdentity(): Promise<string> {

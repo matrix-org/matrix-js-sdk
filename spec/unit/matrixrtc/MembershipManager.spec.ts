@@ -25,15 +25,10 @@ import {
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
-import {
-    MembershipManagerEvent,
-    Status,
-    type Transport,
-    type SessionMembershipData,
-    type LivekitFocusSelection,
-} from "../../../src/matrixrtc";
+import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
+import { SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.

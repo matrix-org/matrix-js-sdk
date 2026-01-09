@@ -16,11 +16,11 @@ limitations under the License.
 
 import { deepCompare } from "../utils.ts";
 import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
-import { type IContent, type MatrixEvent } from "../models/event.ts";
-import { logger } from "../logger.ts";
+import { type MatrixEvent } from "../models/event.ts";
+import { type Logger, logger } from "../logger.ts";
 import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
 import { checkSessionsMembershipData, type SessionMembershipData } from "./membership/legacy.ts";
-import { checkRtcMembershipData, type RtcMembershipData } from "./membership/rtc.ts";
+import { checkRtcMembershipData, computeRtcIdentityRaw, type RtcMembershipData } from "./membership/rtc.ts";
 import { MatrixRTCMembershipParseError } from "./membership/common.ts";
 import { EventType } from "../@types/event.ts";
 
@@ -48,46 +48,88 @@ enum MembershipKind {
 type MembershipData =
     | { kind: MembershipKind.RTC; data: RtcMembershipData }
     | { kind: MembershipKind.Session; data: SessionMembershipData };
+
+type LimitedEvent = Pick<MatrixEvent, "getId" | "getSender" | "getTs" | "getType" | "getContent">;
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
 export class CallMembership {
-    public static equal(a?: CallMembership, b?: CallMembership): boolean {
-        return deepCompare(a?.membershipData, b?.membershipData);
-    }
-
-    private membershipData: MembershipData;
-
-    /** The parsed data from the Matrix event.
-     * To access checked eventId and sender from the matrixEvent.
-     * Class construction will fail if these values cannot get obtained. */
-    private readonly matrixEventData: { eventId: string; sender: string };
-    public constructor(
-        /** The Matrix event that this membership is based on */
-        private readonly matrixEvent: MatrixEvent,
-        data: IContent,
-    ) {
-        const eventId = matrixEvent.getId();
+    /**
+     * Parse the membershipdata from a call membership event.
+     * @param matrixEvent The Matrix event to read.
+     * @param data The contents of the event.
+     * @returns MembershipData in either MembershipKind.RTC or MembershipKind.Session format.
+     * @throws If the content is neither format.
+     */
+    public static membershipDataFromMatrixEvent(matrixEvent: LimitedEvent): MembershipData {
         const sender = matrixEvent.getSender();
         const evType = matrixEvent.getType();
-
-        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
-        if (sender === undefined) throw new Error("parentEvent is missing sender field");
-
+        const data = matrixEvent.getContent();
+        if (sender === undefined) throw new Error("matrixEvent is missing sender field");
         try {
             // Event types are strictly checked here.
             if (evType === EventType.RTCMembership && checkRtcMembershipData(data, sender)) {
-                this.membershipData = { kind: MembershipKind.RTC, data };
+                return { kind: MembershipKind.RTC, data };
             } else if (evType === EventType.GroupCallMemberPrefix && checkSessionsMembershipData(data)) {
-                this.membershipData = { kind: MembershipKind.Session, data };
+                return { kind: MembershipKind.Session, data };
             } else {
                 throw Error(`'${evType} is not a known call membership type`);
             }
         } catch (ex) {
             if (ex instanceof MatrixRTCMembershipParseError) {
-                logger.debug("CallMembership.MatrixRTCMembershipParseError provided data", data);
+                logger.debug("CallMembership.MatrixRTCMembershipParseError provided invalid data", data);
             }
             throw ex;
         }
+    }
 
+    /**
+     * Parse the contents of a MatrixEvent and create a CallMembership instance.
+     * @param matrixEvent The Matrix event to read.
+     * @param data The contents of the event.
+     * @returns
+     */
+    public static async parseFromEvent(matrixEvent: LimitedEvent) {
+        let membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
+        let rtcBackendIdentity =
+            membershipData.kind === MembershipKind.RTC
+                ? await computeRtcIdentityRaw(
+                      membershipData.data.member.claimed_user_id,
+                      membershipData.data.member.claimed_device_id,
+                      membershipData.data.member.id,
+                  )
+                : `${matrixEvent.getSender()}:${membershipData.data.device_id}`;
+        return new CallMembership(matrixEvent, membershipData, rtcBackendIdentity);
+    }
+
+    public static equal(a?: CallMembership, b?: CallMembership): boolean {
+        return deepCompare(a?.membershipData, b?.membershipData);
+    }
+
+    private logger: Logger;
+
+    /** The parsed data from the Matrix event.
+     * To access checked eventId and sender from the matrixEvent.
+     * Class construction will fail if these values cannot get obtained. */
+    private readonly matrixEventData: { eventId: string; sender: string };
+
+    /**
+     * @private Internal constructor. Only construct via this for tests.
+     * @param matrixEvent
+     * @param membershipData
+     * @param rtcBackendIdentity
+     */
+    public constructor(
+        /** The Matrix event that this membership is based on */
+        private readonly matrixEvent: LimitedEvent,
+        private readonly membershipData: MembershipData,
+        public readonly rtcBackendIdentity: string,
+    ) {
+        const eventId = matrixEvent.getId();
+        const sender = matrixEvent.getSender();
+
+        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
+        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+
+        this.logger = logger.getChild(`[CallMembership ${sender}:${this.deviceId}]`);
         this.matrixEventData = { eventId, sender };
     }
 
@@ -97,6 +139,17 @@ export class CallMembership {
     }
 
     public get userId(): string {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case MembershipKind.RTC:
+                return data.member.claimed_user_id;
+            case MembershipKind.Session:
+            default:
+                return this.matrixEventData.sender;
+        }
+    }
+
+    public get rtc(): string {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
@@ -142,7 +195,7 @@ export class CallMembership {
         if (typeof intent === "string") {
             return intent;
         }
-        logger.warn("RTC membership has invalid m.call.intent");
+        this.logger.warn("RTC membership has invalid m.call.intent");
         return undefined;
     }
 
@@ -190,18 +243,45 @@ export class CallMembership {
         }
     }
 
-    public get membershipID(): string {
+    /**
+     * This computes the membership ID for the membership.
+     * For the sticky event based rtcSessionData this is trivial it is `member.id`.
+     * This is not supposed to be used to identity on an rtc backend. This is just a nouance for
+     * a generated (sha256) anonymised identity. Only send `rtcBackendIdentity` to any rtc backend service.
+     *
+     * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
+     * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
+     *
+     * So if there is no membershipID we use the hard coded jwt id default (`${this.matrixEventData.sender}:${data.device_id}`)
+     * value (used until version 0.16.0)
+     *
+     * It is also possible for a session event to set a custom membershipID. in that case this will be used.
+     */
+    public get memberId(): string {
         // the createdTs behaves equivalent to the membershipID.
         // we only need the field for the legacy member events where we needed to update them
         // synapse ignores sending state events if they have the same content.
         const { kind, data } = this.membershipData;
         switch (kind) {
-            case MembershipKind.RTC:
+            case "rtc":
                 return data.member.id;
-            case MembershipKind.Session:
+            case "session":
+                return (
+                    // best case we have a client already publishing the right custom membershipId
+                    data.membershipID ??
+                    // alternativly we use the hard coded jwt id defuatl value (used until version 0.16.0)
+                    `${this.matrixEventData.sender}:${data.device_id}`
+                );
             default:
-                return (this.createdTs() ?? "").toString();
+                throw Error("Not possible to get memberID without knowing the membership event kind");
         }
+    }
+
+    /**
+     * @deprecated renamed to `memberId`
+     */
+    public get membershipID(): string {
+        return this.memberId;
     }
 
     public createdTs(): number {
@@ -224,7 +304,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return this.matrixEvent.unstableStickyExpiresAt;
+                return undefined;
             case MembershipKind.Session:
             default:
                 // TODO: calculate this from the MatrixRTCSession join configuration directly
@@ -237,11 +317,18 @@ export class CallMembership {
      * @deprecated Not used by RTC events.
      */
     public getMsUntilExpiry(): number | undefined {
-        const absExpiry = this.getAbsoluteExpiry();
-        // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
-        // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
-        // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-        return absExpiry ? absExpiry - Date.now() : undefined;
+        const { kind } = this.membershipData;
+        switch (kind) {
+            case MembershipKind.RTC:
+                return undefined;
+            case MembershipKind.Session:
+            default:
+                const absExpiry = this.getAbsoluteExpiry();
+                // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
+                // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
+                // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
+                return absExpiry ? absExpiry - Date.now() : undefined;
+        }
     }
 
     /**
@@ -251,9 +338,7 @@ export class CallMembership {
         const { kind } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return this.matrixEvent.unstableStickyExpiresAt
-                    ? Date.now() > this.matrixEvent.unstableStickyExpiresAt
-                    : false;
+                return false;
             case MembershipKind.Session:
             default:
                 return this.getMsUntilExpiry()! <= 0;
@@ -289,8 +374,9 @@ export class CallMembership {
                     if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
                 }
                 break;
+            default:
+                return undefined;
         }
-        return undefined;
     }
 
     /**

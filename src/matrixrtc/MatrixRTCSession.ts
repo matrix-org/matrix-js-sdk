@@ -615,13 +615,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         return oldestMembership?.getTransport(oldestMembership);
     }
 
-    /**
-     * The used focusActive of the oldest membership (to find out the selection type multi-sfu or oldest membership active focus)
-     * @deprecated does not work with m.rtc.member. Do not rely on it.
-     */
-    public getActiveFocus(): Transport | undefined {
-        return this.getOldestMembership()?.getFocusActive();
-    }
     public getOldestMembership(): CallMembership | undefined {
         return this.memberships[0];
     }
@@ -875,20 +868,12 @@ async function computeBackendIdentityAndVerifyMemberEvents(
         const content = memberEvent.getContent();
 
         // Quick filter to avoid unneeded processing of invalid events or left events.
-        // A more thorough validation will be done later with CallMembership.membershipDataFromMatrixEvent.
         if (!quickFilterNonRelevantContents(content, logger)) {
             continue;
         }
 
         try {
-            const membershipData = CallMembership.membershipDataFromMatrixEvent(memberEvent);
-
-            const membership = new CallMembership(
-                memberEvent,
-                membershipData,
-                await CallMembership.computeRtcBackendIdentity(memberEvent, membershipData),
-                logger,
-            );
+            const membership = await CallMembership.parseFromEvent(memberEvent);
 
             if (isValidMembership(membership, room, slotDescription, logger)) {
                 callMemberships.push(membership);

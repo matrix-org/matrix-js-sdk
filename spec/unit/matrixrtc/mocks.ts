@@ -18,10 +18,10 @@ import { EventEmitter } from "stream";
 import { type Mocked } from "jest-mock";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
+import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
 import { type CallMembershipIdentityParts } from "src/matrixrtc/EncryptionManager";
-import { logger } from "../../../src/logger.ts";
+import { type SessionMembershipData } from "src/matrixrtc/membership/legacy";
 
 export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
 
@@ -196,7 +196,7 @@ export function mockCallMembership(
     const ev = mockRTCEvent(membershipData, roomId);
     (ev.getContent as jest.Mock).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx", logger);
+    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx");
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {
