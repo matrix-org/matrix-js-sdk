@@ -29,13 +29,12 @@ export default {
         // Used in script which only runs in environment with `@octokit/rest` installed
         "@octokit/rest",
         // Used by jest
+        "jest-fixed-jsdom",
         "jest-environment-jsdom",
         "babel-jest",
         "ts-node",
         // Used by `@babel/plugin-transform-runtime`
         "@babel/runtime",
-        // Transitive dep of jest
-        "jsdom",
     ],
     ignoreBinaries: [
         // Used when available by reusable workflow `.github/workflows/release-make.yml`
