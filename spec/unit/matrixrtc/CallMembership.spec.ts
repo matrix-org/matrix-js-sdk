@@ -307,11 +307,11 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it("considers memberships unexpired if local age low enough", () => {
+        it.skip("considers memberships unexpired if local age low enough", () => {
             // TODO link prev event
         });
 
-        it("considers memberships expired if local age large enough", () => {
+        it.skip("considers memberships expired if local age large enough", () => {
             // TODO link prev event
         });
 
