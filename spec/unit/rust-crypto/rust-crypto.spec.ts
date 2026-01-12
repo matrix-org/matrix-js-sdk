@@ -1884,7 +1884,7 @@ describe("RustCrypto", () => {
             // means that the device was successfully rehydrated.
             const rehydrationCompletedPromise = emitPromise(rustCrypto2, CryptoEvent.RehydrationCompleted);
             await rustCrypto2.startDehydration();
-            await rehydrationCompletedPromise;
+            await expect(rehydrationCompletedPromise).resolves.toBeTruthy();
             await rustCrypto2.stop();
         });
 

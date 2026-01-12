@@ -724,7 +724,7 @@ describe("crypto", () => {
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
-            await awaitDecryptionError;
+            await expect(awaitDecryptionError).resolves.toBeUndefined();
         });
     });
 

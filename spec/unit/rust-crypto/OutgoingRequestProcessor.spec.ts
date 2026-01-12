@@ -302,7 +302,7 @@ describe("OutgoingRequestProcessor", () => {
         const result = processor.makeOutgoingRequest(request);
 
         // wait for the HTTP request to be made
-        await authRequestCalledPromise;
+        await expect(authRequestCalledPromise).resolves.toBeUndefined();
 
         // while the HTTP request is in flight, the OlmMachine gets stopped.
         olmMachine.close();

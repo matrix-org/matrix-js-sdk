@@ -360,8 +360,8 @@ describe("Group Call", function () {
             }
         });
 
-        it("does not throw when calling updateLocalUsermediaStream() without local usermedia stream", () => {
-            expect(async () => await groupCall.updateLocalUsermediaStream({} as MediaStream)).not.toThrow();
+        it("does not throw when calling updateLocalUsermediaStream() without local usermedia stream", async () => {
+            await expect(groupCall.updateLocalUsermediaStream({} as MediaStream)).resolves.toBeUndefined();
         });
 
         it.each([GroupCallState.Ended, GroupCallState.Entered, GroupCallState.InitializingLocalCallFeed])(
