@@ -271,14 +271,14 @@ describe("Media Handler", function () {
         beforeEach(() => {
             // replace this with one that returns a new object each time so we can
             // tell whether we've ended up with the same stream
-            mockMediaDevices.getUserMedia.mockImplementation((constraints: MediaStreamConstraints) => {
+            mockMediaDevices.getUserMedia.mockImplementation((constraints: MediaStreamConstraints | undefined) => {
                 const stream = new MockMediaStream("local_stream");
-                if (constraints.audio) {
+                if (constraints?.audio) {
                     const track = new MockMediaStreamTrack("audio_track", "audio");
                     track.settings = { deviceId: FAKE_AUDIO_INPUT_ID };
                     stream.addTrack(track);
                 }
-                if (constraints.video) {
+                if (constraints?.video) {
                     const track = new MockMediaStreamTrack("video_track", "video");
                     track.settings = { deviceId: FAKE_VIDEO_INPUT_ID };
                     stream.addTrack(track);
@@ -336,9 +336,9 @@ describe("Media Handler", function () {
             // First call with exact should fail
             mockMediaDevices.getUserMedia
                 .mockRejectedValueOnce(new Error("OverconstrainedError"))
-                .mockImplementation((constraints: MediaStreamConstraints) => {
+                .mockImplementation((constraints: MediaStreamConstraints | undefined) => {
                     const stream = new MockMediaStream("local_stream");
-                    if (constraints.audio) {
+                    if (constraints?.audio) {
                         const track = new MockMediaStreamTrack("audio_track", "audio");
                         track.settings = { deviceId: FAKE_AUDIO_INPUT_ID };
                         stream.addTrack(track);
@@ -373,9 +373,9 @@ describe("Media Handler", function () {
             // First call with exact should fail
             mockMediaDevices.getUserMedia
                 .mockRejectedValueOnce(new Error("OverconstrainedError"))
-                .mockImplementation((constraints: MediaStreamConstraints) => {
+                .mockImplementation((constraints: MediaStreamConstraints | undefined) => {
                     const stream = new MockMediaStream("local_stream");
-                    if (constraints.video) {
+                    if (constraints?.video) {
                         const track = new MockMediaStreamTrack("video_track", "video");
                         track.settings = { deviceId: FAKE_VIDEO_INPUT_ID };
                         stream.addTrack(track);

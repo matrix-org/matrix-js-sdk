@@ -228,7 +228,7 @@ describe("EventTimelineSet", () => {
         let thread: Thread;
 
         beforeEach(() => {
-            (client.supportsThreads as jest.Mock).mockReturnValue(true);
+            mocked(client.supportsThreads).mockReturnValue(true);
             thread = new Thread("!thread_id:server", messageEvent, { room, client });
         });
 
@@ -384,7 +384,7 @@ describe("EventTimelineSet", () => {
         let thread: Thread;
 
         beforeEach(() => {
-            (client.supportsThreads as jest.Mock).mockReturnValue(true);
+            mocked(client.supportsThreads).mockReturnValue(true);
             thread = new Thread("!thread_id:server", messageEvent, { room, client });
         });
 

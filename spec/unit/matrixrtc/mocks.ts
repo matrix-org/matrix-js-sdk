@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { EventEmitter } from "stream";
-import { type Mocked } from "jest-mock";
+import { mocked, type Mocked } from "jest-mock";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
@@ -72,8 +72,8 @@ export type MockClient = Pick<
  */
 export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
-        getDeviceId: () => deviceId,
-        getUserId: () => userId,
+        getDeviceId: jest.fn(() => deviceId),
+        getUserId: jest.fn(() => userId),
         sendEvent: jest.fn(),
         sendStateEvent: jest.fn(),
         cancelPendingEvent: jest.fn(),
@@ -194,7 +194,7 @@ export function mockCallMembership(
     rtcBackendIdentity?: string,
 ): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
-    (ev.getContent as jest.Mock).mockReturnValue(membershipData);
+    mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, rtcBackendIdentity ?? "xx", logger);
 }

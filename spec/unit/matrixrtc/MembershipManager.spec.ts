@@ -126,7 +126,7 @@ describe("MembershipManager", () => {
                 // Spys/Mocks
 
                 const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
-                    client._unstable_restartScheduledDelayedEvent as Mock,
+                    client._unstable_restartScheduledDelayedEvent,
                 );
 
                 // Test
@@ -293,7 +293,7 @@ describe("MembershipManager", () => {
 
         describe("delayed leave event", () => {
             it("does not try again to schedule a delayed leave event if not supported", () => {
-                const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
+                const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
                 const manager = new MembershipManager({}, room, client, callSession);
                 manager.join([focus]);
                 delayedHandle.reject?.(
@@ -305,7 +305,7 @@ describe("MembershipManager", () => {
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
             });
             it("does try to schedule a delayed leave event again if rate limited", async () => {
-                const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
+                const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
                 const manager = new MembershipManager({}, room, client, callSession);
                 manager.join([focus]);
                 delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
@@ -916,7 +916,7 @@ describe("MembershipManager", () => {
             describe("sends an rtc membership event", () => {
                 it("sends a membership event and schedules delayed leave when joining a call", async () => {
                     const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
-                        client._unstable_restartScheduledDelayedEvent as Mock,
+                        client._unstable_restartScheduledDelayedEvent,
                     );
                     const memberManager = new StickyEventMembershipManager(
                         undefined,
