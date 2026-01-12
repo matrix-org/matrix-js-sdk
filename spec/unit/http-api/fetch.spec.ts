@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { type Mocked, type MockedFunction } from "jest-mock";
+
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
