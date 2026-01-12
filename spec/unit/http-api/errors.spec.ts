@@ -25,8 +25,8 @@ describe("MatrixError", () => {
         headers = new Headers({ "Content-Type": "application/json" });
     });
 
-    function makeMatrixError(httpStatus: number, data: IErrorJson, url?: string): MatrixError {
-        return new MatrixError(data, httpStatus, url, undefined, headers);
+    function makeMatrixError(httpStatus: number, data: IErrorJson, url = "https://default-url"): MatrixError {
+        return new MatrixError(data, { httpStatus, url, httpHeaders: headers });
     }
 
     it("should accept absent retry time from rate-limit error", () => {

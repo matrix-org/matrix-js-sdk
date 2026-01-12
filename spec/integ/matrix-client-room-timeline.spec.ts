@@ -799,12 +799,15 @@ describe("MatrixClient room timelines", function () {
                 })
                 .respond(
                     500,
-                    new MatrixError({
-                        errcode: "TEST_FAKE_ERROR",
-                        error:
-                            "We purposely intercepted this /context request to make it fail " +
-                            "in order to test whether the refresh timeline code is resilient",
-                    }),
+                    new MatrixError(
+                        {
+                            errcode: "TEST_FAKE_ERROR",
+                            error:
+                                "We purposely intercepted this /context request to make it fail " +
+                                "in order to test whether the refresh timeline code is resilient",
+                        },
+                        { httpStatus: 500 },
+                    ),
                 );
 
             // Refresh the timeline and expect it to fail

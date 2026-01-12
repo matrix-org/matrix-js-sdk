@@ -19,6 +19,7 @@ import { type IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
 import { type IUsageLimit } from "../@types/partials.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { NamespacedValue } from "../NamespacedValue.ts";
+import { type Method } from "./method.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
@@ -26,20 +27,60 @@ interface IErrorJson extends Partial<IUsageLimit> {
     error?: string;
 }
 
+interface HttpErrorOptions extends ErrorOptions {
+    /**
+     * The URL which returned this error. This should be the final (after redirects) URL.
+     */
+    url?: string;
+    /**
+     * The HTTP method in response to which this error pertains.
+     */
+    method?: Method;
+    /**
+     * The HTTP status encountered alongside the error.
+     */
+    httpStatus?: number;
+    /**
+     * The HTTP headers present in the response alongside the error.
+     */
+    httpHeaders?: Headers;
+}
+
 /**
  * Construct a generic HTTP error. This is a JavaScript Error with additional information
  * specific to HTTP responses.
  * @param msg - The error message to include.
- * @param httpStatus - The HTTP response status code.
- * @param httpHeaders - The HTTP response headers.
+ * @param options - Relevant context surrounding this error.
  */
 export class HTTPError extends Error {
-    public constructor(
-        msg: string,
-        public readonly httpStatus?: number,
-        public readonly httpHeaders?: Headers,
-    ) {
-        super(msg);
+    public readonly url?: string;
+    public readonly method?: Method;
+    public readonly httpStatus?: number;
+    public readonly httpHeaders?: Headers;
+
+    public constructor(msg: string, options: HttpErrorOptions = {}) {
+        const details: string[] = [];
+        if (options.method) {
+            details.push(options.method);
+        }
+        if (options.httpStatus !== undefined) {
+            details.push("" + options.httpStatus);
+        }
+
+        let message = msg || "Unknown message";
+        if (details.length) {
+            message = `[${details.join(" ")}] ${message}`;
+        }
+        if (options.url) {
+            message += ` (${options.url})`;
+        }
+
+        super(`HTTPError: ${message}`, { cause: options?.cause });
+
+        this.url = options.url;
+        this.method = options.method;
+        this.httpStatus = options.httpStatus;
+        this.httpHeaders = options.httpHeaders;
     }
 
     /**
@@ -80,6 +121,13 @@ export class HTTPError extends Error {
     }
 }
 
+interface MatrixErrorOptions extends HttpErrorOptions {
+    /**
+     * The MatrixEvent to which this error relates.
+     */
+    event?: MatrixEvent;
+}
+
 export class MatrixError extends HTTPError {
     // The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
     public readonly errcode?: string;
@@ -87,29 +135,21 @@ export class MatrixError extends HTTPError {
     public readonly error?: string;
     // The raw Matrix error JSON used to construct this object.
     public data: IErrorJson;
+    // The MatrixEvent to which this error relates.
+    public event?: MatrixEvent;
 
     /**
      * Construct a Matrix error. This is a JavaScript Error with additional
      * information specific to the standard Matrix error response.
      * @param errorJson - The Matrix error JSON returned from the homeserver.
-     * @param httpStatus - The numeric HTTP status code given
-     * @param httpHeaders - The HTTP response headers given
+     * @param options - Relevant context surrounding this error.
      */
-    public constructor(
-        errorJson: IErrorJson = {},
-        httpStatus?: number,
-        public url?: string,
-        public event?: MatrixEvent,
-        httpHeaders?: Headers,
-    ) {
-        let message = errorJson.error || "Unknown message";
-        if (httpStatus) {
-            message = `[${httpStatus}] ${message}`;
-        }
-        if (url) {
-            message = `${message} (${url})`;
-        }
-        super(`MatrixError: ${message}`, httpStatus, httpHeaders);
+    public constructor(errorJson: IErrorJson = {}, options: MatrixErrorOptions = {}) {
+        const { event, ...otherOptions } = options;
+        super(errorJson.error || "Unknown message", otherOptions);
+        this.message = this.message.replace("HTTPError: ", "MatrixError: ");
+
+        this.event = event;
         this.errcode = errorJson.errcode;
         this.error = errorJson.error;
         this.name = errorJson.errcode || "Unknown error code";
@@ -166,7 +206,11 @@ export class MatrixError extends HTTPError {
      * received from Widget API error responses.
      */
     public static fromWidgetApiErrorData(data: IWidgetMatrixError): MatrixError {
-        return new MatrixError(data.response, data.http_status, data.url, undefined, new Headers(data.http_headers));
+        return new MatrixError(data.response, {
+            httpStatus: data.http_status,
+            url: data.url,
+            httpHeaders: new Headers(data.http_headers),
+        });
     }
 }
 

@@ -299,7 +299,7 @@ describe("MatrixClient", function () {
                             message: "Expected testing error",
                             data: next.error,
                         },
-                        (<MatrixError>next.error).httpStatus,
+                        <MatrixError>next.error,
                     ),
                 );
             }
@@ -3876,7 +3876,7 @@ describe("MatrixClient", function () {
                 {
                     method: "GET",
                     path: `/auth_metadata`,
-                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
+                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, { httpStatus: 404, method: Method.Get }),
                     prefix: "/_matrix/client/unstable/org.matrix.msc2965",
                 },
                 {

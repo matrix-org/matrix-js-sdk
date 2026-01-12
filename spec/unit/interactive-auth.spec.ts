@@ -212,7 +212,7 @@ describe("InteractiveAuth", () => {
                         [AuthType.Password]: { param: "aa" },
                     },
                 },
-                401,
+                { httpStatus: 401 },
             );
             throw err;
         });
@@ -274,7 +274,7 @@ describe("InteractiveAuth", () => {
                         [AuthType.Password]: { param: "aa" },
                     },
                 },
-                401,
+                { httpStatus: 401 },
             );
             throw err;
         });
@@ -332,7 +332,7 @@ describe("InteractiveAuth", () => {
                         [AuthType.Password]: { param: "aa" },
                     },
                 },
-                401,
+                { httpStatus: 401 },
             );
             throw err;
         });
@@ -367,7 +367,7 @@ describe("InteractiveAuth", () => {
                     error: "Mock Error 1",
                     errcode: "MOCKERR1",
                 },
-                401,
+                { httpStatus: 401 },
             );
             throw err;
         });
@@ -393,11 +393,11 @@ describe("InteractiveAuth", () => {
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual({ session: "sessionId" }); // has existing sessionId
-            const err = new HTTPError("myerror", 401);
+            const err = new HTTPError("myerror", { httpStatus: 401 });
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("myerror"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new HTTPError("myerror", { httpStatus: 401 }));
     });
 
     it("should allow dummy auth", async () => {

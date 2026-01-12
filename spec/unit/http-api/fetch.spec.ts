@@ -35,7 +35,10 @@ describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
     const idBaseUrl = "http://idBaseUrl";
     const prefix = ClientPrefix.V3;
-    const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
+    const tokenInactiveError = new MatrixError(
+        { errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" },
+        { httpStatus: 401 },
+    );
 
     beforeEach(() => {
         jest.useRealTimers();
@@ -322,7 +325,7 @@ describe("FetchHttpApi", () => {
                     error: "Token is not active",
                     soft_logout: false,
                 };
-                const unknownTokenErr = new MatrixError(unknownTokenErrBody, 401);
+                const unknownTokenErr = new MatrixError(unknownTokenErrBody, { httpStatus: 401, method: Method.Post });
                 const unknownTokenResponse = {
                     ok: false,
                     status: 401,

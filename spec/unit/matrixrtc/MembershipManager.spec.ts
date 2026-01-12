@@ -220,10 +220,7 @@ describe("MembershipManager", () => {
                     const sendStateEventAttempt = new Promise<void>((resolve) => {
                         const error = new MatrixError(
                             { errcode: "M_LIMIT_EXCEEDED" },
-                            429,
-                            undefined,
-                            undefined,
-                            new Headers({ "Retry-After": "1" }),
+                            { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "1" }) },
                         );
                         (client.sendStateEvent as Mock).mockImplementationOnce(() => {
                             resolve();
@@ -308,7 +305,7 @@ describe("MembershipManager", () => {
                 const delayedHandle = createAsyncHandle(client._unstable_sendDelayedStateEvent as Mock);
                 const manager = new MembershipManager({}, room, client, callSession);
                 manager.join([focus]);
-                delayedHandle.reject?.(new HTTPError("rate limited", 429, undefined));
+                delayedHandle.reject?.(new HTTPError("rate limited", { httpStatus: 429 }));
                 await jest.advanceTimersByTimeAsync(5000);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
             });
@@ -632,10 +629,7 @@ describe("MembershipManager", () => {
                 handle.reject?.(
                     new MatrixError(
                         { errcode: "M_LIMIT_EXCEEDED" },
-                        429,
-                        undefined,
-                        undefined,
-                        new Headers({ "Retry-After": "1" }),
+                        { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "1" }) },
                     ),
                 );
                 await jest.advanceTimersByTimeAsync(1000);
@@ -646,10 +640,7 @@ describe("MembershipManager", () => {
                 (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
                     new MatrixError(
                         { errcode: "M_LIMIT_EXCEEDED" },
-                        429,
-                        undefined,
-                        undefined,
-                        new Headers({ "Retry-After": "1" }),
+                        { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "1" }) },
                     ),
                 );
                 const manager = new MembershipManager({}, room, client, callSession);
@@ -677,10 +668,7 @@ describe("MembershipManager", () => {
                 handle.reject?.(
                     new MatrixError(
                         { errcode: "M_LIMIT_EXCEEDED" },
-                        429,
-                        undefined,
-                        undefined,
-                        new Headers({ "Retry-After": "1" }),
+                        { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "1" }) },
                     ),
                 );
 
@@ -701,10 +689,7 @@ describe("MembershipManager", () => {
                 (client._unstable_restartScheduledDelayedEvent as Mock<any>).mockRejectedValue(
                     new MatrixError(
                         { errcode: "M_LIMIT_EXCEEDED" },
-                        429,
-                        undefined,
-                        undefined,
-                        new Headers({ "Retry-After": "1" }),
+                        { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "1" }) },
                     ),
                 );
                 const manager = new MembershipManager({}, room, client, callSession);
@@ -734,10 +719,7 @@ describe("MembershipManager", () => {
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
                 new MatrixError(
                     { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "2" }),
+                    { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "2" }) },
                 ),
             );
             const manager = new MembershipManager({}, room, client, callSession);
@@ -754,10 +736,7 @@ describe("MembershipManager", () => {
             (client._unstable_restartScheduledDelayedEvent as Mock<any>).mockRejectedValue(
                 new MatrixError(
                     { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "1" }),
+                    { httpStatus: 429, httpHeaders: new Headers({ "Retry-After": "1" }) },
                 ),
             );
             const manager = new MembershipManager({}, room, client, callSession);
@@ -770,7 +749,9 @@ describe("MembershipManager", () => {
         });
         it("falls back to using pure state events when some error occurs while sending delayed events", async () => {
             const unrecoverableError = jest.fn();
-            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 601));
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
+                new HTTPError("unknown", { httpStatus: 601 }),
+            );
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([focus], focusActive, unrecoverableError);
             await waitForMockCall(client.sendStateEvent);
@@ -779,7 +760,9 @@ describe("MembershipManager", () => {
         });
         it("retries before failing in case its a network error", async () => {
             const unrecoverableError = jest.fn();
-            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 501));
+            (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
+                new HTTPError("unknown", { httpStatus: 501 }),
+            );
             const manager = new MembershipManager(
                 { networkErrorRetryMs: 1000, maximumNetworkErrorRetryCount: 7 },
                 room,

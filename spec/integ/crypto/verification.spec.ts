@@ -1347,7 +1347,7 @@ describe("verification", () => {
             await sendBackupGossipAndExpectVersion(
                 requestId!,
                 BACKUP_DECRYPTION_KEY_BASE64,
-                new MatrixError({ errcode: "M_NOT_FOUND", error: "No backup found" }, 404),
+                new MatrixError({ errcode: "M_NOT_FOUND", error: "No backup found" }, { httpStatus: 404 }),
             );
 
             // the backup secret should not be cached
