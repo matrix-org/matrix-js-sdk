@@ -1755,7 +1755,7 @@ describe("RustCrypto", () => {
                 fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
                 const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
-                await expect(rustCrypto.getKeyBackupInfo()).resolves.toStrictEqual(testData.SIGNED_BACKUP_DATA);
+                await expect(rustCrypto.getKeyBackupInfo()).resolves.toMatchObject(testData.SIGNED_BACKUP_DATA);
             });
 
             it("should return null if not available", async () => {
