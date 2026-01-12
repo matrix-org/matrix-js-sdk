@@ -22,19 +22,9 @@ import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import {
-    type CallMembership,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-    type SessionMembershipData,
-} from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status } from "./types.ts";
-import {
-    type SlotDescription,
-    type MembershipConfig,
-    type SessionConfig,
-    slotDescriptionToId,
-} from "./MatrixRTCSession.ts";
+import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
+import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
+import { type MembershipConfig, type SessionConfig, slotDescriptionToId } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
@@ -43,6 +33,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "./membership/index.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -782,11 +773,12 @@ export class MembershipManager
 
     /**
      * Constructs our own membership
+     * @returns Only returns `SessionMembershipData`
      */
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
         const ownMembership = this.ownMembership;
 
-        const focusObjects =
+        const focusObjects: Pick<SessionMembershipData, "foci_preferred" | "focus_active"> =
             this.rtcTransport === undefined
                 ? {
                       focus_active: { type: "livekit", focus_selection: "oldest_membership" } as const,
@@ -798,7 +790,7 @@ export class MembershipManager
                   };
         return {
             "application": this.slotDescription.application,
-            "call_id": this.slotDescription.id,
+            "call_id": this.slotDescription.id!,
             "scope": "m.room",
             "device_id": this.deviceId,
             // DO NOT use this.memberId here since that is the state key (using application...)
@@ -1088,7 +1080,11 @@ export class StickyEventMembershipManager extends MembershipManager {
         return super.actionUpdateFromErrors(e, t, StickyEventMembershipManager.nameMap.get(m) ?? "unknown");
     }
 
-    protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
+    /**
+     *
+     * @returns Only returns `RtcMembershipData`
+     */
+    protected makeMyMembership(): RtcMembershipData {
         const ownMembership = this.ownMembership;
 
         const relationObject = ownMembership?.eventId
@@ -1101,7 +1097,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             slot_id: slotDescriptionToId(this.slotDescription),
             rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
-            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
+            member: { claimed_user_id: this.userId, claimed_device_id: this.deviceId, id: this.memberId },
             versions: [],
             ...relationObject,
         };

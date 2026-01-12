@@ -19,8 +19,8 @@ import type { IContent } from "../../models/event.ts";
 import type { RelationType } from "../../types.ts";
 import { type RtcSlotEventContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
-import { sha256 } from "src/digest.ts";
-import { encodeUnpaddedBase64Url } from "src/base64.ts";
+import { sha256 } from "../../digest.ts";
+import { encodeUnpaddedBase64Url } from "../../base64.ts";
 
 /**
  * Represents the current form of MSC4143.

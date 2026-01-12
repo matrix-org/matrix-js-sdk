@@ -19,8 +19,13 @@ import { type RTCCallIntent, type Transport, type SlotDescription } from "./type
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
 import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
-import { checkSessionsMembershipData, type SessionMembershipData } from "./membership/legacy.ts";
-import { checkRtcMembershipData, computeRtcIdentityRaw, type RtcMembershipData } from "./membership/rtc.ts";
+import {
+    checkRtcMembershipData,
+    computeRtcIdentityRaw,
+    type RtcMembershipData,
+    checkSessionsMembershipData,
+    type SessionMembershipData,
+} from "./membership.ts";
 import { MatrixRTCMembershipParseError } from "./membership/common.ts";
 import { EventType } from "../@types/event.ts";
 
@@ -87,9 +92,9 @@ export class CallMembership {
      * @param data The contents of the event.
      * @returns
      */
-    public static async parseFromEvent(matrixEvent: LimitedEvent) {
-        let membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
-        let rtcBackendIdentity =
+    public static async parseFromEvent(matrixEvent: LimitedEvent): Promise<CallMembership> {
+        const membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
+        const rtcBackendIdentity =
             membershipData.kind === MembershipKind.RTC
                 ? await computeRtcIdentityRaw(
                       membershipData.data.member.claimed_user_id,
@@ -112,7 +117,7 @@ export class CallMembership {
     private readonly matrixEventData: { eventId: string; sender: string };
 
     /**
-     * @private Internal constructor. Only construct via this for tests.
+     * @private
      * @param matrixEvent
      * @param membershipData
      * @param rtcBackendIdentity
@@ -139,17 +144,6 @@ export class CallMembership {
     }
 
     public get userId(): string {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.member.claimed_user_id;
-            case MembershipKind.Session:
-            default:
-                return this.matrixEventData.sender;
-        }
-    }
-
-    public get rtc(): string {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
@@ -318,17 +312,16 @@ export class CallMembership {
      */
     public getMsUntilExpiry(): number | undefined {
         const { kind } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return undefined;
-            case MembershipKind.Session:
-            default:
-                const absExpiry = this.getAbsoluteExpiry();
+        if (kind === MembershipKind.Session) {
+            const absExpiry = this.getAbsoluteExpiry();
+            if (absExpiry) {
                 // Assume that local clock is sufficiently in sync with other clocks in the distributed system.
                 // We used to try and adjust for the local clock being skewed, but there are cases where this is not accurate.
                 // The current implementation allows for the local clock to be -infinity to +MatrixRTCSession.MEMBERSHIP_EXPIRY_TIME/2
-                return absExpiry ? absExpiry - Date.now() : undefined;
+                return absExpiry - Date.now();
+            }
         }
+        return undefined;
     }
 
     /**
@@ -368,10 +361,16 @@ export class CallMembership {
             case MembershipKind.RTC:
                 return data.rtc_transports[0];
             case MembershipKind.Session:
-                if (data.focus_active.focus_selection === "oldest_membership") {
-                    // For legacy events we only support "oldest_membership"
-                    if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
-                    if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
+                switch (data.focus_active.focus_selection) {
+                    case "oldest_membership":
+                        if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
+                        if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
+                        break;
+                    case "multi_sfu":
+                        return data.foci_preferred[0];
+                    default:
+                        // `focus_selection` not understood.
+                        return undefined;
                 }
                 break;
             default:

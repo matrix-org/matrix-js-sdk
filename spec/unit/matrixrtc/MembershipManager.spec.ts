@@ -28,7 +28,7 @@ import {
 import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
 import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
-import { SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
+import { type SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -933,9 +933,9 @@ describe("MembershipManager", () => {
                         {
                             application: { type: "m.call" },
                             member: {
-                                user_id: "@alice:example.org",
+                                claimed_user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",
-                                device_id: "AAAAAAA",
+                                claimed_device_id: "AAAAAAA",
                             },
                             slot_id: "m.call#",
                             rtc_transports: [focus],

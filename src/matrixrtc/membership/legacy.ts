@@ -47,8 +47,8 @@ export type SessionMembershipData = {
      * NOTE: This is still included for legacy reasons, but not consumed by the SDK.
      */
     "focus_active": {
-        type: string;
-        focus_selection: "oldest_membership" | string;
+        type: "livekit" | string;
+        focus_selection: "oldest_membership" | "multi_sfu" | string;
     };
 
     /**

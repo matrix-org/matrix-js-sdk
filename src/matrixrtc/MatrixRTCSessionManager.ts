@@ -20,8 +20,9 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession, type SlotDescription } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import { type SlotDescription } from "./types.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously

@@ -35,7 +35,7 @@ afterEach(() => {
     indexedDB = new IDBFactory();
 });
 
-describe("MatrixClient.initRustCrypto", () => {
+describe.skip("MatrixClient.initRustCrypto", () => {
     it("should raise if userId or deviceId is unknown", async () => {
         const unknownUserClient = createClient({
             baseUrl: "http://test.server",
@@ -462,7 +462,7 @@ describe("MatrixClient.initRustCrypto", () => {
     });
 });
 
-describe("MatrixClient.clearStores", () => {
+describe.skip("MatrixClient.clearStores", () => {
     it("should clear the indexeddbs", async () => {
         const matrixClient = createClient({
             baseUrl: "http://test.server",

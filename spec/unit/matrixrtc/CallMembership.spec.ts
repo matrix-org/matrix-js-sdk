@@ -14,20 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RtcMembershipData } from "src/matrixrtc/membership/rtc";
-import { type MatrixEvent } from "../../../src";
+import { type RtcMembershipData } from "src/matrixrtc/membership/rtc";
+import { EventType, type MatrixEvent } from "../../../src";
 import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership";
-import { membershipTemplate } from "./mocks";
-import { SessionMembershipData } from "src/matrixrtc/membership/legacy";
-
-function makeMockEvent(originTs = 0): MatrixEvent {
-    return {
-        getTs: jest.fn().mockReturnValue(originTs),
-        getSender: jest.fn().mockReturnValue("@alice:example.org"),
-        getId: jest.fn().mockReturnValue("$eventid"),
-        getContent: jest.fn().mockReturnValue({}),
-    } as unknown as MatrixEvent;
-}
+import { type SessionMembershipData } from "src/matrixrtc/membership/legacy";
 
 function createCallMembership(ev: MatrixEvent, content: unknown): CallMembership {
     (ev.getContent as jest.Mock).mockReturnValue(content);
@@ -37,6 +27,15 @@ function createCallMembership(ev: MatrixEvent, content: unknown): CallMembership
 
 describe("CallMembership", () => {
     describe("SessionMembershipData", () => {
+        function makeMockEvent(originTs = 0): MatrixEvent {
+            return {
+                getTs: jest.fn().mockReturnValue(originTs),
+                getSender: jest.fn().mockReturnValue("@alice:example.org"),
+                getId: jest.fn().mockReturnValue("$eventid"),
+                getContent: jest.fn().mockReturnValue({}),
+                getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+            } as unknown as MatrixEvent;
+        }
         beforeEach(() => {
             jest.useFakeTimers();
         });
@@ -182,9 +181,40 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(true);
             });
         });
+        describe("expiry calculation", () => {
+            let fakeEvent: MatrixEvent;
+            let membership: CallMembership;
+
+            beforeEach(() => {
+                // server origin timestamp for this event is 1000
+                fakeEvent = makeMockEvent(1000);
+                membership = createCallMembership(fakeEvent!, membershipTemplate);
+
+                jest.useFakeTimers();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it("calculates time until expiry", () => {
+                jest.setSystemTime(2000);
+                // should be using absolute expiry time
+                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+            });
+        });
     });
 
     describe("RtcMembershipData", () => {
+        function makeMockEvent(originTs = 0): MatrixEvent {
+            return {
+                getTs: jest.fn().mockReturnValue(originTs),
+                getSender: jest.fn().mockReturnValue("@alice:example.org"),
+                getId: jest.fn().mockReturnValue("$eventid"),
+                getContent: jest.fn().mockReturnValue({}),
+                getType: jest.fn().mockReturnValue(EventType.RTCMembership),
+            } as unknown as MatrixEvent;
+        }
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
@@ -304,13 +334,9 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it("considers memberships unexpired if local age low enough", () => {
-            // TODO link prev event
-        });
-
-        it("considers memberships expired if local age large enough", () => {
-            // TODO link prev event
-        });
+        // TODO link prev event
+        it.todo("considers memberships unexpired if local age low enough");
+        it.todo("considers memberships expired if local age large enough");
 
         describe("getTransport", () => {
             it("gets the correct active transport with oldest_membership", () => {
@@ -366,29 +392,6 @@ describe("CallMembership", () => {
                 expect(membership.getMsUntilExpiry()).toBe(undefined);
                 expect(membership.isExpired()).toBe(false);
             });
-        });
-    });
-
-    describe("expiry calculation", () => {
-        let fakeEvent: MatrixEvent;
-        let membership: CallMembership;
-
-        beforeEach(() => {
-            // server origin timestamp for this event is 1000
-            fakeEvent = makeMockEvent(1000);
-            membership = createCallMembership(fakeEvent!, membershipTemplate);
-
-            jest.useFakeTimers();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
-        it("calculates time until expiry", () => {
-            jest.setSystemTime(2000);
-            // should be using absolute expiry time
-            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
         });
     });
 });

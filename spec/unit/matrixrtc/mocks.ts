@@ -22,8 +22,9 @@ import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
 import { type CallMembershipIdentityParts } from "src/matrixrtc/EncryptionManager";
 import { type SessionMembershipData } from "src/matrixrtc/membership/legacy";
+import { type RtcMembershipData } from "src/matrixrtc/membership";
 
-export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
 export const owmMemberIdentity: CallMembershipIdentityParts = {
     deviceId: "AAAAAAA",
