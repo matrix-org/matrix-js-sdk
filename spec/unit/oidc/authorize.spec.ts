@@ -50,6 +50,7 @@ describe("oidc authorization", () => {
 
     beforeAll(() => {
         jest.spyOn(logger, "warn");
+        jest.useFakeTimers();
         jest.setSystemTime(now);
 
         fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());

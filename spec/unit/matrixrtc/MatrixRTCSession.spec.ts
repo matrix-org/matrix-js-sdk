@@ -1345,6 +1345,13 @@ describe("MatrixRTCSession", () => {
         });
 
         describe("receiving", () => {
+            beforeAll(() => {
+                jest.useFakeTimers();
+            });
+            afterAll(() => {
+                jest.useRealTimers();
+            });
+
             it("collects keys from encryption events", async () => {
                 const mockRoom = makeMockRoom([membershipTemplate]);
                 sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);

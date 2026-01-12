@@ -97,7 +97,6 @@ describe("Encrypted State Events", () => {
 
     afterEach(async () => {
         await aliceClient.stopClient();
-        await jest.runAllTimersAsync();
         fetchMock.mockReset();
     });
 
