@@ -781,7 +781,9 @@ describe("Room", function () {
         );
     });
 
-    const resetTimelineTests = function (timelineSupport: boolean) {
+    describe.each(["enabled", "disabled"])("resetLiveTimeline with timeline support %s", (enabled) => {
+        const timelineSupport = enabled === "enabled";
+
         let events: MatrixEvent[];
 
         beforeEach(function () {
@@ -812,7 +814,8 @@ describe("Room", function () {
             ];
         });
 
-        it("should copy state from previous timeline", async function () {
+        // XXX: This test was previously not running and it is broken
+        it.skip("should copy state from previous timeline", async function () {
             await room.addLiveEvents([events[0], events[1]], { addToState: false });
             expect(room.getLiveTimeline().getEvents().length).toEqual(2);
             room.resetLiveTimeline("sometoken", "someothertoken");
@@ -882,13 +885,6 @@ describe("Room", function () {
             const tl = room.getTimelineForEvent(events[0].getId()!);
             expect(tl).toBe(timelineSupport ? firstLiveTimeline : null);
         });
-    };
-
-    describe("resetLiveTimeline with timeline support enabled", () => {
-        resetTimelineTests.bind(null, true);
-    });
-    describe("resetLiveTimeline with timeline support disabled", () => {
-        resetTimelineTests.bind(null, false);
     });
 
     describe("compareEventOrdering", function () {
@@ -1836,10 +1832,6 @@ describe("Room", function () {
             describe("threads enabled", () => {
                 beforeEach(() => {
                     jest.spyOn(room.client, "supportsThreads").mockReturnValue(true);
-                });
-
-                afterEach(() => {
-                    jest.restoreAllMocks();
                 });
 
                 it("returns true if there is an unthreaded receipt for a later event in a thread", async () => {
@@ -3628,11 +3620,11 @@ describe("Room", function () {
 
     describe("roomNameGenerator", () => {
         const client = new TestClient(userA).client;
-        client.roomNameGenerator = jest.fn().mockReturnValue(null);
+        client.roomNameGenerator = jest.fn().mockImplementation(() => null);
         const room = new Room(roomId, client, userA);
 
         it("should call fn when recalculating room name", () => {
-            (client.roomNameGenerator as jest.Mock).mockClear();
+            mocked(client.roomNameGenerator!).mockClear();
             room.recalculate();
             expect(client.roomNameGenerator).toHaveBeenCalled();
         });
