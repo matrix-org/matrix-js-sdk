@@ -1110,6 +1110,17 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     private updateDisplayNameCache(userId: string, displayName: string): void {
         const oldName = this.userIdsToDisplayNames[userId];
+
+        // Track which display names are affected by this change so we can
+        // recalculate disambiguation for all members with those names.
+        const affectedDisplayNames = new Set<string>();
+        if (oldName) {
+            const strippedOldName = removeHiddenChars(oldName);
+            if (strippedOldName) {
+                affectedDisplayNames.add(strippedOldName);
+            }
+        }
+
         delete this.userIdsToDisplayNames[userId];
         if (oldName) {
             // Remove the old name from the cache.
@@ -1131,9 +1142,46 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const strippedDisplayname = displayName && removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
+            affectedDisplayNames.add(strippedDisplayname);
             const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];
             arr.push(userId);
             this.displayNameToUserIds.set(strippedDisplayname, arr);
+        }
+
+        // Recalculate disambiguation for all members whose display names were affected.
+        // This ensures that when a user changes their name to match (or stop matching)
+        // another user, both users' disambiguation flags are updated correctly.
+        this.recalculateDisambiguationForDisplayNames(affectedDisplayNames, userId);
+    }
+
+    /**
+     * Recalculate the `disambiguate` flag for all members with the given display names.
+     * This is called when a member's display name changes to ensure that other members
+     * who share (or previously shared) the same display name have their disambiguation
+     * flag updated correctly.
+     *
+     * @param displayNames - Set of stripped display names to check
+     * @param excludeUserId - User ID to exclude from recalculation (they're already being updated)
+     */
+    private recalculateDisambiguationForDisplayNames(displayNames: Set<string>, excludeUserId: string): void {
+        for (const displayName of displayNames) {
+            const userIds = this.displayNameToUserIds.get(displayName) ?? [];
+            for (const otherUserId of userIds) {
+                if (otherUserId === excludeUserId) continue;
+
+                const member = this.members[otherUserId];
+                if (member?.events.member) {
+                    // Recalculate disambiguation by re-setting the membership event.
+                    // This will call shouldDisambiguate() with the updated room state.
+                    const oldName = member.name;
+                    member.setMembershipEvent(member.events.member, this);
+
+                    // If the name changed, emit the Members event so the UI can update
+                    if (oldName !== member.name) {
+                        this.emit(RoomStateEvent.Members, member.events.member, this, member);
+                    }
+                }
+            }
         }
     }
 }
