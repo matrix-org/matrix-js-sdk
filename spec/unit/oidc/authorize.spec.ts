@@ -213,21 +213,6 @@ describe("oidc authorization", () => {
             sub: "123",
         };
 
-        const mockSessionStorage = (state: Record<string, unknown>): void => {
-            jest.spyOn(sessionStorage.__proto__, "getItem").mockImplementation((key: unknown) => {
-                return state[key as string] ?? null;
-            });
-            jest.spyOn(sessionStorage.__proto__, "setItem").mockImplementation(
-                // @ts-ignore mock type
-                (key: string, value: unknown) => (state[key] = value),
-            );
-            jest.spyOn(sessionStorage.__proto__, "removeItem").mockImplementation((key: unknown) => {
-                const { [key as string]: value, ...newState } = state;
-                state = newState;
-                return value;
-            });
-        };
-
         const getValueFromStorage = <T = string>(state: string, key: string): T => {
             const storedState = window.sessionStorage.getItem(`mx_oidc_${state}`)!;
             return JSON.parse(storedState)[key] as unknown as T;
@@ -279,8 +264,6 @@ describe("oidc authorization", () => {
                 },
                 keys: [],
             });
-
-            mockSessionStorage({});
 
             mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
         });
