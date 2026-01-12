@@ -113,7 +113,7 @@ describe("cross-signing", () => {
     );
 
     afterEach(async () => {
-        await aliceClient.stopClient();
+        aliceClient.stopClient();
         fetchMock.mockReset();
     });
 

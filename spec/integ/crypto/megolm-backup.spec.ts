@@ -133,9 +133,7 @@ describe("megolm-keys backup", () => {
     });
 
     afterEach(async () => {
-        if (aliceClient !== undefined) {
-            await aliceClient.stopClient();
-        }
+        aliceClient?.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
         await jest.runAllTimersAsync();

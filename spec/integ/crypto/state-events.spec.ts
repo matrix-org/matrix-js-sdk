@@ -96,7 +96,7 @@ describe("Encrypted State Events", () => {
     }, 10000);
 
     afterEach(async () => {
-        await aliceClient.stopClient();
+        aliceClient.stopClient();
         fetchMock.mockReset();
     });
 

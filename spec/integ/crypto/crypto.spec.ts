@@ -276,7 +276,7 @@ describe("crypto", () => {
     );
 
     afterEach(async () => {
-        await aliceClient.stopClient();
+        aliceClient.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
         await jest.runAllTimersAsync();
