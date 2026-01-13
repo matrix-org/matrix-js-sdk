@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @jest-environment @happy-dom/jest-environment
- */
-
 import * as utils from "../../src/utils";
 import {
     alphabetPad,
