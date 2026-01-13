@@ -42,8 +42,7 @@ jobs:
               run: |
                   yarn test \
                       --coverage=${{ env.ENABLE_COVERAGE }} \
-                      --ci \
-                      --max-workers ${{ steps.cpu-cores.outputs.count }} \
+                      --maxWorkers ${{ steps.cpu-cores.outputs.count }} \
                       ./spec/${{ matrix.specs }}
               env:
                   SHARD: ${{ matrix.specs }}
