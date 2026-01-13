@@ -263,7 +263,7 @@ describe("oidc authorization", () => {
                 keys: [],
             });
 
-            jest.mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
+            mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
         });
 
         it("should make correct request to the token endpoint", async () => {
