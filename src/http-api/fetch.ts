@@ -318,7 +318,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         if (!res.ok) {
-            throw parseErrorResponse(res, await res.text());
+            throw parseErrorResponse(res, method, await res.text());
         }
 
         if (opts.rawResponseBody) {

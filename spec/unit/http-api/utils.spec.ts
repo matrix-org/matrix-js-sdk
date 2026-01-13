@@ -23,6 +23,7 @@ import {
     MatrixError,
     MatrixSafetyError,
     MatrixSafetyErrorCode,
+    Method,
     parseErrorResponse,
     retryNetworkOperation,
     timeoutSignal,
@@ -112,6 +113,7 @@ describe("parseErrorResponse", () => {
                     ...xhrHeaderMethods,
                     status: 500,
                 } as XMLHttpRequest,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
         ).toStrictEqual(
@@ -119,7 +121,7 @@ describe("parseErrorResponse", () => {
                 {
                     errcode: "TEST",
                 },
-                500,
+                { httpStatus: 500, method: Method.Post },
             ),
         );
     });
@@ -132,6 +134,7 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 500,
                 } as Response,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
         ).toStrictEqual(
@@ -139,7 +142,7 @@ describe("parseErrorResponse", () => {
                 {
                     errcode: "TEST",
                 },
-                500,
+                { httpStatus: 500, method: Method.Post },
             ),
         );
     });
@@ -153,6 +156,7 @@ describe("parseErrorResponse", () => {
                     ...xhrHeaderMethods,
                     status: 500,
                 } as XMLHttpRequest,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
         ).toStrictEqual(
@@ -160,8 +164,7 @@ describe("parseErrorResponse", () => {
                 {
                     errcode: "TEST",
                 },
-                500,
-                "https://example.com",
+                { httpStatus: 500, url: "https://example.com", method: Method.Post },
             ),
         );
     });
@@ -175,6 +178,7 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 500,
                 } as Response,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
         ).toStrictEqual(
@@ -182,8 +186,7 @@ describe("parseErrorResponse", () => {
                 {
                     errcode: "TEST",
                 },
-                500,
-                "https://example.com",
+                { httpStatus: 500, url: "https://example.com", method: Method.Post },
             ),
         );
     });
@@ -210,6 +213,7 @@ describe("parseErrorResponse", () => {
                 headers,
                 status: 400,
             } as Response,
+            Method.Post,
             JSON.stringify(errContent),
         ) as MatrixSafetyError;
         expect(value).toBeInstanceOf(MatrixSafetyError);
@@ -233,20 +237,26 @@ describe("parseErrorResponse", () => {
         it("should resolve HTTP Errors from XHR with headers", () => {
             headers.set("Content-Type", "text/plain");
             addHeaders(headers);
-            const err = parseErrorResponse({
-                ...xhrHeaderMethods,
-                status: 500,
-            } as XMLHttpRequest) as HTTPError;
+            const err = parseErrorResponse(
+                {
+                    ...xhrHeaderMethods,
+                    status: 500,
+                } as XMLHttpRequest,
+                Method.Post,
+            ) as HTTPError;
             compareHeaders(headers, err.httpHeaders);
         });
 
         it("should resolve HTTP Errors from fetch with headers", () => {
             headers.set("Content-Type", "text/plain");
             addHeaders(headers);
-            const err = parseErrorResponse({
-                headers,
-                status: 500,
-            } as Response) as HTTPError;
+            const err = parseErrorResponse(
+                {
+                    headers,
+                    status: 500,
+                } as Response,
+                Method.Post,
+            ) as HTTPError;
             compareHeaders(headers, err.httpHeaders);
         });
 
@@ -258,6 +268,7 @@ describe("parseErrorResponse", () => {
                     ...xhrHeaderMethods,
                     status: 500,
                 } as XMLHttpRequest,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ) as MatrixError;
             compareHeaders(headers, err.httpHeaders);
@@ -271,6 +282,7 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 500,
                 } as Response,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ) as MatrixError;
             compareHeaders(headers, err.httpHeaders);
@@ -294,9 +306,10 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 500,
                 } as Response,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
-        ).toStrictEqual(new HTTPError("Server returned 500 error", 500));
+        ).toStrictEqual(new HTTPError("Server returned 500 error", { httpStatus: 500, method: Method.Post }));
     });
 
     it("should handle empty type gracefully", () => {
@@ -307,6 +320,7 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 500,
                 } as Response,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
         ).toStrictEqual(new Error("Error parsing Content-Type '': TypeError: argument string is required"));
@@ -320,6 +334,7 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 500,
                 } as Response,
+                Method.Post,
                 '{"errcode": "TEST"}',
             ),
         ).toStrictEqual(new Error("Error parsing Content-Type 'unknown': TypeError: invalid media type"));
@@ -333,9 +348,12 @@ describe("parseErrorResponse", () => {
                     headers,
                     status: 418,
                 } as Response,
+                Method.Post,
                 "I'm a teapot",
             ),
-        ).toStrictEqual(new HTTPError("Server returned 418 error: I'm a teapot", 418));
+        ).toStrictEqual(
+            new HTTPError("Server returned 418 error: I'm a teapot", { httpStatus: 418, method: Method.Post }),
+        );
     });
 });
 

@@ -26,6 +26,7 @@ import {
     MatrixSafetyErrorCode,
     safeGetRetryAfterMs,
 } from "./errors.ts";
+import { Method } from "./method.ts";
 
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
@@ -75,11 +76,14 @@ export function anySignal(signals: AbortSignal[]): {
  * we return a generic Error.
  *
  * @param response - response object
+ * @param method - the HTTP method used in the request resulting in this response
  * @param body - raw body of the response
  * @returns
  */
-export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
-    const httpHeaders = isXhr(response)
+export function parseErrorResponse(response: XMLHttpRequest | Response, method: Method, body?: string): Error {
+    const responseIsXhr = isXhr(response);
+    const url = responseIsXhr ? response.responseURL : response.url;
+    const httpHeaders = responseIsXhr
         ? new Headers(
               response
                   .getAllResponseHeaders()
@@ -98,29 +102,19 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
     } catch (e) {
         return <Error>e;
     }
+
+    const errorContext = { httpStatus: response.status, url, httpHeaders, method };
     if (contentType?.type === "application/json" && body) {
         const errorBody = JSON.parse(body);
         if (errorBody.errcode && MatrixSafetyErrorCode.matches(errorBody.errcode)) {
-            return new MatrixSafetyError(
-                errorBody,
-                response.status,
-                isXhr(response) ? response.responseURL : response.url,
-                undefined,
-                httpHeaders,
-            );
+            return new MatrixSafetyError(errorBody, errorContext);
         }
-        return new MatrixError(
-            errorBody,
-            response.status,
-            isXhr(response) ? response.responseURL : response.url,
-            undefined,
-            httpHeaders,
-        );
+        return new MatrixError(errorBody, errorContext);
     }
     if (contentType?.type === "text/plain") {
-        return new HTTPError(`Server returned ${response.status} error: ${body}`, response.status, httpHeaders);
+        return new HTTPError(`Server returned ${response.status} error: ${body}`, errorContext);
     }
-    return new HTTPError(`Server returned ${response.status} error`, response.status, httpHeaders);
+    return new HTTPError(`Server returned ${response.status} error`, errorContext);
 }
 
 function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest {

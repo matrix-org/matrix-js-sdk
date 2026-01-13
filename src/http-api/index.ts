@@ -69,6 +69,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
         if (globalThis.XMLHttpRequest) {
             const xhr = new globalThis.XMLHttpRequest();
+            const method = Method.Post;
 
             const timeoutFn = function (): void {
                 xhr.abort();
@@ -91,7 +92,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                             }
 
                             if (xhr.status >= 400) {
-                                uploadResolvers.reject(parseErrorResponse(xhr, xhr.responseText));
+                                uploadResolvers.reject(parseErrorResponse(xhr, method, xhr.responseText));
                             } else {
                                 uploadResolvers.resolve(JSON.parse(xhr.responseText));
                             }
@@ -127,7 +128,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 url.searchParams.set("access_token", encodeURIComponent(this.opts.accessToken));
             }
 
-            xhr.open(Method.Post, url.href);
+            xhr.open(method, url.href);
             if (this.opts.useAuthorizationHeader && this.opts.accessToken) {
                 xhr.setRequestHeader("Authorization", "Bearer " + this.opts.accessToken);
             }

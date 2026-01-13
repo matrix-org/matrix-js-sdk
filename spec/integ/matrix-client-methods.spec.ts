@@ -133,8 +133,9 @@ describe("MatrixClient", function () {
                 },
                 function (error) {
                     expect(error.httpStatus).toEqual(400);
+                    expect(error.method).toEqual("POST");
                     expect(error.errcode).toEqual("M_SNAFU");
-                    expect(error.message).toEqual("MatrixError: [400] broken");
+                    expect(error.message).toEqual("MatrixError: [POST 400] broken");
                 },
             );
 
@@ -380,12 +381,12 @@ describe("MatrixClient", function () {
                 [
                     403,
                     { errcode: "M_FORBIDDEN", error: "You don't have permission to knock" },
-                    "[M_FORBIDDEN: MatrixError: [403] You don't have permission to knock]",
+                    "[M_FORBIDDEN: MatrixError: [POST 403] You don't have permission to knock]",
                 ],
                 [
                     500,
                     { errcode: "INTERNAL_SERVER_ERROR" },
-                    "[INTERNAL_SERVER_ERROR: MatrixError: [500] Unknown message]",
+                    "[INTERNAL_SERVER_ERROR: MatrixError: [POST 500] Unknown message]",
                 ],
             ];
 
@@ -1556,7 +1557,7 @@ describe("MatrixClient", function () {
 
             const prom = client.setPowerLevel("!room_id:server", userId, 42);
             await Promise.all([
-                expect(prom).rejects.toMatchInlineSnapshot(`[ERR_DERP: MatrixError: [500] Unknown message]`),
+                expect(prom).rejects.toMatchInlineSnapshot(`[ERR_DERP: MatrixError: [GET 500] Unknown message]`),
                 httpBackend.flushAllExpected(),
             ]);
         });
@@ -1801,7 +1802,7 @@ describe("MatrixClient", function () {
                 function (error) {
                     expect(error.httpStatus).toEqual(errorUnrecogStatus);
                     expect(error.errcode).toEqual(errorUnrecogBody.errcode);
-                    expect(error.message).toEqual(`MatrixError: [${errorUnrecogStatus}] ${errorUnrecogBody.error}`);
+                    expect(error.message).toEqual(`MatrixError: [GET ${errorUnrecogStatus}] ${errorUnrecogBody.error}`);
                 },
             );
 
@@ -1819,7 +1820,7 @@ describe("MatrixClient", function () {
                 function (error) {
                     expect(error.httpStatus).toEqual(errorBadreqStatus);
                     expect(error.errcode).toEqual(errorBadreqBody.errcode);
-                    expect(error.message).toEqual(`MatrixError: [${errorBadreqStatus}] ${errorBadreqBody.error}`);
+                    expect(error.message).toEqual(`MatrixError: [GET ${errorBadreqStatus}] ${errorBadreqBody.error}`);
                 },
             );
 

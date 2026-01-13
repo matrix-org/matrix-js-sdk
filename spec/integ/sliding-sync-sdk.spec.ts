@@ -590,10 +590,13 @@ describe("SlidingSyncSdk", () => {
                 SlidingSyncEvent.Lifecycle,
                 SlidingSyncState.RequestFinished,
                 null,
-                new MatrixError({
-                    errcode: "M_UNKNOWN_TOKEN",
-                    message: "Oh no your access token is no longer valid",
-                }),
+                new MatrixError(
+                    {
+                        errcode: "M_UNKNOWN_TOKEN",
+                        message: "Oh no your access token is no longer valid",
+                    },
+                    { httpStatus: 401 },
+                ),
             );
             expect(sdk!.getSyncState()).toEqual(SyncState.Error);
             expect(mockSlidingSync!.stop).toHaveBeenCalled();

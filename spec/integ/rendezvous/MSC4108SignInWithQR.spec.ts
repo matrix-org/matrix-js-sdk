@@ -171,7 +171,9 @@ describe("MSC4108SignInWithQR", () => {
         it("should be able to connect with opponent and share verificationUri", async () => {
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
-            mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
+            mocked(client.getDevice).mockRejectedValue(
+                new MatrixError({ errcode: "M_NOT_FOUND" }, { httpStatus: 404 }),
+            );
 
             await Promise.all([
                 expect(ourLogin.deviceAuthorizationGrant()).resolves.toEqual({
@@ -280,7 +282,9 @@ describe("MSC4108SignInWithQR", () => {
             await opponentLogin.send({
                 type: PayloadType.Success,
             });
-            mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
+            mocked(client.getDevice).mockRejectedValue(
+                new MatrixError({ errcode: "M_NOT_FOUND" }, { httpStatus: 404 }),
+            );
 
             const ourProm = ourLogin.shareSecrets();
             await expect(ourProm).rejects.toThrow("New device not found");
@@ -298,7 +302,7 @@ describe("MSC4108SignInWithQR", () => {
                 type: PayloadType.Success,
             });
             mocked(client.getDevice).mockRejectedValue(
-                new MatrixError({ errcode: "M_UNKNOWN", error: "The message" }, 500),
+                new MatrixError({ errcode: "M_UNKNOWN", error: "The message" }, { httpStatus: 500 }),
             );
 
             await expect(ourLogin.shareSecrets()).rejects.toThrow("The message");

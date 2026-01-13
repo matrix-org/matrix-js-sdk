@@ -19,7 +19,7 @@ import { type MatrixClient } from "./client.ts";
 import { type IRoomEvent, type IStateEvent } from "./sync-accumulator.ts";
 import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
 import { sleep } from "./utils.ts";
-import { type HTTPError } from "./http-api/index.ts";
+import { HTTPError } from "./http-api/index.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -634,9 +634,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 });
                 this.invokeLifecycleListeners(SlidingSyncState.RequestFinished, resp);
             } catch (err) {
-                if ((<HTTPError>err).httpStatus) {
-                    this.invokeLifecycleListeners(SlidingSyncState.RequestFinished, null, <Error>err);
-                    if ((<HTTPError>err).httpStatus === 400) {
+                if (err instanceof HTTPError) {
+                    this.invokeLifecycleListeners(SlidingSyncState.RequestFinished, null, err);
+                    if (err.httpStatus === 400) {
                         // session probably expired TODO: assign an errcode
                         // so drop state and re-request
                         this.resetup();

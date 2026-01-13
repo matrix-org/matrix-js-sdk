@@ -1,7 +1,7 @@
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { ClientEvent, MatrixClient } from "../../src/matrix";
+import { ClientEvent, MatrixClient, Method } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
@@ -151,15 +151,18 @@ describe("MatrixClient opts", function () {
         it("shouldn't retry sending events", async () => {
             httpBackend.when("PUT", "/txn1").respond(
                 500,
-                new MatrixError({
-                    errcode: "M_SOMETHING",
-                    error: "Ruh roh",
-                }),
+                new MatrixError(
+                    {
+                        errcode: "M_SOMETHING",
+                        error: "Ruh roh",
+                    },
+                    { httpStatus: 500, method: Method.Put },
+                ),
             );
 
             await expect(
                 Promise.all([client.sendTextMessage("!foo:bar", "a body", "txn1"), httpBackend.flush("/txn1", 1)]),
-            ).rejects.toThrow("MatrixError: [500] Ruh roh");
+            ).rejects.toThrow("MatrixError: [PUT 500] Ruh roh");
         });
 
         it("shouldn't queue events", async () => {

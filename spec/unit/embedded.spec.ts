@@ -383,7 +383,7 @@ describe("RoomWidgetClient", () => {
                     response: errorData,
                 },
             });
-            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl);
+            const matrixError = new MatrixError(errorData, { httpStatus: errorStatusCode, url: errorUrl });
 
             widgetApi.transport.send.mockRejectedValue(widgetError);
 
@@ -994,7 +994,7 @@ describe("RoomWidgetClient", () => {
                     response: errorData,
                 },
             });
-            const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl);
+            const matrixError = new MatrixError(errorData, { httpStatus: errorStatusCode, url: errorUrl });
 
             widgetApi.transport.sendComplete.mockRejectedValue(widgetError);
 
