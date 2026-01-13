@@ -450,26 +450,6 @@ describe("cross-signing", () => {
 
     describe("crossSignDevice", () => {
         beforeEach(async () => {
-            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            // vi.useFakeTimers({
-            //     toFake: [
-            //         "setTimeout",
-            //         "clearTimeout",
-            //         "setImmediate",
-            //         "clearImmediate",
-            //         "setInterval",
-            //         "clearInterval",
-            //         "Date",
-            //         "nextTick",
-            //         "hrtime",
-            //         "requestAnimationFrame",
-            //         "cancelAnimationFrame",
-            //         "requestIdleCallback",
-            //         "cancelIdleCallback",
-            //         "performance",
-            //     ],
-            // });
-
             // make sure that there is another device which we can sign
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
 
@@ -481,10 +461,6 @@ describe("cross-signing", () => {
 
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([aliceClient.getSafeUserId()]);
             expect(devices.get(aliceClient.getSafeUserId())!.has(testData.TEST_DEVICE_ID)).toBeTruthy();
-        });
-
-        afterEach(async () => {
-            vi.useRealTimers();
         });
 
         it("fails for an unknown device", async () => {
