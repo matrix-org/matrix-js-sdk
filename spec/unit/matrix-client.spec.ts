@@ -770,7 +770,7 @@ describe("MatrixClient", function () {
         const body = "This is the body";
         const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
         const timeoutDelayOpts = { delay: 2000 };
-        const realTimeoutDelayOpts = { "org.matrix.msc4140.delay": 2000 };
+        const timeoutDelayQueryOpts = { "org.matrix.msc4140.delay": 2000 };
 
         beforeEach(() => {
             unstableFeatures["org.matrix.msc4140"] = true;
@@ -808,255 +808,553 @@ describe("MatrixClient", function () {
             await expect(client._unstable_sendScheduledDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
         });
 
-        it("works with null threadId", async () => {
-            httpLookups = [];
+        it.each([false, true])(
+            "works with null threadId (with dedicated endpoint: %s)",
+            async (useDedicatedEndpoint: boolean) => {
+                httpLookups = [];
 
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody: content,
-            });
+                const timeoutDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                            expectQueryParams: timeoutDelayQueryOpts,
+                            data: { delay_id: "id1" },
+                            expectBody: content,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                        data: { delay_id: "id1" },
+                        expectBody: {
+                            ...timeoutDelayOpts,
+                            content,
+                        },
+                    });
+                }
 
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                null,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
+                const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    null,
+                    EventType.RoomMessage,
+                    { ...content },
+                    timeoutDelayTxnId,
+                );
 
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody: content,
-            });
+                const actionDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                            expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                            data: { delay_id: "id2" },
+                            expectBody: content,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                        data: { delay_id: "id2" },
+                        expectBody: {
+                            parent_delay_id: timeoutDelayId,
+                            content,
+                        },
+                    });
+                }
 
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                null,
-                EventType.RoomMessage,
-                { ...content },
-                actionDelayTxnId,
-            );
-        });
+                await client._unstable_sendDelayedEvent(
+                    roomId,
+                    { parent_delay_id: timeoutDelayId },
+                    null,
+                    EventType.RoomMessage,
+                    { ...content },
+                    actionDelayTxnId,
+                );
+            },
+        );
 
-        it("works with non-null threadId", async () => {
-            httpLookups = [];
-            const threadId = "$threadId:server";
-            const expectBody = {
-                ...content,
-                "m.relates_to": {
-                    event_id: threadId,
-                    is_falling_back: true,
-                    rel_type: "m.thread",
-                },
-            };
-
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody,
-            });
-
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
-
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody,
-            });
-
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                actionDelayTxnId,
-            );
-        });
-
-        it("should add thread relation if threadId is passed and the relation is missing", async () => {
-            httpLookups = [];
-            const threadId = "$threadId:server";
-            const expectBody = {
-                ...content,
-                "m.relates_to": {
-                    "m.in_reply_to": {
+        it.each([false, true])(
+            "works with non-null threadId (with dedicated endpoint: %s)",
+            async (useDedicatedEndpoint: boolean) => {
+                httpLookups = [];
+                const threadId = "$threadId:server";
+                const expectBody = {
+                    ...content,
+                    "m.relates_to": {
                         event_id: threadId,
+                        is_falling_back: true,
+                        rel_type: "m.thread",
                     },
-                    "event_id": threadId,
-                    "is_falling_back": true,
-                    "rel_type": "m.thread",
-                },
-            };
+                };
 
-            const room = new Room(roomId, client, userId);
-            mocked(store.getRoom).mockReturnValue(room);
+                const timeoutDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                            expectQueryParams: timeoutDelayQueryOpts,
+                            data: { delay_id: "id1" },
+                            expectBody,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                        data: { delay_id: "id1" },
+                        expectBody: {
+                            ...timeoutDelayOpts,
+                            content: expectBody,
+                        },
+                    });
+                }
 
-            const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [rootEvent], false);
+                const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    threadId,
+                    EventType.RoomMessage,
+                    { ...content },
+                    timeoutDelayTxnId,
+                );
 
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody,
-            });
+                const actionDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                            expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                            data: { delay_id: "id2" },
+                            expectBody,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                        data: { delay_id: "id2" },
+                        expectBody: {
+                            parent_delay_id: timeoutDelayId,
+                            content: expectBody,
+                        },
+                    });
+                }
 
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
+                await client._unstable_sendDelayedEvent(
+                    roomId,
+                    { parent_delay_id: timeoutDelayId },
+                    threadId,
+                    EventType.RoomMessage,
+                    { ...content },
+                    actionDelayTxnId,
+                );
+            },
+        );
 
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody,
-            });
-
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                actionDelayTxnId,
-            );
-        });
-
-        it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
-            httpLookups = [];
-            const threadId = "$threadId:server";
-
-            const content = {
-                body,
-                "msgtype": MsgType.Text,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
+        it.each([false, true])(
+            "should add thread relation if threadId is passed and the relation is missing (with dedicated endpoint: %s)",
+            async (useDedicatedEndpoint: boolean) => {
+                httpLookups = [];
+                const threadId = "$threadId:server";
+                const expectBody = {
+                    ...content,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: threadId,
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
                     },
-                },
-            } satisfies RoomMessageEventContent;
-            const expectBody = {
-                ...content,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
+                };
+
+                const room = new Room(roomId, client, userId);
+                mocked(store.getRoom).mockReturnValue(room);
+
+                const rootEvent = new MatrixEvent({ event_id: threadId });
+                room.createThread(threadId, rootEvent, [rootEvent], false);
+
+                const timeoutDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                            expectQueryParams: timeoutDelayQueryOpts,
+                            data: { delay_id: "id1" },
+                            expectBody,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                        data: { delay_id: "id1" },
+                        expectBody: {
+                            ...timeoutDelayOpts,
+                            content: expectBody,
+                        },
+                    });
+                }
+
+                const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    threadId,
+                    EventType.RoomMessage,
+                    { ...content },
+                    timeoutDelayTxnId,
+                );
+
+                const actionDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                            expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                            data: { delay_id: "id2" },
+                            expectBody,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                        data: { delay_id: "id2" },
+                        expectBody: {
+                            parent_delay_id: timeoutDelayId,
+                            content: expectBody,
+                        },
+                    });
+                }
+
+                await client._unstable_sendDelayedEvent(
+                    roomId,
+                    { parent_delay_id: timeoutDelayId },
+                    threadId,
+                    EventType.RoomMessage,
+                    { ...content },
+                    actionDelayTxnId,
+                );
+            },
+        );
+
+        it.each([false, true])(
+            "should add thread relation if threadId is passed and the relation is missing with reply (with dedicated endpoint: %s)",
+            async (useDedicatedEndpoint: boolean) => {
+                httpLookups = [];
+                const threadId = "$threadId:server";
+
+                const content = {
+                    body,
+                    "msgtype": MsgType.Text,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: "$other:event",
+                        },
                     },
-                    "event_id": threadId,
-                    "is_falling_back": false,
-                    "rel_type": "m.thread",
-                },
-            };
+                } satisfies RoomMessageEventContent;
+                const expectBody = {
+                    ...content,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: "$other:event",
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": false,
+                        "rel_type": "m.thread",
+                    },
+                };
 
-            const room = new Room(roomId, client, userId);
-            mocked(store.getRoom).mockReturnValue(room);
+                const room = new Room(roomId, client, userId);
+                mocked(store.getRoom).mockReturnValue(room);
 
-            const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [rootEvent], false);
+                const rootEvent = new MatrixEvent({ event_id: threadId });
+                room.createThread(threadId, rootEvent, [rootEvent], false);
 
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody,
-            });
+                const timeoutDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                            expectQueryParams: timeoutDelayQueryOpts,
+                            data: { delay_id: "id1" },
+                            expectBody,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
+                        data: { delay_id: "id1" },
+                        expectBody: {
+                            ...timeoutDelayOpts,
+                            content: expectBody,
+                        },
+                    });
+                }
 
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
+                const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    threadId,
+                    EventType.RoomMessage,
+                    { ...content },
+                    timeoutDelayTxnId,
+                );
 
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody,
-            });
+                const actionDelayTxnId = client.makeTxnId();
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
+                            expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                            data: { delay_id: "id2" },
+                            expectBody,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${actionDelayTxnId}`,
+                        data: { delay_id: "id2" },
+                        expectBody: {
+                            parent_delay_id: timeoutDelayId,
+                            content: expectBody,
+                        },
+                    });
+                }
 
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                actionDelayTxnId,
-            );
-        });
+                await client._unstable_sendDelayedEvent(
+                    roomId,
+                    { parent_delay_id: timeoutDelayId },
+                    threadId,
+                    EventType.RoomMessage,
+                    { ...content },
+                    actionDelayTxnId,
+                );
+            },
+        );
 
-        it("can send a delayed state event", async () => {
-            httpLookups = [];
-            const content = { topic: "The year 2000" };
+        it.each([false, true])(
+            "can send a delayed state event (with dedicated endpoint: %s)",
+            async (useDedicatedEndpoint: boolean) => {
+                httpLookups = [];
+                const content = { topic: "The year 2000" };
 
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody: content,
-            });
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.topic`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                            expectQueryParams: timeoutDelayQueryOpts,
+                            data: { delay_id: "id1" },
+                            expectBody: content,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.topic`,
+                        data: { delay_id: "id1" },
+                        expectBody: {
+                            ...timeoutDelayOpts,
+                            state_key: "",
+                            content,
+                        },
+                    });
+                }
 
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedStateEvent(
-                roomId,
-                timeoutDelayOpts,
-                EventType.RoomTopic,
-                { ...content },
-            );
+                const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedStateEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    EventType.RoomTopic,
+                    { ...content },
+                );
 
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody: content,
-            });
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.topic`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                            expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
+                            data: { delay_id: "id2" },
+                            expectBody: content,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.topic`,
+                        data: { delay_id: "id2" },
+                        expectBody: {
+                            parent_delay_id: timeoutDelayId,
+                            state_key: "",
+                            content,
+                        },
+                    });
+                }
 
-            await client._unstable_sendDelayedStateEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                EventType.RoomTopic,
-                { ...content },
-            );
-        });
+                await client._unstable_sendDelayedStateEvent(
+                    roomId,
+                    { parent_delay_id: timeoutDelayId },
+                    EventType.RoomTopic,
+                    { ...content },
+                );
+
+                if (!useDedicatedEndpoint) {
+                    httpLookups.push(
+                        {
+                            method: "PUT",
+                            prefix: unstableMSC4140Prefix,
+                            path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/org.example.state`,
+                            error: {
+                                httpStatus: 404,
+                                errcode: "M_UNRECOGNIZED",
+                            },
+                        },
+                        {
+                            method: "PUT",
+                            path: `/rooms/${encodeURIComponent(roomId)}/state/org.example.state/xyz`,
+                            expectQueryParams: timeoutDelayQueryOpts,
+                            data: { delay_id: "id3" },
+                            expectBody: content,
+                        },
+                    );
+                } else {
+                    httpLookups.push({
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/org.example.state`,
+                        data: { delay_id: "id3" },
+                        expectBody: {
+                            ...timeoutDelayOpts,
+                            state_key: "xyz",
+                            content,
+                        },
+                    });
+                }
+
+                await client._unstable_sendDelayedStateEvent(
+                    roomId,
+                    timeoutDelayOpts,
+                    "org.example.state" as any,
+                    { ...content },
+                    "xyz",
+                );
+            },
+        );
 
         describe("lookups", () => {
             const statuses = [undefined, "scheduled" as const, "finalised" as const];
