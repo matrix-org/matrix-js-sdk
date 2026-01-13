@@ -276,7 +276,7 @@ describe("crypto", () => {
     );
 
     afterEach(async () => {
-        await aliceClient.stopClient();
+        aliceClient.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
         await jest.runAllTimersAsync();
@@ -724,7 +724,7 @@ describe("crypto", () => {
             syncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
-            await awaitDecryptionError;
+            await expect(awaitDecryptionError).resolves.toBeUndefined();
         });
     });
 
@@ -1448,7 +1448,7 @@ describe("crypto", () => {
 
             await syncPromise(aliceClient);
 
-            // Verify that `/upload` is called on Alice's homesever
+            // Verify that `/upload` is called on Alice's homeserver
             const { keysCount, fallbackKeysCount } = await uploadPromise;
             expect(keysCount).toBeGreaterThan(0);
             expect(fallbackKeysCount).toBe(0);
@@ -1718,7 +1718,6 @@ describe("crypto", () => {
          * @param backupVersion - The version of the created backup
          */
         async function bootstrapSecurity(backupVersion: string): Promise<void> {
-            mockSetupCrossSigningRequests();
             mockSetupMegolmBackupRequests(backupVersion);
 
             // promise which will resolve when a `KeyBackupStatus` event is emitted with `enabled: true`

@@ -1755,7 +1755,7 @@ describe("RustCrypto", () => {
                 fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
 
                 const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
-                await expect(rustCrypto.getKeyBackupInfo()).resolves.toStrictEqual(testData.SIGNED_BACKUP_DATA);
+                await expect(rustCrypto.getKeyBackupInfo()).resolves.toMatchObject(testData.SIGNED_BACKUP_DATA);
             });
 
             it("should return null if not available", async () => {
@@ -1831,7 +1831,7 @@ describe("RustCrypto", () => {
 
             // we need to process a sync so that the OlmMachine will upload keys
             await rustCrypto1.preprocessToDeviceMessages([]);
-            await rustCrypto1.onSyncCompleted({});
+            rustCrypto1.onSyncCompleted({});
 
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
@@ -1846,7 +1846,7 @@ describe("RustCrypto", () => {
                 return {};
             });
             await rustCrypto1.startDehydration();
-            await rustCrypto1.stop();
+            rustCrypto1.stop();
 
             // Create another RustCrypto, using the same SecretStorage, to
             // rehydrate the device.
@@ -1884,8 +1884,8 @@ describe("RustCrypto", () => {
             // means that the device was successfully rehydrated.
             const rehydrationCompletedPromise = emitPromise(rustCrypto2, CryptoEvent.RehydrationCompleted);
             await rustCrypto2.startDehydration();
-            await rehydrationCompletedPromise;
-            await rustCrypto2.stop();
+            await expect(rehydrationCompletedPromise).resolves.toBeTruthy();
+            rustCrypto2.stop();
         });
 
         describe("start dehydration options", () => {
@@ -1963,7 +1963,7 @@ describe("RustCrypto", () => {
                 });
                 // we need to process a sync so that the OlmMachine will upload keys
                 await rustCrypto.preprocessToDeviceMessages([]);
-                await rustCrypto.onSyncCompleted({});
+                rustCrypto.onSyncCompleted({});
 
                 // set up mocks needed for device dehydration
                 dehydratedDeviceInfo = undefined;

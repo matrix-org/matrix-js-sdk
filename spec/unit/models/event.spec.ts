@@ -159,7 +159,7 @@ describe("MatrixEvent", () => {
 
             // Then it disappears from the thread and appears in the main timeline
             expect(ev.threadRootId).toBeUndefined();
-            expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId(), ev.getId()]);
+            expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId(), ev.getId(), redaction.getId()]);
             expect(threadLiveEventIds(room, 0)).not.toContain(ev.getId());
         });
 
@@ -183,7 +183,12 @@ describe("MatrixEvent", () => {
 
             // Then the reaction moves into the main timeline
             expect(reaction.threadRootId).toBeUndefined();
-            expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId(), ev.getId(), reaction.getId()]);
+            expect(mainTimelineLiveEventIds(room)).toEqual([
+                threadRoot.getId(),
+                ev.getId(),
+                reaction.getId(),
+                redaction.getId(),
+            ]);
             expect(threadLiveEventIds(room, 0)).not.toContain(reaction.getId());
         });
 
@@ -207,7 +212,12 @@ describe("MatrixEvent", () => {
 
             // Then the edit moves into the main timeline
             expect(edit.threadRootId).toBeUndefined();
-            expect(mainTimelineLiveEventIds(room)).toEqual([threadRoot.getId(), ev.getId(), edit.getId()]);
+            expect(mainTimelineLiveEventIds(room)).toEqual([
+                threadRoot.getId(),
+                ev.getId(),
+                edit.getId(),
+                redaction.getId(),
+            ]);
             expect(threadLiveEventIds(room, 0)).not.toContain(edit.getId());
         });
 
@@ -245,6 +255,7 @@ describe("MatrixEvent", () => {
                 reply1.getId(),
                 reply2.getId(),
                 reaction.getId(),
+                redaction.getId(),
             ]);
             expect(threadLiveEventIds(room, 0)).not.toContain(reply1.getId());
             expect(threadLiveEventIds(room, 0)).not.toContain(reply2.getId());
@@ -330,6 +341,7 @@ describe("MatrixEvent", () => {
 
         function createRedaction(redactedEventid: string): MatrixEvent {
             return new MatrixEvent({
+                event_id: `$redact-${redactedEventid}`,
                 type: "m.room.redaction",
                 redacts: redactedEventid,
             });

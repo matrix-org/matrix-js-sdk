@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixEvent } from "../../../src";
+import { mocked } from "jest-mock";
+
+import { type IContent, type MatrixEvent } from "../../../src";
 import {
     CallMembership,
     type SessionMembershipData,
@@ -32,8 +34,8 @@ function makeMockEvent(originTs = 0): MatrixEvent {
     } as unknown as MatrixEvent;
 }
 
-function createCallMembership(ev: MatrixEvent, content: unknown): CallMembership {
-    (ev.getContent as jest.Mock).mockReturnValue(content);
+function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
+    mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, "xx");
 }
@@ -307,11 +309,11 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it("considers memberships unexpired if local age low enough", () => {
+        it.skip("considers memberships unexpired if local age low enough", () => {
             // TODO link prev event
         });
 
-        it("considers memberships expired if local age large enough", () => {
+        it.skip("considers memberships expired if local age large enough", () => {
             // TODO link prev event
         });
 

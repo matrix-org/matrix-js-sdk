@@ -219,7 +219,10 @@ describe("VerificationRequest", () => {
             aliceVerifier.on(VerifierEvent.ShowSas, compareSas);
             bobVerifier.on(VerifierEvent.ShowSas, compareSas);
 
-            await Promise.all([aliceVerifier.verify(), await bobVerifier.verify()]);
+            await expect(Promise.all([aliceVerifier.verify(), await bobVerifier.verify()])).resolves.toEqual([
+                undefined,
+                undefined,
+            ]);
         } finally {
             await aliceRequestLoop.stop();
             await bobRequestLoop.stop();
@@ -348,7 +351,10 @@ describe("VerificationRequest", () => {
             aliceVerifier.on(VerifierEvent.ShowSas, compareSas);
             bobVerifier.on(VerifierEvent.ShowSas, compareSas);
 
-            await Promise.all([aliceVerifier.verify(), await bobVerifier.verify()]);
+            await expect(Promise.all([aliceVerifier.verify(), await bobVerifier.verify()])).resolves.toEqual([
+                undefined,
+                undefined,
+            ]);
         } finally {
             await aliceRequestLoop.stop();
             await bobRequestLoop.stop();
@@ -458,7 +464,10 @@ describe("VerificationRequest", () => {
                 showQrCodeCallbacks.confirm();
             });
 
-            await Promise.all([aliceVerifier.verify(), await bobVerifier.verify()]);
+            await expect(Promise.all([aliceVerifier.verify(), await bobVerifier.verify()])).resolves.toEqual([
+                undefined,
+                undefined,
+            ]);
         } finally {
             await aliceRequestLoop.stop();
             await bobRequestLoop.stop();

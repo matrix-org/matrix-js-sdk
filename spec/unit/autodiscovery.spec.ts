@@ -190,7 +190,7 @@ describe("AutoDiscovery", function () {
         };
         return Promise.all([
             httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(expect(expected).toEqual),
+            AutoDiscovery.findClientConfig("example.org").then((config) => expect(config).toEqual(expected)),
         ]);
     });
 

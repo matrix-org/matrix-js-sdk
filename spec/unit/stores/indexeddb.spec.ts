@@ -236,7 +236,7 @@ describe("IndexedDBStore", () => {
 
         // @ts-ignore - private field access
         (store.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
-        await storeClosedResolvers.promise;
+        await expect(storeClosedResolvers.promise).resolves.toBeUndefined();
     });
 
     it("should use remote backend if workerFactory passed", async () => {
@@ -256,7 +256,7 @@ describe("IndexedDBStore", () => {
             workerFactory: () => new MockWorker() as Worker,
         });
         store.startup();
-        await workerPostMessageResolvers.promise;
+        await expect(workerPostMessageResolvers.promise).resolves.toBeUndefined();
     });
 
     it("remote worker should pass closed event", async () => {
@@ -275,7 +275,7 @@ describe("IndexedDBStore", () => {
         const storeClosedResolvers = Promise.withResolvers<void>();
         store.on("closed", storeClosedResolvers.resolve);
         (worker as any).onmessage({ data: { command: "closed" } });
-        await storeClosedResolvers.promise;
+        await expect(storeClosedResolvers.promise).resolves.toBeUndefined();
     });
 
     it("remote worker should pass command failures", async () => {

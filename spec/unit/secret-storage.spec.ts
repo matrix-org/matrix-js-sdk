@@ -266,7 +266,7 @@ describe("ServerSideSecretStorageImpl", function () {
             accountDataAdapter.getAccountDataFromServer.mockImplementation(mockGetAccountData);
 
             // suppress the expected warning on the console
-            jest.spyOn(console, "warn").mockImplementation();
+            jest.spyOn(console, "warn").mockImplementation(() => {});
 
             // now attempt the store
             await secretStorage.store("mysecret", "supersecret", ["keyid"]);

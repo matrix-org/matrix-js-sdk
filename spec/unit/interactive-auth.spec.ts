@@ -17,7 +17,7 @@ limitations under the License.
 
 import { type MatrixClient } from "../../src/client";
 import { logger } from "../../src/logger";
-import { InteractiveAuth, AuthType } from "../../src/interactive-auth";
+import { InteractiveAuth, AuthType, NoAuthFlowFoundError } from "../../src/interactive-auth";
 import { HTTPError, MatrixError } from "../../src/http-api";
 import { sleep } from "../../src/utils";
 import { secureRandomString } from "../../src/randomstring";
@@ -337,7 +337,9 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
+            new NoAuthFlowFoundError("No appropriate authentication flow found", [], []),
+        );
     });
 
     it("should start an auth stage and reject if no auth flow but has session", async () => {
@@ -372,7 +374,9 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
+            new NoAuthFlowFoundError("No appropriate authentication flow found", [], []),
+        );
     });
 
     it("should handle unexpected error types without data property set", async () => {
@@ -397,7 +401,7 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("myerror"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new HTTPError("myerror", 401));
     });
 
     it("should allow dummy auth", async () => {

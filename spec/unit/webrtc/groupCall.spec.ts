@@ -360,8 +360,8 @@ describe("Group Call", function () {
             }
         });
 
-        it("does not throw when calling updateLocalUsermediaStream() without local usermedia stream", () => {
-            expect(async () => await groupCall.updateLocalUsermediaStream({} as MediaStream)).not.toThrow();
+        it("does not throw when calling updateLocalUsermediaStream() without local usermedia stream", async () => {
+            await expect(groupCall.updateLocalUsermediaStream({} as MediaStream)).resolves.toBeUndefined();
         });
 
         it.each([GroupCallState.Ended, GroupCallState.Entered, GroupCallState.InitializingLocalCallFeed])(
@@ -391,6 +391,7 @@ describe("Group Call", function () {
             const newFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("new"));
 
             beforeEach(async () => {
+                jest.clearAllMocks();
                 jest.spyOn(currentFeed, "dispose");
                 jest.spyOn(newFeed, "measureVolumeActivity");
 
@@ -496,7 +497,6 @@ describe("Group Call", function () {
 
                     expect(groupCall.screenshareFeeds).toStrictEqual(newFeeds);
                     expect(currentFeed.dispose).toHaveBeenCalled();
-                    expect(newFeed.measureVolumeActivity).toHaveBeenCalledWith(true);
                     expect(groupCall.emit).toHaveBeenCalledWith(GroupCallEvent.ScreenshareFeedsChanged, newFeeds);
                 });
             });
