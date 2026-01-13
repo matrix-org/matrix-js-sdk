@@ -25,36 +25,43 @@ describe("MatrixHttpApi", () => {
     const baseUrl = "http://baseUrl";
     const prefix = ClientPrefix.V3;
 
-    let xhr: Writeable<XMLHttpRequest>;
     let upload: Promise<UploadResponse>;
 
     const DONE = 0;
 
+    function getRequest(): Writeable<XMLHttpRequest> | undefined {
+        return vi.mocked(globalThis.XMLHttpRequest)?.mock.instances.at(-1);
+    }
+
     beforeEach(() => {
-        xhr = {
-            upload: {} as XMLHttpRequestUpload,
-            open: vi.fn(),
-            send: vi.fn(),
-            abort: vi.fn(),
-            setRequestHeader: vi.fn(),
-            onreadystatechange: undefined,
-            getResponseHeader: vi.fn(),
-            getAllResponseHeaders: vi.fn(),
-        } as unknown as XMLHttpRequest;
         // We stub out XHR here as it is not available in the test environment
         // @ts-ignore
-        globalThis.XMLHttpRequest = vi.fn().mockReturnValue(xhr);
+        globalThis.XMLHttpRequest = vi.fn().mockImplementation(function (this: XMLHttpRequest) {
+            // @ts-ignore
+            this.upload = {} as XMLHttpRequestUpload;
+            this.open = vi.fn();
+            this.send = vi.fn();
+            this.abort = vi.fn();
+            this.setRequestHeader = vi.fn();
+            // @ts-ignore
+            this.onreadystatechange = undefined;
+            this.getResponseHeader = vi.fn();
+            this.getAllResponseHeaders = vi.fn();
+        });
         // @ts-ignore
         globalThis.XMLHttpRequest.DONE = DONE;
     });
 
     afterEach(() => {
         upload?.catch(() => {});
-        // Abort any remaining requests
-        xhr.readyState = DONE;
-        xhr.status = 0;
-        // @ts-ignore
-        xhr.onreadystatechange?.(new Event("test"));
+        const xhr = getRequest();
+        if (xhr) {
+            // Abort any remaining requests
+            xhr.readyState = DONE;
+            xhr.status = 0;
+            // @ts-ignore
+            xhr.onreadystatechange?.(new Event("test"));
+        }
     });
 
     it("should fall back to `fetch` where xhr is unavailable", async () => {
@@ -71,7 +78,7 @@ describe("MatrixHttpApi", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         upload = api.uploadContent({} as File);
         expect(fetchFn).not.toHaveBeenCalled();
-        expect(xhr.open).toHaveBeenCalled();
+        expect(getRequest()!.open).toHaveBeenCalled();
     });
 
     it("should send access token in query params if header disabled", () => {
@@ -83,11 +90,11 @@ describe("MatrixHttpApi", () => {
             onlyData: true,
         });
         upload = api.uploadContent({} as File);
-        expect(xhr.open).toHaveBeenCalledWith(
+        expect(getRequest()!.open).toHaveBeenCalledWith(
             Method.Post,
             baseUrl.toLowerCase() + "/_matrix/media/v3/upload?access_token=token",
         );
-        expect(xhr.setRequestHeader).not.toHaveBeenCalledWith("Authorization");
+        expect(getRequest()!.setRequestHeader).not.toHaveBeenCalledWith("Authorization");
     });
 
     it("should send access token in header by default", () => {
@@ -98,14 +105,17 @@ describe("MatrixHttpApi", () => {
             onlyData: true,
         });
         upload = api.uploadContent({} as File);
-        expect(xhr.open).toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/v3/upload");
-        expect(xhr.setRequestHeader).toHaveBeenCalledWith("Authorization", "Bearer token");
+        expect(getRequest()!.open).toHaveBeenCalledWith(
+            Method.Post,
+            baseUrl.toLowerCase() + "/_matrix/media/v3/upload",
+        );
+        expect(getRequest()!.setRequestHeader).toHaveBeenCalledWith("Authorization", "Bearer token");
     });
 
     it("should include filename by default", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File, { name: "name" });
-        expect(xhr.open).toHaveBeenCalledWith(
+        expect(getRequest()!.open).toHaveBeenCalledWith(
             Method.Post,
             baseUrl.toLowerCase() + "/_matrix/media/v3/upload?filename=name",
         );
@@ -114,14 +124,17 @@ describe("MatrixHttpApi", () => {
     it("should allow not sending the filename", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File, { name: "name", includeFilename: false });
-        expect(xhr.open).toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/v3/upload");
+        expect(getRequest()!.open).toHaveBeenCalledWith(
+            Method.Post,
+            baseUrl.toLowerCase() + "/_matrix/media/v3/upload",
+        );
     });
 
     it("should abort xhr when the upload is aborted", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
         api.cancelUpload(upload);
-        expect(xhr.abort).toHaveBeenCalled();
+        expect(getRequest()!.abort).toHaveBeenCalled();
         return expect(upload).rejects.toThrow("Aborted");
     });
 
@@ -130,11 +143,11 @@ describe("MatrixHttpApi", () => {
         upload = api.uploadContent({} as File);
         vi.advanceTimersByTime(25000);
         // @ts-ignore
-        xhr.upload.onprogress(new Event("progress", { loaded: 1, total: 100 }));
+        getRequest()!.upload.onprogress(new Event("progress", { loaded: 1, total: 100 }));
         vi.advanceTimersByTime(25000);
-        expect(xhr.abort).not.toHaveBeenCalled();
+        expect(getRequest()!.abort).not.toHaveBeenCalled();
         vi.advanceTimersByTime(5000);
-        expect(xhr.abort).toHaveBeenCalled();
+        expect(getRequest()!.abort).toHaveBeenCalled();
     });
 
     it("should call progressHandler", () => {
@@ -144,12 +157,12 @@ describe("MatrixHttpApi", () => {
         const progressEvent = new Event("progress") as ProgressEvent;
         Object.assign(progressEvent, { loaded: 1, total: 100 });
         // @ts-ignore
-        xhr.upload.onprogress(progressEvent);
+        getRequest()!.upload.onprogress(progressEvent);
         expect(progressHandler).toHaveBeenCalledWith({ loaded: 1, total: 100 });
 
         Object.assign(progressEvent, { loaded: 95, total: 100 });
         // @ts-ignore
-        xhr.upload.onprogress(progressEvent);
+        getRequest()!.upload.onprogress(progressEvent);
         expect(progressHandler).toHaveBeenCalledWith({ loaded: 95, total: 100 });
     });
 
@@ -157,11 +170,11 @@ describe("MatrixHttpApi", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
-        xhr.readyState = DONE;
-        xhr.responseText = "";
-        xhr.status = 200;
+        getRequest()!.readyState = DONE;
+        getRequest()!.responseText = "";
+        getRequest()!.status = 200;
         // @ts-ignore
-        xhr.onreadystatechange?.(new Event("test"));
+        getRequest()!.onreadystatechange?.(new Event("test"));
 
         return expect(upload).rejects.toThrow("No response body.");
     });
@@ -170,15 +183,15 @@ describe("MatrixHttpApi", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
-        xhr.readyState = DONE;
-        xhr.responseText = '{"errcode": "M_NOT_FOUND", "error": "Not found"}';
-        xhr.status = 404;
-        vi.mocked(xhr.getResponseHeader).mockImplementation((name) =>
+        getRequest()!.readyState = DONE;
+        getRequest()!.responseText = '{"errcode": "M_NOT_FOUND", "error": "Not found"}';
+        getRequest()!.status = 404;
+        vi.mocked(getRequest()!.getResponseHeader).mockImplementation((name) =>
             name.toLowerCase() === "content-type" ? "application/json" : null,
         );
-        vi.mocked(xhr.getAllResponseHeaders).mockReturnValue("content-type: application/json\r\n");
+        vi.mocked(getRequest()!.getAllResponseHeaders).mockReturnValue("content-type: application/json\r\n");
         // @ts-ignore
-        xhr.onreadystatechange?.(new Event("test"));
+        getRequest()!.onreadystatechange?.(new Event("test"));
 
         return expect(upload).rejects.toThrow("Not found");
     });
@@ -187,12 +200,12 @@ describe("MatrixHttpApi", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
-        xhr.readyState = DONE;
-        xhr.responseText = '{"content_uri": "mxc://server/foobar"}';
-        xhr.status = 200;
-        vi.mocked(xhr.getResponseHeader).mockReturnValue("application/json");
+        getRequest()!.readyState = DONE;
+        getRequest()!.responseText = '{"content_uri": "mxc://server/foobar"}';
+        getRequest()!.status = 200;
+        vi.mocked(getRequest()!.getResponseHeader).mockReturnValue("application/json");
         // @ts-ignore
-        xhr.onreadystatechange?.(new Event("test"));
+        getRequest()!.onreadystatechange?.(new Event("test"));
 
         return expect(upload).resolves.toStrictEqual({ content_uri: "mxc://server/foobar" });
     });
@@ -201,22 +214,22 @@ describe("MatrixHttpApi", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
         expect(api.cancelUpload(upload)).toBeTruthy();
-        expect(xhr.abort).toHaveBeenCalled();
+        expect(getRequest()!.abort).toHaveBeenCalled();
     });
 
     it("should return false when `cancelUpload` is called but unsuccessful", async () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         upload = api.uploadContent({} as File);
 
-        xhr.readyState = DONE;
-        xhr.status = 500;
-        vi.mocked(xhr.getResponseHeader).mockReturnValue("application/json");
+        getRequest()!.readyState = DONE;
+        getRequest()!.status = 500;
+        vi.mocked(getRequest()!.getResponseHeader).mockReturnValue("application/json");
         // @ts-ignore
-        xhr.onreadystatechange?.(new Event("test"));
+        getRequest()!.onreadystatechange?.(new Event("test"));
         await upload.catch(() => {});
 
         expect(api.cancelUpload(upload)).toBeFalsy();
-        expect(xhr.abort).not.toHaveBeenCalled();
+        expect(getRequest()!.abort).not.toHaveBeenCalled();
     });
 
     it("should return active uploads in `getCurrentUploads`", () => {

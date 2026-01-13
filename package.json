@@ -78,7 +78,7 @@
         "@babel/plugin-transform-runtime": "^7.12.10",
         "@babel/preset-env": "^7.12.11",
         "@babel/preset-typescript": "^7.12.7",
-        "@fetch-mock/vitest": "^0.2.8",
+        "@fetch-mock/vitest": "^0.2.18",
         "@matrix-org/olm": "3.2.15",
         "@peculiar/webcrypto": "^1.4.5",
         "@stylistic/eslint-plugin": "^5.0.0",
@@ -88,9 +88,9 @@
         "@types/sdp-transform": "^2.4.5",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
-        "@vitest/coverage-v8": "^4.0.16",
+        "@vitest/coverage-v8": "^4.0.17",
         "@vitest/eslint-plugin": "^1.6.6",
-        "@vitest/ui": "^3.0.5",
+        "@vitest/ui": "^4.0.17",
         "babel-plugin-search-and-replace": "^1.1.1",
         "debug": "^4.3.4",
         "eslint": "8.57.1",
@@ -117,8 +117,8 @@
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "^5.4.2",
-        "vitest": "^3.0.5",
-        "vitest-sonar-reporter": "^2.0.0"
+        "vitest": "^4.0.17",
+        "vitest-sonar-reporter": "^3.0.0"
     },
     "resolutions": {
         "expect": "30.2.0"

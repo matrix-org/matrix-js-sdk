@@ -1240,52 +1240,48 @@ describe("MatrixRTCSession", () => {
                 }
             });
 
-            it(
-                "wraps key index around to 0 when it reaches the maximum",
-                async () => {
-                    // this should give us keys with index [0...255, 0, 1]
-                    const membersToTest = 258;
-                    const members: MembershipData[] = [];
+            it("wraps key index around to 0 when it reaches the maximum", { timeout: 15000 }, async () => {
+                // this should give us keys with index [0...255, 0, 1]
+                const membersToTest = 258;
+                const members: MembershipData[] = [];
+                for (let i = 0; i < membersToTest; i++) {
+                    members.push(Object.assign({}, membershipTemplate, { device_id: `DEVICE${i}` }));
+                }
+                vi.useFakeTimers();
+                try {
+                    // start with all members
+                    const mockRoom = makeMockRoom(members);
+
                     for (let i = 0; i < membersToTest; i++) {
-                        members.push(Object.assign({}, membershipTemplate, { device_id: `DEVICE${i}` }));
-                    }
-                    vi.useFakeTimers();
-                    try {
-                        // start with all members
-                        const mockRoom = makeMockRoom(members);
+                        const keysSentPromise = new Promise<EncryptionKeysEventContent>((resolve) => {
+                            sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                        });
 
-                        for (let i = 0; i < membersToTest; i++) {
-                            const keysSentPromise = new Promise<EncryptionKeysEventContent>((resolve) => {
-                                sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
+                        if (i === 0) {
+                            // if first time around then set up the session
+                            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                            await flushPromises();
+                            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                                manageMediaKeys: true,
                             });
-
-                            if (i === 0) {
-                                // if first time around then set up the session
-                                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                                await flushPromises();
-                                sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                                    manageMediaKeys: true,
-                                });
-                            } else {
-                                // otherwise update the state reducing the membership each time in order to trigger key rotation
-                                mockRoomState(mockRoom, members.slice(0, membersToTest - i));
-                            }
-
-                            await sess!._onRTCSessionMemberUpdate();
-
-                            // advance time to avoid key throttling
-                            vi.advanceTimersByTime(10000);
-
-                            const keysPayload = await keysSentPromise;
-                            expect(keysPayload.keys).toHaveLength(1);
-                            expect(keysPayload.keys[0].index).toEqual(i % 256);
+                        } else {
+                            // otherwise update the state reducing the membership each time in order to trigger key rotation
+                            mockRoomState(mockRoom, members.slice(0, membersToTest - i));
                         }
-                    } finally {
-                        vi.useRealTimers();
+
+                        await sess!._onRTCSessionMemberUpdate();
+
+                        // advance time to avoid key throttling
+                        vi.advanceTimersByTime(10000);
+
+                        const keysPayload = await keysSentPromise;
+                        expect(keysPayload.keys).toHaveLength(1);
+                        expect(keysPayload.keys[0].index).toEqual(i % 256);
                     }
-                },
-                { timeout: 10000 },
-            );
+                } finally {
+                    vi.useRealTimers();
+                }
+            });
 
             it("doesn't re-send key immediately", async () => {
                 const realSetTimeout = setTimeout;

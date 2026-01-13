@@ -41,7 +41,7 @@ import { MembershipManager, StickyEventMembershipManager } from "../../../src/ma
  * @param returnVal Provide an optional value that the mocked method should return. (use Promise.resolve(val) or Promise.reject(err))
  * @returns The promise that resolves once the method is called.
  */
-function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>): Promise<void> {
+function waitForMockCall(method: MockedFunction<(...args: any[]) => any>, returnVal?: Promise<any>): Promise<void> {
     const { promise, resolve } = Promise.withResolvers<void>();
     method.mockImplementation(() => {
         resolve();
@@ -51,7 +51,7 @@ function waitForMockCall(method: MockedFunction<any>, returnVal?: Promise<any>):
 }
 
 /** See waitForMockCall */
-function waitForMockCallOnce(method: MockedFunction<any>, returnVal?: Promise<any>) {
+function waitForMockCallOnce(method: MockedFunction<(...args: any[]) => any>, returnVal?: Promise<any>) {
     const { promise, resolve } = Promise.withResolvers<void>();
     method.mockImplementationOnce(() => {
         resolve();
@@ -65,7 +65,7 @@ function waitForMockCallOnce(method: MockedFunction<any>, returnVal?: Promise<an
  * @param method The method to control the resolve timing.
  * @returns
  */
-function createAsyncHandle<T>(method: MockedFunction<any>) {
+function createAsyncHandle<T>(method: MockedFunction<(...args: any[]) => any>) {
     const { reject, resolve, promise } = Promise.withResolvers<T>();
     method.mockImplementation(() => promise);
     return { reject, resolve };
