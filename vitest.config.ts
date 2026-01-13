@@ -32,7 +32,7 @@ export default defineConfig({
     test: {
         coverage: {
             provider: "v8",
-            include: ["spec/**/*"],
+            include: ["src/**/*"],
             reporter: "lcov",
         },
         environment: "node",
