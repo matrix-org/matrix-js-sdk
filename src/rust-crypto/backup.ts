@@ -632,6 +632,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
+     * Download and import the keys for a given room from the latest backup version.
+     *
+     * @param roomId - The room in question..
+     */
+    public async downloadLatestRoomKeyBackup(roomId: string): Promise<void> {
+        const { backupVersion, decryptionKey } = await this.olmMachine.getBackupKeys();
+        if (!backupVersion || !decryptionKey) {
+            return;
+        }
+        const sessions = await this.downloadRoomKeyBackup(backupVersion, roomId);
+        const backupDecryptor = this.createBackupDecryptor(decryptionKey);
+        this.importKeyBackup({ rooms: { [roomId]: { sessions } } }, backupVersion, backupDecryptor);
+    }
+
+    /**
      * Call `/room_keys/keys` to download the key backup (room keys) for the given backup version.
      * https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv3room_keyskeys
      *
@@ -648,6 +663,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 prefix: ClientPrefix.V3,
             },
         );
+    }
+
+    /**
+     * Call `/room/keys/keys/{roomId}` to download the key backup (room keys) for a given backup version and room ID.
+     * @param backupVersion - The version to download.
+     * @param roomId - The ID of the room.
+     * @returns The key backup response.
+     */
+    private downloadRoomKeyBackup(backupVersion: string, roomId: string): Promise<KeyBackupRoomSessions> {
+        const path = encodeUri("/room_keys/keys/$roomId", {
+            $roomId: roomId,
+        });
+        return this.http.authedRequest<KeyBackupRoomSessions>(Method.Get, path, { version: backupVersion }, undefined, {
+            prefix: ClientPrefix.V3,
+        });
     }
 
     /**
