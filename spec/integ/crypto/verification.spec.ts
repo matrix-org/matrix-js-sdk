@@ -18,12 +18,12 @@ import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
 import debug from "debug";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
+import { type RouteResponse } from "fetch-mock";
 import { IDBFactory } from "fake-indexeddb";
 import { createHash } from "crypto";
 import Olm from "@matrix-org/olm";
 
-import type FetchMock from "fetch-mock";
 import {
     createClient,
     DebugLogger,
@@ -130,7 +130,6 @@ describe("verification", () => {
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
 
         e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
         e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
@@ -145,8 +144,6 @@ describe("verification", () => {
 
         // Allow in-flight things to complete before we tear down the test
         await jest.runAllTimersAsync();
-
-        fetchMock.mockReset();
     });
 
     describe("Outgoing verification requests for another device", () => {
@@ -154,11 +151,10 @@ describe("verification", () => {
             // pretend that we have another device, which we will verify
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
 
-            fetchMock.put(
-                new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`),
-                { ok: false, status: 404 },
-                { overwriteRoutes: true },
-            );
+            fetchMock.put(new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`), {
+                ok: false,
+                status: 404,
+            });
         });
 
         // test with (1) the default verification method list, (2) a custom verification method list.
@@ -935,19 +931,16 @@ describe("verification", () => {
         function awaitRoomMessageRequest(): Promise<IContent> {
             return new Promise((resolve) => {
                 // Case of unencrypted message of the new crypto
-                fetchMock.put(
-                    "express:/_matrix/client/v3/rooms/:roomId/send/m.room.message/:txId",
-                    (url: string, options: RequestInit) => {
-                        resolve(JSON.parse(options.body as string));
-                        return { event_id: "$YUwRidLecu:example.com" };
-                    },
-                );
+                fetchMock.put("express:/_matrix/client/v3/rooms/:roomId/send/m.room.message/:txId", (callLog) => {
+                    resolve(JSON.parse(callLog.options.body as string));
+                    return { event_id: "$YUwRidLecu:example.com" };
+                });
 
                 // Case of encrypted message of the old crypto
                 fetchMock.put(
                     "express:/_matrix/client/v3/rooms/:roomId/send/m.room.encrypted/:txId",
-                    async (url: string, options: RequestInit) => {
-                        const encryptedMessage = JSON.parse(options.body as string);
+                    async (callLog) => {
+                        const encryptedMessage = JSON.parse(callLog.options.body as string);
                         const event = new MatrixEvent({
                             content: encryptedMessage,
                             type: "m.room.encrypted",
@@ -1301,8 +1294,6 @@ describe("verification", () => {
 
             // Allow in-flight things to complete before we tear down the test
             await jest.runAllTimersAsync();
-
-            fetchMock.mockReset();
         });
 
         it("Should request cross signing keys after verification", async () => {
@@ -1459,27 +1450,21 @@ describe("verification", () => {
             });
 
             const expectBackupCheck = new Promise((resolve) => {
-                fetchMock.get(
-                    "express:/_matrix/client/v3/room_keys/version",
-                    (url, request) => {
-                        resolve(undefined);
-                        if (expectBackup instanceof MatrixError) {
-                            return {
-                                status: expectBackup.httpStatus,
-                                body: expectBackup.data,
-                            };
-                        }
+                fetchMock.get("express:/_matrix/client/v3/room_keys/version", (callLog) => {
+                    resolve(undefined);
+                    if (expectBackup instanceof MatrixError) {
+                        return {
+                            status: expectBackup.httpStatus,
+                            body: expectBackup.data,
+                        };
+                    }
 
-                        if (expectBackup instanceof Error) {
-                            return Promise.reject(expectBackup);
-                        }
+                    if (expectBackup instanceof Error) {
+                        return Promise.reject(expectBackup);
+                    }
 
-                        return expectBackup;
-                    },
-                    {
-                        overwriteRoutes: true,
-                    },
-                );
+                    return expectBackup;
+                });
             });
 
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
@@ -1594,8 +1579,8 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     return new Promise((resolve) => {
         fetchMock.putOnce(
             new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp(msgtype)}`),
-            (url: string, opts: RequestInit): FetchMock.MockResponse => {
-                resolve(JSON.parse(opts.body as string));
+            (callLog): RouteResponse => {
+                resolve(JSON.parse(callLog.options.body as string));
                 return {};
             },
         );
@@ -1616,29 +1601,25 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
     const uskRequestResolvers = Promise.withResolvers<string>();
     const backupKeyRequestResolvers = Promise.withResolvers<string>();
 
-    fetchMock.put(
-        new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
-        (url: string, opts: RequestInit): FetchMock.MockResponse => {
-            const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
-            // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
-            const content = Object.values(messages)[0] as any;
-            if (content.action == "request") {
-                const name = content.name;
-                const requestId = content.request_id;
-                if (name == "m.cross_signing.user_signing") {
-                    uskRequestResolvers.resolve(requestId);
-                } else if (name == "m.cross_signing.master") {
-                    mskRequestResolvers.resolve(requestId);
-                } else if (name == "m.cross_signing.self_signing") {
-                    sskRequestResolvers.resolve(requestId);
-                } else if (name == "m.megolm_backup.v1") {
-                    backupKeyRequestResolvers.resolve(requestId);
-                }
+    fetchMock.put(new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`), (callLog): RouteResponse => {
+        const messages = JSON.parse(callLog.options.body as string).messages[TEST_USER_ID];
+        // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
+        const content = Object.values(messages)[0] as any;
+        if (content.action == "request") {
+            const name = content.name;
+            const requestId = content.request_id;
+            if (name == "m.cross_signing.user_signing") {
+                uskRequestResolvers.resolve(requestId);
+            } else if (name == "m.cross_signing.master") {
+                mskRequestResolvers.resolve(requestId);
+            } else if (name == "m.cross_signing.self_signing") {
+                sskRequestResolvers.resolve(requestId);
+            } else if (name == "m.megolm_backup.v1") {
+                backupKeyRequestResolvers.resolve(requestId);
             }
-            return {};
-        },
-        { overwriteRoutes: true },
-    );
+        }
+        return {};
+    });
 
     const promiseMap = new Map<string, Promise<string>>();
     promiseMap.set("m.cross_signing.master", mskRequestResolvers.promise);

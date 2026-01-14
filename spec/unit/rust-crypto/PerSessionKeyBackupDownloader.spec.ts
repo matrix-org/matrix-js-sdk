@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
+import { type Mocked, type MockInstance } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { PerSessionKeyBackupDownloader } from "../../../src/rust-crypto/PerSessionKeyBackupDownloader";
 import { logger } from "../../../src/logger";
@@ -126,7 +126,6 @@ describe("PerSessionKeyBackupDownloader", () => {
     afterEach(() => {
         expectedSession = {};
         downloader.stop();
-        fetchMock.mockReset();
         jest.useRealTimers();
     });
 
@@ -146,7 +145,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             const roomId = "!roomId";
             const sessionId = "sessionId";
             const expectAPICall = new Promise<void>((resolve) => {
-                fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/${roomId}/${sessionId}`, (url, request) => {
+                fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/${roomId}/${sessionId}`, (callLog) => {
                     resolve();
                     return TestData.CURVE25519_KEY_BACKUP_DATA;
                 });
@@ -169,7 +168,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         it("Should not hammer the backup if the key is requested repeatedly", async () => {
             const blockOnServerRequest = Promise.withResolvers<void>();
 
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/!roomId/:session_id`, async (url, request) => {
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/!roomId/:session_id`, async (callLog) => {
                 await blockOnServerRequest.promise;
                 return [mockCipherKey];
             });
@@ -197,7 +196,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             blockOnServerRequest.resolve();
 
             await awaitKey2Imported.promise;
-            expect(spy).toHaveBeenCalledTimes(2);
+            expect(<any>spy).toHaveBeenCalledTimes(2);
         });
 
         it("should continue to next key if current not in backup", async () => {
@@ -211,7 +210,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA1`, mockCipherKey);
 
             // @ts-ignore access to private function
-            const spy: jest.SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const spy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             const expectImported = expectSessionImported("!roomA", "sessionA1");
 
@@ -237,7 +236,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             });
 
             // @ts-ignore access to private function
-            const spy: jest.SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const spy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
             await jest.runAllTimersAsync();
@@ -270,7 +269,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             const requestRoomKeyCalled = Promise.withResolvers<void>();
 
             // Mock the request to block
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, async (url, request) => {
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, async (callLog) => {
                 requestRoomKeyCalled.resolve();
                 await blockOnServerRequest.promise;
                 return mockCipherKey;
@@ -291,13 +290,13 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             expect(mockRustBackupManager.importBackedUpRoomKeys).not.toHaveBeenCalled();
             expect(
-                fetchMock.calls(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`).length,
+                fetchMock.callHistory.calls(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`).length,
             ).toStrictEqual(1);
         });
     });
 
     describe("Given no usable backup available", () => {
-        let getConfigSpy: jest.SpyInstance;
+        let getConfigSpy: MockInstance;
 
         beforeEach(async () => {
             mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(null);
@@ -479,7 +478,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                         retry_after_ms: 5000,
                     },
                 },
-                { overwriteRoutes: true },
+                { name: "room-keys" },
             );
 
             const keyImported = expectSessionImported("!roomA", "sessionA0");
@@ -488,7 +487,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
             // @ts-ignore access to private function
-            const keyQuerySpy: jest.SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const keyQuerySpy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
             const rateDeferred = Promise.withResolvers<void>();
 
             keyQuerySpy.mockImplementation(
@@ -512,9 +511,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 "Failed to get key from backup: rate limited",
             );
 
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
-                overwriteRoutes: true,
-            });
+            fetchMock.modifyRoute("room-keys", { response: mockCipherKey });
 
             // Advance less than the retry_after_ms
             jest.advanceTimersByTime(100);
@@ -534,15 +531,19 @@ describe("PerSessionKeyBackupDownloader", () => {
 
         it("After a network error the same key is retried", async () => {
             // simulate connectivity error
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, () => {
-                throw new ConnectionError("fetch failed", new Error("fetch failed"));
-            });
+            fetchMock.get(
+                `express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`,
+                () => {
+                    throw new ConnectionError("fetch failed", new Error("fetch failed"));
+                },
+                { name: "room-keys" },
+            );
 
             // @ts-ignore
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
             // @ts-ignore
-            const keyQuerySpy: jest.SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const keyQuerySpy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
             const errorDeferred = Promise.withResolvers<void>();
 
             keyQuerySpy.mockImplementation(
@@ -568,9 +569,7 @@ describe("PerSessionKeyBackupDownloader", () => {
                 "Failed to get key from backup: NETWORK_ERROR",
             );
 
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
-                overwriteRoutes: true,
-            });
+            fetchMock.modifyRoute("room-keys", { response: mockCipherKey });
 
             // Advance less than the retry_after_ms
             jest.advanceTimersByTime(100);
@@ -601,12 +600,10 @@ describe("PerSessionKeyBackupDownloader", () => {
                     return;
                 });
 
-            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey, {
-                overwriteRoutes: true,
-            });
+            fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey);
 
             // @ts-ignore access to private function
-            const keyQuerySpy: jest.SpyInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const keyQuerySpy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");

@@ -88,9 +88,14 @@ describe("anySignal", () => {
 });
 
 describe("parseErrorResponse", () => {
+    const url = "https://example.org";
+
     let headers: Headers;
     const xhrHeaderMethods = {
-        getResponseHeader: (name: string) => headers.get(name),
+        responseURL: url,
+        getResponseHeader: (name: string) => {
+            headers.get(name);
+        },
         getAllResponseHeaders: () => {
             let allHeaders = "";
             headers.forEach((value, key) => {
@@ -120,6 +125,8 @@ describe("parseErrorResponse", () => {
                     errcode: "TEST",
                 },
                 500,
+                url,
+                expect.any(Headers),
             ),
         );
     });
@@ -129,6 +136,7 @@ describe("parseErrorResponse", () => {
         expect(
             parseErrorResponse(
                 {
+                    url,
                     headers,
                     status: 500,
                 } as Response,
@@ -140,6 +148,8 @@ describe("parseErrorResponse", () => {
                     errcode: "TEST",
                 },
                 500,
+                url,
+                expect.any(Headers),
             ),
         );
     });
@@ -149,8 +159,8 @@ describe("parseErrorResponse", () => {
         expect(
             parseErrorResponse(
                 {
-                    responseURL: "https://example.com",
                     ...xhrHeaderMethods,
+                    responseURL: "https://example.com",
                     status: 500,
                 } as XMLHttpRequest,
                 '{"errcode": "TEST"}',
@@ -162,6 +172,7 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
+                expect.any(Headers),
             ),
         );
     });
@@ -184,6 +195,7 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
+                expect.any(Headers),
             ),
         );
     });

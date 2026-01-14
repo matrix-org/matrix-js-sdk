@@ -10,7 +10,7 @@
         "declaration": true,
         "strict": true,
         "allowImportingTsExtensions": true,
-        "lib": ["es2024"],
+        "lib": ["es2024", "dom", "dom.iterable"],
         "baseUrl": ".",
         "typeRoots": ["./node_modules/@types"]
     },

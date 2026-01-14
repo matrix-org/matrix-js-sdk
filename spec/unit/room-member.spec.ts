@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
@@ -447,7 +447,6 @@ describe("MutualRooms", () => {
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = true;
 
         client = createClient({
             baseUrl: HS_URL,
@@ -458,8 +457,7 @@ describe("MutualRooms", () => {
     });
 
     afterEach(async () => {
-        await client.stopClient();
-        fetchMock.mockReset();
+        client.stopClient();
     });
 
     function enableFeature(feature: string) {
@@ -476,8 +474,8 @@ describe("MutualRooms", () => {
     it("supports the initial MSC version (shared rooms)", async () => {
         enableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
 
-        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/:user_id", (rawUrl) => {
-            const segments = rawUrl.split("/");
+        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/:user_id", (callLog) => {
+            const segments = callLog.url.split("/");
             const lastSegment = decodeURIComponent(segments[segments.length - 1]);
 
             expect(lastSegment).toEqual(QUERIED_USER);
@@ -495,8 +493,8 @@ describe("MutualRooms", () => {
     it("supports the renaming MSC version (mutual rooms)", async () => {
         enableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
-        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/:user_id", (rawUrl) => {
-            const segments = rawUrl.split("/");
+        fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms/:user_id", (callLog) => {
+            const segments = callLog.url.split("/");
             const lastSegment = decodeURIComponent(segments[segments.length - 1]);
 
             expect(lastSegment).toEqual(QUERIED_USER);
@@ -517,8 +515,8 @@ describe("MutualRooms", () => {
         });
 
         it("works with a simple response", async () => {
-            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (rawUrl) => {
-                const url = new URL(rawUrl);
+            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (callLog) => {
+                const url = new URL(callLog.url);
 
                 expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
 
@@ -533,8 +531,8 @@ describe("MutualRooms", () => {
         });
 
         it("works with a paginated response", async () => {
-            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (rawUrl) => {
-                const url = new URL(rawUrl);
+            fetchMock.get("express:/_matrix/client/unstable/uk.half-shot.msc2666/user/mutual_rooms", (callLog) => {
+                const url = new URL(callLog.url);
 
                 expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
 

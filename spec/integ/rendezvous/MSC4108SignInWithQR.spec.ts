@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { QrCodeData, QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
+import fetchMock from "@fetch-mock/jest";
 import { mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
 
 import {
     MSC4108FailureReason,
@@ -75,10 +75,6 @@ describe("MSC4108SignInWithQR", () => {
             },
             keys: [],
         });
-    });
-
-    afterEach(() => {
-        fetchMock.reset();
     });
 
     const url = "https://fallbackserver/rz/123";

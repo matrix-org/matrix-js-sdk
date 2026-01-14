@@ -380,23 +380,16 @@ describe("MatrixClient", function () {
                 [
                     403,
                     { errcode: "M_FORBIDDEN", error: "You don't have permission to knock" },
-                    "[M_FORBIDDEN: MatrixError: [403] You don't have permission to knock]",
+                    "MatrixError: [403] You don't have permission to knock",
                 ],
-                [
-                    500,
-                    { errcode: "INTERNAL_SERVER_ERROR" },
-                    "[INTERNAL_SERVER_ERROR: MatrixError: [500] Unknown message]",
-                ],
+                [500, { errcode: "INTERNAL_SERVER_ERROR" }, "MatrixError: [500] Unknown message"],
             ];
 
             it.each(testCases)("should handle %s error", async (code, { errcode, error }, snapshot) => {
                 httpBackend.when("POST", "/knock/" + encodeURIComponent(roomId)).respond(code, { errcode, error });
 
                 const prom = client.knockRoom(roomId);
-                await Promise.all([
-                    httpBackend.flushAllExpected(),
-                    expect(prom).rejects.toMatchInlineSnapshot(snapshot),
-                ]);
+                await Promise.all([httpBackend.flushAllExpected(), expect(prom).rejects.toThrow(snapshot)]);
             });
         });
     });

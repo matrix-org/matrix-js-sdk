@@ -16,12 +16,12 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";
+import { type RouteResponse } from "fetch-mock";
 
-import type FetchMock from "fetch-mock";
 import * as testUtils from "../../test-utils/test-utils";
 import {
     emitPromise,
@@ -154,13 +154,8 @@ describe("crypto", () => {
             return response;
         }
         const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
-        fetchMock.postOnce(
-            new RegExp(rootRegexp + "(r0|v3)/keys/query"),
-            (url: string, opts: RequestInit) => onQueryRequest(JSON.parse(opts.body as string)),
-            {
-                // append to the list of intercepts on this path
-                overwriteRoutes: false,
-            },
+        fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/query"), (callLog) =>
+            onQueryRequest(JSON.parse(callLog.options.body as string)),
         );
     }
 
@@ -170,7 +165,7 @@ describe("crypto", () => {
      * @param response - the response to return from the request. Normally an {@link IClaimOTKsResult}
      *   (or a function that returns one).
      */
-    function expectAliceKeyClaim(response: FetchMock.MockResponse | FetchMock.MockResponseFunction) {
+    function expectAliceKeyClaim(response: RouteResponse) {
         const rootRegexp = escapeRegExp(new URL("/_matrix/client/", aliceClient.getHomeserverUrl()).toString());
         fetchMock.postOnce(new RegExp(rootRegexp + "(r0|v3)/keys/claim"), response);
     }
@@ -248,7 +243,6 @@ describe("crypto", () => {
         async () => {
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
 
             const homeserverUrl = "https://alice-server.com";
             aliceClient = createClient({
@@ -270,6 +264,8 @@ describe("crypto", () => {
             testOlmAccount = await createOlmAccount();
             const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
             testSenderKey = testE2eKeys.curve25519;
+
+            jest.useRealTimers();
         },
         /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */
         10000,
@@ -280,8 +276,6 @@ describe("crypto", () => {
 
         // Allow in-flight things to complete before we tear down the test
         await jest.runAllTimersAsync();
-
-        fetchMock.mockReset();
     });
 
     it("MatrixClient.getCrypto returns a CryptoApi", () => {
@@ -1157,7 +1151,7 @@ describe("crypto", () => {
         // it probably won't be decrypted yet, because it takes a while to process the olm keys
         const decryptedEvent = await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(decryptedEvent.getRoomId()).toEqual(ROOM_ID);
-        expect(decryptedEvent.getContent()).toEqual({});
+        expect(decryptedEvent.getContent<IContent>()).toEqual({});
         expect(decryptedEvent.getClearContent()).toBeUndefined();
     });
 
@@ -1181,20 +1175,12 @@ describe("crypto", () => {
             const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount);
 
             // ... and finally, send the room key. We block the response until `sendRoomMessageDefer` completes.
-            const sendRoomMessageResolvers = Promise.withResolvers<FetchMock.MockResponse>();
+            const sendRoomMessageResolvers = Promise.withResolvers<RouteResponse>();
             const reqProm = new Promise<IContent>((resolve) => {
-                fetchMock.putOnce(
-                    new RegExp("/send/m.room.encrypted/"),
-                    async (url: string, opts: RequestInit): Promise<FetchMock.MockResponse> => {
-                        resolve(JSON.parse(opts.body as string));
-                        return await sendRoomMessageResolvers.promise;
-                    },
-                    {
-                        // append to the list of intercepts on this path (since we have some tests that call
-                        // this function multiple times)
-                        overwriteRoutes: false,
-                    },
-                );
+                fetchMock.putOnce(new RegExp("/send/m.room.encrypted/"), async (callLog): Promise<RouteResponse> => {
+                    resolve(JSON.parse(callLog.options.body as string));
+                    return await sendRoomMessageResolvers.promise;
+                });
             });
 
             // Now we start to send the message
@@ -1415,27 +1401,21 @@ describe("crypto", () => {
 
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
             return new Promise((resolve) => {
-                const listener = (url: string, options: RequestInit) => {
-                    const content = JSON.parse(options.body as string);
-                    const keysCount = Object.keys(content?.one_time_keys || {}).length;
-                    const fallbackKeysCount = Object.keys(content?.fallback_keys || {}).length;
-                    if (keysCount) resolve({ keysCount, fallbackKeysCount });
-                    return {
-                        one_time_key_counts: {
-                            // The matrix client does `/upload` requests until 50 keys are uploaded
-                            // We return here 60 to avoid the `/upload` request loop
-                            signed_curve25519: keysCount ? 60 : keysCount,
-                        },
-                    };
-                };
-
-                for (const path of ["/_matrix/client/v3/keys/upload", "/_matrix/client/v3/keys/upload"]) {
-                    fetchMock.post(new URL(path, aliceClient.getHomeserverUrl()).toString(), listener, {
-                        // These routes are already defined in the E2EKeyReceiver
-                        // We want to overwrite the behaviour of the E2EKeyReceiver
-                        overwriteRoutes: true,
-                    });
-                }
+                fetchMock.modifyRoute("keys-upload", {
+                    response: (callLog) => {
+                        const content = JSON.parse(callLog.options.body as string);
+                        const keysCount = Object.keys(content?.one_time_keys || {}).length;
+                        const fallbackKeysCount = Object.keys(content?.fallback_keys || {}).length;
+                        if (keysCount) resolve({ keysCount, fallbackKeysCount });
+                        return {
+                            one_time_key_counts: {
+                                // The matrix client does `/upload` requests until 50 keys are uploaded
+                                // We return here 60 to avoid the `/upload` request loop
+                                signed_curve25519: keysCount ? 60 : keysCount,
+                            },
+                        };
+                    },
+                });
             });
         }
 
@@ -1553,18 +1533,16 @@ describe("crypto", () => {
 
         function awaitKeyQueryRequest(): Promise<Record<string, []>> {
             return new Promise((resolve) => {
-                const listener = (url: string, options: RequestInit) => {
-                    const content = JSON.parse(options.body as string);
-                    // Resolve with request payload
-                    resolve(content.device_keys);
-
-                    // Return response of `/keys/query`
-                    return queryResponseBody;
-                };
-
                 fetchMock.post(
                     new URL("/_matrix/client/v3/keys/query", aliceClient.getHomeserverUrl()).toString(),
-                    listener,
+                    (callLog) => {
+                        const content = JSON.parse(callLog.options.body as string);
+                        // Resolve with request payload
+                        resolve(content.device_keys);
+
+                        // Return response of `/keys/query`
+                        return queryResponseBody;
+                    },
                 );
             });
         }
@@ -1671,7 +1649,7 @@ describe("crypto", () => {
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
         async function awaitCrossSigningKeyUpload(key: string): Promise<Record<string, {}>> {
-            const content = await accountDataAccumulator.interceptSetAccountData(`m.cross_signing.${key}`);
+            const content = await accountDataAccumulator.waitForAccountData(`m.cross_signing.${key}`);
             return content.encrypted;
         }
 
@@ -1683,10 +1661,7 @@ describe("crypto", () => {
         async function awaitSecretStorageKeyStoredInAccountData(): Promise<string> {
             // eslint-disable-next-line no-constant-condition
             while (true) {
-                const content = await accountDataAccumulator.interceptSetAccountData(":type(m.secret_storage.*)", {
-                    repeat: 1,
-                    overwriteRoutes: true,
-                });
+                const content = await accountDataAccumulator.waitForAccountData("m.secret_storage.*");
                 if (content.key) {
                     return content.key;
                 }
@@ -1694,10 +1669,7 @@ describe("crypto", () => {
         }
 
         async function awaitMegolmBackupKeyUpload(): Promise<Record<string, {}>> {
-            const content = await accountDataAccumulator.interceptSetAccountData("m.megolm_backup.v1", {
-                repeat: 1,
-                overwriteRoutes: true,
-            });
+            const content = await accountDataAccumulator.waitForAccountData("m.megolm_backup.v1");
             return content.encrypted;
         }
 
@@ -1796,6 +1768,7 @@ describe("crypto", () => {
 
             it("Should create a 4S key", async () => {
                 accountDataAccumulator.interceptGetAccountData();
+                accountDataAccumulator.interceptSetAccountData();
 
                 const awaitAccountData = awaitAccountDataUpdate("m.secret_storage.default_key");
 
@@ -1965,23 +1938,17 @@ describe("crypto", () => {
                 const newKey = testData.MEGOLM_SESSION_DATA;
 
                 const awaitKeyUploaded = new Promise<KeyBackup>((resolve) => {
-                    fetchMock.put(
-                        "path:/_matrix/client/v3/room_keys/keys",
-                        (url, request) => {
-                            const uploadPayload: KeyBackup = JSON.parse((request.body as string) ?? "{}");
-                            resolve(uploadPayload);
-                            return {
-                                status: 200,
-                                body: {
-                                    count: 1,
-                                    etag: "abcdefg",
-                                },
-                            };
-                        },
-                        {
-                            overwriteRoutes: true,
-                        },
-                    );
+                    fetchMock.put("path:/_matrix/client/v3/room_keys/keys", (callLog) => {
+                        const uploadPayload: KeyBackup = JSON.parse((callLog.options.body as string) ?? "{}");
+                        resolve(uploadPayload);
+                        return {
+                            status: 200,
+                            body: {
+                                count: 1,
+                                etag: "abcdefg",
+                            },
+                        };
+                    });
                 });
 
                 await aliceClient.getCrypto()!.importRoomKeys([newKey]);
@@ -2015,40 +1982,33 @@ describe("crypto", () => {
                     fetchMock.delete(
                         "express:/_matrix/client/v3/room_keys/version/:version",
                         (url: string, options: RequestInit) => {
-                            fetchMock.get(
-                                "path:/_matrix/client/v3/room_keys/version",
-                                {
+                            fetchMock.modifyRoute("room-keys-version", {
+                                response: {
                                     status: 404,
                                     body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
                                 },
-                                { overwriteRoutes: true },
-                            );
+                            });
                             resolve();
                             return {};
                         },
-                        { overwriteRoutes: true },
                     );
                 });
 
                 const newVersion = "2";
-                fetchMock.post(
-                    "path:/_matrix/client/v3/room_keys/version",
-                    (url, request) => {
-                        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
+                fetchMock.modifyRoute("post-room-keys-version", {
+                    response: (callLog) => {
+                        const backupData: KeyBackupInfo = JSON.parse((callLog.options.body as string) ?? "{}");
                         backupData.version = newVersion;
                         backupData.count = 0;
                         backupData.etag = "zer";
 
                         // update get call with new version
-                        fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData, {
-                            overwriteRoutes: true,
-                        });
+                        fetchMock.modifyRoute("room-keys-version", { response: backupData });
                         return {
                             version: backupVersion,
                         };
                     },
-                    { overwriteRoutes: true },
-                );
+                });
 
                 const newBackupStatusUpdate = new Promise<void>((resolve) => {
                     aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {

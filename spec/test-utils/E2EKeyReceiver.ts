@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import debugFunc, { type Debugger } from "debug";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import type { IDeviceKeys, IOneTimeKey } from "../../src/@types/crypto";
 import type { CrossSigningKeys, ISignedKey, KeySignatures } from "../../src";
@@ -81,26 +81,27 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
 
         // set up a listener for /keys/upload.
         this.oneTimeKeysPromise = new Promise((resolveOneTimeKeys) => {
-            const listener = (url: string, options: RequestInit) =>
-                this.onKeyUploadRequest(resolveOneTimeKeys, options);
-
-            fetchMock.post(new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(), listener);
+            fetchMock.post(
+                new URL("/_matrix/client/v3/keys/upload", homeserverUrl).toString(),
+                (callLog) => this.onKeyUploadRequest(resolveOneTimeKeys, callLog.options),
+                { name: routeNamePrefix + "keys-upload" },
+            );
         });
 
         fetchMock.post(
+            new URL("/_matrix/client/v3/keys/signatures/upload", homeserverUrl).toString(),
+            (callLog) => this.onSignaturesUploadRequest(callLog.options),
             {
-                url: new URL("/_matrix/client/v3/keys/signatures/upload", homeserverUrl).toString(),
                 name: routeNamePrefix + "upload-sigs",
             },
-            (url, options) => this.onSignaturesUploadRequest(options),
         );
 
         fetchMock.post(
+            new URL("/_matrix/client/v3/keys/device_signing/upload", homeserverUrl).toString(),
+            (callLog) => this.onSigningKeyUploadRequest(callLog.options),
             {
-                url: new URL("/_matrix/client/v3/keys/device_signing/upload", homeserverUrl).toString(),
                 name: routeNamePrefix + "upload-cross-signing-keys",
             },
-            (url, options) => this.onSigningKeyUploadRequest(options),
         );
     }
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
 
 import { MapWithDefault } from "../../src/utils";
 import { type E2EKeyReceiver } from "./E2EKeyReceiver";
@@ -36,8 +36,9 @@ export class E2EOTKClaimResponder {
      * @param homeserverUrl - the Homeserver Url of the client under test.
      */
     public constructor(homeserverUrl: string) {
-        const listener = (url: string, options: RequestInit) => this.onKeyClaimRequest(options);
-        fetchMock.post(new URL("/_matrix/client/v3/keys/claim", homeserverUrl).toString(), listener);
+        fetchMock.post(new URL("/_matrix/client/v3/keys/claim", homeserverUrl).toString(), (callLog) =>
+            this.onKeyClaimRequest(callLog.options),
+        );
     }
 
     private onKeyClaimRequest(options: RequestInit) {

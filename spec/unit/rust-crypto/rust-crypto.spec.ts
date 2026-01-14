@@ -26,7 +26,8 @@ import {
     StoreHandle,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { mocked, type Mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/jest";
+import { type CallLog } from "fetch-mock";
 
 import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
@@ -88,7 +89,6 @@ beforeAll(async () => {
 }, 15000);
 
 afterEach(() => {
-    fetchMock.reset();
     jest.restoreAllMocks();
 });
 
@@ -757,7 +757,14 @@ describe("RustCrypto", () => {
         let backupAlg: string;
 
         const fetchMock = {
-            authedRequest: jest.fn().mockImplementation((method, path, query, body) => {
+            authedRequest: jest.fn(),
+        };
+
+        beforeEach(() => {
+            backupAuthData = undefined;
+            backupAlg = "";
+
+            fetchMock.authedRequest.mockImplementation((method, path, query, body) => {
                 if (path === "/room_keys/version") {
                     if (method === "POST") {
                         backupAuthData = body["auth_data"];
@@ -768,12 +775,7 @@ describe("RustCrypto", () => {
                     }
                 }
                 return Promise.resolve({});
-            }),
-        };
-
-        beforeEach(() => {
-            backupAuthData = undefined;
-            backupAlg = "";
+            });
 
             secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
         });
@@ -1768,8 +1770,7 @@ describe("RustCrypto", () => {
     describe("device dehydration", () => {
         it("should detect if dehydration is supported", async () => {
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
-            fetchMock.config.overwriteRoutes = true;
-            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            fetchMock.getOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
                 body: {
                     errcode: "M_UNRECOGNIZED",
@@ -1777,7 +1778,7 @@ describe("RustCrypto", () => {
                 },
             });
             expect(await rustCrypto.isDehydrationSupported()).toBe(false);
-            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            fetchMock.getOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
                 body: {
                     errcode: "M_NOT_FOUND",
@@ -1785,7 +1786,7 @@ describe("RustCrypto", () => {
                 },
             });
             expect(await rustCrypto.isDehydrationSupported()).toBe(true);
-            fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            fetchMock.getOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 device_id: "DEVICE_ID",
                 device_data: "data",
             });
@@ -1793,8 +1794,6 @@ describe("RustCrypto", () => {
         });
 
         it("should load the dehydration key from SSSS if available", async () => {
-            fetchMock.config.overwriteRoutes = true;
-
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
                     return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
@@ -1841,16 +1840,29 @@ describe("RustCrypto", () => {
                 },
             });
             let dehydratedDeviceBody: any;
-            fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
-                dehydratedDeviceBody = JSON.parse(opts.body as string);
+            fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (callLog) => {
+                dehydratedDeviceBody = JSON.parse(callLog.options.body as string);
                 return {};
             });
             await rustCrypto1.startDehydration();
             rustCrypto1.stop();
 
+            fetchMock.mockReset();
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
+            });
+            fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (callLog) => {
+                dehydratedDeviceBody = JSON.parse(callLog.options.body as string);
+                return {};
+            });
+
             // Create another RustCrypto, using the same SecretStorage, to
             // rehydrate the device.
-            const e2eKeyReceiver2 = new E2EKeyReceiver("http://server");
+            const e2eKeyReceiver2 = new E2EKeyReceiver("http://server", "2");
             const e2eKeyResponder2 = new E2EKeyResponder("http://server");
             e2eKeyResponder2.addKeyReceiver(TEST_USER, e2eKeyReceiver2);
 
@@ -1866,7 +1878,7 @@ describe("RustCrypto", () => {
 
             // we need to process a sync so that the OlmMachine will upload keys
             await rustCrypto2.preprocessToDeviceMessages([]);
-            await rustCrypto2.onSyncCompleted({});
+            rustCrypto2.onSyncCompleted({});
 
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 device_id: dehydratedDeviceBody.device_id,
@@ -1913,8 +1925,8 @@ describe("RustCrypto", () => {
             });
             // Function that is called when `PUT /dehydrated_device` is called
             // (i.e. when we create a new dehydrated device)
-            const putDehydratedDeviceMock = jest.fn((path, opts) => {
-                const content = JSON.parse(opts.body as string);
+            const putDehydratedDeviceMock = jest.fn((callLog: CallLog) => {
+                const content = JSON.parse(callLog.options.body as string);
                 dehydratedDeviceInfo = {
                     device_id: content.device_id,
                     device_data: content.device_data,
@@ -1928,6 +1940,9 @@ describe("RustCrypto", () => {
             });
 
             beforeEach(async () => {
+                fetchMock.hardReset();
+                fetchMock.mockGlobal();
+
                 // Set up a RustCrypto object with secret storage and cross-signing.
                 const secretStorageCallbacks = {
                     getSecretStorageKey: async (keys: any, name: string) => {
@@ -2070,9 +2085,8 @@ describe("RustCrypto", () => {
         it("should handle errors when deleting a dehydrated device", async () => {
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi());
             const dehydratedDeviceManager = rustCrypto["dehydratedDeviceManager"];
-            fetchMock.config.overwriteRoutes = true;
             // if the server doesn't support dehydrated devices, delete should succeed without throwing an error
-            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            fetchMock.deleteOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
                 body: {
                     errcode: "M_UNRECOGNIZED",
@@ -2082,7 +2096,7 @@ describe("RustCrypto", () => {
             await dehydratedDeviceManager.delete();
 
             // if there is no dehydrated device, delete should succeed without throwing an error
-            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            fetchMock.deleteOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 404,
                 body: {
                     errcode: "M_NOT_FOUND",
@@ -2092,7 +2106,7 @@ describe("RustCrypto", () => {
             await dehydratedDeviceManager.delete();
 
             // for any other error response, delete should throw an error
-            fetchMock.delete("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
+            fetchMock.deleteOnce("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 status: 400,
                 body: {
                     errcode: "M_UNKNOWN",
@@ -2294,8 +2308,8 @@ describe("RustCrypto", () => {
 
             // A new key backup should be created after the reset
             let newKeyBackupInfo!: KeyBackupInfo;
-            fetchMock.post("path:/_matrix/client/v3/room_keys/version", (res, options) => {
-                newKeyBackupInfo = JSON.parse(options.body as string);
+            fetchMock.post("path:/_matrix/client/v3/room_keys/version", (callLog) => {
+                newKeyBackupInfo = JSON.parse(callLog.options.body as string);
                 return { version: "2" };
             });
 
@@ -2482,9 +2496,7 @@ describe("RustCrypto", () => {
             // Then we throw
             const event = mockedEvent("!r:s.co", null, "m.key.verification.start");
 
-            await expect(async () => await rustCrypto.onLiveEventFromSync(event)).rejects.toThrow(
-                "missing sender in the event",
-            );
+            await expect(rustCrypto.onLiveEventFromSync(event)).rejects.toThrow("missing sender in the event");
 
             // And we do not fetch device details or handle the event
             expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
@@ -2501,9 +2513,7 @@ describe("RustCrypto", () => {
             // Then we throw
             const event = mockedEvent(null, "@u:s.co", "m.key.verification.start");
 
-            await expect(async () => await rustCrypto.onLiveEventFromSync(event)).rejects.toThrow(
-                "missing roomId in the event",
-            );
+            await expect(rustCrypto.onLiveEventFromSync(event)).rejects.toThrow("missing roomId in the event");
 
             // And we do not fetch device details or handle the event
             expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
