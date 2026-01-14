@@ -1616,25 +1616,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         logger.info("Sharing message history");
 
-        // 1. Construct the key bundle
+        // 1. Download keys from backup.
+        if (!(await this.getOlmMachineOrThrow().hasDownloadedAllRoomKeys(new RustSdkCryptoJs.RoomId(roomId)))) {
+            await this.backupManager.downloadLatestRoomKeyBackup(roomId);
+            await this.getOlmMachineOrThrow().setHasDownloadedAllRoomKeys(new RustSdkCryptoJs.RoomId(roomId));
+        }
+
+        // 2. Construct the key bundle
         const bundle = await this.getOlmMachineOrThrow().buildRoomKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         if (!bundle) {
             logger.info("No keys to share");
             return;
         }
 
-        // 2. Upload the encrypted bundle to the server
+        // 3. Upload the encrypted bundle to the server
         const uploadResponse = await this.http.uploadContent(bundle.encryptedData as Uint8Array<ArrayBuffer>);
         logger.info(`Uploaded encrypted key blob: ${JSON.stringify(uploadResponse)}`);
 
-        // 3. We may not share a room with the user, so get a fresh list of devices for the invited user.
+        // 4. We may not share a room with the user, so get a fresh list of devices for the invited user.
         const req = this.getOlmMachineOrThrow().queryKeysForUsers([new RustSdkCryptoJs.UserId(userId)]);
         await this.outgoingRequestProcessor.makeOutgoingRequest(req);
 
-        // 4. Establish Olm sessions with all of the recipient's devices.
+        // 5. Establish Olm sessions with all of the recipient's devices.
         await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(userId)]);
 
-        // 5. Send to-device messages to the recipient to share the keys.
+        // 6. Send to-device messages to the recipient to share the keys.
         const requests = await this.getOlmMachineOrThrow().shareRoomKeyBundleData(
             new RustSdkCryptoJs.UserId(userId),
             new RustSdkCryptoJs.RoomId(roomId),
