@@ -117,7 +117,7 @@ checks, so please check back after a few minutes.
 Your PR should include tests.
 
 For new user facing features in `matrix-js-sdk`, you
-must include comprehensive unit tests written in Jest.
+must include comprehensive unit tests written in Vitest.
 The existing tests can be found under `spec/unit`
 
 It's good practice to write tests alongside the code as it ensures the code is testable from

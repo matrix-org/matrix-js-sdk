@@ -1,5 +1,3 @@
-import { mocked } from "jest-mock";
-
 import * as utils from "../test-utils/test-utils";
 import { Direction, EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src/models/room-state";
@@ -20,21 +18,21 @@ describe("EventTimeline", function () {
     const getTimeline = (): EventTimeline => {
         const room = new Room(roomId, mockClient, userA);
         const timelineSet = new EventTimelineSet(room);
-        jest.spyOn(room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
+        vi.spyOn(room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
 
         const timeline = new EventTimeline(timelineSet);
         // We manually stub the methods we'll be mocking out later instead of mocking the whole module
         // otherwise the default member property values (e.g. paginationToken) will be incorrect
-        timeline.getState(Direction.Backward)!.setStateEvents = jest.fn();
-        timeline.getState(Direction.Backward)!.getSentinelMember = jest.fn();
-        timeline.getState(Direction.Forward)!.setStateEvents = jest.fn();
-        timeline.getState(Direction.Forward)!.getSentinelMember = jest.fn();
+        timeline.getState(Direction.Backward)!.setStateEvents = vi.fn();
+        timeline.getState(Direction.Backward)!.getSentinelMember = vi.fn();
+        timeline.getState(Direction.Forward)!.setStateEvents = vi.fn();
+        timeline.getState(Direction.Forward)!.getSentinelMember = vi.fn();
         return timeline;
     };
 
     beforeEach(function () {
         // reset any RoomState mocks
-        jest.resetAllMocks();
+        vi.resetAllMocks();
 
         timeline = getTimeline();
     });
@@ -67,12 +65,12 @@ describe("EventTimeline", function () {
             timeline.initialiseState(events);
             // @ts-ignore private prop
             const timelineStartState = timeline.startState!;
-            expect(mocked(timelineStartState).setStateEvents).toHaveBeenCalledWith(events, {
+            expect(vi.mocked(timelineStartState).setStateEvents).toHaveBeenCalledWith(events, {
                 timelineWasEmpty: undefined,
             });
             // @ts-ignore private prop
             const timelineEndState = timeline.endState!;
-            expect(mocked(timelineEndState).setStateEvents).toHaveBeenCalledWith(events, {
+            expect(vi.mocked(timelineEndState).setStateEvents).toHaveBeenCalledWith(events, {
                 timelineWasEmpty: undefined,
             });
         });
@@ -210,13 +208,13 @@ describe("EventTimeline", function () {
             sentinel.name = "Old Alice";
             sentinel.membership = KnownMembership.Join;
 
-            mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
+            vi.mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
                     return sentinel;
                 }
                 return null;
             });
-            mocked(timeline.getState(EventTimeline.BACKWARDS)!).getSentinelMember.mockImplementation(function (uid) {
+            vi.mocked(timeline.getState(EventTimeline.BACKWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
                     return oldSentinel;
                 }
@@ -253,13 +251,13 @@ describe("EventTimeline", function () {
             sentinel.name = "Old Alice";
             sentinel.membership = KnownMembership.Join;
 
-            mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
+            vi.mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
                     return sentinel;
                 }
                 return null;
             });
-            mocked(timeline.getState(EventTimeline.BACKWARDS)!).getSentinelMember.mockImplementation(function (uid) {
+            vi.mocked(timeline.getState(EventTimeline.BACKWARDS)!).getSentinelMember.mockImplementation(function (uid) {
                 if (uid === userA) {
                     return oldSentinel;
                 }

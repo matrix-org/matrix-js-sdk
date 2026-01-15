@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import debug from "debug";
@@ -142,11 +142,11 @@ describe("cross-signing", () => {
             expect(keysBody.auth).toEqual(authDict); // check uia dict was passed
             // there should be a key of each type
             // master key is signed by the device
-            expect(keysBody).toHaveProperty(`master_key.signatures.[${TEST_USER_ID}].[ed25519:${TEST_DEVICE_ID}]`);
+            expect(keysBody).toHaveProperty(["master_key", "signatures", TEST_USER_ID, `ed25519:${TEST_DEVICE_ID}`]);
             const masterKeyId = Object.keys(keysBody.master_key.keys)[0];
             // ssk and usk are signed by the master key
-            expect(keysBody).toHaveProperty(`self_signing_key.signatures.[${TEST_USER_ID}].[${masterKeyId}]`);
-            expect(keysBody).toHaveProperty(`user_signing_key.signatures.[${TEST_USER_ID}].[${masterKeyId}]`);
+            expect(keysBody).toHaveProperty(["self_signing_key", "signatures", TEST_USER_ID, masterKeyId]);
+            expect(keysBody).toHaveProperty(["user_signing_key", "signatures", TEST_USER_ID, masterKeyId]);
             const sskId = Object.keys(keysBody.self_signing_key.keys)[0];
 
             // check the publish call
@@ -154,9 +154,7 @@ describe("cross-signing", () => {
             const sigsOpts = fetchMock.callHistory.lastCall("upload-sigs")!.options;
             const body = JSON.parse(sigsOpts!.body as string);
             // there should be a signature for our device, by our self-signing key.
-            expect(body).toHaveProperty(
-                `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[${sskId}]`,
-            );
+            expect(body).toHaveProperty([TEST_USER_ID, TEST_DEVICE_ID, "signatures", TEST_USER_ID, sskId]);
         });
 
         it("get cross signing keys from secret storage and import them", async () => {
@@ -239,9 +237,13 @@ describe("cross-signing", () => {
             const sigsOpts = fetchMock.callHistory.lastCall("upload-sigs")!.options;
             const body = JSON.parse(sigsOpts!.body as string);
             // the device should have a signature with the public self cross signing keys.
-            expect(body).toHaveProperty(
-                `[${TEST_USER_ID}].[${TEST_DEVICE_ID}].signatures.[${TEST_USER_ID}].[ed25519:${SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64}]`,
-            );
+            expect(body).toHaveProperty([
+                TEST_USER_ID,
+                TEST_DEVICE_ID,
+                "signatures",
+                TEST_USER_ID,
+                `ed25519:${SELF_CROSS_SIGNING_PUBLIC_KEY_BASE64}`,
+            ]);
         });
 
         it("can bootstrapCrossSigning twice", async () => {
@@ -448,9 +450,6 @@ describe("cross-signing", () => {
 
     describe("crossSignDevice", () => {
         beforeEach(async () => {
-            // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
-
             // make sure that there is another device which we can sign
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
 
@@ -462,10 +461,6 @@ describe("cross-signing", () => {
 
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([aliceClient.getSafeUserId()]);
             expect(devices.get(aliceClient.getSafeUserId())!.has(testData.TEST_DEVICE_ID)).toBeTruthy();
-        });
-
-        afterEach(async () => {
-            jest.useRealTimers();
         });
 
         it("fails for an unknown device", async () => {

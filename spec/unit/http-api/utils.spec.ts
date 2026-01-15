@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
-
 import {
     anySignal,
     ConnectionError,
@@ -29,38 +27,38 @@ import {
 } from "../../../src";
 import { sleep } from "../../../src/utils";
 
-jest.mock("../../../src/utils");
+vi.mock("../../../src/utils");
 // setupTests mocks `timeoutSignal` due to hanging timers
-jest.unmock("../../../src/http-api/utils");
+vi.unmock("../../../src/http-api/utils");
 
 describe("timeoutSignal", () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
 
     it("should fire abort signal after specified timeout", () => {
         const signal = timeoutSignal(3000);
-        const onabort = jest.fn();
+        const onabort = vi.fn();
         signal.onabort = onabort;
         expect(signal.aborted).toBeFalsy();
         expect(onabort).not.toHaveBeenCalled();
 
-        jest.advanceTimersByTime(3000);
+        vi.advanceTimersByTime(3000);
         expect(signal.aborted).toBeTruthy();
         expect(onabort).toHaveBeenCalled();
     });
 });
 
 describe("anySignal", () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
 
     it("should fire when any signal fires", () => {
         const { signal } = anySignal([timeoutSignal(3000), timeoutSignal(2000)]);
 
-        const onabort = jest.fn();
+        const onabort = vi.fn();
         signal.onabort = onabort;
         expect(signal.aborted).toBeFalsy();
         expect(onabort).not.toHaveBeenCalled();
 
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
         expect(signal.aborted).toBeTruthy();
         expect(onabort).toHaveBeenCalled();
     });
@@ -68,13 +66,13 @@ describe("anySignal", () => {
     it("should cleanup when instructed", () => {
         const { signal, cleanup } = anySignal([timeoutSignal(3000), timeoutSignal(2000)]);
 
-        const onabort = jest.fn();
+        const onabort = vi.fn();
         signal.onabort = onabort;
         expect(signal.aborted).toBeFalsy();
         expect(onabort).not.toHaveBeenCalled();
 
         cleanup();
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
         expect(signal.aborted).toBeFalsy();
         expect(onabort).not.toHaveBeenCalled();
     });
@@ -126,6 +124,7 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 url,
+                undefined,
                 expect.any(Headers),
             ),
         );
@@ -149,6 +148,7 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 url,
+                undefined,
                 expect.any(Headers),
             ),
         );
@@ -172,6 +172,7 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
+                undefined,
                 expect.any(Headers),
             ),
         );
@@ -195,6 +196,7 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
+                undefined,
                 expect.any(Headers),
             ),
         );
@@ -239,7 +241,7 @@ describe("parseErrorResponse", () => {
         }
 
         function compareHeaders(expectedHeaders: Headers, otherHeaders: Headers | undefined) {
-            expect(new Map(otherHeaders)).toEqual(new Map(expectedHeaders));
+            expect(new Map(otherHeaders as any)).toEqual(new Map(expectedHeaders as any));
         }
 
         it("should resolve HTTP Errors from XHR with headers", () => {
@@ -308,7 +310,7 @@ describe("parseErrorResponse", () => {
                 } as Response,
                 '{"errcode": "TEST"}',
             ),
-        ).toStrictEqual(new HTTPError("Server returned 500 error", 500));
+        ).toStrictEqual(new HTTPError("Server returned 500 error", 500, expect.any(Headers)));
     });
 
     it("should handle empty type gracefully", () => {
@@ -347,27 +349,27 @@ describe("parseErrorResponse", () => {
                 } as Response,
                 "I'm a teapot",
             ),
-        ).toStrictEqual(new HTTPError("Server returned 418 error: I'm a teapot", 418));
+        ).toStrictEqual(new HTTPError("Server returned 418 error: I'm a teapot", 418, expect.any(Headers)));
     });
 });
 
 describe("retryNetworkOperation", () => {
     it("should retry given number of times with exponential sleeps", async () => {
         const err = new ConnectionError("test");
-        const fn = jest.fn().mockRejectedValue(err);
-        mocked(sleep).mockResolvedValue(undefined);
+        const fn = vi.fn().mockRejectedValue(err);
+        vi.mocked(sleep).mockResolvedValue(undefined);
         await expect(retryNetworkOperation(4, fn)).rejects.toThrow(err);
         expect(fn).toHaveBeenCalledTimes(4);
-        expect(mocked(sleep)).toHaveBeenCalledTimes(3);
-        expect(mocked(sleep).mock.calls[0][0]).toBe(2000);
-        expect(mocked(sleep).mock.calls[1][0]).toBe(4000);
-        expect(mocked(sleep).mock.calls[2][0]).toBe(8000);
+        expect(vi.mocked(sleep)).toHaveBeenCalledTimes(3);
+        expect(vi.mocked(sleep).mock.calls[0][0]).toBe(2000);
+        expect(vi.mocked(sleep).mock.calls[1][0]).toBe(4000);
+        expect(vi.mocked(sleep).mock.calls[2][0]).toBe(8000);
     });
 
     it("should bail out on errors other than ConnectionError", async () => {
         const err = new TypeError("invalid JSON");
-        const fn = jest.fn().mockRejectedValue(err);
-        mocked(sleep).mockResolvedValue(undefined);
+        const fn = vi.fn().mockRejectedValue(err);
+        vi.mocked(sleep).mockResolvedValue(undefined);
         await expect(retryNetworkOperation(3, fn)).rejects.toThrow(err);
         expect(fn).toHaveBeenCalledTimes(1);
     });
@@ -377,10 +379,10 @@ describe("retryNetworkOperation", () => {
         const err2 = new ConnectionError("test2");
         const err3 = new ConnectionError("test3");
         const errors = [err1, err2, err3];
-        const fn = jest.fn().mockImplementation(() => {
+        const fn = vi.fn().mockImplementation(() => {
             throw errors.shift();
         });
-        mocked(sleep).mockResolvedValue(undefined);
+        vi.mocked(sleep).mockResolvedValue(undefined);
         await expect(retryNetworkOperation(3, fn)).rejects.toThrow(err3);
     });
 });

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
+import { type Mocked } from "vitest";
 
 import { makeMockEvent } from "./mocks";
 import { ClientEvent, EventType, type MatrixClient } from "../../../src";
@@ -34,11 +34,11 @@ describe("ToDeviceKeyTransport", () => {
 
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
-            encryptAndSendToDevice: jest.fn().mockImplementation(() => Promise.resolve()),
+            encryptAndSendToDevice: vi.fn().mockImplementation(() => Promise.resolve()),
         });
         mockLogger = {
-            debug: jest.fn(),
-            warn: jest.fn(),
+            debug: vi.fn(),
+            warn: vi.fn(),
         } as unknown as Mocked<Logger>;
         statistics = {
             counters: {
@@ -56,7 +56,7 @@ describe("ToDeviceKeyTransport", () => {
             mockClient,
             statistics,
             {
-                getChild: jest.fn().mockReturnValue(mockLogger),
+                getChild: vi.fn().mockReturnValue(mockLogger),
             } as unknown as Mocked<Logger>,
         );
     });

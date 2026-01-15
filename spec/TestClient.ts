@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // `expect` is allowed in helper functions which are called within `test`/`it` blocks
-/* eslint-disable jest/no-standalone-expect */
+/* eslint-disable @vitest/no-standalone-expect */
 
 import MockHttpBackend from "matrix-mock-request";
 

@@ -28,15 +28,10 @@ export default {
         "husky",
         // Used in script which only runs in environment with `@octokit/rest` installed
         "@octokit/rest",
-        // Used by jest
-        "jest-fixed-jsdom",
-        "jest-environment-jsdom",
-        "babel-jest",
-        "ts-node",
+        // Used by `vitest`
+        "vitest-sonar-reporter",
         // Used by `@babel/plugin-transform-runtime`
         "@babel/runtime",
-        // Not sure what knip is thinking here, we don't have vitest yet
-        "vitest-environment-jest-fixed-jsdom",
     ],
     ignoreBinaries: [
         // Used when available by reusable workflow `.github/workflows/release-make.yml`

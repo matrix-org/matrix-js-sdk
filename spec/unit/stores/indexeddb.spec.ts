@@ -14,8 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * @vitest-environment happy-dom
+ */
+
 import "fake-indexeddb/auto";
-import "jest-localstorage-mock";
 import { IDBFactory } from "fake-indexeddb";
 
 import { IndexedDBStore, type IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
@@ -24,7 +27,7 @@ import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-lo
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     const roomId = "!room:id";
@@ -133,8 +136,8 @@ describe("IndexedDBStore", () => {
     });
 
     it("should use MemoryStore methods for pending events if no localStorage", async () => {
-        jest.spyOn(MemoryStore.prototype, "setPendingEvents");
-        jest.spyOn(MemoryStore.prototype, "getPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "setPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "getPendingEvents");
 
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
@@ -150,8 +153,8 @@ describe("IndexedDBStore", () => {
     });
 
     it("should persist pending events to localStorage if available", async () => {
-        jest.spyOn(MemoryStore.prototype, "setPendingEvents");
-        jest.spyOn(MemoryStore.prototype, "getPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "setPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "getPendingEvents");
 
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
@@ -312,7 +315,7 @@ describe("IndexedDBStore", () => {
     });
 
     it("remote worker should terminate upon destroy call", async () => {
-        const terminate = jest.fn();
+        const terminate = vi.fn();
         const worker = new (class MockWorker {
             private onmessage!: (data: any) => void;
             postMessage(data: any) {

@@ -213,7 +213,7 @@ Unless otherwise specified, the following applies to all code:
 ## Tests
 
 1. Tests must be written in TypeScript.
-2. Jest mocks are declared below imports, but above everything else.
+2. Mocks are declared below imports, but above everything else.
 3. Use the following convention template:
 
     ```typescript

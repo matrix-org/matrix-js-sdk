@@ -3,8 +3,8 @@
         "target": "es2022",
         "experimentalDecorators": false,
         "esModuleInterop": true,
-        "module": "commonjs",
-        "moduleResolution": "node",
+        "module": "preserve",
+        "moduleResolution": "bundler",
         "noUnusedLocals": true,
         "noEmit": true,
         "declaration": true,
@@ -12,7 +12,10 @@
         "allowImportingTsExtensions": true,
         "lib": ["es2024", "dom", "dom.iterable"],
         "baseUrl": ".",
-        "typeRoots": ["./node_modules/@types"]
+        "types": ["vitest/globals", "node"],
+        "paths": {
+            "#types/*": ["./node_modules/vite/types/*"]
+        }
     },
     "include": ["./src/**/*.ts", "./spec/**/*.ts"]
 }

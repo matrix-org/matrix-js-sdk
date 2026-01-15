@@ -720,7 +720,7 @@ describe("MatrixClient room timelines", function () {
                     } else {
                         reject(new Error("TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire."));
                     }
-                }, 4000 /* FIXME: Is there a way to reference the current timeout of this test in Jest? */);
+                }, 4000 /* FIXME: Is there a way to reference the current timeout of this test in Vitest? */);
 
                 room.on(RoomEvent.TimelineReset, async () => {
                     try {

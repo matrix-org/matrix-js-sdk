@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import { type Mocked } from "jest-mock";
+import { type Mocked } from "vitest";
 
 import {
     createClient,
@@ -117,8 +117,7 @@ describe("megolm-keys backup", () => {
     let e2eKeyResponder: E2EKeyResponder;
 
     beforeEach(async () => {
-        // We want to use fake timers, but the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        vi.useFakeTimers();
 
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -135,9 +134,9 @@ describe("megolm-keys backup", () => {
         aliceClient?.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     async function initTestClient(opts: Partial<ICreateClientOpts> = {}): Promise<MatrixClient> {
@@ -237,7 +236,7 @@ describe("megolm-keys backup", () => {
         });
 
         it("handles error on backup query gracefully", async () => {
-            jest.spyOn(console, "error").mockImplementation(() => {});
+            vi.spyOn(console, "error").mockImplementation(() => {});
 
             fetchMock.get(
                 "express:/_matrix/client/v3/room_keys/keys/:room_id/:session_id",
@@ -360,9 +359,9 @@ describe("megolm-keys backup", () => {
         }
 
         it("Should import full backup in chunks", async function () {
-            const importMockImpl = jest.fn();
+            const importMockImpl = vi.fn();
             // @ts-ignore - mock a private method for testing purpose
-            jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
+            vi.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
 
             // We need several rooms with several sessions to test chunking
             const { response, expectedTotal } = createBackupDownloadResponse([45, 300, 345, 12, 130]);
@@ -376,7 +375,7 @@ describe("megolm-keys backup", () => {
                 check!.backupInfo!.version!,
             );
 
-            const progressCallback = jest.fn();
+            const progressCallback = vi.fn();
             const result = await aliceCrypto.restoreKeyBackup({
                 progressCallback,
             });
@@ -413,7 +412,7 @@ describe("megolm-keys backup", () => {
         });
 
         it("Should continue to process backup if a chunk import fails and report failures", async function () {
-            const importMockImpl = jest
+            const importMockImpl = vi
                 .fn()
                 .mockImplementationOnce(() => {
                     // Fail to import first chunk
@@ -423,7 +422,7 @@ describe("megolm-keys backup", () => {
                 .mockResolvedValue(undefined);
 
             // @ts-ignore - mock a private method for testing purpose
-            jest.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
+            vi.spyOn(aliceCrypto.backupManager, "importBackedUpRoomKeys").mockImplementation(importMockImpl);
 
             const { response, expectedTotal } = createBackupDownloadResponse([100, 300]);
 
@@ -435,7 +434,7 @@ describe("megolm-keys backup", () => {
                 check!.backupInfo!.version!,
             );
 
-            const progressCallback = jest.fn();
+            const progressCallback = vi.fn();
             const result = await aliceCrypto.restoreKeyBackup({ progressCallback });
 
             expect(result.total).toStrictEqual(expectedTotal);
@@ -459,13 +458,13 @@ describe("megolm-keys backup", () => {
 
         it("Should continue if some keys fails to decrypt", async function () {
             // @ts-ignore - mock a private method for testing purpose
-            aliceCrypto.importBackedUpRoomKeys = jest.fn();
+            aliceCrypto.importBackedUpRoomKeys = vi.fn();
 
             const decryptionFailureCount = 2;
 
             const mockDecryptor = {
                 // DecryptSessions does not reject on decryption failure, but just skip the key
-                decryptSessions: jest.fn().mockImplementation((sessions) => {
+                decryptSessions: vi.fn().mockImplementation((sessions) => {
                     // simulate fail to decrypt 2 keys out of all
                     const decrypted = [];
                     const keys = Object.keys(sessions);
@@ -476,11 +475,11 @@ describe("megolm-keys backup", () => {
                     }
                     return decrypted;
                 }),
-                free: jest.fn(),
+                free: vi.fn(),
             };
 
             // @ts-ignore - mock a private method for testing purpose
-            aliceCrypto.getBackupDecryptor = jest.fn().mockResolvedValue(mockDecryptor);
+            aliceCrypto.getBackupDecryptor = vi.fn().mockResolvedValue(mockDecryptor);
 
             const { response, expectedTotal } = createBackupDownloadResponse([100]);
 
@@ -501,7 +500,7 @@ describe("megolm-keys backup", () => {
 
         it("Should get the decryption key from the secret storage and restore the key backup", async function () {
             // @ts-ignore - mock a private method for testing purpose
-            jest.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
+            vi.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
 
             const fullBackup = {
                 rooms: {
@@ -577,7 +576,7 @@ describe("megolm-keys backup", () => {
             await aliceCrypto.importRoomKeys(someRoomKeys);
 
             // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
-            jest.runAllTimers();
+            vi.runAllTimers();
 
             await Promise.all(uploadPromises);
 
@@ -601,7 +600,7 @@ describe("megolm-keys backup", () => {
 
             await aliceCrypto.importRoomKeys([newKey]);
 
-            jest.runAllTimers();
+            vi.runAllTimers();
             await newKeyUploadPromise;
         });
 
@@ -636,7 +635,7 @@ describe("megolm-keys backup", () => {
             await aliceCrypto.importRoomKeys(someRoomKeys);
 
             // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
-            jest.runAllTimers();
+            vi.runAllTimers();
 
             // wait for all keys to be backed up
             await remainingZeroPromise;
@@ -690,12 +689,12 @@ describe("megolm-keys backup", () => {
 
             await aliceCrypto.importRoomKeys([newKey]);
 
-            jest.runAllTimers();
+            vi.runAllTimers();
 
             await disableOldBackup;
             await enableNewBackup;
 
-            jest.runAllTimers();
+            vi.runAllTimers();
 
             await Promise.all(uploadPromises);
             await newKeyUploadPromise;
@@ -726,7 +725,7 @@ describe("megolm-keys backup", () => {
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
             expect(result).toBeTruthy();
-            jest.advanceTimersByTime(10 * 60 * 1000);
+            vi.advanceTimersByTime(10 * 60 * 1000);
             await failurePromise;
 
             // Fix the endpoint to do successful uploads
@@ -753,7 +752,7 @@ describe("megolm-keys backup", () => {
             });
 
             // run the timers, which will make the backup loop redo the request
-            await jest.advanceTimersByTimeAsync(10 * 60 * 1000);
+            await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
             await successPromise;
             await allKeysUploadedPromise;
         });
@@ -1179,7 +1178,7 @@ describe("megolm-keys backup", () => {
         // user will be one).
         syncResponder.sendOrQueueSyncResponse({});
         // DeviceList has a sleep(5) which we need to make happen
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // The client should now know about the dummy device
         const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);

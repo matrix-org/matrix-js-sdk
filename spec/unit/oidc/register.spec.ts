@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { OidcError } from "../../../src/oidc/error";
 import { type OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";

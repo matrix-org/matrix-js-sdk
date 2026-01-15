@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";

@@ -16,7 +16,7 @@ limitations under the License.
 
 import debugFunc from "debug";
 import { type Debugger } from "debug";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 
 /** Interface implemented by classes that intercept `/sync` requests from test clients
