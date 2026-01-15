@@ -440,6 +440,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // update the core event dict
         // Track display names that change so we can recalculate disambiguation
         const affectedDisplayNames = new Set<string>();
+        // Track userIds whose membership events we process so we don't emit duplicate events
+        const processedMemberUserIds = new Set<string>();
 
         stateEvents.forEach((event) => {
             if (event.getRoomId() !== this.roomId || !event.isState()) return;
@@ -452,6 +454,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
                 const userId = event.getStateKey()!;
+                processedMemberUserIds.add(userId);
                 const newDisplayName = event.getContent().displayname ?? "";
                 const oldDisplayName = this.userIdsToDisplayNames[userId];
 
@@ -542,8 +545,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 userIds.forEach((id) => affectedUserIds.add(id));
             }
 
-            // Process each affected member once
+            // Process each affected member once, excluding those whose membership
+            // events were already processed (they already got their events emitted)
             for (const userId of affectedUserIds) {
+                if (processedMemberUserIds.has(userId)) {
+                    continue;
+                }
                 const member = this.members[userId];
                 if (member?.events.member) {
                     const nameChanged = member.recalculateDisambiguatedName(this);
