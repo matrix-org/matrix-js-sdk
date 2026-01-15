@@ -124,7 +124,6 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 url,
-                undefined,
                 expect.any(Headers),
             ),
         );
@@ -148,7 +147,6 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 url,
-                undefined,
                 expect.any(Headers),
             ),
         );
@@ -172,7 +170,6 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
-                undefined,
                 expect.any(Headers),
             ),
         );
@@ -196,7 +193,6 @@ describe("parseErrorResponse", () => {
                 },
                 500,
                 "https://example.com",
-                undefined,
                 expect.any(Headers),
             ),
         );

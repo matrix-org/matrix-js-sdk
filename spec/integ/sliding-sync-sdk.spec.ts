@@ -26,7 +26,7 @@ import {
     type Extension,
 } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
-import { type IRoomEvent, type IStateEvent } from "../../src";
+import { type IContent, type IRoomEvent, type IStateEvent } from "../../src";
 import {
     type MatrixClient,
     type MatrixEvent,
@@ -111,7 +111,7 @@ describe("SlidingSyncSdk", () => {
             expect(m.getType()).toEqual(want[i].type);
             expect(m.getSender()).toEqual(want[i].sender);
             expect(m.getId()).toEqual(want[i].event_id);
-            expect(m.getContent()).toEqual(want[i].content);
+            expect(m.getContent<IContent>()).toEqual(want[i].content);
             expect(m.getTs()).toEqual(want[i].origin_server_ts);
             if (want[i].unsigned) {
                 expect(m.getUnsigned()).toEqual(want[i].unsigned);
@@ -722,7 +722,7 @@ describe("SlidingSyncSdk", () => {
             });
             globalData = client!.getAccountData(globalType)!;
             expect(globalData).toBeTruthy();
-            expect(globalData.getContent()).toEqual(globalContent);
+            expect(globalData.getContent<IContent>()).toEqual(globalContent);
         });
 
         it("processes rooms account data", async () => {
@@ -757,7 +757,7 @@ describe("SlidingSyncSdk", () => {
             expect(room).toBeTruthy();
             const event = room.getAccountData(roomType)!;
             expect(event).toBeTruthy();
-            expect(event.getContent()).toEqual(roomContent);
+            expect(event.getContent<IContent>()).toEqual(roomContent);
         });
 
         it("doesn't crash for unknown room account data", async () => {
@@ -862,7 +862,7 @@ describe("SlidingSyncSdk", () => {
             };
             let called = false;
             client!.once(ClientEvent.ToDeviceEvent, (ev) => {
-                expect(ev.getContent()).toEqual(toDeviceContent);
+                expect(ev.getContent<IContent>()).toEqual(toDeviceContent);
                 expect(ev.getType()).toEqual(toDeviceType);
                 called = true;
             });

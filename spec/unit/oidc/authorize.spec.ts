@@ -249,7 +249,7 @@ describe("oidc authorization", () => {
             return state;
         };
 
-        beforeEach(async () => {
+        beforeEach(() => {
             sessionStorage.clear();
 
             fetchMock.get(`${metadata.issuer}.well-known/openid-configuration`, metadata);

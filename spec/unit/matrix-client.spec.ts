@@ -41,7 +41,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
-import { EventStatus, MatrixEvent } from "../../src/models/event";
+import { EventStatus, type IContent, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
@@ -2738,7 +2738,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2767,7 +2767,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch!.getContent()).toMatchObject({
+            expect(ruleSenderMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2777,7 +2777,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:example.org",
             });
             expect(ruleRoomMatch).toBeTruthy();
-            expect(ruleRoomMatch!.getContent()).toMatchObject({
+            expect(ruleRoomMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2802,7 +2802,7 @@ describe("MatrixClient", function () {
                 roomId: BAD_ROOM_ID,
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch!.getContent()).toMatchObject({
+            expect(ruleSenderMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2836,7 +2836,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2864,7 +2864,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
