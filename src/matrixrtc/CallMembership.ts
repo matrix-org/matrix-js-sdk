@@ -25,7 +25,7 @@ import {
     type RtcMembershipData,
     checkSessionsMembershipData,
     type SessionMembershipData,
-} from "./membership.ts";
+} from "./membership";
 import { MatrixRTCMembershipParseError } from "./membership/common.ts";
 import { EventType } from "../@types/event.ts";
 
