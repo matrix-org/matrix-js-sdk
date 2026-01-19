@@ -27,7 +27,7 @@ import {
 } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
-import { type IMembershipManager, MembershipManagerEvent } from "../../../src/matrixrtc/IMembershipManager";
+import { MembershipManagerEvent } from "../../../src/matrixrtc/IMembershipManager";
 import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import {
     makeMockEvent,
@@ -1716,7 +1716,7 @@ describe("MatrixRTCSession", () => {
 
             sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
 
-            const membershipManager = (sess as unknown as { membershipManager: IMembershipManager }).membershipManager;
+            const membershipManager = sess["membershipManager"]!;
             membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");
             membershipManager.emit(MembershipManagerEvent.StatusChanged, Status.Connected, Status.Disconnected);
             membershipManager.emit(MembershipManagerEvent.ProbablyLeft, false);
