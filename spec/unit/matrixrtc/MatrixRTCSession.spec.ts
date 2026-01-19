@@ -27,6 +27,7 @@ import {
 } from "../../../src";
 import { KnownMembership } from "../../../src/@types/membership";
 import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
+import { type IMembershipManager, MembershipManagerEvent } from "../../../src/matrixrtc/IMembershipManager";
 import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
 import {
     makeMockEvent,
@@ -1703,6 +1704,25 @@ describe("MatrixRTCSession", () => {
                 sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
                 expect(sess!.membershipStatus).toBe(Status.Connecting);
             });
+        });
+        it("reemits membershipManager events", () => {
+            sess = MatrixRTCSession.sessionForSlot(client, makeMockRoom([membershipTemplate]), callSession);
+            const delayIdChanged = vi.fn();
+            sess.on(MembershipManagerEvent.DelayIdChanged, delayIdChanged);
+            const statusChanged = vi.fn();
+            sess.on(MembershipManagerEvent.StatusChanged, statusChanged);
+            const probablyLeftChanged = vi.fn();
+            sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
+
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
+
+            const membershipManager = (sess as unknown as { membershipManager: IMembershipManager }).membershipManager;
+            membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");
+            membershipManager.emit(MembershipManagerEvent.StatusChanged, Status.Connected, Status.Disconnected);
+            membershipManager.emit(MembershipManagerEvent.ProbablyLeft, false);
+            expect(delayIdChanged).toHaveBeenCalledWith("newDelayId", membershipManager);
+            expect(statusChanged).toHaveBeenCalledWith(Status.Connected, Status.Disconnected, membershipManager);
+            expect(probablyLeftChanged).toHaveBeenCalledWith(false, membershipManager);
         });
     });
 });
