@@ -500,8 +500,8 @@ describe("MatrixRTCSession", () => {
             livekit_service_url: "https://active.url",
             livekit_alias: "!active:active.url",
         };
-        // eslint-disable-next-line @vitest/expect-expect
-        it("gets the correct active focus with oldest_membership", () => {
+        it("gets the correct active focus with oldest_membership", async () => {
+            client.sendStateEvent = vi.fn();
             vi.useFakeTimers();
             vi.setSystemTime(3000);
             const mockRoom = makeMockRoom([
@@ -516,10 +516,36 @@ describe("MatrixRTCSession", () => {
 
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
 
-            sess.joinRTCSession(owmMemberIdentity, [{ type: "livekit", livekit_service_url: "htts://test.org" }], {
-                type: "livekit",
-                focus_selection: "oldest_membership",
-            });
+            sess.joinRTCSession(
+                owmMemberIdentity,
+                [{ type: "livekit", livekit_service_url: "htts://test.org" }],
+                undefined,
+            );
+            await flushPromises();
+            expect(client.sendStateEvent).toHaveBeenCalledWith(
+                expect.any(String),
+                "org.matrix.msc3401.call.member",
+                {
+                    "application": "m.call",
+                    "call_id": "",
+                    "device_id": "AAAAAAA",
+                    "expires": 14400000,
+                    "foci_preferred": [
+                        {
+                            livekit_service_url: "htts://test.org",
+                            type: "livekit",
+                        },
+                    ],
+                    "focus_active": {
+                        focus_selection: "oldest_membership",
+                        type: "livekit",
+                    },
+                    "m.call.intent": undefined,
+                    "membershipID": "@alice:example.org:AAAAAAA",
+                    "scope": "m.room",
+                },
+                "_@alice:example.org_AAAAAAA_m.call",
+            );
             vi.useRealTimers();
         });
         it("does not provide focus if the selection method is unknown", () => {
@@ -739,6 +765,9 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
             await sess!._onRTCSessionMemberUpdate();
 
+            // check we send out join event
+            expect(client.sendStateEvent).toHaveBeenCalled();
+            // but no notification event
             expect(client.sendEvent).not.toHaveBeenCalled();
         });
 
@@ -753,34 +782,31 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [membershipTemplate, { ...membershipTemplate, user_id: client.getUserId()! }]);
             await sess!._onRTCSessionMemberUpdate();
 
-            // We assume that the responsibility to send a notification, if any, lies with the other
+            // check we send out join event
+            expect(client.sendStateEvent).toHaveBeenCalled();
+            // but no notification event
+            //
+            //  We assume that the responsibility to send a notification, if any, lies with the other
             // participant that won the race
             expect(client.sendEvent).not.toHaveBeenCalled();
         });
     });
 
     describe("onMembershipsChanged", () => {
-        it("does not emit if no membership changes", async () => {
+        it("only emit if membership changes", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             await flushPromises();
             const onMembershipsChanged = vi.fn();
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+            // no change -> no emission
             await sess._onRTCSessionMemberUpdate();
-
             expect(onMembershipsChanged).not.toHaveBeenCalled();
-        });
 
-        it("emits on membership changes", async () => {
-            const mockRoom = makeMockRoom([membershipTemplate]);
-            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-
-            const onMembershipsChanged = vi.fn();
-            sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
-
+            // no change -> emission
             mockRoomState(mockRoom, []);
             await sess._onRTCSessionMemberUpdate();
-
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
 
