@@ -48,11 +48,17 @@ export class OutdatedKeyFilter {
     }
 }
 
+/**
+ * Converts a slot ID into it's component application and ID portions.
+ * @param slotId e.g. `m.call#call_id`
+ */
 export function slotIdToDescription(slotId: string): SlotDescription {
     const [application, id] = slotId.split("#");
     return { application, id };
 }
-
+/**
+ * Converts a SlotDescription into it's slot ID format.
+ */
 export function slotDescriptionToId(slotDescription: SlotDescription): string {
     return `${slotDescription.application}#${slotDescription.id}`;
 }
