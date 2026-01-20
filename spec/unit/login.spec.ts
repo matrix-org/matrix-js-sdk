@@ -1,4 +1,4 @@
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientPrefix, MatrixClient } from "../../src";
 import { SSOAction } from "../../src/@types/auth";
@@ -68,10 +68,6 @@ describe("SSO login URL", function () {
 });
 
 describe("refreshToken", () => {
-    afterEach(() => {
-        fetchMock.mockReset();
-    });
-
     it("requests the correctly-prefixed /refresh endpoint when server correctly accepts /v3", async () => {
         const client = createExampleMatrixClient();
 

@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
+import { type Mock, type Mocked } from "vitest";
 
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 import { type CallMembership, type Statistics } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
-import { membershipTemplate, mockCallMembership } from "./mocks.ts";
+import { sessionMembershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { logger } from "../../../src/logger.ts";
 import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
@@ -29,11 +29,11 @@ import { flushPromises } from "../../test-utils/flushPromises.ts";
 describe("RTCEncryptionManager", () => {
     // The manager being tested
     let encryptionManager: RTCEncryptionManager;
-    let getMembershipMock: jest.Mock;
+    let getMembershipMock: Mock;
     let mockTransport: Mocked<ToDeviceKeyTransport>;
     let statistics: Statistics;
-    let onEncryptionKeysChanged: jest.Mock;
-    let rtcIdentifierProvider: jest.Mock;
+    let onEncryptionKeysChanged: Mock;
+    let rtcIdentifierProvider: Mock;
 
     beforeEach(() => {
         statistics = {
@@ -45,17 +45,17 @@ describe("RTCEncryptionManager", () => {
                 roomEventEncryptionKeysReceivedTotalAge: 0,
             },
         };
-        getMembershipMock = jest.fn().mockReturnValue([]);
-        onEncryptionKeysChanged = jest.fn();
+        getMembershipMock = vi.fn().mockReturnValue([]);
+        onEncryptionKeysChanged = vi.fn();
         mockTransport = {
-            start: jest.fn(),
-            stop: jest.fn(),
-            sendKey: jest.fn().mockResolvedValue(undefined),
-            on: jest.fn(),
-            off: jest.fn(),
+            start: vi.fn(),
+            stop: vi.fn(),
+            sendKey: vi.fn().mockResolvedValue(undefined),
+            on: vi.fn(),
+            off: vi.fn(),
         } as unknown as Mocked<ToDeviceKeyTransport>;
 
-        rtcIdentifierProvider = jest.fn().mockImplementation((userId: string, deviceId: string, memberId: string) => {
+        rtcIdentifierProvider = vi.fn().mockImplementation((userId: string, deviceId: string, memberId: string) => {
             return `MOCKSHA<${userId}|${deviceId}|${memberId}>`;
         });
 
@@ -96,7 +96,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should distribute keys to members on join", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
@@ -106,7 +106,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await vi.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -115,7 +115,7 @@ describe("RTCEncryptionManager", () => {
                 0,
                 members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
             );
-            await jest.runOnlyPendingTimersAsync();
+            await vi.runOnlyPendingTimersAsync();
             // The key should have been rolled out immediately
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
             expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
@@ -136,7 +136,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await vi.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -151,7 +151,7 @@ describe("RTCEncryptionManager", () => {
                     },
                 ],
             );
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
             // The key should have been rolled out immediately
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
 
@@ -164,7 +164,7 @@ describe("RTCEncryptionManager", () => {
             // There are no membership change but the callMembership ts has changed (reset?)
             // Resend the key
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await vi.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -182,7 +182,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should not rotate key when a user join within the rotation grace period", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -194,7 +194,7 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -208,10 +208,10 @@ describe("RTCEncryptionManager", () => {
 
             // Carl joins, within the grace period
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
-            await jest.advanceTimersByTimeAsync(gracePeriod / 2);
+            await vi.advanceTimersByTimeAsync(gracePeriod / 2);
             encryptionManager.onMembershipsUpdate();
 
-            await jest.runOnlyPendingTimersAsync();
+            await vi.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
                 expect.any(String),
@@ -222,7 +222,7 @@ describe("RTCEncryptionManager", () => {
             );
 
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
-            await jest.advanceTimersByTimeAsync(1000);
+            await vi.advanceTimersByTimeAsync(1000);
 
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
@@ -231,8 +231,9 @@ describe("RTCEncryptionManager", () => {
         // This means that no matter what, the key once rolled out will be too old to be re-used for the new member that
         // joined within the grace period.
         // So we expect another rotation to happen in all cases where a new member joins.
+        // eslint-disable-next-line @vitest/expect-expect
         it("test grace period lower than delay period", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -248,26 +249,26 @@ describe("RTCEncryptionManager", () => {
                 keyRotationGracePeriodMs: gracePeriod,
             });
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
             // The existing members have been talking for 5mn
-            await jest.advanceTimersByTimeAsync(5 * 60 * 1000);
+            await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
             // A new member joins, that should trigger a key rotation.
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             // A new member joins, within the grace period, but under the delay period
             members.push(aStateBaseMembership("@david:example.org", "DAVDEVICE"));
-            await jest.advanceTimersByTimeAsync((useKeyDelay - gracePeriod) / 2);
+            await vi.advanceTimersByTimeAsync((useKeyDelay - gracePeriod) / 2);
             encryptionManager.onMembershipsUpdate();
 
             // Wait past the delay period
-            await jest.advanceTimersByTimeAsync(5_000);
+            await vi.advanceTimersByTimeAsync(5_000);
 
             // Even though the new member joined within the grace period, the key should be rotated because once the delay period has passed
             // also the grace period is exceeded/the key is too old to be reshared.
@@ -284,7 +285,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should rotate key when a user join past the rotation grace period", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -296,12 +297,12 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            await jest.advanceTimersByTimeAsync(gracePeriod + 1000);
+            await vi.advanceTimersByTimeAsync(gracePeriod + 1000);
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
 
@@ -318,15 +319,15 @@ describe("RTCEncryptionManager", () => {
             );
 
             // Wait for useKeyDelay to pass
-            await jest.advanceTimersByTimeAsync(5000);
+            await vi.advanceTimersByTimeAsync(5000);
 
             expect(onEncryptionKeysChanged).toHaveBeenCalled();
-            await jest.advanceTimersByTimeAsync(1000);
+            await vi.advanceTimersByTimeAsync(1000);
             expect(statistics.counters.roomEventEncryptionKeysSent).toBe(2);
         });
 
         it("Should not rotate key when several users join within the rotation grace period", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -337,7 +338,7 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
@@ -353,9 +354,9 @@ describe("RTCEncryptionManager", () => {
             for (const newJoiner of newJoiners) {
                 members.push(newJoiner);
                 getMembershipMock.mockReturnValue(members);
-                await jest.advanceTimersByTimeAsync(1_000);
+                await vi.advanceTimersByTimeAsync(1_000);
                 encryptionManager.onMembershipsUpdate();
-                await jest.advanceTimersByTimeAsync(1);
+                await vi.advanceTimersByTimeAsync(1);
             }
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(newJoiners.length);
@@ -376,7 +377,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should not resend keys when no changes", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -387,26 +388,26 @@ describe("RTCEncryptionManager", () => {
             // initial rollout
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(200);
+            await vi.advanceTimersByTimeAsync(200);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(100);
+            await vi.advanceTimersByTimeAsync(100);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(50);
+            await vi.advanceTimersByTimeAsync(50);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(100);
+            await vi.advanceTimersByTimeAsync(100);
 
             expect(mockTransport.sendKey).not.toHaveBeenCalled();
         });
 
         it("Should rotate key when a user leaves and delay the rollout", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -417,7 +418,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -439,7 +440,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.onMembershipsUpdate();
 
-            await jest.advanceTimersByTimeAsync(200);
+            await vi.advanceTimersByTimeAsync(200);
             // The is rotated but not rolled out yet to give time for the key to be sent
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
                 expect.any(String),
@@ -450,7 +451,7 @@ describe("RTCEncryptionManager", () => {
             );
 
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
-            await jest.advanceTimersByTimeAsync(1000);
+            await vi.advanceTimersByTimeAsync(1000);
 
             // now should be rolled out
             expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
@@ -468,7 +469,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should not distribute keys if encryption is disabled", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
@@ -478,7 +479,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.join({ manageMediaKeys: false });
             encryptionManager.onMembershipsUpdate();
-            await jest.runOnlyPendingTimersAsync();
+            await vi.runOnlyPendingTimersAsync();
 
             expect(mockTransport.sendKey).not.toHaveBeenCalled();
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
@@ -489,9 +490,9 @@ describe("RTCEncryptionManager", () => {
         beforeEach(() => {
             const emitter = new TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>();
             mockTransport = {
-                start: jest.fn(),
-                stop: jest.fn(),
-                sendKey: jest.fn().mockResolvedValue(undefined),
+                start: vi.fn(),
+                stop: vi.fn(),
+                sendKey: vi.fn().mockResolvedValue(undefined),
                 on: emitter.on.bind(emitter),
                 off: emitter.off.bind(emitter),
                 emit: emitter.emit.bind(emitter),
@@ -506,14 +507,14 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("should not accept keys when manageMediaKeys is disabled", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE")];
             getMembershipMock.mockReturnValue(members);
 
             encryptionManager.join({ manageMediaKeys: false });
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
@@ -528,7 +529,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("should accept keys from transport", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aCallMembership("@bob:example.org", "BOBDEVICE", 1000, "rtcIDBOB1"),
@@ -539,7 +540,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
@@ -601,14 +602,14 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should support quick re-joiner if keys received out of order", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [aStateBaseMembership("@carol:example.org", "CAROLDEVICE")];
             getMembershipMock.mockReturnValue(members);
 
             // Let's join
             encryptionManager.join(undefined);
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // Simulate Carl leaving then joining back, and key received out of order
             // XXX This can only happen in legacy because with sticky events the rtcBackendIdentity would be different.
@@ -623,7 +624,7 @@ describe("RTCEncryptionManager", () => {
                 newKey0TimeStamp,
             );
 
-            await jest.advanceTimersByTimeAsync(20);
+            await vi.advanceTimersByTimeAsync(20);
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
@@ -633,7 +634,7 @@ describe("RTCEncryptionManager", () => {
                 initialKey0TimeStamp,
             );
 
-            await jest.advanceTimersByTimeAsync(20);
+            await vi.advanceTimersByTimeAsync(20);
 
             // The latest key used for carol should be the one with the latest timestamp
 
@@ -650,7 +651,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should store keys for later retrieval", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
 
             const members = [
                 aCallMembership("@bob:example.org", "BOBDEVICE", 1000, "@bob:example.org|BOBDEVICE"),
@@ -663,7 +664,7 @@ describe("RTCEncryptionManager", () => {
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
 
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
@@ -758,7 +759,7 @@ describe("RTCEncryptionManager", () => {
     });
 
     it("Should only rotate once again if several membership changes during a rollout", async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
 
         let members = [
             aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -770,7 +771,7 @@ describe("RTCEncryptionManager", () => {
         // Let's join
         encryptionManager.join(undefined);
         encryptionManager.onMembershipsUpdate();
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // The initial rollout
         expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
@@ -794,7 +795,7 @@ describe("RTCEncryptionManager", () => {
 
         // This should start a new key rollout
         encryptionManager.onMembershipsUpdate();
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // Now simulate a new leaver
         members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE")];
@@ -802,17 +803,17 @@ describe("RTCEncryptionManager", () => {
 
         // The key `1` rollout is in progress
         encryptionManager.onMembershipsUpdate();
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // And another one ( plus a joiner)
         const lastMembership = [aStateBaseMembership("@bob:example.org", "BOBDEVICE3")];
         getMembershipMock.mockReturnValue(lastMembership);
         // The key `1` rollout is still in progress
         encryptionManager.onMembershipsUpdate();
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // Let all rollouts finish
-        await jest.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(2000);
 
         // There should 2 rollout. The `1` rollout, then just one additional one
         // that has "buffered" the 2 membership changes with leavers
@@ -901,9 +902,9 @@ describe("RTCEncryptionManager", () => {
         it("Should use early keys as soon as the membership is known", async () => {
             const emitter = new TypedEventEmitter<KeyTransportEvents, KeyTransportEventsHandlerMap>();
             mockTransport = {
-                start: jest.fn(),
-                stop: jest.fn(),
-                sendKey: jest.fn().mockResolvedValue(undefined),
+                start: vi.fn(),
+                stop: vi.fn(),
+                sendKey: vi.fn().mockResolvedValue(undefined),
                 on: emitter.on.bind(emitter),
                 off: emitter.off.bind(emitter),
                 emit: emitter.emit.bind(emitter),
@@ -982,7 +983,7 @@ describe("RTCEncryptionManager", () => {
         rtcBackendIdentity: string,
     ): CallMembership {
         return mockCallMembership(
-            { ...membershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
+            { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
             rtcBackendIdentity,
         );
@@ -997,7 +998,7 @@ describe("RTCEncryptionManager", () => {
      */
     function aStateBaseMembership(userId: string, deviceId: string, ts: number = 1000): CallMembership {
         return mockCallMembership(
-            { ...membershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
+            { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
             `${userId}|${deviceId}`,
         );

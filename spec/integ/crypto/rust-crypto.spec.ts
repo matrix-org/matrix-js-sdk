@@ -16,7 +16,7 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { createClient, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
@@ -26,7 +26,7 @@ import { FULL_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostor
 import { EMPTY_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/empty_account";
 import { CryptoEvent } from "../../../src/crypto-api";
 
-jest.setTimeout(15000);
+vi.setConfig({ testTimeout: 15000 });
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -122,6 +122,7 @@ describe.skip("MatrixClient.initRustCrypto", () => {
         );
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should ignore a second call", async () => {
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -134,10 +135,6 @@ describe.skip("MatrixClient.initRustCrypto", () => {
     });
 
     describe("Libolm Migration", () => {
-        beforeEach(() => {
-            fetchMock.reset();
-        });
-
         it("should migrate from libolm", async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.backupResponse);
 
@@ -155,7 +152,7 @@ describe.skip("MatrixClient.initRustCrypto", () => {
                 pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
             });
 
-            const progressListener = jest.fn();
+            const progressListener = vi.fn();
             matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
 
             await matrixClient.initRustCrypto();
@@ -326,7 +323,7 @@ describe.skip("MatrixClient.initRustCrypto", () => {
             });
 
             // When we start Rust crypto, potentially triggering an upgrade
-            const progressListener = jest.fn();
+            const progressListener = vi.fn();
             matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
 
             await matrixClient.initRustCrypto();
@@ -478,6 +475,7 @@ describe.skip("MatrixClient.clearStores", () => {
         expect(await indexedDB.databases()).toHaveLength(0);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should not fail in environments without indexedDB", async () => {
         // eslint-disable-next-line no-global-assign
         indexedDB = undefined!;

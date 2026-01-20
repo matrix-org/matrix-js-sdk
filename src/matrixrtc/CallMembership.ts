@@ -117,7 +117,7 @@ export class CallMembership {
     private readonly matrixEventData: { eventId: string; sender: string };
 
     /**
-     * @private
+     * @private Only to be used by tests.
      * @param matrixEvent
      * @param membershipData
      * @param rtcBackendIdentity
@@ -197,8 +197,15 @@ export class CallMembership {
      * Parsed `slot_id` (format `{application}#{id}`) into its components (application and id).
      */
     public get slotDescription(): SlotDescription {
-        // TODO: Should this use content.application?
-        return slotIdToDescription(this.slotId);
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case MembershipKind.RTC:
+                const id = data.slot_id.slice(`${data.application.type}#`.length);
+                return { application: data.application.type, id };
+            case MembershipKind.Session:
+            default:
+                return slotIdToDescription(this.slotId);
+        }        
     }
 
     /**

@@ -53,12 +53,13 @@ export interface RtcMembershipData {
 export const checkRtcMembershipData = (data: IContent, sender: string): data is RtcMembershipData => {
     const errors: string[] = [];
     const prefix = " - ";
+    const expectedSlotPrefix = `${data?.application?.type}#`;
 
     // required fields
     if (typeof data.slot_id !== "string") {
         errors.push(prefix + "slot_id must be string");
-    } else {
-        if (data.slot_id.split("#").length !== 2) errors.push(prefix + 'slot_id must include exactly one "#"');
+    } else if (!data.slot_id.startsWith(expectedSlotPrefix)) {
+        errors.push(prefix + `slot_id must start with ${expectedSlotPrefix}`);
     }
     if (typeof data.member !== "object" || data.member === null) {
         errors.push(prefix + "member must be an object");
@@ -133,7 +134,7 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     }
 
     if (errors.length) {
-        throw new MatrixRTCMembershipParseError("foo", errors);
+        throw new MatrixRTCMembershipParseError("RtcMembership", errors);
     }
 
     return true;

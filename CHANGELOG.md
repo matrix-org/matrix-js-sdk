@@ -1,3 +1,27 @@
+Changes in [40.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.0.0) (2026-01-13)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* MatrixRTC Pseudonymous livekit identities ([#5110](https://github.com/matrix-org/matrix-js-sdk/pull/5110)). Contributed by @toger5.
+
+## 🦖 Deprecations
+
+* Mark `forwardingCurve25519KeyChain` as deprecated ([#5111](https://github.com/matrix-org/matrix-js-sdk/pull/5111)). Contributed by @richvdh.
+* Mark `IEventDecryptionResult` as deprecated ([#5112](https://github.com/matrix-org/matrix-js-sdk/pull/5112)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Implement MSC4387: M\_SAFETY error ([#5107](https://github.com/matrix-org/matrix-js-sdk/pull/5107)). Contributed by @Half-Shot.
+* Implement \_unstable\_getRTCTransports for MSC4143 ([#5104](https://github.com/matrix-org/matrix-js-sdk/pull/5104)). Contributed by @Half-Shot.
+* Use `membershipID` for session events ([#5105](https://github.com/matrix-org/matrix-js-sdk/pull/5105)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Make MatrixRTC encryption key types narrower for TS 5.9 compatibility ([#5117](https://github.com/matrix-org/matrix-js-sdk/pull/5117)). Contributed by @robintown.
+* Re-check outgoing requests after processing them ([#5109](https://github.com/matrix-org/matrix-js-sdk/pull/5109)). Contributed by @andybalaam.
+* Make token refresher init itself lazily ([#5106](https://github.com/matrix-org/matrix-js-sdk/pull/5106)). Contributed by @dbkr.
+
+
 Changes in [39.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.4.0) (2025-12-16)
 ==================================================================================================
 ## ✨ Features

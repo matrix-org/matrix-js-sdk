@@ -59,7 +59,7 @@ import {
     type ICallNotifyContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membership.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membership";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";

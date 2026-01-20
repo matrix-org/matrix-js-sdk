@@ -136,7 +136,7 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
         // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
-                result[key] = jest.fn();
+                result[key] = vi.fn();
             }
         } catch {
             // Direct access to some non-function fields of DOM prototypes may
@@ -592,7 +592,7 @@ export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
     });
 
     while (!resolved) {
-        await jest.advanceTimersByTimeAsync(1);
+        await vi.advanceTimersByTimeAsync(1);
     }
 
     return await promise;
@@ -641,7 +641,7 @@ export function waitFor<T>(
             checkCallback();
 
             while (!finished) {
-                jest.advanceTimersByTime(interval);
+                vi.advanceTimersByTime(interval);
 
                 // Could have timed-out
                 if (finished) break;

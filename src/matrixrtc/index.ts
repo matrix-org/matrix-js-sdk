@@ -19,5 +19,5 @@ export * from "./LivekitTransport.ts";
 export * from "./MatrixRTCSession.ts";
 export * from "./MatrixRTCSessionManager.ts";
 export type * from "./types.ts";
-export { Status } from "./types.ts";
+export { Status, parseCallNotificationContent, isMyMembership } from "./types.ts";
 export { MembershipManagerEvent } from "./IMembershipManager.ts";

@@ -48,6 +48,7 @@ import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import { slotDescriptionToId } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -97,14 +98,6 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
-}
-
-export function slotIdToDescription(slotId: string): SlotDescription {
-    const [application, id] = slotId.split("#");
-    return { application, id };
-}
-export function slotDescriptionToId(slotDescription: SlotDescription): string {
-    return `${slotDescription.application}#${slotDescription.id}`;
 }
 
 // The names follow these principles:
@@ -327,7 +320,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // (prefer sticky events in case of a duplicate)
         options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
     ): Promise<CallMembership[]> {
-        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
+        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId} ${slotDescription.application}#${slotDescription.id}]`);
         const callMemberEvents = collectMembersEvents(room, options, logger);
 
         const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
@@ -415,7 +408,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         private readonly calculateMembershipsOpts?: SessionMembershipsForSlotOpts,
     ) {
         super();
-        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
+        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId} ${slotDescription.application}#${slotDescription.id}]`);
 
         this.roomSubset.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
@@ -493,6 +486,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.reEmitter.reEmit(this.membershipManager!, [
                 MembershipManagerEvent.ProbablyLeft,
                 MembershipManagerEvent.StatusChanged,
+                MembershipManagerEvent.DelayIdChanged,
             ]);
             // Create Encryption manager
             let transport;
@@ -913,7 +907,7 @@ function isValidMembership(
 ): boolean {
     if (!deepCompare(membership.slotDescription, slotDescription)) {
         logger.info(
-            `Ignoring membership of user ${membership.userId} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
+            `Ignoring membership of user ${membership.userId} for a different slot. Theirs: ${JSON.stringify(membership.slotDescription)}, Expected: ${JSON.stringify(slotDescription)}`,
         );
         return false;
     }

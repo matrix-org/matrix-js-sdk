@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMockJest from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { OidcError } from "../../../src/oidc/error";
 import { type OidcRegistrationClientMetadata, registerOidcClient } from "../../../src/oidc/register";
@@ -37,18 +37,14 @@ describe("registerOidcClient()", () => {
     const dynamicClientId = "xyz789";
 
     const delegatedAuthConfig = makeDelegatedAuthConfig(issuer);
-    beforeEach(() => {
-        fetchMockJest.mockClear();
-        fetchMockJest.resetBehavior();
-    });
 
     it("should make correct request to register client", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
         expect(await registerOidcClient(delegatedAuthConfig, metadata)).toEqual(dynamicClientId);
-        expect(fetchMockJest).toHaveBeenCalledWith(
+        expect(fetchMock.fetchHandler).toHaveFetched(
             delegatedAuthConfig.registration_endpoint,
             expect.objectContaining({
                 headers: {
@@ -58,7 +54,7 @@ describe("registerOidcClient()", () => {
                 method: "POST",
             }),
         );
-        expect(JSON.parse(fetchMockJest.mock.calls[0][1]!.body as string)).toEqual(
+        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options!.body as string)).toEqual(
             expect.objectContaining({
                 client_name: clientName,
                 client_uri: baseUrl,
@@ -76,7 +72,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should throw when registration request fails", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
             status: 500,
         });
         await expect(() => registerOidcClient(delegatedAuthConfig, metadata)).rejects.toThrow(
@@ -85,7 +81,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should throw when registration response is invalid", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
             status: 200,
             // no clientId in response
             body: "{}",
@@ -120,7 +116,7 @@ describe("registerOidcClient()", () => {
     });
 
     it("should filter out invalid URIs", async () => {
-        fetchMockJest.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
@@ -131,7 +127,7 @@ describe("registerOidcClient()", () => {
                 policyUri: "https://policy-uri/",
             }),
         ).toEqual(dynamicClientId);
-        expect(JSON.parse(fetchMockJest.mock.calls[0][1]!.body as string)).not.toEqual(
+        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options!.body as string)).not.toEqual(
             expect.objectContaining({
                 tos_uri: "http://just.testing/tos",
                 policy_uri: "https://policy-uri/",

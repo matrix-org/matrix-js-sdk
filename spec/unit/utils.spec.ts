@@ -149,11 +149,11 @@ describe("utils", function () {
     describe("deepCompare", function () {
         const assert = {
             isTrue: function (x: any) {
-                // eslint-disable-next-line jest/no-standalone-expect
+                // eslint-disable-next-line @vitest/no-standalone-expect
                 expect(x).toBe(true);
             },
             isFalse: function (x: any) {
-                // eslint-disable-next-line jest/no-standalone-expect
+                // eslint-disable-next-line @vitest/no-standalone-expect
                 expect(x).toBe(false);
             },
         };
@@ -268,7 +268,7 @@ describe("utils", function () {
             const fn = (attempt: any) => {
                 count++;
 
-                // If this expectation fails then it can appear as a Jest Timeout due to
+                // If this expectation fails then it can appear as a test timeout due to
                 // the retry running beyond the test limit.
                 expect(attempt).toEqual(count);
 
@@ -710,6 +710,7 @@ describe("utils", function () {
     });
 
     describe("sleep", () => {
+        // eslint-disable-next-line @vitest/expect-expect
         it("resolves", async () => {
             await utils.sleep(0);
         });
@@ -722,6 +723,7 @@ describe("utils", function () {
     });
 
     describe("immediate", () => {
+        // eslint-disable-next-line @vitest/expect-expect
         it("resolves", async () => {
             await utils.immediate();
         });

@@ -12,8 +12,8 @@ env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 permissions: {} # No permissions required
 jobs:
-    jest:
-        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
+    test:
+        name: "Vitest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
         runs-on: ubuntu-24.04
         timeout-minutes: 10
         strategy:
@@ -42,14 +42,10 @@ jobs:
               run: |
                   yarn test \
                       --coverage=${{ env.ENABLE_COVERAGE }} \
-                      --ci \
-                      --max-workers ${{ steps.cpu-cores.outputs.count }} \
+                      --maxWorkers ${{ steps.cpu-cores.outputs.count }} \
                       ./spec/${{ matrix.specs }}
               env:
-                  JEST_SONAR_UNIQUE_OUTPUT_NAME: true
-
-                  # tell jest to use coloured output
-                  FORCE_COLOR: true
+                  SHARD: ${{ matrix.specs }}
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
@@ -65,13 +61,13 @@ jobs:
                       !coverage/lcov-report
 
     # Dummy completion job to simplify branch protections
-    jest-complete:
-        name: Jest tests
-        needs: jest
+    complete:
+        name: Tests
+        needs: test
         if: always()
         runs-on: ubuntu-24.04
         steps:
-            - if: needs.jest.result != 'skipped' && needs.jest.result != 'success'
+            - if: needs.test.result != 'skipped' && needs.test.result != 'success'
               run: exit 1
 
     element-web:
