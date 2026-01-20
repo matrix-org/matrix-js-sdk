@@ -135,43 +135,38 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             sessionManager.start();
             sessionManager.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
             sessionManager.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+            const sessionStartedPromise = new Promise((resolve) =>
+                sessionManager.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve),
+            );
+            const sessionEndedPromise = new Promise((resolve) =>
+                sessionManager.once(MatrixRTCSessionManagerEvents.SessionEnded, (...params) => resolve(params)),
+            );
 
-            try {
-                // Create a session for applicaation m.other, we ignore this session because it lacks a call_id
-                const room1MembershipData: MembershipData[] = [generateMembership({ type: "m.other" })];
-                const room1 = makeMockRoom(room1MembershipData, eventKind === "sticky");
-                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
-                client.emit(ClientEvent.Room, room1);
-                await flushPromises();
-                expect(onStarted).not.toHaveBeenCalled();
-                onStarted.mockClear();
+            // Create a session for applicaation m.other, we ignore this session because it lacks a call_id
+            const room1MembershipData: MembershipData[] = [generateMembership({ type: "m.other" })];
+            const room1 = makeMockRoom(room1MembershipData, eventKind === "sticky");
+            vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+            client.emit(ClientEvent.Room, room1);
+            await flushPromises();
+            expect(onStarted).not.toHaveBeenCalled();
 
-                // Create a session for applicaation m.notCall. We expect this call to be tracked because it has matching call_id
-                const room2MembershipData: MembershipData[] = [
-                    generateMembership({ type: "m.notCall", callId: "test" }),
-                ];
-                const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky");
-                vi.spyOn(client, "getRooms").mockReturnValue([room2]);
-                client.emit(ClientEvent.Room, room2);
-                await flushPromises();
-                expect(onStarted).toHaveBeenCalled();
-                onStarted.mockClear();
+            // Create a session for applicaation m.notCall. We expect this call to be tracked because it has matching call_id
+            const room2MembershipData: MembershipData[] = [generateMembership({ type: "m.notCall", callId: "test" })];
+            const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky");
+            vi.spyOn(client, "getRooms").mockReturnValue([room2]);
+            client.emit(ClientEvent.Room, room2);
+            await flushPromises();
+            await sessionStartedPromise;
 
-                // Stop room1's RTC session. Not tracked.
-                vi.spyOn(client, "getRoom").mockReturnValue(room1);
-                await sendLeaveMembership(room1, room1MembershipData);
-                expect(onEnded).not.toHaveBeenCalled();
+            // Stop room1's RTC session. Not tracked.
+            vi.spyOn(client, "getRoom").mockReturnValue(room1);
+            await sendLeaveMembership(room1, room1MembershipData);
+            expect(onEnded).not.toHaveBeenCalled();
 
-                // Stop room2's RTC session. Tracked.
-                vi.spyOn(client, "getRoom").mockReturnValue(room2);
-                await sendLeaveMembership(room2, room2MembershipData);
-                expect(onEnded).toHaveBeenCalled();
-
-                onEnded.mockClear();
-            } finally {
-                client.matrixRTC.off(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
-                client.matrixRTC.off(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
-            }
+            // Stop room2's RTC session. Tracked.
+            vi.spyOn(client, "getRoom").mockReturnValue(room2);
+            await sendLeaveMembership(room2, room2MembershipData);
+            await sessionEndedPromise;
         });
 
         it("Doesn't fire event if unrelated sessions ends", async () => {
