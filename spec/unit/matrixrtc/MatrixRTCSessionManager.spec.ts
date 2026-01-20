@@ -16,17 +16,24 @@ limitations under the License.
 
 import { ClientEvent, EventTimeline, MatrixClient, type Room, RoomStateEvent } from "../../../src";
 import { MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc";
-import { makeMockRoom, type MembershipData, sessionMembershipTemplate, mockRoomState, mockRTCEvent, rtcMembershipTemplate } from "./mocks";
+import {
+    makeMockRoom,
+    type MembershipData,
+    sessionMembershipTemplate,
+    mockRoomState,
+    mockRTCEvent,
+    rtcMembershipTemplate,
+} from "./mocks";
 import { logger } from "../../../src/logger";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { RtcMembershipData, SessionMembershipData } from "src/matrixrtc/membership";
+import { type RtcMembershipData, type SessionMembershipData } from "src/matrixrtc/membership";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
     ({ eventKind }) => {
         let client: MatrixClient;
 
-        function generateMembership(userId: string, opts: {type: string, callId?: string} = {type: "m.call"}): MembershipData {
+        function generateMembership(opts: { type: string; callId?: string } = { type: "m.call" }): MembershipData {
             if (eventKind === "sticky") {
                 return {
                     ...rtcMembershipTemplate,
@@ -34,22 +41,20 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                     application: {
                         ...rtcMembershipTemplate.application,
                         type: opts.type,
-                    }
-                } satisfies RtcMembershipData&{user_id: string}
+                    },
+                } satisfies RtcMembershipData & { user_id: string };
             }
 
             return {
                 ...sessionMembershipTemplate,
                 application: opts.type,
                 call_id: opts.callId ?? sessionMembershipTemplate.call_id, // approximate version.
-            } satisfies SessionMembershipData&{user_id: string}
+            } satisfies SessionMembershipData & { user_id: string };
         }
 
         async function sendLeaveMembership(room: Room, membershipData: MembershipData[]): Promise<void> {
             if (eventKind === "memberState") {
-                mockRoomState(room, [
-                    { user_id: sessionMembershipTemplate.user_id }
-                ]);
+                mockRoomState(room, [{ user_id: sessionMembershipTemplate.user_id }]);
                 const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
                 const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
                 client.emit(RoomStateEvent.Events, membEvent, roomState, null);
@@ -76,7 +81,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
             try {
-                const room1 = makeMockRoom([generateMembership(sessionMembershipTemplate.user_id, { type: "m.call" })], eventKind === "sticky");
+                const room1 = makeMockRoom([generateMembership({ type: "m.call" })], eventKind === "sticky");
                 vi.spyOn(client, "getRooms").mockReturnValue([room1]);
 
                 client.emit(ClientEvent.Room, room1);
@@ -92,7 +97,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
             try {
-                const room1 = makeMockRoom([generateMembership(sessionMembershipTemplate.user_id, {type : "m.other" })], eventKind === "sticky");
+                const room1 = makeMockRoom([generateMembership({ type: "m.other" })], eventKind === "sticky");
                 vi.spyOn(client, "getRooms").mockReturnValue([room1]);
 
                 client.emit(ClientEvent.Room, room1);
@@ -105,7 +110,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         it("Fires event when session ends", async () => {
             const onEnded = vi.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
-            const membershipData: MembershipData[] = [generateMembership(sessionMembershipTemplate.user_id)];
+            const membershipData: MembershipData[] = [generateMembership()];
             const room1 = makeMockRoom(membershipData, eventKind === "sticky");
             vi.spyOn(client, "getRooms").mockReturnValue([room1]);
             vi.spyOn(client, "getRoom").mockReturnValue(room1);
@@ -132,9 +137,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
 
             try {
                 // Create a session for applicaation m.other, we ignore this session because it lacks a call_id
-                const room1MembershipData: MembershipData[] = [
-                    generateMembership(sessionMembershipTemplate.user_id, { type: "m.other" })
-                ];
+                const room1MembershipData: MembershipData[] = [generateMembership({ type: "m.other" })];
                 const room1 = makeMockRoom(room1MembershipData, eventKind === "sticky");
                 vi.spyOn(client, "getRooms").mockReturnValue([room1]);
                 client.emit(ClientEvent.Room, room1);
@@ -144,7 +147,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
 
                 // Create a session for applicaation m.notCall. We expect this call to be tracked because it has matching call_id
                 const room2MembershipData: MembershipData[] = [
-                    generateMembership(sessionMembershipTemplate.user_id, { type: "m.notCall", callId: "test" })
+                    generateMembership({ type: "m.notCall", callId: "test" }),
                 ];
                 const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky");
                 vi.spyOn(client, "getRooms").mockReturnValue([room2]);
@@ -173,7 +176,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         it("Doesn't fire event if unrelated sessions ends", async () => {
             const onEnded = vi.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
-            const membership: MembershipData[] = [{ ...sessionMembershipTemplate, application: "m.other_app" }];
+            const membership: MembershipData[] = [generateMembership({ type: "m.other_app" })];
             const room1 = makeMockRoom(membership, eventKind === "sticky");
             vi.spyOn(client, "getRooms").mockReturnValue([room1]);
             vi.spyOn(client, "getRoom").mockReturnValue(room1);

@@ -882,7 +882,10 @@ describe("MembershipManager", () => {
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
-            const membership = mockCallMembership({ ...sessionMembershipTemplate, user_id: client.getUserId()! }, room.roomId);
+            const membership = mockCallMembership(
+                { ...sessionMembershipTemplate, user_id: client.getUserId()! },
+                room.roomId,
+            );
             await manager.onRTCSessionMemberUpdate([membership]);
             await manager.updateCallIntent("video");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);

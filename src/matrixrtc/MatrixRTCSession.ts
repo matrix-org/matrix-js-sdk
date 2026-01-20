@@ -320,7 +320,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // (prefer sticky events in case of a duplicate)
         options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
     ): Promise<CallMembership[]> {
-        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId} ${slotDescription.application}#${slotDescription.id}]`);
+        const logger = rootLogger.getChild(
+            `[MatrixRTCSession ${room.roomId} ${slotDescription.application}#${slotDescription.id}]`,
+        );
         const callMemberEvents = collectMembersEvents(room, options, logger);
 
         const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
@@ -408,13 +410,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         private readonly calculateMembershipsOpts?: SessionMembershipsForSlotOpts,
     ) {
         super();
-        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId} ${slotDescription.application}#${slotDescription.id}]`);
+        this.logger = rootLogger.getChild(
+            `[MatrixRTCSession ${roomSubset.roomId} ${slotDescription.application}#${slotDescription.id}]`,
+        );
 
         this.roomSubset.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
 
-        // We can ignore this promise because `recalculateSessionMembers` will emit
-        // `MatrixRTCSessionEvent.MembershipsChanged` once it has completed.
         this.ensureRecalculateSessionMembers();
         this.setExpiryTimer();
     }
@@ -779,7 +781,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     private ensureRecalculateSessionMembers(): void {
         if (this.recalculateSessionMembersPromise === undefined) {
-            this.recalculateSessionMembersPromise = this.recalculateSessionMembers().then(() => {
+            this.recalculateSessionMembersPromise = this.recalculateSessionMembers().finally(() => {
                 this.recalculateSessionMembersPromise = undefined;
                 if (this.recalculateSessionMembersDirty) {
                     this.ensureRecalculateSessionMembers();

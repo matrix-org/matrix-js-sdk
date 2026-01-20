@@ -24,7 +24,7 @@ import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
 import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
-import { type MembershipConfig, type SessionConfig, slotDescriptionToId } from "./MatrixRTCSession.ts";
+import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
@@ -34,6 +34,7 @@ import {
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "./membership/index.ts";
+import { slotDescriptionToId } from "./utils.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
