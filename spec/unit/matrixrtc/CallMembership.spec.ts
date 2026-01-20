@@ -207,12 +207,12 @@ describe("CallMembership", () => {
     });
 
     describe("RtcMembershipData", () => {
-        function makeMockEvent(originTs = 0): MatrixEvent {
+        function makeMockEvent(originTs = 0, content: IContent = {}): MatrixEvent {
             return {
                 getTs: vi.fn().mockReturnValue(originTs),
                 getSender: vi.fn().mockReturnValue("@alice:example.org"),
                 getId: vi.fn().mockReturnValue("$eventid"),
-                getContent: vi.fn().mockReturnValue({}),
+                getContent: vi.fn().mockReturnValue(content),
                 getType: vi.fn().mockReturnValue(EventType.RTCMembership),
             } as unknown as MatrixEvent;
         }
@@ -393,6 +393,10 @@ describe("CallMembership", () => {
                 expect(membership.getMsUntilExpiry()).toBe(undefined);
                 expect(membership.isExpired()).toBe(false);
             });
+        });
+        it("uses unpadded base64 for RTC backend identities", async () => {
+            const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
+            expect(membership.rtcBackendIdentity).toBe("j9N1u04ZbvI9qKf3cxrf2NauD-fIGJ4uAcYkfI9V7SY");
         });
     });
 });
