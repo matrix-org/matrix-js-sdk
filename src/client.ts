@@ -2888,7 +2888,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
-    ): Promise<SendDelayedEventResponse>;
+    ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room | null,
         event: MatrixEvent,
