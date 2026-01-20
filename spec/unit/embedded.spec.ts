@@ -430,26 +430,6 @@ describe("RoomWidgetClient", () => {
                 );
             });
 
-            it("sends child action delayed message events", async () => {
-                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                const parentDelayId = `id-${Math.random()}`;
-                await client._unstable_sendDelayedEvent(
-                    "!1:example.org",
-                    { parent_delay_id: parentDelayId },
-                    null,
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                );
-                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                    "!1:example.org",
-                    undefined,
-                    parentDelayId,
-                );
-            });
-
             it("sends delayed state events", async () => {
                 await makeClient({
                     sendDelayedEvents: true,
@@ -470,30 +450,6 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     2000,
                     undefined,
-                );
-            });
-
-            it("sends child action delayed state events", async () => {
-                await makeClient({
-                    sendDelayedEvents: true,
-                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
-                });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                const parentDelayId = `fg-${Math.random()}`;
-                await client._unstable_sendDelayedStateEvent(
-                    "!1:example.org",
-                    { parent_delay_id: parentDelayId },
-                    "org.example.foo",
-                    { hello: "world" },
-                    "bar",
-                );
-                expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
-                    "org.example.foo",
-                    "bar",
-                    { hello: "world" },
-                    "!1:example.org",
-                    undefined,
-                    parentDelayId,
                 );
             });
 

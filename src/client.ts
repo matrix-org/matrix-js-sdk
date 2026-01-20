@@ -103,7 +103,7 @@ import {
 import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
 import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
-    isSendDelayedEventRequestOpts,
+    type SendStickyEventRequestOpts,
     UpdateDelayedEventAction,
     type DelayedEventInfo,
     type IAddThreePidOnlyBody,
@@ -2758,54 +2758,51 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    /**
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
-     * @returns Rejects: with an error response.
-     */
     private sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
-        queryDict?: QueryDict;
+        queryDict: SendDelayedEventRequestOpts;
+        txnId?: string;
+    }): Promise<SendDelayedEventResponse>;
+    private sendCompleteEvent(params: {
+        roomId: string;
+        threadId: string | null;
+        eventObject: Partial<IEvent>;
+        queryDict: QueryDict & SendDelayedEventRequestOpts;
+        txnId?: string;
+    }): Promise<SendDelayedEventResponse>;
+    private sendCompleteEvent(params: {
+        roomId: string;
+        threadId: string | null;
+        eventObject: Partial<IEvent>;
+        queryDict?: QueryDict | SendStickyEventRequestOpts;
         txnId?: string;
     }): Promise<ISendEventResponse>;
     /**
-     * Sends a delayed event (MSC4140).
      * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param delayOpts - Properties of the delay for this event.
      * @param txnId - Optional.
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
-        roomId: string;
-        threadId: string | null;
-        eventObject: Partial<IEvent>;
-        delayOpts: SendDelayedEventRequestOpts;
-        queryDict?: QueryDict;
-        txnId?: string;
-    }): Promise<SendDelayedEventResponse>;
     private sendCompleteEvent({
         roomId,
         threadId,
         eventObject,
-        delayOpts,
         queryDict,
         txnId,
     }: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
-        delayOpts?: SendDelayedEventRequestOpts;
-        queryDict?: QueryDict;
+        queryDict?: QueryDict | SendDelayedEventRequestOpts | SendStickyEventRequestOpts;
         txnId?: string;
     }): Promise<SendDelayedEventResponse | ISendEventResponse> {
         if (!txnId) {
             txnId = this.makeTxnId();
         }
 
+        const isDalayedEvent = queryDict && "delay" in queryDict && typeof queryDict.delay === "number";
         // We always construct a MatrixEvent when sending because the store and scheduler use them.
         // We'll extract the params back out if it turns out the client has no scheduler or store.
         const localEvent = new MatrixEvent(
@@ -2824,7 +2821,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             localEvent.setThread(thread);
         }
 
-        if (!delayOpts) {
+        if (!isDalayedEvent) {
             // set up re-emitter for this new event - this is normally the job of EventMapper but we don't use it here
             this.reEmitter.reEmit(localEvent, [MatrixEventEvent.Replaced, MatrixEventEvent.VisibilityChange]);
             room?.reEmitter.reEmit(localEvent, [MatrixEventEvent.BeforeRedaction]);
@@ -2844,14 +2841,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const type = localEvent.getType();
         this.logger.debug(
-            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${delayOpts ? " (delayed event)" : ""}${queryDict ? " query params: " + JSON.stringify(queryDict) : ""}`,
+            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${isDalayedEvent ? " (delayed event)" : ""}${queryDict ? " query params: " + JSON.stringify(queryDict) : ""}`,
         );
 
         localEvent.setTxnId(txnId);
         localEvent.setStatus(EventStatus.SENDING);
 
         // TODO: separate store for delayed events?
-        if (!delayOpts) {
+        if (!isDalayedEvent) {
             // add this event immediately to the local store as 'sending'.
             room?.addPendingEvent(localEvent, txnId);
 
@@ -2861,22 +2858,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (localEvent.status === EventStatus.NOT_SENT) {
                 return Promise.reject(new Error("Event blocked by other events not yet sent"));
             }
-
-            return this.encryptAndSendEvent(room, localEvent, queryDict);
-        } else {
-            return this.encryptAndSendEvent(room, localEvent, delayOpts, queryDict);
         }
+        return this.encryptAndSendEvent(room, localEvent, queryDict);
     }
 
     /**
      * encrypts the event if necessary; adds the event to the queue, or sends it; marks the event as sent/unsent
      * @returns returns a promise which resolves with the result of the send request
      */
-    protected async encryptAndSendEvent(
-        room: Room | null,
-        event: MatrixEvent,
-        queryDict?: QueryDict,
-    ): Promise<ISendEventResponse>;
     /**
      * Simply sends a delayed event without encrypting it.
      * TODO: Allow encrypted delayed events, and encrypt them properly
@@ -2886,20 +2875,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected async encryptAndSendEvent(
         room: Room | null,
         event: MatrixEvent,
-        delayOpts: SendDelayedEventRequestOpts,
-        queryDict?: QueryDict,
+        queryDict: (QueryDict | SendStickyEventRequestOpts) & SendDelayedEventRequestOpts,
+    ): Promise<SendDelayedEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room | null,
+        event: MatrixEvent,
+        queryDict?: QueryDict | SendStickyEventRequestOpts | SendDelayedEventRequestOpts,
     ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room | null,
         event: MatrixEvent,
-        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
-        queryDict?: QueryDict,
+        queryDict?: QueryDict | SendStickyEventRequestOpts | SendDelayedEventRequestOpts,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        let queryOpts = queryDict;
-        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            return this.sendEventHttpRequest(event, delayOptsOrQuery, queryOpts);
-        } else if (!queryOpts) {
-            queryOpts = delayOptsOrQuery;
+        if (queryDict && "delay" in queryDict && queryDict.delay !== undefined) {
+            return this.sendEventHttpRequest(event, queryDict);
         }
         try {
             let cancelled: boolean;
@@ -2936,7 +2925,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             if (!promise) {
-                promise = this.sendEventHttpRequest(event, queryOpts);
+                promise = this.sendEventHttpRequest(event, queryDict);
                 if (room) {
                     promise = promise.then((res) => {
                         room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
@@ -3051,16 +3040,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse>;
     private sendEventHttpRequest(
         event: MatrixEvent,
-        delayOpts: SendDelayedEventRequestOpts,
-        queryDict?: QueryDict,
+        queryDict: (QueryDict | SendStickyEventRequestOpts) & SendDelayedEventRequestOpts,
     ): Promise<SendDelayedEventResponse>;
     private sendEventHttpRequest(
         event: MatrixEvent,
-        queryOrDelayOpts?: SendDelayedEventRequestOpts | QueryDict,
-        queryDict?: QueryDict,
+        queryDict?: QueryDict | SendStickyEventRequestOpts | SendDelayedEventRequestOpts,
+    ): Promise<ISendEventResponse>;
+    private sendEventHttpRequest(
+        event: MatrixEvent,
+        queryDict?: QueryDict | SendStickyEventRequestOpts | SendDelayedEventRequestOpts,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let txnId = event.getTxnId();
         if (!txnId) {
@@ -3093,19 +3083,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
 
-        const delayOpts =
-            queryOrDelayOpts && isSendDelayedEventRequestOpts(queryOrDelayOpts) ? queryOrDelayOpts : undefined;
-        const queryOpts = !delayOpts ? queryOrDelayOpts : queryDict;
+        const isDelayedEvent = queryDict && "delay" in queryDict && typeof queryDict.delay === "number";
+
+        let query = queryDict;
+        if (query) {
+            query = replaceParam("delay", `${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`, query);
+            query = replaceParam("sticky_duration_ms", `${UNSTABLE_MSC4354_STICKY_EVENTS}.sticky_duration_ms`, query);
+        }
+
         const content = event.getWireContent();
-        if (delayOpts) {
-            return this.http.authedRequest<SendDelayedEventResponse>(
-                Method.Put,
-                path,
-                { ...getUnstableDelayQueryOpts(delayOpts), ...queryOpts },
-                content,
-            );
+
+        if (isDelayedEvent) {
+            return this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, query, content);
         } else {
-            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content).then((res) => {
+            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, query, content).then((res) => {
                 this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
                 return res;
             });
@@ -3482,7 +3473,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            delayOpts,
+            queryDict: delayOpts,
             txnId,
         });
     }
@@ -3524,8 +3515,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-            delayOpts,
+            queryDict: { ...delayOpts, sticky_duration_ms: stickDuration },
             txnId,
         });
     }
@@ -3563,7 +3553,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, getUnstableDelayQueryOpts(delayOpts), content as Body, opts);
+        return this.http.authedRequest(
+            Method.Put,
+            path,
+            replaceParam("delay", `${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`, delayOpts),
+            content as Body,
+            opts,
+        );
     }
 
     /**
@@ -8857,12 +8853,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return validateAuthMetadataAndKeys(authMetadata);
     }
-}
-
-function getUnstableDelayQueryOpts(delayOpts: SendDelayedEventRequestOpts): QueryDict {
-    return Object.fromEntries(
-        Object.entries(delayOpts).map(([k, v]) => [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.${k}`, v]),
-    );
 }
 
 /**
