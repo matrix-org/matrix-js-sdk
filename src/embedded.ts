@@ -57,7 +57,7 @@ import { ConnectionError, MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
-import { MapWithDefault, QueryDict, recursiveMapToObject } from "./utils.ts";
+import { MapWithDefault, type QueryDict, recursiveMapToObject } from "./utils.ts";
 import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
 
 interface IStateEventRequest {
@@ -129,14 +129,14 @@ export interface ICapabilities {
      * @experimental Part of MSC4354
      * @defaultValue false
      */
-    sendSticky?: boolean
+    sendSticky?: boolean;
 
     /**
      * Whether this client needs to be able to receive sticky events.
      * @experimental Part of MSC4354
      * @defaultValue false
      */
-    receiveSticky?: boolean
+    receiveSticky?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -258,10 +258,10 @@ export class RoomWidgetClient extends MatrixClient {
             widgetApi.requestCapability(MatrixCapabilities.MSC4157UpdateDelayedEvent);
         }
         if (capabilities.sendSticky) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC4354SendStickyEvent)
+            widgetApi.requestCapability(MatrixCapabilities.MSC4354SendStickyEvent);
         }
         if (capabilities.receiveSticky) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC4354ReceiveStickyEvent)
+            widgetApi.requestCapability(MatrixCapabilities.MSC4354ReceiveStickyEvent);
         }
         if (capabilities.turnServers) {
             widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
@@ -385,16 +385,17 @@ export class RoomWidgetClient extends MatrixClient {
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let queryOpts = queryDict;
-        let delayOpts: SendDelayedEventRequestOpts | undefined
+        let delayOpts: SendDelayedEventRequestOpts | undefined;
         if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            delayOpts = delayOptsOrQuery
+            delayOpts = delayOptsOrQuery;
         } else if (!queryOpts) {
             queryOpts = delayOptsOrQuery;
         }
 
-        const stickyDurationMs = queryOpts?.["org.matrix.msc4354.sticky_duration_ms"]
-        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== 'number')
-            throw new Error('Sticky duration must be a number when defined')
+        const stickyDurationMs = queryOpts?.["org.matrix.msc4354.sticky_duration_ms"];
+        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
+            throw new Error("Sticky duration must be a number when defined");
+        }
 
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts

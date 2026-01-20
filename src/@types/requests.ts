@@ -97,6 +97,7 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
+// TODO the concept of `parent_delay_id` is not deprecated
 export type SendDelayedEventRequestOpts = { parent_delay_id: string } | { delay: number; parent_delay_id?: string };
 
 export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
