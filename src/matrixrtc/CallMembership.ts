@@ -60,7 +60,6 @@ export class CallMembership {
     /**
      * Parse the membershipdata from a call membership event.
      * @param matrixEvent The Matrix event to read.
-     * @param data The contents of the event.
      * @returns MembershipData in either MembershipKind.RTC or MembershipKind.Session format.
      * @throws If the content is neither format.
      */
@@ -89,8 +88,6 @@ export class CallMembership {
     /**
      * Parse the contents of a MatrixEvent and create a CallMembership instance.
      * @param matrixEvent The Matrix event to read.
-     * @param data The contents of the event.
-     * @returns
      */
     public static async parseFromEvent(matrixEvent: LimitedEvent): Promise<CallMembership> {
         const membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
