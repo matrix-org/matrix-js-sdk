@@ -265,6 +265,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public memberships: CallMembership[] = [];
 
     /**
+     * Resolves when the session has calculated the initial membership of the session.
+     */
+    public readonly initialMembershipCalculated: Promise<void>;
+
+    /**
      * The statistics for this session.
      */
     public statistics: Statistics = {
@@ -417,7 +422,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.roomSubset.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
 
-        this.ensureRecalculateSessionMembers();
+        this.initialMembershipCalculated = this.ensureRecalculateSessionMembers();
         this.setExpiryTimer();
     }
     /*
@@ -679,7 +684,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.ensureRecalculateSessionMembers.bind(this), soonestExpiry);
+            this.expiryTimeout = setTimeout(() => void this.ensureRecalculateSessionMembers(), soonestExpiry);
         }
     }
 
@@ -745,7 +750,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Call this when the Matrix room members have changed.
      */
     private readonly onRoomMemberUpdate = (): void => {
-        this.ensureRecalculateSessionMembers();
+        void this.ensureRecalculateSessionMembers();
     };
 
     /**
@@ -761,7 +766,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 (e) => e.getType() === EventType.RTCMembership,
             )
         ) {
-            this.ensureRecalculateSessionMembers();
+            void this.ensureRecalculateSessionMembers();
         }
     };
 
@@ -779,15 +784,20 @@ export class MatrixRTCSession extends TypedEventEmitter<
     private recalculateSessionMembersDirty = false;
     private recalculateSessionMembersPromise: Promise<void> | undefined = undefined;
 
-    private ensureRecalculateSessionMembers(): void {
+    private async ensureRecalculateSessionMembers(): Promise<void> {
         if (this.recalculateSessionMembersPromise === undefined) {
-            this.recalculateSessionMembersPromise = this.recalculateSessionMembers().finally(() => {
+            try {
+                this.recalculateSessionMembersPromise = this.recalculateSessionMembers();
+                await this.recalculateSessionMembersPromise;
+            } finally {
                 this.recalculateSessionMembersPromise = undefined;
-                if (this.recalculateSessionMembersDirty) {
-                    this.ensureRecalculateSessionMembers();
-                    this.recalculateSessionMembersDirty = false;
-                }
-            });
+                setImmediate(() => {
+                    if (this.recalculateSessionMembersDirty) {
+                        void this.ensureRecalculateSessionMembers();
+                        this.recalculateSessionMembersDirty = false;
+                    }
+                });
+            }
         } else {
             this.recalculateSessionMembersDirty = true;
         }
