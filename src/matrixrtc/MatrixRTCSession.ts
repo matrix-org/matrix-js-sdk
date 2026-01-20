@@ -791,12 +791,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 await this.recalculateSessionMembersPromise;
             } finally {
                 this.recalculateSessionMembersPromise = undefined;
-                setImmediate(() => {
+                setTimeout(() => {
                     if (this.recalculateSessionMembersDirty) {
                         void this.ensureRecalculateSessionMembers();
                         this.recalculateSessionMembersDirty = false;
                     }
-                });
+                }, 1);
             }
         } else {
             this.recalculateSessionMembersDirty = true;

@@ -83,7 +83,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                 client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve),
             );
             client.emit(ClientEvent.Room, room1);
-            await expect(sessionStartedPromise).to.resolves.toBeTruthy();
+            await expect(sessionStartedPromise).resolves.toBeTruthy();
         });
 
         it("Doesn't fire event if unrelated sessions starts", () => {
