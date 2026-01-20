@@ -79,7 +79,9 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         it("Fires event when session starts", async () => {
             const room1 = makeMockRoom([generateMembership({ type: "m.call" })], eventKind === "sticky");
             vi.spyOn(client, "getRooms").mockReturnValue([room1]);
-            const sessionStartedPromise = new Promise(resolve => client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve));
+            const sessionStartedPromise = new Promise((resolve) =>
+                client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve),
+            );
             client.emit(ClientEvent.Room, room1);
             await expect(sessionStartedPromise).to.resolves.toBeTruthy();
         });
@@ -100,17 +102,24 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Fires event when session ends", async () => {
-            const onEnded = vi.fn();
-            client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
+            const sessionStartedPromise = new Promise((resolve) =>
+                client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve),
+            );
+            const sessionEndedPromise = new Promise((resolve) =>
+                client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionEnded, (...params) => resolve(params)),
+            );
             const membershipData: MembershipData[] = [generateMembership()];
             const room1 = makeMockRoom(membershipData, eventKind === "sticky");
             vi.spyOn(client, "getRooms").mockReturnValue([room1]);
             vi.spyOn(client, "getRoom").mockReturnValue(room1);
             client.emit(ClientEvent.Room, room1);
-            await flushPromises();
+            await sessionStartedPromise;
             await sendLeaveMembership(room1, membershipData);
 
-            expect(onEnded).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
+            await expect(sessionEndedPromise).resolves.toStrictEqual([
+                room1.roomId,
+                client.matrixRTC.getActiveRoomSession(room1),
+            ]);
         });
 
         it("Fires correctly with custom sessionDescription", async () => {
