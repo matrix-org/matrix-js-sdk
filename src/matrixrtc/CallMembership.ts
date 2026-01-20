@@ -55,7 +55,7 @@ type MembershipData =
     | { kind: MembershipKind.Session; data: SessionMembershipData };
 
 type LimitedEvent = Pick<MatrixEvent, "getId" | "getSender" | "getTs" | "getType" | "getContent">;
-// TODO: Rename to RtcMembership once we removed the legacy SessionMembership from this file.
+// TODO: Rename to RtcMembership once we removed the legacy SessionMembership is removed, to avoid confusion.
 export class CallMembership {
     /**
      * Parse the membershipdata from a call membership event.
