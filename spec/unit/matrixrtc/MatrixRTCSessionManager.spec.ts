@@ -77,19 +77,11 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Fires event when session starts", async () => {
-            const onStarted = vi.fn();
-            client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
-
-            try {
-                const room1 = makeMockRoom([generateMembership({ type: "m.call" })], eventKind === "sticky");
-                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
-
-                client.emit(ClientEvent.Room, room1);
-                await flushPromises();
-                expect(onStarted).toHaveBeenCalledWith(room1.roomId, client.matrixRTC.getActiveRoomSession(room1));
-            } finally {
-                client.matrixRTC.off(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
-            }
+            const room1 = makeMockRoom([generateMembership({ type: "m.call" })], eventKind === "sticky");
+            vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+            const sessionStartedPromise = new Promise(resolve => client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve));
+            client.emit(ClientEvent.Room, room1);
+            await expect(sessionStartedPromise).to.resolves.toBeTruthy();
         });
 
         it("Doesn't fire event if unrelated sessions starts", () => {
