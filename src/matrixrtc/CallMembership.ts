@@ -25,7 +25,7 @@ import {
     type RtcMembershipData,
     checkSessionsMembershipData,
     type SessionMembershipData,
-} from "./membership";
+} from "./membership/index.ts";
 import { MatrixRTCMembershipParseError } from "./membership/common.ts";
 import { EventType } from "../@types/event.ts";
 
@@ -117,7 +117,9 @@ export class CallMembership {
     private readonly matrixEventData: { eventId: string; sender: string };
 
     /**
-     * @private Only to be used by tests.
+     * Use `parseFromEvent`.
+     * Constructor should only be used by tests.
+     * @private
      * @param matrixEvent
      * @param membershipData
      * @param rtcBackendIdentity
@@ -198,14 +200,11 @@ export class CallMembership {
      */
     public get slotDescription(): SlotDescription {
         const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                const id = data.slot_id.slice(`${data.application.type}#`.length);
-                return { application: data.application.type, id };
-            case MembershipKind.Session:
-            default:
-                return slotIdToDescription(this.slotId);
-        }        
+        if (kind === MembershipKind.RTC) {
+            const id = data.slot_id.slice(`${data.application.type}#`.length);
+            return { application: data.application.type, id };
+        }
+        return slotIdToDescription(this.slotId);
     }
 
     /**

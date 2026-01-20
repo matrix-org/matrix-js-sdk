@@ -23,7 +23,7 @@ import {
     mockRoomState,
     mockRTCEvent,
     rtcMembershipTemplate,
-} from "./mocks";
+} from "./mocks.ts";
 import { logger } from "../../../src/logger";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { type RtcMembershipData, type SessionMembershipData } from "src/matrixrtc/membership";

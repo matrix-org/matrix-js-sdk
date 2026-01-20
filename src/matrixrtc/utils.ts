@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { getEncryptionKeyMapKey, type CallMembershipIdentityParts } from "./EncryptionManager.ts";
-import { type InboundEncryptionSession, type EncryptionKeyMapKey, SlotDescription } from "./types.ts";
+import type { InboundEncryptionSession, EncryptionKeyMapKey, SlotDescription } from "./types.ts";
 
 /**
  * Detects when a key for a given index is outdated.

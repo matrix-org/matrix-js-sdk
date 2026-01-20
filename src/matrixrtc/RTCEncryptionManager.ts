@@ -20,7 +20,7 @@ import {
     type IEncryptionManager,
 } from "./EncryptionManager.ts";
 import { type EncryptionConfig, type MembershipConfig } from "./MatrixRTCSession.ts";
-import { CallMembership } from "./CallMembership.ts";
+import type { CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { type Logger } from "../logger.ts";

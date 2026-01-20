@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mocked } from "vitest";
 
-import { makeMockEvent } from "./mocks";
+import { makeMockEvent } from "./mocks.ts";
 import { ClientEvent, EventType, type MatrixClient } from "../../../src";
 import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { getMockClientWithEventEmitter } from "../../test-utils/client.ts";

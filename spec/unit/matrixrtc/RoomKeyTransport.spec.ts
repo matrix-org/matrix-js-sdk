@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mocked } from "vitest";
 
-import { makeMockEvent, makeMockRoom, sessionMembershipTemplate, makeKey } from "./mocks";
+import { makeMockEvent, makeMockRoom, sessionMembershipTemplate, makeKey } from "./mocks.ts";
 import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";

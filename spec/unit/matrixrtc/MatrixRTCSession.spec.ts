@@ -25,10 +25,10 @@ import {
     type MatrixEvent,
     type Room,
 } from "../../../src";
-import { KnownMembership } from "../../../src/@types/membership";
-import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
-import { MembershipManagerEvent } from "../../../src/matrixrtc/IMembershipManager";
-import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types";
+import { KnownMembership } from "../../../src/@types/membership.ts";
+import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession.ts";
+import { MembershipManagerEvent } from "../../../src/matrixrtc/IMembershipManager.ts";
+import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types.ts";
 import {
     makeMockEvent,
     makeMockRoom,
@@ -39,7 +39,7 @@ import {
     mockRTCEvent,
     owmMemberIdentity,
     rtcMembershipTemplate,
-} from "./mocks";
+} from "./mocks.ts";
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";

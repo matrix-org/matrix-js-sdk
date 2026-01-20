@@ -26,7 +26,13 @@ import {
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
 import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
-import { makeMockClient, makeMockRoom, sessionMembershipTemplate, mockCallMembership, type MockClient } from "./mocks";
+import {
+    makeMockClient,
+    makeMockRoom,
+    sessionMembershipTemplate,
+    mockCallMembership,
+    type MockClient,
+} from "./mocks.ts";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 import { type SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
 
