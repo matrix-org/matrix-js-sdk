@@ -584,7 +584,7 @@ export class MembershipManager
         this.emit(MembershipManagerEvent.ProbablyLeft, this.state.probablyLeft);
     }
 
-    private setAndEmitDelayId(delayId?: string): void {
+    private setAndEmitDelayId(delayId: string | undefined): void {
         if (this.state.delayId === delayId) return;
 
         this.state.delayId = delayId;
