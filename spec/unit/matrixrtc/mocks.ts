@@ -20,7 +20,7 @@ import { type Mocked, type MockedObject } from "vitest";
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
-import { type CallMembershipIdentityParts } from "src/matrixrtc/EncryptionManager";
+import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
 import { logger } from "../../../src/logger.ts";
 
 export type MembershipData = (SessionMembershipData | {}) & { user_id: string };

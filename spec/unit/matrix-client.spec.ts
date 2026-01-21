@@ -88,7 +88,7 @@ import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
-import { type Transport } from "src/matrixrtc/index.ts";
+import { type Transport } from "../../src/matrixrtc/index.ts";
 
 vi.useFakeTimers();
 
