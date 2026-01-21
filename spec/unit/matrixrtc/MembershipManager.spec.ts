@@ -416,8 +416,9 @@ describe("MembershipManager", () => {
             await manager.leave();
             expect(client._unstable_sendScheduledDelayedEvent).toHaveBeenLastCalledWith("id");
             expect(client.sendStateEvent).toHaveBeenCalled();
+            expect(manager.delayId).toBe(undefined);
         });
-        it("send leave event when leave is called and resolving delayed leave fails", async () => {
+        it("send leave event when leave is called and resolving delayed leave fails unknown error", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([focus]);
             await vi.advanceTimersByTimeAsync(1);
@@ -431,6 +432,27 @@ describe("MembershipManager", () => {
                 {},
                 "_@alice:example.org_AAAAAAA_m.call",
             );
+            // If there is a unknown error, we do not reset the delayId
+            // The delayed event might still be around and we track it.
+            expect(manager.delayId).not.toBe(undefined);
+        });
+        it("send leave event when leave is called and resolving delayed leave fails not found error", async () => {
+            const manager = new MembershipManager({}, room, client, callSession);
+            manager.join([focus]);
+            await vi.advanceTimersByTimeAsync(1);
+            (client._unstable_sendScheduledDelayedEvent as Mock<any>).mockRejectedValue(
+                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
+            );
+            await manager.leave();
+
+            // We send a normal leave event since we failed using sendScheduledDelayedEvent.
+            expect(client.sendStateEvent).toHaveBeenLastCalledWith(
+                room.roomId,
+                "org.matrix.msc3401.call.member",
+                {},
+                "_@alice:example.org_AAAAAAA_m.call",
+            );
+            expect(manager.delayId).toBe(undefined);
         });
         it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
