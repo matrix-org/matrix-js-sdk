@@ -2006,7 +2006,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             deviceId: deviceId,
             secretStorage: this.secretStorage,
             cryptoCallbacks: this.cryptoCallbacks,
-            storePrefix: args.useIndexedDB === false ? null : (args.cryptoDatabasePrefix ?? RUST_SDK_STORE_PREFIX),
+            storePrefix: args.useIndexedDB === false ? null : args.cryptoDatabasePrefix ?? RUST_SDK_STORE_PREFIX,
             storeKey: args.storageKey,
             storePassphrase: args.storagePassword,
 
@@ -2393,10 +2393,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // If we were invited to the room, the ID of the user that sent the invite. Otherwise, `null`.
         const inviter =
-            preJoinMembership == KnownMembership.Invite ? (roomMember?.events.member?.getSender() ?? null) : null;
+            preJoinMembership == KnownMembership.Invite ? roomMember?.events.member?.getSender() ?? null : null;
 
         this.logger.debug(
-            `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership}, inviter=${inviter}, opts=${JSON.stringify(opts)}`,
+            `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership}, inviter=${inviter}, opts=${JSON.stringify(
+                opts,
+            )}`,
         );
         if (preJoinMembership == KnownMembership.Join) return room!;
 
@@ -2841,7 +2843,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const type = localEvent.getType();
         this.logger.debug(
-            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${isDalayedEvent ? " (delayed event)" : ""}${queryDict ? " query params: " + JSON.stringify(queryDict) : ""}`,
+            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${isDalayedEvent ? " (delayed event)" : ""}${
+                queryDict ? " query params: " + JSON.stringify(queryDict) : ""
+            }`,
         );
 
         localEvent.setTxnId(txnId);
@@ -3455,7 +3459,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // eslint-disable-next-line
     public async _unstable_sendDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delay: number,
         threadId: string | null,
         eventType: K,
         content: TimelineEvents[K],
@@ -3473,7 +3477,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: delayOpts,
+            queryDict: { delay },
             txnId,
         });
     }
@@ -3491,7 +3495,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
         stickDuration: number,
-        delayOpts: SendDelayedEventRequestOpts,
+        delay: number,
         threadId: string | null,
         eventType: K,
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
@@ -3515,7 +3519,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { ...delayOpts, sticky_duration_ms: stickDuration },
+            queryDict: { delay, sticky_duration_ms: stickDuration },
             txnId,
         });
     }
@@ -3531,7 +3535,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // eslint-disable-next-line
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delay: number,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
@@ -3553,13 +3557,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(
-            Method.Put,
-            path,
-            replaceParam("delay", `${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`, delayOpts),
-            content as Body,
-            opts,
-        );
+        const queryDict = {
+            [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delay,
+        };
+        return this.http.authedRequest(Method.Put, path, queryDict, content as Body, opts);
     }
 
     /**
@@ -3591,7 +3592,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            queryDict: { sticky_duration_ms: stickDuration },
             txnId,
         });
     }

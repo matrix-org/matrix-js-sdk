@@ -461,7 +461,7 @@ export class RoomWidgetClient extends MatrixClient {
     // eslint-disable-next-line
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delay: number,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
@@ -479,7 +479,7 @@ export class RoomWidgetClient extends MatrixClient {
                 stateKey,
                 content,
                 roomId,
-                "delay" in delayOpts ? delayOpts.delay : undefined,
+                delay,
                 // TODO remove the parent_delay_id from the widget api.
                 undefined,
             )
