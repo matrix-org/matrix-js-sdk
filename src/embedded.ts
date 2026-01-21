@@ -126,14 +126,14 @@ export interface ICapabilities {
 
     /**
      * Whether this client needs to be able to send sticky events.
-     * @experimental Part of MSC4354
+     * @experimental Part of MSC4354 & MSC4407
      * @defaultValue false
      */
     sendSticky?: boolean;
 
     /**
      * Whether this client needs to be able to receive sticky events.
-     * @experimental Part of MSC4354
+     * @experimental Part of MSC4354 & MSC4407
      * @defaultValue false
      */
     receiveSticky?: boolean;
@@ -258,10 +258,10 @@ export class RoomWidgetClient extends MatrixClient {
             widgetApi.requestCapability(MatrixCapabilities.MSC4157UpdateDelayedEvent);
         }
         if (capabilities.sendSticky) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC4354SendStickyEvent);
+            widgetApi.requestCapability(MatrixCapabilities.MSC4407SendStickyEvent);
         }
         if (capabilities.receiveSticky) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC4354ReceiveStickyEvent);
+            widgetApi.requestCapability(MatrixCapabilities.MSC4407ReceiveStickyEvent);
         }
         if (capabilities.turnServers) {
             widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);

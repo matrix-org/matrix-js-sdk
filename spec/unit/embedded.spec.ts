@@ -880,15 +880,15 @@ describe("RoomWidgetClient", () => {
 
             it("requests capabilities when set", async () => {
                 await makeClient({ sendSticky: true, receiveSticky: true });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4354SendStickyEvent);
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4354ReceiveStickyEvent);
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407ReceiveStickyEvent);
             });
 
             it("does not request capabilities when unset", async () => {
                 await makeClient({});
-                expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4354SendStickyEvent);
+                expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
                 expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(
-                    MatrixCapabilities.MSC4354ReceiveStickyEvent,
+                    MatrixCapabilities.MSC4407ReceiveStickyEvent,
                 );
             });
 
@@ -896,7 +896,7 @@ describe("RoomWidgetClient", () => {
                 await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
                 expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
                 expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith(EventType.RTCMembership);
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4354SendStickyEvent);
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
                 await client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
                     msc4354_sticky_key: "test",
                 });
