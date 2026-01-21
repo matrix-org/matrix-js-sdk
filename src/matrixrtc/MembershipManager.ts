@@ -481,7 +481,7 @@ export class MembershipManager
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
         this.client._unstable_sendDelayedStateEvent(
             this.room.roomId,
-            { delay: this.delayedLeaveEventDelayMs },
+            this.delayedLeaveEventDelayMs,
             EventType.GroupCallMemberPrefix,
             {},
             this.stateKey,
@@ -1062,7 +1062,7 @@ export class StickyEventMembershipManager extends MembershipManager {
         this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
-            { delay: this.delayedLeaveEventDelayMs },
+            this.delayedLeaveEventDelayMs,
             null,
             EventType.RTCMembership,
             { msc4354_sticky_key: this.memberId },

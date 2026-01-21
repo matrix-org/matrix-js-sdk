@@ -414,39 +414,15 @@ describe("RoomWidgetClient", () => {
             it("sends delayed message events", async () => {
                 await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                await client._unstable_sendDelayedEvent(
-                    "!1:example.org",
-                    { delay: 2000 },
-                    null,
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                );
+                await client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                    request_id: 123,
+                });
                 expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
                     "org.matrix.rageshake_request",
                     { request_id: 123 },
                     "!1:example.org",
                     2000,
                     undefined,
-                );
-            });
-
-            it("sends child action delayed message events", async () => {
-                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                const parentDelayId = `id-${Math.random()}`;
-                await client._unstable_sendDelayedEvent(
-                    "!1:example.org",
-                    { parent_delay_id: parentDelayId },
-                    null,
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                );
-                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                    "!1:example.org",
-                    undefined,
-                    parentDelayId,
                 );
             });
 
@@ -458,7 +434,7 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
                 await client._unstable_sendDelayedStateEvent(
                     "!1:example.org",
-                    { delay: 2000 },
+                    2000,
                     "org.example.foo",
                     { hello: "world" },
                     "bar",
@@ -473,30 +449,6 @@ describe("RoomWidgetClient", () => {
                 );
             });
 
-            it("sends child action delayed state events", async () => {
-                await makeClient({
-                    sendDelayedEvents: true,
-                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
-                });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                const parentDelayId = `fg-${Math.random()}`;
-                await client._unstable_sendDelayedStateEvent(
-                    "!1:example.org",
-                    { parent_delay_id: parentDelayId },
-                    "org.example.foo",
-                    { hello: "world" },
-                    "bar",
-                );
-                expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
-                    "org.example.foo",
-                    "bar",
-                    { hello: "world" },
-                    "!1:example.org",
-                    undefined,
-                    parentDelayId,
-                );
-            });
-
             it("send delayed message events handles wrong field in response", async () => {
                 await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 widgetApi.sendRoomEvent.mockResolvedValueOnce({
@@ -504,13 +456,9 @@ describe("RoomWidgetClient", () => {
                     event_id: `$${Math.random()}`,
                 });
                 await expect(
-                    client._unstable_sendDelayedEvent(
-                        "!1:example.org",
-                        { delay: 2000 },
-                        null,
-                        "org.matrix.rageshake_request",
-                        { request_id: 123 },
-                    ),
+                    client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                        request_id: 123,
+                    }),
                 ).rejects.toThrow();
             });
 
@@ -526,7 +474,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
-                        { delay: 2000 },
+                        2000,
                         "org.example.foo",
                         { hello: "world" },
                         "bar",
@@ -584,13 +532,9 @@ describe("RoomWidgetClient", () => {
             it("fails to send delayed message events", async () => {
                 await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
                 await expect(
-                    client._unstable_sendDelayedEvent(
-                        "!1:example.org",
-                        { delay: 2000 },
-                        null,
-                        "org.matrix.rageshake_request",
-                        { request_id: 123 },
-                    ),
+                    client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                        request_id: 123,
+                    }),
                 ).rejects.toThrow("Server does not support");
             });
 
@@ -599,7 +543,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
-                        { delay: 2000 },
+                        2000,
                         "org.example.foo",
                         { hello: "world" },
                         "bar",

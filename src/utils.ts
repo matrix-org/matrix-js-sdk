@@ -25,6 +25,7 @@ import { type IEvent, type MatrixEvent } from "./models/event.ts";
 import { M_TIMESTAMP } from "./@types/location.ts";
 import { ReceiptType } from "./@types/read_receipts.ts";
 import { type BaseLogger } from "./logger.ts";
+import { type SendDelayedEventRequestOpts, type SendStickyEventRequestOpts } from "./matrix.ts";
 
 const interns = new Map<string, string>();
 
@@ -78,12 +79,18 @@ export type QueryDict = Record<string, string[] | string | number | boolean | un
 /**
  * Replace a stable parameter with the unstable naming for params
  */
-export function replaceParam(stable: string, unstable: string, dict: QueryDict): QueryDict {
+export function replaceParam(
+    stable: string,
+    unstable: string,
+    dict: SendStickyEventRequestOpts | SendDelayedEventRequestOpts | QueryDict,
+): QueryDict {
+    const field = stable as keyof (SendStickyEventRequestOpts | SendDelayedEventRequestOpts | QueryDict);
     const result = {
         ...dict,
-        [unstable]: dict[stable],
+        [unstable]: dict[field],
     };
-    delete result[stable];
+
+    delete result[field];
     return result;
 }
 

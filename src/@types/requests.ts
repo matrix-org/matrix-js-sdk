@@ -97,24 +97,19 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-// TODO the concept of `parent_delay_id` is not deprecated
-export type SendDelayedEventRequestOpts = { parent_delay_id: string } | { delay: number; parent_delay_id?: string };
-
-export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
-    if ("parent_delay_id" in opts && typeof opts.parent_delay_id !== "string") {
-        // Invalid type, reject
-        return false;
-    }
-    if ("delay" in opts && typeof opts.delay !== "number") {
-        // Invalid type, reject.
-        return true;
-    }
-    // At least one of these fields must be specified.
-    return "delay" in opts || "parent_delay_id" in opts;
+// sticky
+export interface SendStickyEventRequestOpts {
+    sticky_duration_ms: number;
 }
-export type SendDelayedEventResponse = {
+
+// delayed
+export interface SendDelayedEventRequestOpts {
+    delay: number;
+}
+
+export interface SendDelayedEventResponse {
     delay_id: string;
-};
+}
 
 export enum UpdateDelayedEventAction {
     Cancel = "cancel",
