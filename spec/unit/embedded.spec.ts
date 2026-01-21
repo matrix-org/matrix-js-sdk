@@ -54,6 +54,7 @@ const testOIDCToken = {
     matrix_server_name: "homeserver.oabc",
     token_type: "Bearer",
 };
+
 class MockWidgetApi extends EventEmitter {
     public start = jest.fn().mockResolvedValue(undefined);
     public getClientVersions = jest.fn();
@@ -172,6 +173,9 @@ describe("RoomWidgetClient", () => {
                 "org.matrix.rageshake_request",
                 { request_id: 123 },
                 "!1:example.org",
+                undefined,
+                undefined,
+                undefined,
             );
         });
 
@@ -427,6 +431,7 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     2000,
                     undefined,
+                    undefined,
                 );
             });
 
@@ -447,6 +452,7 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     undefined,
                     parentDelayId,
+                    undefined,
                 );
             });
 
