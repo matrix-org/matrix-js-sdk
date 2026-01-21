@@ -35,6 +35,7 @@ describe("AutoDiscovery", function () {
         AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should throw an error when no domain is specified", function () {
         getHttpBackend();
         return Promise.all([

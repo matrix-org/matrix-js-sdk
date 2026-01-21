@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type Mock, vi } from "vitest";
+
 import { type GroupCall, type MatrixCall, type MatrixClient } from "../../../src";
 import { MediaHandler, MediaHandlerEvent } from "../../../src/webrtc/mediaHandler";
 import { MockMediaDeviceInfo, MockMediaDevices, MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
@@ -31,9 +33,9 @@ describe("Media Handler", function () {
     beforeEach(() => {
         mockMediaDevices = new MockMediaDevices();
 
-        globalThis.navigator = {
+        vi.stubGlobal("navigator", {
             mediaDevices: mockMediaDevices.typed(),
-        } as unknown as Navigator;
+        });
 
         calls = new Map();
         groupCalls = new Map();
@@ -132,10 +134,10 @@ describe("Media Handler", function () {
     });
 
     describe("updateLocalUsermediaStreams", () => {
-        let localStreamsChangedHandler: jest.Mock<void, []>;
+        let localStreamsChangedHandler: Mock<() => void>;
 
         beforeEach(() => {
-            localStreamsChangedHandler = jest.fn();
+            localStreamsChangedHandler = vi.fn();
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, localStreamsChangedHandler);
         });
 
@@ -155,11 +157,11 @@ describe("Media Handler", function () {
         });
 
         describe("with existing streams", () => {
-            let stopTrack: jest.Mock<void, []>;
-            let updateLocalUsermediaStream: jest.Mock;
+            let stopTrack: Mock<() => void>;
+            let updateLocalUsermediaStream: Mock;
 
             beforeEach(() => {
-                stopTrack = jest.fn();
+                stopTrack = vi.fn();
 
                 mediaHandler.userMediaStreams = [
                     {
@@ -171,7 +173,7 @@ describe("Media Handler", function () {
                     } as unknown as MediaStream,
                 ];
 
-                updateLocalUsermediaStream = jest.fn();
+                updateLocalUsermediaStream = vi.fn();
             });
 
             it("stops existing streams", async () => {
@@ -183,7 +185,7 @@ describe("Media Handler", function () {
                 calls.set("some_call", {
                     hasLocalUserMediaAudioTrack: true,
                     hasLocalUserMediaVideoTrack: true,
-                    callHasEnded: jest.fn().mockReturnValue(false),
+                    callHasEnded: vi.fn().mockReturnValue(false),
                     updateLocalUsermediaStream,
                 } as unknown as MatrixCall);
 
@@ -195,7 +197,7 @@ describe("Media Handler", function () {
                 calls.set("some_call", {
                     hasLocalUserMediaAudioTrack: true,
                     hasLocalUserMediaVideoTrack: true,
-                    callHasEnded: jest.fn().mockReturnValue(true),
+                    callHasEnded: vi.fn().mockReturnValue(true),
                     updateLocalUsermediaStream,
                 } as unknown as MatrixCall);
 
@@ -445,7 +447,7 @@ describe("Media Handler", function () {
         });
 
         it("emits LocalStreamsChanged", async () => {
-            const onLocalStreamChanged = jest.fn();
+            const onLocalStreamChanged = vi.fn();
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             await mediaHandler.getScreensharingStream();
             expect(onLocalStreamChanged).toHaveBeenCalled();
@@ -476,7 +478,7 @@ describe("Media Handler", function () {
         });
 
         it("emits LocalStreamsChanged", async () => {
-            const onLocalStreamChanged = jest.fn();
+            const onLocalStreamChanged = vi.fn();
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             mediaHandler.stopUserMediaStream(stream);
             expect(onLocalStreamChanged).toHaveBeenCalled();
@@ -507,7 +509,7 @@ describe("Media Handler", function () {
         });
 
         it("emits LocalStreamsChanged", async () => {
-            const onLocalStreamChanged = jest.fn();
+            const onLocalStreamChanged = vi.fn();
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             mediaHandler.stopScreensharingStream(stream);
             expect(onLocalStreamChanged).toHaveBeenCalled();
@@ -547,7 +549,7 @@ describe("Media Handler", function () {
         });
 
         it("emits LocalStreamsChanged", async () => {
-            const onLocalStreamChanged = jest.fn();
+            const onLocalStreamChanged = vi.fn();
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             mediaHandler.stopAllStreams();
             expect(onLocalStreamChanged).toHaveBeenCalled();

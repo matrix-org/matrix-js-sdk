@@ -347,6 +347,7 @@ describe("MatrixClient", function () {
             expect((await prom).room_id).toBe(roomId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should no-op if you've already knocked a room", function () {
             const room = new Room(roomId, client, userId);
 
@@ -1191,7 +1192,7 @@ describe("MatrixClient", function () {
     describe("logout", () => {
         it("should abort pending requests when called with stopClient=true", async () => {
             httpBackend.when("POST", "/logout").respond(200, {});
-            const fn = jest.fn();
+            const fn = vi.fn();
             client.http.request(Method.Get, "/test").catch(fn);
             client.logout(true);
             await httpBackend.flush(undefined);
@@ -1319,7 +1320,7 @@ describe("MatrixClient", function () {
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("should always fetch capabilities and then cache", async () => {
@@ -1390,6 +1391,7 @@ describe("MatrixClient", function () {
     });
 
     describe("publicRooms", () => {
+        // eslint-disable-next-line @vitest/expect-expect
         it("should use GET request if no server or filter is specified", () => {
             httpBackend.when("GET", "/publicRooms").respond(200, {});
             client.publicRooms({});
@@ -1578,7 +1580,7 @@ describe("MatrixClient", function () {
 
     describe("setSyncPresence", () => {
         it("should pass calls through to the underlying sync api", () => {
-            const setPresence = jest.fn();
+            const setPresence = vi.fn();
             // @ts-ignore
             client.syncApi = { setPresence };
             client.setSyncPresence(SetPresence.Unavailable);
@@ -1587,6 +1589,7 @@ describe("MatrixClient", function () {
     });
 
     describe("sendTyping", () => {
+        // eslint-disable-next-line @vitest/expect-expect
         it("should bail early for guests", async () => {
             client.setGuest(true);
             await client.sendTyping("!room:server", true, 100);
@@ -1844,6 +1847,7 @@ describe("MatrixClient", function () {
     });
 
     describe("setRoomMutePushRule", () => {
+        // eslint-disable-next-line @vitest/expect-expect
         it("should set room push rule to muted", async () => {
             const roomId = "!roomId:server";
             const client = new MatrixClient({

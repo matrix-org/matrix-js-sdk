@@ -499,6 +499,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.reEmitter.reEmit(this.membershipManager!, [
                 MembershipManagerEvent.ProbablyLeft,
                 MembershipManagerEvent.StatusChanged,
+                MembershipManagerEvent.DelayIdChanged,
             ]);
             // Create Encryption manager
             let transport;

@@ -49,12 +49,12 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Fires event when session starts", async () => {
-            const onStarted = jest.fn();
+            const onStarted = vi.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
             try {
                 const room1 = makeMockRoom([membershipTemplate], eventKind === "sticky");
-                jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
 
                 client.emit(ClientEvent.Room, room1);
                 await flushPromises();
@@ -65,12 +65,12 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Doesn't fire event if unrelated sessions starts", () => {
-            const onStarted = jest.fn();
+            const onStarted = vi.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
 
             try {
                 const room1 = makeMockRoom([{ ...membershipTemplate, application: "m.other" }], eventKind === "sticky");
-                jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
 
                 client.emit(ClientEvent.Room, room1);
                 expect(onStarted).not.toHaveBeenCalled();
@@ -80,12 +80,12 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Fires event when session ends", async () => {
-            const onEnded = jest.fn();
+            const onEnded = vi.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
             const membershipData: MembershipData[] = [membershipTemplate];
             const room1 = makeMockRoom(membershipData, eventKind === "sticky");
-            jest.spyOn(client, "getRooms").mockReturnValue([room1]);
-            jest.spyOn(client, "getRoom").mockReturnValue(room1);
+            vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+            vi.spyOn(client, "getRoom").mockReturnValue(room1);
             client.emit(ClientEvent.Room, room1);
             await flushPromises();
             await sendLeaveMembership(room1, membershipData);
@@ -94,8 +94,8 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Fires correctly with custom sessionDescription", async () => {
-            const onStarted = jest.fn();
-            const onEnded = jest.fn();
+            const onStarted = vi.fn();
+            const onEnded = vi.fn();
             // create a session manager with a custom session description
             const sessionManager = new MatrixRTCSessionManager(logger, client, {
                 id: "test",
@@ -111,7 +111,7 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                 // Create a session for applicaation m.other, we ignore this session ecause it lacks a call_id
                 const room1MembershipData: MembershipData[] = [{ ...membershipTemplate, application: "m.other" }];
                 const room1 = makeMockRoom(room1MembershipData, eventKind === "sticky");
-                jest.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
                 client.emit(ClientEvent.Room, room1);
                 await flushPromises();
                 expect(onStarted).not.toHaveBeenCalled();
@@ -122,20 +122,20 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                     { ...membershipTemplate, application: "m.notCall", call_id: "test" },
                 ];
                 const room2 = makeMockRoom(room2MembershipData, eventKind === "sticky");
-                jest.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
+                vi.spyOn(client, "getRooms").mockReturnValue([room1, room2]);
                 client.emit(ClientEvent.Room, room2);
                 await flushPromises();
                 expect(onStarted).toHaveBeenCalled();
                 onStarted.mockClear();
 
                 // Stop room1's RTC session. Tracked.
-                jest.spyOn(client, "getRoom").mockReturnValue(room2);
+                vi.spyOn(client, "getRoom").mockReturnValue(room2);
                 await sendLeaveMembership(room2, room2MembershipData);
                 expect(onEnded).toHaveBeenCalled();
                 onEnded.mockClear();
 
                 // Stop room1's RTC session. Not tracked.
-                jest.spyOn(client, "getRoom").mockReturnValue(room1);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
                 await sendLeaveMembership(room1, room1MembershipData);
                 expect(onEnded).not.toHaveBeenCalled();
             } finally {
@@ -145,12 +145,12 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
 
         it("Doesn't fire event if unrelated sessions ends", async () => {
-            const onEnded = jest.fn();
+            const onEnded = vi.fn();
             client.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
             const membership: MembershipData[] = [{ ...membershipTemplate, application: "m.other_app" }];
             const room1 = makeMockRoom(membership, eventKind === "sticky");
-            jest.spyOn(client, "getRooms").mockReturnValue([room1]);
-            jest.spyOn(client, "getRoom").mockReturnValue(room1);
+            vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+            vi.spyOn(client, "getRoom").mockReturnValue(room1);
 
             client.emit(ClientEvent.Room, room1);
 

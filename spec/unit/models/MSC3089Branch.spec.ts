@@ -85,7 +85,7 @@ describe("MSC3089Branch", () => {
     it("should be able to delete the file", async () => {
         const eventIdOrder = [fileEventId, fileEventId2];
 
-        const stateFn = jest
+        const stateFn = vi
             .fn()
             .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(branchRoomId);
@@ -98,7 +98,7 @@ describe("MSC3089Branch", () => {
             });
         client.sendStateEvent = stateFn;
 
-        const redactFn = jest.fn().mockImplementation((roomId: string, eventId: string) => {
+        const redactFn = vi.fn().mockImplementation((roomId: string, eventId: string) => {
             expect(roomId).toEqual(branchRoomId);
             expect(eventId).toEqual(eventIdOrder[stateFn.mock.calls.length - 1]);
 
@@ -127,7 +127,7 @@ describe("MSC3089Branch", () => {
     it("should be able to change its name", async () => {
         const name = "My File.txt";
         indexEvent.getContent = () => ({ active: true, retained: true });
-        const stateFn = jest
+        const stateFn = vi
             .fn()
             .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(branchRoomId);
@@ -183,7 +183,7 @@ describe("MSC3089Branch", () => {
     it("should be able to change its locked status", async () => {
         const locked = true;
         indexEvent.getContent = () => ({ active: true, retained: true });
-        const stateFn = jest
+        const stateFn = vi
             .fn()
             .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(branchRoomId);
@@ -259,20 +259,20 @@ describe("MSC3089Branch", () => {
         const canaryAddl = { canary: true };
         indexEvent.getContent = () => ({ active: true, retained: true });
         const stateKeyOrder = [fileEventId2, fileEventId];
-        const stateFn = jest
+        const stateFn = vi
             .fn()
             .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(branchRoomId);
                 expect(eventType).toEqual(UNSTABLE_MSC3089_BRANCH.unstable); // test that we're definitely using the unstable value
                 expect(stateKey).toEqual(stateKeyOrder[stateFn.mock.calls.length - 1]);
                 if (stateKey === fileEventId) {
-                    // eslint-disable-next-line jest/no-conditional-expect
+                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(content).toMatchObject({
                         retained: true, // canary for copying state
                         active: false,
                     });
                 } else if (stateKey === fileEventId2) {
-                    // eslint-disable-next-line jest/no-conditional-expect
+                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(content).toMatchObject({
                         active: true,
                         version: 2,
@@ -286,7 +286,7 @@ describe("MSC3089Branch", () => {
             });
         client.sendStateEvent = stateFn;
 
-        const createFn = jest
+        const createFn = vi
             .fn()
             .mockImplementation((name: string, contents: ArrayBuffer, info: Partial<EncryptedFile>, addl: IContent) => {
                 expect(name).toEqual(canaryName);

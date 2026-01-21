@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked, type MockInstance } from "jest-mock";
+import { type Mocked, type MockInstance } from "vitest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { PerSessionKeyBackupDownloader } from "../../../src/rust-crypto/PerSessionKeyBackupDownloader";
 import { logger } from "../../../src/logger";
@@ -83,7 +83,7 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         mockBackupDecryptor = {
-            decryptSessions: jest.fn(),
+            decryptSessions: vi.fn(),
         } as unknown as Mocked<BackupDecryptor>;
 
         mockBackupDecryptor.decryptSessions.mockImplementation(async (ciphertexts) => {
@@ -92,20 +92,20 @@ describe("PerSessionKeyBackupDownloader", () => {
         });
 
         mockRustBackupManager = {
-            getActiveBackupVersion: jest.fn(),
-            getServerBackupInfo: jest.fn(),
-            importBackedUpRoomKeys: jest.fn(),
-            createBackupDecryptor: jest.fn().mockReturnValue(mockBackupDecryptor),
-            on: jest.fn().mockImplementation((event, listener) => {
+            getActiveBackupVersion: vi.fn(),
+            getServerBackupInfo: vi.fn(),
+            importBackedUpRoomKeys: vi.fn(),
+            createBackupDecryptor: vi.fn().mockReturnValue(mockBackupDecryptor),
+            on: vi.fn().mockImplementation((event, listener) => {
                 mockEmitter.on(event, listener);
             }),
-            off: jest.fn().mockImplementation((event, listener) => {
+            off: vi.fn().mockImplementation((event, listener) => {
                 mockEmitter.off(event, listener);
             }),
         } as unknown as Mocked<RustBackupManager>;
 
         mockOlmMachine = {
-            getBackupKeys: jest.fn(),
+            getBackupKeys: vi.fn(),
         } as unknown as Mocked<OlmMachine>;
 
         downloader = new PerSessionKeyBackupDownloader(logger, mockOlmMachine, mockHttp, mockRustBackupManager);
@@ -120,13 +120,13 @@ describe("PerSessionKeyBackupDownloader", () => {
             }
         });
 
-        jest.useFakeTimers();
+        vi.useFakeTimers();
     });
 
     afterEach(() => {
         expectedSession = {};
         downloader.stop();
-        jest.useRealTimers();
+        vi.useRealTimers();
     });
 
     describe("Given valid backup available", () => {
@@ -182,7 +182,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             });
 
             // @ts-ignore access to private function
-            const spy = jest.spyOn(downloader, "queryKeyBackup");
+            const spy = vi.spyOn(downloader, "queryKeyBackup");
 
             // Call 3 times for same key
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
@@ -210,17 +210,17 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.get(`path:/_matrix/client/v3/room_keys/keys/!roomA/sessionA1`, mockCipherKey);
 
             // @ts-ignore access to private function
-            const spy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const spy = vi.spyOn(downloader, "queryKeyBackup");
 
             const expectImported = expectSessionImported("!roomA", "sessionA1");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
             expect(spy).toHaveBeenCalledTimes(1);
             await expect(spy.mock.results[0].value).rejects.toThrow("MISSING_DECRYPTION_KEY");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
             expect(spy).toHaveBeenCalledTimes(2);
 
             await expectImported;
@@ -236,10 +236,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             });
 
             // @ts-ignore access to private function
-            const spy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const spy = vi.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(spy).toHaveBeenCalledTimes(1);
             const returnedPromise = spy.mock.results[0].value;
@@ -247,15 +247,15 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             // Should not query again for a key not in backup
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(spy).toHaveBeenCalledTimes(1);
 
             // advance time to retry
-            jest.advanceTimersByTime(BACKOFF_TIME + 10);
+            vi.advanceTimersByTime(BACKOFF_TIME + 10);
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(spy).toHaveBeenCalledTimes(2);
             await expect(spy.mock.results[1].value).rejects.toThrow(
@@ -286,7 +286,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             blockOnServerRequest.resolve();
 
             // let the first request complete
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(mockRustBackupManager.importBackedUpRoomKeys).not.toHaveBeenCalled();
             expect(
@@ -303,7 +303,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             mockOlmMachine.getBackupKeys.mockResolvedValue({} as RustSdkCryptoJs.BackupKeys);
 
             // @ts-ignore access to private function
-            getConfigSpy = jest.spyOn(downloader, "getOrCreateBackupConfiguration");
+            getConfigSpy = vi.spyOn(downloader, "getOrCreateBackupConfiguration");
         });
 
         it("Should not query server if no backup", async () => {
@@ -314,7 +314,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
@@ -332,7 +332,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
@@ -351,7 +351,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
@@ -373,7 +373,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
@@ -395,7 +395,7 @@ describe("PerSessionKeyBackupDownloader", () => {
 
             downloader.onDecryptionKeyMissingError("!roomId", "sessionId");
 
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             expect(getConfigSpy).toHaveBeenCalledTimes(1);
             await expect(getConfigSpy.mock.results[0].value).resolves.toEqual(null);
@@ -426,7 +426,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");
             downloader.onDecryptionKeyMissingError("!roomB", "sessionB1");
             downloader.onDecryptionKeyMissingError("!roomC", "sessionC1");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             // @ts-ignore access to private property
             expect(downloader.hasConfigurationProblem).toEqual(true);
@@ -443,7 +443,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             // In that case the sdk would fire a backup status update
             mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
 
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(true);
 
             await a0Imported;
@@ -487,7 +487,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
             // @ts-ignore access to private function
-            const keyQuerySpy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const keyQuerySpy = vi.spyOn(downloader, "queryKeyBackup");
             const rateDeferred = Promise.withResolvers<void>();
 
             keyQuerySpy.mockImplementation(
@@ -514,14 +514,14 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.modifyRoute("room-keys", { response: mockCipherKey });
 
             // Advance less than the retry_after_ms
-            jest.advanceTimersByTime(100);
+            vi.advanceTimersByTime(100);
             // let any pending callbacks in PromiseJobs run
             await Promise.resolve();
             // no additional call should have been made
             expect(keyQuerySpy).toHaveBeenCalledTimes(1);
 
             // The loop should resume after the retry_after_ms
-            jest.advanceTimersByTime(5000);
+            vi.advanceTimersByTime(5000);
             // let any pending callbacks in PromiseJobs run
             await Promise.resolve();
 
@@ -543,7 +543,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             const originalImplementation = downloader.queryKeyBackup.bind(downloader);
 
             // @ts-ignore
-            const keyQuerySpy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const keyQuerySpy = vi.spyOn(downloader, "queryKeyBackup");
             const errorDeferred = Promise.withResolvers<void>();
 
             keyQuerySpy.mockImplementation(
@@ -572,14 +572,14 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.modifyRoute("room-keys", { response: mockCipherKey });
 
             // Advance less than the retry_after_ms
-            jest.advanceTimersByTime(100);
+            vi.advanceTimersByTime(100);
             // let any pending callbacks in PromiseJobs run
             await Promise.resolve();
             // no additional call should have been made
             expect(keyQuerySpy).toHaveBeenCalledTimes(1);
 
             // The loop should resume after the retry_after_ms
-            jest.advanceTimersByTime(BACKOFF_TIME + 100);
+            vi.advanceTimersByTime(BACKOFF_TIME + 100);
             await Promise.resolve();
 
             await keyImported;
@@ -603,11 +603,11 @@ describe("PerSessionKeyBackupDownloader", () => {
             fetchMock.get(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`, mockCipherKey);
 
             // @ts-ignore access to private function
-            const keyQuerySpy: MockInstance = jest.spyOn(downloader, "queryKeyBackup");
+            const keyQuerySpy = vi.spyOn(downloader, "queryKeyBackup");
 
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
             downloader.onDecryptionKeyMissingError("!roomA", "sessionA1");
-            await jest.runAllTimersAsync();
+            await vi.runAllTimersAsync();
 
             await keyImported.promise;
 

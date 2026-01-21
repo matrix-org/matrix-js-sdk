@@ -16,7 +16,7 @@ limitations under the License.
 
 import Olm from "@matrix-org/olm";
 import anotherjson from "another-json";
-import fetchMock from "@fetch-mock/jest";
+import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 
 import {

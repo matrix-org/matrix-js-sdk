@@ -94,6 +94,7 @@ describe("MatrixClient syncing", () => {
             presence: {},
         };
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should /sync after /pushrules and /filter.", async () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
@@ -501,7 +502,7 @@ describe("MatrixClient syncing", () => {
                 })
                 .respond(200, syncData);
 
-            client!.store.getSavedSyncToken = jest.fn().mockResolvedValue("this-is-a-token");
+            client!.store.getSavedSyncToken = vi.fn().mockResolvedValue("this-is-a-token");
             client!.startClient({ initialSyncLimit: 1 });
 
             return httpBackend!.flushAllExpected();
@@ -994,7 +995,7 @@ describe("MatrixClient syncing", () => {
                     roomVersion: "org.matrix.msc2716v3",
                 },
             ].forEach((testMeta) => {
-                // eslint-disable-next-line jest/valid-title
+                // eslint-disable-next-line @vitest/valid-title
                 describe(testMeta.label, () => {
                     const roomCreateEvent = utils.mkEvent({
                         type: "m.room.create",
@@ -1835,7 +1836,7 @@ describe("MatrixClient syncing", () => {
             await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
 
             const room = client!.getRoom(roomOne);
-            room!.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+            room!.hasEncryptionStateEvent = vi.fn().mockReturnValue(true);
 
             expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
 
@@ -2519,7 +2520,7 @@ describe("MatrixClient syncing", () => {
             const eventB2 = new MatrixEvent({ type: "b", content: { body: "2" } });
 
             client!.store.storeAccountDataEvents([eventA1, eventB1]);
-            const fn = jest.fn();
+            const fn = vi.fn();
             client!.on(ClientEvent.AccountData, fn);
 
             httpBackend!.when("GET", "/sync").respond(200, {

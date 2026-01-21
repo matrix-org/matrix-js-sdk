@@ -1,7 +1,3 @@
-/**
- * @jest-environment jest-fixed-jsdom
- */
-
 /*
 Copyright 2022 The Matrix.org Foundation C.I.C.
 
@@ -22,7 +18,7 @@ limitations under the License.
 // project, which doesn't know about our TypeEventEmitter implementation at all
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
-import { type MockedObject } from "jest-mock";
+import { type MockedObject } from "vitest";
 import {
     type WidgetApi,
     WidgetApiToWidgetAction,
@@ -35,7 +31,6 @@ import {
     type ApiVersion,
     type IRoomEvent,
 } from "matrix-widget-api";
-import { mocked } from "jest-mock";
 
 import {
     createRoomWidgetClient,
@@ -64,26 +59,26 @@ const testOIDCToken = {
 };
 
 class MockWidgetApi extends EventEmitter {
-    public start = jest.fn().mockResolvedValue(undefined);
-    public getClientVersions = jest.fn();
-    public requestCapability = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilities = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityForRoomTimeline = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToSendEvent = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToReceiveEvent = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToSendMessage = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToReceiveMessage = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToSendState = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToReceiveState = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToSendToDevice = jest.fn().mockResolvedValue(undefined);
-    public requestCapabilityToReceiveToDevice = jest.fn().mockResolvedValue(undefined);
-    public sendRoomEvent = jest.fn(
+    public start = vi.fn().mockResolvedValue(undefined);
+    public getClientVersions = vi.fn();
+    public requestCapability = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilities = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityForRoomTimeline = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendEvent = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveEvent = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendMessage = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveMessage = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendState = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveState = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToSendToDevice = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToReceiveToDevice = vi.fn().mockResolvedValue(undefined);
+    public sendRoomEvent = vi.fn(
         async (eventType: string, content: unknown, roomId?: string, delay?: number, parentDelayId?: string) =>
             delay === undefined && parentDelayId === undefined
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public sendStateEvent = jest.fn(
+    public sendStateEvent = vi.fn(
         async (
             eventType: string,
             stateKey: string,
@@ -96,24 +91,24 @@ class MockWidgetApi extends EventEmitter {
                 ? { event_id: `$${Math.random()}` }
                 : { delay_id: `id-${Math.random()}` },
     );
-    public cancelScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
-    public restartScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
-    public sendScheduledDelayedEvent = jest.fn().mockResolvedValue(undefined);
-    public sendToDevice = jest.fn().mockResolvedValue(undefined);
-    public requestOpenIDConnectToken = jest.fn(async () => {
+    public cancelScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+    public restartScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+    public sendScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+    public sendToDevice = vi.fn().mockResolvedValue(undefined);
+    public requestOpenIDConnectToken = vi.fn(async () => {
         return testOIDCToken;
         return new Promise<IOpenIDCredentials>(() => {
             return testOIDCToken;
         });
     });
-    public readStateEvents = jest.fn(async () => []);
-    public getTurnServers = jest.fn(async () => []);
-    public sendContentLoaded = jest.fn().mockResolvedValue(undefined);
+    public readStateEvents = vi.fn(async () => []);
+    public getTurnServers = vi.fn(async () => []);
+    public sendContentLoaded = vi.fn().mockResolvedValue(undefined);
 
     public transport = {
-        reply: jest.fn(),
-        send: jest.fn(),
-        sendComplete: jest.fn(),
+        reply: vi.fn(),
+        send: vi.fn(),
+        sendComplete: vi.fn(),
     };
 
     /**
@@ -243,7 +238,7 @@ describe("RoomWidgetClient", () => {
                 );
                 expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
                 expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
-                const injectSpy = jest.spyOn((client as any).syncApi, "injectRoomEvents");
+                const injectSpy = vi.spyOn((client as any).syncApi, "injectRoomEvents");
                 const widgetSendEmitter = new EventEmitter();
                 const widgetSendPromise = new Promise<void>((resolve) =>
                     widgetSendEmitter.once("send", () => resolve()),
@@ -370,7 +365,7 @@ describe("RoomWidgetClient", () => {
 
         it("handles widget errors with generic error data", async () => {
             const error = new Error("failed to send");
-            mocked(widgetApi.transport.send).mockRejectedValue(error);
+            vi.mocked(widgetApi.transport.send).mockRejectedValue(error);
 
             await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
             widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
@@ -398,7 +393,7 @@ describe("RoomWidgetClient", () => {
             });
             const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl, undefined, expect.any(Headers));
 
-            mocked(widgetApi.transport.send).mockRejectedValue(widgetError);
+            vi.mocked(widgetApi.transport.send).mockRejectedValue(widgetError);
 
             await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
             widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
@@ -411,7 +406,7 @@ describe("RoomWidgetClient", () => {
 
     describe("delayed events", () => {
         describe("when supported", () => {
-            const doesServerSupportUnstableFeatureMock = jest.fn((feature) =>
+            const doesServerSupportUnstableFeatureMock = vi.fn((feature) =>
                 Promise.resolve(feature === "org.matrix.msc4140"),
             );
 
@@ -595,6 +590,16 @@ describe("RoomWidgetClient", () => {
         });
 
         describe("when unsupported", () => {
+            const doesServerSupportUnstableFeatureMock = vi.fn().mockResolvedValue(false);
+
+            beforeAll(() => {
+                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
+            });
+
+            afterAll(() => {
+                doesServerSupportUnstableFeatureMock.mockReset();
+            });
+
             it("fails to send delayed message events", async () => {
                 await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
                 await expect(
@@ -785,7 +790,7 @@ describe("RoomWidgetClient", () => {
 
                 const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
                 const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
-                const logSpy = jest.spyOn(logger, "error");
+                const logSpy = vi.spyOn(logger, "error");
                 widgetApi.emit(
                     `action:${WidgetApiToWidgetAction.SendEvent}`,
                     new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
@@ -866,7 +871,7 @@ describe("RoomWidgetClient", () => {
 
     describe("sticky events", () => {
         describe("when supported", () => {
-            const doesServerSupportUnstableFeatureMock = jest.fn((feature) =>
+            const doesServerSupportUnstableFeatureMock = vi.fn((feature) =>
                 Promise.resolve(feature === "org.matrix.msc4354"),
             );
 
@@ -999,6 +1004,16 @@ describe("RoomWidgetClient", () => {
         });
 
         describe("when unsupported", () => {
+            const doesServerSupportUnstableFeatureMock = vi.fn().mockResolvedValue(false);
+
+            beforeAll(() => {
+                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
+            });
+
+            afterAll(() => {
+                doesServerSupportUnstableFeatureMock.mockReset();
+            });
+
             it("fails to send", async () => {
                 await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
                 await expect(
@@ -1131,7 +1146,7 @@ describe("RoomWidgetClient", () => {
 
         it("handles widget errors with generic error data", async () => {
             const error = new Error("failed to get token");
-            mocked(widgetApi.transport.sendComplete).mockRejectedValue(error);
+            vi.mocked(widgetApi.transport.sendComplete).mockRejectedValue(error);
 
             await makeClient({});
             widgetApi.requestOpenIDConnectToken.mockImplementation(widgetApi.transport.sendComplete as any);
@@ -1157,7 +1172,7 @@ describe("RoomWidgetClient", () => {
             });
             const matrixError = new MatrixError(errorData, errorStatusCode, errorUrl, undefined, expect.any(Headers));
 
-            mocked(widgetApi.transport.sendComplete).mockRejectedValue(widgetError);
+            vi.mocked(widgetApi.transport.sendComplete).mockRejectedValue(widgetError);
 
             await makeClient({});
             widgetApi.requestOpenIDConnectToken.mockImplementation(widgetApi.transport.sendComplete as any);

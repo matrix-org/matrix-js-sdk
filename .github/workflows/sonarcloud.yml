@@ -12,7 +12,7 @@ on:
             sharded:
                 type: boolean
                 required: false
-                description: "Whether to combine multiple LCOV and jest-sonar-report files in coverage artifact"
+                description: "Whether to combine multiple LCOV and sonar-report files in coverage artifact"
 permissions: {}
 jobs:
     sonarqube:
@@ -75,7 +75,7 @@ jobs:
 
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
-              uses: matrix-org/sonarcloud-workflow-action@9f6f057c1b30500877460c66d4ae937e53d168ee
+              uses: matrix-org/sonarcloud-workflow-action@ea0cd9dbd5562e79816685972bc0d03c235a900c
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
