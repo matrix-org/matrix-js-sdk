@@ -11,7 +11,6 @@
         "strict": true,
         "allowImportingTsExtensions": true,
         "lib": ["es2024", "dom", "dom.iterable"],
-        "baseUrl": ".",
         "types": ["vitest/globals", "node"],
         "paths": {
             "#types/*": ["./node_modules/vite/types/*"]
