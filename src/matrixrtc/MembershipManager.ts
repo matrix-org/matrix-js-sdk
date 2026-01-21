@@ -654,6 +654,7 @@ export class MembershipManager
             ._unstable_sendScheduledDelayedEvent(delayId)
             .then(() => {
                 this.state.hasMemberStateEvent = false;
+                this.setAndEmitDelayId(undefined);
                 this.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
 
                 return { replace: [] };
