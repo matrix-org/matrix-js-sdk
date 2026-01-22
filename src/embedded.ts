@@ -396,6 +396,11 @@ export class RoomWidgetClient extends MatrixClient {
         if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
             throw new Error("Sticky duration must be a number when defined");
         }
+        // This is save since we just checked that above
+        // We need the additional as assertion for the EW linter to be happy.
+        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
+        // above
+        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs as number | undefined;
 
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts
@@ -414,7 +419,7 @@ export class RoomWidgetClient extends MatrixClient {
                     room.roomId,
                     "delay" in delayOpts ? delayOpts.delay : undefined,
                     "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-                    stickyDurationMs,
+                    stickyDurationMsAsNumber,
                 )
                 .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
@@ -427,7 +432,7 @@ export class RoomWidgetClient extends MatrixClient {
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMs)
+                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
