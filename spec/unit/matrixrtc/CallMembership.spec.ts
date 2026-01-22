@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type RtcMembershipData } from "src/matrixrtc/membership/rtc.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "src/matrixrtc/membership/index.ts";
 import { type IContent, type MatrixEvent } from "../../../src/models/event.ts";
 import { EventType } from "../../../src/@types/event.ts";
 import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership.ts";
-import { type SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
 
 function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
     vi.mocked(ev.getContent).mockReturnValue(content);

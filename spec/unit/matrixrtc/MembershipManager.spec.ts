@@ -34,7 +34,7 @@ import {
     type MockClient,
 } from "./mocks.ts";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
-import { type SessionMembershipData } from "src/matrixrtc/membership/legacy.ts";
+import { type SessionMembershipData } from "src/matrixrtc/membership/session.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
