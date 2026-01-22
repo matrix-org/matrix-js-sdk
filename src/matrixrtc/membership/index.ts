@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export { type SessionMembershipData, checkSessionsMembershipData } from "./legacy.ts";
+export { type SessionMembershipData, checkSessionsMembershipData } from "./session.ts";
 export { type RtcMembershipData, computeRtcIdentityRaw, checkRtcMembershipData } from "./rtc.ts";
 export { MatrixRTCMembershipParseError } from "./common.ts";
