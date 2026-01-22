@@ -2056,7 +2056,7 @@ describe("Room", function () {
         });
     });
 
-    describe("loadMembersIfNeeded", function () {
+    describe("loadMemfbersIfNeeded", function () {
         function createClientMock(
             serverResponse: Error | MatrixEvent[],
             storageResponse: MatrixEvent[] | Error | null = null,
@@ -2103,7 +2103,7 @@ describe("Room", function () {
         }
 
         const memberEvent = utils.mkMembership({
-            user: "@user_a:bar",
+            user: userA,
             mship: KnownMembership.Join,
             room: roomId,
             event: true,
@@ -2147,6 +2147,23 @@ describe("Room", function () {
             await room.loadMembersIfNeeded();
             const memberA = room.getMember("@user_a:bar")!;
             expect(memberA.name).toEqual("User A");
+        });
+
+        it("should emit room name change event if loading members causes the room name to change", async function () {
+            const otherMemberEvent = utils.mkMembership({
+                user: "@user_b:bar",
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "User B",
+            });
+
+            const client = createClientMock([memberEvent, otherMemberEvent]);
+            const room = new Room(roomId, client as any, userA, { lazyLoadMembers: true });
+
+            expect(room.name).toEqual("!foo:bar");
+            await room.loadMembersIfNeeded();
+            expect(room.name).toEqual("User B");
         });
     });
 
