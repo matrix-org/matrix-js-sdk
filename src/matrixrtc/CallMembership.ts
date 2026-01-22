@@ -223,7 +223,8 @@ export class CallMembership {
                 return data.application;
             case MembershipKind.Session:
             default:
-                // XXX: This is a hack around
+                 // SessionData does not have application data as such. We return specific
+                 // properties in use by other getters in this class, for compatibility.
                 return { "type": data.application, "m.call.intent": data["m.call.intent"] };
         }
     }

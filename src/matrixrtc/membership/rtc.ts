@@ -23,7 +23,7 @@ import { sha256 } from "../../digest.ts";
 import { encodeUnpaddedBase64Url } from "../../base64.ts";
 
 /**
- * Represents the current form of MSC4143.
+ * Represents the current form of MSC4143, which uses sticky events to store membership.
  */
 export interface RtcMembershipData {
     "slot_id": string;

@@ -19,8 +19,8 @@ import { type RTCCallIntent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 
 /**
- * **Legacy** (MatrixRTC) session membership data.
- * This represents the *OLD* form of MSC4143.
+ * (MatrixRTC) session membership data.
+ * This represents the *OLD* form of MSC4143, which uses state events to store membership.
  * Represents the `session` in the memberships section of an m.call.member event as it is on the wire.
  **/
 export type SessionMembershipData = {
@@ -139,7 +139,7 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
     }
 
     if (errors.length) {
-        throw new MatrixRTCMembershipParseError("bar", errors);
+        throw new MatrixRTCMembershipParseError("SessionMembership", errors);
     }
 
     return true;
