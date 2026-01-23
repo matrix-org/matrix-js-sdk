@@ -340,6 +340,11 @@ export interface TimelineEvents {
             { sdp_stream_metadata: SDPStreamMetadata },
             { "org.matrix.msc3077.sdp_stream_metadata": SDPStreamMetadata }
         >;
+    [EventType.CallSDPStreamMetadataChanged]: MCallBase &
+        EitherAnd<
+            { sdp_stream_metadata: SDPStreamMetadata },
+            { "org.matrix.msc3077.sdp_stream_metadata": SDPStreamMetadata }
+        >;
     [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
     [EventType.CallNotify]: ICallNotifyContent;
     [EventType.RTCNotification]: IRTCNotificationContent;

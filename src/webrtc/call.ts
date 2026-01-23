@@ -301,7 +301,7 @@ type CallEventType =
     | EventType.CallCandidates
     | EventType.CallHangup
     | EventType.CallReject
-    | EventType.CallSDPStreamMetadataChangedPrefix;
+    | EventType.CallSDPStreamMetadataChanged;
 
 export interface VoipEvent {
     type: "toDevice" | "sendEvent";
@@ -1596,7 +1596,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public async sendMetadataUpdate(): Promise<void> {
-        await this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
+        await this.sendVoipEvent(EventType.CallSDPStreamMetadataChanged, {
             [SDPStreamMetadataKey.name]: this.getLocalSDPStreamMetadata(),
         });
     }
