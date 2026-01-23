@@ -59,6 +59,6 @@ export function slotIdToDescription(slotId: string): SlotDescription {
 /**
  * Converts a SlotDescription into it's slot ID format.
  */
-export function slotDescriptionToId(slotDescription: SlotDescription): string {
+export function computeSlotId(slotDescription: SlotDescription): string {
     return `${slotDescription.application}#${slotDescription.id}`;
 }
