@@ -27,7 +27,7 @@ import { type RoomMember } from "./models/room-member.ts";
 import { EventType } from "./@types/event.ts";
 import { type DecryptionFailureCode } from "./crypto-api/index.ts";
 import { DecryptionError, type EventDecryptionResult } from "./common-crypto/CryptoBackend.ts";
-import { type OidcClientConfig, type ValidatedAuthMetadata } from "./oidc/index.ts";
+import { OAuthGrantType, type OidcClientConfig, type ValidatedAuthMetadata } from "./oidc/index.ts";
 
 /**
  * Create a {@link MatrixEvent}.
@@ -226,6 +226,6 @@ export const mockOpenIdConfiguration = (
     device_authorization_endpoint: issuer + "device",
     jwks_uri: issuer + "jwks",
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "refresh_token", ...additionalGrantTypes],
+    grant_types_supported: [OAuthGrantType.AuthorizationCode, OAuthGrantType.RefreshToken, ...additionalGrantTypes],
     code_challenge_methods_supported: ["S256"],
 });

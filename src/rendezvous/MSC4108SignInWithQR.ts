@@ -27,7 +27,7 @@ import { logger } from "../logger.ts";
 import { type MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";
 import { MatrixError } from "../http-api/index.ts";
 import { sleep } from "../utils.ts";
-import { DEVICE_CODE_SCOPE, type OidcClientConfig } from "../oidc/index.ts";
+import { OAuthGrantType, type OidcClientConfig } from "../oidc/index.ts";
 import { type CryptoApi } from "../crypto-api/index.ts";
 
 /**
@@ -194,7 +194,7 @@ export class MSC4108SignInWithQR {
                     logger.error("Failed to discover OIDC metadata", e);
                 }
 
-                if (oidcClientConfig?.grant_types_supported.includes(DEVICE_CODE_SCOPE)) {
+                if (oidcClientConfig?.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],
