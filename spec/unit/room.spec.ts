@@ -2114,7 +2114,7 @@ describe("Room", function () {
             const client = createClientMock([memberEvent]);
             const room = new Room(roomId, client as any, null!, { lazyLoadMembers: true });
             await room.loadMembersIfNeeded();
-            const memberA = room.getMember("@user_a:bar")!;
+            const memberA = room.getMember(userA)!;
             expect(memberA.name).toEqual("User A");
             const storedMembers = client.store.storedMembers!;
             expect(storedMembers.length).toEqual(1);
@@ -2123,7 +2123,7 @@ describe("Room", function () {
 
         it("should take members from storage if available", async function () {
             const memberEvent2 = utils.mkMembership({
-                user: "@user_a:bar",
+                user: userA,
                 mship: KnownMembership.Join,
                 room: roomId,
                 event: true,
@@ -2134,7 +2134,7 @@ describe("Room", function () {
 
             await room.loadMembersIfNeeded();
 
-            const memberA = room.getMember("@user_a:bar")!;
+            const memberA = room.getMember(userA)!;
             expect(memberA.name).toEqual("User A");
         });
 
@@ -2145,13 +2145,13 @@ describe("Room", function () {
 
             client.members.mockReturnValue({ chunk: [memberEvent] });
             await room.loadMembersIfNeeded();
-            const memberA = room.getMember("@user_a:bar")!;
+            const memberA = room.getMember(userA)!;
             expect(memberA.name).toEqual("User A");
         });
 
         it("should emit room name change event if loading members causes the room name to change", async function () {
             const otherMemberEvent = utils.mkMembership({
-                user: "@user_b:bar",
+                user: userB,
                 mship: KnownMembership.Join,
                 room: roomId,
                 event: true,
