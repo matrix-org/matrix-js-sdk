@@ -2056,7 +2056,7 @@ describe("Room", function () {
         });
     });
 
-    describe("loadMemfbersIfNeeded", function () {
+    describe("loadMembersIfNeeded", function () {
         function createClientMock(
             serverResponse: Error | MatrixEvent[],
             storageResponse: MatrixEvent[] | Error | null = null,
