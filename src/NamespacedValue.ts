@@ -119,25 +119,3 @@ export class UnstableValue<S extends string, U extends string> extends Namespace
         return this.stable!;
     }
 }
-
-/**
- * Represents a namespaced value which prioritizes the stable value over the stable
- * value.
- */
-export class StableValue<S extends string, U extends string> extends NamespacedValue<S, U> {
-    // Note: Constructor difference is that `stable` is *required*.
-    public constructor(stable: S, unstable: U) {
-        super(stable, unstable);
-        if (!this.stable) {
-            throw new Error("Stable value must be supplied");
-        }
-    }
-
-    public get name(): S {
-        return this.stable!;
-    }
-
-    public get altName(): U {
-        return this.unstable!;
-    }
-}

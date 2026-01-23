@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd } from "matrix-events-sdk";
+import { type EitherAnd } from "matrix-events-sdk";
 
 import { NamespacedValue, UnstableValue } from "../NamespacedValue.ts";
 import {
@@ -400,7 +400,7 @@ export interface StateEvents {
 /**
  * Mapped type from event type to content type for all specified room-specific account_data events.
  */
-export interface AccountDataEvents extends SecretStorageAccountDataEvents {
+export interface RoomAccountDataEvents extends SecretStorageAccountDataEvents {
     [EventType.FullyRead]: { event_id: string };
     [EventType.Tag]: { tags: { [name: string]: { order?: number } } };
     [EventType.SpaceOrder]: { order: string };

@@ -138,6 +138,7 @@ import {
     MsgType,
     PUSHER_ENABLED,
     RelationType,
+    type RoomAccountDataEvents,
     RoomCreateTypeField,
     RoomType,
     type StateEvents,
@@ -145,7 +146,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
-    WritableAccountDataEvents,
+    type WritableAccountDataEvents,
 } from "./@types/event.ts";
 import {
     GuestAccess,
@@ -2585,12 +2586,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * @param roomId - the ID of the room this event should be stored within
      * @param eventType - event type to be set
      * @param content - event content
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<EmptyObject> {
+    public setRoomAccountData<K extends keyof RoomAccountDataEvents>(
+        roomId: string,
+        eventType: K,
+        content: RoomAccountDataEvents[K] | Record<string, never>,
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
