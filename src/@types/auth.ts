@@ -65,8 +65,8 @@ export interface ISSOFlow extends ILoginFlow {
     type: "m.login.sso" | "m.login.cas";
     // eslint-disable-next-line camelcase
     identity_providers?: IIdentityProvider[];
-    [DELEGATED_OIDC_COMPATIBILITY.name]?: boolean;
-    [DELEGATED_OIDC_COMPATIBILITY.altName]?: boolean;
+    [OAUTH_AWARE_PREFERRED_FLOW_FIELD.name]?: boolean;
+    [OAUTH_AWARE_PREFERRED_FLOW_FIELD.altName]?: boolean;
 }
 
 export enum IdentityProviderBrand {
