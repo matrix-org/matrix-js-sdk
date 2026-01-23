@@ -314,7 +314,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {
+                [SDPStreamMetadataKey.name]: {
                     remote_stream: {
                         purpose: SDPStreamMetadataPurpose.Usermedia,
                         audio_muted: true,
@@ -420,7 +420,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {},
+                [SDPStreamMetadataKey.name]: {},
             }),
         );
 
@@ -451,7 +451,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {},
+                [SDPStreamMetadataKey.name]: {},
             }),
         );
 
@@ -478,7 +478,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {},
+                [SDPStreamMetadataKey.name]: {},
             }),
         );
 
@@ -504,7 +504,7 @@ describe("Call", function () {
 
         call.onSDPStreamMetadataChangedReceived(
             makeMockEvent("@test:foo", {
-                [SDPStreamMetadataKey]: {
+                [SDPStreamMetadataKey.name]: {
                     remote_stream: {
                         purpose: SDPStreamMetadataPurpose.Screenshare,
                         audio_muted: true,
@@ -849,7 +849,7 @@ describe("Call", function () {
                     answer: {
                         sdp: DUMMY_SDP,
                     },
-                    [SDPStreamMetadataKey]: {
+                    [SDPStreamMetadataKey.name]: {
                         [STREAM_ID]: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                         },
@@ -960,7 +960,7 @@ describe("Call", function () {
             it("should send sdp_stream_metadata_changed when muting audio", async () => {
                 await call.setMicrophoneMuted(true);
                 expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
-                    [SDPStreamMetadataKey]: {
+                    [SDPStreamMetadataKey.name]: {
                         mock_stream_from_media_handler: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: true,
@@ -973,7 +973,7 @@ describe("Call", function () {
             it("should send sdp_stream_metadata_changed when muting video", async () => {
                 await call.setLocalVideoMuted(true);
                 expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
-                    [SDPStreamMetadataKey]: {
+                    [SDPStreamMetadataKey.name]: {
                         mock_stream_from_media_handler: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: false,
@@ -1001,7 +1001,7 @@ describe("Call", function () {
                 );
                 call.onSDPStreamMetadataChangedReceived({
                     getContent: () => ({
-                        [SDPStreamMetadataKey]: metadata,
+                        [SDPStreamMetadataKey.name]: metadata,
                     }),
                 } as MatrixEvent);
                 return metadata;

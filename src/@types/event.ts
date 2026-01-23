@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EitherAnd } from "matrix-events-sdk";
+
 import { NamespacedValue, UnstableValue } from "../NamespacedValue.ts";
 import {
     type PolicyRuleEventContent,
@@ -50,7 +52,6 @@ import {
     type MCallReplacesEvent,
     type MCallSelectAnswer,
     type SDPStreamMetadata,
-    type SDPStreamMetadataKey,
 } from "../webrtc/callEventTypes.ts";
 import {
     type IRTCNotificationContent,
@@ -334,7 +335,11 @@ export interface TimelineEvents {
     [EventType.CallCandidates]: MCallCandidates;
     [EventType.CallHangup]: MCallHangupReject;
     [EventType.CallReject]: MCallHangupReject;
-    [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase & { [SDPStreamMetadataKey]: SDPStreamMetadata };
+    [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase &
+        EitherAnd<
+            { sdp_stream_metadata: SDPStreamMetadata },
+            { "org.matrix.msc3077.sdp_stream_metadata": SDPStreamMetadata }
+        >;
     [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
     [EventType.CallNotify]: ICallNotifyContent;
     [EventType.RTCNotification]: IRTCNotificationContent;
@@ -405,6 +410,11 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [POLICIES_ACCOUNT_EVENT_TYPE.name]: { [key: string]: any };
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
 }
+
+/**
+ * Subset of AccountDataEvents, excluding events specified in https://spec.matrix.org/v1.17/client-server-api/#server-behaviour-12
+ */
+export type WritableAccountDataEvents = Exclude<AccountDataEvents, "m.fully_read" | "m.push_rules">;
 
 /**
  * Mapped type from event type to content type for all specified global events encrypted by secret storage.
