@@ -86,7 +86,7 @@ describe("ToDeviceKeyTransport", () => {
                     key: keyBase64Encoded,
                 },
                 member: {
-                    claimed_device_id: "MYDEVICE",
+                    device_id: "MYDEVICE",
                     id: "@alice:example.org:MYDEVICE",
                 },
                 room_id: roomId,
@@ -130,7 +130,7 @@ describe("ToDeviceKeyTransport", () => {
                     key: testEncoded,
                 },
                 member: {
-                    claimed_device_id: "BOBDEVICE",
+                    device_id: "BOBDEVICE",
                 },
                 room_id: roomId,
                 session: {
@@ -176,7 +176,7 @@ describe("ToDeviceKeyTransport", () => {
                     key: testEncoded,
                 },
                 member: {
-                    claimed_device_id: "BOBDEVICE",
+                    device_id: "BOBDEVICE",
                 },
                 room_id: "!anotherroom:id",
                 session: {
@@ -195,19 +195,19 @@ describe("ToDeviceKeyTransport", () => {
         const MALFORMED_EVENT = [
             {
                 keys: {},
-                member: { claimed_device_id: "MYDEVICE" },
+                member: { device_id: "MYDEVICE" },
                 room_id: "!room:id",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { index: 0 },
-                member: { claimed_device_id: "MYDEVICE" },
+                member: { device_id: "MYDEVICE" },
                 room_id: "!room:id",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF" },
-                member: { claimed_device_id: "MYDEVICE" },
+                member: { device_id: "MYDEVICE" },
                 room_id: "!room:id",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
@@ -224,12 +224,12 @@ describe("ToDeviceKeyTransport", () => {
             },
             {
                 keys: { key: "ABCDEF", index: 2 },
-                member: { claimed_device_id: "MYDEVICE" },
+                member: { device_id: "MYDEVICE" },
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF", index: 2 },
-                member: { claimed_device_id: "MYDEVICE" },
+                member: { device_id: "MYDEVICE" },
                 room_id: "!wrong_room",
                 session: { application: "m.call", call_id: "", scope: "m.room" },
             },

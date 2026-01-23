@@ -971,7 +971,7 @@ describe("MembershipManager", () => {
                             member: {
                                 claimed_user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",
-                                claimed_device_id: "AAAAAAA",
+                                device_id: "AAAAAAA",
                             },
                             slot_id: "m.call#",
                             rtc_transports: [focus],

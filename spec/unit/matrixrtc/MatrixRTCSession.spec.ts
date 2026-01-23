@@ -121,7 +121,7 @@ describe("MatrixRTCSession", () => {
                         ...rtcMembershipTemplate,
                         member: {
                             ...rtcMembershipTemplate.member,
-                            claimed_device_id: opts.deviceId ?? rtcMembershipTemplate.member.claimed_device_id,
+                            device_id: opts.deviceId ?? rtcMembershipTemplate.member.device_id,
                         },
                         slot_id: opts.callId ? `${opts.type}#${opts.callId}` : rtcMembershipTemplate.slot_id,
                         application: {
@@ -403,7 +403,7 @@ describe("MatrixRTCSession", () => {
                     testConfig.testCreateSticky
                         ? await computeRtcIdentityRaw(
                               rtcMembershipTemplate.member.claimed_user_id,
-                              rtcMembershipTemplate.member.claimed_device_id,
+                              rtcMembershipTemplate.member.device_id,
                               rtcMembershipTemplate.member.id,
                           )
                         : "@mock:user.example:AAAAAAA",
@@ -420,7 +420,7 @@ describe("MatrixRTCSession", () => {
                 const ev = mockRTCEvent(
                     {
                         ...rtcMembershipTemplate,
-                        msc4354_sticky_key: `_${rtcMembershipTemplate.user_id}_${rtcMembershipTemplate.member.claimed_device_id}`,
+                        msc4354_sticky_key: `_${rtcMembershipTemplate.user_id}_${rtcMembershipTemplate.member.device_id}`,
                     },
                     mockRoom.roomId,
                     5000,
@@ -455,7 +455,7 @@ describe("MatrixRTCSession", () => {
                             claimed_user_id: stickyUserId,
                         },
                         user_id: stickyUserId,
-                        msc4354_sticky_key: `_${stickyUserId}_${rtcMembershipTemplate.member.claimed_device_id}`,
+                        msc4354_sticky_key: `_${stickyUserId}_${rtcMembershipTemplate.member.device_id}`,
                     },
                     mockRoom.roomId,
                     15000,
@@ -503,7 +503,7 @@ describe("MatrixRTCSession", () => {
                         claimed_user_id: stickyUserId,
                     },
                     user_id: stickyUserId,
-                    msc4354_sticky_key: `_${stickyUserId}_${rtcMembershipTemplate.member.claimed_device_id}`,
+                    msc4354_sticky_key: `_${stickyUserId}_${rtcMembershipTemplate.member.device_id}`,
                 },
                 mockRoom.roomId,
                 15000,

@@ -25,8 +25,8 @@ import {
     type RtcMembershipData,
     checkSessionsMembershipData,
     type SessionMembershipData,
-} from "./membership/index.ts";
-import { MatrixRTCMembershipParseError } from "./membership/common.ts";
+    MatrixRTCMembershipParseError,
+} from "./membershipData/index.ts";
 import { EventType } from "../@types/event.ts";
 
 /**
@@ -95,7 +95,7 @@ export class CallMembership {
             membershipData.kind === MembershipKind.RTC
                 ? await computeRtcIdentityRaw(
                       membershipData.data.member.user_id,
-                      membershipData.data.member.claimed_device_id,
+                      membershipData.data.member.device_id,
                       membershipData.data.member.id,
                   )
                 : `${matrixEvent.getSender()}:${membershipData.data.device_id}`;
@@ -176,7 +176,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return data.member.claimed_device_id;
+                return data.member.device_id;
             case MembershipKind.Session:
             default:
                 return data.device_id;

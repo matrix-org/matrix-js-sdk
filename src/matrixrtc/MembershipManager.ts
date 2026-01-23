@@ -33,7 +33,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "./membership/index.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
 
 /* MembershipActionTypes:
@@ -1099,7 +1099,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             slot_id: computeSlotId(this.slotDescription),
             rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
-            member: { claimed_user_id: this.userId, claimed_device_id: this.deviceId, id: this.memberId },
+            member: { user_id: this.userId, device_id: this.deviceId, id: this.memberId },
             versions: [],
             ...relationObject,
         };

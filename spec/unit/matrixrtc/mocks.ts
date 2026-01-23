@@ -20,9 +20,8 @@ import { type Mocked, type MockedObject } from "vitest";
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
-import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membership";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
 import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
-import { logger } from "../../../src/logger.ts";
 
 export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
@@ -60,8 +59,8 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
     },
     member: {
         id: "IDIDID",
-        claimed_user_id: "@mock:user.example",
-        claimed_device_id: "AAAAAAA",
+        user_id: "@mock:user.example",
+        device_id: "AAAAAAA",
     },
     slot_id: "m.call#",
     versions: [],

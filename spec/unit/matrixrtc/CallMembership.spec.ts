@@ -218,7 +218,7 @@ describe("CallMembership", () => {
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
-            member: { claimed_user_id: "@alice:example.org", claimed_device_id: "AAAAAAA", id: "xyzHASHxyz" },
+            member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             rtc_transports: [{ type: "livekit" }],
             versions: [],
             msc4354_sticky_key: "abc123",

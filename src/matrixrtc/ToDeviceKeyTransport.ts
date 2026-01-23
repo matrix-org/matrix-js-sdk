@@ -74,7 +74,7 @@ export class ToDeviceKeyTransport
             },
             room_id: this.roomId,
             member: {
-                claimed_device_id: this.membership.deviceId,
+                device_id: this.membership.deviceId,
                 id: this.membership.memberId,
             },
             session: {
@@ -130,14 +130,14 @@ export class ToDeviceKeyTransport
         const age = now - (typeof content.sent_ts === "number" ? content.sent_ts : now);
         this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
 
-        const hardcodedMemberIdAlternative = `${fromUser}:${content.member.claimed_device_id}`;
+        const hardcodedMemberIdAlternative = `${fromUser}:${content.member.device_id}`;
 
         this.emit(
             KeyTransportEvents.ReceivedKeys,
             // TODO userId this is claimed information, deviceId is claimed information
             {
                 userId: fromUser,
-                deviceId: content.member.claimed_device_id!,
+                deviceId: content.member.device_id!,
                 memberId: content.member.id ?? hardcodedMemberIdAlternative,
             },
             content.keys.key,
@@ -186,8 +186,8 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        if (!content.member || !content.member.claimed_device_id) {
-            this.logger.warn("Malformed Event: Missing claimed_device_id");
+        if (!content.member || !content.member.device_id) {
+            this.logger.warn("Malformed Event: Missing device_id");
             return;
         }
 

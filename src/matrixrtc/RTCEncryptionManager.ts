@@ -33,7 +33,7 @@ import {
     type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
-import { computeRtcIdentityRaw } from "./membership/rtc.ts";
+import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.

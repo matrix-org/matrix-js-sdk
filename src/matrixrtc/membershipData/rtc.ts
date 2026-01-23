@@ -29,7 +29,7 @@ export interface RtcMembershipData {
     "slot_id": string;
     "member": {
         user_id: string;
-        claimed_device_id: string;
+        device_id: string;
         id: string;
     };
     "m.relates_to"?: {
@@ -75,8 +75,8 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
         else if (data.member.user_id !== sender) {
             errors.push(prefix + "member.user_id must match the sender");
         }
-        if (typeof data.member.claimed_device_id !== "string") {
-            errors.push(prefix + "member.claimed_device_id must be string");
+        if (typeof data.member.device_id !== "string") {
+            errors.push(prefix + "member.device_id must be string");
         }
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
     }
