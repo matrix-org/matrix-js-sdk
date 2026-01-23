@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type OidcClientConfig } from "./index.ts";
+import { OAuthGrantType, type OidcClientConfig } from "./index.ts";
 import { OidcError } from "./error.ts";
 import { Method } from "../http-api/index.ts";
 import { logger } from "../logger.ts";
@@ -52,7 +52,12 @@ interface OidcRegistrationRequestBody {
     application_type: "web" | "native";
 }
 
-export const DEVICE_CODE_SCOPE = "urn:ietf:params:oauth:grant-type:device_code";
+/**
+ * The name "scope" is a misnomer here as it is actually a "grant type".
+ *
+ * @deprecated use `OAuthGrantType.DeviceAuthorization` instead
+ */
+export const DEVICE_CODE_SCOPE: string = OAuthGrantType.DeviceAuthorization;
 
 // Check that URIs have a common base, as per the MSC2966 definition
 const urlHasCommonBase = (base: URL, urlStr?: string): boolean => {
@@ -79,7 +84,7 @@ export const registerOidcClient = async (
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
-    const grantTypes: NonEmptyArray<string> = ["authorization_code", "refresh_token"];
+    const grantTypes: NonEmptyArray<string> = [OAuthGrantType.AuthorizationCode, OAuthGrantType.RefreshToken];
     if (grantTypes.some((scope) => !delegatedAuthConfig.grant_types_supported.includes(scope))) {
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }

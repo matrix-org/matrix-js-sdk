@@ -31,3 +31,25 @@ export * from "./validate.ts";
 export interface OidcClientConfig extends ValidatedAuthMetadata {
     signingKeys: SigningKey[] | null;
 }
+
+/**
+ * The OAuth 2.0 grant types that are defined for Matrix in https://spec.matrix.org/v1.17/client-server-api/#grant-types
+ */
+export enum OAuthGrantType {
+    /**
+     * See https://spec.matrix.org/v1.17/client-server-api/#authorization-code-grant
+     */
+    AuthorizationCode = "authorization_code",
+    /**
+     * https://spec.matrix.org/v1.17/client-server-api/#refresh-token-grant
+     */
+    RefreshToken = "refresh_token",
+    /**
+     * The OAuth 2.0 Device Authorization Grant type identifier as per
+     * https://www.rfc-editor.org/rfc/rfc8628.html#section-7.2 from
+     * [MSC4341](https://github.com/matrix-org/matrix-spec-proposals/pull/4341).
+     *
+     * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
+     */
+    DeviceAuthorization = "urn:ietf:params:oauth:grant-type:device_code",
+}

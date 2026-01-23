@@ -19,6 +19,7 @@ import { type IdTokenClaims, type OidcMetadata, type SigninResponse } from "oidc
 
 import { logger } from "../logger.ts";
 import { OidcError } from "./error.ts";
+import { OAuthGrantType } from "./index.ts";
 
 /**
  * Metadata from OIDC authority discovery
@@ -102,7 +103,7 @@ export const validateAuthMetadata = (authMetadata: unknown): ValidatedAuthMetada
         optionalStringProperty(authMetadata, "device_authorization_endpoint"),
         optionalStringArrayProperty(authMetadata, "account_management_actions_supported"),
         requiredArrayValue(authMetadata, "response_types_supported", "code"),
-        requiredArrayValue(authMetadata, "grant_types_supported", "authorization_code"),
+        requiredArrayValue(authMetadata, "grant_types_supported", OAuthGrantType.AuthorizationCode),
         requiredArrayValue(authMetadata, "code_challenge_methods_supported", "S256"),
         optionalStringArrayProperty(authMetadata, "prompt_values_supported"),
     ].some((isValid) => !isValid);
