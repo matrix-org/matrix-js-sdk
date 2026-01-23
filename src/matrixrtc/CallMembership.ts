@@ -18,7 +18,7 @@ import { deepCompare } from "../utils.ts";
 import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
-import { slotDescriptionToId, slotIdToDescription } from "./utils.ts";
+import { computeSlotId, slotIdToDescription } from "./utils.ts";
 import {
     checkRtcMembershipData,
     computeRtcIdentityRaw,
@@ -94,7 +94,7 @@ export class CallMembership {
         const rtcBackendIdentity =
             membershipData.kind === MembershipKind.RTC
                 ? await computeRtcIdentityRaw(
-                      membershipData.data.member.claimed_user_id,
+                      membershipData.data.member.user_id,
                       membershipData.data.member.claimed_device_id,
                       membershipData.data.member.id,
                   )
@@ -146,7 +146,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return data.member.claimed_user_id;
+                return data.member.user_id;
             case MembershipKind.Session:
             default:
                 return this.matrixEventData.sender;
@@ -168,7 +168,7 @@ export class CallMembership {
                 return data.slot_id;
             case MembershipKind.Session:
             default:
-                return slotDescriptionToId({ application: this.application, id: data.call_id });
+                return computeSlotId({ application: this.application, id: data.call_id });
         }
     }
 
@@ -223,8 +223,8 @@ export class CallMembership {
                 return data.application;
             case MembershipKind.Session:
             default:
-                 // SessionData does not have application data as such. We return specific
-                 // properties in use by other getters in this class, for compatibility.
+                // SessionData does not have application data as such. We return specific
+                // properties in use by other getters in this class, for compatibility.
                 return { "type": data.application, "m.call.intent": data["m.call.intent"] };
         }
     }

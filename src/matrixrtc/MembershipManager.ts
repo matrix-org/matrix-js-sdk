@@ -34,7 +34,7 @@ import {
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "./membership/index.ts";
-import { slotDescriptionToId } from "./utils.ts";
+import { computeSlotId } from "./utils.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -1096,7 +1096,7 @@ export class StickyEventMembershipManager extends MembershipManager {
                 type: this.slotDescription.application,
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
             },
-            slot_id: slotDescriptionToId(this.slotDescription),
+            slot_id: computeSlotId(this.slotDescription),
             rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
             member: { claimed_user_id: this.userId, claimed_device_id: this.deviceId, id: this.memberId },
             versions: [],

@@ -48,7 +48,7 @@ import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
 import { RoomKeyTransport } from "./RoomKeyTransport.ts";
-import { slotDescriptionToId } from "./utils.ts";
+import { computeSlotId } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -309,7 +309,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * The slotId is the property that, per definition, groups memberships into one call.
      */
     public get slotId(): string | undefined {
-        return slotDescriptionToId(this.slotDescription);
+        return computeSlotId(this.slotDescription);
     }
 
     /**
