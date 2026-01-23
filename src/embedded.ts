@@ -38,6 +38,7 @@ import {
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
     UpdateDelayedEventAction,
+    isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -56,7 +57,7 @@ import { ConnectionError, MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
-import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
+import { MapWithDefault, type QueryDict, recursiveMapToObject } from "./utils.ts";
 import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
 
 interface IStateEventRequest {
@@ -122,6 +123,20 @@ export interface ICapabilities {
      * @defaultValue false
      */
     updateDelayedEvents?: boolean;
+
+    /**
+     * Whether this client needs to be able to send sticky events.
+     * @experimental Part of MSC4354 & MSC4407
+     * @defaultValue false
+     */
+    sendSticky?: boolean;
+
+    /**
+     * Whether this client needs to be able to receive sticky events.
+     * @experimental Part of MSC4354 & MSC4407
+     * @defaultValue false
+     */
+    receiveSticky?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -242,6 +257,12 @@ export class RoomWidgetClient extends MatrixClient {
         if (capabilities.updateDelayedEvents) {
             widgetApi.requestCapability(MatrixCapabilities.MSC4157UpdateDelayedEvent);
         }
+        if (capabilities.sendSticky) {
+            widgetApi.requestCapability(MatrixCapabilities.MSC4407SendStickyEvent);
+        }
+        if (capabilities.receiveSticky) {
+            widgetApi.requestCapability(MatrixCapabilities.MSC4407ReceiveStickyEvent);
+        }
         if (capabilities.turnServers) {
             widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
         }
@@ -346,17 +367,41 @@ export class RoomWidgetClient extends MatrixClient {
         throw new Error(`Unknown room: ${roomIdOrAlias}`);
     }
 
-    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
-    ): Promise<SendDelayedEventResponse>;
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
-        delayOpts?: SendDelayedEventRequestOpts,
+        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
+        queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        let queryOpts = queryDict;
+        let delayOpts: SendDelayedEventRequestOpts | undefined;
+        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
+            delayOpts = delayOptsOrQuery;
+        } else if (!queryOpts) {
+            queryOpts = delayOptsOrQuery;
+        }
+
+        const stickyDurationMs = queryOpts?.["org.matrix.msc4354.sticky_duration_ms"];
+        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
+            throw new Error("Sticky duration must be a number when defined");
+        }
+        // This is save since we just checked that above
+        // We need the additional as assertion for the EW linter to be happy.
+        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
+        // above
+        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs as number | undefined;
+
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts
         // This will be converted back to event.redacts in the widget driver.
@@ -374,6 +419,7 @@ export class RoomWidgetClient extends MatrixClient {
                     room.roomId,
                     "delay" in delayOpts ? delayOpts.delay : undefined,
                     "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
+                    stickyDurationMsAsNumber,
                 )
                 .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
@@ -386,7 +432,7 @@ export class RoomWidgetClient extends MatrixClient {
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId)
+                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
@@ -704,6 +750,7 @@ export class RoomWidgetClient extends MatrixClient {
             }
 
             this.emit(ClientEvent.Event, event);
+            if (event.unstableStickyInfo !== undefined) this.room!._unstable_addStickyEvents([event]);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()}`);
         } else {

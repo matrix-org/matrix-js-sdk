@@ -32,7 +32,14 @@ import {
     type IRoomEvent,
 } from "matrix-widget-api";
 
-import { createRoomWidgetClient, MatrixError, MsgType, UpdateDelayedEventAction } from "../../src/matrix";
+import {
+    createRoomWidgetClient,
+    EventType,
+    type IEvent,
+    MatrixError,
+    MsgType,
+    UpdateDelayedEventAction,
+} from "../../src/matrix";
 import { MatrixClient, ClientEvent, type ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
 import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
@@ -42,6 +49,7 @@ import { sleep } from "../../src/utils";
 import { SlidingSync } from "../../src/sliding-sync";
 import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
+import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../../src/models/room-sticky-events";
 
 const testOIDCToken = {
     access_token: "12345678",
@@ -49,6 +57,7 @@ const testOIDCToken = {
     matrix_server_name: "homeserver.oabc",
     token_type: "Bearer",
 };
+
 class MockWidgetApi extends EventEmitter {
     public start = vi.fn().mockResolvedValue(undefined);
     public getClientVersions = vi.fn();
@@ -167,6 +176,9 @@ describe("RoomWidgetClient", () => {
                 "org.matrix.rageshake_request",
                 { request_id: 123 },
                 "!1:example.org",
+                undefined,
+                undefined,
+                undefined,
             );
         });
 
@@ -422,6 +434,7 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     2000,
                     undefined,
+                    undefined,
                 );
             });
 
@@ -442,6 +455,7 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     undefined,
                     parentDelayId,
+                    undefined,
                 );
             });
 
@@ -852,6 +866,162 @@ describe("RoomWidgetClient", () => {
             for (const room of client.getRooms()) {
                 expect(room.currentState.getStateEvents("org.example.foo", "bar")).toBe(null);
             }
+        });
+    });
+
+    describe("sticky events", () => {
+        describe("when supported", () => {
+            const doesServerSupportUnstableFeatureMock = vi.fn((feature) =>
+                Promise.resolve(feature === "org.matrix.msc4354"),
+            );
+
+            beforeAll(() => {
+                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
+            });
+
+            afterAll(() => {
+                doesServerSupportUnstableFeatureMock.mockReset();
+            });
+
+            it("requests capabilities when set", async () => {
+                await makeClient({ sendSticky: true, receiveSticky: true });
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407ReceiveStickyEvent);
+            });
+
+            it("does not request capabilities when unset", async () => {
+                await makeClient({});
+                expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
+                expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(
+                    MatrixCapabilities.MSC4407ReceiveStickyEvent,
+                );
+            });
+
+            it("sends", async () => {
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+                expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith(EventType.RTCMembership);
+                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
+                await client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                    msc4354_sticky_key: "test",
+                });
+                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
+                    EventType.RTCMembership,
+                    { msc4354_sticky_key: "test" },
+                    "!1:example.org",
+                    undefined,
+                    undefined,
+                    2000,
+                );
+            });
+
+            it("receives (adds, updates, then removes when redacted)", async () => {
+                await makeClient({ receiveEvent: [EventType.RTCMembership, EventType.RoomRedaction] });
+                const room = client.getRoom("!1:example.org")!;
+
+                function expectStickyEvents(events: IEvent[]) {
+                    expect([...room._unstable_getStickyEvents()].map((e) => e.getEffectiveEvent())).toEqual(events);
+                }
+
+                async function sendAndExpectStickyUpdate(
+                    eventToSend: IEvent,
+                    added: IEvent[],
+                    updated: { current: IEvent; previous: IEvent }[],
+                    removed: IEvent[],
+                ) {
+                    const emittedStickyUpdate = new Promise<
+                        Parameters<RoomStickyEventsMap[RoomStickyEventsEvent.Update]>
+                    >((resolve) => room.once(RoomStickyEventsEvent.Update, (...args) => resolve(args)));
+
+                    widgetApi.emit(
+                        `action:${WidgetApiToWidgetAction.SendEvent}`,
+                        new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, {
+                            detail: { data: eventToSend },
+                        }),
+                    );
+
+                    const [addedReceived, updatedReceived, removedReceived] = await emittedStickyUpdate;
+                    expect(addedReceived.map((e) => e.getEffectiveEvent())).toEqual(added);
+                    expect(
+                        updatedReceived.map(({ current, previous }) => ({
+                            current: current.getEffectiveEvent(),
+                            previous: previous.getEffectiveEvent(),
+                        })),
+                    ).toEqual(updated);
+                    expect(removedReceived.map((e) => e.getEffectiveEvent())).toEqual(removed);
+                }
+
+                // First, add a new sticky event to the map. The client should emit.
+                const event1 = new MatrixEvent({
+                    type: EventType.RTCMembership,
+                    event_id: "$pduhfiidph",
+                    room_id: "!1:example.org",
+                    sender: "@alice:example.org",
+                    msc4354_sticky: { duration_ms: 1200000 },
+                    content: { msc4354_sticky_key: "test" },
+                }).getEffectiveEvent();
+                await sendAndExpectStickyUpdate(event1, [event1], [], []);
+                // It should remain cached in the sticky map
+                expectStickyEvents([event1]);
+
+                // Next, update the same key in the sticky map
+                const event2 = new MatrixEvent({
+                    type: EventType.RTCMembership,
+                    event_id: "$zshgyutptfh",
+                    room_id: "!1:example.org",
+                    sender: "@alice:example.org",
+                    msc4354_sticky: { duration_ms: 1200000 },
+                    content: { msc4354_sticky_key: "test" },
+                }).getEffectiveEvent();
+                await sendAndExpectStickyUpdate(event2, [], [{ current: event2, previous: event1 }], []);
+                expectStickyEvents([event2]);
+
+                // Next, redact the second event. Because it has the first as a predecessor, the map should revert to
+                // the first event.
+                const redaction1 = new MatrixEvent({
+                    type: EventType.RoomRedaction,
+                    event_id: "$cimoexnvz",
+                    room_id: "!1:example.org",
+                    sender: "@alice:example.org",
+                    redacts: event2.event_id,
+                    content: { redacts: event2.event_id },
+                }).getEffectiveEvent();
+                await sendAndExpectStickyUpdate(redaction1, [], [{ current: event1, previous: event2 }], []);
+                expectStickyEvents([event1]);
+
+                // Finally, redact the first event. Now everything should be gone from the map.
+                const redaction2 = new MatrixEvent({
+                    type: EventType.RoomRedaction,
+                    event_id: "$drgzmenlh",
+                    room_id: "!1:example.org",
+                    sender: "@alice:example.org",
+                    redacts: event1.event_id,
+                    content: { redacts: event1.event_id },
+                }).getEffectiveEvent();
+                await sendAndExpectStickyUpdate(redaction2, [], [], [event1]);
+                expectStickyEvents([]);
+            });
+        });
+
+        describe("when unsupported", () => {
+            const doesServerSupportUnstableFeatureMock = vi.fn().mockResolvedValue(false);
+
+            beforeAll(() => {
+                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
+            });
+
+            afterAll(() => {
+                doesServerSupportUnstableFeatureMock.mockReset();
+            });
+
+            it("fails to send", async () => {
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await expect(
+                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                        msc4354_sticky_key: "test",
+                    }),
+                ).rejects.toThrow("Server does not support");
+            });
         });
     });
 
