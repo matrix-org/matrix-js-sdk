@@ -36,6 +36,7 @@ export const SUPPORTED_MATRIX_VERSIONS = [
     "v1.10",
     "v1.11",
     "v1.12",
+    "v1.13",
 ];
 
 /**
