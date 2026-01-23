@@ -54,6 +54,7 @@ export const OAUTH_AWARE_PREFERRED_FLOW_FIELD = new UnstableValue(
 );
 
 /**
+ * @alias
  * @deprecated use `OAUTH_AWARE_PREFERRED_FLOW_FIELD` instead.
  */
 export const DELEGATED_OIDC_COMPATIBILITY = OAUTH_AWARE_PREFERRED_FLOW_FIELD;
