@@ -49,7 +49,7 @@ import {
     computeRtcIdentityRaw,
     type RtcMembershipData,
     type SessionMembershipData,
-} from "../../../src/matrixrtc/membership/index.ts";
+} from "../../../src/matrixrtc/membershipData/index.ts";
 
 const mockFocus = { type: "mock" };
 
@@ -402,7 +402,7 @@ describe("MatrixRTCSession", () => {
                 expect(sess?.memberships[0].rtcBackendIdentity).toEqual(
                     testConfig.testCreateSticky
                         ? await computeRtcIdentityRaw(
-                              rtcMembershipTemplate.member.claimed_user_id,
+                              rtcMembershipTemplate.member.user_id,
                               rtcMembershipTemplate.member.device_id,
                               rtcMembershipTemplate.member.id,
                           )
@@ -452,7 +452,7 @@ describe("MatrixRTCSession", () => {
                         ...rtcMembershipTemplate,
                         member: {
                             ...rtcMembershipTemplate.member,
-                            claimed_user_id: stickyUserId,
+                            user_id: stickyUserId,
                         },
                         user_id: stickyUserId,
                         msc4354_sticky_key: `_${stickyUserId}_${rtcMembershipTemplate.member.device_id}`,
@@ -500,7 +500,7 @@ describe("MatrixRTCSession", () => {
                     ...rtcMembershipTemplate,
                     member: {
                         ...rtcMembershipTemplate.member,
-                        claimed_user_id: stickyUserId,
+                        user_id: stickyUserId,
                     },
                     user_id: stickyUserId,
                     msc4354_sticky_key: `_${stickyUserId}_${rtcMembershipTemplate.member.device_id}`,

@@ -34,7 +34,7 @@ import {
     type MockClient,
 } from "./mocks.ts";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
-import { type SessionMembershipData } from "src/matrixrtc/membership/session.ts";
+import { type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -969,7 +969,7 @@ describe("MembershipManager", () => {
                         {
                             application: { type: "m.call" },
                             member: {
-                                claimed_user_id: "@alice:example.org",
+                                user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",
                                 device_id: "AAAAAAA",
                             },

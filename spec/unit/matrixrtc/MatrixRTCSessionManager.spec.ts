@@ -26,7 +26,7 @@ import {
 } from "./mocks.ts";
 import { logger } from "../../../src/logger";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { type RtcMembershipData, type SessionMembershipData } from "src/matrixrtc/membership";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",

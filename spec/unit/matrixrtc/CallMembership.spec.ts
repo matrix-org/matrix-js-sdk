@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type RtcMembershipData, type SessionMembershipData } from "src/matrixrtc/membership/index.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
 import { type IContent, type MatrixEvent } from "../../../src/models/event.ts";
 import { EventType } from "../../../src/@types/event.ts";
 import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership.ts";
