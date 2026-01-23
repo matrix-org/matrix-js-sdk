@@ -134,6 +134,7 @@ export enum EventType {
     FullyRead = "m.fully_read",
     Tag = "m.tag",
     SpaceOrder = "org.matrix.msc3230.space_order", // MSC3230
+    MarkedUnread = "m.marked_unread",
 
     // User account_data events
     PushRules = "m.push_rules",
@@ -394,6 +395,16 @@ export interface StateEvents {
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+}
+
+/**
+ * Mapped type from event type to content type for all specified room-specific account_data events.
+ */
+export interface AccountDataEvents extends SecretStorageAccountDataEvents {
+    [EventType.FullyRead]: { event_id: string };
+    [EventType.Tag]: { tags: { [name: string]: { order?: number } } };
+    [EventType.SpaceOrder]: { order: string };
+    [EventType.MarkedUnread]: { unread: boolean };
 }
 
 /**
