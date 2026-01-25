@@ -158,8 +158,10 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                // for legacy events we expect the room to be added automagically
+                // See INFO_SLOT_ID_LEGACY_CASE comments
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
@@ -189,7 +191,7 @@ describe("CallMembership", () => {
 
     describe("RtcMembershipData", () => {
         const membershipTemplate: RtcMembershipData = {
-            slot_id: "m.call#",
+            slot_id: "m.call#ROOM",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             rtc_transports: [{ type: "livekit" }],
@@ -209,7 +211,7 @@ describe("CallMembership", () => {
         });
         it("accepts membership with valid slot_id", () => {
             expect(() => {
-                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#" });
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#ROOM" });
             }).not.toThrow();
         });
 
@@ -339,8 +341,8 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");

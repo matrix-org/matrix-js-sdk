@@ -16,20 +16,13 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
-export interface LivekitTransportConfig extends Transport {
+export interface LivekitTransport extends Transport {
     type: "livekit";
     livekit_service_url: string;
 }
 
-export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
-    object.type === "livekit" && "livekit_service_url" in object;
-
-export interface LivekitTransport extends LivekitTransportConfig {
-    livekit_alias: string;
-}
-
 export const isLivekitTransport = (object: any): object is LivekitTransport =>
-    isLivekitTransportConfig(object) && "livekit_alias" in object;
+    object.type === "livekit" && "livekit_service_url" in object;
 
 /**
  * @deprecated, this is just needed for the old focus active / focus fields of a call membership.

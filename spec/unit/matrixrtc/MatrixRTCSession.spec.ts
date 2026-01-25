@@ -49,7 +49,7 @@ const mockFocus = { type: "mock" };
 
 const textEncoder = new TextEncoder();
 
-const callSession = { id: "", application: "m.call" };
+const callSession = { id: "ROOM", application: "m.call" };
 
 describe("MatrixRTCSession", () => {
     let client: MatrixClient;
@@ -723,11 +723,11 @@ describe("MatrixRTCSession", () => {
             });
 
             // Check if deprecated notify event is also sent.
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
+            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, I, {
                 "application": "m.call",
                 "m.mentions": { user_ids: [], room: true },
                 "notify_type": "ring",
-                "call_id": "",
+                "call_id": "ROOM",
             });
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads

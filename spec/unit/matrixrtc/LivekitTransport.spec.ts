@@ -14,11 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    isLivekitTransport,
-    isLivekitFocusSelection,
-    isLivekitTransportConfig,
-} from "../../../src/matrixrtc/LivekitTransport";
+import { isLivekitTransport, isLivekitFocusSelection } from "../../../src/matrixrtc/LivekitTransport";
 
 describe("LivekitFocus", () => {
     it("isLivekitFocus", () => {
@@ -52,13 +48,13 @@ describe("LivekitFocus", () => {
     });
     it("isLivekitFocusConfig", () => {
         expect(
-            isLivekitTransportConfig({
+            isLivekitTransport({
                 type: "livekit",
                 livekit_service_url: "http://test.com",
             }),
         ).toBeTruthy();
-        expect(isLivekitTransportConfig({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitTransportConfig({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
-        expect(isLivekitTransportConfig({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
     });
 });
