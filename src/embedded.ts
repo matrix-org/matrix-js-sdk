@@ -30,6 +30,8 @@ import {
     type IWidgetApiResponseData,
     type IUpdateStateToWidgetActionRequest,
     UnstableApiVersion,
+    type IRoomEvent,
+    type IPushInitialStickyStateToWidgetActionRequest,
 } from "matrix-widget-api";
 
 import { MatrixEvent, type IEvent, type IContent, EventStatus } from "./models/event.ts";
@@ -270,6 +272,7 @@ export class RoomWidgetClient extends MatrixClient {
         widgetApi.on(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
         widgetApi.on(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
         widgetApi.on(`action:${WidgetApiToWidgetAction.UpdateState}`, this.onStateUpdate);
+        widgetApi.on(`action:${WidgetApiToWidgetAction.MSC4407PushInitialStickyState}`, this.onPushInitialStickyState);
 
         // Open communication with the host
         widgetApi.start();
@@ -357,6 +360,10 @@ export class RoomWidgetClient extends MatrixClient {
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.UpdateState}`, this.onStateUpdate);
+        this.widgetApi.off(
+            `action:${WidgetApiToWidgetAction.MSC4407PushInitialStickyState}`,
+            this.onPushInitialStickyState,
+        );
 
         super.stopClient();
         this.lifecycle!.abort(); // Signal to other async tasks that the client has stopped
@@ -804,6 +811,31 @@ export class RoomWidgetClient extends MatrixClient {
             }
         }
 
+        await this.ack(ev);
+    };
+
+    private onPushInitialStickyState = async (
+        ev: CustomEvent<IPushInitialStickyStateToWidgetActionRequest>,
+    ): Promise<void> => {
+        ev.preventDefault();
+
+        const { roomId, stickyEvents } = ev.detail.data;
+        if (roomId !== this.roomId) {
+            logger.info(`Received initial sticky state for a different room ${roomId}; discarding`);
+            return;
+        }
+        const room = this.room;
+        if (!room) {
+            logger.error("No room found to push initial sticky state into");
+            return;
+        }
+
+        const matrixEvents: MatrixEvent[] = stickyEvents.map(
+            (stickyEvent: IRoomEvent) => new MatrixEvent(stickyEvent as Partial<IEvent>),
+        );
+        room._unstable_addStickyEvents(matrixEvents);
+
+        logger.debug(`Pushed #${stickyEvents.length} initial sticky events for room ${roomId}`);
         await this.ack(ev);
     };
 
