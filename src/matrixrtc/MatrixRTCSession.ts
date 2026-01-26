@@ -421,7 +421,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
         private readonly calculateMembershipsOpts?: SessionMembershipsForSlotOpts,
     ) {
         super();
-        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
+        this.logger = rootLogger.getChild(
+            `[MatrixRTCSession ${roomSubset.roomId} ${slotDescription.application} ${slotDescription.id}]`,
+        );
 
         this.roomSubset.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
@@ -922,7 +924,7 @@ function isValidMembership(
 ): boolean {
     if (membership.slotId !== slotId) {
         logger.info(
-            `Ignoring membership of user ${membership.userId} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
+            `Ignoring membership of user ${membership.userId} for a different slot:  user: ${JSON.stringify(membership.slotDescription)}, session: ${JSON.stringify(slotDescription)})`,
         );
         return false;
     }
