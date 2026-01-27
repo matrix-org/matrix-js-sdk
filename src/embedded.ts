@@ -285,6 +285,7 @@ export class RoomWidgetClient extends MatrixClient {
         return (await this.widgetApi.getClientVersions()).includes(UnstableApiVersion.MSC2762_UPDATE_STATE);
     }
 
+    private syncApiResolver = Promise.withResolvers<void>();
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
         this.lifecycle = new AbortController();
 
@@ -303,6 +304,7 @@ export class RoomWidgetClient extends MatrixClient {
         } else {
             this.syncApi = new SyncApi(this, opts, this.buildSyncApiOptions());
         }
+        this.syncApiResolver.resolve();
 
         this.room = this.syncApi.createRoom(this.roomId);
         this.store.storeRoom(this.room);
@@ -729,7 +731,7 @@ export class RoomWidgetClient extends MatrixClient {
 
             // Only inject once we have update the txId
             await this.updateTxId(event);
-
+            await this.syncApiResolver.promise;
             if (this.syncApi instanceof SyncApi) {
                 if (await this.supportUpdateState()) {
                     await this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
@@ -784,6 +786,7 @@ export class RoomWidgetClient extends MatrixClient {
                 "received update_state widget action but the widget driver did not claim to support 'org.matrix.msc2762_update_state'",
             );
         }
+        await this.syncApiResolver.promise;
         for (const rawEvent of ev.detail.data.state) {
             // Verify the room ID matches, since it's possible for the client to
             // send us state updates from other rooms if this widget is always
