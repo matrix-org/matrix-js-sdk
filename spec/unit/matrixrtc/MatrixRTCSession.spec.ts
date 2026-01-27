@@ -620,9 +620,7 @@ describe("MatrixRTCSession", () => {
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock
-                .mockResolvedValueOnce({ event_id: "legacy-evt" })
-                .mockResolvedValueOnce({ event_id: "new-evt" });
+            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -647,43 +645,25 @@ describe("MatrixRTCSession", () => {
                 "sender_ts": expect.any(Number),
             });
 
-            // Check if deprecated notify event is also sent.
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": "ring",
-                "call_id": "",
-            });
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
-            expect(didSendEventFn).toHaveBeenCalledWith(
-                {
-                    "event_id": "new-evt",
-                    "lifetime": 30000,
-                    "m.mentions": { room: true, user_ids: [] },
-                    "m.relates_to": {
-                        event_id: expect.any(String),
-                        rel_type: "m.reference",
-                    },
-                    "notification_type": "ring",
-                    "sender_ts": expect.any(Number),
+            expect(didSendEventFn).toHaveBeenCalledWith({
+                "event_id": "new-evt",
+                "lifetime": 30000,
+                "m.mentions": { room: true, user_ids: [] },
+                "m.relates_to": {
+                    event_id: expect.any(String),
+                    rel_type: "m.reference",
                 },
-                {
-                    "application": "m.call",
-                    "call_id": "",
-                    "event_id": "legacy-evt",
-                    "m.mentions": { room: true, user_ids: [] },
-                    "notify_type": "ring",
-                },
-            );
+                "notification_type": "ring",
+                "sender_ts": expect.any(Number),
+            });
         });
 
         it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock
-                .mockResolvedValueOnce({ event_id: "legacy-evt" })
-                .mockResolvedValueOnce({ event_id: "new-evt" });
+            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -707,7 +687,7 @@ describe("MatrixRTCSession", () => {
             ]);
 
             await sess!._onRTCSessionMemberUpdate();
-            const ownMembershipId = sess?.memberships[0].eventId;
+            const ownMembershipEventId = sess?.memberships[0].eventId;
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
@@ -715,43 +695,27 @@ describe("MatrixRTCSession", () => {
                 "notification_type": "ring",
                 "m.call.intent": "audio",
                 "m.relates_to": {
-                    event_id: ownMembershipId,
+                    event_id: ownMembershipEventId,
                     rel_type: "m.reference",
                 },
                 "lifetime": 30000,
                 "sender_ts": expect.any(Number),
             });
 
-            // Check if deprecated notify event is also sent.
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": "ring",
-                "call_id": "",
-            });
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
-            expect(didSendEventFn).toHaveBeenCalledWith(
-                {
-                    "event_id": "new-evt",
-                    "lifetime": 30000,
-                    "m.mentions": { room: true, user_ids: [] },
-                    "m.relates_to": {
-                        event_id: expect.any(String),
-                        rel_type: "m.reference",
-                    },
-                    "notification_type": "ring",
-                    "m.call.intent": "audio",
-                    "sender_ts": expect.any(Number),
+            expect(didSendEventFn).toHaveBeenCalledWith({
+                "event_id": "new-evt",
+                "lifetime": 30000,
+                "m.mentions": { room: true, user_ids: [] },
+                "m.relates_to": {
+                    event_id: expect.any(String),
+                    rel_type: "m.reference",
                 },
-                {
-                    "application": "m.call",
-                    "call_id": "",
-                    "event_id": "legacy-evt",
-                    "m.mentions": { room: true, user_ids: [] },
-                    "notify_type": "ring",
-                },
-            );
+                "notification_type": "ring",
+                "m.call.intent": "audio",
+                "sender_ts": expect.any(Number),
+            });
         });
 
         it("doesn't send a notification when joining an existing call", async () => {
