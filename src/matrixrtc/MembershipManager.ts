@@ -43,6 +43,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { isLivekitTransportConfig } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -1098,6 +1099,7 @@ export class StickyEventMembershipManager extends MembershipManager {
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
         const ownMembership = this.ownMembership;
 
+        const livekitTransport = isLivekitTransportConfig(this.rtcTransport) ? this.rtcTransport : undefined;
         const relationObject = ownMembership?.eventId
             ? { "m.relation": { rel_type: RelationType.Reference, event_id: ownMembership?.eventId } }
             : {};
@@ -1107,7 +1109,11 @@ export class StickyEventMembershipManager extends MembershipManager {
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
             },
             slot_id: slotDescriptionToId(this.slotDescription),
-            rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
+            // Make sure we do not add the alias to the transport.
+            // It is not needed in matrix2.0. The additional session information will be used to find the right alias on the sfu.
+            rtc_transports: livekitTransport
+                ? [{ type: livekitTransport.type, livekit_service_url: livekitTransport.livekit_service_url }]
+                : [],
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],
             ...relationObject,
