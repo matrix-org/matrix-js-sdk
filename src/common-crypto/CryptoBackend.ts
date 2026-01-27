@@ -90,8 +90,20 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      *
      * @param inviter - The user who invited us to the room and is expected to have
      *   sent the room key bundle.
+     *
+     * @returns `true` if the key bundle was successfuly downloaded and imported.
      */
-    maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void>;
+    maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<boolean>;
+
+    /**
+     * Mark a room as pending a key bundle under MSC4268. The backend will listen for room key bundle messages, and if
+     * it sees one matching the room specified, it will automatically import it as long as the message author's ID matches
+     * the inviter's ID.
+     *
+     * @param roomId - The room we were invited to, for which we did not receive a key bundle before accepting the invite.
+     * @param inviterId - The user who invited us to the room and is expected to send the room key bundle.
+     */
+    markRoomAsPendingKeyBundle(roomId: string, inviterId: string): void;
 }
 
 /** The methods which crypto implementations should expose to the Sync api
@@ -188,8 +200,9 @@ export interface EventDecryptionResult {
      */
     clearEvent: IClearEvent;
     /**
-     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     * No longer used.
      * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
+     * @deprecated
      */
     forwardingCurve25519KeyChain?: string[];
     /**
@@ -200,11 +213,13 @@ export interface EventDecryptionResult {
      * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
      */
     claimedEd25519Key?: string;
+
     /**
-     * Whether the keys for this event have been received via an unauthenticated source (eg via key forwards, or
-     * restored from backup)
+     * If another user forwarded the key to this message
+     * (eg via [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)),
+     * the ID of that user.
      */
-    untrusted?: boolean;
+    keyForwardedBy?: string;
 }
 
 /**

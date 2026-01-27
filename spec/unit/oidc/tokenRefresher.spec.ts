@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @vitest-environment happy-dom
  */
 
 /*
@@ -18,10 +18,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { OidcTokenRefresher, TokenRefreshLogoutError } from "../../../src";
-import { logger } from "../../../src/logger";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
 
 describe("OidcTokenRefresher", () => {
@@ -55,7 +54,7 @@ describe("OidcTokenRefresher", () => {
     });
 
     beforeEach(() => {
-        fetchMock.get(`${config.issuer}.well-known/openid-configuration`, config);
+        fetchMock.get(`${config.issuer}.well-known/openid-configuration`, config, { name: "openid-configuration" });
         fetchMock.get(`${config.issuer}jwks`, {
             status: 200,
             headers: {
@@ -64,65 +63,64 @@ describe("OidcTokenRefresher", () => {
             keys: [],
         });
 
-        fetchMock.post(config.token_endpoint, {
-            status: 200,
-            headers: {
-                "Content-Type": "application/json",
+        fetchMock.post(
+            config.token_endpoint,
+            {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                ...makeTokenResponse("new-access-token", "new-refresh-token"),
             },
-            ...makeTokenResponse("new-access-token", "new-refresh-token"),
-        });
+            { name: "token-endpoint" },
+        );
     });
 
     afterEach(() => {
-        jest.restoreAllMocks();
-        fetchMock.resetBehavior();
-    });
-
-    it("throws when oidc client cannot be initialised", async () => {
-        jest.spyOn(logger, "error");
-        fetchMock.get(
-            `${config.issuer}.well-known/openid-configuration`,
-            {
-                ok: false,
-                status: 404,
-            },
-            { overwriteRoutes: true },
-        );
-        const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-        await expect(refresher.oidcClientReady).rejects.toThrow();
-        expect(logger.error).toHaveBeenCalledWith(
-            "Failed to initialise OIDC client.",
-            // error from OidcClient
-            expect.any(Error),
-        );
-    });
-
-    it("initialises oidc client", async () => {
-        const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-        await refresher.oidcClientReady;
-
-        // @ts-ignore peek at private property to see we initialised the client correctly
-        expect(refresher.oidcClient.settings).toEqual(
-            expect.objectContaining({
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                authority: authConfig.issuer,
-                scope,
-            }),
-        );
+        vi.restoreAllMocks();
     });
 
     describe("doRefreshAccessToken()", () => {
         it("should throw when oidcClient has not been initialised", async () => {
+            fetchMock.modifyRoute("openid-configuration", {
+                response: {
+                    ok: false,
+                    status: 404,
+                },
+            });
+
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow(
-                "Cannot get new token before OIDC client is initialised.",
+            await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow("Failed to initialise OIDC client.");
+        });
+
+        it("should retry initialisation", async () => {
+            fetchMock.modifyRoute("openid-configuration", {
+                response: {
+                    ok: false,
+                    status: 404,
+                },
+            });
+
+            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
+            await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow("Failed to initialise OIDC client.");
+
+            // put the successful mock back
+            fetchMock.modifyRoute("openid-configuration", {
+                response: config,
+            });
+
+            const result = await refresher.doRefreshAccessToken("token");
+
+            expect(result).toEqual(
+                expect.objectContaining({
+                    accessToken: "new-access-token",
+                    refreshToken: "new-refresh-token",
+                }),
             );
         });
 
         it("should refresh the tokens", async () => {
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await refresher.oidcClientReady;
 
             const result = await refresher.doRefreshAccessToken("refresh-token");
 
@@ -140,13 +138,12 @@ describe("OidcTokenRefresher", () => {
 
         it("should persist the new tokens", async () => {
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await refresher.oidcClientReady;
             // spy on our stub
-            jest.spyOn(refresher, "persistTokens");
+            vi.spyOn(refresher as any, "persistTokens");
 
             await refresher.doRefreshAccessToken("refresh-token");
 
-            expect(refresher.persistTokens).toHaveBeenCalledWith(
+            expect((refresher as any).persistTokens).toHaveBeenCalledWith(
                 expect.objectContaining({
                     accessToken: "new-access-token",
                     refreshToken: "new-refresh-token",
@@ -155,34 +152,27 @@ describe("OidcTokenRefresher", () => {
         });
 
         it("should only have one inflight refresh request at once", async () => {
+            fetchMock.removeRoute("token-endpoint");
             fetchMock
-                .postOnce(
-                    config.token_endpoint,
-                    {
-                        status: 200,
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        ...makeTokenResponse("first-new-access-token", "first-new-refresh-token"),
+                .postOnce(config.token_endpoint, {
+                    status: 200,
+                    headers: {
+                        "Content-Type": "application/json",
                     },
-                    { overwriteRoutes: true },
-                )
-                .postOnce(
-                    config.token_endpoint,
-                    {
-                        status: 200,
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        ...makeTokenResponse("second-new-access-token", "second-new-refresh-token"),
+                    ...makeTokenResponse("first-new-access-token", "first-new-refresh-token"),
+                })
+                .postOnce(config.token_endpoint, {
+                    status: 200,
+                    headers: {
+                        "Content-Type": "application/json",
                     },
-                    { overwriteRoutes: false },
-                );
+                    ...makeTokenResponse("second-new-access-token", "second-new-refresh-token"),
+                });
 
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // reset call counts
-            fetchMock.resetHistory();
+            fetchMock.clearHistory();
 
             const refreshToken = "refresh-token";
             const first = refresher.doRefreshAccessToken(refreshToken);
@@ -215,16 +205,14 @@ describe("OidcTokenRefresher", () => {
         });
 
         it("should log and rethrow when token refresh fails", async () => {
-            fetchMock.post(
-                config.token_endpoint,
-                {
+            fetchMock.modifyRoute("token-endpoint", {
+                response: {
                     status: 503,
                     headers: {
                         "Content-Type": "application/json",
                     },
                 },
-                { overwriteRoutes: true },
-            );
+            });
 
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
@@ -234,33 +222,26 @@ describe("OidcTokenRefresher", () => {
 
         it("should make fresh request after a failed request", async () => {
             // make sure inflight request is cleared after a failure
+            fetchMock.removeRoute("token-endpoint");
             fetchMock
-                .postOnce(
-                    config.token_endpoint,
-                    {
-                        status: 503,
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
+                .postOnce(config.token_endpoint, {
+                    status: 503,
+                    headers: {
+                        "Content-Type": "application/json",
                     },
-                    { overwriteRoutes: true },
-                )
-                .postOnce(
-                    config.token_endpoint,
-                    {
-                        status: 200,
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        ...makeTokenResponse("second-new-access-token", "second-new-refresh-token"),
+                })
+                .postOnce(config.token_endpoint, {
+                    status: 200,
+                    headers: {
+                        "Content-Type": "application/json",
                     },
-                    { overwriteRoutes: false },
-                );
+                    ...makeTokenResponse("second-new-access-token", "second-new-refresh-token"),
+                });
 
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;
             // reset call counts
-            fetchMock.resetHistory();
+            fetchMock.clearHistory();
 
             // first call fails
             await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
@@ -278,9 +259,8 @@ describe("OidcTokenRefresher", () => {
         });
 
         it("should throw TokenRefreshLogoutError when expired", async () => {
-            fetchMock.post(
-                config.token_endpoint,
-                {
+            fetchMock.modifyRoute("token-endpoint", {
+                response: {
                     status: 400,
                     headers: {
                         "Content-Type": "application/json",
@@ -290,8 +270,7 @@ describe("OidcTokenRefresher", () => {
                         error_description: "The provided access grant is invalid, expired, or revoked.",
                     },
                 },
-                { overwriteRoutes: true },
-            );
+            });
 
             const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
             await refresher.oidcClientReady;

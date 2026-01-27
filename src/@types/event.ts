@@ -27,6 +27,7 @@ import {
     type RoomMemberEventContent,
     type RoomNameEventContent,
     type RoomPinnedEventsEventContent,
+    type RoomPolicyContent,
     type RoomPowerLevelsEventContent,
     type RoomServerAclEventContent,
     type RoomThirdPartyInviteEventContent,
@@ -155,6 +156,9 @@ export enum EventType {
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
     RTCDecline = "org.matrix.msc4310.rtc.decline",
+
+    // Policy servers
+    RoomPolicy = "org.matrix.msc4284.policy",
 }
 
 export enum RelationType {
@@ -367,6 +371,9 @@ export interface StateEvents {
     [EventType.PolicyRuleUser]: PolicyRuleEventContent | EmptyObject;
     [EventType.PolicyRuleRoom]: PolicyRuleEventContent | EmptyObject;
     [EventType.PolicyRuleServer]: PolicyRuleEventContent | EmptyObject;
+
+    // MSC4284: Policy servers
+    [EventType.RoomPolicy]: RoomPolicyContent | EmptyObject;
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;

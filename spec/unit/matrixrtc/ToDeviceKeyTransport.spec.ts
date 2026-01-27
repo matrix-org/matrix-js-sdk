@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
+import { type Mocked } from "vitest";
 
 import { makeMockEvent } from "./mocks";
 import { ClientEvent, EventType, type MatrixClient } from "../../../src";
@@ -34,11 +34,11 @@ describe("ToDeviceKeyTransport", () => {
 
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
-            encryptAndSendToDevice: jest.fn().mockImplementation(() => Promise.resolve()),
+            encryptAndSendToDevice: vi.fn().mockImplementation(() => Promise.resolve()),
         });
         mockLogger = {
-            debug: jest.fn(),
-            warn: jest.fn(),
+            debug: vi.fn(),
+            warn: vi.fn(),
         } as unknown as Mocked<Logger>;
         statistics = {
             counters: {
@@ -50,9 +50,15 @@ describe("ToDeviceKeyTransport", () => {
             },
         };
 
-        transport = new ToDeviceKeyTransport("@alice:example.org", "MYDEVICE", roomId, mockClient, statistics, {
-            getChild: jest.fn().mockReturnValue(mockLogger),
-        } as unknown as Mocked<Logger>);
+        transport = new ToDeviceKeyTransport(
+            { userId: "@alice:example.org", deviceId: "MYDEVICE", memberId: "@alice:example.org:MYDEVICE" },
+            roomId,
+            mockClient,
+            statistics,
+            {
+                getChild: vi.fn().mockReturnValue(mockLogger),
+            } as unknown as Mocked<Logger>,
+        );
     });
 
     it("should send my keys on via to device", async () => {
@@ -81,6 +87,7 @@ describe("ToDeviceKeyTransport", () => {
                 },
                 member: {
                     claimed_device_id: "MYDEVICE",
+                    id: "@alice:example.org:MYDEVICE",
                 },
                 room_id: roomId,
                 session: {
@@ -102,8 +109,13 @@ describe("ToDeviceKeyTransport", () => {
             keyBase64Encoded: string;
             index: number;
         }>();
-        transport.on(KeyTransportEvents.ReceivedKeys, (userId, deviceId, keyBase64Encoded, index, timestamp) => {
-            receivedKeyResolvers.resolve({ userId, deviceId, keyBase64Encoded, index });
+        transport.on(KeyTransportEvents.ReceivedKeys, (membership, keyBase64Encoded, index, _timestamp) => {
+            receivedKeyResolvers.resolve({
+                userId: membership.userId,
+                deviceId: membership.deviceId,
+                keyBase64Encoded,
+                index,
+            });
         });
         transport.start();
 

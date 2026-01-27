@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
+import { type CallLog } from "fetch-mock";
 import debug from "debug";
 
 import { ClientEvent, createClient, DebugLogger, type MatrixClient, MatrixEvent } from "../../../src";
@@ -28,7 +29,7 @@ import { emitPromise, EventCounter } from "../../test-utils/test-utils";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
-        jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+        vi.useFakeTimers();
 
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -59,28 +60,35 @@ describe("Device dehydration", () => {
         });
 
         const crypto = matrixClient.getCrypto()!;
-        fetchMock.config.overwriteRoutes = true;
 
         // start dehydration -- we start with no dehydrated device, and we
         // store the dehydrated device that we create
-        fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
-            status: 404,
-            body: {
-                errcode: "M_NOT_FOUND",
-                error: "Not found",
+        fetchMock.get(
+            "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            {
+                status: 404,
+                body: {
+                    errcode: "M_NOT_FOUND",
+                    error: "Not found",
+                },
             },
-        });
+            { name: "get-dehydrated-device" },
+        );
         let dehydratedDeviceBody: any;
         let dehydrationCount = 0;
         let resolveDehydrationPromise: () => void;
-        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
-            dehydratedDeviceBody = JSON.parse(opts.body as string);
-            dehydrationCount++;
-            if (resolveDehydrationPromise) {
-                resolveDehydrationPromise();
-            }
-            return {};
-        });
+        fetchMock.put(
+            "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            (callLog) => {
+                dehydratedDeviceBody = JSON.parse(callLog.options.body as string);
+                dehydrationCount++;
+                if (resolveDehydrationPromise) {
+                    resolveDehydrationPromise();
+                }
+                return {};
+            },
+            { name: "put-dehydrated-device" },
+        );
         await crypto.startDehydration();
 
         expect(dehydrationCount).toEqual(1);
@@ -91,7 +99,7 @@ describe("Device dehydration", () => {
         const dehydrationPromise = new Promise<void>((resolve, reject) => {
             resolveDehydrationPromise = resolve;
         });
-        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await dehydrationPromise;
 
         expect(dehydrationKeyCachedEventCounter.counter).toEqual(1);
@@ -101,16 +109,18 @@ describe("Device dehydration", () => {
         // restart dehydration -- rehydrate the device that we created above,
         // and create a new dehydrated device.  We also set `createNewKey`, so
         // a new dehydration key will be set
-        fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
-            device_id: dehydratedDeviceBody.device_id,
-            device_data: dehydratedDeviceBody.device_data,
+        fetchMock.modifyRoute("get-dehydrated-device", {
+            response: {
+                device_id: dehydratedDeviceBody.device_id,
+                device_data: dehydratedDeviceBody.device_data,
+            },
         });
-        const eventsResponse = jest.fn((url, opts) => {
+        const eventsResponse = vi.fn((callLog: CallLog) => {
             // rehydrating should make two calls to the /events endpoint.
             // The first time will return a single event, and the second
             // time will return no events (which will signal to the
             // rehydration function that it can stop)
-            const body = JSON.parse(opts.body as string);
+            const body = JSON.parse(callLog.options.body as string);
             const nextBatch = body.next_batch ?? "0";
             const events = nextBatch === "0" ? [{ sender: "@alice:localhost", type: "m.dummy", content: {} }] : [];
             return {
@@ -135,28 +145,30 @@ describe("Device dehydration", () => {
         expect(dehydrationKeyCachedEventCounter.counter).toEqual(2);
 
         // test that if we get an error when we try to rotate, it emits an event
-        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
-            status: 500,
-            body: {
-                errcode: "M_UNKNOWN",
-                error: "Unknown error",
+        fetchMock.modifyRoute("put-dehydrated-device", {
+            response: {
+                status: 500,
+                body: {
+                    errcode: "M_UNKNOWN",
+                    error: "Unknown error",
+                },
             },
         });
         const rotationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.DehydratedDeviceRotationError);
-        jest.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+        vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
         await rotationErrorEventPromise;
 
         // Restart dehydration, but return an error for GET /dehydrated_device so that rehydration fails.
-        fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
-            status: 500,
-            body: {
-                errcode: "M_UNKNOWN",
-                error: "Unknown error",
+        fetchMock.modifyRoute("get-dehydrated-device", {
+            response: {
+                status: 500,
+                body: {
+                    errcode: "M_UNKNOWN",
+                    error: "Unknown error",
+                },
             },
         });
-        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (_, opts) => {
-            return {};
-        });
+        fetchMock.modifyRoute("put-dehydrated-device", { response: { body: {} } });
         const rehydrationErrorEventPromise = emitPromise(matrixClient, CryptoEvent.RehydrationError);
         await crypto.startDehydration(true);
         await rehydrationErrorEventPromise;
@@ -182,8 +194,8 @@ async function initializeSecretStorage(
     const e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
     e2eKeyResponder.addKeyReceiver(userId, e2eKeyReceiver);
     const accountData: Map<string, object> = new Map();
-    fetchMock.get("glob:http://*/_matrix/client/v3/user/*/account_data/*", (url, opts) => {
-        const name = url.split("/").pop()!;
+    fetchMock.get("glob:http://*/_matrix/client/v3/user/*/account_data/*", (callLog) => {
+        const name = callLog.url.split("/").pop()!;
         const value = accountData.get(name);
         if (value) {
             return value;
@@ -197,9 +209,9 @@ async function initializeSecretStorage(
             };
         }
     });
-    fetchMock.put("glob:http://*/_matrix/client/v3/user/*/account_data/*", (url, opts) => {
-        const name = url.split("/").pop()!;
-        const value = JSON.parse(opts.body as string);
+    fetchMock.put("glob:http://*/_matrix/client/v3/user/*/account_data/*", (callLog) => {
+        const name = callLog.url.split("/").pop()!;
+        const value = JSON.parse(callLog.options.body as string);
         accountData.set(name, value);
         matrixClient.emit(ClientEvent.AccountData, new MatrixEvent({ type: name, content: value }));
         return {};

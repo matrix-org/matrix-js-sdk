@@ -276,13 +276,8 @@ export class MembershipManager
         if (!this.isActivated()) {
             return Promise.resolve();
         }
-        const userId = this.client.getUserId();
-        const deviceId = this.client.getDeviceId();
-        if (!userId || !deviceId) {
-            this.logger.error("MembershipManager.onRTCSessionMemberUpdate called without user or device id");
-            return Promise.resolve();
-        }
-        this._ownMembership = memberships.find((m) => isMyMembership(m, userId, deviceId));
+
+        this._ownMembership = memberships.find((m) => isMyMembership(m, this.userId, this.deviceId));
 
         if (!this._ownMembership) {
             // If one of these actions are scheduled or are getting inserted in the next iteration, we should already
@@ -338,9 +333,10 @@ export class MembershipManager
         if (userId === null) throw Error("Missing userId in client");
         if (deviceId === null) throw Error("Missing deviceId in client");
         this.deviceId = deviceId;
+        this.userId = userId;
         // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
         // we keep it as a string for now for backwards compatibility.
-        this.memberId = this.makeMembershipStateKey(userId, deviceId);
+        this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
@@ -386,7 +382,8 @@ export class MembershipManager
     }
     // Membership Event static parameters:
     protected deviceId: string;
-    protected memberId: string;
+    protected userId: string;
+    protected stateKey: string;
     protected rtcTransport?: Transport;
     /** @deprecated This will be removed in favor or rtcTransport becoming a list of actively used transports */
     private fociPreferred?: Transport[];
@@ -487,7 +484,7 @@ export class MembershipManager
             { delay: this.delayedLeaveEventDelayMs },
             EventType.GroupCallMemberPrefix,
             {},
-            this.memberId,
+            this.stateKey,
         );
 
     // HANDLERS (used in the membershipLoopHandler)
@@ -502,7 +499,7 @@ export class MembershipManager
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
-                this.state.delayId = response.delay_id;
+                this.setAndEmitDelayId(response.delay_id);
                 if (this.state.hasMemberStateEvent) {
                     // This action was scheduled because the previous delayed event was cancelled
                     // due to lack of https://github.com/element-hq/synapse/pull/17810
@@ -549,7 +546,7 @@ export class MembershipManager
         return await this.client
             ._unstable_cancelScheduledDelayedEvent(delayId)
             .then(() => {
-                this.state.delayId = undefined;
+                this.setAndEmitDelayId(undefined);
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
                 return createReplaceActionUpdate(MembershipActionType.SendDelayedEvent);
             })
@@ -561,7 +558,7 @@ export class MembershipManager
                 if (this.isNotFoundError(e)) {
                     // If we get a M_NOT_FOUND we know that the delayed event got already removed.
                     // This means we are good and can set it to undefined and run this again.
-                    this.state.delayId = undefined;
+                    this.setAndEmitDelayId(undefined);
                     return createReplaceActionUpdate(repeatActionType);
                 }
                 if (this.isUnsupportedDelayedEndpoint(e)) {
@@ -585,6 +582,13 @@ export class MembershipManager
         }
         this.state.probablyLeft = probablyLeft;
         this.emit(MembershipManagerEvent.ProbablyLeft, this.state.probablyLeft);
+    }
+
+    private setAndEmitDelayId(delayId: string | undefined): void {
+        if (this.state.delayId === delayId) return;
+
+        this.state.delayId = delayId;
+        this.emit(MembershipManagerEvent.DelayIdChanged, this.state.delayId);
     }
 
     private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
@@ -630,7 +634,7 @@ export class MembershipManager
                 }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
                 if (this.isNotFoundError(e)) {
-                    this.state.delayId = undefined;
+                    this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(MembershipActionType.SendDelayedEvent);
                 }
                 // If the HS does not support delayed events we wont reschedule.
@@ -650,6 +654,7 @@ export class MembershipManager
             ._unstable_sendScheduledDelayedEvent(delayId)
             .then(() => {
                 this.state.hasMemberStateEvent = false;
+                this.setAndEmitDelayId(undefined);
                 this.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
 
                 return { replace: [] };
@@ -658,7 +663,7 @@ export class MembershipManager
                 const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
                 if (this.isNotFoundError(e)) {
-                    this.state.delayId = undefined;
+                    this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(repeatActionType);
                 }
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "sendScheduledDelayedEvent");
@@ -680,7 +685,7 @@ export class MembershipManager
             this.room.roomId,
             EventType.GroupCallMemberPrefix,
             myMembership as EmptyObject | SessionMembershipData,
-            this.memberId,
+            this.stateKey,
         );
     };
 
@@ -763,6 +768,10 @@ export class MembershipManager
     }
 
     // HELPERS
+    /**
+     * this creates `${localUserId}_${localDeviceId}_${this.slotDescription.application}${this.slotDescription.id}`
+     * which is not compatible with membershipID of session type member events. They have to be `${localUserId}:${localDeviceId}`
+     */
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
         const stateKey = `${localUserId}_${localDeviceId}_${this.slotDescription.application}${this.slotDescription.id}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
@@ -793,6 +802,10 @@ export class MembershipManager
             "call_id": this.slotDescription.id,
             "scope": "m.room",
             "device_id": this.deviceId,
+            // DO NOT use this.memberId here since that is the state key (using application...)
+            // But for session events we use the colon seperated userId and deviceId. The SFU will automatically
+            // assign those values to the media participant for those versions.
+            "membershipID": `${this.userId}:${this.deviceId}`,
             expires,
             "m.call.intent": this.callIntent,
             ...focusObjects,
@@ -1022,6 +1035,9 @@ export class MembershipManager
     public get probablyLeft(): boolean {
         return this.state.probablyLeft;
     }
+    public get delayId(): string | undefined {
+        return this.state.delayId;
+    }
 }
 
 /**
@@ -1035,6 +1051,9 @@ export class StickyEventMembershipManager extends MembershipManager {
         private readonly clientWithSticky: MembershipManagerClient &
             Pick<MatrixClient, "_unstable_sendStickyEvent" | "_unstable_sendStickyDelayedEvent">,
         sessionDescription: SlotDescription,
+        // this needs to become a uuid so that consecutive join/leaves result in a key rotation.
+        // we keep it as a string for now for backwards compatibility.
+        private readonly memberId: string,
         parentLogger?: Logger,
     ) {
         super(joinConfig, room, clientWithSticky, sessionDescription, parentLogger);
@@ -1083,7 +1102,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             slot_id: slotDescriptionToId(this.slotDescription),
             rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
-            member: { device_id: this.deviceId, user_id: this.client.getUserId()!, id: this.memberId },
+            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],
             ...relationObject,
         };

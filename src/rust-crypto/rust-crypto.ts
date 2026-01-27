@@ -17,7 +17,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto.ts";
+import type { IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type IDeviceLists, type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
 import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
@@ -28,6 +28,7 @@ import {
     type BackupDecryptor,
     type CryptoBackend,
     DecryptionError,
+    type EventDecryptionResult,
     type OnSyncCompletedData,
 } from "../common-crypto/CryptoBackend.ts";
 import { type Logger, LogSpan } from "../logger.ts";
@@ -129,6 +130,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
+    /** mapping of room ID -> inviter ID for rooms pending MSC4268 key bundles */
+    private readonly roomsPendingKeyBundles: Map<string, string> = new Map();
+
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
@@ -164,7 +168,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         /** Crypto callbacks provided by the application */
         private readonly cryptoCallbacks: CryptoCallbacks,
 
-        /** Enable support for encrypted state events under MSC3414. */
+        /** Enable support for encrypted state events under MSC4362. */
         private readonly enableEncryptedStateEvents: boolean = false,
     ) {
         super();
@@ -282,7 +286,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         await encryptor.encryptEvent(event, this.globalBlacklistUnverifiedDevices, this.deviceIsolationMode);
     }
 
-    public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
+    public async decryptEvent(event: MatrixEvent): Promise<EventDecryptionResult> {
         const roomId = event.getRoomId();
         if (!roomId) {
             // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
@@ -329,10 +333,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend.maybeAcceptKeyBundle}.
      */
-    public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<void> {
+    public async maybeAcceptKeyBundle(roomId: string, inviter: string): Promise<boolean> {
         // TODO: retry this if it gets interrupted or it fails. (https://github.com/matrix-org/matrix-rust-sdk/issues/5112)
         // TODO: do this in the background.
-        // TODO: handle the bundle message arriving after the invite (https://github.com/element-hq/element-web/issues/30740)
 
         const logger = new LogSpan(this.logger, `maybeAcceptKeyBundle(${roomId}, ${inviter})`);
 
@@ -352,7 +355,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
         if (!bundleData) {
             logger.info("No key bundle found for user");
-            return;
+            return false;
         }
 
         logger.info(`Fetching key bundle ${bundleData.url}`);
@@ -391,7 +394,17 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             logger.warn(`Error receiving encrypted bundle:`, err);
             throw err;
         }
+
+        return true;
     }
+
+    /**
+     * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
+     */
+    public markRoomAsPendingKeyBundle(roomId: string, inviter: string): void {
+        this.roomsPendingKeyBundles.set(roomId, inviter);
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // CryptoApi implementation
@@ -1611,7 +1624,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         }
 
         // 2. Upload the encrypted bundle to the server
-        const uploadResponse = await this.http.uploadContent(bundle.encryptedData);
+        const uploadResponse = await this.http.uploadContent(bundle.encryptedData as Uint8Array<ArrayBuffer>);
         logger.info(`Uploaded encrypted key blob: ${JSON.stringify(uploadResponse)}`);
 
         // 3. We may not share a room with the user, so get a fresh list of devices for the invited user.
@@ -1703,6 +1716,37 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                             senderVerified: encryptionInfo.isSenderVerified(),
                         },
                     });
+
+                    // If we have received a room key bundle message, and have previously marked the room
+                    // IDs it references as pending key bundles, tell the Rust SDK to try and accept it,
+                    // just in case it was received after invite.
+                    //
+                    // We don't actually need to validate the contents of the bundle message, or do
+                    // anything with its contents at all. We simply want to inform the Rust SDK we have
+                    // received a new room key bundle that we might be able to download.
+                    if (
+                        isRoomKeyBundleMessage(parsedMessage) &&
+                        this.roomsPendingKeyBundles.has(parsedMessage.content.room_id)
+                    ) {
+                        // No `await`-ing here, as this is called from inside the `/sync` loop.
+                        this.maybeAcceptKeyBundle(
+                            parsedMessage.content.room_id,
+                            this.roomsPendingKeyBundles.get(parsedMessage.content.room_id)!,
+                        ).then(
+                            (success) => {
+                                if (success) {
+                                    this.roomsPendingKeyBundles.delete(parsedMessage.content.room_id);
+                                }
+                            },
+                            (err) => {
+                                this.logger.error(
+                                    `Error attempting to download key bundle for room ${parsedMessage.content.room_id}`,
+                                );
+                                this.logger.error(err);
+                            },
+                        );
+                    }
+
                     break;
                 }
                 case RustSdkCryptoJs.ProcessedToDeviceEventType.PlainText: {
@@ -1774,7 +1818,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             return;
         }
 
-        if (config["io.element.msc3414.encrypt_state_events"] && this.enableEncryptedStateEvents) {
+        if (config["io.element.msc4362.encrypt_state_events"] && this.enableEncryptedStateEvents) {
             this.logger.info("crypto Enabling state event encryption...");
             settings.encryptStateEvents = true;
         }
@@ -2159,7 +2203,7 @@ class EventDecryptor {
     public async attemptEventDecryption(
         event: MatrixEvent,
         isolationMode: DeviceIsolationMode,
-    ): Promise<IEventDecryptionResult> {
+    ): Promise<EventDecryptionResult> {
         // add the event to the pending list *before* attempting to decrypt.
         // then, if the key turns up while decryption is in progress (and
         // decryption fails), we will schedule a retry.
@@ -2192,7 +2236,7 @@ class EventDecryptor {
                 clearEvent: JSON.parse(res.event),
                 claimedEd25519Key: res.senderClaimedEd25519Key,
                 senderCurve25519Key: res.senderCurve25519Key,
-                forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+                keyForwardedBy: res.forwarder?.toString(),
             };
         } catch (err) {
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
@@ -2451,9 +2495,6 @@ function rustEncryptionInfoToJsEncryptionInfo(
         case RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity:
             shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
             break;
-        case RustSdkCryptoJs.ShieldStateCode.SentInClear:
-            shieldReason = EventShieldReason.SENT_IN_CLEAR;
-            break;
         case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;
             break;
@@ -2466,6 +2507,26 @@ function rustEncryptionInfoToJsEncryptionInfo(
     }
 
     return { shieldColour, shieldReason };
+}
+
+interface RoomKeyBundleMessage {
+    type: "io.element.msc4268.room_key_bundle";
+    content: {
+        room_id: string;
+    };
+}
+
+/**
+ * Determines if the given payload is a RoomKeyBundleMessage.
+ *
+ * A RoomKeyBundleMessage is identified by having a specific message type
+ * ("io.element.msc4268.room_key_bundle") and a valid room_id in its content.
+ *
+ * @param message - The received to-device message to check.
+ * @returns True if the payload matches the RoomKeyBundleMessage structure, false otherwise.
+ */
+function isRoomKeyBundleMessage(message: IToDeviceEvent): message is IToDeviceEvent & RoomKeyBundleMessage {
+    return message.type === "io.element.msc4268.room_key_bundle" && typeof message.content.room_id === "string";
 }
 
 type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];

@@ -44,13 +44,13 @@ jobs:
                 repo:
                     - element-hq/element-web
         steps:
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   repository: ${{ matrix.repo }}
                   ref: staging
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
 
-            - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   cache: "yarn"
                   node-version: "lts/*"
@@ -73,10 +73,10 @@ jobs:
         runs-on: ubuntu-24.04
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
             - name: 🔧 Yarn cache
-              uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+              uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   cache: "yarn"
                   node-version-file: package.json

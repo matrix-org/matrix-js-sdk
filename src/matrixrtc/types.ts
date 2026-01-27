@@ -16,8 +16,9 @@ limitations under the License.
 import type { IContent, IMentions } from "../matrix.ts";
 import type { RelationEvent } from "../types.ts";
 import type { CallMembership } from "./CallMembership.ts";
+import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 
-export type ParticipantId = string;
+export type EncryptionKeyMapKey = string;
 
 export interface EncryptionKeyEntry {
     index: number;
@@ -37,8 +38,8 @@ export type ParticipantDeviceInfo = {
  * A type representing the information needed to decrypt video streams.
  */
 export type InboundEncryptionSession = {
-    key: Uint8Array;
-    participantId: ParticipantId;
+    key: Uint8Array<ArrayBuffer>;
+    membership: CallMembershipIdentityParts;
     keyIndex: number;
     creationTS: number;
 };
@@ -47,7 +48,7 @@ export type InboundEncryptionSession = {
  * The information about the key used to encrypt video streams.
  */
 export type OutboundEncryptionSession = {
-    key: Uint8Array;
+    key: Uint8Array<ArrayBuffer>;
     creationTS: number;
     // The devices that this key is shared with.
     sharedWith: Array<ParticipantDeviceInfo>;
@@ -68,6 +69,7 @@ export interface EncryptionKeysEventContent {
 export interface EncryptionKeysToDeviceEventContent {
     keys: { index: number; key: string };
     member: {
+        id: string;
         // TODO Remove that it is claimed, need to get the sealed sender from decryption info
         // Or add some validation on it based on the encryption info
         claimed_device_id: string;
@@ -159,11 +161,8 @@ export interface IRTCDeclineContent extends RelationEvent {}
 export enum Status {
     Disconnected = "Disconnected",
     Connecting = "Connecting",
-    ConnectingFailed = "ConnectingFailed",
     Connected = "Connected",
-    Reconnecting = "Reconnecting",
     Disconnecting = "Disconnecting",
-    Stuck = "Stuck",
     Unknown = "Unknown",
 }
 

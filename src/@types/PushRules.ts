@@ -102,8 +102,7 @@ export interface IRoomMemberCountCondition extends IPushRuleCondition<ConditionK
     is: AnyMemberCountCondition;
 }
 
-export interface ISenderNotificationPermissionCondition
-    extends IPushRuleCondition<ConditionKind.SenderNotificationPermission> {
+export interface ISenderNotificationPermissionCondition extends IPushRuleCondition<ConditionKind.SenderNotificationPermission> {
     key: string;
 }
 

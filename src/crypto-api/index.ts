@@ -1138,7 +1138,7 @@ export interface CryptoCallbacks {
             keys: Record<string, SecretStorageKeyDescription>;
         },
         name: string,
-    ) => Promise<[string, Uint8Array] | null>;
+    ) => Promise<[string, Uint8Array<ArrayBuffer>] | null>;
 
     /**
      * Called by {@link CryptoApi.bootstrapSecretStorage} when a new default secret storage key is created.
@@ -1150,7 +1150,7 @@ export interface CryptoCallbacks {
      * @param keyInfo - secret storage key info
      * @param key - private key to store
      */
-    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array) => void;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: SecretStorageKeyDescription, key: Uint8Array<ArrayBuffer>) => void;
 }
 
 /**
@@ -1231,7 +1231,7 @@ export interface GeneratedSecretStorageKey {
         name?: string;
     };
     /** The raw generated private key. */
-    privateKey: Uint8Array;
+    privateKey: Uint8Array<ArrayBuffer>;
     /** The generated key, encoded for display to the user per https://spec.matrix.org/v1.7/client-server-api/#key-representation. */
     encodedPrivateKey?: string;
 }
@@ -1284,11 +1284,17 @@ export enum EventShieldReason {
     /**
      * The (deprecated) sender_key field in the event does not match the Ed25519 key of the device that sent us the
      * decryption keys.
+     *
+     * @deprecated The sender_key field is not checked by matrix-sdk-crypto, and this value is therefore unused since
+     * the migration to matrix-sdk-crypto in v37.0.0.
      */
     MISMATCHED_SENDER_KEY,
 
     /**
      * The event was sent unencrypted in an encrypted room.
+     *
+     * @deprecated This has never been used. The fact it is here was due to a misunderstanding of the behaviour of
+     * `matrix-sdk-crypto`.
      */
     SENT_IN_CLEAR,
 

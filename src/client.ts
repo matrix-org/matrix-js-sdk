@@ -246,6 +246,7 @@ import {
 } from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
+import { type Transport } from "./matrixrtc/index.ts";
 
 export type Store = IStore;
 
@@ -1216,7 +1217,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
 
     private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
-    private readonly enableEncryptedStateEvents: boolean;
+
+    /**
+     * Support MSC4362: Simplified Encrypted State Events.
+     *
+     * The client must be recreated for changes to this setting to take effect
+     * reliably.
+     *
+     * When this setting is true, if we find a state event that is encrypted
+     * (within a room that supports encrypted state), we will attempt to decrypt
+     * it as specified in MSC4362. If the user was in the room at the time an
+     * encrypted state event was received (meaning we have the key), even if
+     * this setting was set to false at the time it was received, recreating the
+     * client with this setting set to true will allow decrypting that event.
+     *
+     * When this setting is false, any state event that is encrypted will not be
+     * decrypted, meaning it will have no effect. This matched the behaviour of
+     * a client that does not support MSC4362.
+     */
+    public enableEncryptedStateEvents: boolean;
+
     public cryptoCallbacks: CryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;
@@ -2406,7 +2426,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const roomId = res.room_id;
         if (opts.acceptSharedHistory && inviter && this.cryptoBackend) {
-            await this.cryptoBackend.maybeAcceptKeyBundle(roomId, inviter);
+            // Try to accept the room key bundle specified in a `m.room_key_bundle` to-device message we (might have) already received.
+            const bundleDownloaded = await this.cryptoBackend.maybeAcceptKeyBundle(roomId, inviter);
+            // If this fails, i.e. we haven't received this message yet, we need to wait until the to-device message arrives.
+            if (!bundleDownloaded) {
+                this.cryptoBackend.markRoomAsPendingKeyBundle(roomId, inviter);
+            }
         }
 
         // In case we were originally given an alias, check the room cache again
@@ -2456,8 +2481,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param event - The event to resend.
      * @param room - Optional. The room the event is in. Will update the
      * timeline entry if provided.
-     * @returns Promise which resolves: to an ISendEventResponse object
-     * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public resendEvent(event: MatrixEvent, room: Room): Promise<ISendEventResponse> {
         // also kick the to-device queue to retry
@@ -2496,6 +2521,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public setRoomName(roomId: string, name: string): Promise<ISendEventResponse> {
         return this.sendStateEvent(roomId, EventType.RoomName, { name: name });
@@ -2507,6 +2534,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param htmlTopic - Optional.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public setRoomTopic(roomId: string, topic?: string, htmlTopic?: string): Promise<ISendEventResponse> {
         const content = ContentHelpers.makeTopicContent(topic, htmlTopic);
@@ -2578,6 +2607,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param powerLevel - the numeric power level to update given users to
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public async setPowerLevel(
         roomId: string,
@@ -2623,6 +2654,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Create an m.beacon_info event
      * @returns
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public async unstable_createLiveBeacon(
@@ -2637,6 +2670,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * using a specific m.beacon_info.* event variable type
      * @param roomId - string
      * @returns
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public async unstable_setLiveBeacon(
@@ -2646,6 +2681,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
     }
 
+    /**
+     * Send a Matrix timeline event.
+     * @param roomId The room to send to.
+     * @param eventType The event type.
+     * @param content The event content.
+     * @param txnId An optional ID to deduplicate requests in case of repeated attempts.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
+     */
     public sendEvent<K extends keyof TimelineEvents>(
         roomId: string,
         eventType: K,
@@ -3075,6 +3119,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      * @throws Error if called with `with_rel_types` (MSC3912) but the server does not support it.
      *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public redactEvent(
         roomId: string,
@@ -3221,6 +3267,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param txnId - Optional.
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public sendEmoteMessage(roomId: string, body: string, txnId?: string): Promise<ISendEventResponse>;
     public sendEmoteMessage(
@@ -3247,6 +3295,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public sendImageMessage(roomId: string, url: string, info?: ImageInfo, text?: string): Promise<ISendEventResponse>;
     public sendImageMessage(
@@ -3281,6 +3331,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public sendStickerMessage(
         roomId: string,
@@ -3320,6 +3372,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public sendHtmlMessage(roomId: string, body: string, htmlBody: string): Promise<ISendEventResponse>;
     public sendHtmlMessage(
@@ -3346,6 +3400,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public sendHtmlNotice(roomId: string, body: string, htmlBody: string): Promise<ISendEventResponse>;
     public sendHtmlNotice(
@@ -3372,6 +3428,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public sendHtmlEmote(roomId: string, body: string, htmlBody: string): Promise<ISendEventResponse>;
     public sendHtmlEmote(
@@ -3400,6 +3458,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line
     public async _unstable_sendDelayedEvent<K extends keyof TimelineEvents>(
@@ -3433,6 +3493,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) and
      *   [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354) for more details.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line
     public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
@@ -3473,6 +3535,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
@@ -3507,6 +3571,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354) for more details.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line
     public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
@@ -3629,6 +3695,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
      *
      * @throws A M_NOT_FOUND error if no matching delayed event could be found.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_sendScheduledDelayedEvent(
@@ -3815,6 +3883,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return await this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
     }
 
+    /**
+     *
+     * @param roomId
+     * @param notificationEventId
+     * @returns
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
+     */
     public sendRtcDecline(roomId: string, notificationEventId: string): Promise<ISendEventResponse> {
         return this.sendEvent(roomId, EventType.RTCDecline, {
             "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
@@ -3994,6 +4070,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param opts - Optional reason object. For backwards compatibility, a string is also accepted, and will be interpreted as a reason.
      *
      * @returns An empty object.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public async invite(roomId: string, userId: string, opts: InviteOpts | string = {}): Promise<EmptyObject> {
         if (typeof opts != "object") {
@@ -4013,6 +4091,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param email - The email address to invite.
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public inviteByEmail(roomId: string, email: string): Promise<EmptyObject> {
         return this.inviteByThreePid(roomId, "email", email);
@@ -4025,6 +4105,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param address - The address for the specified medium.
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public async inviteByThreePid(roomId: string, medium: string, address: string): Promise<EmptyObject> {
         const path = utils.encodeUri("/rooms/$roomId/invite", { $roomId: roomId });
@@ -4228,6 +4310,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param data - The JSON object to set.
      * @returns
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     // eslint-disable-next-line camelcase
     public setProfileInfo(info: "avatar_url", data: { avatar_url: string }): Promise<EmptyObject>;
@@ -4243,6 +4327,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public async setDisplayName(name: string): Promise<EmptyObject> {
         const prom = await this.setProfileInfo("displayname", { displayname: name });
@@ -4258,6 +4344,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public async setAvatarUrl(url: string): Promise<EmptyObject> {
         const prom = await this.setProfileInfo("avatar_url", { avatar_url: url });
@@ -6076,6 +6164,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     * Requires homeserver support for MSC4143.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver.
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_getRTCTransports(): Promise<Transport[]> {
+        // There is no /versions endpoint to check for support, so we just have to attempt a request.
+        return (
+            await this.http.authedRequest<{
+                rtc_transports: Transport[];
+            }>(Method.Get, "/rtc/transports", undefined, undefined, {
+                prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
+            })
+        ).rtc_transports;
+    }
+
+    /**
      * Get the API versions supported by the server, along with any
      * unstable APIs it supports
      * @returns The server /versions response
@@ -6584,6 +6689,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const params = {
             redirectUrl,
+            [SSO_ACTION_PARAM.stable!]: action,
             [SSO_ACTION_PARAM.unstable!]: action,
         };
 
@@ -6928,7 +7034,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
 
-        // Check if the event is excluded under MSC3414
+        // Check if the event is excluded under MSC4362
         if (
             [
                 "m.room.create",
@@ -7020,9 +7126,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get the public rooms list from the server. Supports pagination
      * @param params - Options for this request
      * @returns Promise which resolves: IPublicRoomsResponse
      * @returns Rejects: with an error response.
+     * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
+     * @see MatrixSafetyError
      */
     public publicRooms({
         server,

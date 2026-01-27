@@ -71,7 +71,7 @@ jobs:
                   draft: true
                   latest: true
 
-            - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   ref: staging
                   # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
@@ -79,7 +79,7 @@ jobs:
                   fetch-depth: 0
 
             - name: Get actions scripts
-              uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
@@ -123,7 +123,7 @@ jobs:
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
 
-            - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   cache: "yarn"
                   node-version-file: package.json

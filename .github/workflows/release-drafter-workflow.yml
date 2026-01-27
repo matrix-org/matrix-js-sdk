@@ -16,12 +16,12 @@ jobs:
             contents: write
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   ref: staging
                   fetch-depth: 0
 
-            - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   node-version-file: package.json
                   cache: "yarn"
@@ -37,7 +37,7 @@ jobs:
                   disable-autolabeler: true
 
             - name: Get actions scripts
-              uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false

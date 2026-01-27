@@ -14,12 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Jest now uses @sinonjs/fake-timers which exposes tickAsync() and a number of
-// other async methods which break the event loop, letting scheduled promise
-// callbacks run. Unfortunately, Jest doesn't expose these, so we have to do
-// it manually (this is what sinon does under the hood). We do both in a loop
-// until the thing we expect happens: hopefully this is the least flakey way
-// and avoids assuming anything about the app's behaviour.
+// Vitest lacks tickAsync() and a number of other async methods which break the event loop,
+// letting scheduled promise callbacks run. So we have to do it manually
+// (this is what sinon does under the hood). We do both in a loop until the thing we expect happens:
+// hopefully this is the least flakey way and avoids assuming anything about the app's behaviour.
 const realSetTimeout = setTimeout;
 export function flushPromises() {
     return new Promise((r) => {

@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
-
 import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room, RoomEvent } from "../../../src/models/room";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/thread";
@@ -43,12 +41,12 @@ describe("Thread", () => {
         const myUserId = "@bob:example.org";
         const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, { timelineSupport: false });
         const client = testClient.client;
-        client.supportsThreads = jest.fn().mockReturnValue(true);
+        client.supportsThreads = vi.fn().mockReturnValue(true);
         const room = new Room("123", client, myUserId, {
             pendingEventOrdering: PendingEventOrdering.Detached,
         });
 
-        jest.spyOn(client, "getRoom").mockReturnValue(room);
+        vi.spyOn(client, "getRoom").mockReturnValue(room);
 
         const { thread } = mkThread({
             room,
@@ -86,10 +84,10 @@ describe("Thread", () => {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
-                isInitialSyncComplete: jest.fn().mockReturnValue(false),
-                getRoom: jest.fn().mockImplementation(() => room),
-                decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-                supportsThreads: jest.fn().mockReturnValue(true),
+                isInitialSyncComplete: vi.fn().mockReturnValue(false),
+                getRoom: vi.fn().mockImplementation(() => room),
+                decryptEventIfNeeded: vi.fn().mockResolvedValue(void 0),
+                supportsThreads: vi.fn().mockReturnValue(true),
             });
             client.reEmitter = mock(ReEmitter, "ReEmitter");
             client.canSupport = new Map();
@@ -128,11 +126,11 @@ describe("Thread", () => {
             });
             room.addReceipt(receipt);
 
-            jest.spyOn(client, "getRoom").mockReturnValue(room);
+            vi.spyOn(client, "getRoom").mockReturnValue(room);
         });
 
         afterAll(() => {
-            jest.resetAllMocks();
+            vi.resetAllMocks();
         });
 
         it("considers own events with no RR as read", () => {
@@ -216,10 +214,10 @@ describe("Thread", () => {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
-                isInitialSyncComplete: jest.fn().mockReturnValue(false),
-                getRoom: jest.fn().mockImplementation(() => room),
-                decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-                supportsThreads: jest.fn().mockReturnValue(true),
+                isInitialSyncComplete: vi.fn().mockReturnValue(false),
+                getRoom: vi.fn().mockImplementation(() => room),
+                decryptEventIfNeeded: vi.fn().mockResolvedValue(void 0),
+                supportsThreads: vi.fn().mockReturnValue(true),
             });
             client.reEmitter = mock(ReEmitter, "ReEmitter");
             client.canSupport = new Map();
@@ -231,11 +229,11 @@ describe("Thread", () => {
 
             room = new Room("123", client, myUserId);
 
-            jest.spyOn(client, "getRoom").mockReturnValue(room);
+            vi.spyOn(client, "getRoom").mockReturnValue(room);
         });
 
         afterAll(() => {
-            jest.resetAllMocks();
+            vi.resetAllMocks();
         });
 
         it("uses unthreaded receipt to figure out read up to", () => {
@@ -319,12 +317,12 @@ describe("Thread", () => {
                 timelineSupport: false,
             });
             const client = testClient.client;
-            client.supportsThreads = jest.fn().mockReturnValue(true);
+            client.supportsThreads = vi.fn().mockReturnValue(true);
             const room = new Room("123", client, myUserId, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
 
-            jest.spyOn(client, "getRoom").mockReturnValue(room);
+            vi.spyOn(client, "getRoom").mockReturnValue(room);
 
             const { thread } = mkThread({
                 room,
@@ -336,7 +334,7 @@ describe("Thread", () => {
             await emitPromise(thread, ThreadEvent.Update);
             expect(thread.length).toBe(2);
 
-            jest.spyOn(client, "createMessagesRequest").mockImplementation((_, token) =>
+            vi.spyOn(client, "createMessagesRequest").mockImplementation((_, token) =>
                 Promise.resolve({
                     chunk: [],
                     start: `${token}-new`,
@@ -374,12 +372,12 @@ describe("Thread", () => {
                 timelineSupport: false,
             });
             const client = testClient.client;
-            client.supportsThreads = jest.fn().mockReturnValue(true);
+            client.supportsThreads = vi.fn().mockReturnValue(true);
             const room = new Room("123", client, myUserId, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
 
-            jest.spyOn(client, "getRoom").mockReturnValue(room);
+            vi.spyOn(client, "getRoom").mockReturnValue(room);
 
             const { thread } = mkThread({
                 room,
@@ -391,7 +389,7 @@ describe("Thread", () => {
             await emitPromise(thread, ThreadEvent.Update);
             expect(thread.length).toBe(2);
 
-            jest.spyOn(client, "createMessagesRequest").mockImplementation((_, token) =>
+            vi.spyOn(client, "createMessagesRequest").mockImplementation((_, token) =>
                 Promise.resolve({
                     chunk: [],
                     start: `${token}-new`,
@@ -426,12 +424,12 @@ describe("Thread", () => {
                 timelineSupport: false,
             });
             const client = testClient.client;
-            client.supportsThreads = jest.fn().mockReturnValue(true);
+            client.supportsThreads = vi.fn().mockReturnValue(true);
             const room = new Room("123", client, myUserId, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
 
-            jest.spyOn(client, "getRoom").mockReturnValue(room);
+            vi.spyOn(client, "getRoom").mockReturnValue(room);
 
             const { thread } = mkThread({
                 room,
@@ -442,7 +440,7 @@ describe("Thread", () => {
             });
             await emitPromise(thread, ThreadEvent.Update);
             expect(thread.length).toBe(2);
-            const mock = jest.spyOn(thread, "resetLiveTimeline");
+            const mock = vi.spyOn(thread, "resetLiveTimeline");
             mock.mockReturnValue(Promise.resolve());
 
             room.resetLiveTimeline("b1", "f1");
@@ -637,8 +635,8 @@ describe("Thread", () => {
             const client = mock(MatrixClient, "MatrixClient");
             client.reEmitter = mock(ReEmitter, "ReEmitter");
             client.canSupport = canSupport;
-            jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
-            mocked(client.supportsThreads).mockReturnValue(true);
+            vi.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
+            vi.mocked(client.supportsThreads).mockReturnValue(true);
             return client;
         }
     });
@@ -692,7 +690,7 @@ describe("Thread", () => {
                 // (fetchEditsWhereNeeded only applies to encrypted messages for some reason)
                 messageToEdit.event.type = EventType.RoomMessageEncrypted;
                 const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
-                mocked(client.relations).mockImplementation(async (_roomId, eventId) => {
+                vi.mocked(client.relations).mockImplementation(async (_roomId, eventId) => {
                     if (eventId === messageToEdit.getId()) {
                         return { events: [editEvent] };
                     } else {
@@ -785,12 +783,12 @@ describe("Thread", () => {
                     timelineSupport: false,
                 });
                 const client = testClient.client;
-                client.supportsThreads = jest.fn().mockReturnValue(true);
+                client.supportsThreads = vi.fn().mockReturnValue(true);
 
                 const room = new Room("!room:z", client, myUserId, {
                     pendingEventOrdering: PendingEventOrdering.Detached,
                 });
-                jest.spyOn(client, "getRoom").mockReturnValue(room);
+                vi.spyOn(client, "getRoom").mockReturnValue(room);
 
                 // Create a root event
                 const rootEvent = mkMessage({
@@ -903,7 +901,7 @@ describe("Thread", () => {
                     timelineSupport: false,
                 });
                 const client = testClient.client;
-                client.supportsThreads = jest.fn().mockReturnValue(true);
+                client.supportsThreads = vi.fn().mockReturnValue(true);
 
                 // Force server-side support so threads start uninitialised
                 const prevSupport = Thread.hasServerSideSupport;
@@ -913,7 +911,7 @@ describe("Thread", () => {
                     const room = new Room("!room:z", client, myUserId, {
                         pendingEventOrdering: PendingEventOrdering.Detached,
                     });
-                    jest.spyOn(client, "getRoom").mockReturnValue(room);
+                    vi.spyOn(client, "getRoom").mockReturnValue(room);
 
                     // Create a root event and thread
                     const rootEvent = mkMessage({ room: room.roomId, user: myUserId, msg: "Root", event: true });
@@ -1028,13 +1026,13 @@ function createClient(canSupport = new Map()): MatrixClient {
     client.reEmitter = mock(ReEmitter, "ReEmitter");
     client.canSupport = canSupport;
 
-    jest.spyOn(client, "supportsThreads").mockReturnValue(true);
-    jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
+    vi.spyOn(client, "supportsThreads").mockReturnValue(true);
+    vi.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
 
     // Mock methods that call out to HTTP endpoints
-    jest.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
-    jest.spyOn(client, "relations").mockResolvedValue({ events: [] });
-    jest.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
+    vi.spyOn(client, "paginateEventTimeline").mockResolvedValue(true);
+    vi.spyOn(client, "relations").mockResolvedValue({ events: [] });
+    vi.spyOn(client, "fetchRoomEvent").mockResolvedValue({});
 
     return client;
 }

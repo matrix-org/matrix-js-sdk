@@ -12,8 +12,8 @@ env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 permissions: {} # No permissions required
 jobs:
-    jest:
-        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
+    test:
+        name: "Vitest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
         runs-on: ubuntu-24.04
         timeout-minutes: 10
         strategy:
@@ -22,11 +22,11 @@ jobs:
                 node: ["lts/*", 22]
         steps:
             - name: Checkout code
-              uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
             - name: Setup Node
               id: setupNode
-              uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+              uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   cache: "yarn"
                   node-version: ${{ matrix.node }}
@@ -42,14 +42,10 @@ jobs:
               run: |
                   yarn test \
                       --coverage=${{ env.ENABLE_COVERAGE }} \
-                      --ci \
-                      --max-workers ${{ steps.cpu-cores.outputs.count }} \
+                      --maxWorkers ${{ steps.cpu-cores.outputs.count }} \
                       ./spec/${{ matrix.specs }}
               env:
-                  JEST_SONAR_UNIQUE_OUTPUT_NAME: true
-
-                  # tell jest to use coloured output
-                  FORCE_COLOR: true
+                  SHARD: ${{ matrix.specs }}
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
@@ -57,7 +53,7 @@ jobs:
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
-              uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
               with:
                   name: coverage-${{ matrix.specs }}-${{ matrix.node == 'lts/*' && 'lts' || matrix.node }}
                   path: |
@@ -65,13 +61,13 @@ jobs:
                       !coverage/lcov-report
 
     # Dummy completion job to simplify branch protections
-    jest-complete:
-        name: Jest tests
-        needs: jest
+    complete:
+        name: Tests
+        needs: test
         if: always()
         runs-on: ubuntu-24.04
         steps:
-            - if: needs.jest.result != 'skipped' && needs.jest.result != 'success'
+            - if: needs.test.result != 'skipped' && needs.test.result != 'success'
               run: exit 1
 
     element-web:

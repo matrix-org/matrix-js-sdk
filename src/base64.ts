@@ -64,7 +64,7 @@ export function encodeUnpaddedBase64Url(uint8Array: Uint8Array): string {
     return toBase64(uint8Array, { alphabet: "base64url", omitPadding: true });
 }
 
-function fromBase64(base64: string, options: Uint8ArrayFromBase64Options): Uint8Array {
+function fromBase64(base64: string, options: Uint8ArrayFromBase64Options): Uint8Array<ArrayBuffer> {
     if (typeof Uint8Array.fromBase64 === "function") {
         // Currently this is only supported in Firefox,
         // but we match the options in the hope in the future we can rely on it for all environments.
@@ -80,7 +80,7 @@ function fromBase64(base64: string, options: Uint8ArrayFromBase64Options): Uint8
  * @param base64 - The base64 to decode.
  * @returns The decoded data.
  */
-export function decodeBase64(base64: string): Uint8Array {
+export function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
     // The function requires us to select an alphabet, but we don't know if base64url was used so we convert.
     return fromBase64(base64.replace(/-/g, "+").replace(/_/g, "/"), { alphabet: "base64", lastChunkHandling: "loose" });
 }

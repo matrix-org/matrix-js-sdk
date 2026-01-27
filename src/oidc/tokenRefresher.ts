@@ -30,12 +30,15 @@ import { logger } from "../logger.ts";
  */
 export class OidcTokenRefresher {
     /**
-     * Promise which will complete once the OidcClient has been initialised
-     * and is ready to start refreshing tokens.
-     *
-     * Will reject if the client initialisation fails.
+     * This is now just a resolved promise and will be removed in a future version.
+     * Initialisation is done lazily at token refresh time.
+     * @deprecated Consumers no longer need to wait for this promise.
      */
     public readonly oidcClientReady!: Promise<void>;
+
+    // If there is a initialisation attempt in progress, we keep track of it here.
+    private initPromise?: Promise<void>;
+
     private oidcClient!: OidcClient;
     private inflightRefreshRequest?: Promise<AccessTokens>;
 
@@ -43,26 +46,46 @@ export class OidcTokenRefresher {
         /**
          * The OIDC issuer as returned by the /auth_issuer API
          */
-        issuer: string,
+        private issuer: string,
         /**
          * id of this client as registered with the OP
          */
-        clientId: string,
+        private clientId: string,
         /**
          * redirectUri as registered with OP
          */
-        redirectUri: string,
+        private redirectUri: string,
         /**
          * Device ID of current session
          */
-        deviceId: string,
+        protected deviceId: string,
         /**
          * idTokenClaims as returned from authorization grant
          * used to validate tokens
          */
         private readonly idTokenClaims: IdTokenClaims,
     ) {
-        this.oidcClientReady = this.initialiseOidcClient(issuer, clientId, deviceId, redirectUri);
+        this.oidcClientReady = Promise.resolve();
+    }
+
+    /**
+     * Ensures that the client is initialised.
+     * @returns Promise that resolves when initialisation is complete
+     * @throws if initialisation fails
+     */
+    private async ensureInit(): Promise<void> {
+        if (!this.oidcClient) {
+            if (this.initPromise) {
+                return this.initPromise;
+            }
+
+            this.initPromise = this.initialiseOidcClient(this.issuer, this.clientId, this.deviceId, this.redirectUri);
+            try {
+                await this.initPromise;
+            } finally {
+                this.initPromise = undefined;
+            }
+        }
     }
 
     private async initialiseOidcClient(
@@ -98,6 +121,8 @@ export class OidcTokenRefresher {
      * @throws when token refresh fails
      */
     public async doRefreshAccessToken(refreshToken: string): Promise<AccessTokens> {
+        await this.ensureInit();
+
         if (!this.inflightRefreshRequest) {
             this.inflightRefreshRequest = this.getNewTokens(refreshToken);
         }
@@ -123,7 +148,7 @@ export class OidcTokenRefresher {
      * @param tokens.accessToken - new access token
      * @param tokens.refreshToken - OPTIONAL new refresh token
      */
-    public async persistTokens(tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
+    protected async persistTokens(tokens: { accessToken: string; refreshToken?: string }): Promise<void> {
         // NOOP
     }
 

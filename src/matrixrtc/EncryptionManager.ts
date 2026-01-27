@@ -5,8 +5,15 @@ import { decodeBase64, encodeUnpaddedBase64 } from "../base64.ts";
 import { safeGetRetryAfterMs } from "../http-api/errors.ts";
 import { type CallMembership } from "./CallMembership.ts";
 import { type KeyTransportEventListener, KeyTransportEvents, type IKeyTransport } from "./IKeyTransport.ts";
-import { isMyMembership, type ParticipantId, type Statistics } from "./types.ts";
-import { getParticipantId } from "./utils.ts";
+import { isMyMembership, type EncryptionKeyMapKey, type Statistics } from "./types.ts";
+
+/**
+ * The string used for the keys in the the encryption key map.
+ * `@bob:examle.org:DEVICEID(UUIDRANDOM_MEMBERID_RANDOMUUID)`
+ */
+export function getEncryptionKeyMapKey(membership: CallMembershipIdentityParts): EncryptionKeyMapKey {
+    return `${membership.userId}:${membership.deviceId}(${membership.memberId})`;
+}
 
 /**
  * This interface is for testing and for making it possible to interchange the encryption manager.
@@ -38,8 +45,18 @@ export interface IEncryptionManager {
      *
      * @returns A map of participant IDs to their encryption keys.
      */
-    getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>;
+    getEncryptionKeys(): ReadonlyMap<
+        EncryptionKeyMapKey,
+        ReadonlyArray<{
+            key: Uint8Array<ArrayBuffer>;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
+    >;
 }
+
+export type CallMembershipIdentityParts = Pick<CallMembership, "userId" | "deviceId" | "memberId">;
 
 /**
  * This class implements the IEncryptionManager interface,
@@ -67,7 +84,10 @@ export class EncryptionManager implements IEncryptionManager {
         return this.joinConfig?.useKeyDelay ?? 5_000;
     }
 
-    private encryptionKeys = new Map<string, Array<{ key: Uint8Array; timestamp: number }>>();
+    private encryptionKeys = new Map<
+        string,
+        Array<{ key: Uint8Array<ArrayBuffer>; timestamp: number; membership: CallMembershipIdentityParts }>
+    >();
     private lastEncryptionKeyUpdateRequest?: number;
 
     // We use this to store the last membership fingerprints we saw, so we can proactively re-send encryption keys
@@ -79,29 +99,52 @@ export class EncryptionManager implements IEncryptionManager {
     private logger: Logger;
 
     public constructor(
-        private userId: string,
-        private deviceId: string,
+        private membership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
         private statistics: Statistics,
         private onEncryptionKeysChanged: (
-            keyBin: Uint8Array,
+            keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
-            participantId: string,
+            membership: CallMembershipIdentityParts,
+            rtcBackendIdentity: string,
         ) => void,
         parentLogger?: Logger,
     ) {
         this.logger = (parentLogger ?? rootLogger).getChild(`[EncryptionManager]`);
     }
 
-    public getEncryptionKeys(): ReadonlyMap<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>> {
-        const keysMap = new Map<ParticipantId, ReadonlyArray<{ key: Uint8Array; keyIndex: number }>>();
-        for (const [userId, userKeys] of this.encryptionKeys) {
-            const keys = userKeys.map((entry, index) => ({
+    private rtcBackendIdentityFromMembershipParts(membership: CallMembershipIdentityParts): string {
+        // Implement logic to construct rtcBackendIdentity from membership parts
+        return `${membership.userId}:${membership.deviceId}`;
+    }
+
+    public getEncryptionKeys(): ReadonlyMap<
+        EncryptionKeyMapKey,
+        ReadonlyArray<{
+            key: Uint8Array<ArrayBuffer>;
+            keyIndex: number;
+            membership: CallMembershipIdentityParts;
+            rtcBackendIdentity: string;
+        }>
+    > {
+        const keysMap = new Map<
+            EncryptionKeyMapKey,
+            ReadonlyArray<{
+                key: Uint8Array<ArrayBuffer>;
+                keyIndex: number;
+                membership: CallMembershipIdentityParts;
+                rtcBackendIdentity: string;
+            }>
+        >();
+        for (const [userId, userKeyEntry] of this.encryptionKeys) {
+            const keys = userKeyEntry.map((entry, index) => ({
                 key: entry.key,
+                membership: entry.membership,
                 keyIndex: index,
+                rtcBackendIdentity: this.rtcBackendIdentityFromMembershipParts(entry.membership),
             }));
-            keysMap.set(userId as ParticipantId, keys);
+            keysMap.set(userId as EncryptionKeyMapKey, keys);
         }
         return keysMap;
     }
@@ -126,7 +169,7 @@ export class EncryptionManager implements IEncryptionManager {
         // clear our encryption keys as we're done with them now (we'll
         // make new keys if we rejoin). We leave keys for other participants
         // as they may still be using the same ones.
-        this.encryptionKeys.set(getParticipantId(this.userId, this.deviceId), []);
+        this.encryptionKeys.set(getEncryptionKeyMapKey(this.membership), []);
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.stop();
 
@@ -147,13 +190,13 @@ export class EncryptionManager implements IEncryptionManager {
         if (this.manageMediaKeys && this.joined) {
             const oldMembershipIds = new Set(
                 oldMemberships
-                    .filter((m) => !isMyMembership(m, this.userId, this.deviceId))
-                    .map(getParticipantIdFromMembership),
+                    .filter((m) => !isMyMembership(m, this.membership.userId, this.membership.deviceId))
+                    .map(getEncryptionKeyMapKey),
             );
             const newMembershipIds = new Set(
                 this.getMemberships()
-                    .filter((m) => !isMyMembership(m, this.userId, this.deviceId))
-                    .map(getParticipantIdFromMembership),
+                    .filter((m) => !isMyMembership(m, this.membership.userId, this.membership.deviceId))
+                    .map(getEncryptionKeyMapKey),
             );
 
             // We can use https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set/symmetricDifference
@@ -202,14 +245,7 @@ export class EncryptionManager implements IEncryptionManager {
         const encryptionKey = secureRandomBase64Url(16);
         const encryptionKeyIndex = this.getNewEncryptionKeyIndex();
         this.logger.info("Generated new key at index " + encryptionKeyIndex);
-        this.setEncryptionKey(
-            this.userId,
-            this.deviceId,
-            encryptionKeyIndex,
-            encryptionKey,
-            Date.now(),
-            delayBeforeUse,
-        );
+        this.setEncryptionKey(this.membership, encryptionKeyIndex, encryptionKey, Date.now(), delayBeforeUse);
         return encryptionKeyIndex;
     }
 
@@ -240,12 +276,11 @@ export class EncryptionManager implements IEncryptionManager {
     /**
      * Get the known encryption keys for a given participant device.
      *
-     * @param userId the user ID of the participant
-     * @param deviceId the device ID of the participant
+     * @param membership - The membership identity parts of the participant
      * @returns The encryption keys for the given participant, or undefined if they are not known.
      */
-    private getKeysForParticipant(userId: string, deviceId: string): Array<Uint8Array> | undefined {
-        return this.encryptionKeys.get(getParticipantId(userId, deviceId))?.map((entry) => entry.key);
+    private getKeysForParticipant(membership: CallMembershipIdentityParts): Array<Uint8Array<ArrayBuffer>> | undefined {
+        return this.encryptionKeys.get(getEncryptionKeyMapKey(membership))?.map((entry) => entry.key);
     }
 
     /**
@@ -260,7 +295,7 @@ export class EncryptionManager implements IEncryptionManager {
 
         if (!this.joined) return;
 
-        const myKeys = this.getKeysForParticipant(this.userId, this.deviceId);
+        const myKeys = this.getKeysForParticipant(this.membership);
 
         if (!myKeys) {
             this.logger.warn("Tried to send encryption keys event but no keys found!");
@@ -294,7 +329,7 @@ export class EncryptionManager implements IEncryptionManager {
                 });
             await this.transport.sendKey(encodeUnpaddedBase64(keyToSend), keyIndexToSend, targets);
             this.logger.debug(
-                `sendEncryptionKeysEvent participantId=${this.userId}:${this.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
+                `sendEncryptionKeysEvent participantId=${this.membership.userId}:${this.membership.deviceId} numKeys=${myKeys.length} currentKeyIndex=${this.latestGeneratedKeyIndex} keyIndexToSend=${keyIndexToSend}`,
             );
         } catch (error) {
             if (this.keysEventUpdateTimeout === undefined) {
@@ -307,16 +342,18 @@ export class EncryptionManager implements IEncryptionManager {
         }
     };
 
-    public onNewKeyReceived: KeyTransportEventListener = (userId, deviceId, keyBase64Encoded, index, timestamp) => {
-        this.logger.debug(`Received key over key transport ${userId}:${deviceId} at index ${index}`);
-        this.setEncryptionKey(userId, deviceId, index, keyBase64Encoded, timestamp);
+    public onNewKeyReceived: KeyTransportEventListener = (membership, keyBase64Encoded, index, timestamp) => {
+        this.logger.debug(
+            `Received key over key transport ${membership.userId}:${membership.deviceId} at index ${index}`,
+        );
+        this.setEncryptionKey(membership, index, keyBase64Encoded, timestamp);
     };
 
     private storeLastMembershipFingerprints(): void {
         this.lastMembershipFingerprints = new Set(
             this.getMemberships()
-                .filter((m) => !isMyMembership(m, this.userId, this.deviceId))
-                .map((m) => `${getParticipantIdFromMembership(m)}:${m.createdTs()}`),
+                .filter((m) => !isMyMembership(m, this.membership.userId, this.membership.deviceId))
+                .map((m) => `${getEncryptionKeyMapKey(m)}:${m.createdTs()}`),
         );
     }
 
@@ -344,28 +381,29 @@ export class EncryptionManager implements IEncryptionManager {
      *                         be distributed.
      */
     private setEncryptionKey(
-        userId: string,
-        deviceId: string,
+        membership: CallMembershipIdentityParts,
         encryptionKeyIndex: number,
         encryptionKeyString: string,
         timestamp: number,
         delayBeforeUse = false,
     ): void {
-        this.logger.debug(`Setting encryption key for ${userId}:${deviceId} at index ${encryptionKeyIndex}`);
+        this.logger.debug(
+            `Setting encryption key for ${membership.userId}:${membership.deviceId} at index ${encryptionKeyIndex}`,
+        );
         const keyBin = decodeBase64(encryptionKeyString);
 
-        const participantId = getParticipantId(userId, deviceId);
-        if (!this.encryptionKeys.has(participantId)) {
-            this.encryptionKeys.set(participantId, []);
+        const mapKey = getEncryptionKeyMapKey(membership);
+        if (!this.encryptionKeys.has(mapKey)) {
+            this.encryptionKeys.set(mapKey, []);
         }
-        const participantKeys = this.encryptionKeys.get(participantId)!;
+        const participantKeys = this.encryptionKeys.get(mapKey)!;
 
         const existingKeyAtIndex = participantKeys[encryptionKeyIndex];
 
         if (existingKeyAtIndex) {
             if (existingKeyAtIndex.timestamp > timestamp) {
                 this.logger.info(
-                    `Ignoring new key at index ${encryptionKeyIndex} for ${participantId} as it is older than existing known key`,
+                    `Ignoring new key at index ${encryptionKeyIndex} for ${mapKey} as it is older than existing known key`,
                 );
                 return;
             }
@@ -376,7 +414,7 @@ export class EncryptionManager implements IEncryptionManager {
             }
         }
 
-        if (userId === this.userId && deviceId === this.deviceId) {
+        if (membership.userId === this.membership.userId && membership.deviceId === this.membership.deviceId) {
             // It is important to already update the latestGeneratedKeyIndex here
             // NOT IN THE `delayBeforeUse` `setTimeout`.
             // Even though this is where we call onEncryptionKeysChanged and set the key in EC (and livekit).
@@ -388,18 +426,29 @@ export class EncryptionManager implements IEncryptionManager {
         participantKeys[encryptionKeyIndex] = {
             key: keyBin,
             timestamp,
+            membership: membership,
         };
 
         if (delayBeforeUse) {
             const useKeyTimeout = setTimeout(() => {
                 this.setNewKeyTimeouts.delete(useKeyTimeout);
-                this.logger.info(`Delayed-emitting key changed event for ${participantId} index ${encryptionKeyIndex}`);
+                this.logger.info(`Delayed-emitting key changed event for ${mapKey} index ${encryptionKeyIndex}`);
 
-                this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
+                this.onEncryptionKeysChanged(
+                    keyBin,
+                    encryptionKeyIndex,
+                    membership,
+                    this.rtcBackendIdentityFromMembershipParts(membership),
+                );
             }, this.useKeyDelay);
             this.setNewKeyTimeouts.add(useKeyTimeout);
         } else {
-            this.onEncryptionKeysChanged(keyBin, encryptionKeyIndex, participantId);
+            this.onEncryptionKeysChanged(
+                keyBin,
+                encryptionKeyIndex,
+                membership,
+                this.rtcBackendIdentityFromMembershipParts(membership),
+            );
         }
     }
 
@@ -419,5 +468,3 @@ function keysEqual(a: Uint8Array | undefined, b: Uint8Array | undefined): boolea
     if (a === b) return true;
     return !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 }
-
-const getParticipantIdFromMembership = (m: CallMembership): string => getParticipantId(m.sender!, m.deviceId);
