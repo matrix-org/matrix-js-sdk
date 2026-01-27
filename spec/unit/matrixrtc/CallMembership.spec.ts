@@ -158,8 +158,10 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                // for legacy events we expect the room to be added automagically
+                // See INFO_SLOT_ID_LEGACY_CASE comments
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");

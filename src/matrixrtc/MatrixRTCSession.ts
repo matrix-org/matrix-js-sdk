@@ -26,7 +26,7 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
-import { deepCompare, logDurationSync } from "../utils.ts";
+import { logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
@@ -328,7 +328,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public static async sessionMembershipsForSlot(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-        slotDescription: SlotDescription,
+        slotId: string,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
         options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
@@ -339,7 +339,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
             room,
             callMemberEvents,
-            slotDescription,
+            slotId,
             logger,
         );
 
@@ -823,7 +823,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
-            this.slotDescription,
+            slotDescriptionToId(this.slotDescription),
             this.calculateMembershipsOpts,
         );
 
@@ -873,7 +873,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 async function computeBackendIdentityAndVerifyMemberEvents(
     room: Pick<Room, "hasMembershipState">,
     callMemberEvents: MatrixEvent[],
-    slotDescription: SlotDescription,
+    slotId: string,
     logger: Logger,
 ): Promise<CallMembership[]> {
     const callMemberships: CallMembership[] = [];
@@ -897,7 +897,7 @@ async function computeBackendIdentityAndVerifyMemberEvents(
                 logger,
             );
 
-            if (isValidMembership(membership, room, slotDescription, logger)) {
+            if (isValidMembership(membership, room, slotId, logger)) {
                 callMemberships.push(membership);
             }
         } catch (e) {
@@ -930,12 +930,12 @@ function quickFilterNonRelevantContents(content: IContent, logger: Logger): bool
 function isValidMembership(
     membership: CallMembership,
     room: Pick<Room, "hasMembershipState">,
-    slotDescription: SlotDescription,
+    slotId: string,
     logger: Logger,
 ): boolean {
-    if (!deepCompare(membership.slotDescription, slotDescription)) {
+    if (membership.slotId !== slotId) {
         logger.info(
-            `Ignoring membership of user ${membership.userId} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
+            `Ignoring membership of user ${membership.userId} for a different slot:  user: ${JSON.stringify(membership.slotDescription)}, slotId: ${slotId})`,
         );
         return false;
     }

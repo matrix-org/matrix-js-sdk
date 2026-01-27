@@ -377,7 +377,23 @@ export class CallMembership {
                 return data.slot_id;
             case "session":
             default:
-                return slotDescriptionToId({ application: this.application, id: data.call_id });
+                // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
+                // The spec got changed to use `"ROOM"` instead of `""` empyt string for the implicit default call.
+                // State events still are sent with `""` however. To find other events that should end up in the same call,
+                // we use the slotId.
+                // Since the CallMembership is the public representation of a rtc.member event, we just pretend it is a
+                // "ROOM" slotId/call_id.
+                // This makes all the remote members work with just this simple trick.
+                //
+                // We of course now need to be careful when sending legacy events (state events)
+                // They get a slotDescription containing "ROOM" since this is what we use starting at the time this comment
+                // is commited.
+                //
+                // See the Other INFO_SLOT_ID_LEGACY_CASE comments to see where we revert back to "" just before sending the event.
+                return slotDescriptionToId({
+                    application: this.application,
+                    id: data.call_id === "" ? "ROOM" : data.call_id,
+                });
         }
     }
 

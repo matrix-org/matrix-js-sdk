@@ -773,7 +773,11 @@ export class MembershipManager
      * which is not compatible with membershipID of session type member events. They have to be `${localUserId}:${localDeviceId}`
      */
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
-        const stateKey = `${localUserId}_${localDeviceId}_${this.slotDescription.application}${this.slotDescription.id}`;
+        // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
+        // Revert back to "" just for the state key (state keys are always legacy. we use sticky events for non legacy events)
+        const application = this.slotDescription.application;
+        const slotId = this.slotDescription.id === "ROOM" ? "" : this.slotDescription.id;
+        const stateKey = `${localUserId}_${localDeviceId}_${application}${slotId}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
             return stateKey;
         } else {
@@ -799,7 +803,9 @@ export class MembershipManager
                   };
         return {
             "application": this.slotDescription.application,
-            "call_id": this.slotDescription.id,
+            // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
+            // Revert back to "" just for the sending the event.
+            "call_id": this.slotDescription.id === "ROOM" ? "" : this.slotDescription.id,
             "scope": "m.room",
             "device_id": this.deviceId,
             // DO NOT use this.memberId here since that is the state key (using application...)
