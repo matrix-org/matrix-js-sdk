@@ -970,7 +970,7 @@ describe("MembershipManager", () => {
                                 device_id: "AAAAAAA",
                             },
                             slot_id: "m.call#",
-                            rtc_transports: [focus],
+                            rtc_transports: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
                             versions: [],
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
