@@ -49,7 +49,7 @@ const mockFocus = { type: "mock" };
 
 const textEncoder = new TextEncoder();
 
-const callSession = { id: "", application: "m.call" };
+const callSession = { id: "ROOM", application: "m.call" };
 
 describe("MatrixRTCSession", () => {
     let client: MatrixClient;
@@ -134,12 +134,12 @@ describe("MatrixRTCSession", () => {
                 );
                 await flushPromises();
                 expect(sess?.memberships.length).toEqual(1);
-                expect(sess?.memberships[0].slotDescription.id).toEqual("");
+                expect(sess?.memberships[0].slotDescription.id).toEqual("ROOM");
                 expect(sess?.memberships[0].scope).toEqual("m.room");
                 expect(sess?.memberships[0].application).toEqual("m.call");
                 expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
                 expect(sess?.memberships[0].isExpired()).toEqual(false);
-                expect(sess?.slotDescription.id).toEqual("");
+                expect(sess?.slotDescription.id).toEqual("ROOM");
             });
 
             it("ignores memberships where application is not m.call", () => {
@@ -381,12 +381,12 @@ describe("MatrixRTCSession", () => {
             });
             await flushPromises();
             expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].slotDescription.id).toEqual("");
+            expect(sess?.memberships[0].slotDescription.id).toEqual("ROOM");
             expect(sess?.memberships[0].scope).toEqual("m.room");
             expect(sess?.memberships[0].application).toEqual("m.call");
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
-            expect(sess?.slotDescription.id).toEqual("");
+            expect(sess?.slotDescription.id).toEqual("ROOM");
         });
         it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
@@ -415,7 +415,7 @@ describe("MatrixRTCSession", () => {
             const memberships = sess.memberships;
             expect(memberships.length).toEqual(2);
             expect(memberships[0].sender).toEqual(stickyUserId);
-            expect(memberships[0].slotDescription.id).toEqual("");
+            expect(memberships[0].slotDescription.id).toEqual("ROOM");
             expect(memberships[0].scope).toEqual("m.room");
             expect(memberships[0].application).toEqual("m.call");
             expect(memberships[0].deviceId).toEqual("AAAAAAA");
@@ -424,7 +424,7 @@ describe("MatrixRTCSession", () => {
             // Then state
             expect(memberships[1].sender).toEqual(membershipTemplate.user_id);
 
-            expect(sess?.slotDescription.id).toEqual("");
+            expect(sess?.slotDescription.id).toEqual("ROOM");
         });
         it("handles an incoming sticky event to an existing session", async () => {
             const mockRoom = makeMockRoom([membershipTemplate]);

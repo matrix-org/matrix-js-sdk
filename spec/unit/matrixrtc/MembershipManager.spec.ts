@@ -71,7 +71,7 @@ function createAsyncHandle<T>(method: MockedFunction<(...args: any[]) => any>) {
     return { reject, resolve };
 }
 
-const callSession = { id: "", application: "m.call" };
+const callSession = { id: "ROOM", application: "m.call" };
 
 describe("MembershipManager", () => {
     let client: MockClient;
@@ -969,7 +969,7 @@ describe("MembershipManager", () => {
                                 id: "@alice:example.org:AAAAAAA_m.call",
                                 device_id: "AAAAAAA",
                             },
-                            slot_id: "m.call#",
+                            slot_id: "m.call#ROOM",
                             rtc_transports: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
                             versions: [],
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
