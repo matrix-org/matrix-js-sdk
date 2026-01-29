@@ -702,16 +702,6 @@ describe("MatrixRTCSession", () => {
                 "sender_ts": expect.any(Number),
             });
 
-<<<<<<< HEAD
-            // Check if deprecated notify event is also sent.
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": "ring",
-                "call_id": "ROOM",
-            });
-=======
->>>>>>> develop
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
