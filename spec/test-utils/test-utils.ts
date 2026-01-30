@@ -85,6 +85,14 @@ export function getSyncResponse(
                         "io.element.msc4362.encrypt_state_events": encryptStateEvents,
                     },
                 }),
+                mkEventCustom({
+                    sender: roomMembers[0],
+                    type: "m.room.history_visibility",
+                    state_key: "",
+                    content: {
+                        history_visibility: "shared",
+                    },
+                }),
             ],
         },
         timeline: {
