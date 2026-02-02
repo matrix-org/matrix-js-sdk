@@ -8837,21 +8837,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Discover and validate delegated auth configuration
-     * - delegated auth issuer openid-configuration is reachable
-     * - delegated auth issuer openid-configuration is configured correctly for us
+     * Discover and validate the auth metadata for the OAuth 2.0 API.
+     *
      * Fetches /auth_metadata falling back to legacy implementation using /auth_issuer followed by
      * https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
-     * When successful, validated metadata is returned
+     * When successful, validated metadata is returned.
+     *
      * @returns validated authentication metadata and optionally signing keys
      * @throws when delegated auth config is invalid or unreachable
-     * @experimental - part of MSC2965
      */
     public async getAuthMetadata(): Promise<OidcClientConfig> {
         let authMetadata: unknown | undefined;
         try {
+            const useStable = await this.isVersionSupported("v1.15");
             authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
-                prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+                prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
             });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {

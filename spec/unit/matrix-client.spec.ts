@@ -3877,6 +3877,27 @@ describe("MatrixClient", function () {
             makeClient();
         });
 
+        it("should use stable prefix", async () => {
+            const metadata = mockOpenIdConfiguration();
+            client.getVersions = vi.fn().mockResolvedValue({
+                versions: ["v1.15"],
+            });
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/auth_metadata`,
+                    data: metadata,
+                    prefix: "/_matrix/client/v1",
+                },
+            ];
+
+            await expect(client.getAuthMetadata()).resolves.toEqual({
+                ...metadata,
+                signingKeys: [],
+            });
+            expect(httpLookups.length).toEqual(0);
+        });
+
         it("should use unstable prefix", async () => {
             const metadata = mockOpenIdConfiguration();
             httpLookups = [
