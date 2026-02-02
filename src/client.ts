@@ -6946,7 +6946,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public upgradeRoom(
         roomId: string,
         newVersion: string,
-        additionalCreators?: string[] | undefined,
+        additionalCreators?: string[],
     ): Promise<{ replacement_room: string }> {
         // eslint-disable-line camelcase
         const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
