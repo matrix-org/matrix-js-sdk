@@ -28,6 +28,8 @@ import { OAuthGrantType } from "./index.ts";
  */
 export type ValidatedAuthMetadata = Partial<OidcMetadata> &
     Pick<
+        // These values are from [RFC8414](https://datatracker.ietf.org/doc/html/rfc8414#section-2)
+        // so we can reuse the OidcMetadata definitions from oidc-client-ts
         OidcMetadata,
         | "issuer"
         | "authorization_endpoint"
@@ -37,12 +39,14 @@ export type ValidatedAuthMetadata = Partial<OidcMetadata> &
         | "grant_types_supported"
         | "code_challenge_methods_supported"
     > & {
-        // MSC4191 extensions to the OIDC spec
+        // These values aren't part of RFC8414 so we add them here
+        // Account management fields from stable MSC4191:
         account_management_uri?: string;
         account_management_actions_supported?: string[];
-        // The OidcMetadata type from oidc-client-ts does not include `prompt_values_supported`
-        // even though it is part of the OIDC spec
+        // Value from [Initiating User Registration via OpenID Connect](https://openid.net/specs/openid-connect-prompt-create-1_0.html):
         prompt_values_supported?: string[];
+        // Experimental MSC4341 value from [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628#section-4):
+        device_authorization_endpoint?: string;
     };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
