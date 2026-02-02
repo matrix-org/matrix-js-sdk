@@ -6937,13 +6937,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Upgrades a room to a new protocol version
      * @param newVersion - The target version to upgrade to
+     * @param additionalCreators - an optional list of user IDs of users who
+     *        should have the same permissions as the user performing the
+     *        upgrade
      * @returns Promise which resolves: Object with key 'replacement_room'
      * @returns Rejects: with an error response.
      */
-    public upgradeRoom(roomId: string, newVersion: string): Promise<{ replacement_room: string }> {
+    public upgradeRoom(
+        roomId: string,
+        newVersion: string,
+        additionalCreators?: string[],
+    ): Promise<{ replacement_room: string }> {
         // eslint-disable-line camelcase
         const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
-        return this.http.authedRequest(Method.Post, path, undefined, { new_version: newVersion });
+        return this.http.authedRequest(Method.Post, path, undefined, {
+            new_version: newVersion,
+            additional_creators: additionalCreators,
+        });
     }
 
     /**
