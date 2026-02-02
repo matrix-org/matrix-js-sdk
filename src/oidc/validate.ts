@@ -22,7 +22,8 @@ import { OidcError } from "./error.ts";
 import { OAuthGrantType } from "./index.ts";
 
 /**
- * Metadata from OIDC authority discovery
+ * Metadata from OAuth 2.0 client authentication API as per
+ * https://spec.matrix.org/v1.17/client-server-api/#get_matrixclientv1auth_metadata
  * With validated properties required in type
  */
 export type ValidatedAuthMetadata = Partial<OidcMetadata> &
@@ -36,7 +37,7 @@ export type ValidatedAuthMetadata = Partial<OidcMetadata> &
         | "grant_types_supported"
         | "code_challenge_methods_supported"
     > & {
-        // MSC2965 extensions to the OIDC spec
+        // MSC4191 extensions to the OIDC spec
         account_management_uri?: string;
         account_management_actions_supported?: string[];
         // The OidcMetadata type from oidc-client-ts does not include `prompt_values_supported`
@@ -80,9 +81,9 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
 };
 
 /**
- * Validates issuer `.well-known/openid-configuration`
- * As defined in RFC5785 https://openid.net/specs/openid-connect-discovery-1_0.html
- * validates that OP is compatible with Element's OIDC flow
+ * Validates OAuth 2.0 auth metadata as defined by
+ * https://spec.matrix.org/v1.17/client-server-api/#get_matrixclientv1auth_metadata
+ * is compatible with Element's OAuth/OIDC flow
  * @param authMetadata - json object
  * @returns valid issuer config
  * @throws Error - when issuer config is not found or is invalid
