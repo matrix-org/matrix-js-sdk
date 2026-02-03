@@ -5,7 +5,7 @@
 
 import type { IDeviceKeys, IMegolmSessionData } from "../../../src/@types/crypto";
 import type { IDownloadKeyResult, IEvent } from "../../../src";
-import type { KeyBackupSession, KeyBackupInfo } from "../../../src/crypto-api/keybackup";
+import type { KeyBackupSession, KeyBackupInfo, KeyBackupRoomSessions } from "../../../src/crypto-api/keybackup";
 
 /* eslint-disable comma-dangle */
 
@@ -138,20 +138,6 @@ export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
     }
 };
 
-/** Per-room signed backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}` */
-export const PER_ROOM_SIGNED_BACKUP_DATA = {
-    "ipdI6Zs/7DzFTEhiA2iGaMDfHkIYCleqXT6L+5e1/co": {
-        "first_message_index": 1,
-        "forwarded_count": 0,
-        "is_verified": false,
-        "session_data": {
-            "ciphertext": "y3oXGMp+KII1Vm/NCZRI2A1Ah3fCgMArlsZfJsMD0ITvgiRlN7SWBPG2f8HTDOaEvX2Ehv8bA+izKYc4IIcn0rl8Wtb6gsy6ZxYXekACgALKeGoDG6+AJ4HsQyZaUYdujVVYvGjToyMRmoLQnTkgv+Zcbi4b5ZPunMGmI976ESiC8bLQCsri/70uheIjBDWI4C4T6ldhP+I2SsSiPcKUw3bGPM3TrGuZ1EJjNElMnAlLbwBgALQQTkQQRtNpUOosAlYRJtTdTGFbyupaCYClyCWZH0LXkRaKqWzg9fl24Am+TOsxd5CJYQlV5ITVDAdD1Wasz3oShGjOI0GJBi60xTUafxs+nT8+3SrOHaNhf1p7TIn5oN2fBTjqHBwDJOwra+T6T9rddbci68SmS5EUJNEBnCyU1iFodkT1yNiBvXGXyZkZSEt8/NSQs52UoJRpFjk/riN9T4C8Os22ZoqN3ebOzxEF47qsDyyY5XHS7+johumzXqsZkFAp+oZq0l8DZTslJ5v70bM4Gxh+ssj4Mp0I3t3faLwUbkd/nIgY7ofQuVzWtpsbMF8frp46SaxPF2hCqMTs0zRJg7swapkZZ6UgsNNwqMlEG/RT3qL7c6BJ2abrsr2HTBFL+B1boaqRG3K/CTzhMR1601Wh+2YoXYABPtel1ivFleL4C25s/Vg2gqK9nvszvi3zu79S1pqClzHX4DonhbAwiMzuea0gQVYuAGt/BHTx3+3fxhe+nZ+yYVZ8iTSXSXd5+HK1U56N",
-            "ephemeral": "Z7hgyh7cIqbMsKCzTJSY+JiVNj1sjKSsnZkJwwFugRs",
-            "mac": "YAgp+lZ3xsQ"
-        }
-    }
-};
-
 /** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
@@ -244,6 +230,14 @@ export const ENCRYPTED_EVENT: Partial<IEvent> = {
     },
     "event_id": "$event1",
     "origin_server_ts": 1507753886000
+};
+
+/** 
+ * Per-room backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}`.
+ * Contains the key from MEGOLM_SESSION_DATA.
+ */
+export const PER_ROOM_CURVE25519_KEY_BACKUP_DATA: KeyBackupRoomSessions = {
+     [MEGOLM_SESSION_DATA.session_id]: CURVE25519_KEY_BACKUP_DATA
 };
 
 // Bob data
@@ -375,30 +369,16 @@ export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
     }
 };
 
-/** Per-room signed backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}` */
-export const BOB_PER_ROOM_SIGNED_BACKUP_DATA = {
-    "JMjeaG/6e909DDlMuLqwIg5PramOROUuxovWyv3ZTg8": {
-        "first_message_index": 1,
-        "forwarded_count": 0,
-        "is_verified": false,
-        "session_data": {
-            "ciphertext": "W4radIX5LKT+AUHc+u3/xFM0ASj8ry4zFMVMERj3sgX4B53sqdfPQJvXGRh41547NVTzRxXpRq56QUXaRKSIdpVPeciMy6MXQRVhlUOgyC7ccBHcjNXHC56uiy8lCAi/kxlmpRbXEfsOePqrScsQ+a9EDjclNU29fUZ11SDKQHRWWgNQEpmuRyGtkDdQDl8AJ9ORGM8UCoVPBtj4K65CIXvzh7Y4RLCzwknK2x4qRMcY0TMYMTLSulpuPiiv9nvUpVJhsVjjSYhT5WIqYw0IIub25phnawhCQM0QucIW+9AayK6kFhkBk85vQz1u97qPWAb4G0whyxN4I+DqkG+u80HHSS74KKvLzJrBrbm3mvmwK0rlhxq92dTfqSza1/o1l3jBsXT2PehYCRAw890/5ZWZN2hqNBntbBBFbpsAVQwiIyeJIYmA/Y+E+2Db4cgyiqRSmSI9WpwUHCCiaf8Y3pQdcIfN6yKVOqkHxnhUJlXQQHl65l7LDIY+2y4dfETLh5u/JnO7yXshxMebs+PyGuhDVd04dpOJTAU+G1XuF7GyDHhwmo6+Yh6CYUAHdMleYfHWCvuLoCnaGaBogGtF3mUfGs/7+iukS0ElvrGD9bTdxEtjrbZqiGyxAKPvFjajmB3p9dEy8jqIgu33sBELpYX5X4APCj/4CsFg53Tqk8ukMSh1hIVVwOgBVAEvieFc8cstANEuhvbBUyPtZQcIexUeOpBBCj3gPSuL1XPbwT76BkBnRcgvNvtMa3IXt0ov",
-            "ephemeral": "Epv7jYGZX8v43FbrvQzTmpfbLov+SyVOy0jv/qN4xH0",
-            "mac": "Ejh4yuDB3ww"
-        }
-    }
-};
-
 /** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!room:id",
         "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
-        "session_id": "MQc2WIBHwITyjpXxLM10zpN2uVZ20nJT+ByAZF6ZbhE",
-        "session_key": "AQAAAAAq7sw94oV/vOaWfYbFfQX+n74Y6e+ljUWo6CWF9FCLe2qLI5rtIvh/tO4RENM6kyqVaEh9MpCerLQDIXa+kOLluXKwZnU0wSLKpqFrDSWSiqBNvpXWK2dZaxXmiW4wSGPvzml9oz+ms62icSqiRgiP/Br8cKQ1QRlJS/v3C+xW+TEHNliAR8CE8o6V8SzNdM6TdrlWdtJyU/gcgGRemW4R",
+        "session_id": "/2K+V777vipCxPZ0gpY9qcpz1DYaXwuMRIu0UEP0Wa0",
+        "session_key": "AQAAAAAclzWVMeWBKH+B/WMowa3rb4ma3jEl6n5W4GCs9ue65CruzD3ihX+85pZ9hsV9Bf6fvhjp76WNRajoJYX0UIt7aosjmu0i+H+07hEQ0zqTKpVoSH0ykJ6stAMhdr6Q4uW5crBmdTTBIsqmoWsNJZKKoE2+ldYrZ1lrFeaJbjBIY/9ivle++74qQsT2dIKWPanKc9Q2Gl8LjESLtFBD9Fmt",
         "sender_claimed_keys": {
-            "ed25519": "+07YOpSgdZ1X9le3n3NMByw0V1B0H0Djnbm76jgmWoo"
+            "ed25519": "F4P7f1Z0RjbiZMgHk1xBCG3KC4/Ng9PmxLJ4hQ13sHA"
         },
         "forwarding_curve25519_key_chain": [],
         "org.matrix.msc3061.shared_history": true
@@ -407,10 +387,10 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
         "algorithm": "m.megolm.v1.aes-sha2",
         "room_id": "!room:id",
         "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
-        "session_id": "Br1KX582z393pUce8dEWzh1qMaQdHmOSjxtXM8Hp0uM",
-        "session_key": "AQAAAAAcziD+H7atzG2WLHx/JKkjAXNpdWJtrtw5LL9v50dMxkHjSIDsXjLsB1N0cu/g3VdSPem5T8pVQgp/3+UQMurJiqGnspabT3V4FV5sN2AQVFWKR6ZvsQiFFKfX6AHW/IULH1QnPiFZvbN5wjz/LrRSwx9+nngbbAgTiuCveWsRMga9Sl+fNs9/d6VHHvHRFs4dajGkHR5jko8bVzPB6dLj",
+        "session_id": "+07YOpSgdZ1X9le3n3NMByw0V1B0H0Djnbm76jgmWoo",
+        "session_key": "AQAAAAAjWfIMo9+BWS8IvhfsQuomxXXXGy11tJs0ej505xxd1RzOIP4ftq3MbZYsfH8kqSMBc2l1Ym2u3Dksv2/nR0zGQeNIgOxeMuwHU3Ry7+DdV1I96blPylVCCn/f5RAy6smKoaeylptPdXgVXmw3YBBUVYpHpm+xCIUUp9foAdb8hftO2DqUoHWdV/ZXt59zTAcsNFdQdB9A4525u+o4JlqK",
         "sender_claimed_keys": {
-            "ed25519": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc"
+            "ed25519": "OsZMdC1gQ5nPr+L9tuT6xXsaFJkVPkgxP2FexHF1/QM"
         },
         "forwarding_curve25519_key_chain": [],
         "org.matrix.msc3061.shared_history": true
@@ -422,10 +402,10 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "algorithm": "m.megolm.v1.aes-sha2",
     "room_id": "!room:id",
     "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
-    "session_id": "JMjeaG/6e909DDlMuLqwIg5PramOROUuxovWyv3ZTg8",
-    "session_key": "AQAAAACbu963Zk4QSnahgOMcwssWbB3WC2Ua5Zg91cDpjX71jKmHT8QNV9L7N3de9svRCBvIvjf7JCcU0cqXFUlfV6IpwTSFq/4JMnqbgCokKnppXPCeWpg/TpJm1ZJp68T9bsncKSUxoxNh/Jb+kFmVNrsuczZqFCDSapcI/9Qxi0A/bSTI3mhv+nvdPQw5TLi6sCIOT62pjkTlLsaL1sr92U4P",
+    "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
+    "session_key": "AQAAAADZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9XoinBNIWr/gkyepuAKiQqemlc8J5amD9OkmbVkmnrxP1uyYMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
     "sender_claimed_keys": {
-        "ed25519": "pBeflyM5dtB45UpeCVzzEQtQQxMAr99xkf8e5I7/0EU"
+        "ed25519": "zBdpQwWYyz1MkZuEUhXqcdMfUNN/B9psLFDDDTJOg64"
     },
     "forwarding_curve25519_key_chain": [],
     "org.matrix.msc3061.shared_history": true
@@ -436,10 +416,10 @@ export const BOB_RATCHTED_MEGOLM_SESSION_DATA: IMegolmSessionData = {
     "algorithm": "m.megolm.v1.aes-sha2",
     "room_id": "!room:id",
     "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
-    "session_id": "JMjeaG/6e909DDlMuLqwIg5PramOROUuxovWyv3ZTg8",
-    "session_key": "AQAAAAGbu963Zk4QSnahgOMcwssWbB3WC2Ua5Zg91cDpjX71jKmHT8QNV9L7N3de9svRCBvIvjf7JCcU0cqXFUlfV6IpwTSFq/4JMnqbgCokKnppXPCeWpg/TpJm1ZJp68T9bsnoYDYx5dCHeIL3g7FY17m6J9snLcaBMokZaGffpTmu4CTI3mhv+nvdPQw5TLi6sCIOT62pjkTlLsaL1sr92U4P",
+    "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
+    "session_key": "AQAAAAHZJL7OdM/KHfPzXPZ3CtlLBIlzbwk06dnZTd3bvkcdP5u73rdmThBKdqGA4xzCyxZsHdYLZRrlmD3VwOmNfvWMqYdPxA1X0vs3d172y9EIG8i+N/skJxTRypcVSV9Xoil2JdGx9oPqR0dFVh661Aqs86rJRbQ4IeRiuEm35VMxboMsMnQayCXCVpLQv4nN7bpymTNV2ZtTKWImLXW4/EaX",
     "sender_claimed_keys": {
-        "ed25519": "pBeflyM5dtB45UpeCVzzEQtQQxMAr99xkf8e5I7/0EU"
+        "ed25519": "zBdpQwWYyz1MkZuEUhXqcdMfUNN/B9psLFDDDTJOg64"
     },
     "forwarding_curve25519_key_chain": []
 };
@@ -450,9 +430,9 @@ export const BOB_CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     "forwarded_count": 0,
     "is_verified": false,
     "session_data": {
-        "ciphertext": "9fn9mZSIdo57CvzifRTm38REUNK0/uqROh7tSjXx864NNegFi7YyOynuHmrPiay4Uoz4aHQmD2E05LVHuqb7BLDn9S1LKXFMPIfLFy7JlpxwdQUbzN4aqJaqnom5rAgFgNCxIvNhIyWOMnrZKEPahF52JKWpXc4U408YeNa/W2DRImjjlzw9aAzQjUVcuq1QVzFL6Ew0pXg2Xwsd1xdEnKWAJwyzt1kgh7fQwSe12lWyu40URz5MkZ7y8zm8LgmDbiwmyQcWGw9VKko5E52dmQ5DZIfIPdogD/7f6zNXX5jFQ/ZYASM6Ycmb1O2xUNe1lm1HYWQfd/p5XSf+6QCr1SBMC2Yc4ijPuV9+SLPM9YiCy4cI/KXrq21dCdyTz+mXuRnCIXpnTUCkGBRNQo3+R9bBM+548bQRnegTWEFYvOAofgcUbU2w3pPpr4SqXdyWdnH9nyPWHbRyZqCruj9pZRXFZMEEa3S7woUoROqWt+1Bflz5BuHCvFq22qHKCplT5Cc5CgJz6D8JmCN6zNSGL/xNGgotbrm6GkJEp438ExGzZ/fQYcK9clppPttRCYlIcCvZjrs1UNNo8+vkgKi1RxCzyvY2vin+tLc00sWkqXj6oZkI3mvvlJfOfMAOXeR9Et6/VC/z8BNihlX/tCHF2cFjh1CsCKnCyBQXP27bpPpSDX4o74oGloNIetZrd9O2R3X7ElZYDGBEJULjSA/4Dm1nh+EIgvNnshkyAfTD8xo6qttrlQ1tgaWQchEc1ax6",
-        "ephemeral": "amAla2UxgpvHErBBaF4ih+UQKYGMzAuAgAW8nkfhYlE",
-        "mac": "vN+fEbjPlLQ"
+        "ciphertext": "d7UVOK17WEVky/8hK0h3HsTQrFMEbKbfqMcl2KtyTWcI9S5gGFWK9Git5BzVRxRggvxQ0c8PDfqL+dr3zHytAA7TEpHlx8Ks23hCqXmVW710VjqK2K9xnWCyJvkHfE8x0w6AYvffDj+tRVP8C8M7t4849rD2itn0uma+YMkvjG/nANUTxG1dBf3oUOZ673vflCPoaz7s7x9ZNhYDVSVH5JTdMgNwwN42R5dqqxnGTu516tJzJh/9BWvyD9oIPWJ8X0rt1sbzEJ3PZeBXcSy8GTlZ1SgSFjeiXlwYxOZCaX2sxprk4N1oI1db6g+wCDBhbCGGucJIlTDJna/h9/C5J4drGd/fkisG3SidUmJXXCyInhs/BhwjGAtTGeQS8j7R8UnJxhMulYBHSckzj0Kas71LElPp8W8M4Jq81APA03n5UfYB+U6jbxjDgf8OJnxGQyrteq9F2+SEvS/TwHe1pE3t6EM2mDYRoYDTpU5pTNYSJkGIQMfWJKRxxuWUGs29o1twewJ6dhHgm+SlCII0M7ESoVdV54vxZCvHZnPcR0NXDzal7ils7zBKJmamHfPQBuaqNPU3KmSo+5R8ngFPaWU5LbWqYp/WxSBfNCoLZ7Jf8Io5uitjXTATR2qy2r6l/RJmk3RlfP51kliQqI2TWqRF96oaB96IGgUGSFCX/2pv0psOBGc1SjfmMB3d7gYis+2iBYVbG3xmnpeXbqvlD0Lw9TiTIPkjhJkTW1+lXyhy1xVH9ZmcFamcL7bX15Jx",
+        "ephemeral": "oO0VX84OUIzm2i/12zAhTWOZT5IFRH5mXaKZ8fXkCgU",
+        "mac": "lEfHlqfJQwU"
     }
 };
 
@@ -475,12 +455,20 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
         "sender_key": "FOvlmz18LLI3k/llCpqRoKT90+gFF8YhuL+v1YBXHlw",
-        "ciphertext": "AwgAEnCovuJr2CM5C0VBLa4wgnwvQ3YyHplZb8hYpgggpFg2swvToJ/aTGvt7uipqsB7AEBZcWNAtHaVcM839zdUWzV2jmWx/Bi4jjLjJPzjq7MkKRKEz349yHDfQwIa01JTEUvkoEMilMyLI1ihxD0f6uDYW2zePGcVj8+AHWPZe+KkFACqySq3Ugl2hLgDIFkHpO3xwlWSmXbY1wJgniKkoekf9rP4X0fBEl5ggeqrJMfuuf6gGcNZDIAO",
-        "session_id": "JMjeaG/6e909DDlMuLqwIg5PramOROUuxovWyv3ZTg8",
+        "ciphertext": "AwgAEnA/mEqZm2lSrhoG11OpDqsohGSBJWsudbuoItLlivmpFZQHrKMbE6z/dhCTwUi76vwfRCtf4tyPMD845cqZH1nL0bowq3/awyzZ8Q263Y3WrLfkUTFBU6oPF/IULUFZZuw6kLdfd5g5+uigvqUhFFpICoj7KNHznv4sFNssd00/WgJquZ6PRt6e1v6ANFNiZPAwghIL+kBc6pb8i6MUWt9JnXilJhTqFDHdXiY4qkaKBWbwebC26PYM",
+        "session_id": "gywydBrIJcJWktC/ic3tunKZM1XZm1MpYiYtdbj8Rpc",
         "device_id": "TEST_DEVICE"
     },
     "event_id": "$event1",
     "origin_server_ts": 1507753886000
+};
+
+/** 
+ * Per-room backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}`.
+ * Contains the key from BOB_MEGOLM_SESSION_DATA.
+ */
+export const BOB_PER_ROOM_CURVE25519_KEY_BACKUP_DATA: KeyBackupRoomSessions = {
+     [BOB_MEGOLM_SESSION_DATA.session_id]: BOB_CURVE25519_KEY_BACKUP_DATA
 };
 
 /** A second set of signed cross-signing keys data, also suitable for returning from a `/keys/query` call */

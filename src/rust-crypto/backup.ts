@@ -632,9 +632,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Download and import the keys for a given room from the latest backup version.
+     * Download and import the keys for a given room from the current backup version.
      *
-     * @param roomId - The room in question..
+     * @param roomId - The room in question.
      */
     public async downloadLatestRoomKeyBackup(roomId: string): Promise<void> {
         const { backupVersion, decryptionKey } = await this.olmMachine.getBackupKeys();

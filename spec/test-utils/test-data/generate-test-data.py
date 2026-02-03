@@ -86,7 +86,7 @@ def main() -> None:
 
 import type {{ IDeviceKeys, IMegolmSessionData }} from "../../../src/@types/crypto";
 import type {{ IDownloadKeyResult, IEvent }} from "../../../src";
-import type {{ KeyBackupSession, KeyBackupInfo }} from "../../../src/crypto-api/keybackup";
+import type {{ KeyBackupSession, KeyBackupInfo, KeyBackupRoomSessions }} from "../../../src/crypto-api/keybackup";
 
 /* eslint-disable comma-dangle */
 
@@ -205,13 +205,6 @@ def build_test_data(user_data, prefix = "") -> str:
 
     backed_up_room_key = encrypt_megolm_key_for_backup(additional_exported_room_key, backup_decryption_key.public_key())
 
-    # generate per-room signed backup data
-    per_room_backup_data = {
-        additional_exported_room_key["session_id"]: encrypt_megolm_key_for_backup(
-            additional_exported_room_key, backup_decryption_key.public_key()
-        )
-    }
-
     clear_event, encrypted_event = generate_encrypted_event_content(additional_exported_room_key, additional_exported_ed_key, device_curve_key)
 
     backup_recovery_key = export_recovery_key(user_data["B64_BACKUP_DECRYPTION_KEY"])
@@ -262,9 +255,6 @@ export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
 export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
 
-/** Per-room signed backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}` */
-export const {prefix}PER_ROOM_SIGNED_BACKUP_DATA = { json.dumps(per_room_backup_data, indent=4) };
-
 /** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const {prefix}MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = {
     json.dumps(set_of_exported_room_keys, indent=4)
@@ -288,6 +278,14 @@ export const {prefix}CLEAR_EVENT: Partial<IEvent> = {json.dumps(clear_event, ind
 
 /** The encrypted CLEAR_EVENT by MEGOLM_SESSION_DATA */
 export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_event, indent=4)};
+
+/** 
+ * Per-room backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}`.
+ * Contains the key from {prefix}MEGOLM_SESSION_DATA.
+ */
+export const {prefix}PER_ROOM_CURVE25519_KEY_BACKUP_DATA: KeyBackupRoomSessions = {{
+     [{prefix}MEGOLM_SESSION_DATA.session_id]: {prefix}CURVE25519_KEY_BACKUP_DATA
+}};
 """
 
     alt_master_key = user_data.get("ALT_MASTER_CROSS_SIGNING_PRIVATE_KEY_BYTES")
@@ -664,7 +662,7 @@ def export_recovery_key(key_b64: str) -> str:
     export_bytes += parity_byte.to_bytes(1, 'big')
 
     # The byte string is encoded using base58
-    recovery_key = base58.b58encode(bytes(export_bytes)).decode('utf-8')
+    recovery_key = base58.b58encode(export_bytes).decode('utf-8')
 
     split = [recovery_key[i:i + 4] for i in range(0, len(recovery_key), 4)]
     return ' '.join(split)
