@@ -21,10 +21,10 @@ jobs:
               with:
                   ref: staging
 
-            - name: 🔧 Yarn cache
+            - name: 🔧 pnpm cache
               uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   registry-url: "https://registry.npmjs.org"
                   node-version-file: package.json
 
@@ -33,7 +33,7 @@ jobs:
               run: npm install -g npm@latest
 
             - name: 🔨 Install dependencies
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - name: 🚀 Publish to npm
               id: npm-publish

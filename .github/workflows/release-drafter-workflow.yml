@@ -24,10 +24,10 @@ jobs:
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   node-version-file: package.json
-                  cache: "yarn"
+                  cache: "pnpm"
 
             - name: Install Deps
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - uses: t3chguy/release-drafter@105e541c2c3d857f032bd522c0764694758fabad
               id: draft-release

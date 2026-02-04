@@ -18,14 +18,14 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install"
+              run: "pnpm install"
 
             - name: Typecheck
-              run: "yarn run lint:types"
+              run: "pnpm run lint:types"
 
     js_lint:
         name: "ESLint"
@@ -35,14 +35,14 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install"
+              run: "pnpm install"
 
             - name: Run Linter
-              run: "yarn run lint:js"
+              run: "pnpm run lint:js"
 
     node_example_lint:
         name: "Node.js example"
@@ -52,14 +52,14 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install"
+              run: "pnpm install"
 
             - name: Build Types
-              run: "yarn build:types"
+              run: "pnpm build:types"
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
@@ -87,14 +87,14 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - name: Run Linter
-              run: "yarn lint:workflows"
+              run: "pnpm lint:workflows"
 
     docs:
         name: "JSDoc Checker"
@@ -104,14 +104,14 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install"
+              run: "pnpm install"
 
             - name: Generate Docs
-              run: "yarn run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
+              run: "pnpm run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
 
             - name: Upload Artifact
               uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -129,14 +129,14 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - name: Run linter
-              run: "yarn run lint:knip"
+              run: "pnpm run lint:knip"
 
     element-web:
         name: Downstream tsc element-web
@@ -149,7 +149,7 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version: "lts/*"
 
             - name: Install Dependencies
@@ -159,7 +159,7 @@ jobs:
                   JS_SDK_GITHUB_BASE_REF: ${{ github.sha }}
 
             - name: Typecheck
-              run: "yarn run lint:types"
+              run: "pnpm run lint:types"
 
     # Hook for branch protection to skip downstream typechecking outside of merge queues
     downstream:

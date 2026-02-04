@@ -52,7 +52,7 @@ jobs:
 
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version: "lts/*"
 
             - name: Bump dependency
@@ -61,8 +61,8 @@ jobs:
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
-                  yarn upgrade "$DEPENDENCY" --exact
-                  git add package.json yarn.lock
+                  pnpm add "$DEPENDENCY" --save-exact
+                  git add package.json pnpm-lock.yaml
                   git commit -am"Upgrade dependency to $DEPENDENCY"
                   git push origin staging
 
@@ -75,17 +75,17 @@ jobs:
             - name: 🧮 Checkout code
               uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
-            - name: 🔧 Yarn cache
+            - name: 🔧 pnpm cache
               uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: 🔨 Install dependencies
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - name: 📖 Generate docs
-              run: yarn gendoc
+              run: pnpm gendoc
 
             - name: Upload artifact
               uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
