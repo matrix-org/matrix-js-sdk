@@ -639,6 +639,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     public async downloadLatestRoomKeyBackup(roomId: string): Promise<void> {
         const { backupVersion, decryptionKey } = await this.olmMachine.getBackupKeys();
         if (!backupVersion || !decryptionKey) {
+            this.logger.warn(
+                `downloadLatestRoomKeyBackup: Could not download backup (backupVersion=${backupVersion}, hasDecryptionKey=${!!decryptionKey})`,
+            );
             return;
         }
         const sessions = await this.downloadRoomKeyBackup(backupVersion, roomId);
