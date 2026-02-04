@@ -54,6 +54,7 @@ jobs:
               with:
                   cache: "pnpm"
                   node-version: "lts/*"
+            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: Bump dependency
               env:
@@ -80,6 +81,7 @@ jobs:
               with:
                   cache: "pnpm"
                   node-version-file: package.json
+            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: 🔨 Install dependencies
               run: "pnpm install --frozen-lockfile"
