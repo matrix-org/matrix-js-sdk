@@ -246,15 +246,6 @@ export const {prefix}SIGNED_CROSS_SIGNING_KEYS_DATA: Partial<IDownloadKeyResult>
 /** Signed OTKs, returned by `POST /keys/claim` */
 export const {prefix}ONE_TIME_KEYS = { json.dumps(otks, indent=4) };
 
-/** base64-encoded backup decryption (private) key */
-export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
-
-/** Backup decryption key in export format */
-export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
-
-/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
-export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
-
 /** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const {prefix}MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = {
     json.dumps(set_of_exported_room_keys, indent=4)
@@ -278,6 +269,15 @@ export const {prefix}CLEAR_EVENT: Partial<IEvent> = {json.dumps(clear_event, ind
 
 /** The encrypted CLEAR_EVENT by MEGOLM_SESSION_DATA */
 export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_event, indent=4)};
+
+/** base64-encoded backup decryption (private) key */
+export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
+
+/** Backup decryption key in export format */
+export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
+
+/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
+export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
 
 /** 
  * Per-room backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}`.
@@ -417,7 +417,7 @@ def build_exported_megolm_key(device_curve_key: x25519.X25519PrivateKey) -> tupl
         "session_id": encode_base64(
             private_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         ),
-        "session_key": encode_base64(exported_key),
+        "session_key": encode_base64(bytes(exported_key)),
         "sender_claimed_keys": {
             "ed25519": encode_base64(ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32)).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
         },
@@ -467,7 +467,7 @@ def symetric_ratchet_step_of_megolm_key(previous: dict , megolm_private_key: ed2
         "room_id": "!room:id",
         "sender_key": previous["sender_key"],
         "session_id": previous["session_id"],
-        "session_key": encode_base64(exported_key),
+        "session_key": encode_base64(bytes(exported_key)),
         "sender_claimed_keys": previous["sender_claimed_keys"],
         "forwarding_curve25519_key_chain": [],
     }
@@ -618,7 +618,7 @@ def generate_encrypted_event_content(exported_key: dict, ed_key: ed25519.Ed25519
 
     message += signature
 
-    cipher_text = encode_base64(message)
+    cipher_text = encode_base64(bytes(message))
 
     encrypted_payload = {
         "algorithm" : "m.megolm.v1.aes-sha2",
@@ -662,7 +662,7 @@ def export_recovery_key(key_b64: str) -> str:
     export_bytes += parity_byte.to_bytes(1, 'big')
 
     # The byte string is encoded using base58
-    recovery_key = base58.b58encode(export_bytes).decode('utf-8')
+    recovery_key = base58.b58encode(bytes(export_bytes)).decode('utf-8')
 
     split = [recovery_key[i:i + 4] for i in range(0, len(recovery_key), 4)]
     return ' '.join(split)

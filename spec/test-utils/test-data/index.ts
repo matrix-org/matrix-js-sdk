@@ -118,26 +118,6 @@ export const ONE_TIME_KEYS = {
     }
 };
 
-/** base64-encoded backup decryption (private) key */
-export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
-
-/** Backup decryption key in export format */
-export const BACKUP_DECRYPTION_KEY_BASE58 = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
-
-/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
-export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
-    "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
-    "version": "1",
-    "auth_data": {
-        "public_key": "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
-        "signatures": {
-            "@alice:localhost": {
-                "ed25519:test_device": "KDSNeumirTsd8piI0oVfv/wzg4J4HlEc7rs5XhODFcJ/YAcUdg65ajsZG+rLI0TQOSSGjorJqcrSiSB1HRSCAA"
-            }
-        }
-    }
-};
-
 /** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
@@ -230,6 +210,26 @@ export const ENCRYPTED_EVENT: Partial<IEvent> = {
     },
     "event_id": "$event1",
     "origin_server_ts": 1507753886000
+};
+
+/** base64-encoded backup decryption (private) key */
+export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** Backup decryption key in export format */
+export const BACKUP_DECRYPTION_KEY_BASE58 = "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d";
+
+/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
+export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
+    "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+    "version": "1",
+    "auth_data": {
+        "public_key": "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+        "signatures": {
+            "@alice:localhost": {
+                "ed25519:test_device": "KDSNeumirTsd8piI0oVfv/wzg4J4HlEc7rs5XhODFcJ/YAcUdg65ajsZG+rLI0TQOSSGjorJqcrSiSB1HRSCAA"
+            }
+        }
+    }
 };
 
 /** 
@@ -349,26 +349,6 @@ export const BOB_ONE_TIME_KEYS = {
     }
 };
 
-/** base64-encoded backup decryption (private) key */
-export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
-
-/** Backup decryption key in export format */
-export const BOB_BACKUP_DECRYPTION_KEY_BASE58 = "EsT5 Sd5m mEXs NQYE ibRe 3q9E 4aXW rHih 5f9J 6rU6 AfwY mASR";
-
-/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
-export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
-    "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
-    "version": "1",
-    "auth_data": {
-        "public_key": "ZRuVWcWlDuvOwZRygccUCD4Avtnt130800I+WQNwwRY",
-        "signatures": {
-            "@bob:xyz": {
-                "ed25519:bob_device": "lDIMj3VC0WazE2FamGHpmbiqKf9Z4pO4qapZ5TL5BnD3c+dvb+2waOEd6pgay/pmrQ6MW4Eu2KDEpe1fnHc3BA"
-            }
-        }
-    }
-};
-
 /** A set of megolm keys that can be imported via CryptoAPI#importRoomKeys */
 export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
     {
@@ -461,6 +441,26 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
     },
     "event_id": "$event1",
     "origin_server_ts": 1507753886000
+};
+
+/** base64-encoded backup decryption (private) key */
+export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** Backup decryption key in export format */
+export const BOB_BACKUP_DECRYPTION_KEY_BASE58 = "EsT5 Sd5m mEXs NQYE ibRe 3q9E 4aXW rHih 5f9J 6rU6 AfwY mASR";
+
+/** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}` */
+export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
+    "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+    "version": "1",
+    "auth_data": {
+        "public_key": "ZRuVWcWlDuvOwZRygccUCD4Avtnt130800I+WQNwwRY",
+        "signatures": {
+            "@bob:xyz": {
+                "ed25519:bob_device": "lDIMj3VC0WazE2FamGHpmbiqKf9Z4pO4qapZ5TL5BnD3c+dvb+2waOEd6pgay/pmrQ6MW4Eu2KDEpe1fnHc3BA"
+            }
+        }
+    }
 };
 
 /** 
