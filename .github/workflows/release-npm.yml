@@ -21,13 +21,13 @@ jobs:
               with:
                   ref: staging
 
+            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - name: 🔧 pnpm cache
               uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   cache: "pnpm"
                   registry-url: "https://registry.npmjs.org"
                   node-version-file: package.json
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             # Ensure npm 11.5.1 or later is installed
             - name: Update npm
