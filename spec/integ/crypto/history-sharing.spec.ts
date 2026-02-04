@@ -314,6 +314,20 @@ describe("History Sharing", () => {
         await flushPromises();
     });
 
+    /**
+     * Helper function to automatically test that room history is shared on invite.
+     * The function performs the following:
+     *
+     *  1. Sets up the relevant fetchMock and to-device event listeners for Alice.
+     *  2. Alice invites Bob to the room.
+     *  3. Checks the key bundle was uploaded and that the `m.room_key_bundle`
+     *     to-device message was sent.
+     *  4. Sends the invite event to Bob and ensures it is processed correctly.
+     *  5. Sets up the relevant fetchMock listeners for Bob.
+     *  5. Simulates Bob joining the room and verifies that the room history is shared.
+     *
+     * @param roomId The ID of the room where the invite and history sharing will be tested.
+     */
     async function assertInviteAndShareHistory(roomId: string): Promise<void> {
         const uploadProm = new Promise<Uint8Array>((resolve) => {
             fetchMock.postOnce(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString(), (callLog) => {

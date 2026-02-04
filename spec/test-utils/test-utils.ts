@@ -13,6 +13,7 @@ import {
 import {
     ClientEvent,
     EventType,
+    HistoryVisibility,
     type IJoinedRoom,
     type IPusher,
     type ISyncResponse,
@@ -57,14 +58,19 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
 }
 
 /**
- * Return a sync response which contains a single room (by default TEST_ROOM_ID), with the members given
- * @param roomMembers
- * @param roomId
+ * Return a sync response which contains a single room (by default `TEST_ROOM_ID`), with the members given
+ * and history visibility set to `shared`.
  *
- * @returns the sync response
+ * @param roomMembers - An array of user IDs representing the members of the room.
+ * @param roomHistoryVisibility - The history visibility setting for the room. Defaults to `shared`.
+ * @param roomId - The ID of the room. Defaults to `TEST_ROOM_ID`.
+ * @param encryptStateEvents - A boolean indicating whether state events should be encrypted. Defaults to `false`.
+ *
+ * @returns The sync response object containing the room data.
  */
 export function getSyncResponse(
     roomMembers: string[],
+    roomHistoryVisibility: HistoryVisibility = HistoryVisibility.Shared,
     roomId = TEST_ROOM_ID,
     encryptStateEvents = false,
 ): ISyncResponse {
@@ -90,7 +96,7 @@ export function getSyncResponse(
                     type: "m.room.history_visibility",
                     state_key: "",
                     content: {
-                        history_visibility: "shared",
+                        history_visibility: roomHistoryVisibility,
                     },
                 }),
             ],
