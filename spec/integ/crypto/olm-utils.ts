@@ -16,7 +16,8 @@ limitations under the License.
 
 import Olm from "@matrix-org/olm";
 import anotherjson from "another-json";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
+import { type RouteResponse } from "fetch-mock";
 
 import {
     type IContent,
@@ -32,7 +33,6 @@ import { type ISyncResponder } from "../../test-utils/SyncResponder";
 import { syncPromise } from "../../test-utils/test-utils";
 import { type KeyBackupInfo } from "../../../src/crypto-api";
 import { logger } from "../../../src/logger";
-import type FetchMock from "fetch-mock";
 
 /**
  * @module
@@ -462,19 +462,11 @@ export async function expectSendRoomKey(
         return inboundGroupSession;
     }
     return await new Promise<Olm.InboundGroupSession>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/sendToDevice/m.room.encrypted/"),
-            (url: string, opts: RequestInit): FetchMock.MockResponse => {
-                const content = JSON.parse(opts.body as string);
-                resolve(onSendRoomKey(content));
-                return {};
-            },
-            {
-                // append to the list of intercepts on this path (since we have some tests that call
-                // this function multiple times)
-                overwriteRoutes: false,
-            },
-        );
+        fetchMock.putOnce(new RegExp("/sendToDevice/m.room.encrypted/"), (callLog): RouteResponse => {
+            const content = JSON.parse(callLog.options.body as string);
+            resolve(onSendRoomKey(content));
+            return {};
+        });
     });
 }
 
@@ -485,17 +477,11 @@ export async function expectSendRoomKey(
  */
 export function expectEncryptedSendMessageEvent() {
     return new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/send/m.room.encrypted/"),
-            (url, request) => {
-                const content = JSON.parse(request.body as string);
-                resolve(content);
-                return { event_id: "$event_id" };
-            },
-            // append to the list of intercepts on this path (since we have some tests that call
-            // this function multiple times)
-            { overwriteRoutes: false },
-        );
+        fetchMock.putOnce(new RegExp("/send/m.room.encrypted/"), (callLog) => {
+            const content = JSON.parse(callLog.options.body as string);
+            resolve(content);
+            return { event_id: "$event_id" };
+        });
     });
 }
 
@@ -506,17 +492,11 @@ export function expectEncryptedSendMessageEvent() {
  */
 function expectEncryptedSendStateEvent() {
     return new Promise<IContent>((resolve) => {
-        fetchMock.putOnce(
-            new RegExp("/state/m.room.encrypted/"),
-            (url, request) => {
-                const content = JSON.parse(request.body as string);
-                resolve(content);
-                return { event_id: "$event_id" };
-            },
-            // append to the list of intercepts on this path (since we have some tests that call
-            // this function multiple times)
-            { overwriteRoutes: false },
-        );
+        fetchMock.putOnce(new RegExp("/state/m.room.encrypted/"), (callLog) => {
+            const content = JSON.parse(callLog.options.body as string);
+            resolve(content);
+            return { event_id: "$event_id" };
+        });
     });
 }
 

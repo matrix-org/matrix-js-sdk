@@ -14,13 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-jest.mock("../src/http-api/utils", () => ({
-    ...jest.requireActual("../src/http-api/utils"),
+import fetchMock, { manageFetchMockGlobally } from "@fetch-mock/vitest";
+
+vi.mock("../src/http-api/utils", async () => ({
+    ...(await vi.importActual("../src/http-api/utils")),
     // We mock timeoutSignal otherwise it causes tests to leave timers running
     timeoutSignal: () => new AbortController().signal,
 }));
 
-// Dont make test fail too soon due to timeouts while debugging.
+manageFetchMockGlobally();
+
+beforeEach(() => {
+    fetchMock.hardReset();
+    fetchMock.mockGlobal();
+});
+
+// Don't make test fail too soon due to timeouts while debugging.
 if (process.env.VSCODE_INSPECTOR_OPTIONS) {
-    jest.setTimeout(60 * 1000 * 5); // 5 minutes
+    vi.setConfig({ testTimeout: 60 * 1000 * 5 }); // 5 minutes
 }

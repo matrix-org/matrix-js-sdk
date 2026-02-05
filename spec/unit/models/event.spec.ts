@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MockedObject } from "jest-mock";
+import { type MockedObject } from "vitest";
 
 import { type IContent, MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
@@ -264,9 +264,9 @@ describe("MatrixEvent", () => {
 
         function createMockClient(): MatrixClient {
             return {
-                supportsThreads: jest.fn().mockReturnValue(true),
-                decryptEventIfNeeded: jest.fn().mockReturnThis(),
-                getUserId: jest.fn().mockReturnValue("@user:server"),
+                supportsThreads: vi.fn().mockReturnValue(true),
+                decryptEventIfNeeded: vi.fn().mockReturnThis(),
+                getUserId: vi.fn().mockReturnValue("@user:server"),
             } as unknown as MockedObject<MatrixClient>;
         }
 
@@ -374,6 +374,7 @@ describe("MatrixEvent", () => {
     });
 
     describe("applyVisibilityEvent", () => {
+        // eslint-disable-next-line @vitest/expect-expect
         it("should emit VisibilityChange if a change was made", async () => {
             const ev = new MatrixEvent({
                 type: "m.room.message",
@@ -404,12 +405,12 @@ describe("MatrixEvent", () => {
         });
 
         it("should report unknown decryption errors", async () => {
-            const decryptionListener = jest.fn();
+            const decryptionListener = vi.fn();
             encryptedEvent.addListener(MatrixEventEvent.Decrypted, decryptionListener);
 
             const testError = new Error("test error");
             const crypto = {
-                decryptEvent: jest.fn().mockRejectedValue(testError),
+                decryptEvent: vi.fn().mockRejectedValue(testError),
             } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
@@ -420,7 +421,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent()).toEqual({
+            expect(encryptedEvent.getContent<IContent>()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
             });
@@ -428,12 +429,12 @@ describe("MatrixEvent", () => {
         });
 
         it("should report known decryption errors", async () => {
-            const decryptionListener = jest.fn();
+            const decryptionListener = vi.fn();
             encryptedEvent.addListener(MatrixEventEvent.Decrypted, decryptionListener);
 
             const testError = new DecryptionError(DecryptionFailureCode.MEGOLM_UNKNOWN_INBOUND_SESSION_ID, "uisi");
             const crypto = {
-                decryptEvent: jest.fn().mockRejectedValue(testError),
+                decryptEvent: vi.fn().mockRejectedValue(testError),
             } as unknown as CryptoBackend;
 
             await encryptedEvent.attemptDecryption(crypto);
@@ -446,7 +447,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent()).toEqual({
+            expect(encryptedEvent.getContent<IContent>()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: uisi **",
             });
@@ -455,7 +456,7 @@ describe("MatrixEvent", () => {
 
         it(`should report "DecryptionError: The sender has disabled encrypting to unverified devices."`, async () => {
             const crypto = {
-                decryptEvent: jest
+                decryptEvent: vi
                     .fn()
                     .mockRejectedValue(
                         new DecryptionError(
@@ -472,17 +473,17 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent()).toEqual({
+            expect(encryptedEvent.getContent<IContent>()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
             });
         });
 
         it("should retry decryption if a retry is queued", async () => {
-            const eventAttemptDecryptionSpy = jest.spyOn(encryptedEvent, "attemptDecryption");
+            const eventAttemptDecryptionSpy = vi.spyOn(encryptedEvent, "attemptDecryption");
 
             const crypto = {
-                decryptEvent: jest
+                decryptEvent: vi
                     .fn()
                     .mockImplementationOnce(() => {
                         // schedule a second decryption attempt while
@@ -524,7 +525,7 @@ describe("MatrixEvent", () => {
             });
 
             const crypto = {
-                decryptEvent: jest.fn().mockImplementationOnce(() => {
+                decryptEvent: vi.fn().mockImplementationOnce(() => {
                     return Promise.resolve<EventDecryptionResult>({
                         clearEvent: {
                             type: "m.room.message",
@@ -627,8 +628,8 @@ describe("MatrixEvent", () => {
             },
         };
         try {
-            jest.useFakeTimers();
-            jest.setSystemTime(50);
+            vi.useFakeTimers();
+            vi.setSystemTime(50);
             // Prefer unsigned
             expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
             // Fall back to `duration_ms`
@@ -641,7 +642,7 @@ describe("MatrixEvent", () => {
                     .unstableStickyExpiresAt,
             ).toEqual(1050);
         } finally {
-            jest.useRealTimers();
+            vi.useRealTimers();
         }
     });
 });

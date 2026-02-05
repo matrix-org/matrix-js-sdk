@@ -62,7 +62,7 @@ describe("Notification count fixing", () => {
 
         client!.startClient({ threadSupport: true });
         const room = new Room(roomId, client!, selfUserId);
-        jest.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
+        vi.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
 
         const event = new MatrixEvent({
             room_id: roomId,
@@ -77,7 +77,7 @@ describe("Notification count fixing", () => {
             },
         });
 
-        jest.spyOn(event, "getPushActions").mockReturnValue({
+        vi.spyOn(event, "getPushActions").mockReturnValue({
             notify: true,
             tweaks: {},
         });
@@ -123,7 +123,7 @@ describe("MatrixClient syncing", () => {
         ]);
 
         const room = new Room(roomId, client!, selfUserId);
-        jest.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
+        vi.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
 
         const thread = mkThread({ room, client: client!, authorId: selfUserId, participantUserIds: [selfUserId] });
         const threadReply = thread.events.at(-1)!;
@@ -143,7 +143,7 @@ describe("MatrixClient syncing", () => {
 
         const reactionEventId = `$9-${Math.random()}-${Math.random()}`;
         let lastEvent: MatrixEvent | null = null;
-        jest.spyOn(client! as any, "sendEventHttpRequest").mockImplementation((event) => {
+        vi.spyOn(client! as any, "sendEventHttpRequest").mockImplementation((event) => {
             lastEvent = event as MatrixEvent;
             return { event_id: reactionEventId };
         });
@@ -195,7 +195,7 @@ describe("MatrixClient syncing", () => {
                 })
                 .respond(200, syncData);
 
-            client!.store.getSavedSyncToken = jest.fn().mockResolvedValue("this-is-a-token");
+            client!.store.getSavedSyncToken = vi.fn().mockResolvedValue("this-is-a-token");
             client!.startClient({ initialSyncLimit: 1 });
 
             await httpBackend!.flushAllExpected();

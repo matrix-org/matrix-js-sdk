@@ -1,3 +1,24 @@
+Changes in [40.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.1.0) (2026-01-27)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate unused `EventShieldReason` reason codes ([#5127](https://github.com/matrix-org/matrix-js-sdk/pull/5127)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Add stable m.oauth UIA stage enum ([#5138](https://github.com/matrix-org/matrix-js-sdk/pull/5138)). Contributed by @hughns.
+* Add `MatrixEvent.getKeyForwardingUser` ([#5128](https://github.com/matrix-org/matrix-js-sdk/pull/5128)). Contributed by @richvdh.
+* Add types for (unstable) policy servers ([#5116](https://github.com/matrix-org/matrix-js-sdk/pull/5116)). Contributed by @turt2live.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] Recalculate room name on loading members ([#5164](https://github.com/matrix-org/matrix-js-sdk/pull/5164)). Contributed by @RiotRobot.
+* Avoid rapidly retrying failed requests ([#5146](https://github.com/matrix-org/matrix-js-sdk/pull/5146)). Contributed by @andybalaam.
+* [matrixRTC] MatrixRTCSessions, add missing event reemission. ([#5144](https://github.com/matrix-org/matrix-js-sdk/pull/5144)). Contributed by @toger5.
+* Use normal base64 encoding for RTC backend identities ([#5129](https://github.com/matrix-org/matrix-js-sdk/pull/5129)). Contributed by @robintown.
+* export parseCallNotificationContent and isMyMembership from RTC types ([#5132](https://github.com/matrix-org/matrix-js-sdk/pull/5132)). Contributed by @Half-Shot.
+
+
 Changes in [40.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.0.0) (2026-01-13)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES

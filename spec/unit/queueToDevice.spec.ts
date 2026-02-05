@@ -53,7 +53,7 @@ async function flushAndRunTimersUntil(cond: () => boolean) {
     while (!cond()) {
         await flushPromises();
         if (cond()) break;
-        jest.advanceTimersToNextTimer();
+        vi.advanceTimersToNextTimer();
     }
 }
 
@@ -186,8 +186,8 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
                 event_id: "!fake:example.org",
             });
             const mockRoom = {
-                updatePendingEvent: jest.fn(),
-                hasEncryptionStateEvent: jest.fn().mockReturnValue(false),
+                updatePendingEvent: vi.fn(),
+                hasEncryptionStateEvent: vi.fn().mockReturnValue(false),
             } as unknown as Room;
             client.resendEvent(dummyEvent, mockRoom);
 
@@ -234,11 +234,11 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
 
     describe("async tests", () => {
         beforeAll(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterAll(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         beforeEach(async function () {
@@ -341,14 +341,14 @@ describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s st
 
             logger.info("Advancing clock to just before expected retry time...");
 
-            jest.advanceTimersByTime(retryDelay - 1000);
+            vi.advanceTimersByTime(retryDelay - 1000);
             await flushPromises();
 
             expect(httpBackend.requests.length).toEqual(0);
 
             logger.info("Advancing clock past expected retry time...");
 
-            jest.advanceTimersByTime(2000);
+            vi.advanceTimersByTime(2000);
             await flushPromises();
 
             expect(httpBackend.flushSync(undefined, 1)).toEqual(1);

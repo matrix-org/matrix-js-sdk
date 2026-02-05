@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type Mocked } from "vitest";
+
 import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey } from "./mocks";
 import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
 import { type IRoomTimelineData, MatrixEvent, type Room } from "../../../src";
-import type { Mocked } from "jest-mock";
 import type { Logger } from "../../../src/logger.ts";
 
 describe("RoomKeyTransport", () => {
@@ -30,13 +31,13 @@ describe("RoomKeyTransport", () => {
     let transport: RoomKeyTransport;
     let mockLogger: Mocked<Logger>;
 
-    const onCallEncryptionMock = jest.fn();
+    const onCallEncryptionMock = vi.fn();
     beforeEach(() => {
         onCallEncryptionMock.mockReset();
         mockLogger = {
-            debug: jest.fn(),
-            warn: jest.fn(),
-            info: jest.fn(),
+            debug: vi.fn(),
+            warn: vi.fn(),
+            info: vi.fn(),
         } as unknown as Mocked<Logger>;
 
         const statistics = {
@@ -52,7 +53,7 @@ describe("RoomKeyTransport", () => {
         client = new MatrixClient({ baseUrl: "base_url" });
         client.matrixRTC.start();
         transport = new RoomKeyTransport(room, client, statistics, {
-            getChild: jest.fn().mockReturnValue(mockLogger),
+            getChild: vi.fn().mockReturnValue(mockLogger),
         } as unknown as Mocked<Logger>);
         transport.on(KeyTransportEvents.ReceivedKeys, (...p) => {
             onCallEncryptionMock(...p);
@@ -81,9 +82,9 @@ describe("RoomKeyTransport", () => {
 
     describe("event decryption", () => {
         it("Retries decryption and processes success", async () => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
             let isDecryptionFailure = true;
-            client.decryptEventIfNeeded = jest
+            client.decryptEventIfNeeded = vi
                 .fn()
                 .mockReturnValueOnce(Promise.resolve())
                 .mockImplementation(() => {
@@ -98,7 +99,7 @@ describe("RoomKeyTransport", () => {
                     sent_ts: Date.now(),
                     device_id: "AAAAAAA",
                 }),
-                { isDecryptionFailure: jest.fn().mockImplementation(() => isDecryptionFailure) },
+                { isDecryptionFailure: vi.fn().mockImplementation(() => isDecryptionFailure) },
             );
             room.emit(RoomEvent.Timeline, timelineEvent, undefined, undefined, false, {} as IRoomTimelineData);
 
@@ -106,18 +107,18 @@ describe("RoomKeyTransport", () => {
             expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
 
             // should retry after one second:
-            await jest.advanceTimersByTimeAsync(1500);
+            await vi.advanceTimersByTimeAsync(1500);
 
             expect(client.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
             expect(onCallEncryptionMock).toHaveBeenCalledTimes(1);
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("Retries decryption and processes failure", async () => {
             try {
-                jest.useFakeTimers();
-                const onCallEncryptionMock = jest.fn();
-                client.decryptEventIfNeeded = jest.fn().mockReturnValue(Promise.resolve());
+                vi.useFakeTimers();
+                const onCallEncryptionMock = vi.fn();
+                client.decryptEventIfNeeded = vi.fn().mockReturnValue(Promise.resolve());
 
                 const timelineEvent = Object.assign(
                     makeMockEvent(EventType.CallEncryptionKeysPrefix, "@mock:user.example", "!room:id", {
@@ -126,7 +127,7 @@ describe("RoomKeyTransport", () => {
                         sent_ts: Date.now(),
                         device_id: "AAAAAAA",
                     }),
-                    { isDecryptionFailure: jest.fn().mockReturnValue(true) },
+                    { isDecryptionFailure: vi.fn().mockReturnValue(true) },
                 );
 
                 room.emit(RoomEvent.Timeline, timelineEvent, undefined, undefined, false, {} as IRoomTimelineData);
@@ -135,18 +136,18 @@ describe("RoomKeyTransport", () => {
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
 
                 // should retry after one second:
-                await jest.advanceTimersByTimeAsync(1500);
+                await vi.advanceTimersByTimeAsync(1500);
 
                 expect(client.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
 
                 // doesn't retry again:
-                await jest.advanceTimersByTimeAsync(1500);
+                await vi.advanceTimersByTimeAsync(1500);
 
                 expect(client.decryptEventIfNeeded).toHaveBeenCalledTimes(2);
                 expect(onCallEncryptionMock).toHaveBeenCalledTimes(0);
             } finally {
-                jest.useRealTimers();
+                vi.useRealTimers();
             }
         });
     });

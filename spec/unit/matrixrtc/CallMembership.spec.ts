@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
-
 import { type IContent, type MatrixEvent } from "../../../src";
 import {
     CallMembership,
@@ -27,15 +25,15 @@ import { membershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
-        getTs: jest.fn().mockReturnValue(originTs),
-        getSender: jest.fn().mockReturnValue("@alice:example.org"),
-        getId: jest.fn().mockReturnValue("$eventid"),
-        getContent: jest.fn().mockReturnValue({}),
+        getTs: vi.fn().mockReturnValue(originTs),
+        getSender: vi.fn().mockReturnValue("@alice:example.org"),
+        getId: vi.fn().mockReturnValue("$eventid"),
+        getContent: vi.fn().mockReturnValue({}),
     } as unknown as MatrixEvent;
 }
 
 function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
-    mocked(ev.getContent).mockReturnValue(content);
+    vi.mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, "xx");
 }
@@ -43,11 +41,11 @@ function createCallMembership(ev: MatrixEvent, content: IContent): CallMembershi
 describe("CallMembership", () => {
     describe("SessionMembershipData", () => {
         beforeEach(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         const membershipTemplate: SessionMembershipData = {
@@ -93,13 +91,13 @@ describe("CallMembership", () => {
 
         it("considers memberships unexpired if local age low enough", () => {
             const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
+            fakeEvent.getTs = vi.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
             expect(createCallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(false);
         });
 
         it("considers memberships expired if local age large enough", () => {
             const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
+            fakeEvent.getTs = vi.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
             expect(createCallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(true);
         });
 
@@ -160,8 +158,10 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                // for legacy events we expect the room to be added automagically
+                // See INFO_SLOT_ID_LEGACY_CASE comments
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
@@ -383,15 +383,15 @@ describe("CallMembership", () => {
             fakeEvent = makeMockEvent(1000);
             membership = createCallMembership(fakeEvent!, membershipTemplate);
 
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("calculates time until expiry", () => {
-            jest.setSystemTime(2000);
+            vi.setSystemTime(2000);
             // should be using absolute expiry time
             expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
         });

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import Olm from "@matrix-org/olm";
 
@@ -72,7 +72,6 @@ describe("Encrypted State Events", () => {
 
     beforeEach(async () => {
         fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
 
         const homeserverUrl = "https://alice-server.com";
         aliceClient = createClient({
@@ -97,13 +96,10 @@ describe("Encrypted State Events", () => {
 
     afterEach(async () => {
         aliceClient.stopClient();
-        fetchMock.mockReset();
     });
 
     function expectAliceKeyQuery(response: any) {
-        fetchMock.postOnce(new RegExp("/keys/query"), (url: string, opts: RequestInit) => response, {
-            overwriteRoutes: false,
-        });
+        fetchMock.postOnce(new RegExp("/keys/query"), (callLog) => response);
     }
 
     function expectAliceKeyClaim(response: any) {
@@ -189,6 +185,7 @@ describe("Encrypted State Events", () => {
         expect(decryptedEvent.getContent().topic).toEqual("Secret!");
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("Should send an encrypted state event", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);

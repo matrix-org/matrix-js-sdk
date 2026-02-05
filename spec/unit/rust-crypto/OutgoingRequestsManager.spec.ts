@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type Mocked } from "vitest";
 
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -34,11 +34,11 @@ describe("OutgoingRequestsManager", () => {
 
     beforeEach(async () => {
         olmMachine = {
-            outgoingRequests: jest.fn(),
+            outgoingRequests: vi.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
         processor = {
-            makeOutgoingRequest: jest.fn(),
+            makeOutgoingRequest: vi.fn(),
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
         manager = new OutgoingRequestsManager(logger, olmMachine, processor);
@@ -235,5 +235,106 @@ describe("OutgoingRequestsManager", () => {
             // should have been called once but not twice
             expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
         });
+    });
+
+    describe("Repeated processing of outgoing requests", () => {
+        it("Processes any requests still in the queue after processing", async () => {
+            // Given that the first time we call outgoingRequests we get back
+            // requests 1 and 2, but the second time, we get request 3
+            const [request1, request2, request3] = setupOutgoingTwoRequestsThenOne();
+
+            // (And requests finish immediately)
+            processor.makeOutgoingRequest.mockImplementation(async () => {
+                return;
+            });
+
+            // When we ask a manager to process the requests
+            await manager.doProcessOutgoingRequests();
+
+            // Then all three are processed because we re-call outgoingRequests
+            // to check for more
+            await vi.waitFor(() => expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(3));
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(3);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request1);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request2);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request3);
+        });
+
+        it("Does reprocess if any request succeeded, even if some failed", async () => {
+            // Given that the first time we call outgoingRequests we get back
+            // requests 1 and 2, but the second time, we get request 3
+            const [request1, request2, request3] = setupOutgoingTwoRequestsThenOne();
+
+            // And the first request fails, but subsequent ones pass
+            processor.makeOutgoingRequest
+                .mockImplementationOnce(async () => {
+                    throw new Error("This request failed!");
+                })
+                .mockImplementation(async () => {
+                    return;
+                });
+
+            // When we ask a manager to process the requests
+            await manager.doProcessOutgoingRequests();
+
+            // Then all three are processed because we re-call outgoingRequests
+            // to check for more, even though one failed
+            await vi.waitFor(() => expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(3));
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(3);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request1);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request2);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request3);
+        });
+
+        it("Does not reprocess if all requests failed", async () => {
+            // Given that the first time we call outgoingRequests we get back
+            // requests 1 and 2, but the second time, we get request 3
+            const [request1, request2, request3] = setupOutgoingTwoRequestsThenOne();
+
+            // And the first two requests fail, but subsequent ones pass
+            processor.makeOutgoingRequest
+                .mockImplementationOnce(async () => {
+                    throw new Error("Request 1 failed!");
+                })
+                .mockImplementationOnce(async () => {
+                    throw new Error("Request 2 failed!");
+                })
+                .mockImplementation(async () => {
+                    return;
+                });
+
+            // When we ask a manager to process the requests
+            await manager.doProcessOutgoingRequests();
+
+            // Then only the first two requests are processed, because since
+            // they both failed we stop retrying
+            await vi.waitFor(() => expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1));
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledTimes(2);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request1);
+            expect(processor.makeOutgoingRequest).toHaveBeenCalledWith(request2);
+            expect(processor.makeOutgoingRequest).not.toHaveBeenCalledWith(request3);
+        });
+
+        /// Mock calls to olmMachine.outgoingRequests. The first time it is
+        // called, return two requests and the second time return a third one.
+        //
+        // Returns the three returned requests.
+        function setupOutgoingTwoRequestsThenOne(): [OutgoingRequest, OutgoingRequest, OutgoingRequest] {
+            const request1 = new RustSdkCryptoJs.KeysQueryRequest("1", "{}");
+            const request2 = new RustSdkCryptoJs.KeysUploadRequest("2", "{}");
+            const request3 = new RustSdkCryptoJs.KeysUploadRequest("3", "{}");
+
+            // Given that the first time we call outgoingRequests we get back
+            // requests 1 and 2, but the second time, we get request 3
+            olmMachine.outgoingRequests
+                .mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
+                    return [request1, request2];
+                })
+                .mockImplementationOnce(async (): Promise<OutgoingRequest[]> => {
+                    return [request3];
+                });
+
+            return [request1, request2, request3];
+        }
     });
 });

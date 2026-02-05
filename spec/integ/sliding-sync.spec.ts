@@ -82,6 +82,7 @@ describe("SlidingSync", () => {
             await p;
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should stop the sync loop upon calling stop()", () => {
             slidingSync.stop();
             httpBackend!.verifyNoOutstandingExpectation();
