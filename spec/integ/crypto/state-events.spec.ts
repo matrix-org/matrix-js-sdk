@@ -23,7 +23,13 @@ import * as testUtils from "../../test-utils/test-utils";
 import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
 import { TEST_ROOM_ID as ROOM_ID } from "../../test-utils/test-data";
 import { logger } from "../../../src/logger";
-import { createClient, PendingEventOrdering, type IStartClientOpts, type MatrixClient } from "../../../src/matrix";
+import {
+    createClient,
+    HistoryVisibility,
+    PendingEventOrdering,
+    type IStartClientOpts,
+    type MatrixClient,
+} from "../../../src/matrix";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
@@ -197,7 +203,7 @@ describe("Encrypted State Events", () => {
         await startClientAndAwaitFirstSync();
 
         // Alice shares a room with Bob
-        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"], ROOM_ID, true));
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"], HistoryVisibility.Joined, ROOM_ID, true));
         await syncPromise(aliceClient);
 
         // ... and claim one of Bob's OTKs ...
