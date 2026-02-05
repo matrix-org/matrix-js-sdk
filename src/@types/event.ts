@@ -140,6 +140,7 @@ export enum EventType {
     PushRules = "m.push_rules",
     Direct = "m.direct",
     IgnoredUserList = "m.ignored_user_list",
+    InvitePermissionConfig = "m.invite_permission_config", // MSC4380
 
     // to_device events
     RoomKey = "m.room_key",
@@ -425,6 +426,8 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     // Invites-ignorer events
     [POLICIES_ACCOUNT_EVENT_TYPE.name]: { [key: string]: any };
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
+
+    [EventType.InvitePermissionConfig]: { default_action?: string };
 }
 
 /**
