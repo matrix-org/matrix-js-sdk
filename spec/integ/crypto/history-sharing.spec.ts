@@ -22,6 +22,7 @@ import {
     createClient,
     DebugLogger,
     EventType,
+    HistoryVisibility,
     type IContent,
     type IRoomEvent,
     KnownMembership,
@@ -127,7 +128,7 @@ describe("History Sharing", () => {
 
     test("Room keys are successfully shared on invite", async () => {
         // Alice is in an encrypted room
-        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], ROOM_ID);
+        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
         aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
         await syncPromise(aliceClient);
 
@@ -141,7 +142,11 @@ describe("History Sharing", () => {
         await assertInviteAndShareHistory(ROOM_ID);
 
         // Bob receives, should be able to decrypt, the megolm message
-        const bobSyncResponse = getSyncResponse([aliceClient.getSafeUserId(), bobClient.getSafeUserId()], ROOM_ID);
+        const bobSyncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
         bobSyncResponse.rooms.join[ROOM_ID].timeline.events.push(
             mkEventCustom({
                 type: "m.room.encrypted",
@@ -167,7 +172,7 @@ describe("History Sharing", () => {
 
     test("Room keys are imported correctly if invite is accepted before the bundle arrives", async () => {
         // Alice is in an encrypted room
-        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], ROOM_ID);
+        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
         aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
         await syncPromise(aliceClient);
 
@@ -218,7 +223,11 @@ describe("History Sharing", () => {
         await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
 
         // Bob receives and attempts to decrypt the megolm message, but should not be able to (yet).
-        const bobSyncResponse = getSyncResponse([aliceClient.getSafeUserId(), bobClient.getSafeUserId()], ROOM_ID);
+        const bobSyncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
         bobSyncResponse.rooms.join[ROOM_ID].timeline.events.push(
             mkEventCustom({
                 type: "m.room.encrypted",
@@ -283,7 +292,7 @@ describe("History Sharing", () => {
         await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
 
         // Alice is in an encrypted room.
-        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], TEST_ROOM_ID);
+        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, TEST_ROOM_ID);
         aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
         await syncPromise(aliceClient);
 
@@ -291,7 +300,11 @@ describe("History Sharing", () => {
         await assertInviteAndShareHistory(TEST_ROOM_ID);
 
         // Bob receives, and should be able to decrypt, the historical message
-        const bobSyncResponse = getSyncResponse([aliceClient.getSafeUserId(), bobClient.getSafeUserId()], TEST_ROOM_ID);
+        const bobSyncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            TEST_ROOM_ID,
+        );
         bobSyncResponse.rooms.join[TEST_ROOM_ID].timeline.events.push(ENCRYPTED_EVENT as IRoomEvent);
         bobSyncResponder.sendOrQueueSyncResponse(bobSyncResponse);
         await syncPromise(bobClient);
