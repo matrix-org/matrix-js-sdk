@@ -373,7 +373,7 @@ export class CallMembership {
     public get slotId(): string {
         const { kind, data } = this.membershipData;
         if (data.application === "m.call") {
-            this.logger.info("use slotId compat hack emptyString -> ROOM");
+            this.logger?.info("use slotId compat hack emptyString -> ROOM");
             switch (kind) {
                 case "rtc":
                     return data.slot_id;
@@ -401,7 +401,7 @@ export class CallMembership {
             }
         }
 
-        this.logger.info("NOT using slotId compat hack emptyString -> ROOM");
+        this.logger?.info("NOT using slotId compat hack emptyString -> ROOM");
         // This is what the function should look like for any other application that did not
         // go through a `""`=> `"ROOM"` rename
         switch (kind) {
