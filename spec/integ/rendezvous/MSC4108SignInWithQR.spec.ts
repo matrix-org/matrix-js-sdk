@@ -22,7 +22,6 @@ import {
     MSC4108RendezvousSession,
     MSC4108SecureChannel,
     MSC4108SignInWithQR,
-    PayloadType,
     RendezvousError,
 } from "../../../src/rendezvous";
 import {
@@ -35,6 +34,7 @@ import {
     MatrixHttpApi,
 } from "../../../src";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
+import { PayloadType } from "../../../src/rendezvous/MSC4108v2024SignInWithQR";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const baseUrl = "https://example.com";

@@ -25,12 +25,12 @@ import {
 import {
     ClientRendezvousFailureReason,
     MSC4108FailureReason,
-    type MSC4108Payload,
     RendezvousError,
     type RendezvousFailureListener,
 } from "../index.ts";
 import { type MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession.ts";
 import { logger } from "../../logger.ts";
+import { type MSC4108v2024Payload as MSC4108Payload } from "../MSC4108v2024SignInWithQR.ts";
 
 /**
  * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)

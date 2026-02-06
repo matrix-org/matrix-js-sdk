@@ -16,7 +16,8 @@ limitations under the License.
 
 import { type EstablishedEcies, QrCodeData, QrCodeMode, Ecies } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
+import { MSC4108RendezvousSession, MSC4108SecureChannel } from "../../../../src/rendezvous";
+import { PayloadType } from "../../../../src/rendezvous/MSC4108v2024SignInWithQR";
 
 describe("MSC4108SecureChannel", () => {
     const baseUrl = "https://example.com";
