@@ -373,13 +373,13 @@ export class CallMembership {
     public get slotId(): string {
         const { kind, data } = this.membershipData;
         if (data.application === "m.call") {
-            this.logger?.info("use slotId compat hack emptyString -> ROOM");
             switch (kind) {
                 case "rtc":
                     return data.slot_id;
                 case "session":
                 default: {
                     const [application, id] = [this.application, data.call_id];
+
                     // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
                     // The spec got changed to use `"ROOM"` instead of `""` empyt string for the implicit default call.
                     // State events still are sent with `""` however. To find other events that should end up in the same call,
@@ -393,9 +393,16 @@ export class CallMembership {
                     // is commited.
                     //
                     // See the Other INFO_SLOT_ID_LEGACY_CASE comments to see where we revert back to "" just before sending the event.
+                    let compatibilityAdaptedId: string;
+                    if (id === "") {
+                        compatibilityAdaptedId = "ROOM";
+                        this.logger?.info("use slotId compat hack emptyString -> ROOM");
+                    } else {
+                        compatibilityAdaptedId = id;
+                    }
                     return slotDescriptionToId({
                         application,
-                        id: id === "" ? "ROOM" : id,
+                        id: compatibilityAdaptedId,
                     });
                 }
             }
