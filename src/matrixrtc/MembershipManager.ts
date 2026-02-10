@@ -777,7 +777,8 @@ export class MembershipManager
         // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
         // Revert back to "" just for the state key (state keys are always legacy. we use sticky events for non legacy events)
         const application = this.slotDescription.application;
-        const slotId = this.slotDescription.id === "ROOM" ? "" : this.slotDescription.id;
+        const needsEmptyStringRoomFix = application === "m.call" && this.slotDescription.id === "ROOM";
+        const slotId = needsEmptyStringRoomFix ? "" : this.slotDescription.id;
         const stateKey = `${localUserId}_${localDeviceId}_${application}${slotId}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
             return stateKey;
@@ -791,6 +792,8 @@ export class MembershipManager
      */
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
         const ownMembership = this.ownMembership;
+        const needsEmptyStringRoomFix =
+            this.slotDescription.application === "m.call" && this.slotDescription.id === "ROOM";
 
         const focusObjects =
             this.rtcTransport === undefined
@@ -806,7 +809,7 @@ export class MembershipManager
             "application": this.slotDescription.application,
             // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
             // Revert back to "" just for the sending the event.
-            "call_id": this.slotDescription.id === "ROOM" ? "" : this.slotDescription.id,
+            "call_id": needsEmptyStringRoomFix ? "" : this.slotDescription.id,
             "scope": "m.room",
             "device_id": this.deviceId,
             // DO NOT use this.memberId here since that is the state key (using application...)
