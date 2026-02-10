@@ -1,3 +1,26 @@
+Changes in [40.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.2.0) (2026-02-10)
+==================================================================================================
+## 🦖 Deprecations
+
+* [MatrixRTC] Remove sending of deprecated `notify` event (we now use `m.rtc.notification`) ([#5167](https://github.com/matrix-org/matrix-js-sdk/pull/5167)). Contributed by @toger5.
+
+## ✨ Features
+
+* Use stable /auth\_metadata endpoint where homeserver supports v1.15 ([#5174](https://github.com/matrix-org/matrix-js-sdk/pull/5174)). Contributed by @hughns.
+* Support additional\_creators in upgradeRoom (MSC4289) ([#5173](https://github.com/matrix-org/matrix-js-sdk/pull/5173)). Contributed by @andybalaam.
+* [MatrixRTC] Minimal change to transition from "" to "ROOM" as the callId/slotId ([#5166](https://github.com/matrix-org/matrix-js-sdk/pull/5166)). Contributed by @toger5.
+* [MatrixRTC] Do not send the `livekit_alias` in sticky events ([#5165](https://github.com/matrix-org/matrix-js-sdk/pull/5165)). Contributed by @toger5.
+* Improve startup performance by using `promise.all` when processing rooms from sync ([#5095](https://github.com/matrix-org/matrix-js-sdk/pull/5095)). Contributed by @MidhunSureshR.
+* Add OAuthGrantType enum for OAuth 2.0 API grant types ([#5161](https://github.com/matrix-org/matrix-js-sdk/pull/5161)). Contributed by @hughns.
+* Add support for stable OAuth2.0 aware feature from MSC3824 ([#5159](https://github.com/matrix-org/matrix-js-sdk/pull/5159)). Contributed by @hughns.
+* Give RoomWidgetClient the ability to send and receive sticky events ([#5142](https://github.com/matrix-org/matrix-js-sdk/pull/5142)). Contributed by @robintown.
+
+## 🐛 Bug Fixes
+
+* [js sdk embedded/widget] Fix race where this.syncApi.injectRoomEvents was called before the syncApi is instantiated ([#5168](https://github.com/matrix-org/matrix-js-sdk/pull/5168)). Contributed by @toger5.
+* [MatrixRTC] Fix delayId not resetting on leave ([#5156](https://github.com/matrix-org/matrix-js-sdk/pull/5156)). Contributed by @toger5.
+
+
 Changes in [40.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.1.0) (2026-01-27)
 ==================================================================================================
 ## 🦖 Deprecations
