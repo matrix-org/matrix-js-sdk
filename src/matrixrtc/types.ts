@@ -221,7 +221,7 @@ export interface SlotDescription {
      */
     application: string;
     /**
-     * The identifier portion of the slot ID. e.g. "ROOM".
+     * The application-specific slot ID. e.g. "ROOM".
      */
     id: string;
 }

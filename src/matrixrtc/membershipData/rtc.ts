@@ -21,6 +21,7 @@ import { type RtcSlotEventContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 import { sha256 } from "../../digest.ts";
 import { encodeUnpaddedBase64Url } from "../../base64.ts";
+import { slotIdToDescription } from "../utils.ts";
 
 /**
  * Represents the current form of MSC4143, which uses sticky events to store membership.
@@ -60,7 +61,14 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
         errors.push(prefix + "slot_id must be string");
     } else if (!data.slot_id.startsWith(expectedSlotPrefix)) {
         errors.push(prefix + `slot_id must start with ${expectedSlotPrefix}`);
+    } else {
+        try {
+            slotIdToDescription(data.slot_id);
+        } catch (ex) {
+            errors.push(prefix + `slot_id was badly formed${ex instanceof Error ? `: ${ex.message}` : ""}`);
+        }
     }
+
     if (typeof data.member !== "object" || data.member === null) {
         errors.push(prefix + "member must be an object");
     } else {

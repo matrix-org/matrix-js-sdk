@@ -268,6 +268,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Resolves when the session has calculated the initial membership of the session.
      */
     public readonly initialMembershipCalculated: Promise<void>;
+    /**
+     * Does membership need to be recalculated? This is set to false upon
+     * recalculation.
+     */
+    private membershipNeedsRecalculation = false;
 
     /**
      * The statistics for this session.
@@ -782,10 +787,22 @@ export class MatrixRTCSession extends TypedEventEmitter<
     // helper variables to make sure we do not have parallel running recalculations.
     private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
 
+    /**
+     * Ensures that membership is recalculated when the state of the session may have changed.
+     * Also ensures that only one recalculation is made at a time.
+     * @returns A promise resolving when the state has been recalculated.
+     */
     private ensureRecalculateSessionMembers(): Promise<void> {
-        return (this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise
+        if (this.membershipNeedsRecalculation) {
+            // We have already requested recalcuation, don't attempt a new one.
+            return this.recalculateSessionMembersPromise;
+        }
+        this.membershipNeedsRecalculation = true;
+        // Chain the recalculation.
+        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise
             .finally()
-            .then(() => this.recalculateSessionMembers()));
+            .then(() => this.recalculateSessionMembers());
+        return this.recalculateSessionMembersPromise;
     }
 
     /**
@@ -796,6 +813,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * This function should be called when the room members or call memberships might have changed.
      */
     private readonly recalculateSessionMembers = async (): Promise<void> => {
+        // Clear the flag.
+        this.membershipNeedsRecalculation = false;
         const oldMemberships = this.memberships;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(

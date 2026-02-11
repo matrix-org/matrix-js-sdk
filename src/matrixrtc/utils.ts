@@ -53,7 +53,12 @@ export class OutdatedKeyFilter {
  * @param slotId e.g. `m.call#call_id`
  */
 export function slotIdToDescription(slotId: string): SlotDescription {
-    const [application, id] = slotId.split("#");
+    const [application, id, ...unexpectedAdditionalValues] = slotId.split("#");
+    if (unexpectedAdditionalValues.length) {
+        throw Error(
+            "MatrixRTC Slot IDs *must* only contain two components seperated by one '#'. Additional '#' characters detected.",
+        );
+    }
     return { application, id };
 }
 /**

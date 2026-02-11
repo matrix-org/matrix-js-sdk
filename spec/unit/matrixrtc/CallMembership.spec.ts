@@ -234,6 +234,11 @@ describe("CallMembership", () => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "invalid_slot_id" });
             }).toThrow();
         });
+        it("rejects membership with slot_id that contains extra #", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#mycall#extra" });
+            }).toThrow();
+        });
         it("accepts membership with valid slot_id", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#" });
