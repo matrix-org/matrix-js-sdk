@@ -780,27 +780,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
     };
 
     // helper variables to make sure we do not have parallel running recalculations.
+    private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
 
-    private recalculateSessionMembersDirty = false;
-    private recalculateSessionMembersPromise: Promise<void> | undefined = undefined;
-
-    private async ensureRecalculateSessionMembers(): Promise<void> {
-        if (this.recalculateSessionMembersPromise === undefined) {
-            try {
-                this.recalculateSessionMembersPromise = this.recalculateSessionMembers();
-                await this.recalculateSessionMembersPromise;
-            } finally {
-                this.recalculateSessionMembersPromise = undefined;
-                setTimeout(() => {
-                    if (this.recalculateSessionMembersDirty) {
-                        void this.ensureRecalculateSessionMembers();
-                        this.recalculateSessionMembersDirty = false;
-                    }
-                }, 1);
-            }
-        } else {
-            this.recalculateSessionMembersDirty = true;
-        }
+    private ensureRecalculateSessionMembers(): Promise<void> {
+        return (this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise
+            .finally()
+            .then(() => this.recalculateSessionMembers()));
     }
 
     /**

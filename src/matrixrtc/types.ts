@@ -216,6 +216,12 @@ export interface RtcSlotEventContent<T extends string = string> {
  * The session description is used to identify a session. Used in the state event.
  */
 export interface SlotDescription {
-    id?: string;
+    /**
+     * The application type. e.g. "m.call".
+     */
     application: string;
+    /**
+     * The identifier portion of the slot ID. e.g. "ROOM".
+     */
+    id: string;
 }
