@@ -3,6 +3,7 @@
 
 /.npmrc
 /*.log
+pnpm-lock.yaml
 package-lock.json
 .lock-wscript
 build/Release
