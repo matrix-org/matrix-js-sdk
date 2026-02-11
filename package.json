@@ -1,19 +1,19 @@
 {
     "name": "matrix-js-sdk",
-    "version": "40.1.0",
+    "version": "40.2.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
     },
     "scripts": {
-        "prepare": "yarn build",
+        "prepare": "pnpm build",
         "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
         "clean": "rimraf lib",
-        "build": "yarn clean && yarn build:compile && yarn build:types",
+        "build": "pnpm clean && pnpm build:compile && pnpm build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
         "gendoc": "typedoc",
-        "lint": "yarn lint:types && yarn lint:js && yarn lint:workflows",
+        "lint": "pnpm lint:types && pnpm lint:js && pnpm lint:workflows",
         "lint:js": "eslint --max-warnings 0 src spec && prettier --check .",
         "lint:js-fix": "prettier --log-level=warn --write . && eslint --fix src spec",
         "lint:types": "tsc --noEmit",
@@ -21,7 +21,7 @@
         "lint:knip": "knip",
         "test": "vitest",
         "test:watch": "vitest --watch",
-        "coverage": "yarn test --coverage"
+        "coverage": "pnpm test --coverage"
     },
     "repository": {
         "type": "git",
@@ -84,7 +84,7 @@
         "@stylistic/eslint-plugin": "^5.0.0",
         "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
-        "@types/node": "18",
+        "@types/node": "22",
         "@types/sdp-transform": "^2.4.5",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
@@ -122,5 +122,16 @@
     },
     "resolutions": {
         "expect": "30.2.0"
-    }
+    },
+    "pnpm": {
+        "peerDependencyRules": {
+            "allowedVersions": {
+                "eslint": "8"
+            }
+        },
+        "allowedDeprecatedVersions": {
+            "eslint": "8"
+        }
+    },
+    "packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264"
 }

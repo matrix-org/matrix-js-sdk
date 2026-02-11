@@ -262,7 +262,9 @@ export class MSC4108RendezvousSession {
 
         if (!this.url) return;
         try {
-            await this.fetch(this.url, { method: Method.Delete });
+            const method = Method.Delete;
+            logger.info(`=> ${method} ${this.url}`);
+            await this.fetch(this.url, { method });
         } catch (e) {
             logger.warn(e);
         }
