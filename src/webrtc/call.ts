@@ -301,7 +301,7 @@ type CallEventType =
     | EventType.CallCandidates
     | EventType.CallHangup
     | EventType.CallReject
-    | EventType.CallSDPStreamMetadataChangedPrefix;
+    | EventType.CallSDPStreamMetadataChanged;
 
 export interface VoipEvent {
     type: "toDevice" | "sendEvent";
@@ -954,7 +954,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             );
         }
 
-        const sdpStreamMetadata = invite[SDPStreamMetadataKey];
+        const sdpStreamMetadata = SDPStreamMetadataKey.findIn(invite);
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
@@ -1596,8 +1596,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public async sendMetadataUpdate(): Promise<void> {
-        await this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
-            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+        await this.sendVoipEvent(EventType.CallSDPStreamMetadataChanged, {
+            [SDPStreamMetadataKey.name]: this.getLocalSDPStreamMetadata(),
         });
     }
 
@@ -1628,15 +1628,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private async sendAnswer(): Promise<void> {
-        const answerContent = {
+        const answerContent: Omit<MCallAnswer, "version" | "call_id" | "party_id" | "conf_id"> = {
             answer: {
                 sdp: this.peerConn!.localDescription!.sdp,
                 // type is now deprecated as of Matrix VoIP v1, but
                 // required to still be sent for backwards compat
                 type: this.peerConn!.localDescription!.type,
             },
-            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
-        } as MCallAnswer;
+            [SDPStreamMetadataKey.name]: this.getLocalSDPStreamMetadata(true),
+        };
 
         answerContent.capabilities = {
             "m.call.transferee": this.client.supportsCallTransfer,
@@ -1894,7 +1894,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.state = CallState.Connecting;
 
-        const sdpStreamMetadata = content[SDPStreamMetadataKey];
+        const sdpStreamMetadata = SDPStreamMetadataKey.findIn(content);
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
@@ -1986,7 +1986,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const prevLocalOnHold = this.isLocalOnHold();
 
-        const sdpStreamMetadata = content[SDPStreamMetadataKey];
+        const sdpStreamMetadata = SDPStreamMetadataKey.findIn<SDPStreamMetadata>(content);
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
@@ -2019,7 +2019,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.sendVoipEvent(EventType.CallNegotiate, {
                     lifetime: CALL_TIMEOUT_MS,
                     description: this.peerConn!.localDescription?.toJSON() as RTCSessionDescription,
-                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
+                    [SDPStreamMetadataKey.name]: this.getLocalSDPStreamMetadata(true),
                 });
             }
         } catch (err) {
@@ -2048,8 +2048,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public onSDPStreamMetadataChangedReceived(event: MatrixEvent): void {
         const content = event.getContent<MCallSDPStreamMetadataChanged>();
-        const metadata = content[SDPStreamMetadataKey];
-        this.updateRemoteSDPStreamMetadata(metadata);
+        const metadata = SDPStreamMetadataKey.findIn<SDPStreamMetadata>(content);
+        if (metadata) {
+            this.updateRemoteSDPStreamMetadata(metadata);
+        }
     }
 
     public async onAssertedIdentityReceived(event: MatrixEvent): Promise<void> {
@@ -2156,7 +2158,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             "m.call.dtmf": false,
         };
 
-        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata(true);
+        content[SDPStreamMetadataKey.name] = this.getLocalSDPStreamMetadata(true);
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
