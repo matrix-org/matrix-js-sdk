@@ -72,7 +72,7 @@ export interface EncryptionKeysToDeviceEventContent {
         id: string;
         // TODO Remove that it is claimed, need to get the sealed sender from decryption info
         // Or add some validation on it based on the encryption info
-        device_id: string;
+        claimed_device_id: string;
     };
     room_id: string;
     session: {

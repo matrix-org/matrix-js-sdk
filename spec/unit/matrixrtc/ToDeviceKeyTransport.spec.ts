@@ -86,7 +86,7 @@ describe("ToDeviceKeyTransport", () => {
                     key: keyBase64Encoded,
                 },
                 member: {
-                    device_id: "MYDEVICE",
+                    claimed_device_id: "MYDEVICE",
                     id: "@alice:example.org:MYDEVICE",
                 },
                 room_id: roomId,

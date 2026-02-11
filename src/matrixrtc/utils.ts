@@ -51,6 +51,7 @@ export class OutdatedKeyFilter {
 /**
  * Converts a slot ID into it's component application and ID portions.
  * @param slotId e.g. `m.call#call_id`
+ * @throws If the format of `slotId` is invalid.
  */
 export function slotIdToDescription(slotId: string): SlotDescription {
     const [application, id, ...unexpectedAdditionalValues] = slotId.split("#");

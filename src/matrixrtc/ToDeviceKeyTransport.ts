@@ -74,7 +74,7 @@ export class ToDeviceKeyTransport
             },
             room_id: this.roomId,
             member: {
-                device_id: this.membership.deviceId,
+                claimed_device_id: this.membership.deviceId,
                 id: this.membership.memberId,
             },
             session: {
