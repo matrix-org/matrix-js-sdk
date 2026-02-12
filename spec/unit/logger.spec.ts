@@ -21,12 +21,12 @@ import loglevel from "loglevel";
 import { DebugLogger, logger } from "../../src/logger.ts";
 
 afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
 });
 
 describe("logger", () => {
     it("should log to console by default", () => {
-        jest.spyOn(console, "debug").mockReturnValue(undefined);
+        vi.spyOn(console, "debug").mockReturnValue(undefined);
         logger.debug("test1");
         logger.log("test2");
 
@@ -35,8 +35,8 @@ describe("logger", () => {
     });
 
     it("should allow creation of child loggers which add a prefix", () => {
-        jest.spyOn(loglevel, "getLogger");
-        jest.spyOn(console, "debug").mockReturnValue(undefined);
+        vi.spyOn(loglevel, "getLogger");
+        vi.spyOn(console, "debug").mockReturnValue(undefined);
 
         const childLogger = logger.getChild("[prefix1]");
         expect(loglevel.getLogger).toHaveBeenCalledWith("matrix-[prefix1]");
@@ -52,7 +52,7 @@ describe("logger", () => {
 
 describe("DebugLogger", () => {
     it("should handle empty log messages", () => {
-        const mockTarget = jest.fn();
+        const mockTarget = vi.fn();
         const logger = new DebugLogger(mockTarget as any);
         logger.info();
         expect(mockTarget).toHaveBeenCalledTimes(1);
@@ -60,7 +60,7 @@ describe("DebugLogger", () => {
     });
 
     it("should handle logging an Error", () => {
-        const mockTarget = jest.fn();
+        const mockTarget = vi.fn();
         const logger = new DebugLogger(mockTarget as any);
 
         // If there is a stack and a message, we use the stack.
@@ -79,7 +79,7 @@ describe("DebugLogger", () => {
     });
 
     it("should handle logging an object", () => {
-        const mockTarget = jest.fn();
+        const mockTarget = vi.fn();
         const logger = new DebugLogger(mockTarget as any);
 
         const obj = { a: 1 };

@@ -85,6 +85,11 @@ export enum AuthType {
     // use the stable "m.login.registration_token" type.
     // The authentication flow is the same in both cases.
     UnstableRegistrationToken = "org.matrix.msc3231.login.registration_token",
+    /**
+     * m.oauth stage introduced by MSC4312:
+     * https://spec.matrix.org/v1.17/client-server-api/#oauth-authentication
+     */
+    OAuth = "m.oauth",
 }
 
 /**

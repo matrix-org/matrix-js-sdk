@@ -26,7 +26,7 @@ import {
     type Extension,
 } from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
-import { type IRoomEvent, type IStateEvent } from "../../src";
+import { type IContent, type IRoomEvent, type IStateEvent } from "../../src";
 import {
     type MatrixClient,
     type MatrixEvent,
@@ -68,17 +68,17 @@ describe("SlidingSyncSdk", () => {
     const selfAccessToken = "aseukfgwef";
 
     const mockifySlidingSync = (s: SlidingSync): SlidingSync => {
-        s.getListParams = jest.fn();
-        s.getListData = jest.fn();
-        s.getRoomSubscriptions = jest.fn();
-        s.modifyRoomSubscriptionInfo = jest.fn();
-        s.modifyRoomSubscriptions = jest.fn();
-        s.registerExtension = jest.fn();
-        s.setList = jest.fn();
-        s.setListRanges = jest.fn();
-        s.start = jest.fn();
-        s.stop = jest.fn();
-        s.resend = jest.fn();
+        s.getListParams = vi.fn();
+        s.getListData = vi.fn();
+        s.getRoomSubscriptions = vi.fn();
+        s.modifyRoomSubscriptionInfo = vi.fn();
+        s.modifyRoomSubscriptions = vi.fn();
+        s.registerExtension = vi.fn();
+        s.setList = vi.fn();
+        s.setListRanges = vi.fn();
+        s.start = vi.fn();
+        s.stop = vi.fn();
+        s.resend = vi.fn();
         return s;
     };
 
@@ -111,7 +111,7 @@ describe("SlidingSyncSdk", () => {
             expect(m.getType()).toEqual(want[i].type);
             expect(m.getSender()).toEqual(want[i].sender);
             expect(m.getId()).toEqual(want[i].event_id);
-            expect(m.getContent()).toEqual(want[i].content);
+            expect(m.getContent<IContent>()).toEqual(want[i].content);
             expect(m.getTs()).toEqual(want[i].origin_server_ts);
             if (want[i].unsigned) {
                 expect(m.getUnsigned()).toEqual(want[i].unsigned);
@@ -150,7 +150,7 @@ describe("SlidingSyncSdk", () => {
     // find an extension on a SlidingSyncSdk instance
     const findExtension = (name: string): Extension<any, any> => {
         expect(mockSlidingSync!.registerExtension).toHaveBeenCalled();
-        const mockFn = mockSlidingSync!.registerExtension as jest.Mock;
+        const mockFn = vi.mocked(mockSlidingSync!.registerExtension);
         // find the extension
         for (let i = 0; i < mockFn.mock.calls.length; i++) {
             const calledExtension = mockFn.mock.calls[i][0] as Extension<any, any>;
@@ -658,7 +658,7 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("can update device lists", () => {
-            syncCryptoCallback!.processDeviceLists = jest.fn();
+            syncCryptoCallback!.processDeviceLists = vi.fn();
             ext.onResponse({
                 device_lists: {
                     changed: ["@alice:localhost"],
@@ -672,7 +672,7 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("can update OTK counts and unused fallback keys", () => {
-            syncCryptoCallback!.processKeyCounts = jest.fn();
+            syncCryptoCallback!.processKeyCounts = vi.fn();
             ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
@@ -722,7 +722,7 @@ describe("SlidingSyncSdk", () => {
             });
             globalData = client!.getAccountData(globalType)!;
             expect(globalData).toBeTruthy();
-            expect(globalData.getContent()).toEqual(globalContent);
+            expect(globalData.getContent<IContent>()).toEqual(globalContent);
         });
 
         it("processes rooms account data", async () => {
@@ -757,7 +757,7 @@ describe("SlidingSyncSdk", () => {
             expect(room).toBeTruthy();
             const event = room.getAccountData(roomType)!;
             expect(event).toBeTruthy();
-            expect(event.getContent()).toEqual(roomContent);
+            expect(event.getContent<IContent>()).toEqual(roomContent);
         });
 
         it("doesn't crash for unknown room account data", async () => {
@@ -847,6 +847,7 @@ describe("SlidingSyncSdk", () => {
             });
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("can handle missing fields", async () => {
             ext.onResponse({
                 next_batch: "23456",
@@ -861,7 +862,7 @@ describe("SlidingSyncSdk", () => {
             };
             let called = false;
             client!.once(ClientEvent.ToDeviceEvent, (ev) => {
-                expect(ev.getContent()).toEqual(toDeviceContent);
+                expect(ev.getContent<IContent>()).toEqual(toDeviceContent);
                 expect(ev.getType()).toEqual(toDeviceType);
                 called = true;
             });
@@ -1095,6 +1096,7 @@ describe("SlidingSyncSdk", () => {
             expect(receipt?.data.thread_id).toBeFalsy();
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("gracefully handles missing rooms when receiving receipts", async () => {
             const roomId = "!room:id";
             const alice = "@alice:alice";

@@ -89,7 +89,7 @@ describe("TrackStatsBuilder", () => {
         it("creating build bitrate send report.", async () => {
             const trackStats = new MediaTrackStats("1", "remote", "video");
             const remote = {} as RTCStatsReport;
-            remote.get = jest.fn().mockReturnValue({ mimeType: "video/v8" });
+            remote.get = vi.fn().mockReturnValue({ mimeType: "video/v8" });
             TrackStatsBuilder.buildCodec(remote, trackStats, { codecId: "codecID" });
             expect(trackStats.getCodec()).toEqual("v8");
         });

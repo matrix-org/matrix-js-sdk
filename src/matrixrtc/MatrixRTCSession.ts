@@ -26,13 +26,12 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
-import { deepCompare, logDurationSync } from "../utils.ts";
+import { logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
     Status,
     IRTCNotificationContent,
-    ICallNotifyContent,
     RTCCallIntent,
     Transport,
 } from "./types.ts";
@@ -80,7 +79,6 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
         notificationContentNew: { event_id: string } & IRTCNotificationContent,
-        notificationContentLegacy: { event_id: string } & ICallNotifyContent,
     ) => void;
 };
 
@@ -322,7 +320,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public static async sessionMembershipsForSlot(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-        slotDescription: SlotDescription,
+        slotId: string,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
         options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
@@ -333,7 +331,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
             room,
             callMemberEvents,
-            slotDescription,
+            slotId,
             logger,
         );
 
@@ -500,6 +498,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.reEmitter.reEmit(this.membershipManager!, [
                 MembershipManagerEvent.ProbablyLeft,
                 MembershipManagerEvent.StatusChanged,
+                MembershipManagerEvent.DelayIdChanged,
             ]);
             // Create Encryption manager
             const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
@@ -684,20 +683,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
-        const sendLegacyNotificationEvent = async (): Promise<{
-            response: ISendEventResponse;
-            content: ICallNotifyContent;
-        }> => {
-            const content: ICallNotifyContent = {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": notificationType === "notification" ? "notify" : notificationType,
-                "call_id": this.callId!,
-            };
-            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.CallNotify, content);
-            return { response, content };
-        };
-        const sendNewNotificationEvent = async (): Promise<{
+        const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
         }> => {
@@ -718,12 +704,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
             return { response, content };
         };
 
-        void Promise.all([sendLegacyNotificationEvent(), sendNewNotificationEvent()])
-            .then(([legacy, newNotification]) => {
+        void sendNotificationEvent()
+            .then((notification) => {
                 // Join event_id and origin event content
-                const legacyResult = { ...legacy.response, ...legacy.content };
-                const newResult = { ...newNotification.response, ...newNotification.content };
-                this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult, legacyResult);
+                const newResult = { ...notification.response, ...notification.content };
+                this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult);
             })
             .catch(([errorLegacy, errorNew]) =>
                 this.logger.error("Failed to send call notification", errorLegacy, errorNew),
@@ -793,8 +778,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const oldMemberships = this.memberships;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
-            this.roomSubset,
-            this.slotDescription,
+            this.room,
+            slotDescriptionToId(this.slotDescription),
             this.calculateMembershipsOpts,
         );
 
@@ -844,7 +829,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 async function computeBackendIdentityAndVerifyMemberEvents(
     room: Pick<Room, "hasMembershipState">,
     callMemberEvents: MatrixEvent[],
-    slotDescription: SlotDescription,
+    slotId: string,
     logger: Logger,
 ): Promise<CallMembership[]> {
     const callMemberships: CallMembership[] = [];
@@ -868,7 +853,7 @@ async function computeBackendIdentityAndVerifyMemberEvents(
                 logger,
             );
 
-            if (isValidMembership(membership, room, slotDescription, logger)) {
+            if (isValidMembership(membership, room, slotId, logger)) {
                 callMemberships.push(membership);
             }
         } catch (e) {
@@ -901,12 +886,12 @@ function quickFilterNonRelevantContents(content: IContent, logger: Logger): bool
 function isValidMembership(
     membership: CallMembership,
     room: Pick<Room, "hasMembershipState">,
-    slotDescription: SlotDescription,
+    slotId: string,
     logger: Logger,
 ): boolean {
-    if (!deepCompare(membership.slotDescription, slotDescription)) {
+    if (membership.slotId !== slotId) {
         logger.info(
-            `Ignoring membership of user ${membership.userId} for a different slot:  ${JSON.stringify(membership.slotDescription)}`,
+            `Ignoring membership of user ${membership.userId} for a different slot:  user: ${JSON.stringify(membership.slotDescription)}, slotId: ${slotId})`,
         );
         return false;
     }

@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`RustCrypto importing and exporting room keys should import and export keys 1`] = `
+exports[`RustCrypto > importing and exporting room keys > should import and export keys 1`] = `
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
@@ -15,7 +15,7 @@ exports[`RustCrypto importing and exporting room keys should import and export k
 }
 `;
 
-exports[`RustCrypto importing and exporting room keys should import and export keys as JSON 1`] = `
+exports[`RustCrypto > importing and exporting room keys > should import and export keys as JSON 1`] = `
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],

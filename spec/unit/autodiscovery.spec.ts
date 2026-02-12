@@ -35,6 +35,7 @@ describe("AutoDiscovery", function () {
         AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should throw an error when no domain is specified", function () {
         getHttpBackend();
         return Promise.all([
@@ -190,7 +191,7 @@ describe("AutoDiscovery", function () {
         };
         return Promise.all([
             httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(expect(expected).toEqual),
+            AutoDiscovery.findClientConfig("example.org").then((config) => expect(config).toEqual(expected)),
         ]);
     });
 

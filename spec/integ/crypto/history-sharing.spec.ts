@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import mkDebug from "debug";
 
 import {
@@ -35,6 +35,7 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
 import { E2EOTKClaimResponder } from "../../test-utils/E2EOTKClaimResponder.ts";
 import { escapeRegExp } from "../../../src/utils.ts";
+import { EventShieldColour, EventShieldReason } from "../../../src/crypto-api";
 
 const debug = mkDebug("matrix-js-sdk:history-sharing");
 
@@ -80,12 +81,9 @@ describe("History Sharing", () => {
     let bobSyncResponder: SyncResponder;
 
     beforeEach(async () => {
-        // Reset mocks.
-        fetchMock.reset();
-
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
+
         mockSetupCrossSigningRequests();
 
         const aliceId = "@alice:localhost";
@@ -131,8 +129,8 @@ describe("History Sharing", () => {
 
         // Now, Alice invites Bob
         const uploadProm = new Promise<Uint8Array>((resolve) => {
-            fetchMock.postOnce(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString(), (url, request) => {
-                const body = request.body as Uint8Array;
+            fetchMock.postOnce(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString(), (callLog) => {
+                const body = callLog.options.body as Uint8Array;
                 debug(`Alice uploaded blob of length ${body.length}`);
                 resolve(body);
                 return { content_uri: "mxc://alice-server/here" };
@@ -176,11 +174,9 @@ describe("History Sharing", () => {
         fetchMock.postOnce(`${BOB_HOMESERVER_URL}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
             room_id: ROOM_ID,
         });
-        fetchMock.getOnce(
-            `begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`,
-            { body: uploadedBlob },
-            { sendAsJson: false },
-        );
+        fetchMock.getOnce(`begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`, {
+            body: uploadedBlob,
+        });
         await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
 
         // Bob receives, should be able to decrypt, the megolm message
@@ -202,6 +198,10 @@ describe("History Sharing", () => {
         await event.getDecryptionPromise();
         expect(event.getType()).toEqual("m.room.message");
         expect(event.getContent().body).toEqual("Hi!");
+        expect(event.getKeyForwardingUser()).toEqual(aliceClient.getUserId());
+        const encryptionInfo = await bobClient.getCrypto()!.getEncryptionInfoForEvent(event);
+        expect(encryptionInfo?.shieldColour).toEqual(EventShieldColour.GREY);
+        expect(encryptionInfo?.shieldReason).toEqual(EventShieldReason.AUTHENTICITY_NOT_GUARANTEED);
     });
 
     test("Room keys are imported correctly if invite is accepted before the bundle arrives", async () => {
@@ -218,8 +218,8 @@ describe("History Sharing", () => {
 
         // Now, Alice invites Bob
         const uploadProm = new Promise<Uint8Array>((resolve) => {
-            fetchMock.postOnce(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString(), (url, request) => {
-                const body = request.body as Uint8Array;
+            fetchMock.postOnce(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString(), (callLog) => {
+                const body = callLog.options.body as Uint8Array;
                 debug(`Alice uploaded blob of length ${body.length}`);
                 resolve(body);
                 return { content_uri: "mxc://alice-server/here" };
@@ -275,11 +275,9 @@ describe("History Sharing", () => {
         expect(event.isDecryptionFailure()).toBeTruthy();
 
         // Now the room key bundle message arrives
-        fetchMock.getOnce(
-            `begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`,
-            { body: uploadedBlob },
-            { sendAsJson: false },
-        );
+        fetchMock.getOnce(`begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`, {
+            body: uploadedBlob,
+        });
         bobSyncResponder.sendOrQueueSyncResponse({
             to_device: {
                 events: [
@@ -297,9 +295,13 @@ describe("History Sharing", () => {
         await waitFor(async () => {
             await event.getDecryptionPromise();
             expect(event.isDecryptionFailure()).toBeFalsy();
-            expect(event.getType()).toEqual("m.room.message");
-            expect(event.getContent().body).toEqual("Hello!");
         });
+        expect(event.getType()).toEqual("m.room.message");
+        expect(event.getContent().body).toEqual("Hello!");
+        expect(event.getKeyForwardingUser()).toEqual(aliceClient.getUserId());
+        const encryptionInfo = await bobClient.getCrypto()!.getEncryptionInfoForEvent(event);
+        expect(encryptionInfo?.shieldColour).toEqual(EventShieldColour.GREY);
+        expect(encryptionInfo?.shieldReason).toEqual(EventShieldReason.AUTHENTICITY_NOT_GUARANTEED);
     });
 
     afterEach(async () => {
@@ -313,8 +315,8 @@ function expectSendRoomEvent(homeserverUrl: string, msgtype: string): Promise<IC
     return new Promise<IContent>((resolve) => {
         fetchMock.putOnce(
             new RegExp(`^${escapeRegExp(homeserverUrl)}/_matrix/client/v3/rooms/[^/]*/send/${escapeRegExp(msgtype)}/`),
-            (url, request) => {
-                const content = JSON.parse(request.body as string);
+            (callLog) => {
+                const content = JSON.parse(callLog.options.body as string);
                 resolve(content);
                 return { event_id: "$event_id" };
             },
@@ -330,8 +332,8 @@ function expectSendToDeviceMessage(
     return new Promise((resolve) => {
         fetchMock.putOnce(
             new RegExp(`^${escapeRegExp(homeserverUrl)}/_matrix/client/v3/sendToDevice/${escapeRegExp(msgtype)}/`),
-            (url: string, opts: RequestInit) => {
-                const body = JSON.parse(opts.body as string);
+            (callLog) => {
+                const body = JSON.parse(callLog.options.body as string);
                 resolve(body.messages);
                 return {};
             },

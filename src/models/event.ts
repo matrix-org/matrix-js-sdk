@@ -76,6 +76,8 @@ export interface IUnsigned {
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
     "msc4354_sticky_duration_ttl_ms"?: number;
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
+    "membership"?: Membership;
+    "io.element.msc4115.membership"?: Membership;
 }
 
 export interface IThreadBundledRelationship {
@@ -282,6 +284,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * the megolm session (for megolm) claims to own. See getClaimedEd25519Key()
      */
     private claimedEd25519Key: string | null = null;
+
+    /**
+     * If another user forwarded the key to this message
+     * (eg via [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)),
+     * the ID of that user.
+     */
+    private keyForwardedBy?: string;
 
     /* if we have a process decrypting this event, a Promise which resolves
      * when it is finished. Normally null.
@@ -779,7 +788,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getMembershipAtEvent(): Membership | string | undefined {
         const unsigned = this.getUnsigned();
-        return UNSIGNED_MEMBERSHIP_FIELD.findIn<Membership | string>(unsigned);
+        return UNSIGNED_MEMBERSHIP_FIELD.findIn<Membership>(unsigned);
     }
 
     /**
@@ -1016,6 +1025,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.clearEvent = decryptionResult.clearEvent;
         this.senderCurve25519Key = decryptionResult.senderCurve25519Key ?? null;
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
+        this.keyForwardedBy = decryptionResult.keyForwardedBy;
         this.invalidateExtensibleEvent();
     }
 
@@ -1122,6 +1132,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public isKeySourceUntrusted(): false {
         return false;
+    }
+
+    /**
+     * If another user forwarded the key to this message
+     * (eg via [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)),
+     * get the ID of that user.
+     */
+    public getKeyForwardingUser(): string | undefined {
+        return this.keyForwardedBy;
     }
 
     public getUnsigned(): IUnsigned {

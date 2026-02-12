@@ -1624,7 +1624,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         }
 
         // 2. Upload the encrypted bundle to the server
-        const uploadResponse = await this.http.uploadContent(bundle.encryptedData);
+        const uploadResponse = await this.http.uploadContent(bundle.encryptedData as Uint8Array<ArrayBuffer>);
         logger.info(`Uploaded encrypted key blob: ${JSON.stringify(uploadResponse)}`);
 
         // 3. We may not share a room with the user, so get a fresh list of devices for the invited user.
@@ -2236,6 +2236,7 @@ class EventDecryptor {
                 clearEvent: JSON.parse(res.event),
                 claimedEd25519Key: res.senderClaimedEd25519Key,
                 senderCurve25519Key: res.senderCurve25519Key,
+                keyForwardedBy: res.forwarder?.toString(),
             };
         } catch (err) {
             if (err instanceof RustSdkCryptoJs.MegolmDecryptionError) {
@@ -2493,9 +2494,6 @@ function rustEncryptionInfoToJsEncryptionInfo(
             break;
         case RustSdkCryptoJs.ShieldStateCode.UnverifiedIdentity:
             shieldReason = EventShieldReason.UNVERIFIED_IDENTITY;
-            break;
-        case RustSdkCryptoJs.ShieldStateCode.SentInClear:
-            shieldReason = EventShieldReason.SENT_IN_CLEAR;
             break;
         case RustSdkCryptoJs.ShieldStateCode.VerificationViolation:
             shieldReason = EventShieldReason.VERIFICATION_VIOLATION;

@@ -22,7 +22,7 @@ import type { RTCCallIntent, Transport } from "./types.ts";
 import { type MatrixEvent, type IContent } from "../models/event.ts";
 import { type RelationType } from "../@types/event.ts";
 import { sha256 } from "../digest.ts";
-import { encodeUnpaddedBase64Url } from "../base64.ts";
+import { encodeUnpaddedBase64 } from "../base64.ts";
 import { type Logger } from "../logger.ts";
 
 /**
@@ -322,10 +322,7 @@ export class CallMembership {
     }
 
     public static async computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
-        const hashInput = `${userId}|${deviceId}|${memberId}`;
-        const hashBuffer = await sha256(hashInput);
-        const hashedString = encodeUnpaddedBase64Url(hashBuffer);
-        return hashedString;
+        return encodeUnpaddedBase64(await sha256(`${userId}|${deviceId}|${memberId}`));
     }
 
     public static membershipDataFromMatrixEvent(matrixEvent: MatrixEvent): MembershipData {
@@ -375,12 +372,53 @@ export class CallMembership {
      */
     public get slotId(): string {
         const { kind, data } = this.membershipData;
+        if (data.application === "m.call") {
+            switch (kind) {
+                case "rtc":
+                    return data.slot_id;
+                case "session":
+                default: {
+                    const [application, id] = [this.application, data.call_id];
+
+                    // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
+                    // The spec got changed to use `"ROOM"` instead of `""` empyt string for the implicit default call.
+                    // State events still are sent with `""` however. To find other events that should end up in the same call,
+                    // we use the slotId.
+                    // Since the CallMembership is the public representation of a rtc.member event, we just pretend it is a
+                    // "ROOM" slotId/call_id.
+                    // This makes all the remote members work with just this simple trick.
+                    //
+                    // We of course now need to be careful when sending legacy events (state events)
+                    // They get a slotDescription containing "ROOM" since this is what we use starting at the time this comment
+                    // is commited.
+                    //
+                    // See the Other INFO_SLOT_ID_LEGACY_CASE comments to see where we revert back to "" just before sending the event.
+                    let compatibilityAdaptedId: string;
+                    if (id === "") {
+                        compatibilityAdaptedId = "ROOM";
+                        this.logger?.info("use slotId compat hack emptyString -> ROOM");
+                    } else {
+                        compatibilityAdaptedId = id;
+                    }
+                    return slotDescriptionToId({
+                        application,
+                        id: compatibilityAdaptedId,
+                    });
+                }
+            }
+        }
+
+        this.logger?.info("NOT using slotId compat hack emptyString -> ROOM");
+        // This is what the function should look like for any other application that did not
+        // go through a `""`=> `"ROOM"` rename
         switch (kind) {
             case "rtc":
                 return data.slot_id;
             case "session":
-            default:
-                return slotDescriptionToId({ application: this.application, id: data.call_id });
+            default: {
+                const [application, id] = [this.application, data.call_id];
+                return slotDescriptionToId({ application, id });
+            }
         }
     }
 

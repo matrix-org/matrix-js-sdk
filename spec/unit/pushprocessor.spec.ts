@@ -357,6 +357,7 @@ describe("NotificationService", function () {
             expect(actions?.tweaks?.highlight).toBeFalsy();
         };
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each(["m.ring", "m.prompt"])(
             "should notify when new group call event appears with %s intent",
             (intent: string) => {
@@ -373,6 +374,7 @@ describe("NotificationService", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should notify when a call is un-terminated", () => {
             assertDoesNotify(
                 getActionsForEvent(
@@ -391,6 +393,7 @@ describe("NotificationService", function () {
             );
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should not notify when call is terminated", () => {
             assertDoesNotNotify(
                 getActionsForEvent(
@@ -409,6 +412,7 @@ describe("NotificationService", function () {
             );
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should ignore with m.room intent", () => {
             assertDoesNotNotify(
                 getActionsForEvent(
@@ -423,6 +427,7 @@ describe("NotificationService", function () {
         });
 
         describe("ignoring non-relevant state changes", () => {
+            // eslint-disable-next-line @vitest/expect-expect
             it("should ignore intent changes", () => {
                 assertDoesNotNotify(
                     getActionsForEvent(
@@ -440,6 +445,7 @@ describe("NotificationService", function () {
                 );
             });
 
+            // eslint-disable-next-line @vitest/expect-expect
             it("should ignore name changes", () => {
                 assertDoesNotNotify(
                     getActionsForEvent(

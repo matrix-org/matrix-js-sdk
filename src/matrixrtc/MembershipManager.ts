@@ -43,6 +43,7 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { isLivekitTransportConfig } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -584,7 +585,7 @@ export class MembershipManager
         this.emit(MembershipManagerEvent.ProbablyLeft, this.state.probablyLeft);
     }
 
-    private setAndEmitDelayId(delayId?: string): void {
+    private setAndEmitDelayId(delayId: string | undefined): void {
         if (this.state.delayId === delayId) return;
 
         this.state.delayId = delayId;
@@ -654,6 +655,7 @@ export class MembershipManager
             ._unstable_sendScheduledDelayedEvent(delayId)
             .then(() => {
                 this.state.hasMemberStateEvent = false;
+                this.setAndEmitDelayId(undefined);
                 this.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
 
                 return { replace: [] };
@@ -772,7 +774,12 @@ export class MembershipManager
      * which is not compatible with membershipID of session type member events. They have to be `${localUserId}:${localDeviceId}`
      */
     private makeMembershipStateKey(localUserId: string, localDeviceId: string): string {
-        const stateKey = `${localUserId}_${localDeviceId}_${this.slotDescription.application}${this.slotDescription.id}`;
+        // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
+        // Revert back to "" just for the state key (state keys are always legacy. we use sticky events for non legacy events)
+        const application = this.slotDescription.application;
+        const needsEmptyStringRoomFix = application === "m.call" && this.slotDescription.id === "ROOM";
+        const slotId = needsEmptyStringRoomFix ? "" : this.slotDescription.id;
+        const stateKey = `${localUserId}_${localDeviceId}_${application}${slotId}`;
         if (/^org\.matrix\.msc(3757|3779)\b/.exec(this.room.getVersion())) {
             return stateKey;
         } else {
@@ -785,6 +792,8 @@ export class MembershipManager
      */
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
         const ownMembership = this.ownMembership;
+        const needsEmptyStringRoomFix =
+            this.slotDescription.application === "m.call" && this.slotDescription.id === "ROOM";
 
         const focusObjects =
             this.rtcTransport === undefined
@@ -798,7 +807,9 @@ export class MembershipManager
                   };
         return {
             "application": this.slotDescription.application,
-            "call_id": this.slotDescription.id,
+            // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
+            // Revert back to "" just for the sending the event.
+            "call_id": needsEmptyStringRoomFix ? "" : this.slotDescription.id,
             "scope": "m.room",
             "device_id": this.deviceId,
             // DO NOT use this.memberId here since that is the state key (using application...)
@@ -1091,6 +1102,7 @@ export class StickyEventMembershipManager extends MembershipManager {
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
         const ownMembership = this.ownMembership;
 
+        const livekitTransport = isLivekitTransportConfig(this.rtcTransport) ? this.rtcTransport : undefined;
         const relationObject = ownMembership?.eventId
             ? { "m.relation": { rel_type: RelationType.Reference, event_id: ownMembership?.eventId } }
             : {};
@@ -1100,7 +1112,11 @@ export class StickyEventMembershipManager extends MembershipManager {
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
             },
             slot_id: slotDescriptionToId(this.slotDescription),
-            rtc_transports: this.rtcTransport ? [this.rtcTransport] : [],
+            // Make sure we do not add the alias to the transport.
+            // It is not needed in matrix2.0. The additional session information will be used to find the right alias on the sfu.
+            rtc_transports: livekitTransport
+                ? [{ type: livekitTransport.type, livekit_service_url: livekitTransport.livekit_service_url }]
+                : [],
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],
             ...relationObject,

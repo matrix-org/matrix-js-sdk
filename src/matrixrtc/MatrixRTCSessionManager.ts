@@ -56,7 +56,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private readonly slotDescription: SlotDescription = { application: "m.call", id: "" }, // Default to the Matrix Call application
+        private readonly slotDescription: SlotDescription = { application: "m.call", id: "ROOM" }, // Default to the Matrix Call application
     ) {
         super();
         this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");

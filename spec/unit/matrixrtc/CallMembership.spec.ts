@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixEvent } from "../../../src";
+import { type IContent, type MatrixEvent } from "../../../src";
 import {
     CallMembership,
     type SessionMembershipData,
@@ -25,15 +25,15 @@ import { membershipTemplate } from "./mocks";
 
 function makeMockEvent(originTs = 0): MatrixEvent {
     return {
-        getTs: jest.fn().mockReturnValue(originTs),
-        getSender: jest.fn().mockReturnValue("@alice:example.org"),
-        getId: jest.fn().mockReturnValue("$eventid"),
-        getContent: jest.fn().mockReturnValue({}),
+        getTs: vi.fn().mockReturnValue(originTs),
+        getSender: vi.fn().mockReturnValue("@alice:example.org"),
+        getId: vi.fn().mockReturnValue("$eventid"),
+        getContent: vi.fn().mockReturnValue({}),
     } as unknown as MatrixEvent;
 }
 
-function createCallMembership(ev: MatrixEvent, content: unknown): CallMembership {
-    (ev.getContent as jest.Mock).mockReturnValue(content);
+function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
+    vi.mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, "xx");
 }
@@ -41,11 +41,11 @@ function createCallMembership(ev: MatrixEvent, content: unknown): CallMembership
 describe("CallMembership", () => {
     describe("SessionMembershipData", () => {
         beforeEach(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         const membershipTemplate: SessionMembershipData = {
@@ -91,13 +91,13 @@ describe("CallMembership", () => {
 
         it("considers memberships unexpired if local age low enough", () => {
             const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
+            fakeEvent.getTs = vi.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
             expect(createCallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(false);
         });
 
         it("considers memberships expired if local age large enough", () => {
             const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
+            fakeEvent.getTs = vi.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
             expect(createCallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(true);
         });
 
@@ -158,8 +158,35 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                // slot_id is application and call_id dependent. So we create
+                // a membership for each possible combination
+
+                // non call application (should not alter call_id even with empty string)
+                const nonCallMembership = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: "m.not.a.call",
+                    call_id: "",
+                });
+                // non "" call id should not be altered
+                const callMembershipCustomId = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    call_id: "customCallId",
+                });
+
+                // for membership (application = m.call and call_id = "") we expect "" -> ROOM
+                // for legacy events we expect the room to be added automagically
+                // See INFO_SLOT_ID_LEGACY_CASE comments
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
+
+                expect(nonCallMembership.slotId).toBe("m.not.a.call#");
+                expect(nonCallMembership.slotDescription).toStrictEqual({ id: "", application: "m.not.a.call" });
+
+                expect(callMembershipCustomId.slotId).toBe("m.call#customCallId");
+                expect(callMembershipCustomId.slotDescription).toStrictEqual({
+                    id: "customCallId",
+                    application: "m.call",
+                });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
@@ -307,11 +334,11 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it("considers memberships unexpired if local age low enough", () => {
+        it.skip("considers memberships unexpired if local age low enough", () => {
             // TODO link prev event
         });
 
-        it("considers memberships expired if local age large enough", () => {
+        it.skip("considers memberships expired if local age large enough", () => {
             // TODO link prev event
         });
 
@@ -381,17 +408,33 @@ describe("CallMembership", () => {
             fakeEvent = makeMockEvent(1000);
             membership = createCallMembership(fakeEvent!, membershipTemplate);
 
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("calculates time until expiry", () => {
-            jest.setSystemTime(2000);
+            vi.setSystemTime(2000);
             // should be using absolute expiry time
             expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
         });
+    });
+
+    it("uses unpadded base64 for RTC backend identities", async () => {
+        expect(
+            await CallMembership.computeRtcBackendIdentity(makeMockEvent(), {
+                kind: "rtc",
+                data: {
+                    slot_id: "m.call#",
+                    application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+                    member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzRANDOMxyz" },
+                    rtc_transports: [{ type: "livekit" }],
+                    versions: [],
+                    msc4354_sticky_key: "abc123",
+                },
+            }),
+        ).toBe("2+h2ELE1XY/NsuveToZOekORCoyQMO6V0W7XZUWk5Q4");
     });
 });

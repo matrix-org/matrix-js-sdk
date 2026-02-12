@@ -29,7 +29,7 @@ import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSec
  */
 export default async function decryptAESSecretStorageItem(
     data: AESEncryptedSecretStoragePayload,
-    key: Uint8Array,
+    key: Uint8Array<ArrayBuffer>,
     name: string,
 ): Promise<string> {
     const [aesKey, hmacKey] = await deriveKeys(key, name);

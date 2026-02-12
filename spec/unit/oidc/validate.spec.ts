@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { mocked } from "jest-mock";
 import { jwtDecode } from "jwt-decode";
 
 import { logger } from "../../../src/logger";
 import { type ValidatedAuthMetadata, validateIdToken, validateAuthMetadata } from "../../../src/oidc/validate";
 import { OidcError } from "../../../src/oidc/error";
 
-jest.mock("jwt-decode");
+vi.mock("jwt-decode");
 
 describe("validateOIDCIssuerWellKnown", () => {
     const validWk: ValidatedAuthMetadata = {
@@ -38,7 +37,7 @@ describe("validateOIDCIssuerWellKnown", () => {
     };
     beforeEach(() => {
         // stub to avoid console litter
-        jest.spyOn(logger, "error")
+        vi.spyOn(logger, "error")
             .mockClear()
             .mockImplementation(() => {});
     });
@@ -135,9 +134,9 @@ describe("validateIdToken()", () => {
         iss: issuer,
     };
     beforeEach(() => {
-        mocked(jwtDecode).mockClear().mockReturnValue(validDecodedIdToken);
+        vi.mocked(jwtDecode).mockClear().mockReturnValue(validDecodedIdToken);
 
-        jest.spyOn(logger, "error").mockClear();
+        vi.spyOn(logger, "error").mockClear();
     });
 
     it("should throw when idToken is falsy", () => {
@@ -145,14 +144,14 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when idToken cannot be decoded", () => {
-        mocked(jwtDecode).mockImplementation(() => {
+        vi.mocked(jwtDecode).mockImplementation(() => {
             throw new Error("oh no!");
         });
         expect(() => validateIdToken(undefined, issuer, clientId, nonce)).toThrow(new Error(OidcError.InvalidIdToken));
     });
 
     it("should throw when issuer does not match", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             iss: "https://badissuer.com",
         });
@@ -161,7 +160,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when audience does not include clientId", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             aud: "qwerty,uiop,asdf",
         });
@@ -170,7 +169,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when audience includes clientId and other audiences", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             aud: `${clientId},uiop,asdf`,
         });
@@ -179,7 +178,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should not throw when audience is an array that includes clientId", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             aud: [clientId],
         });
@@ -187,7 +186,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when audience is an array that does not include clientId", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             aud: [`${clientId},uiop`, "asdf"],
         });
@@ -196,7 +195,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when nonce does not match", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             nonce: "something else",
         });
@@ -205,7 +204,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when token does not have an expiry", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             exp: undefined,
         });
@@ -214,7 +213,7 @@ describe("validateIdToken()", () => {
     });
 
     it("should throw when token is expired", () => {
-        mocked(jwtDecode).mockReturnValue({
+        vi.mocked(jwtDecode).mockReturnValue({
             ...validDecodedIdToken,
             // expired in the past
             exp: Date.now() / 1000 - 777,

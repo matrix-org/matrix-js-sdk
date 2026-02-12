@@ -17,17 +17,17 @@ limitations under the License.
 import * as callbacks from "../../src/realtime-callbacks";
 
 let wallTime = 1234567890;
-jest.useFakeTimers().setSystemTime(wallTime);
+vi.useFakeTimers().setSystemTime(wallTime);
 
 describe("realtime-callbacks", function () {
     function tick(millis: number): void {
         wallTime += millis;
-        jest.advanceTimersByTime(millis);
+        vi.advanceTimersByTime(millis);
     }
 
     describe("setTimeout", function () {
         it("should call the callback after the timeout", function () {
-            const callback = jest.fn();
+            const callback = vi.fn();
             callbacks.setTimeout(callback, 100);
 
             expect(callback).not.toHaveBeenCalled();
@@ -36,7 +36,7 @@ describe("realtime-callbacks", function () {
         });
 
         it("should default to a zero timeout", function () {
-            const callback = jest.fn();
+            const callback = vi.fn();
             callbacks.setTimeout(callback, 0);
 
             expect(callback).not.toHaveBeenCalled();
@@ -45,7 +45,7 @@ describe("realtime-callbacks", function () {
         });
 
         it("should pass any parameters to the callback", function () {
-            const callback = jest.fn();
+            const callback = vi.fn();
             callbacks.setTimeout(callback, 0, "a", "b", "c");
             tick(0);
             expect(callback).toHaveBeenCalledWith("a", "b", "c");
@@ -64,7 +64,7 @@ describe("realtime-callbacks", function () {
         });
 
         it("should handle timeouts of several seconds", function () {
-            const callback = jest.fn();
+            const callback = vi.fn();
             callbacks.setTimeout(callback, 2000);
 
             expect(callback).not.toHaveBeenCalled();
@@ -75,9 +75,9 @@ describe("realtime-callbacks", function () {
         });
 
         it("should call multiple callbacks in the right order", function () {
-            const callback1 = jest.fn();
-            const callback2 = jest.fn();
-            const callback3 = jest.fn();
+            const callback1 = vi.fn();
+            const callback2 = vi.fn();
+            const callback3 = vi.fn();
             callbacks.setTimeout(callback2, 200);
             callbacks.setTimeout(callback1, 100);
             callbacks.setTimeout(callback3, 300);
@@ -100,8 +100,8 @@ describe("realtime-callbacks", function () {
         });
 
         it("should treat -ve timeouts the same as a zero timeout", function () {
-            const callback1 = jest.fn();
-            const callback2 = jest.fn();
+            const callback1 = vi.fn();
+            const callback2 = vi.fn();
 
             // check that cb1 is called before cb2
             callback1.mockImplementation(function () {
@@ -119,8 +119,8 @@ describe("realtime-callbacks", function () {
         });
 
         it("should not get confused by chained calls", function () {
-            const callback2 = jest.fn();
-            const callback1 = jest.fn(function () {
+            const callback2 = vi.fn();
+            const callback1 = vi.fn(function () {
                 callbacks.setTimeout(callback2, 0);
                 expect(callback2).not.toHaveBeenCalled();
             });
@@ -137,24 +137,24 @@ describe("realtime-callbacks", function () {
         });
 
         it("should be immune to exceptions", function () {
-            const callback1 = jest.fn(function () {
+            const callback1 = vi.fn(function () {
                 throw new Error("prepare to die");
             });
-            const callback2 = jest.fn();
+            const callback2 = vi.fn();
             callbacks.setTimeout(callback1, 0);
             callbacks.setTimeout(callback2, 0);
 
-            expect(callback1).not.toHaveBeenCalled();
+            expect(<any>callback1).not.toHaveBeenCalled();
             expect(callback2).not.toHaveBeenCalled();
             tick(0);
-            expect(callback1).toHaveBeenCalled();
+            expect(<any>callback1).toHaveBeenCalled();
             expect(callback2).toHaveBeenCalled();
         });
     });
 
     describe("cancelTimeout", function () {
         it("should cancel a pending timeout", function () {
-            const callback = jest.fn();
+            const callback = vi.fn();
             const k = callbacks.setTimeout(callback, 10);
             callbacks.clearTimeout(k);
             tick(11);
@@ -162,8 +162,8 @@ describe("realtime-callbacks", function () {
         });
 
         it("should not affect sooner timeouts", function () {
-            const callback1 = jest.fn();
-            const callback2 = jest.fn();
+            const callback1 = vi.fn();
+            const callback2 = vi.fn();
 
             callbacks.setTimeout(callback1, 100);
             const k = callbacks.setTimeout(callback2, 200);

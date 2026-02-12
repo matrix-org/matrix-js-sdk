@@ -22,19 +22,7 @@ import { EventType, type MatrixEvent, RelationType, Room, threadIdForReceipt } f
 import { synthesizeReceipt } from "../../src/models/read-receipt";
 import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";
-
-// Jest now uses @sinonjs/fake-timers which exposes tickAsync() and a number of
-// other async methods which break the event loop, letting scheduled promise
-// callbacks run. Unfortunately, Jest doesn't expose these, so we have to do
-// it manually (this is what sinon does under the hood). We do both in a loop
-// until the thing we expect happens: hopefully this is the least flakey way
-// and avoids assuming anything about the app's behaviour.
-const realSetTimeout = setTimeout;
-function flushPromises() {
-    return new Promise((r) => {
-        realSetTimeout(r, 1);
-    });
-}
+import { flushPromises } from "../test-utils/flushPromises.ts";
 
 let client: MatrixClient;
 let httpBackend: MockHttpBackend;
@@ -240,7 +228,7 @@ describe("Read receipt", () => {
         it("should not allow an older unthreaded receipt to clobber a `main` threaded one", () => {
             const userId = client.getSafeUserId();
             const room = new Room(ROOM_ID, client, userId);
-            room.findEventById = jest.fn().mockReturnValue({} as MatrixEvent);
+            room.findEventById = vi.fn().mockReturnValue({} as MatrixEvent);
 
             const unthreadedReceipt: WrappedReceipt = {
                 eventId: "$olderEvent",

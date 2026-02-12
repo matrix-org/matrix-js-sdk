@@ -35,16 +35,16 @@ describe("onResumedSync", () => {
         };
 
         store = new StubStore();
-        store.getOldestToDeviceBatch = jest.fn().mockImplementation(() => {
+        store.getOldestToDeviceBatch = vi.fn().mockImplementation(() => {
             return batch;
         });
-        store.removeToDeviceBatch = jest.fn().mockImplementation(() => {
+        store.removeToDeviceBatch = vi.fn().mockImplementation(() => {
             batch = null;
         });
 
         mockClient = getMockClientWithEventEmitter({});
         mockClient.store = store;
-        mockClient.sendToDevice = jest.fn().mockImplementation(async () => {
+        mockClient.sendToDevice = vi.fn().mockImplementation(async () => {
             if (shouldFailSendToDevice) {
                 await Promise.reject(new ConnectionError("")).finally(() => {
                     setTimeout(onSendToDeviceFailure, 0);

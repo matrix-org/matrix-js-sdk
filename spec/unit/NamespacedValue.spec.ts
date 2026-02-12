@@ -32,7 +32,7 @@ describe("NamespacedValue", () => {
     });
 
     it("should have a falsey unstable if needed", () => {
-        const ns = new NamespacedValue("stable");
+        const ns = new NamespacedValue("stable", null);
         expect(ns.name).toBe(ns.stable);
         expect(ns.altName).toBeFalsy();
         expect(ns.names).toEqual([ns.stable]);
@@ -61,7 +61,7 @@ describe("UnstableValue", () => {
     it("should return unstable if there is no stable", () => {
         const ns = new UnstableValue(null!, "unstable");
         expect(ns.name).toBe(ns.unstable);
-        expect(ns.altName).toBeFalsy();
+        expect(<any>ns.altName).toBeFalsy();
         expect(ns.names).toEqual([ns.unstable]);
     });
 
