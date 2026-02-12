@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { type EstablishedEcies, QrCodeData, QrCodeMode, Ecies } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { mocked } from "jest-mock";
 
 import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
 
@@ -38,8 +37,8 @@ describe("MSC4108SecureChannel", () => {
 
     it("should throw error if attempt to connect multiple times", async () => {
         const mockSession = {
-            send: jest.fn(),
-            receive: jest.fn(),
+            send: vi.fn(),
+            receive: vi.fn(),
             url,
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
@@ -49,20 +48,20 @@ describe("MSC4108SecureChannel", () => {
             qrCodeData.publicKey,
             "MATRIX_QR_CODE_LOGIN_INITIATE",
         );
-        mocked(mockSession.receive).mockResolvedValue(ciphertext);
+        vi.mocked(mockSession.receive).mockResolvedValue(ciphertext);
         await channel.connect();
         await expect(channel.connect()).rejects.toThrow("Channel already connected");
     });
 
     it("should throw error on invalid initiate response", async () => {
         const mockSession = {
-            send: jest.fn(),
-            receive: jest.fn(),
+            send: vi.fn(),
+            receive: vi.fn(),
             url,
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
 
-        mocked(mockSession.receive).mockResolvedValue("");
+        vi.mocked(mockSession.receive).mockResolvedValue("");
         await expect(channel.connect()).rejects.toThrow("No response from other device");
 
         const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
@@ -71,7 +70,7 @@ describe("MSC4108SecureChannel", () => {
             "NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE",
         );
 
-        mocked(mockSession.receive).mockResolvedValue(ciphertext);
+        vi.mocked(mockSession.receive).mockResolvedValue(ciphertext);
         await expect(channel.connect()).rejects.toThrow("Invalid response from other device");
     });
 
@@ -82,8 +81,8 @@ describe("MSC4108SecureChannel", () => {
 
         beforeEach(async () => {
             mockSession = {
-                send: jest.fn(),
-                receive: jest.fn(),
+                send: vi.fn(),
+                receive: vi.fn(),
                 url,
             } as unknown as MSC4108RendezvousSession;
             channel = new MSC4108SecureChannel(mockSession);
@@ -95,10 +94,12 @@ describe("MSC4108SecureChannel", () => {
             );
             opponentChannel = _opponentChannel;
 
-            mocked(mockSession.receive).mockResolvedValue(ciphertext);
+            vi.mocked(mockSession.receive).mockResolvedValue(ciphertext);
             await channel.connect();
-            expect(opponentChannel.decrypt(mocked(mockSession.send).mock.calls[0][0])).toBe("MATRIX_QR_CODE_LOGIN_OK");
-            mocked(mockSession.send).mockReset();
+            expect(opponentChannel.decrypt(vi.mocked(mockSession.send).mock.calls[0][0])).toBe(
+                "MATRIX_QR_CODE_LOGIN_OK",
+            );
+            vi.mocked(mockSession.send).mockReset();
         });
 
         it("should be able to securely send encrypted payloads", async () => {
@@ -109,7 +110,7 @@ describe("MSC4108SecureChannel", () => {
             };
             await channel.secureSend(payload);
             expect(mockSession.send).toHaveBeenCalled();
-            expect(opponentChannel.decrypt(mocked(mockSession.send).mock.calls[0][0])).toBe(JSON.stringify(payload));
+            expect(opponentChannel.decrypt(vi.mocked(mockSession.send).mock.calls[0][0])).toBe(JSON.stringify(payload));
         });
 
         it("should be able to securely receive encrypted payloads", async () => {
@@ -119,7 +120,7 @@ describe("MSC4108SecureChannel", () => {
                 homeserver: "https://example.org",
             };
             const ciphertext = opponentChannel.encrypt(JSON.stringify(payload));
-            mocked(mockSession.receive).mockResolvedValue(ciphertext);
+            vi.mocked(mockSession.receive).mockResolvedValue(ciphertext);
             await expect(channel.secureReceive()).resolves.toEqual(payload);
         });
     });

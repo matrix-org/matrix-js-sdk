@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // `expect` is allowed in helper functions which are called within `test`/`it` blocks
-/* eslint-disable jest/no-standalone-expect */
+/* eslint-disable @vitest/no-standalone-expect */
 
 import MockHttpBackend from "matrix-mock-request";
 
@@ -39,7 +39,7 @@ import { type ISyncResponder } from "./test-utils/SyncResponder";
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
  *
  * @deprecated Avoid using this; it is tied too tightly to matrix-mock-request and is generally inconvenient to use.
- *    Instead, construct a MatrixClient manually, use fetch-mock-jest to intercept the HTTP requests, and
+ *    Instead, construct a MatrixClient manually, use fetch-mock to intercept the HTTP requests, and
  *    use things like {@link E2EKeyReceiver} and {@link SyncResponder} to manage the requests.
  */
 export class TestClient implements IE2EKeyReceiver, ISyncResponder {

@@ -17,7 +17,7 @@ limitations under the License.
 
 import { type MatrixClient } from "../../src/client";
 import { logger } from "../../src/logger";
-import { InteractiveAuth, AuthType } from "../../src/interactive-auth";
+import { InteractiveAuth, AuthType, NoAuthFlowFoundError } from "../../src/interactive-auth";
 import { HTTPError, MatrixError } from "../../src/http-api";
 import { sleep } from "../../src/utils";
 import { secureRandomString } from "../../src/randomstring";
@@ -34,14 +34,14 @@ const getFakeClient = (): MatrixClient => new FakeClient() as unknown as MatrixC
 
 describe("InteractiveAuth", () => {
     it("should start an auth stage and complete it", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
             doRequest: doRequest,
             stateUpdated: stateUpdated,
-            requestEmailToken: jest.fn(),
+            requestEmailToken: vi.fn(),
             authData: {
                 session: "sessionId",
                 flows: [{ stages: [AuthType.Password] }],
@@ -83,14 +83,14 @@ describe("InteractiveAuth", () => {
     });
 
     it("should handle auth errcode presence", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
             doRequest: doRequest,
             stateUpdated: stateUpdated,
-            requestEmailToken: jest.fn(),
+            requestEmailToken: vi.fn(),
             authData: {
                 session: "sessionId",
                 flows: [{ stages: [AuthType.Password] }],
@@ -132,9 +132,9 @@ describe("InteractiveAuth", () => {
     });
 
     it("should handle set emailSid for email flow", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             doRequest,
@@ -186,9 +186,9 @@ describe("InteractiveAuth", () => {
     });
 
     it("should make a request if no authdata is provided", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
@@ -248,9 +248,9 @@ describe("InteractiveAuth", () => {
     });
 
     it("should make a request if authdata is null", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
@@ -310,9 +310,9 @@ describe("InteractiveAuth", () => {
     });
 
     it("should start an auth stage and reject if no auth flow", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
@@ -337,13 +337,15 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
+            new NoAuthFlowFoundError("No appropriate authentication flow found", [], []),
+        );
     });
 
     it("should start an auth stage and reject if no auth flow but has session", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
@@ -372,13 +374,15 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
+            new NoAuthFlowFoundError("No appropriate authentication flow found", [], []),
+        );
     });
 
     it("should handle unexpected error types without data property set", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
@@ -397,13 +401,13 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("myerror"));
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new HTTPError("myerror", 401));
     });
 
     it("should allow dummy auth", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
+        const requestEmailToken = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
@@ -435,9 +439,9 @@ describe("InteractiveAuth", () => {
 
     describe("requestEmailToken", () => {
         it("increases auth attempts", async () => {
-            const doRequest = jest.fn();
-            const stateUpdated = jest.fn();
-            const requestEmailToken = jest.fn();
+            const doRequest = vi.fn();
+            const stateUpdated = vi.fn();
+            const requestEmailToken = vi.fn();
             requestEmailToken.mockImplementation(async () => ({ sid: "" }));
 
             const ia = new InteractiveAuth({
@@ -464,9 +468,9 @@ describe("InteractiveAuth", () => {
         });
 
         it("passes errors through", async () => {
-            const doRequest = jest.fn();
-            const stateUpdated = jest.fn();
-            const requestEmailToken = jest.fn();
+            const doRequest = vi.fn();
+            const stateUpdated = vi.fn();
+            const requestEmailToken = vi.fn();
             requestEmailToken.mockImplementation(async () => {
                 throw new Error("unspecific network error");
             });
@@ -482,9 +486,9 @@ describe("InteractiveAuth", () => {
         });
 
         it("only starts one request at a time", async () => {
-            const doRequest = jest.fn();
-            const stateUpdated = jest.fn();
-            const requestEmailToken = jest.fn();
+            const doRequest = vi.fn();
+            const stateUpdated = vi.fn();
+            const requestEmailToken = vi.fn();
             requestEmailToken.mockImplementation(() => sleep(500, { sid: "" }));
 
             const ia = new InteractiveAuth({
@@ -499,9 +503,9 @@ describe("InteractiveAuth", () => {
         });
 
         it("stores result in email sid", async () => {
-            const doRequest = jest.fn();
-            const stateUpdated = jest.fn();
-            const requestEmailToken = jest.fn();
+            const doRequest = vi.fn();
+            const stateUpdated = vi.fn();
+            const requestEmailToken = vi.fn();
             const sid = secureRandomString(24);
             requestEmailToken.mockImplementation(() => sleep(500, { sid }));
 
@@ -518,14 +522,14 @@ describe("InteractiveAuth", () => {
     });
 
     it("should prioritise shorter flows", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
             doRequest: doRequest,
             stateUpdated: stateUpdated,
-            requestEmailToken: jest.fn(),
+            requestEmailToken: vi.fn(),
             authData: {
                 session: "sessionId",
                 flows: [{ stages: [AuthType.Recaptcha, AuthType.Password] }, { stages: [AuthType.Password] }],
@@ -539,14 +543,14 @@ describe("InteractiveAuth", () => {
     });
 
     it("should prioritise flows with entirely supported stages", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
             doRequest: doRequest,
             stateUpdated: stateUpdated,
-            requestEmailToken: jest.fn(),
+            requestEmailToken: vi.fn(),
             authData: {
                 session: "sessionId",
                 flows: [{ stages: ["com.devture.shared_secret_auth"] }, { stages: [AuthType.Password] }],
@@ -561,14 +565,14 @@ describe("InteractiveAuth", () => {
     });
 
     it("should fire stateUpdated callback with error when a request fails", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+        const doRequest = vi.fn();
+        const stateUpdated = vi.fn();
 
         const ia = new InteractiveAuth({
             matrixClient: getFakeClient(),
             doRequest: doRequest,
             stateUpdated: stateUpdated,
-            requestEmailToken: jest.fn(),
+            requestEmailToken: vi.fn(),
             authData: {
                 session: "sessionId",
                 flows: [{ stages: [AuthType.Password] }],

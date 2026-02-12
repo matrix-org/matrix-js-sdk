@@ -19,13 +19,17 @@ import { type IdTokenClaims, type OidcMetadata, type SigninResponse } from "oidc
 
 import { logger } from "../logger.ts";
 import { OidcError } from "./error.ts";
+import { OAuthGrantType } from "./index.ts";
 
 /**
- * Metadata from OIDC authority discovery
+ * Metadata from OAuth 2.0 client authentication API as per
+ * https://spec.matrix.org/v1.17/client-server-api/#get_matrixclientv1auth_metadata
  * With validated properties required in type
  */
 export type ValidatedAuthMetadata = Partial<OidcMetadata> &
     Pick<
+        // These values are from [RFC8414](https://datatracker.ietf.org/doc/html/rfc8414#section-2)
+        // so we can reuse the OidcMetadata definitions from oidc-client-ts
         OidcMetadata,
         | "issuer"
         | "authorization_endpoint"
@@ -35,12 +39,14 @@ export type ValidatedAuthMetadata = Partial<OidcMetadata> &
         | "grant_types_supported"
         | "code_challenge_methods_supported"
     > & {
-        // MSC2965 extensions to the OIDC spec
+        // These values aren't part of RFC8414 so we add them here
+        // Account management fields from stable MSC4191:
         account_management_uri?: string;
         account_management_actions_supported?: string[];
-        // The OidcMetadata type from oidc-client-ts does not include `prompt_values_supported`
-        // even though it is part of the OIDC spec
+        // Value from [Initiating User Registration via OpenID Connect](https://openid.net/specs/openid-connect-prompt-create-1_0.html):
         prompt_values_supported?: string[];
+        // Experimental MSC4341 value from [RFC8628](https://datatracker.ietf.org/doc/html/rfc8628#section-4):
+        device_authorization_endpoint?: string;
     };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -79,9 +85,9 @@ const requiredArrayValue = (wellKnown: Record<string, unknown>, key: string, val
 };
 
 /**
- * Validates issuer `.well-known/openid-configuration`
- * As defined in RFC5785 https://openid.net/specs/openid-connect-discovery-1_0.html
- * validates that OP is compatible with Element's OIDC flow
+ * Validates OAuth 2.0 auth metadata as defined by
+ * https://spec.matrix.org/v1.17/client-server-api/#get_matrixclientv1auth_metadata
+ * is compatible with Element's OAuth/OIDC flow
  * @param authMetadata - json object
  * @returns valid issuer config
  * @throws Error - when issuer config is not found or is invalid
@@ -102,7 +108,7 @@ export const validateAuthMetadata = (authMetadata: unknown): ValidatedAuthMetada
         optionalStringProperty(authMetadata, "device_authorization_endpoint"),
         optionalStringArrayProperty(authMetadata, "account_management_actions_supported"),
         requiredArrayValue(authMetadata, "response_types_supported", "code"),
-        requiredArrayValue(authMetadata, "grant_types_supported", "authorization_code"),
+        requiredArrayValue(authMetadata, "grant_types_supported", OAuthGrantType.AuthorizationCode),
         requiredArrayValue(authMetadata, "code_challenge_methods_supported", "S256"),
         optionalStringArrayProperty(authMetadata, "prompt_values_supported"),
     ].some((isValid) => !isValid);

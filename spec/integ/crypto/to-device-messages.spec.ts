@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";
@@ -59,7 +59,6 @@ describe("to-device-messages", () => {
         async () => {
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
 
             const homeserverUrl = "https://server.com";
             aliceClient = createClient({
@@ -100,7 +99,6 @@ describe("to-device-messages", () => {
 
     afterEach(async () => {
         aliceClient.stopClient();
-        fetchMock.mockReset();
     });
 
     describe("encryptToDeviceMessages", () => {

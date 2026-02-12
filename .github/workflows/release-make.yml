@@ -123,13 +123,14 @@ jobs:
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
 
-            - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install dependencies
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - name: Handle develop dependencies
               run: |
@@ -140,14 +141,14 @@ jobs:
                       VERSION=${dep[1]}
 
                       echo "::warning title=Develop dependency found::$DEPENDENCY will be kept at $VERSION"
-                      yarn upgrade "$PACKAGE@$VERSION" --exact
+                      pnpm add "$PACKAGE@$VERSION" --save-exact
                       git add -u
                       git commit -m "Keep $PACKAGE at $VERSION"
                   done
 
             - name: Bump package.json version
               run: |
-                  yarn version --no-git-tag-version --new-version "${VERSION#v}"
+                  pnpm version --no-git-tag-version "${VERSION#v}"
                   git add package.json
 
             - name: Add to CHANGELOG.md
@@ -175,7 +176,7 @@ jobs:
 
             - name: Build assets
               if: steps.prepare.outputs.has-dist-script == '1'
-              run: DIST_VERSION="$VERSION" yarn dist
+              run: DIST_VERSION="$VERSION" pnpm dist
 
             - name: Upload release assets & signatures
               if: inputs.asset-path

@@ -33,13 +33,14 @@ jobs:
                   sparse-checkout: |
                       scripts/release
 
-            - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "yarn install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile"
 
             - name: Set up git
               run: |
@@ -73,7 +74,7 @@ jobs:
                       fi
 
                       echo "Resetting $PACKAGE to develop branch..."
-                      yarn add "github:matrix-org/$PACKAGE#develop"
+                      pnpm add "github:matrix-org/$PACKAGE#develop"
                       git add -u
                       git commit -m "Reset $PACKAGE back to develop branch"
                   done <<< "$DEPENDENCIES"

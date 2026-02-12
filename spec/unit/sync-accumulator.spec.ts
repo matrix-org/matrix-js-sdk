@@ -839,7 +839,7 @@ describe("SyncAccumulator", function () {
         }
 
         afterEach(() => {
-            jest.spyOn(globalThis.Date, "now").mockRestore();
+            vi.spyOn(globalThis.Date, "now").mockRestore();
         });
 
         it("should copy summary properties", function () {
@@ -896,11 +896,11 @@ describe("SyncAccumulator", function () {
             const delta = 1000;
             const startingTs = 1000;
 
-            jest.spyOn(globalThis.Date, "now").mockReturnValue(startingTs);
+            vi.spyOn(globalThis.Date, "now").mockReturnValue(startingTs);
 
             sa.accumulate(RES_WITH_AGE);
 
-            jest.spyOn(globalThis.Date, "now").mockReturnValue(startingTs + delta);
+            vi.spyOn(globalThis.Date, "now").mockReturnValue(startingTs + delta);
 
             const output = sa.getJSON();
             expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned?.age).toEqual(
@@ -1082,15 +1082,15 @@ describe("SyncAccumulator", function () {
         }
 
         beforeAll(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterAll(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         it("should accumulate sticky events", () => {
-            jest.setSystemTime(0);
+            vi.setSystemTime(0);
             const ev = stickyEvent();
             sa.accumulate(
                 syncSkeleton({
@@ -1102,7 +1102,7 @@ describe("SyncAccumulator", function () {
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
         });
         it("should clear stale sticky events", () => {
-            jest.setSystemTime(1000);
+            vi.setSystemTime(1000);
             const ev = stickyEvent(1000);
             sa.accumulate(
                 syncSkeleton({
@@ -1112,19 +1112,19 @@ describe("SyncAccumulator", function () {
                 }),
             );
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
-            jest.setSystemTime(2000); // Expire the event
+            vi.setSystemTime(2000); // Expire the event
             sa.accumulate(syncSkeleton({}));
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
         });
 
         it("clears stale sticky events that pretend to be from the distant future", () => {
-            jest.setSystemTime(0);
+            vi.setSystemTime(0);
             const eventFarInTheFuture = stickyEvent(999999999999);
             sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [eventFarInTheFuture] } }));
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
                 eventFarInTheFuture,
             ]);
-            jest.setSystemTime(1000); // Expire the event
+            vi.setSystemTime(1000); // Expire the event
             sa.accumulate(syncSkeleton({}));
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
         });

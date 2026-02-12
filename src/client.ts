@@ -138,6 +138,7 @@ import {
     MsgType,
     PUSHER_ENABLED,
     RelationType,
+    type RoomAccountDataEvents,
     RoomCreateTypeField,
     RoomType,
     type StateEvents,
@@ -145,6 +146,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    type WritableAccountDataEvents,
 } from "./@types/event.ts";
 import {
     GuestAccess,
@@ -2221,7 +2223,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The event type
      * @param content - the contents object for the event
      */
-    public async setAccountData<K extends keyof AccountDataEvents>(
+    public async setAccountData<K extends keyof WritableAccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
     ): Promise<EmptyObject> {
@@ -2273,7 +2275,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The event type
      * @param content - the contents object for the event
      */
-    public setAccountDataRaw<K extends keyof AccountDataEvents>(
+    public setAccountDataRaw<K extends keyof WritableAccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
     ): Promise<EmptyObject> {
@@ -2328,7 +2330,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    public async deleteAccountData(eventType: keyof AccountDataEvents): Promise<void> {
+    public async deleteAccountData(eventType: keyof WritableAccountDataEvents): Promise<void> {
         const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
         // if deletion is not supported overwrite with empty content
         if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
@@ -2584,12 +2586,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * @param roomId - the ID of the room this event should be stored within
      * @param eventType - event type to be set
      * @param content - event content
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<EmptyObject> {
+    public setRoomAccountData<K extends keyof RoomAccountDataEvents>(
+        roomId: string,
+        eventType: K,
+        content: RoomAccountDataEvents[K] | Record<string, never>,
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
@@ -6689,6 +6696,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const params = {
             redirectUrl,
+            [SSO_ACTION_PARAM.stable!]: action,
             [SSO_ACTION_PARAM.unstable!]: action,
         };
 
@@ -6936,13 +6944,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Upgrades a room to a new protocol version
      * @param newVersion - The target version to upgrade to
+     * @param additionalCreators - an optional list of user IDs of users who
+     *        should have the same permissions as the user performing the
+     *        upgrade
      * @returns Promise which resolves: Object with key 'replacement_room'
      * @returns Rejects: with an error response.
      */
-    public upgradeRoom(roomId: string, newVersion: string): Promise<{ replacement_room: string }> {
+    public upgradeRoom(
+        roomId: string,
+        newVersion: string,
+        additionalCreators?: string[],
+    ): Promise<{ replacement_room: string }> {
         // eslint-disable-line camelcase
         const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
-        return this.http.authedRequest(Method.Post, path, undefined, { new_version: newVersion });
+        return this.http.authedRequest(Method.Post, path, undefined, {
+            new_version: newVersion,
+            additional_creators: additionalCreators,
+        });
     }
 
     /**
@@ -8826,21 +8844,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Discover and validate delegated auth configuration
-     * - delegated auth issuer openid-configuration is reachable
-     * - delegated auth issuer openid-configuration is configured correctly for us
+     * Discover and validate the auth metadata for the OAuth 2.0 API.
+     *
      * Fetches /auth_metadata falling back to legacy implementation using /auth_issuer followed by
      * https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
-     * When successful, validated metadata is returned
+     * When successful, validated metadata is returned.
+     *
      * @returns validated authentication metadata and optionally signing keys
      * @throws when delegated auth config is invalid or unreachable
-     * @experimental - part of MSC2965
      */
     public async getAuthMetadata(): Promise<OidcClientConfig> {
         let authMetadata: unknown | undefined;
         try {
+            const useStable = await this.isVersionSupported("v1.15");
             authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
-                prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
+                prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
             });
         } catch (e) {
             if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {

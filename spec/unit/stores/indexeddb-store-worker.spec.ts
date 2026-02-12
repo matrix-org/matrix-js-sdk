@@ -27,7 +27,7 @@ function setupWorker(worker: IndexedDBStoreWorker): void {
 describe("IndexedDBStore Worker", () => {
     it("should pass 'closed' event via postMessage", async () => {
         const postMessageSuccessResolvers = Promise.withResolvers<void>();
-        const postMessage = jest.fn().mockImplementation(({ seq, command }) => {
+        const postMessage = vi.fn().mockImplementation(({ seq, command }) => {
             if (seq === 1 && command === "cmd_success") {
                 postMessageSuccessResolvers.resolve();
             }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked } from "jest-mock";
+import { type Mocked } from "vitest";
 
 import {
     type AccountDataClient,
@@ -247,7 +247,7 @@ describe("ServerSideSecretStorageImpl", function () {
 
         beforeEach(() => {
             accountDataAdapter = mockAccountDataClient();
-            const mockCallbacks = { getSecretStorageKey: jest.fn() } as Mocked<SecretStorageCallbacks>;
+            const mockCallbacks = { getSecretStorageKey: vi.fn() } as Mocked<SecretStorageCallbacks>;
             secretStorage = new ServerSideSecretStorageImpl(accountDataAdapter, mockCallbacks);
         });
 
@@ -266,7 +266,7 @@ describe("ServerSideSecretStorageImpl", function () {
             accountDataAdapter.getAccountDataFromServer.mockImplementation(mockGetAccountData);
 
             // suppress the expected warning on the console
-            jest.spyOn(console, "warn").mockImplementation();
+            vi.spyOn(console, "warn").mockImplementation(() => {});
 
             // now attempt the store
             await secretStorage.store("mysecret", "supersecret", ["keyid"]);
@@ -376,8 +376,8 @@ describe("trimTrailingEquals", () => {
 function mockAccountDataClient(): Mocked<AccountDataClient> {
     const eventEmitter = new TypedEventEmitter();
     return {
-        getAccountDataFromServer: jest.fn().mockResolvedValue(null),
-        setAccountData: jest.fn().mockResolvedValue({}),
+        getAccountDataFromServer: vi.fn().mockResolvedValue(null),
+        setAccountData: vi.fn().mockResolvedValue({}),
         on: eventEmitter.on.bind(eventEmitter),
         off: eventEmitter.off.bind(eventEmitter),
         removeListener: eventEmitter.removeListener.bind(eventEmitter),

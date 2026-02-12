@@ -1,6 +1,6 @@
-import { type Mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type Mocked } from "vitest";
 
 import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
 import { CryptoEvent, type KeyBackupSession } from "../../../src/crypto-api/index.ts";
@@ -43,25 +43,25 @@ describe("Upload keys to backup", () => {
     }
 
     beforeEach(async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         idGenerator = 0;
 
         mockOlmMachine = {
-            getBackupKeys: jest.fn().mockResolvedValue({
+            getBackupKeys: vi.fn().mockResolvedValue({
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys),
-            backupRoomKeys: jest.fn(),
-            isBackupEnabled: jest.fn().mockResolvedValue(true),
-            enableBackupV1: jest.fn(),
-            verifyBackup: jest.fn().mockResolvedValue({
-                trusted: jest.fn().mockResolvedValue(true),
+            backupRoomKeys: vi.fn(),
+            isBackupEnabled: vi.fn().mockResolvedValue(true),
+            enableBackupV1: vi.fn(),
+            verifyBackup: vi.fn().mockResolvedValue({
+                trusted: vi.fn().mockResolvedValue(true),
             } as unknown as RustSdkCryptoJs.SignatureVerification),
-            roomKeyCounts: jest.fn(),
+            roomKeyCounts: vi.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
         outgoingRequestProcessor = {
-            makeOutgoingRequest: jest.fn(),
+            makeOutgoingRequest: vi.fn(),
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
         rustBackupManager = new RustBackupManager(logger, mockOlmMachine, httpAPi, outgoingRequestProcessor);
@@ -70,9 +70,8 @@ describe("Upload keys to backup", () => {
     });
 
     afterEach(() => {
-        fetchMock.reset();
-        jest.useRealTimers();
-        jest.resetAllMocks();
+        vi.useRealTimers();
+        vi.resetAllMocks();
     });
 
     it("Should call expensive roomKeyCounts only once per loop", async () => {
@@ -105,7 +104,7 @@ describe("Upload keys to backup", () => {
         } as unknown as RustSdkCryptoJs.RoomKeyCounts);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         await zeroRemainingWasEmitted;
 
@@ -134,7 +133,7 @@ describe("Upload keys to backup", () => {
         mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(undefined);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         await zeroRemainingWasEmitted;
 

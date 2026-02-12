@@ -38,6 +38,7 @@ import {
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
     UpdateDelayedEventAction,
+    isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -56,7 +57,7 @@ import { ConnectionError, MatrixError } from "./http-api/errors.ts";
 import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
-import { MapWithDefault, recursiveMapToObject } from "./utils.ts";
+import { MapWithDefault, type QueryDict, recursiveMapToObject } from "./utils.ts";
 import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
 
 interface IStateEventRequest {
@@ -122,6 +123,20 @@ export interface ICapabilities {
      * @defaultValue false
      */
     updateDelayedEvents?: boolean;
+
+    /**
+     * Whether this client needs to be able to send sticky events.
+     * @experimental Part of MSC4354 & MSC4407
+     * @defaultValue false
+     */
+    sendSticky?: boolean;
+
+    /**
+     * Whether this client needs to be able to receive sticky events.
+     * @experimental Part of MSC4354 & MSC4407
+     * @defaultValue false
+     */
+    receiveSticky?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -197,54 +212,7 @@ export class RoomWidgetClient extends MatrixClient {
               )
             : Promise.resolve();
 
-        // Request capabilities for the functionality this client needs to support
-        if (
-            capabilities.sendEvent?.length ||
-            capabilities.receiveEvent?.length ||
-            capabilities.sendMessage === true ||
-            (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length) ||
-            capabilities.receiveMessage === true ||
-            (Array.isArray(capabilities.receiveMessage) && capabilities.receiveMessage.length) ||
-            capabilities.sendState?.length ||
-            capabilities.receiveState?.length
-        ) {
-            widgetApi.requestCapabilityForRoomTimeline(roomId);
-        }
-        capabilities.sendEvent?.forEach((eventType) => widgetApi.requestCapabilityToSendEvent(eventType));
-        capabilities.receiveEvent?.forEach((eventType) => widgetApi.requestCapabilityToReceiveEvent(eventType));
-        if (capabilities.sendMessage === true) {
-            widgetApi.requestCapabilityToSendMessage();
-        } else if (Array.isArray(capabilities.sendMessage)) {
-            capabilities.sendMessage.forEach((msgType) => widgetApi.requestCapabilityToSendMessage(msgType));
-        }
-        if (capabilities.receiveMessage === true) {
-            widgetApi.requestCapabilityToReceiveMessage();
-        } else if (Array.isArray(capabilities.receiveMessage)) {
-            capabilities.receiveMessage.forEach((msgType) => widgetApi.requestCapabilityToReceiveMessage(msgType));
-        }
-        capabilities.sendState?.forEach(({ eventType, stateKey }) =>
-            widgetApi.requestCapabilityToSendState(eventType, stateKey),
-        );
-        capabilities.receiveState?.forEach(({ eventType, stateKey }) =>
-            widgetApi.requestCapabilityToReceiveState(eventType, stateKey),
-        );
-        capabilities.sendToDevice?.forEach((eventType) => widgetApi.requestCapabilityToSendToDevice(eventType));
-        capabilities.receiveToDevice?.forEach((eventType) => widgetApi.requestCapabilityToReceiveToDevice(eventType));
-        if (
-            capabilities.sendDelayedEvents &&
-            (capabilities.sendEvent?.length ||
-                capabilities.sendMessage === true ||
-                (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length) ||
-                capabilities.sendState?.length)
-        ) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC4157SendDelayedEvent);
-        }
-        if (capabilities.updateDelayedEvents) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC4157UpdateDelayedEvent);
-        }
-        if (capabilities.turnServers) {
-            widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
-        }
+        this.requestInitialCapabilities(capabilities, roomId);
 
         widgetApi.on(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
         widgetApi.on(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
@@ -260,10 +228,70 @@ export class RoomWidgetClient extends MatrixClient {
         if (sendContentLoaded) widgetApi.sendContentLoaded();
     }
 
+    private requestInitialCapabilities(capabilities: ICapabilities, roomId: string): void {
+        // Request capabilities for the functionality this client needs to support
+        if (
+            capabilities.sendEvent?.length ||
+            capabilities.receiveEvent?.length ||
+            capabilities.sendMessage === true ||
+            (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length) ||
+            capabilities.receiveMessage === true ||
+            (Array.isArray(capabilities.receiveMessage) && capabilities.receiveMessage.length) ||
+            capabilities.sendState?.length ||
+            capabilities.receiveState?.length
+        ) {
+            this.widgetApi.requestCapabilityForRoomTimeline(roomId);
+        }
+        capabilities.sendEvent?.forEach((eventType) => this.widgetApi.requestCapabilityToSendEvent(eventType));
+        capabilities.receiveEvent?.forEach((eventType) => this.widgetApi.requestCapabilityToReceiveEvent(eventType));
+        if (capabilities.sendMessage === true) {
+            this.widgetApi.requestCapabilityToSendMessage();
+        } else if (Array.isArray(capabilities.sendMessage)) {
+            capabilities.sendMessage.forEach((msgType) => this.widgetApi.requestCapabilityToSendMessage(msgType));
+        }
+        if (capabilities.receiveMessage === true) {
+            this.widgetApi.requestCapabilityToReceiveMessage();
+        } else if (Array.isArray(capabilities.receiveMessage)) {
+            capabilities.receiveMessage.forEach((msgType) => this.widgetApi.requestCapabilityToReceiveMessage(msgType));
+        }
+        capabilities.sendState?.forEach(({ eventType, stateKey }) =>
+            this.widgetApi.requestCapabilityToSendState(eventType, stateKey),
+        );
+        capabilities.receiveState?.forEach(({ eventType, stateKey }) =>
+            this.widgetApi.requestCapabilityToReceiveState(eventType, stateKey),
+        );
+        capabilities.sendToDevice?.forEach((eventType) => this.widgetApi.requestCapabilityToSendToDevice(eventType));
+        capabilities.receiveToDevice?.forEach((eventType) =>
+            this.widgetApi.requestCapabilityToReceiveToDevice(eventType),
+        );
+        if (
+            capabilities.sendDelayedEvents &&
+            (capabilities.sendEvent?.length ||
+                capabilities.sendMessage === true ||
+                (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length) ||
+                capabilities.sendState?.length)
+        ) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4157SendDelayedEvent);
+        }
+        if (capabilities.updateDelayedEvents) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+        }
+        if (capabilities.sendSticky) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4407SendStickyEvent);
+        }
+        if (capabilities.receiveSticky) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4407ReceiveStickyEvent);
+        }
+        if (capabilities.turnServers) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
+        }
+    }
+
     public async supportUpdateState(): Promise<boolean> {
         return (await this.widgetApi.getClientVersions()).includes(UnstableApiVersion.MSC2762_UPDATE_STATE);
     }
 
+    private readonly syncApiResolver = Promise.withResolvers<void>();
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
         this.lifecycle = new AbortController();
 
@@ -282,6 +310,7 @@ export class RoomWidgetClient extends MatrixClient {
         } else {
             this.syncApi = new SyncApi(this, opts, this.buildSyncApiOptions());
         }
+        this.syncApiResolver.resolve();
 
         this.room = this.syncApi.createRoom(this.roomId);
         this.store.storeRoom(this.room);
@@ -346,17 +375,41 @@ export class RoomWidgetClient extends MatrixClient {
         throw new Error(`Unknown room: ${roomIdOrAlias}`);
     }
 
-    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
-    ): Promise<SendDelayedEventResponse>;
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse>;
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
-        delayOpts?: SendDelayedEventRequestOpts,
+        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
+        queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        let queryOpts = queryDict;
+        let delayOpts: SendDelayedEventRequestOpts | undefined;
+        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
+            delayOpts = delayOptsOrQuery;
+        } else if (!queryOpts) {
+            queryOpts = delayOptsOrQuery;
+        }
+
+        const stickyDurationMs = queryOpts?.["org.matrix.msc4354.sticky_duration_ms"];
+        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
+            throw new Error("Sticky duration must be a number when defined");
+        }
+        // This is save since we just checked that above
+        // We need the additional as assertion for the EW linter to be happy.
+        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
+        // above
+        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs as number | undefined;
+
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts
         // This will be converted back to event.redacts in the widget driver.
@@ -374,6 +427,7 @@ export class RoomWidgetClient extends MatrixClient {
                     room.roomId,
                     "delay" in delayOpts ? delayOpts.delay : undefined,
                     "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
+                    stickyDurationMsAsNumber,
                 )
                 .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
@@ -386,7 +440,7 @@ export class RoomWidgetClient extends MatrixClient {
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId)
+                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
@@ -683,7 +737,7 @@ export class RoomWidgetClient extends MatrixClient {
 
             // Only inject once we have update the txId
             await this.updateTxId(event);
-
+            await this.syncApiResolver.promise;
             if (this.syncApi instanceof SyncApi) {
                 if (await this.supportUpdateState()) {
                     await this.syncApi.injectRoomEvents(this.room!, undefined, [], [event]);
@@ -704,6 +758,7 @@ export class RoomWidgetClient extends MatrixClient {
             }
 
             this.emit(ClientEvent.Event, event);
+            if (event.unstableStickyInfo !== undefined) this.room!._unstable_addStickyEvents([event]);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()}`);
         } else {
@@ -737,6 +792,7 @@ export class RoomWidgetClient extends MatrixClient {
                 "received update_state widget action but the widget driver did not claim to support 'org.matrix.msc2762_update_state'",
             );
         }
+        await this.syncApiResolver.promise;
         for (const rawEvent of ev.detail.data.state) {
             // Verify the room ID matches, since it's possible for the client to
             // send us state updates from other rooms if this widget is always

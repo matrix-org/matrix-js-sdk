@@ -76,6 +76,8 @@ export interface IUnsigned {
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
     "msc4354_sticky_duration_ttl_ms"?: number;
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
+    "membership"?: Membership;
+    "io.element.msc4115.membership"?: Membership;
 }
 
 export interface IThreadBundledRelationship {
@@ -786,7 +788,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getMembershipAtEvent(): Membership | string | undefined {
         const unsigned = this.getUnsigned();
-        return UNSIGNED_MEMBERSHIP_FIELD.findIn<Membership | string>(unsigned);
+        return UNSIGNED_MEMBERSHIP_FIELD.findIn<Membership>(unsigned);
     }
 
     /**

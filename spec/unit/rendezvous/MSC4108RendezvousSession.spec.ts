@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientPrefix, type IHttpOpts, type MatrixClient, MatrixHttpApi } from "../../../src";
 import { ClientRendezvousFailureReason, MSC4108RendezvousSession } from "../../../src/rendezvous";
@@ -40,13 +40,7 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
     return client;
 }
 
-fetchMock.config.overwriteRoutes = true;
-
 describe("MSC4108RendezvousSession", () => {
-    beforeEach(() => {
-        fetchMock.reset();
-    });
-
     async function postAndCheckLocation(msc4108Enabled: boolean, fallbackRzServer: string, locationResponse: string) {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled });
         const transport = new MSC4108RendezvousSession({ client, fallbackRzServer });
@@ -77,8 +71,8 @@ describe("MSC4108RendezvousSession", () => {
     }
 
     it("should use custom fetchFn if provided", async () => {
-        const sandbox = fetchMock.sandbox();
-        const fetchFn = jest.fn().mockImplementation(sandbox);
+        const sandbox = fetchMock.createInstance();
+        const fetchFn = vi.fn().mockImplementation(sandbox.fetchHandler);
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
         const transport = new MSC4108RendezvousSession({
             client,
@@ -92,7 +86,7 @@ describe("MSC4108RendezvousSession", () => {
             },
         });
         await transport.send("data");
-        await sandbox.flush(true);
+        await sandbox.callHistory.flush(true);
         expect(fetchFn).toHaveBeenCalledWith("https://fallbackserver/rz", expect.anything());
     });
 
@@ -112,7 +106,7 @@ describe("MSC4108RendezvousSession", () => {
             status: 201,
             body: { url: "https://fallbackserver/rz/123" },
         });
-        await fetchMock.flush(true);
+        await fetchMock.callHistory.flush(true);
         await expect(transport.send("data")).resolves.toStrictEqual(undefined);
     });
 
@@ -125,13 +119,15 @@ describe("MSC4108RendezvousSession", () => {
         fetchMock.postOnce("https://fallbackserver/rz", {
             status: 201,
         });
-        await Promise.all([expect(transport.send("data")).rejects.toThrow(), fetchMock.flush(true)]);
+        await Promise.all([expect(transport.send("data")).rejects.toThrow(), fetchMock.callHistory.flush(true)]);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("POST with absolute path response", async function () {
         await postAndCheckLocation(false, "https://fallbackserver/rz", "https://fallbackserver/123");
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("POST to built-in MSC3886 implementation", async function () {
         await postAndCheckLocation(
             true,
@@ -140,6 +136,7 @@ describe("MSC4108RendezvousSession", () => {
         );
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("POST with relative path response including parent", async function () {
         await postAndCheckLocation(false, "https://fallbackserver/rz/abc", "https://fallbackserver/rz/xyz/123");
     });
@@ -161,7 +158,7 @@ describe("MSC4108RendezvousSession", () => {
             body: { url: "https://redirected.fallbackserver/rz/123" },
             headers: { etag: "aaa" },
         });
-        await fetchMock.flush(true);
+        await fetchMock.callHistory.flush(true);
         await expect(transport.send("data")).resolves.toStrictEqual(undefined);
     });
 
@@ -178,12 +175,12 @@ describe("MSC4108RendezvousSession", () => {
                 body: { url: "https://fallbackserver/rz/123" },
             });
             await expect(transport.send("foo=baa")).resolves.toStrictEqual(undefined);
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
             expect(fetchMock).toHaveFetched("https://fallbackserver/rz", {
                 method: "POST",
                 headers: { "content-type": "text/plain" },
-                functionMatcher: (_, opts): boolean => {
-                    return opts.body === "foo=baa";
+                matcherFunction: (callLog): boolean => {
+                    return callLog.options.body === "foo=baa";
                 },
             });
         }
@@ -195,7 +192,7 @@ describe("MSC4108RendezvousSession", () => {
                 headers: { "content-type": "text/plain", "etag": "aaa" },
             });
             await expect(transport.receive()).resolves.toEqual("foo=baa");
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
         }
         {
             // subsequent GET which should have etag from previous request
@@ -205,7 +202,7 @@ describe("MSC4108RendezvousSession", () => {
                 headers: { "content-type": "text/plain", "etag": "bbb" },
             });
             await expect(transport.receive()).resolves.toEqual("foo=baa");
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
             expect(fetchMock).toHaveFetched("https://fallbackserver/rz/123", {
                 method: "GET",
                 headers: { "if-none-match": "aaa" },
@@ -227,12 +224,12 @@ describe("MSC4108RendezvousSession", () => {
                 headers: { etag: "aaa" },
             });
             await transport.send("foo=baa");
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
             expect(fetchMock).toHaveFetched("https://fallbackserver/rz", {
                 method: "POST",
                 headers: { "content-type": "text/plain" },
-                functionMatcher: (_, opts): boolean => {
-                    return opts.body === "foo=baa";
+                matcherFunction: (callLog): boolean => {
+                    return callLog.options.body === "foo=baa";
                 },
             });
         }
@@ -240,7 +237,7 @@ describe("MSC4108RendezvousSession", () => {
             // subsequent PUT which should have etag from previous request
             fetchMock.putOnce("https://fallbackserver/rz/123", { status: 202, headers: { etag: "bbb" } });
             await transport.send("c=d");
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
             expect(fetchMock).toHaveFetched("https://fallbackserver/rz/123", {
                 method: "PUT",
                 headers: { "if-match": "aaa" },
@@ -261,12 +258,12 @@ describe("MSC4108RendezvousSession", () => {
                 body: { url: "https://fallbackserver/rz/123" },
             });
             await expect(transport.send("foo=baa")).resolves.toStrictEqual(undefined);
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
             expect(fetchMock).toHaveFetched("https://fallbackserver/rz", {
                 method: "POST",
                 headers: { "content-type": "text/plain" },
-                functionMatcher: (_, opts): boolean => {
-                    return opts.body === "foo=baa";
+                matcherFunction: (callLog): boolean => {
+                    return callLog.options.body === "foo=baa";
                 },
             });
         }
@@ -274,7 +271,7 @@ describe("MSC4108RendezvousSession", () => {
             // Cancel
             fetchMock.deleteOnce("https://fallbackserver/rz/123", { status: 204 });
             await transport.cancel(ClientRendezvousFailureReason.UserDeclined);
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
         }
     });
 
@@ -299,7 +296,7 @@ describe("MSC4108RendezvousSession", () => {
 
     it("404 failure callback", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const onFailure = jest.fn();
+        const onFailure = vi.fn();
         const transport = new MSC4108RendezvousSession({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
@@ -307,13 +304,16 @@ describe("MSC4108RendezvousSession", () => {
         });
 
         fetchMock.postOnce("https://fallbackserver/rz", { status: 404 });
-        await Promise.all([expect(transport.send("foo=baa")).resolves.toBeUndefined(), fetchMock.flush(true)]);
+        await Promise.all([
+            expect(transport.send("foo=baa")).resolves.toBeUndefined(),
+            fetchMock.callHistory.flush(true),
+        ]);
         expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Unknown);
     });
 
     it("404 failure callback mapped to expired", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
-        const onFailure = jest.fn();
+        const onFailure = vi.fn();
         const transport = new MSC4108RendezvousSession({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
@@ -329,12 +329,15 @@ describe("MSC4108RendezvousSession", () => {
             });
 
             await transport.send("foo=baa");
-            await fetchMock.flush(true);
+            await fetchMock.callHistory.flush(true);
         }
         {
             // GET with 404 to simulate expiry
             fetchMock.getOnce("https://fallbackserver/rz/123", { status: 404, body: "foo=baa" });
-            await Promise.all([expect(transport.receive()).resolves.toBeUndefined(), fetchMock.flush(true)]);
+            await Promise.all([
+                expect(transport.receive()).resolves.toBeUndefined(),
+                fetchMock.callHistory.flush(true),
+            ]);
             expect(onFailure).toHaveBeenCalledWith(ClientRendezvousFailureReason.Expired);
         }
     });

@@ -20,7 +20,7 @@ import {
     mkEncryptedMatrixEvent,
     mkMatrixEvent,
 } from "../../src/testing";
-import { EventType } from "../../src";
+import { EventType, type IContent } from "../../src";
 import { DecryptionFailureCode } from "../../src/crypto-api";
 
 describe("testing", () => {
@@ -33,7 +33,7 @@ describe("testing", () => {
                 roomId: "!test:room",
             });
 
-            expect(event.getContent()).toEqual({ body: "blah" });
+            expect(event.getContent<IContent>()).toEqual({ body: "blah" });
             expect(event.sender?.userId).toEqual("@alice:test");
             expect(event.isState()).toBe(false);
         });
@@ -47,7 +47,7 @@ describe("testing", () => {
                 stateKey: "",
             });
 
-            expect(event.getContent()).toEqual({ body: "blah" });
+            expect(event.getContent<IContent>()).toEqual({ body: "blah" });
             expect(event.sender?.userId).toEqual("@alice:test");
             expect(event.isState()).toBe(true);
             expect(event.getStateKey()).toEqual("");
@@ -67,7 +67,7 @@ describe("testing", () => {
             expect(event.isEncrypted()).toBe(true);
             expect(event.isDecryptionFailure()).toBe(false);
             expect(event.decryptionFailureReason).toBe(null);
-            expect(event.getContent()).toEqual({ body: "blah" });
+            expect(event.getContent<IContent>()).toEqual({ body: "blah" });
             expect(event.getType()).toEqual("m.room.message");
         });
     });
@@ -85,7 +85,7 @@ describe("testing", () => {
             expect(event.isEncrypted()).toBe(true);
             expect(event.isDecryptionFailure()).toBe(true);
             expect(event.decryptionFailureReason).toEqual(DecryptionFailureCode.UNKNOWN_ERROR);
-            expect(event.getContent()).toEqual({
+            expect(event.getContent<IContent>()).toEqual({
                 body: "** Unable to decrypt: DecryptionError: blah **",
                 msgtype: "m.bad.encrypted",
             });
@@ -113,7 +113,7 @@ describe("testing", () => {
             expect(event.isEncrypted()).toBe(true);
             expect(event.isDecryptionFailure()).toBe(false);
             expect(event.decryptionFailureReason).toBe(null);
-            expect(event.getContent()).toEqual({ body: "blah" });
+            expect(event.getContent<IContent>()).toEqual({ body: "blah" });
             expect(event.getType()).toEqual("m.room.test");
         });
     });

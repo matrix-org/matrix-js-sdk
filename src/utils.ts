@@ -226,12 +226,21 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // everything else is either an unequal primitive, or an object
-    if (!(x instanceof Object)) {
+    // XXX: this check has been temporarily tweaked due to issues in the jest test environment,
+    // this will be reverted as part of the migration to vitest
+    if (
+        x.constructor.name !== "Object" &&
+        x.constructor.name !== "RegExp" &&
+        x.constructor.name !== "Date" &&
+        x.constructor.name !== "Array"
+    ) {
         return false;
     }
 
     // check they are the same type of object
-    if (x.constructor !== y.constructor || x.prototype !== y.prototype) {
+    // XXX: this check has been temporarily tweaked due to issues in the jest test environment,
+    // this will be reverted as part of the migration to vitest
+    if (x.prototype !== y.prototype) {
         return false;
     }
 

@@ -12,8 +12,8 @@ env:
     ENABLE_COVERAGE: ${{ github.event_name != 'merge_group' }}
 permissions: {} # No permissions required
 jobs:
-    jest:
-        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
+    test:
+        name: "Vitest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
         runs-on: ubuntu-24.04
         timeout-minutes: 10
         strategy:
@@ -24,15 +24,16 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
+            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - name: Setup Node
               id: setupNode
-              uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+              uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
-                  cache: "yarn"
+                  cache: "pnpm"
                   node-version: ${{ matrix.node }}
 
             - name: Install dependencies
-              run: "yarn install"
+              run: "pnpm install"
 
             - name: Get number of CPU cores
               id: cpu-cores
@@ -40,16 +41,12 @@ jobs:
 
             - name: Run tests
               run: |
-                  yarn test \
+                  pnpm test \
                       --coverage=${{ env.ENABLE_COVERAGE }} \
-                      --ci \
-                      --max-workers ${{ steps.cpu-cores.outputs.count }} \
+                      --maxWorkers ${{ steps.cpu-cores.outputs.count }} \
                       ./spec/${{ matrix.specs }}
               env:
-                  JEST_SONAR_UNIQUE_OUTPUT_NAME: true
-
-                  # tell jest to use coloured output
-                  FORCE_COLOR: true
+                  SHARD: ${{ matrix.specs }}
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
@@ -65,13 +62,13 @@ jobs:
                       !coverage/lcov-report
 
     # Dummy completion job to simplify branch protections
-    jest-complete:
-        name: Jest tests
-        needs: jest
+    complete:
+        name: Tests
+        needs: test
         if: always()
         runs-on: ubuntu-24.04
         steps:
-            - if: needs.jest.result != 'skipped' && needs.jest.result != 'success'
+            - if: needs.test.result != 'skipped' && needs.test.result != 'success'
               run: exit 1
 
     element-web:
@@ -116,7 +113,7 @@ jobs:
         steps:
             - name: Skip SonarCloud on merge queues
               if: env.ENABLE_COVERAGE == 'false'
-              uses: guibranco/github-status-action-v2@5530c593759f489bba08272e96986ffc571c1ea1
+              uses: guibranco/github-status-action-v2@9bfa8773cdbdc6c185747fd43cd7faa9d7c32f09
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
                   state: success
