@@ -16,9 +16,8 @@ limitations under the License.
 
 import { type Mock } from "vitest";
 
-import { type EventTimeline, EventType, MatrixClient, type Room } from "../../../src";
-import { KnownMembership } from "../../../src/@types/membership";
-import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession";
+import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
+import { MatrixRTCSession, MatrixRTCSessionEvent, MembershipManagerEvent, Status } from "../../../src/matrixrtc";
 import { makeMockRoom, membershipTemplate, mockRoomState, mockRTCEvent, owmMemberIdentity } from "./mocks";
 import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
@@ -808,5 +807,51 @@ describe("MatrixRTCSession", () => {
 
             await sess.leaveRoomSession();
         });
+    });
+
+    describe("read status", () => {
+        it("returns the correct probablyLeft status", () => {
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            expect(sess!.probablyLeft).toBe(undefined);
+
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess!.probablyLeft).toBe(false);
+
+            // Simulate the membership manager believing the user has left
+            const accessPrivateFieldsSession = sess as unknown as {
+                membershipManager: { state: { probablyLeft: boolean } };
+            };
+            accessPrivateFieldsSession.membershipManager.state.probablyLeft = true;
+            expect(sess!.probablyLeft).toBe(true);
+        });
+
+        it("returns membershipStatus once joinRTCSession got called", () => {
+            const mockRoom = makeMockRoom([membershipTemplate]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            expect(sess!.membershipStatus).toBe(undefined);
+
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess!.membershipStatus).toBe(Status.Connecting);
+        });
+    });
+    it("reemits membershipManager events", () => {
+        sess = MatrixRTCSession.sessionForSlot(client, makeMockRoom([membershipTemplate]), callSession);
+        const delayIdChanged = vi.fn();
+        sess.on(MembershipManagerEvent.DelayIdChanged, delayIdChanged);
+        const statusChanged = vi.fn();
+        sess.on(MembershipManagerEvent.StatusChanged, statusChanged);
+        const probablyLeftChanged = vi.fn();
+        sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
+
+        sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
+
+        const membershipManager = sess["membershipManager"]!;
+        membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");
+        membershipManager.emit(MembershipManagerEvent.StatusChanged, Status.Connected, Status.Disconnected);
+        membershipManager.emit(MembershipManagerEvent.ProbablyLeft, false);
+        expect(delayIdChanged).toHaveBeenCalledWith("newDelayId", membershipManager);
+        expect(statusChanged).toHaveBeenCalledWith(Status.Connected, Status.Disconnected, membershipManager);
+        expect(probablyLeftChanged).toHaveBeenCalledWith(false, membershipManager);
     });
 });
