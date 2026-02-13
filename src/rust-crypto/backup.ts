@@ -161,7 +161,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Handles a backup secret received event and store it if it matches the current backup version.
      *
-     * @param secret - The secret as received from a `m.secret.send` event for secret `m.megolm_backup.v1`.
+     * @param secret - The secret as received from a `m.secret.send` or `io.element.msc4385.secret.push` event for secret `m.megolm_backup.v1`.
      * @returns true if the secret is valid and has been stored, false otherwise.
      */
     public async handleBackupSecretReceived(secret: string): Promise<boolean> {
