@@ -1308,4 +1308,144 @@ describe("RoomState", function () {
             ).toBeFalsy();
         });
     });
+
+    describe("reactive display name disambiguation", function () {
+        it("should disambiguate existing member when another member changes to the same name", function () {
+            // Create a fresh state
+            const testState = new RoomState(roomId);
+
+            // Alice joins with display name "Alice"
+            const aliceJoinEvent = utils.mkMembership({
+                user: userA,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Alice",
+            });
+
+            // Bob joins with display name "Bob"
+            const bobJoinEvent = utils.mkMembership({
+                user: userB,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Bob",
+            });
+
+            testState.setStateEvents([aliceJoinEvent, bobJoinEvent]);
+
+            // Verify no disambiguation needed initially
+            const aliceBefore = testState.getMember(userA);
+            const bobBefore = testState.getMember(userB);
+            expect(aliceBefore?.disambiguate).toBe(false);
+            expect(bobBefore?.disambiguate).toBe(false);
+            expect(aliceBefore?.name).toBe("Alice");
+            expect(bobBefore?.name).toBe("Bob");
+
+            // Bob changes display name to "Alice"
+            const bobRenameEvent = utils.mkMembership({
+                user: userB,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Alice",
+            });
+
+            testState.setStateEvents([bobRenameEvent]);
+
+            // Now both should be disambiguated
+            const aliceAfter = testState.getMember(userA);
+            const bobAfter = testState.getMember(userB);
+            expect(aliceAfter?.disambiguate).toBe(true);
+            expect(bobAfter?.disambiguate).toBe(true);
+            expect(aliceAfter?.name).toContain(userA);
+            expect(bobAfter?.name).toContain(userB);
+        });
+
+        it("should un-disambiguate member when conflicting member changes to different name", function () {
+            // Create a fresh state
+            const testState = new RoomState(roomId);
+
+            // Both Alice and Bob join with display name "Alice"
+            const aliceJoinEvent = utils.mkMembership({
+                user: userA,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Alice",
+            });
+
+            const bobJoinEvent = utils.mkMembership({
+                user: userB,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Alice",
+            });
+
+            testState.setStateEvents([aliceJoinEvent, bobJoinEvent]);
+
+            // Verify both are disambiguated
+            const aliceBefore = testState.getMember(userA);
+            const bobBefore = testState.getMember(userB);
+            expect(aliceBefore?.disambiguate).toBe(true);
+            expect(bobBefore?.disambiguate).toBe(true);
+
+            // Bob changes display name to "Bob"
+            const bobRenameEvent = utils.mkMembership({
+                user: userB,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Bob",
+            });
+
+            testState.setStateEvents([bobRenameEvent]);
+
+            // Alice should no longer be disambiguated, Bob should not be either
+            const aliceAfter = testState.getMember(userA);
+            const bobAfter = testState.getMember(userB);
+            expect(aliceAfter?.disambiguate).toBe(false);
+            expect(bobAfter?.disambiguate).toBe(false);
+            expect(aliceAfter?.name).toBe("Alice");
+            expect(bobAfter?.name).toBe("Bob");
+        });
+
+        it("should emit RoomState.members for affected members when disambiguation changes", function () {
+            // Create a fresh state
+            const testState = new RoomState(roomId);
+
+            // Alice joins with display name "Alice"
+            const aliceJoinEvent = utils.mkMembership({
+                user: userA,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Alice",
+            });
+
+            testState.setStateEvents([aliceJoinEvent]);
+
+            // Set up listener for Members event
+            const membersEmitted: string[] = [];
+            testState.on(RoomStateEvent.Members, (_ev, _state, member) => {
+                membersEmitted.push(member.userId);
+            });
+
+            // Bob joins with display name "Alice" - should trigger disambiguation for Alice
+            const bobJoinEvent = utils.mkMembership({
+                user: userB,
+                mship: KnownMembership.Join,
+                room: roomId,
+                event: true,
+                name: "Alice",
+            });
+
+            testState.setStateEvents([bobJoinEvent]);
+
+            // Both Alice and Bob should have emitted Members events
+            expect(membersEmitted).toContain(userA);
+            expect(membersEmitted).toContain(userB);
+        });
+    });
 });

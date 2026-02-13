@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type EitherAnd } from "matrix-events-sdk";
+
 import { NamespacedValue, UnstableValue } from "../NamespacedValue.ts";
 import {
     type PolicyRuleEventContent,
@@ -50,7 +52,6 @@ import {
     type MCallReplacesEvent,
     type MCallSelectAnswer,
     type SDPStreamMetadata,
-    type SDPStreamMetadataKey,
 } from "../webrtc/callEventTypes.ts";
 import {
     type IRTCNotificationContent,
@@ -133,6 +134,7 @@ export enum EventType {
     FullyRead = "m.fully_read",
     Tag = "m.tag",
     SpaceOrder = "org.matrix.msc3230.space_order", // MSC3230
+    MarkedUnread = "m.marked_unread",
 
     // User account_data events
     PushRules = "m.push_rules",
@@ -335,7 +337,16 @@ export interface TimelineEvents {
     [EventType.CallCandidates]: MCallCandidates;
     [EventType.CallHangup]: MCallHangupReject;
     [EventType.CallReject]: MCallHangupReject;
-    [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase & { [SDPStreamMetadataKey]: SDPStreamMetadata };
+    [EventType.CallSDPStreamMetadataChangedPrefix]: MCallBase &
+        EitherAnd<
+            { sdp_stream_metadata: SDPStreamMetadata },
+            { "org.matrix.msc3077.sdp_stream_metadata": SDPStreamMetadata }
+        >;
+    [EventType.CallSDPStreamMetadataChanged]: MCallBase &
+        EitherAnd<
+            { sdp_stream_metadata: SDPStreamMetadata },
+            { "org.matrix.msc3077.sdp_stream_metadata": SDPStreamMetadata }
+        >;
     [EventType.CallEncryptionKeysPrefix]: EncryptionKeysEventContent;
     [EventType.CallNotify]: ICallNotifyContent;
     [EventType.RTCNotification]: IRTCNotificationContent;
@@ -388,6 +399,16 @@ export interface StateEvents {
 }
 
 /**
+ * Mapped type from event type to content type for all specified room-specific account_data events.
+ */
+export interface RoomAccountDataEvents extends SecretStorageAccountDataEvents {
+    [EventType.FullyRead]: { event_id: string };
+    [EventType.Tag]: { tags: { [name: string]: { order?: number } } };
+    [EventType.SpaceOrder]: { order: string };
+    [EventType.MarkedUnread]: { unread: boolean };
+}
+
+/**
  * Mapped type from event type to content type for all specified global account_data events.
  */
 export interface AccountDataEvents extends SecretStorageAccountDataEvents {
@@ -408,6 +429,11 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
 
     [EventType.InvitePermissionConfig]: { default_action?: string };
 }
+
+/**
+ * Subset of AccountDataEvents, excluding events specified in https://spec.matrix.org/v1.17/client-server-api/#server-behaviour-12
+ */
+export type WritableAccountDataEvents = Exclude<AccountDataEvents, "m.fully_read" | "m.push_rules">;
 
 /**
  * Mapped type from event type to content type for all specified global events encrypted by secret storage.

@@ -314,7 +314,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {
+                [SDPStreamMetadataKey.name]: {
                     remote_stream: {
                         purpose: SDPStreamMetadataPurpose.Usermedia,
                         audio_muted: true,
@@ -420,7 +420,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {},
+                [SDPStreamMetadataKey.name]: {},
             }),
         );
 
@@ -451,7 +451,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {},
+                [SDPStreamMetadataKey.name]: {},
             }),
         );
 
@@ -478,7 +478,7 @@ describe("Call", function () {
                 answer: {
                     sdp: DUMMY_SDP,
                 },
-                [SDPStreamMetadataKey]: {},
+                [SDPStreamMetadataKey.name]: {},
             }),
         );
 
@@ -504,7 +504,7 @@ describe("Call", function () {
 
         call.onSDPStreamMetadataChangedReceived(
             makeMockEvent("@test:foo", {
-                [SDPStreamMetadataKey]: {
+                [SDPStreamMetadataKey.name]: {
                     remote_stream: {
                         purpose: SDPStreamMetadataPurpose.Screenshare,
                         audio_muted: true,
@@ -849,7 +849,7 @@ describe("Call", function () {
                     answer: {
                         sdp: DUMMY_SDP,
                     },
-                    [SDPStreamMetadataKey]: {
+                    [SDPStreamMetadataKey.name]: {
                         [STREAM_ID]: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                         },
@@ -959,8 +959,8 @@ describe("Call", function () {
         describe("sending sdp_stream_metadata_changed events", () => {
             it("should send sdp_stream_metadata_changed when muting audio", async () => {
                 await call.setMicrophoneMuted(true);
-                expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
-                    [SDPStreamMetadataKey]: {
+                expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChanged, {
+                    [SDPStreamMetadataKey.name]: {
                         mock_stream_from_media_handler: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: true,
@@ -972,8 +972,8 @@ describe("Call", function () {
 
             it("should send sdp_stream_metadata_changed when muting video", async () => {
                 await call.setLocalVideoMuted(true);
-                expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
-                    [SDPStreamMetadataKey]: {
+                expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChanged, {
+                    [SDPStreamMetadataKey.name]: {
                         mock_stream_from_media_handler: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: false,
@@ -1001,7 +1001,7 @@ describe("Call", function () {
                 );
                 call.onSDPStreamMetadataChangedReceived({
                     getContent: () => ({
-                        [SDPStreamMetadataKey]: metadata,
+                        [SDPStreamMetadataKey.name]: metadata,
                     }),
                 } as MatrixEvent);
                 return metadata;
@@ -1293,9 +1293,9 @@ describe("Call", function () {
                 FAKE_ROOM_ID,
                 EventType.CallNegotiate,
                 expect.objectContaining({
-                    "version": "1",
-                    "call_id": call.callId,
-                    "org.matrix.msc3077.sdp_stream_metadata": expect.objectContaining({
+                    version: "1",
+                    call_id: call.callId,
+                    sdp_stream_metadata: expect.objectContaining({
                         [SCREENSHARE_STREAM_ID]: expect.objectContaining({
                             purpose: SDPStreamMetadataPurpose.Screenshare,
                         }),
