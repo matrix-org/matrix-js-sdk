@@ -3911,7 +3911,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      * May return synthesized attributes if the URL lacked OG meta.
      */
-    public getUrlPreview(url: string, ts: number): Promise<IPreviewUrlResponse> {
+    public async getUrlPreview(url: string, ts: number): Promise<IPreviewUrlResponse> {
         // bucket the timestamp to the nearest minute to prevent excessive spam to the server
         // Surely 60-second accuracy is enough for anyone.
         ts = Math.floor(ts / 60000) * 60000;
@@ -3927,16 +3927,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.urlPreviewCache[key];
         }
 
+        const supportsNewEndpoint = await this.isVersionSupported("v1.11");
+
         const resp = this.http.authedRequest<IPreviewUrlResponse>(
             Method.Get,
-            "/media/preview_url",
+            supportsNewEndpoint ? "/media/preview_url" : "/preview_url",
             {
                 url,
                 ts: ts.toString(),
             },
             undefined,
             {
-                prefix: ClientPrefix.V1,
+                prefix: supportsNewEndpoint ? ClientPrefix.V1 : MediaPrefix.V3,
                 priority: "low",
             },
         );
