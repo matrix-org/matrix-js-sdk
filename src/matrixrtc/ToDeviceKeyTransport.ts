@@ -186,8 +186,8 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        if (!content.member || !content.member.device_id) {
-            this.logger.warn("Malformed Event: Missing device_id");
+        if (!content.member || !content.member.claimed_device_id) {
+            this.logger.warn("Malformed Event: Missing claimed_device_id");
             return;
         }
 
